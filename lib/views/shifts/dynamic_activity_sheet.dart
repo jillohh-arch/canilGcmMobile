@@ -1,116 +1,103 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../viewmodels/training_viewmodel.dart';
-import '../../models/training_session_model.dart';
 import '../../models/occurrence_nature.dart';
-import '../../models/routine_model.dart';
 import '../../viewmodels/incident_viewmodel.dart';
 import '../../models/incident.dart';
 import '../../viewmodels/health_viewmodel.dart';
-import '../../models/health_log_model.dart';
 import '../../viewmodels/routine_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/user_viewmodel.dart';
 import '../../viewmodels/dog_viewmodel.dart';
 import '../../services/handler_identity_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/form_metadata_reader.dart';
+import '../../services/location_resolution_service.dart';
+import '../../services/media_processing_service.dart';
+import '../../services/media_attachment_upload_service.dart';
+import '../../services/occurrence_event_media_service.dart';
+import '../../services/operator_context_service.dart';
+import '../../services/pdf_attachment_service.dart';
+import '../../services/pt_br_date_time_service.dart';
+import '../../services/speech_dictation_service.dart';
 import '../../services/storage_service.dart';
-import '../../services/weather_service.dart';
+import '../../services/text_match_service.dart';
+import '../../services/weather_capture_service.dart';
 import '../../utils/firestore_date.dart';
+import '../../widgets/activity_form_body.dart';
+import '../../widgets/activity_card_catalog.dart';
 import '../../widgets/activity_common_fields.dart';
 import '../../widgets/activity_category_menu_sheet.dart';
+import '../../widgets/activity_form_labels.dart';
+import '../../widgets/activity_form_scaffold.dart';
 import '../../widgets/activity_save_controls.dart';
 import '../../widgets/activity_tracking_action.dart';
+import '../../widgets/dynamic_subtype_fields.dart';
 import '../../widgets/health_activity_fields.dart';
-import '../../widgets/hud_chip_group.dart';
-import '../../widgets/hud_controls.dart';
-import '../../widgets/hud_expansion_section.dart';
+import '../../widgets/media_attachment_rows.dart';
 import '../../widgets/media_attachment_gallery.dart';
 import '../../widgets/quick_location_actions.dart';
 import '../../widgets/routine_activity_fields.dart';
 import '../../widgets/tactical_text_field.dart';
 import '../incidents/controllers/occurrence_form_controller.dart';
+import '../incidents/controllers/occurrence_display_text.dart';
+import '../incidents/controllers/occurrence_dynamic_rows.dart';
+import '../incidents/controllers/occurrence_event_draft.dart';
+import '../incidents/controllers/occurrence_extra_fields_snapshot.dart';
 import '../incidents/controllers/occurrence_payload_builder.dart';
+import '../incidents/controllers/occurrence_progress_update_builder.dart';
+import '../incidents/controllers/occurrence_save_validator.dart';
+import '../incidents/controllers/occurrence_wizard_result.dart';
 import '../incidents/widgets/occurrence_command_header.dart';
 import '../incidents/widgets/occurrence_active_context_summary.dart';
 import '../incidents/widgets/occurrence_active_footer.dart';
 import '../incidents/widgets/event_details_bottom_sheet.dart';
-import '../incidents/widgets/occurrence_detection_fields.dart';
 import '../incidents/widgets/occurrence_nature_search.dart';
 import '../incidents/widgets/occurrence_close_wizard.dart';
 import '../incidents/widgets/occurrence_event_center_sheet.dart';
 import '../incidents/widgets/occurrence_event_catalog.dart';
 import '../incidents/widgets/occurrence_compact_location_block.dart';
 import '../incidents/widgets/occurrence_form_scaffold.dart';
+import '../incidents/widgets/occurrence_grouped_sections.dart';
 import '../incidents/widgets/occurrence_initial_data_sheet.dart';
 import '../incidents/widgets/occurrence_location_map_sheet.dart';
+import '../incidents/widgets/occurrence_meta_fields.dart';
 import '../incidents/widgets/occurrence_timeline_preview.dart';
 import '../incidents/widgets/occurrence_quick_action.dart';
 import '../incidents/widgets/occurrence_quick_action_catalog.dart';
 import '../incidents/widgets/occurrence_quick_action_grid.dart';
 import '../incidents/widgets/occurrence_quick_action_options_sheet.dart';
 import '../incidents/widgets/occurrence_quick_update_catalog.dart';
-import '../incidents/widgets/occurrence_quick_update_shortcuts.dart';
+import '../incidents/widgets/occurrence_specific_fields.dart';
 import '../incidents/widgets/occurrence_stage_panels.dart';
 import '../incidents/widgets/occurrence_start_screen.dart';
+import 'controllers/activity_record_payload_builder.dart';
 import 'live_tracking_screen.dart';
 
 abstract final class _SheetSubtype {
-  static const detection = 'Detecção';
-  static const supportVehicle = 'Apoio à Viatura/Guarnição';
-  static const missingPerson = 'Busca de Pessoa';
-  static const serviceOrder = 'Ordem de Serviço (O.S.)';
-  static const event = 'Palestra/Evento (RP)';
+  static const detection = ActivitySubtypeIds.detection;
+  static const missingPerson = ActivitySubtypeIds.missingPerson;
+  static const event = ActivitySubtypeIds.event;
 
-  static const obedience = 'Obediência';
-  static const scentWork = 'Faro';
-  static const guardProtection = 'Guarda e Proteção';
-  static const searchCapture = 'Busca & Captura';
-  static const physicalConditioning = 'Condicionamento Físico';
-  static const leisureConditioning = 'Lazer/Condicionamento';
+  static const scentWork = ActivitySubtypeIds.scentWork;
+  static const searchCapture = ActivitySubtypeIds.searchCapture;
 
-  static const consultation = 'Consulta';
-  static const vaccine = 'Vacina';
-  static const exam = 'Exame';
-  static const bath = 'Banho';
+  static const consultation = ActivitySubtypeIds.consultation;
+  static const vaccine = ActivitySubtypeIds.vaccine;
+  static const exam = ActivitySubtypeIds.exam;
+  static const bath = ActivitySubtypeIds.bath;
 
-  static const feeding = 'Alimentação';
-  static const cleaning = 'Limpeza';
-  static const walk = 'Passeio';
-  static const rest = 'Descanso';
-  static const play = 'Brincadeira';
-  static const brushing = 'Escovação';
-  static const other = 'Outros';
-  static const narcoticsSearch = 'Busca de Entorpecentes';
-}
-
-class _OccurrenceEventChange {
-  final bool delete;
-  final IncidentProgressUpdate? update;
-
-  const _OccurrenceEventChange.delete() : delete = true, update = null;
-  const _OccurrenceEventChange.update(this.update) : delete = false;
-}
-
-class _OccurrenceEventLocation {
-  final String address;
-  final LatLng point;
-
-  const _OccurrenceEventLocation({required this.address, required this.point});
+  static const feeding = ActivitySubtypeIds.feeding;
+  static const walk = ActivitySubtypeIds.walk;
+  static const play = ActivitySubtypeIds.play;
+  static const other = ActivitySubtypeIds.other;
+  static const narcoticsSearch = ActivitySubtypeIds.narcoticsSearch;
 }
 
 class DynamicActivitySheet extends StatefulWidget {
@@ -162,139 +149,14 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   late PageController _menuPageController;
   int _currentMenuPage = 0;
 
-  final List<Map<String, dynamic>> ocorrenciasCards = [
-    {
-      'id': _SheetSubtype.detection,
-      'image': 'assets/images/card_deteccao.png',
-      'glow': Colors.orangeAccent,
-    },
-    {
-      'id': _SheetSubtype.supportVehicle,
-      'image': 'assets/images/card_apoio.png',
-      'glow': Colors.orangeAccent,
-    },
-    {
-      'id': _SheetSubtype.missingPerson,
-      'image': 'assets/images/card_busca_captura.png',
-      'glow': Colors.redAccent,
-    },
-    {
-      'id': _SheetSubtype.serviceOrder,
-      'image': 'assets/images/card_ordem_servico.png',
-      'glow': Colors.blueGrey,
-    },
-    {
-      'id': _SheetSubtype.event,
-      'image': 'assets/images/card_palestras.png',
-      'glow': Colors.greenAccent,
-    },
-    {
-      'id': _SheetSubtype.other,
-      'image': 'assets/images/card_outros.png',
-      'glow': Colors.white54,
-    },
-  ];
-
-  final List<Map<String, dynamic>> treinosCards = [
-    {
-      'id': _SheetSubtype.obedience,
-      'image': 'assets/images/card_obediencia.png',
-      'glow': Colors.blueAccent,
-    },
-    {
-      'id': _SheetSubtype.scentWork,
-      'image': 'assets/images/card_faro.png',
-      'glow': Colors.orangeAccent,
-    },
-    {
-      'id': _SheetSubtype.guardProtection,
-      'image': 'assets/images/card_protecao.png',
-      'glow': Colors.redAccent,
-    },
-    {
-      'id': _SheetSubtype.searchCapture,
-      'image': 'assets/images/card_treino_busca.png',
-      'glow': Colors.greenAccent,
-    },
-    {
-      'id': _SheetSubtype.physicalConditioning,
-      'image': 'assets/images/card_condicionamento.png',
-      'glow': Colors.cyanAccent,
-    },
-  ];
-
-  final List<Map<String, dynamic>> saudeCards = [
-    {
-      'id': _SheetSubtype.consultation,
-      'image': 'assets/images/card_consulta.png',
-      'glow': Colors.tealAccent,
-    },
-    {
-      'id': _SheetSubtype.vaccine,
-      'image': 'assets/images/card_vacina.png',
-      'glow': Colors.lightBlueAccent,
-    },
-    {
-      'id': _SheetSubtype.exam,
-      'image': 'assets/images/card_exame.png',
-      'glow': Colors.indigoAccent,
-    },
-    {
-      'id': _SheetSubtype.bath,
-      'image': 'assets/images/card_banho.png',
-      'glow': Colors.cyanAccent,
-    },
-  ];
-
-  final List<Map<String, dynamic>> rotinaCards = [
-    {
-      'id': _SheetSubtype.feeding,
-      'image': 'assets/images/card_alimentacao.png',
-      'glow': Colors.amber,
-    },
-    {
-      'id': _SheetSubtype.cleaning,
-      'image': 'assets/images/card_limpeza.png',
-      'glow': Colors.orange,
-    },
-    {
-      'id': _SheetSubtype.walk,
-      'image': 'assets/images/card_passeio.png',
-      'glow': Colors.lightGreen,
-    },
-    {
-      'id': _SheetSubtype.rest,
-      'image': 'assets/images/card_descanso.png',
-      'glow': Colors.deepOrangeAccent,
-    },
-    {
-      'id': _SheetSubtype.play,
-      'image': 'assets/images/card_brincadeira.png',
-      'glow': Colors.yellowAccent,
-    },
-    {
-      'id': _SheetSubtype.brushing,
-      'image': 'assets/images/card_escovacao.png',
-      'glow': Colors.orangeAccent,
-    },
-    {
-      'id': _SheetSubtype.other,
-      'image': 'assets/images/card_outros.png',
-      'glow': Colors.white54,
-    },
-  ];
-
   List<Map<String, dynamic>> get _currentCategoryCards {
-    if (widget.category == 'Treino') return treinosCards;
-    if (widget.category == 'Saude') return saudeCards;
-    if (widget.category == 'Rotina') return rotinaCards;
-    return ocorrenciasCards;
+    return ActivityCardCatalog.forCategory(widget.category);
   }
 
   @override
   void initState() {
     super.initState();
-    _speech = stt.SpeechToText();
+    _speechDictation = SpeechDictationService();
     _activeIncidentId = widget.documentId;
     if (widget.initialData?['startedAt'] != null) {
       _activeOccurrenceStartedAt = parseFirestoreDate(
@@ -324,9 +186,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
     // Set default time to now when creating a new record
     if (widget.initialData == null) {
-      final now = DateTime.now();
-      _timeController.text =
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      _timeController.text = _formatTimeOfDay(DateTime.now());
     }
     if (_isOccurrenceCategory) {
       _loadOccurrenceNatures();
@@ -363,181 +223,202 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   void _populateEditData() {
     final d = widget.initialData!;
     _selectedSubtypeImagePath = 'assets/images/k9_tactical_background.png';
-
-    // Populate time field from the raw date
-    if (d['_rawDate'] is DateTime) {
-      final dt = d['_rawDate'] as DateTime;
-      _timeController.text =
-          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    }
+    _populateEditTimestamp(d);
 
     if (widget.category == 'Treino') {
-      // Carrega campos da coleção trainings
-      _selectedSubtype = d['trainingType'];
-      _locationController.text = d['location'] ?? '';
-      _descriptionController.text = d['handlerNotes'] ?? '';
-      if (d['searchDuration'] != null) {
-        _durationController.text = ((d['searchDuration'] as num) ~/ 60)
-            .toString();
-      }
-      if (d['metadata'] != null) {
-        _formData.addAll(Map<String, dynamic>.from(d['metadata']));
-        final storedTemperature = _metadataValue('Temperatura (°C)');
-        if (storedTemperature != null) {
-          _tempController.text = storedTemperature.toString();
-        }
-        final storedHumidity = _metadataValue('Umidade (%)');
-        if (storedHumidity != null) {
-          _humidityController.text = storedHumidity.toString();
-        }
-      }
+      _populateTrainingEditData(d);
     } else if (widget.category == 'Rotina') {
-      // Carrega campos da coleção routines (schema próprio)
-      _selectedSubtype = d['activityType'];
-      _descriptionController.text = d['notes'] ?? '';
-      if (d['metadata'] != null) {
-        _formData.addAll(Map<String, dynamic>.from(d['metadata']));
-        final rationBrand = _metadataValue('Marca da Ração');
-        if (rationBrand != null) {
-          _racaoMarcaController.text = rationBrand.toString();
-        }
-        final rationAmount = _metadataValue('Quantidade (g)');
-        if (rationAmount != null) {
-          _racaoQtdController.text = rationAmount.toString();
-        }
-        final duration = _metadataValue('Duração (min)');
-        if (duration != null) {
-          _durationController.text = duration.toString();
-        }
-        final distance = _metadataValue('Distância (km)');
-        if (distance != null) {
-          _distanciaController.text = distance.toString();
-        }
-      }
+      _populateRoutineEditData(d);
     } else if (_isOccurrenceCategory || widget.category == 'Evento') {
-      _selectedSubtype = OccurrenceFormController.normalizeNature(
-        d['type'] ??
-            (_isOccurrenceCategory
-                ? _SheetSubtype.detection
-                : _SheetSubtype.event),
-      );
-      _setOccurrenceNatureTextFromSelected();
-      _locationController.text = d['location'] ?? '';
-      _descriptionController.text = d['description'] ?? '';
-      _formData['Resultado da Busca'] = d['result'];
-      _occurrenceStatus = OccurrenceFormController.normalizeStatus(d['status']);
-      _occurrenceSuccessful = d['operationalSuccess'] as bool?;
-      if (_occurrenceStatus == OccurrenceFormController.statusInProgress) {
-        _showOccurrenceFinalization = false;
-      } else {
-        _showOccurrenceFinalization = true;
-      }
-      if (d['extraFields'] is Map) {
-        _populateOccurrenceExtraFields(
-          Map<String, dynamic>.from(d['extraFields'] as Map),
-        );
-      }
-      if (d['outcomes'] is List) {
-        _selectedOccurrenceOutcomes
-          ..clear()
-          ..addAll(
-            List<String>.from(
-              d['outcomes'] as List,
-            ).map(OccurrenceFormController.normalizeOutcome),
-          );
-      }
-      if (d['progressUpdates'] is List) {
-        _occurrenceTimeline
-          ..clear()
-          ..addAll(
-            (d['progressUpdates'] as List).map(
-              (e) => IncidentProgressUpdate.fromJson(
-                Map<String, dynamic>.from(e as Map),
-              ),
-            ),
-          );
-      } else if (_descriptionController.text.isNotEmpty) {
-        _occurrenceTimeline
-          ..clear()
-          ..add(
-            IncidentProgressUpdate(
-              title: 'Registro inicial',
-              description: _descriptionController.text,
-              timestamp: d['_rawDate'] is DateTime
-                  ? d['_rawDate'] as DateTime
-                  : DateTime.now(),
-              location: _locationController.text,
-            ),
-          );
-      }
-      _syncOccurrenceController();
+      _populateOccurrenceEditData(d);
     } else if (widget.category == 'Saude') {
-      _selectedSubtype = d['logType'];
-      final obs = d['healthObservations'] as String? ?? '';
-      _descriptionController.text = obs;
-      if (obs.contains('Retorno agendado: ')) {
-        final split = obs.split('Retorno agendado: ');
-        if (split.length > 1) {
-          _returnDateController.text = split[1].trim();
-          _descriptionController.text = split[0].trim();
-        }
-      }
-      // Pre-fill vet name
-      _vetNameController.text = d['vetName'] ?? '';
+      _populateHealthEditData(d);
     }
 
-    final match = _currentCategoryCards
-        .where((c) => c['id'] == _selectedSubtype)
-        .toList();
-    if (match.isNotEmpty) {
-      _selectedSubtypeImagePath = match.first['image'];
+    _applySelectedSubtypeImage();
+  }
+
+  void _populateEditTimestamp(Map<String, dynamic> data) {
+    final rawDate = data['_rawDate'];
+    if (rawDate is DateTime) {
+      _timeController.text = _formatTimeOfDay(rawDate);
+    }
+  }
+
+  void _populateTrainingEditData(Map<String, dynamic> data) {
+    _selectedSubtype = data['trainingType'];
+    _locationController.text = data['location'] ?? '';
+    _descriptionController.text = data['handlerNotes'] ?? '';
+    if (data['searchDuration'] != null) {
+      _durationController.text = ((data['searchDuration'] as num) ~/ 60)
+          .toString();
+    }
+    if (data['metadata'] != null) {
+      _formData.addAll(Map<String, dynamic>.from(data['metadata']));
+      final storedTemperature = _metadataValue('Temperatura (°C)');
+      if (storedTemperature != null) {
+        _tempController.text = storedTemperature.toString();
+      }
+      final storedHumidity = _metadataValue('Umidade (%)');
+      if (storedHumidity != null) {
+        _humidityController.text = storedHumidity.toString();
+      }
+    }
+  }
+
+  void _populateRoutineEditData(Map<String, dynamic> data) {
+    _selectedSubtype = data['activityType'];
+    _descriptionController.text = data['notes'] ?? '';
+    if (data['metadata'] == null) return;
+
+    _formData.addAll(Map<String, dynamic>.from(data['metadata']));
+    final rationBrand = _metadataValue('Marca da Ração');
+    if (rationBrand != null) {
+      _racaoMarcaController.text = rationBrand.toString();
+    }
+    final rationAmount = _metadataValue('Quantidade (g)');
+    if (rationAmount != null) {
+      _racaoQtdController.text = rationAmount.toString();
+    }
+    final duration = _metadataValue('Duração (min)');
+    if (duration != null) {
+      _durationController.text = duration.toString();
+    }
+    final distance = _metadataValue('Distância (km)');
+    if (distance != null) {
+      _distanciaController.text = distance.toString();
+    }
+  }
+
+  void _populateOccurrenceEditData(Map<String, dynamic> data) {
+    _selectedSubtype = OccurrenceFormController.normalizeNature(
+      data['type'] ??
+          (_isOccurrenceCategory
+              ? _SheetSubtype.detection
+              : _SheetSubtype.event),
+    );
+    _setOccurrenceNatureTextFromSelected();
+    _locationController.text = data['location'] ?? '';
+    _descriptionController.text = data['description'] ?? '';
+    _formData['Resultado da Busca'] = data['result'];
+    _occurrenceStatus = OccurrenceFormController.normalizeStatus(
+      data['status'],
+    );
+    _occurrenceSuccessful = data['operationalSuccess'] as bool?;
+    _showOccurrenceFinalization =
+        _occurrenceStatus != OccurrenceFormController.statusInProgress;
+
+    if (data['extraFields'] is Map) {
+      _populateOccurrenceExtraFields(
+        Map<String, dynamic>.from(data['extraFields'] as Map),
+      );
+    }
+    _populateOccurrenceOutcomes(data['outcomes']);
+    _populateOccurrenceTimeline(data);
+    _syncOccurrenceController();
+  }
+
+  void _populateOccurrenceOutcomes(dynamic rawOutcomes) {
+    if (rawOutcomes is! List) return;
+
+    _selectedOccurrenceOutcomes
+      ..clear()
+      ..addAll(
+        List<String>.from(
+          rawOutcomes,
+        ).map(OccurrenceFormController.normalizeOutcome),
+      );
+  }
+
+  void _populateOccurrenceTimeline(Map<String, dynamic> data) {
+    if (data['progressUpdates'] is List) {
+      _occurrenceTimeline
+        ..clear()
+        ..addAll(
+          (data['progressUpdates'] as List).map(
+            (e) => IncidentProgressUpdate.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          ),
+        );
+      return;
+    }
+
+    if (_descriptionController.text.isEmpty) return;
+    _occurrenceTimeline
+      ..clear()
+      ..add(
+        IncidentProgressUpdate(
+          title: 'Registro inicial',
+          description: _descriptionController.text,
+          timestamp: data['_rawDate'] is DateTime
+              ? data['_rawDate'] as DateTime
+              : DateTime.now(),
+          location: _locationController.text,
+        ),
+      );
+  }
+
+  void _populateHealthEditData(Map<String, dynamic> data) {
+    _selectedSubtype = data['logType'];
+    final obs = data['healthObservations'] as String? ?? '';
+    _descriptionController.text = obs;
+    if (obs.contains('Retorno agendado: ')) {
+      final split = obs.split('Retorno agendado: ');
+      if (split.length > 1) {
+        _returnDateController.text = split[1].trim();
+        _descriptionController.text = split[0].trim();
+      }
+    }
+    _vetNameController.text = data['vetName'] ?? '';
+  }
+
+  void _applySelectedSubtypeImage() {
+    final cardImage = ActivityCardCatalog.imageFor(
+      category: widget.category,
+      id: _selectedSubtype,
+    );
+    if (cardImage != null) {
+      _selectedSubtypeImagePath = cardImage;
     }
   }
 
   dynamic _metadataValue(String key) {
-    return _formData[key] ?? _formData[_legacyMojibakeKey(key)];
-  }
-
-  String _legacyMojibakeKey(String value) {
-    return latin1.decode(utf8.encode(value));
+    return FormMetadataReader(_formData).value(key);
   }
 
   void _populateOccurrenceExtraFields(Map<String, dynamic> extraFields) {
-    String textValue(String key) => extraFields[key]?.toString() ?? '';
+    final snapshot = OccurrenceExtraFieldsSnapshot(extraFields);
 
-    _equipeController.text = textValue('equipe');
-    _boController.text = textValue('bo');
-    _guarnicaoController.text = textValue('guarnicao');
-    _situacaoController.text = textValue('situacao');
-    _desfechoController.text = textValue('desfecho');
-    _odorObjetoController.text = textValue('odor_inicial');
-    _tempoDesaparecimentoController.text = textValue('tempo_desaparecimento');
-    _durationController.text = textValue('duracao_busca');
-    _condicaoTerrenoController.text = textValue('condicao_terreno');
-    _numeroOsController.text = textValue('numero_os');
-    _publicoController.text = textValue('publico_estimado');
-    _temaController.text = textValue('tema');
+    _equipeController.text = snapshot.team;
+    _boController.text = snapshot.reportNumber;
+    _guarnicaoController.text = snapshot.supportedGarrison;
+    _situacaoController.text = snapshot.situation;
+    _desfechoController.text = snapshot.interventionOutcome;
+    _odorObjetoController.text = snapshot.odorSource;
+    _tempoDesaparecimentoController.text = snapshot.missingTime;
+    _durationController.text = snapshot.searchDuration;
+    _condicaoTerrenoController.text = snapshot.terrainCondition;
+    _numeroOsController.text = snapshot.serviceOrderNumber;
+    _publicoController.text = snapshot.publicEstimate;
+    _temaController.text = snapshot.eventTheme;
 
     if (_selectedSubtype == _SheetSubtype.other) {
-      _naturezaOcorrenciaController.text =
-          textValue('natureza_manual').isNotEmpty
-          ? textValue('natureza_manual')
-          : textValue('natureza');
+      _naturezaOcorrenciaController.text = snapshot.manualNatureOrNature();
     }
 
-    if (extraFields['tipo_busca'] != null) {
-      _formData['Tipo de Busca'] = extraFields['tipo_busca'];
+    if (snapshot.searchType != null) {
+      _formData['Tipo de Busca'] = snapshot.searchType;
     }
 
-    final lat = extraFields['locationLat'];
-    final lng = extraFields['locationLng'];
-    if (lat is num && lng is num) {
-      _selectedLocationLatLng = LatLng(lat.toDouble(), lng.toDouble());
+    final lat = snapshot.locationLat;
+    final lng = snapshot.locationLng;
+    if (lat != null && lng != null) {
+      _selectedLocationLatLng = LatLng(lat, lng);
     }
 
-    final detailedResults = extraFields['resultadosDetalhados'];
-    if (detailedResults is Map) {
-      final details = Map<String, dynamic>.from(detailedResults);
+    final details = snapshot.detailedResults;
+    if (details != null) {
       _hydrateDetainedIndividuals(details['individuosDetidos']);
       _hydrateSeizedObjects(details['objetosApreendidos']);
       _hydrateDrugRows(details['drogasApreendidas']);
@@ -545,7 +426,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
 
     if (_detecaoDrogas.isEmpty) {
-      _hydrateDrugRows(extraFields['drogas']);
+      _hydrateDrugRows(snapshot.legacyDrugRows);
     }
   }
 
@@ -591,80 +472,39 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   void _hydrateDetainedIndividuals(dynamic rows) {
     if (rows is! List) return;
-    _disposeDynamicResultRows(_detainedIndividuals, ['quantidade']);
-    _detainedIndividuals
-      ..clear()
-      ..addAll(
-        rows.map((row) {
-          final data = row is Map ? Map<String, dynamic>.from(row) : {};
-          return {
-            'quantidade': TextEditingController(
-              text: data['quantidade']?.toString() ?? '',
-            ),
-          };
-        }),
-      );
+    _replaceDynamicRows(
+      _detainedIndividuals,
+      ['quantidade'],
+      OccurrenceDynamicRows.hydrateDetainedIndividuals(rows),
+    );
   }
 
   void _hydrateSeizedObjects(dynamic rows) {
     if (rows is! List) return;
-    _disposeDynamicResultRows(_seizedObjects, ['descricao', 'quantidade']);
-    _seizedObjects
-      ..clear()
-      ..addAll(
-        rows.map((row) {
-          final data = row is Map ? Map<String, dynamic>.from(row) : {};
-          return {
-            'descricao': TextEditingController(
-              text: data['descricao']?.toString() ?? '',
-            ),
-            'quantidade': TextEditingController(
-              text: data['quantidade']?.toString() ?? '',
-            ),
-          };
-        }),
-      );
+    _replaceDynamicRows(_seizedObjects, [
+      'descricao',
+      'quantidade',
+    ], OccurrenceDynamicRows.hydrateSeizedObjects(rows));
   }
 
   void _hydrateDrugRows(dynamic rows) {
     if (rows is! List) return;
-    _disposeDrugRows();
-    _detecaoDrogas
-      ..clear()
-      ..addAll(
-        rows.map((row) {
-          final data = row is Map ? Map<String, dynamic>.from(row) : {};
-          final rawType = data['tipo']?.toString() ?? '';
-          final knownType = _detectionDrugOptions.contains(rawType);
-          return {
-            'tipo': knownType ? rawType : 'Outros',
-            'quantidade': TextEditingController(
-              text: data['quantidade']?.toString() ?? '',
-            ),
-            'especificar': TextEditingController(
-              text: knownType ? '' : rawType,
-            ),
-          };
-        }),
-      );
+    _replaceDynamicRows(
+      _detecaoDrogas,
+      ['quantidade', 'especificar'],
+      OccurrenceDynamicRows.hydrateDrugs(
+        rows,
+        knownOptions: _detectionDrugOptions,
+      ),
+    );
   }
 
   void _hydrateDetainedVehicles(dynamic rows) {
     if (rows is! List) return;
-    _disposeDynamicResultRows(_detainedVehicles, ['tipo', 'placa']);
-    _detainedVehicles
-      ..clear()
-      ..addAll(
-        rows.map((row) {
-          final data = row is Map ? Map<String, dynamic>.from(row) : {};
-          return {
-            'tipo': TextEditingController(text: data['tipo']?.toString() ?? ''),
-            'placa': TextEditingController(
-              text: data['placa']?.toString() ?? '',
-            ),
-          };
-        }),
-      );
+    _replaceDynamicRows(_detainedVehicles, [
+      'tipo',
+      'placa',
+    ], OccurrenceDynamicRows.hydrateDetainedVehicles(rows));
   }
 
   bool _showMenu = true;
@@ -679,9 +519,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   bool _occurrenceFinishSubmitted = false;
   String _saveStatus = '';
   bool _saveFailed = false;
-  late stt.SpeechToText _speech;
+  late SpeechDictationService _speechDictation;
   bool _isListening = false;
-  String _previousText = '';
   int _activePhotoIndex = -1;
 
   final _timeController = TextEditingController();
@@ -756,24 +595,20 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         .trim();
   }
 
+  String _formatTimeOfDay(DateTime value) {
+    return const PtBrDateTimeService().time(value);
+  }
+
+  String _formatDatePtBr(DateTime value) {
+    return const PtBrDateTimeService().date(value);
+  }
+
   String _successSaveMessage() {
-    if (_isOccurrenceCategory || widget.category == 'Evento') {
-      return _occurrenceStatus == OccurrenceFormController.statusInProgress
-          ? 'Ocorrência salva em andamento no Firebase.'
-          : 'Ocorrência concluída e sincronizada.';
-    }
-
-    if (widget.category == 'Treino') {
-      return 'Treino salvo no Firebase.';
-    }
-    if (widget.category == 'Rotina') {
-      return 'Rotina salva no Firebase.';
-    }
-    if (widget.category == 'Saude') {
-      return 'Prontuário salvo no Firebase.';
-    }
-
-    return 'Registro salvo no Firebase.';
+    return ActivityFormLabels.successSaveMessage(
+      category: widget.category,
+      isOccurrenceCategory: _isOccurrenceCategory,
+      occurrenceStatus: _occurrenceStatus,
+    );
   }
 
   // Faro / clima fields
@@ -886,9 +721,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _racaoQtdController.dispose();
     _distanciaController.dispose();
     _disposeDrugRows();
-    for (var m in _mediaAttachments) {
-      m['caption'].dispose();
-    }
+    MediaAttachmentRows.disposeAll(_mediaAttachments);
     _disposeDynamicResultRows(_detainedIndividuals, ['quantidade']);
     _disposeDynamicResultRows(_seizedObjects, ['descricao', 'quantidade']);
     _disposeDynamicResultRows(_detainedVehicles, ['tipo', 'placa']);
@@ -900,18 +733,22 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     List<Map<String, dynamic>> rows,
     List<String> controllerKeys,
   ) {
-    for (final row in rows) {
-      for (final key in controllerKeys) {
-        row[key]?.dispose();
-      }
-    }
+    OccurrenceDynamicRows.disposeRows(rows, controllerKeys);
+  }
+
+  void _replaceDynamicRows(
+    List<Map<String, dynamic>> target,
+    List<String> controllerKeys,
+    List<Map<String, dynamic>> nextRows,
+  ) {
+    _disposeDynamicResultRows(target, controllerKeys);
+    target
+      ..clear()
+      ..addAll(nextRows);
   }
 
   void _disposeDrugRows() {
-    for (final droga in _detecaoDrogas) {
-      droga['quantidade']?.dispose();
-      droga['especificar']?.dispose();
-    }
+    OccurrenceDynamicRows.disposeDrugs(_detecaoDrogas);
   }
 
   void _selectSubtype(String type, {String? imagePath}) {
@@ -940,30 +777,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   Future<void> _fetchCurrentAddress() async {
     try {
       HapticFeedback.lightImpact();
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        // Formato: Rua [Nome], [Bairro], [Cidade]
-        final address =
-            "${p.thoroughfare}, ${p.subLocality ?? p.subAdministrativeArea}, ${p.locality}";
-        setState(() {
-          _locationController.text = address;
-          _selectedLocationLatLng = LatLng(
-            position.latitude,
-            position.longitude,
-          );
-        });
-        HapticFeedback.mediumImpact();
-      }
+      final location = await const LocationResolutionService()
+          .currentHighAccuracy();
+      setState(() {
+        _locationController.text = location.address;
+        _selectedLocationLatLng = location.point;
+      });
+      HapticFeedback.mediumImpact();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -975,44 +795,24 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   Future<void> _selectOccurrenceLocation(LatLng point) async {
     setState(() => _selectedLocationLatLng = point);
-    try {
-      final placemarks = await placemarkFromCoordinates(
-        point.latitude,
-        point.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        final address = [
-          p.thoroughfare,
-          p.subLocality ?? p.subAdministrativeArea,
-          p.locality,
-        ].where((part) => part != null && part.trim().isNotEmpty).join(', ');
-        if (address.isNotEmpty) {
-          setState(() => _locationController.text = address);
-        }
-      }
-    } catch (_) {
-      // Mantém o ponto manual no mapa mesmo que a conversão de endereço falhe.
+    final address = await const LocationResolutionService().addressForPoint(
+      point,
+    );
+    if (address.isNotEmpty) {
+      setState(() => _locationController.text = address);
     }
   }
 
   void _setTimeToNow() {
-    final now = DateTime.now();
-    final h = now.hour.toString().padLeft(2, '0');
-    final m = now.minute.toString().padLeft(2, '0');
     setState(() {
-      _timeController.text = "$h:$m";
+      _timeController.text = _formatTimeOfDay(DateTime.now());
     });
     HapticFeedback.selectionClick();
   }
 
   void _addDrug() {
     setState(() {
-      _detecaoDrogas.add({
-        'tipo': 'Maconha',
-        'quantidade': TextEditingController(),
-        'especificar': TextEditingController(),
-      });
+      _detecaoDrogas.add(OccurrenceDynamicRows.drug());
     });
     HapticFeedback.selectionClick();
   }
@@ -1028,27 +828,21 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   void _addDetainedIndividual() {
     setState(() {
-      _detainedIndividuals.add({'quantidade': TextEditingController()});
+      _detainedIndividuals.add(OccurrenceDynamicRows.detainedIndividual());
     });
     HapticFeedback.selectionClick();
   }
 
   void _addSeizedObject() {
     setState(() {
-      _seizedObjects.add({
-        'descricao': TextEditingController(),
-        'quantidade': TextEditingController(),
-      });
+      _seizedObjects.add(OccurrenceDynamicRows.seizedObject());
     });
     HapticFeedback.selectionClick();
   }
 
   void _addDetainedVehicle() {
     setState(() {
-      _detainedVehicles.add({
-        'tipo': TextEditingController(),
-        'placa': TextEditingController(),
-      });
+      _detainedVehicles.add(OccurrenceDynamicRows.detainedVehicle());
     });
     HapticFeedback.selectionClick();
   }
@@ -1056,23 +850,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   Future<void> _pullCurrentWeather() async {
     try {
       HapticFeedback.lightImpact();
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-      final weatherService = WeatherService();
-      final weather = await weatherService.getCurrentWeather(
-        position.latitude,
-        position.longitude,
-      );
+      final weather = await const WeatherCaptureService().currentWeather();
       if (weather != null) {
         setState(() {
-          _tempController.text = weather['temperature'].toString();
-          _humidityController.text = weather['humidity'].toString();
+          _tempController.text = weather.temperature.toString();
+          _humidityController.text = weather.humidity.toString();
           if (_condicaoTerrenoController.text.isEmpty) {
-            _condicaoTerrenoController.text =
-                "Temp média: ${weather['temperature']}°C / Umidade: ${weather['humidity']}%";
+            _condicaoTerrenoController.text = weather.terrainSummary;
           }
         });
         HapticFeedback.mediumImpact();
@@ -1094,207 +878,140 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 
-  Future<File?> _compressImage(File file) async {
-    try {
-      final dir = await getTemporaryDirectory();
-      final targetPath =
-          '${dir.absolute.path}/temp_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      var result = await FlutterImageCompress.compressAndGetFile(
-        file.absolute.path,
-        targetPath,
-        quality: 70,
-        format: CompressFormat.jpeg,
-      );
-
-      return result != null ? File(result.path) : null;
-    } catch (e) {
-      debugPrint("Erro ao comprimir imagem: $e");
-      return null; // fallback: return null se falhar
-    }
-  }
-
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> images = await picker.pickMultiImage(
-      maxWidth: 1280,
-      maxHeight: 1280,
-      imageQuality: 60,
-    );
-    if (images.isNotEmpty) {
-      if (mounted) {
-        setState(() => _isCompressing = true);
-      }
+    if (mounted) {
+      setState(() => _isCompressing = true);
+    }
 
-      final compressedImages = <File>[];
-      for (var img in images) {
-        final File originalFile = File(img.path);
-        final File? compressed = await _compressImage(originalFile);
-        if (compressed != null) {
-          compressedImages.add(compressed);
-        } else {
-          // Se a compressão falhar, usa a imagem original.
-          compressedImages.add(originalFile);
-        }
-      }
-
+    final compressedImages = await const MediaProcessingService()
+        .pickAndCompressImages();
+    if (compressedImages.isNotEmpty) {
       setState(() {
         for (var file in compressedImages) {
-          _mediaAttachments.add({
-            'file': file,
-            'caption': TextEditingController(),
-            'status': 'pending',
-          });
+          _mediaAttachments.add(MediaAttachmentRows.pendingPhoto(file));
         }
         _isCompressing = false;
       });
       HapticFeedback.lightImpact();
+    } else if (mounted) {
+      setState(() => _isCompressing = false);
     }
   }
 
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          if (val == 'done' || val == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
-          }
-        },
-        onError: (val) {
-          if (mounted) setState(() => _isListening = false);
-        },
-      );
-      if (available) {
-        if (mounted) setState(() => _isListening = true);
-        HapticFeedback.lightImpact();
-        _previousText = _descriptionController.text;
-        if (_previousText.isNotEmpty && !_previousText.endsWith(' ')) {
-          _previousText += ' ';
-        }
-        _speech.listen(
-          localeId: 'pt_BR',
-          onResult: (val) {
-            if (mounted) {
-              setState(() {
-                _descriptionController.text =
-                    _previousText + val.recognizedWords;
-              });
-            }
-          },
-        );
-      }
-    } else {
+  Future<void> _listen() async {
+    if (_isListening) {
       _stopListening();
+      return;
+    }
+
+    final started = await _speechDictation.start(
+      controller: _descriptionController,
+      onListeningStarted: () {
+        if (mounted) setState(() => _isListening = true);
+      },
+      onListeningStopped: () {
+        if (mounted) setState(() => _isListening = false);
+      },
+    );
+    if (started) {
+      HapticFeedback.lightImpact();
     }
   }
 
   void _stopListening() {
     if (_isListening) {
       if (mounted) setState(() => _isListening = false);
-      _speech.stop();
+      _speechDictation.stop();
       HapticFeedback.selectionClick();
     }
   }
 
   Future<List<Map<String, dynamic>>> _uploadAllMedia(String folder) async {
-    final StorageService storageService = StorageService();
-    List<Map<String, dynamic>> finalMedia = [];
-
-    if (_mediaAttachments.isEmpty) return finalMedia;
+    if (_mediaAttachments.isEmpty) return const [];
 
     if (mounted) {
       setState(() {
-        _saveStatus = 'Fazendo upload de mídia(s)...';
+        _saveStatus = 'Fazendo upload de mídias...';
       });
     }
 
-    for (int i = 0; i < _mediaAttachments.length; i++) {
-      if (_mediaAttachments[i]['status'] == 'done') {
-        final existingUrl = _mediaAttachments[i]['url']?.toString();
-        if (existingUrl != null && existingUrl.isNotEmpty) {
-          finalMedia.add({
-            'url': existingUrl,
-            'caption': _mediaAttachments[i]['caption']?.text ?? '',
-          });
-        }
-        continue;
-      }
-
-      if (mounted) setState(() => _mediaAttachments[i]['status'] = 'uploading');
-
-      final String? url = await storageService.uploadProfileImage(
-        _mediaAttachments[i]['file'],
-        folder,
-      );
-
-      if (url != null) {
+    return MediaAttachmentUploadService(
+      storageService: StorageService(),
+    ).uploadAll(
+      attachments: _mediaAttachments,
+      folder: folder,
+      onUploading: (attachment) {
         if (mounted) {
-          setState(() {
-            _mediaAttachments[i]['status'] = 'done';
-            _mediaAttachments[i]['url'] = url;
-          });
+          setState(() => MediaAttachmentRows.markUploading(attachment));
         }
-        finalMedia.add({
-          'url': url,
-          'caption': _mediaAttachments[i]['caption'].text,
-        });
-      } else {
-        if (mounted) setState(() => _mediaAttachments[i]['status'] = 'pending');
-        throw Exception("Falha ao subir a foto ${i + 1}.");
-      }
-    }
-    return finalMedia;
+      },
+      onUploaded: (attachment, url) {
+        if (mounted) {
+          setState(() => MediaAttachmentRows.markDone(attachment, url));
+        }
+      },
+      onPending: (attachment) {
+        if (mounted) {
+          setState(() => MediaAttachmentRows.markPending(attachment));
+        }
+      },
+    );
   }
 
   List<Map<String, dynamic>> _mergeExistingIncidentMedia(
     List<Map<String, dynamic>> uploadedMedia,
   ) {
-    final existing = widget.initialData?['mediaAttachments'];
-    final merged = <Map<String, dynamic>>[];
-
-    if (existing is List) {
-      merged.addAll(
-        existing.whereType<Map>().map(
-          (item) => Map<String, dynamic>.from(item),
-        ),
-      );
-    }
-
-    merged.addAll(uploadedMedia);
-    return merged;
+    return MediaAttachmentRows.mergeExistingWithUploaded(
+      existing: widget.initialData?['mediaAttachments'],
+      uploaded: uploadedMedia,
+    );
   }
 
   Future<String?> _uploadExamePdf() async {
     if (_examePdfFile == null) return null;
-    final StorageService storageService = StorageService();
     if (mounted) setState(() => _saveStatus = 'Enviando PDF do Exame...');
-    return await storageService.uploadFile(
-      _examePdfFile!,
-      'health/exams',
-      mimeType: 'application/pdf',
-      extension: 'pdf',
-    );
+    return const PdfAttachmentService().uploadExamPdf(_examePdfFile!);
   }
 
   DateTime _resolveFormTimestamp() {
-    DateTime finalTimestamp = widget.initialData?['_rawDate'] ?? DateTime.now();
-
-    if (_timeController.text.isEmpty) {
-      return finalTimestamp;
-    }
-
-    final parts = _timeController.text.split(':');
-    if (parts.length != 2) {
-      return finalTimestamp;
-    }
-
-    return DateTime(
-      finalTimestamp.year,
-      finalTimestamp.month,
-      finalTimestamp.day,
-      int.tryParse(parts[0]) ?? finalTimestamp.hour,
-      int.tryParse(parts[1]) ?? finalTimestamp.minute,
+    final baseTimestamp = widget.initialData?['_rawDate'] ?? DateTime.now();
+    return const PtBrDateTimeService().withTimeText(
+      base: baseTimestamp,
+      timeText: _timeController.text,
     );
+  }
+
+  void _prepareRoutineMetadata() {
+    if (_selectedSubtype == _SheetSubtype.feeding) {
+      _formData['Marca da Ração'] = _racaoMarcaController.text;
+      _formData['Quantidade (g)'] = _racaoQtdController.text;
+    }
+    if (_durationController.text.isNotEmpty) {
+      _formData['Duração (min)'] = _durationController.text;
+    }
+    if (_distanciaController.text.isNotEmpty) {
+      _formData['Distância (km)'] = _distanciaController.text;
+    }
+  }
+
+  void _prepareHealthMetadata() {
+    if (_returnDateController.text.isNotEmpty) {
+      _formData['Data de Retorno'] = _returnDateController.text;
+    }
+  }
+
+  void _prepareTrainingMetadata() {
+    if (_durationController.text.isNotEmpty) {
+      _formData['Duração (min)'] = _durationController.text;
+    }
+    if (_selectedSubtype == _SheetSubtype.scentWork) {
+      if (_tempController.text.isNotEmpty) {
+        _formData['Temperatura (°C)'] = _tempController.text;
+      }
+      if (_humidityController.text.isNotEmpty) {
+        _formData['Umidade (%)'] = _humidityController.text;
+      }
+    }
   }
 
   Future<void> _saveRoutine({
@@ -1306,21 +1023,17 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       'routines',
     );
 
-    final routine = RoutineModel(
-      id: widget.documentId,
+    final routine = ActivityRecordPayloadBuilder.routine(
+      documentId: widget.documentId,
       dogId: widget.dogId,
       dogName: widget.dogName,
-      handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,
+      currentRa: currentRa,
+      initialHandlerId: widget.initialData?['_rawHandlerId']?.toString(),
       activityType: _selectedSubtype!,
-      status: 'Concluído',
       timestamp: _resolveFormTimestamp(),
-      notes: _descriptionController.text.isNotEmpty
-          ? _descriptionController.text
-          : null,
-      mediaAttachments: finalMedia.isNotEmpty ? finalMedia : null,
-      metadata: _formData.isNotEmpty
-          ? Map<String, dynamic>.from(_formData)
-          : null,
+      notes: _descriptionController.text,
+      mediaAttachments: finalMedia,
+      metadata: _formData,
     );
 
     if (widget.documentId != null) {
@@ -1344,25 +1057,18 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       });
     }
 
-    if (_returnDateController.text.isNotEmpty) {
-      _formData['Data de Retorno'] = _returnDateController.text;
-    }
+    _prepareHealthMetadata();
 
-    final hLog = HealthLogModel(
-      id: widget.documentId,
+    final hLog = ActivityRecordPayloadBuilder.healthLog(
+      documentId: widget.documentId,
       dogId: widget.dogId,
       dogName: widget.dogName,
       date: widget.initialData?['_rawDate'] ?? DateTime.now(),
       logType: _selectedSubtype!,
-      healthObservations:
-          _descriptionController.text +
-          (_returnDateController.text.isNotEmpty
-              ? "\nRetorno agendado: ${_returnDateController.text}"
-              : ''),
-      vetName: _vetNameController.text.isNotEmpty
-          ? _vetNameController.text
-          : null,
-      mediaAttachments: finalMedia.isNotEmpty ? finalMedia : null,
+      observations: _descriptionController.text,
+      returnDate: _returnDateController.text,
+      vetName: _vetNameController.text,
+      mediaAttachments: finalMedia,
     );
 
     if (widget.documentId != null) {
@@ -1384,35 +1090,17 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         HandlerIdentityService.raFromUser(authVM.user) ??
         '';
 
-    if (_selectedSubtype == _SheetSubtype.scentWork) {
-      if (_tempController.text.isNotEmpty) {
-        _formData['Temperatura (°C)'] = _tempController.text;
-      }
-      if (_humidityController.text.isNotEmpty) {
-        _formData['Umidade (%)'] = _humidityController.text;
-      }
-    }
-
-    int? durationSecs;
-    if (_durationController.text.isNotEmpty) {
-      final mins = int.tryParse(_durationController.text) ?? 0;
-      durationSecs = mins * 60;
-    }
-
-    final session = TrainingSessionModel(
-      id: widget.documentId,
+    final session = ActivityRecordPayloadBuilder.trainingSession(
+      documentId: widget.documentId,
       dogId: widget.dogId,
       dogName: widget.dogName,
-      handlerId: currentRa,
+      currentRa: currentRa,
       date: widget.initialData?['_rawDate'] ?? DateTime.now(),
       trainingType: _selectedSubtype!,
-      location: _locationController.text.isNotEmpty
-          ? _locationController.text
-          : 'Base GCM',
-      weather: 'Limpo',
-      handlerNotes: _descriptionController.text,
-      searchDuration: durationSecs,
-      mediaAttachments: finalMedia.isNotEmpty ? finalMedia : null,
+      location: _locationController.text,
+      notes: _descriptionController.text,
+      durationMinutes: _durationController.text,
+      mediaAttachments: finalMedia,
       metadata: _formData,
     );
 
@@ -1421,6 +1109,123 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     } else {
       await trainingVM.addTrainingSession(session);
     }
+  }
+
+  Future<List<Map<String, dynamic>>>
+  _prepareOccurrenceMediaAttachments() async {
+    _setSaveStatus('Preparando anexos da ocorrência...');
+    final List<Map<String, dynamic>> uploadedMedia = await _uploadAllMedia(
+      'incidents',
+    );
+    return _mergeExistingIncidentMedia(uploadedMedia);
+  }
+
+  Map<String, dynamic>? _existingOccurrenceExtraFields() {
+    if (widget.initialData?['extraFields'] is! Map) {
+      return null;
+    }
+
+    return Map<String, dynamic>.from(widget.initialData!['extraFields'] as Map);
+  }
+
+  DateTime _occurrenceSaveDate() {
+    return _activeIncidentId == null ? _resolveFormTimestamp() : DateTime.now();
+  }
+
+  DateTime _occurrenceStartedAtOr(DateTime fallbackDate) {
+    return _activeOccurrenceStartedAt ??
+        (widget.initialData?['startedAt'] != null
+            ? parseFirestoreDate(widget.initialData!['startedAt'])
+            : widget.initialData?['_rawDate'] ?? fallbackDate);
+  }
+
+  Future<void> _grantOccurrenceBadgesIfNeeded({
+    required UserViewModel userVM,
+    required String currentRa,
+    required Map<String, dynamic> extraFields,
+  }) async {
+    final hasDetectedDrugs =
+        extraFields.containsKey('drogas') &&
+        (extraFields['drogas'] as List).isNotEmpty;
+    final isDetection =
+        _selectedSubtype == _SheetSubtype.detection ||
+        _selectedSubtype == _SheetSubtype.narcoticsSearch;
+
+    if (isDetection && hasDetectedDrugs) {
+      await userVM.grantBadge(currentRa, 'faro_afiado');
+    }
+  }
+
+  OperatorContext _operatorContext({
+    required AuthViewModel authVM,
+    required UserViewModel userVM,
+  }) {
+    return const OperatorContextService().fromViewModels(
+      authVM: authVM,
+      userVM: userVM,
+    );
+  }
+
+  Future<void> _saveOccurrenceOrEvent({
+    required AuthViewModel authVM,
+    required IncidentViewModel incidentVM,
+    required UserViewModel userVM,
+  }) async {
+    _setSaveStatus('Validando ocorrência...');
+    final operatorContext = _operatorContext(authVM: authVM, userVM: userVM);
+
+    if (_activeIncidentId == null) {
+      _setSaveStatus('Verificando ocorrência aberta...');
+      final openIncident = await incidentVM.findOpenIncident(
+        dogId: widget.dogId,
+      );
+      if (openIncident != null) {
+        throw Exception(
+          'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
+        );
+      }
+    }
+
+    _validateOccurrenceBeforeSave();
+
+    final finalMedia = await _prepareOccurrenceMediaAttachments();
+    final extraFields = _buildOccurrenceExtraFields(
+      existingExtraFields: _existingOccurrenceExtraFields(),
+    );
+
+    final finalDate = _occurrenceSaveDate();
+    final incidentUpdates = _buildIncidentProgressUpdates(
+      finalDate,
+      authorId: operatorContext.ra,
+      authorName: operatorContext.name,
+    );
+    final startedAt = _occurrenceStartedAtOr(finalDate);
+
+    final inc = _buildOccurrenceIncident(
+      currentRa: operatorContext.ra,
+      finalDate: finalDate,
+      startedAt: startedAt,
+      extraFields: extraFields,
+      mediaAttachments: finalMedia,
+      progressUpdates: incidentUpdates,
+    );
+
+    if (_activeIncidentId != null) {
+      _setSaveStatus('Atualizando ocorrência no Firebase...');
+      await incidentVM.updateIncident(inc);
+      return;
+    }
+
+    _setSaveStatus('Criando ocorrência no Firebase...');
+    await incidentVM.saveIncident(inc);
+    _activeIncidentId = inc.id;
+    _activeOccurrenceStartedAt = inc.startedAt;
+
+    await _grantOccurrenceBadgesIfNeeded(
+      userVM: userVM,
+      currentRa: operatorContext.ra,
+      extraFields: extraFields,
+    );
   }
 
   Future<bool> _save({bool closeAfterSave = true}) async {
@@ -1460,156 +1265,20 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       try {
         if (widget.category == 'Rotina') {
           _setSaveStatus('Validando rotina...');
-          if (_selectedSubtype == _SheetSubtype.feeding) {
-            _formData['Marca da Ração'] = _racaoMarcaController.text;
-            _formData['Quantidade (g)'] = _racaoQtdController.text;
-          }
-          if (_durationController.text.isNotEmpty) {
-            _formData['Duração (min)'] = _durationController.text;
-          }
-          if (_distanciaController.text.isNotEmpty) {
-            _formData['Distância (km)'] = _distanciaController.text;
-          }
+          _prepareRoutineMetadata();
           _setSaveStatus('Salvando rotina no Firebase...');
           await _saveRoutine(authVM: authVM, routineVM: routineVM);
         } else if (widget.category == 'Treino') {
           _setSaveStatus('Validando treino...');
-          if (_durationController.text.isNotEmpty) {
-            _formData['Duração (min)'] = _durationController.text;
-          }
+          _prepareTrainingMetadata();
           _setSaveStatus('Salvando treino no Firebase...');
           await _saveTraining(trainingVM: trainingVM, authVM: authVM);
         } else if (_isOccurrenceCategory || widget.category == 'Evento') {
-          _setSaveStatus('Validando ocorrência...');
-          final currentRa =
-              HandlerIdentityService.raFromUser(authVM.user) ?? '';
-          final currentOperatorName = _currentOperatorName(
+          await _saveOccurrenceOrEvent(
             authVM: authVM,
+            incidentVM: incidentVM,
             userVM: userVM,
-            currentRa: currentRa,
           );
-
-          if (_activeIncidentId == null) {
-            _setSaveStatus('Verificando ocorrência aberta...');
-            final openIncident = await incidentVM.findOpenIncident(
-              dogId: widget.dogId,
-            );
-            if (openIncident != null) {
-              throw Exception(
-                'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
-              );
-            }
-          }
-
-          final finalizing =
-              _occurrenceStatus != OccurrenceFormController.statusInProgress;
-          if (finalizing && _descriptionController.text.trim().isEmpty) {
-            throw Exception(
-              'Preencha a descrição final antes de encerrar a ocorrência.',
-            );
-          }
-          if (finalizing && _selectedOccurrenceOutcomes.isEmpty) {
-            throw Exception(
-              'Selecione ao menos um resultado final antes de encerrar.',
-            );
-          }
-          if (_selectedSubtype!.trim().isEmpty ||
-              _naturezaOcorrenciaController.text.trim().isEmpty) {
-            throw Exception('Informe a natureza da ocorrência.');
-          }
-
-          _setSaveStatus('Preparando anexos da ocorrência...');
-          final List<Map<String, dynamic>> uploadedMedia =
-              await _uploadAllMedia('incidents');
-          final List<Map<String, dynamic>> finalMedia =
-              _mergeExistingIncidentMedia(uploadedMedia);
-          final existingExtraFields = widget.initialData?['extraFields'] is Map
-              ? Map<String, dynamic>.from(
-                  widget.initialData!['extraFields'] as Map,
-                )
-              : null;
-
-          final extraFields = OccurrencePayloadBuilder.buildExtraFields(
-            nature: _selectedSubtype,
-            manualNature: _naturezaOcorrenciaController.text,
-            formData: _formData,
-            team: _equipeController.text,
-            bo: _boController.text,
-            supportedTeam: _guarnicaoController.text,
-            situation: _situacaoController.text,
-            interventionOutcome: _desfechoController.text,
-            odorSource: _odorObjetoController.text,
-            missingTime: _tempoDesaparecimentoController.text,
-            searchDuration: _durationController.text,
-            terrainCondition: _condicaoTerrenoController.text,
-            serviceOrderNumber: _numeroOsController.text,
-            drugRows: _detecaoDrogas,
-            detainedIndividuals: _detainedIndividuals,
-            seizedObjects: _seizedObjects,
-            detainedVehicles: _detainedVehicles,
-            existingExtraFields: existingExtraFields,
-            publicEstimate: _publicoController.text,
-            eventTheme: _temaController.text,
-            locationLat: _selectedLocationLatLng?.latitude,
-            locationLng: _selectedLocationLatLng?.longitude,
-          );
-          final selectedNature = _selectedOccurrenceNature();
-          if (selectedNature != null) {
-            extraFields['natureza_codigo'] = selectedNature.code;
-            extraFields['natureza_nome'] = selectedNature.name;
-            extraFields['natureza_grupo'] = selectedNature.group;
-          }
-
-          final finalDate = _activeIncidentId == null
-              ? _resolveFormTimestamp()
-              : DateTime.now();
-          final incidentUpdates = _buildIncidentProgressUpdates(
-            finalDate,
-            authorId: currentRa,
-            authorName: currentOperatorName,
-          );
-          final startedAt =
-              _activeOccurrenceStartedAt ??
-              (widget.initialData?['startedAt'] != null
-                  ? parseFirestoreDate(widget.initialData!['startedAt'])
-                  : widget.initialData?['_rawDate'] ?? finalDate);
-
-          final inc = OccurrencePayloadBuilder.buildIncident(
-            documentId: _activeIncidentId,
-            dogId: widget.dogId,
-            dogName: widget.dogName,
-            handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,
-            location: _locationController.text.isNotEmpty
-                ? _locationController.text
-                : 'GCM',
-            description: _descriptionController.text,
-            result: _resolveIncidentResultSummary(),
-            type: _selectedSubtype,
-            extraFields: extraFields,
-            mediaAttachments: finalMedia,
-            status: _occurrenceStatus,
-            operationalSuccess: _occurrenceSuccessful,
-            outcomes: _selectedOccurrenceOutcomes.toList(),
-            startedAt: startedAt,
-            updatedAt: finalDate,
-            progressUpdates: incidentUpdates,
-          );
-
-          if (_activeIncidentId != null) {
-            _setSaveStatus('Atualizando ocorrência no Firebase...');
-            await incidentVM.updateIncident(inc);
-          } else {
-            _setSaveStatus('Criando ocorrência no Firebase...');
-            await incidentVM.saveIncident(inc);
-            _activeIncidentId = inc.id;
-            _activeOccurrenceStartedAt = inc.startedAt;
-            if ((_selectedSubtype == _SheetSubtype.detection ||
-                    _selectedSubtype == _SheetSubtype.narcoticsSearch) &&
-                extraFields.containsKey('drogas') &&
-                (extraFields['drogas'] as List).isNotEmpty) {
-              await userVM.grantBadge(currentRa, 'faro_afiado');
-            }
-          }
         } else if (widget.category == 'Saude') {
           _setSaveStatus('Salvando prontuário no Firebase...');
           await _saveHealth(healthVM: healthVM);
@@ -1663,6 +1332,82 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _save(closeAfterSave: false);
   }
 
+  void _validateOccurrenceBeforeSave() {
+    OccurrenceSaveValidator.validate(
+      status: _occurrenceStatus,
+      description: _descriptionController.text,
+      outcomes: _selectedOccurrenceOutcomes,
+      subtype: _selectedSubtype,
+      natureText: _naturezaOcorrenciaController.text,
+    );
+  }
+
+  Map<String, dynamic> _buildOccurrenceExtraFields({
+    required Map<String, dynamic>? existingExtraFields,
+  }) {
+    final extraFields = OccurrencePayloadBuilder.buildExtraFields(
+      nature: _selectedSubtype,
+      manualNature: _naturezaOcorrenciaController.text,
+      formData: _formData,
+      team: _equipeController.text,
+      bo: _boController.text,
+      supportedTeam: _guarnicaoController.text,
+      situation: _situacaoController.text,
+      interventionOutcome: _desfechoController.text,
+      odorSource: _odorObjetoController.text,
+      missingTime: _tempoDesaparecimentoController.text,
+      searchDuration: _durationController.text,
+      terrainCondition: _condicaoTerrenoController.text,
+      serviceOrderNumber: _numeroOsController.text,
+      drugRows: _detecaoDrogas,
+      detainedIndividuals: _detainedIndividuals,
+      seizedObjects: _seizedObjects,
+      detainedVehicles: _detainedVehicles,
+      existingExtraFields: existingExtraFields,
+      publicEstimate: _publicoController.text,
+      eventTheme: _temaController.text,
+      locationLat: _selectedLocationLatLng?.latitude,
+      locationLng: _selectedLocationLatLng?.longitude,
+    );
+    final selectedNature = _selectedOccurrenceNature();
+    if (selectedNature != null) {
+      extraFields['natureza_codigo'] = selectedNature.code;
+      extraFields['natureza_nome'] = selectedNature.name;
+      extraFields['natureza_grupo'] = selectedNature.group;
+    }
+    return extraFields;
+  }
+
+  Incident _buildOccurrenceIncident({
+    required String currentRa,
+    required DateTime finalDate,
+    required DateTime startedAt,
+    required Map<String, dynamic> extraFields,
+    required List<Map<String, dynamic>> mediaAttachments,
+    required List<IncidentProgressUpdate> progressUpdates,
+  }) {
+    return OccurrencePayloadBuilder.buildIncident(
+      documentId: _activeIncidentId,
+      dogId: widget.dogId,
+      dogName: widget.dogName,
+      handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,
+      location: _locationController.text.isNotEmpty
+          ? _locationController.text
+          : 'GCM',
+      description: _descriptionController.text,
+      result: _resolveIncidentResultSummary(),
+      type: _selectedSubtype,
+      extraFields: extraFields,
+      mediaAttachments: mediaAttachments,
+      status: _occurrenceStatus,
+      operationalSuccess: _occurrenceSuccessful,
+      outcomes: _selectedOccurrenceOutcomes.toList(),
+      startedAt: startedAt,
+      updatedAt: finalDate,
+      progressUpdates: progressUpdates,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.fullScreen) {
@@ -1694,104 +1439,39 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return _buildOccurrenceFormScaffold();
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      resizeToAvoidBottomInset: true,
-      body: CustomScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        slivers: [
-          SliverAppBar(
-            expandedHeight: _isOccurrenceCategory ? 96 : 250,
-            pinned: true,
-            stretch: true,
-            backgroundColor: const Color(0xFF1E1E1E),
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              onPressed: _isSaving
-                  ? null
-                  : () {
-                      if (widget.fullScreen ||
-                          widget.initialData != null ||
-                          _isOccurrenceCategory) {
-                        _closeForm(false);
-                      } else {
-                        final savedPage = _currentMenuPage;
-                        setState(() {
-                          _showMenu = true;
-                          _selectedSubtype = null;
-                        });
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_menuPageController.hasClients) {
-                            _menuPageController.jumpToPage(savedPage);
-                          }
-                        });
-                      }
-                    },
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground],
-              title: Text(
-                _isOccurrenceCategory
-                    ? 'OCORRÊNCIA'
-                    : _selectedSubtype?.toUpperCase() ?? '',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
-              ),
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_selectedSubtypeImagePath != null &&
-                      !_isOccurrenceCategory)
-                    Hero(
-                      tag: 'hero_category_$_selectedSubtype',
-                      child: Image.asset(
-                        _selectedSubtypeImagePath!,
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                      ),
-                    )
-                  else
-                    Container(color: const Color(0xFF1E1E1E)),
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xFF121212)],
-                        stops: [0.3, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Container(
-              color: const Color(0xFF121212),
-              child: _buildFormContent(),
-            ),
-          ),
-        ],
-      ),
+    return ActivityFormScaffold(
+      title: _selectedSubtype?.toUpperCase() ?? '',
+      imagePath: _selectedSubtypeImagePath,
+      heroTag: _selectedSubtype == null
+          ? null
+          : 'hero_category_$_selectedSubtype',
+      isSaving: _isSaving,
+      onBack: _handleStandardFormBack,
+      child: _buildFormContent(),
     );
+  }
+
+  void _handleStandardFormBack() {
+    if (widget.fullScreen || widget.initialData != null) {
+      _closeForm(false);
+      return;
+    }
+
+    final savedPage = _currentMenuPage;
+    setState(() {
+      _showMenu = true;
+      _selectedSubtype = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_menuPageController.hasClients) {
+        _menuPageController.jumpToPage(savedPage);
+      }
+    });
   }
 
   Widget _buildOccurrenceFormScaffold() {
     final tColor = _getCategoryColor();
-    final statusLabel =
-        _occurrenceStatus == OccurrenceFormController.statusCompleted
-        ? 'FECHADA'
-        : widget.documentId == null
-        ? 'NOVA'
-        : 'ABERTA';
+    final isNewRecord = widget.documentId == null;
 
     return OccurrenceFormScaffold(
       backgroundColor: _hudBackground,
@@ -1799,10 +1479,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       accentColor: _hudCyan,
       showTopBar: !_hasActiveOccurrenceRecord,
       isSaving: _isSaving,
-      modeLabel: widget.documentId == null
-          ? 'NOVA OCORRÊNCIA'
-          : 'OCORRÊNCIA OPERACIONAL',
-      statusLabel: statusLabel,
+      modeLabel: ActivityFormLabels.occurrenceModeLabel(
+        isNewRecord: isNewRecord,
+      ),
+      statusLabel: ActivityFormLabels.occurrenceStatusLabel(
+        occurrenceStatus: _occurrenceStatus,
+        isNewRecord: isNewRecord,
+      ),
       content: _buildOccurrenceStepperContent(tColor, includeControls: false),
       footer: _showOccurrenceFinalization
           ? null
@@ -1839,11 +1522,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       }
       return _hudCyan;
     }
-    final match = _currentCategoryCards
-        .where((c) => c['id'] == _selectedSubtype)
-        .toList();
-    if (match.isNotEmpty) return match.first['glow'];
-    return const Color(0xFF1B8A4C);
+    return ActivityCardCatalog.glowFor(
+      category: widget.category,
+      id: _selectedSubtype,
+      fallback: const Color(0xFF1B8A4C),
+    );
   }
 
   Widget _buildFormContent() {
@@ -1859,22 +1542,18 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Widget _buildGroupedFormContent(Color tColor) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            if (_selectedSubtype == _SheetSubtype.detection)
-              ..._buildDetecaoGrouped(),
-            if (_selectedSubtype == _SheetSubtype.missingPerson)
-              ..._buildBuscaPessoaGrouped(),
-            ..._buildOccurrenceMetaFields(),
-            const SizedBox(height: 32),
-            _buildSaveButton(tColor),
-          ],
-        ),
-      ),
+    return ActivityFormBody(
+      formKey: _formKey,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (_selectedSubtype == _SheetSubtype.detection)
+          ..._buildDetecaoGrouped(),
+        if (_selectedSubtype == _SheetSubtype.missingPerson)
+          ..._buildBuscaPessoaGrouped(),
+        ..._buildOccurrenceMetaFields(),
+        const SizedBox(height: 32),
+        _buildSaveButton(tColor),
+      ],
     );
   }
 
@@ -1913,7 +1592,15 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       commandHeader: _buildOccurrenceCommandHeader(tColor),
       contextSummary: _buildOccurrenceActiveContextSummary(tColor),
       quickActions: _buildOccurrenceQuickActionGrid(tColor),
-      timelinePreview: _buildOccurrenceTimelinePreview(),
+      timelinePreview: _occurrenceTimeline.isEmpty
+          ? const []
+          : [
+              OccurrenceTimelinePreview(
+                updates: _occurrenceTimeline,
+                accent: _getCategoryColor(),
+                onEventTap: _openOccurrenceEventDetails,
+              ),
+            ],
     );
   }
 
@@ -1937,9 +1624,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final timeLabel = _timeController.text.trim().isEmpty
         ? '--:--'
         : _timeController.text.trim();
-    final today = DateTime.now();
-    final dateLabel =
-        '${today.day.toString().padLeft(2, '0')}/${today.month.toString().padLeft(2, '0')}/${today.year}';
+    final dateLabel = _formatDatePtBr(DateTime.now());
     final natureText = _naturezaOcorrenciaController.text.trim();
 
     return OccurrenceStartScreen(
@@ -1974,15 +1659,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       panelColor: _hudPanel,
       accent: _hudCyan,
       onChanged: (_) => setState(_syncSelectedOccurrenceNatureFromText),
-      onSelected: (option) {
-        HapticFeedback.selectionClick();
-        setState(() {
-          _selectedSubtype = option.name;
-          _naturezaOcorrenciaController.text = option.label;
-          _occurrenceController.selectNature(option.name);
-          _copyOccurrenceControllerToFields();
-        });
-      },
+      onSelected: _selectOccurrenceNature,
       fieldBuilder: (context, controller, focusNode, onChanged) {
         return TacticalTextField(
           controller: controller,
@@ -2000,13 +1677,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Widget _buildOccurrenceFinalizationPanel(
-    Color tColor,
-    bool canShowFinalResults,
-  ) {
-    return _buildOccurrenceFinalizationPanelV2(tColor, canShowFinalResults);
-  }
-
-  Widget _buildOccurrenceFinalizationPanelV2(
     Color tColor,
     bool canShowFinalResults,
   ) {
@@ -2030,8 +1700,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   Widget _buildOccurrenceActiveContextSummary(Color tColor) {
     final startedAt = _occurrenceStartedAt() ?? _resolveFormTimestamp();
-    final startedLabel =
-        '${startedAt.hour.toString().padLeft(2, '0')}:${startedAt.minute.toString().padLeft(2, '0')}';
+    final startedLabel = _formatTimeOfDay(startedAt);
     final location = _locationController.text.trim().isEmpty
         ? 'Local pendente'
         : _locationController.text.trim();
@@ -2052,11 +1721,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   Future<void> _showOccurrenceInitialDataSheet(Color tColor) async {
     HapticFeedback.selectionClick();
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    await _showTacticalBottomSheet<void>(
       builder: (context) {
         return OccurrenceInitialDataSheet(
           accentColor: tColor,
@@ -2106,11 +1771,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (location == null) return;
 
     HapticFeedback.selectionClick();
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    await _showTacticalBottomSheet<void>(
       builder: (context) {
         return OccurrenceLocationMapSheet(
           location: location,
@@ -2155,11 +1816,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     OccurrenceQuickAction action,
   ) {
     HapticFeedback.selectionClick();
-    return showModalBottomSheet<OccurrenceQuickAction>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    return _showTacticalBottomSheet<OccurrenceQuickAction>(
       builder: (context) => OccurrenceQuickActionOptionsSheet(
         action: action,
         backgroundColor: _hudBackground,
@@ -2173,11 +1830,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final categories = OccurrenceEventCatalog.categories(tColor);
     _occurrenceUpdateController.clear();
 
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    await _showTacticalBottomSheet<void>(
       builder: (context) => OccurrenceEventCenterSheet(
         accentColor: tColor,
         backgroundColor: _hudBackground,
@@ -2187,6 +1840,23 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         focusNode: _occurrenceUpdateFocusNode,
         onActionSelected: _registerOccurrenceEvent,
       ),
+    );
+  }
+
+  IncidentProgressUpdate _buildOccurrenceEventUpdate(
+    OccurrenceQuickAction action, {
+    required DateTime timestamp,
+    required OperatorContext operatorContext,
+  }) {
+    return IncidentProgressUpdate(
+      title: action.title,
+      description: action.description,
+      timestamp: timestamp,
+      location: _locationController.text.trim(),
+      latitude: _selectedLocationLatLng?.latitude,
+      longitude: _selectedLocationLatLng?.longitude,
+      authorId: operatorContext.ra,
+      authorName: operatorContext.name,
     );
   }
 
@@ -2227,22 +1897,12 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
     final userVM = Provider.of<UserViewModel>(context, listen: false);
-    final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-    final currentOperatorName = _currentOperatorName(
-      authVM: authVM,
-      userVM: userVM,
-      currentRa: currentRa,
-    );
+    final operatorContext = _operatorContext(authVM: authVM, userVM: userVM);
 
-    final update = IncidentProgressUpdate(
-      title: action.title,
-      description: action.description,
+    final update = _buildOccurrenceEventUpdate(
+      action,
       timestamp: now,
-      location: _locationController.text.trim(),
-      latitude: _selectedLocationLatLng?.latitude,
-      longitude: _selectedLocationLatLng?.longitude,
-      authorId: currentRa,
-      authorName: currentOperatorName,
+      operatorContext: operatorContext,
     );
 
     setState(() {
@@ -2259,8 +1919,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     try {
       await _saveActiveOccurrenceSnapshot(
         incidentVM: incidentVM,
-        currentRa: currentRa,
-        currentOperatorName: currentOperatorName,
+        currentRa: operatorContext.ra,
+        currentOperatorName: operatorContext.name,
         updatedAt: now,
       );
       if (!mounted) return;
@@ -2328,16 +1988,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     required String currentOperatorName,
     required DateTime updatedAt,
   }) {
-    final existingExtraFields = widget.initialData?['extraFields'] is Map
-        ? Map<String, dynamic>.from(widget.initialData!['extraFields'] as Map)
-        : null;
-    final effectiveNature = (_selectedSubtype?.trim().isNotEmpty ?? false)
-        ? _selectedSubtype!
-        : 'Averiguação';
-    final effectiveManualNature =
-        _naturezaOcorrenciaController.text.trim().isNotEmpty
-        ? _naturezaOcorrenciaController.text.trim()
-        : effectiveNature;
+    final effectiveNature = OccurrenceDisplayText.effectiveNature(
+      _selectedSubtype,
+    );
+    final effectiveManualNature = OccurrenceDisplayText.manualNatureOr(
+      manualNature: _naturezaOcorrenciaController.text,
+      fallback: effectiveNature,
+    );
 
     final extraFields = OccurrencePayloadBuilder.buildExtraFields(
       nature: effectiveNature,
@@ -2357,7 +2014,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       detainedIndividuals: _detainedIndividuals,
       seizedObjects: _seizedObjects,
       detainedVehicles: _detainedVehicles,
-      existingExtraFields: existingExtraFields,
+      existingExtraFields: _existingOccurrenceExtraFields(),
       publicEstimate: _publicoController.text,
       eventTheme: _temaController.text,
       locationLat: _selectedLocationLatLng?.latitude,
@@ -2392,6 +2049,27 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
+  dynamic _activeDogFrom(DogViewModel dogVM) {
+    for (final dog in dogVM.dogs) {
+      if (dog.id == widget.dogId) {
+        return dog;
+      }
+    }
+    return null;
+  }
+
+  dynamic _operatorUserFrom({
+    required UserViewModel userVM,
+    required String currentRa,
+  }) {
+    for (final user in userVM.users) {
+      if (user.ra == currentRa) {
+        return user;
+      }
+    }
+    return null;
+  }
+
   Widget _buildOccurrenceCommandHeader(
     Color tColor, {
     bool showOperationalMetrics = false,
@@ -2401,41 +2079,22 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final userVM = Provider.of<UserViewModel>(context, listen: false);
     final dogVM = Provider.of<DogViewModel>(context, listen: false);
-    final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-    final operatorName = _currentOperatorName(
-      authVM: authVM,
+    final operatorContext = _operatorContext(authVM: authVM, userVM: userVM);
+    final activeDog = _activeDogFrom(dogVM);
+    final currentUser = _operatorUserFrom(
       userVM: userVM,
-      currentRa: currentRa,
+      currentRa: operatorContext.ra,
     );
-    dynamic activeDog;
-    for (final dog in dogVM.dogs) {
-      if (dog.id == widget.dogId) {
-        activeDog = dog;
-        break;
-      }
-    }
-    dynamic currentUser;
-    for (final user in userVM.users) {
-      if (user.ra == currentRa) {
-        currentUser = user;
-        break;
-      }
-    }
-    final elapsedLabel = startedAt == null
-        ? 'Não iniciada'
-        : _formatElapsedDuration(DateTime.now().difference(startedAt));
-    final nature = _selectedSubtype == _SheetSubtype.other
-        ? (_naturezaOcorrenciaController.text.trim().isEmpty
-              ? 'Outros'
-              : _naturezaOcorrenciaController.text.trim())
-        : (_selectedSubtype ?? 'Averiguação');
 
     return OccurrenceCommandHeader(
-      nature: nature,
+      nature: OccurrenceDisplayText.headerNatureLabel(
+        selectedSubtype: _selectedSubtype,
+        manualNature: _naturezaOcorrenciaController.text,
+      ),
       status: status,
       dogName: widget.dogName,
-      operatorName: operatorName,
-      elapsedLabel: elapsedLabel,
+      operatorName: operatorContext.name,
+      elapsedLabel: OccurrenceDisplayText.elapsedLabel(startedAt),
       eventCount: showOperationalMetrics ? _occurrenceTimeline.length : null,
       showOperationalMetrics: showOperationalMetrics,
       dogImageUrl: activeDog?.profileImageUrl?.toString(),
@@ -2461,15 +2120,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     return null;
   }
 
-  String _formatElapsedDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    if (hours > 0) {
-      return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
-    }
-    return '${minutes}m';
-  }
-
   Widget _buildOccurrenceNatureStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2481,15 +2131,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           panelColor: _hudPanel,
           accent: _hudCyan,
           onChanged: (_) => setState(_syncSelectedOccurrenceNatureFromText),
-          onSelected: (option) {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _selectedSubtype = option.name;
-              _naturezaOcorrenciaController.text = option.label;
-              _occurrenceController.selectNature(option.name);
-              _copyOccurrenceControllerToFields();
-            });
-          },
+          onSelected: _selectOccurrenceNature,
           fieldBuilder: (context, controller, focusNode, onChanged) {
             return TacticalTextField(
               controller: controller,
@@ -2544,154 +2186,168 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
-  void _applyOccurrenceWizardData(Map<String, dynamic> wizardData) {
-    _occurrenceStatus = OccurrenceFormController.statusCompleted;
-    _occurrenceController.setStatus(OccurrenceFormController.statusCompleted);
+  void _selectOccurrenceNature(OccurrenceNature option) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedSubtype = option.name;
+      _naturezaOcorrenciaController.text = option.label;
+      _occurrenceController.selectNature(option.name);
+      _copyOccurrenceControllerToFields();
+    });
+  }
 
-    _descriptionController.text = (wizardData['report'] ?? '').toString();
+  void _addWizardDrugRow({required String type, required String amount}) {
+    if (type.isEmpty && amount.isEmpty) return;
+    _detecaoDrogas.add(
+      OccurrenceDynamicRows.drug(
+        type: type.isEmpty ? 'Maconha' : type,
+        amount: amount,
+      ),
+    );
+  }
 
-    final results = List<String>.from(wizardData['results'] ?? const []);
-    _selectedOccurrenceOutcomes
-      ..clear()
-      ..addAll(results);
-    _occurrenceController.outcomes
-      ..clear()
-      ..addAll(results);
+  void _applyWizardDrugResult(OccurrenceWizardResult wizardResult) {
+    if (!wizardResult.containsResult('Droga apreendida')) return;
 
-    _occurrenceSuccessful =
-        !(results.contains('Nada Localizado') ||
-            results.contains('Sem constatação'));
-
-    final details = wizardData['details'] is Map
-        ? Map<String, dynamic>.from(wizardData['details'] as Map)
-        : <String, dynamic>{};
-    _formData['wizard_results'] = results;
-    _formData['wizard_details'] = details;
-
-    String detail(String key) => (details[key] ?? '').toString().trim();
-
-    if (results.contains('Droga apreendida')) {
-      _disposeDynamicResultRows(_detecaoDrogas, ['quantidade', 'especificar']);
-      _detecaoDrogas.clear();
-      final drugDetails = details['drogas'];
-      if (drugDetails is List) {
-        for (final item in drugDetails) {
-          if (item is! Map) continue;
-          final data = Map<String, dynamic>.from(item);
-          final tipo = (data['tipo'] ?? '').toString().trim();
-          final quantidade = (data['quantidade'] ?? '').toString().trim();
-          if (tipo.isEmpty && quantidade.isEmpty) continue;
-          _detecaoDrogas.add({
-            'tipo': tipo.isEmpty ? 'Maconha' : tipo,
-            'quantidade': TextEditingController(text: quantidade),
-            'especificar': TextEditingController(),
-          });
-        }
-      }
-      if (_detecaoDrogas.isEmpty) {
-        final tipo = detail('droga_tipo');
-        final quantidade = detail('droga_quantidade');
-        if (tipo.isNotEmpty || quantidade.isNotEmpty) {
-          _detecaoDrogas.add({
-            'tipo': tipo.isEmpty ? 'Maconha' : tipo,
-            'quantidade': TextEditingController(text: quantidade),
-            'especificar': TextEditingController(),
-          });
-        }
-      }
-      if (_detecaoDrogas.isEmpty) {
-        _detecaoDrogas.add({
-          'tipo': 'Maconha',
-          'quantidade': TextEditingController(),
-          'especificar': TextEditingController(),
-        });
+    _replaceDynamicRows(_detecaoDrogas, ['quantidade', 'especificar'], []);
+    final drugDetails = wizardResult.details['drogas'];
+    if (drugDetails is List) {
+      for (final item in drugDetails) {
+        if (item is! Map) continue;
+        final data = Map<String, dynamic>.from(item);
+        _addWizardDrugRow(
+          type: (data['tipo'] ?? '').toString().trim(),
+          amount: (data['quantidade'] ?? '').toString().trim(),
+        );
       }
     }
 
-    if (results.contains('Objetos apreendidos')) {
-      _disposeDynamicResultRows(_seizedObjects, ['descricao', 'quantidade']);
-      _seizedObjects.clear();
-      final descricao = detail('objetos_descricao');
-      final quantidade = detail('objetos_quantidade');
-      if (descricao.isNotEmpty || quantidade.isNotEmpty) {
-        _seizedObjects.add({
-          'descricao': TextEditingController(text: descricao),
-          'quantidade': TextEditingController(text: quantidade),
-        });
-      }
+    if (_detecaoDrogas.isEmpty) {
+      _addWizardDrugRow(
+        type: wizardResult.detail('droga_tipo'),
+        amount: wizardResult.detail('droga_quantidade'),
+      );
     }
 
-    if (results.contains('Veículo detido')) {
-      _disposeDynamicResultRows(_detainedVehicles, ['tipo', 'placa']);
-      _detainedVehicles.clear();
-      final tipo = detail('veiculo_tipo');
-      final placa = detail('veiculo_placa');
-      if (tipo.isNotEmpty || placa.isNotEmpty) {
-        _detainedVehicles.add({
-          'tipo': TextEditingController(text: tipo),
-          'placa': TextEditingController(text: placa),
-        });
-      }
+    if (_detecaoDrogas.isEmpty) {
+      _detecaoDrogas.add(OccurrenceDynamicRows.drug());
+    }
+  }
+
+  void _applyWizardSeizedObjectResult(OccurrenceWizardResult wizardResult) {
+    if (!wizardResult.containsResult('Objetos apreendidos')) return;
+
+    _replaceDynamicRows(_seizedObjects, ['descricao', 'quantidade'], []);
+    final descricao = wizardResult.detail('objetos_descricao');
+    final quantidade = wizardResult.detail('objetos_quantidade');
+    if (descricao.isNotEmpty || quantidade.isNotEmpty) {
+      _seizedObjects.add(
+        OccurrenceDynamicRows.seizedObject(
+          description: descricao,
+          amount: quantidade,
+        ),
+      );
+    }
+  }
+
+  void _applyWizardDetainedVehicleResult(OccurrenceWizardResult wizardResult) {
+    if (!wizardResult.containsResult('Veículo detido')) return;
+
+    _replaceDynamicRows(_detainedVehicles, ['tipo', 'placa'], []);
+    final tipo = wizardResult.detail('veiculo_tipo');
+    final placa = wizardResult.detail('veiculo_placa');
+    if (tipo.isNotEmpty || placa.isNotEmpty) {
+      _detainedVehicles.add(
+        OccurrenceDynamicRows.detainedVehicle(type: tipo, plate: placa),
+      );
+    }
+  }
+
+  void _applyWizardDetainedIndividualResult(
+    OccurrenceWizardResult wizardResult,
+  ) {
+    if (!wizardResult.containsResult('Indivíduo detido')) return;
+
+    _replaceDynamicRows(_detainedIndividuals, ['quantidade'], []);
+    final quantidade = wizardResult.detail('individuo_quantidade');
+    if (quantidade.isNotEmpty) {
+      _detainedIndividuals.add(
+        OccurrenceDynamicRows.detainedIndividual(amount: quantidade),
+      );
     }
 
-    if (results.contains('Indivíduo detido')) {
-      _disposeDynamicResultRows(_detainedIndividuals, ['quantidade']);
-      _detainedIndividuals.clear();
-      final quantidade = detail('individuo_quantidade');
-      if (quantidade.isNotEmpty) {
-        _detainedIndividuals.add({
-          'quantidade': TextEditingController(text: quantidade),
-        });
-      }
-      final destino = detail('individuo_destino');
-      if (destino.isNotEmpty) _formData['Destino do indivíduo'] = destino;
+    final destino = wizardResult.detail('individuo_destino');
+    if (destino.isNotEmpty) {
+      _formData['Destino do indivíduo'] = destino;
     }
+  }
 
-    final bo = detail('bo_numero');
+  void _applyWizardAdministrativeDetails(OccurrenceWizardResult wizardResult) {
+    final bo = wizardResult.detail('bo_numero');
     if (bo.isNotEmpty) {
       _boController.text = bo;
     }
 
-    final apoio = detail('apoio_observacao');
-    if (apoio.isNotEmpty) _formData['Apoio prestado'] = apoio;
-    final encaminhamento = detail('encaminhamento_observacao');
+    final apoio = wizardResult.detail('apoio_observacao');
+    if (apoio.isNotEmpty) {
+      _formData['Apoio prestado'] = apoio;
+    }
+
+    final encaminhamento = wizardResult.detail('encaminhamento_observacao');
     if (encaminhamento.isNotEmpty) {
       _formData['Encaminhamento médico'] = encaminhamento;
     }
+  }
+
+  void _applyOccurrenceWizardData(Map<String, dynamic> wizardData) {
+    final wizardResult = OccurrenceWizardResult.fromMap(wizardData);
+    _occurrenceStatus = OccurrenceFormController.statusCompleted;
+    _occurrenceController.setStatus(OccurrenceFormController.statusCompleted);
+
+    _descriptionController.text = wizardResult.report;
+
+    _selectedOccurrenceOutcomes
+      ..clear()
+      ..addAll(wizardResult.results);
+    _occurrenceController.outcomes
+      ..clear()
+      ..addAll(wizardResult.results);
+
+    _occurrenceSuccessful = wizardResult.successful;
+
+    _formData['wizard_results'] = wizardResult.results;
+    _formData['wizard_details'] = wizardResult.details;
+
+    _applyWizardDrugResult(wizardResult);
+    _applyWizardSeizedObjectResult(wizardResult);
+    _applyWizardDetainedVehicleResult(wizardResult);
+    _applyWizardDetainedIndividualResult(wizardResult);
+    _applyWizardAdministrativeDetails(wizardResult);
 
     _syncOccurrenceController();
   }
 
   Widget _buildStandardFormContent(Color tColor) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopActionRow(),
-            const SizedBox(height: 16),
-            _buildLocationTimeRow(),
-            const SizedBox(height: 32),
-
-            ..._buildDynamicFields(),
-            ..._buildCategorySpecificFields(),
-
-            ..._buildStandardContextFields(),
-            ..._buildTrainingMetaFields(),
-            ..._buildHealthMetaFields(),
-            ..._buildRoutineMetaFields(),
-
-            const SizedBox(height: 24),
-            _buildDescriptionField(),
-            const SizedBox(height: 24),
-            _buildImageGallery(),
-            const SizedBox(height: 48),
-            _buildSaveButton(tColor),
-          ],
-        ),
-      ),
+    return ActivityFormBody(
+      formKey: _formKey,
+      children: [
+        _buildTopActionRow(),
+        const SizedBox(height: 16),
+        _buildLocationTimeRow(),
+        const SizedBox(height: 32),
+        ..._buildDynamicFields(),
+        ..._buildCategorySpecificFields(),
+        ..._buildStandardContextFields(),
+        ..._buildTrainingMetaFields(),
+        ..._buildHealthMetaFields(),
+        ..._buildRoutineMetaFields(),
+        const SizedBox(height: 24),
+        _buildDescriptionField(),
+        const SizedBox(height: 24),
+        _buildImageGallery(),
+        const SizedBox(height: 48),
+        _buildSaveButton(tColor),
+      ],
     );
   }
 
@@ -2715,46 +2371,29 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return const [];
     }
 
+    final shortcuts = OccurrenceQuickUpdateCatalog.forSubtype(_selectedSubtype);
     return [
-      const SizedBox(height: 16),
-      _buildChoiceChipGroup(
-        label: 'Status da ocorrência',
-        options: const [
-          OccurrenceFormController.statusInProgress,
-          OccurrenceFormController.statusCompleted,
-          OccurrenceFormController.statusCanceled,
-        ],
-        selectedOption: _occurrenceStatus,
-        onSelected: (value) {
+      OccurrenceMetaFields(
+        status: _occurrenceStatus,
+        successful: _occurrenceSuccessful,
+        outcomeOptions: _outcomeOptionsForOccurrenceSubtype(_selectedSubtype),
+        selectedOutcomes: _selectedOccurrenceOutcomes,
+        shortcuts: shortcuts,
+        selectedShortcutTitle: _selectedOccurrenceUpdateTitle,
+        showUpdateSpacing: _selectedSubtype != null,
+        updateController: _occurrenceUpdateController,
+        timelineUpdates: _occurrenceTimeline,
+        accent: _getCategoryColor(),
+        onStatusSelected: (value) {
           setState(() {
             _occurrenceController.setStatus(value);
             _copyOccurrenceControllerToFields(includeOutcomes: false);
           });
         },
-      ),
-      if (_occurrenceStatus != OccurrenceFormController.statusInProgress) ...[
-        const SizedBox(height: 8),
-        _buildChoiceChipGroup(
-          label: 'Desfecho Operacional',
-          options: const ['Com êxito', 'Sem êxito'],
-          selectedOption: _occurrenceSuccessful == true
-              ? 'Com êxito'
-              : _occurrenceSuccessful == false
-              ? 'Sem êxito'
-              : null,
-          onSelected: (value) {
-            setState(() {
-              _occurrenceSuccessful = value == 'Com êxito';
-            });
-          },
-        ),
-      ],
-      const SizedBox(height: 8),
-      _buildMultiChipGroup(
-        label: 'Resultados Finais',
-        options: _outcomeOptionsForOccurrenceSubtype(_selectedSubtype),
-        selectedOptions: _selectedOccurrenceOutcomes,
-        onToggle: (option) {
+        onSuccessChanged: (value) {
+          setState(() => _occurrenceSuccessful = value);
+        },
+        onOutcomeToggle: (option) {
           setState(() {
             if (_selectedOccurrenceOutcomes.contains(option)) {
               _selectedOccurrenceOutcomes.remove(option);
@@ -2764,38 +2403,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
             }
           });
         },
-      ),
-      const SizedBox(height: 16),
-      ..._buildOccurrenceQuickUpdateShortcuts(),
-      if (_selectedSubtype != null) const SizedBox(height: 12),
-      TacticalTextField(
-        controller: _occurrenceUpdateController,
-        labelText: 'Atualização desta etapa',
-        prefixIcon: Icons.timeline_rounded,
-        maxLines: 3,
-        minLines: 2,
-      ),
-      ..._buildOccurrenceTimelinePreview(),
-    ];
-  }
-
-  List<Widget> _buildOccurrenceQuickUpdateShortcuts() {
-    final shortcuts = OccurrenceQuickUpdateCatalog.forSubtype(_selectedSubtype);
-    if (shortcuts.isEmpty) {
-      return const [];
-    }
-
-    return [
-      OccurrenceQuickUpdateShortcuts(
-        titles: shortcuts.map((shortcut) => shortcut.title).toList(),
-        selectedTitle: _selectedOccurrenceUpdateTitle,
-        accent: _getCategoryColor(),
-        onSelected: (title) {
+        onShortcutSelected: (title) {
           final shortcut = shortcuts.firstWhere(
             (shortcut) => shortcut.title == title,
           );
           _applyOccurrenceQuickUpdateShortcut(shortcut);
         },
+        onEventTap: _openOccurrenceEventDetails,
       ),
     ];
   }
@@ -2820,35 +2434,12 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     });
   }
 
-  List<Widget> _buildOccurrenceTimelinePreview() {
-    if (_occurrenceTimeline.isEmpty) {
-      return const [];
-    }
-
-    return [
-      OccurrenceTimelinePreview(
-        updates: _occurrenceTimeline,
-        accent: _getCategoryColor(),
-        onEventTap: _openOccurrenceEventDetails,
-      ),
-    ];
-  }
-
   Future<List<File>> _pickOccurrenceEventPhotos() async {
-    final picker = ImagePicker();
-    final images = await picker.pickMultiImage(
-      maxWidth: 1280,
-      maxHeight: 1280,
-      imageQuality: 60,
-    );
-    if (images.isEmpty) return const [];
+    final files = await OccurrenceEventMediaService(
+      storageService: StorageService(),
+    ).pickCompressedPhotos();
+    if (files.isEmpty) return const [];
 
-    final files = <File>[];
-    for (final image in images) {
-      final originalFile = File(image.path);
-      final compressed = await _compressImage(originalFile);
-      files.add(compressed ?? originalFile);
-    }
     HapticFeedback.lightImpact();
     return files;
   }
@@ -2856,91 +2447,48 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   Future<List<Map<String, dynamic>>> _uploadOccurrenceEventPhotos(
     List<File> files,
   ) async {
-    if (files.isEmpty) return const [];
-
-    final storageService = StorageService();
-    final uploaded = <Map<String, dynamic>>[];
-    final folder = 'incidents/${_activeIncidentId ?? widget.dogId}/events';
-
-    for (var i = 0; i < files.length; i++) {
-      final url = await storageService.uploadProfileImage(files[i], folder);
-      if (url == null) {
-        throw Exception('Falha ao subir a foto do evento ${i + 1}.');
-      }
-      uploaded.add({
-        'url': url,
-        'type': 'photo',
-        'caption': '',
-        'uploadedAt': DateTime.now().toIso8601String(),
-      });
-    }
-
-    return uploaded;
+    return OccurrenceEventMediaService(
+      storageService: StorageService(),
+    ).uploadPhotos(
+      files: files,
+      incidentIdOrDogId: _activeIncidentId ?? widget.dogId,
+    );
   }
 
-  Future<_OccurrenceEventLocation> _captureOccurrenceEventLocation() async {
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-    final point = LatLng(position.latitude, position.longitude);
-    var address =
-        '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
-
-    try {
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        final resolvedAddress = [
-          p.thoroughfare,
-          p.subLocality ?? p.subAdministrativeArea,
-          p.locality,
-        ].where((part) => part != null && part.trim().isNotEmpty).join(', ');
-        if (resolvedAddress.isNotEmpty) {
-          address = resolvedAddress;
-        }
-      }
-    } catch (_) {
-      // Mantém a coordenada mesmo quando o endereço textual não puder ser resolvido.
-    }
-
+  Future<ResolvedLocation> _captureOccurrenceEventLocation() async {
+    final location = await const LocationResolutionService()
+        .currentHighAccuracy();
     HapticFeedback.lightImpact();
-    return _OccurrenceEventLocation(address: address, point: point);
+    return location;
   }
 
   Future<void> _openOccurrenceEventDetails(int index) async {
     if (index < 0 || index >= _occurrenceTimeline.length || _isSaving) return;
 
     final update = _occurrenceTimeline[index];
-    final titleController = TextEditingController(text: update.title);
-    final descriptionController = TextEditingController(
-      text: update.description,
-    );
-    var eventLocation = update.location ?? '';
-    var eventLatitude = update.latitude;
-    var eventLongitude = update.longitude;
-    final eventAttachments = List<Map<String, dynamic>>.from(
-      update.attachments,
-    );
-    final pendingPhotos = <File>[];
+    final draft = OccurrenceEventDraft(update);
+    final result = await _showOccurrenceEventDetailsSheet(update, draft);
+    draft.dispose();
+    if (result == null || !mounted) return;
 
-    final result = await showModalBottomSheet<_OccurrenceEventChange>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    await _applyOccurrenceEventChange(index, result);
+  }
+
+  Future<OccurrenceEventChange?> _showOccurrenceEventDetailsSheet(
+    IncidentProgressUpdate update,
+    OccurrenceEventDraft draft,
+  ) {
+    return _showTacticalBottomSheet<OccurrenceEventChange>(
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) => OccurrenceEventDetailsSheet(
             update: update,
-            titleController: titleController,
-            descriptionController: descriptionController,
+            titleController: draft.titleController,
+            descriptionController: draft.descriptionController,
             timestampLabel: _formatOccurrenceEventTimestamp(update.timestamp),
-            eventLocation: eventLocation,
-            eventAttachments: eventAttachments,
-            pendingPhotoCount: pendingPhotos.length,
+            eventLocation: draft.location,
+            eventAttachments: draft.attachments,
+            pendingPhotoCount: draft.pendingPhotoCount,
             backgroundColor: _hudBackground,
             panelColor: _hudPanel,
             accentColor: _hudCyan,
@@ -2950,16 +2498,12 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
             onAddPhotos: () async {
               final files = await _pickOccurrenceEventPhotos();
               if (files.isEmpty) return;
-              setSheetState(() => pendingPhotos.addAll(files));
+              setSheetState(() => draft.addPendingPhotos(files));
             },
             onCaptureLocation: () async {
               try {
                 final eventPoint = await _captureOccurrenceEventLocation();
-                setSheetState(() {
-                  eventLocation = eventPoint.address;
-                  eventLatitude = eventPoint.point.latitude;
-                  eventLongitude = eventPoint.point.longitude;
-                });
+                setSheetState(() => draft.applyLocation(eventPoint));
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -2969,32 +2513,18 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
                 );
               }
             },
-            onDelete: () => Navigator.of(
-              context,
-            ).pop(const _OccurrenceEventChange.delete()),
+            onDelete: () =>
+                Navigator.of(context).pop(const OccurrenceEventChange.delete()),
             onSave: () async {
               try {
                 final uploaded = await _uploadOccurrenceEventPhotos(
-                  pendingPhotos,
+                  draft.pendingPhotos,
                 );
-                eventAttachments.addAll(uploaded);
-                final edited = IncidentProgressUpdate(
-                  title: titleController.text.trim().isEmpty
-                      ? update.title
-                      : titleController.text.trim(),
-                  description: descriptionController.text.trim(),
-                  timestamp: update.timestamp,
-                  location: eventLocation.trim(),
-                  latitude: eventLatitude,
-                  longitude: eventLongitude,
-                  authorId: update.authorId,
-                  authorName: update.authorName,
-                  attachments: eventAttachments,
-                );
+                draft.addAttachments(uploaded);
                 if (!context.mounted) return;
                 Navigator.of(
                   context,
-                ).pop(_OccurrenceEventChange.update(edited));
+                ).pop(OccurrenceEventChange.update(draft.toProgressUpdate()));
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -3012,24 +2542,41 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         );
       },
     );
-    titleController.dispose();
-    descriptionController.dispose();
-    if (result == null || !mounted) return;
+  }
 
-    await _applyOccurrenceEventChange(index, result);
+  Future<T?> _showTacticalBottomSheet<T>({required WidgetBuilder builder}) {
+    return showModalBottomSheet<T>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: builder,
+    );
   }
 
   String _formatOccurrenceEventTimestamp(DateTime timestamp) {
-    return '${timestamp.day.toString().padLeft(2, '0')}/'
-        '${timestamp.month.toString().padLeft(2, '0')}/'
-        '${timestamp.year} às '
-        '${timestamp.hour.toString().padLeft(2, '0')}:'
-        '${timestamp.minute.toString().padLeft(2, '0')}';
+    return '${_formatDatePtBr(timestamp)} às ${_formatTimeOfDay(timestamp)}';
+  }
+
+  Future<void> _syncActiveOccurrenceSnapshot(DateTime updatedAt) async {
+    if (_activeIncidentId == null) return;
+
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final operatorContext = _operatorContext(authVM: authVM, userVM: userVM);
+
+    await _saveActiveOccurrenceSnapshot(
+      incidentVM: incidentVM,
+      currentRa: operatorContext.ra,
+      currentOperatorName: operatorContext.name,
+      updatedAt: updatedAt,
+    );
   }
 
   Future<void> _applyOccurrenceEventChange(
     int index,
-    _OccurrenceEventChange change,
+    OccurrenceEventChange change,
   ) async {
     if (index < 0 || index >= _occurrenceTimeline.length || _isSaving) return;
     final previousTimeline = List<IncidentProgressUpdate>.from(
@@ -3050,26 +2597,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     });
 
     try {
-      if (_activeIncidentId != null) {
-        final authVM = Provider.of<AuthViewModel>(context, listen: false);
-        final incidentVM = Provider.of<IncidentViewModel>(
-          context,
-          listen: false,
-        );
-        final userVM = Provider.of<UserViewModel>(context, listen: false);
-        final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-        final currentOperatorName = _currentOperatorName(
-          authVM: authVM,
-          userVM: userVM,
-          currentRa: currentRa,
-        );
-        await _saveActiveOccurrenceSnapshot(
-          incidentVM: incidentVM,
-          currentRa: currentRa,
-          currentOperatorName: currentOperatorName,
-          updatedAt: DateTime.now(),
-        );
-      }
+      await _syncActiveOccurrenceSnapshot(DateTime.now());
       if (!mounted) return;
       _setSaveStatus('Linha do tempo sincronizada.');
       _showOperationalSnack(
@@ -3134,7 +2662,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   void _ensureOutcomeDetailRow(String option) {
-    final normalized = _normalizeOutcomeForMatch(option);
+    final normalized = const TextMatchService().normalizePtBr(option);
     if (normalized.contains('veiculo') && _detainedVehicles.isEmpty) {
       _addDetainedVehicle();
     } else if (normalized.contains('detido') && _detainedIndividuals.isEmpty) {
@@ -3146,78 +2674,24 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 
-  String _normalizeOutcomeForMatch(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll(RegExp('[áàâãä]'), 'a')
-        .replaceAll(RegExp('[éèêë]'), 'e')
-        .replaceAll(RegExp('[íìîï]'), 'i')
-        .replaceAll(RegExp('[óòôõö]'), 'o')
-        .replaceAll(RegExp('[úùûü]'), 'u')
-        .replaceAll('ç', 'c');
-  }
-
-  String _currentOperatorName({
-    required AuthViewModel authVM,
-    required UserViewModel userVM,
-    required String currentRa,
-  }) {
-    return userVM.displayNameFor(ra: currentRa, firebaseUser: authVM.user);
-  }
-
   List<IncidentProgressUpdate> _buildIncidentProgressUpdates(
     DateTime finalDate, {
     required String authorId,
     required String authorName,
   }) {
-    final updates = List<IncidentProgressUpdate>.from(_occurrenceTimeline);
-    final note = _occurrenceUpdateController.text.trim();
-
-    if (updates.isEmpty && widget.initialData == null) {
-      updates.add(
-        IncidentProgressUpdate(
-          title: 'Registro inicial',
-          description: _descriptionController.text.trim().isNotEmpty
-              ? _descriptionController.text.trim()
-              : 'Ocorrência registrada pela equipe.',
-          timestamp: finalDate,
-          location: _locationController.text.trim(),
-          authorId: authorId,
-          authorName: authorName,
-        ),
-      );
-    }
-
-    if (note.isNotEmpty) {
-      final progressTitle =
-          _selectedOccurrenceUpdateTitle ??
-          (_occurrenceStatus == OccurrenceFormController.statusInProgress
-              ? 'Atualização operacional'
-              : 'Encerramento da ocorrência');
-      updates.add(
-        IncidentProgressUpdate(
-          title: progressTitle,
-          description: note,
-          timestamp: finalDate,
-          location: _locationController.text.trim(),
-          authorId: authorId,
-          authorName: authorName,
-        ),
-      );
-    } else if (widget.documentId != null) {
-      updates.add(
-        IncidentProgressUpdate(
-          title: 'Registro atualizado',
-          description: 'Dados da ocorrência atualizados.',
-          timestamp: finalDate,
-          location: _locationController.text.trim(),
-          authorId: authorId,
-          authorName: authorName,
-        ),
-      );
-    }
-
-    return updates;
+    return OccurrenceProgressUpdateBuilder.build(
+      timeline: _occurrenceTimeline,
+      isNewRecord: widget.initialData == null,
+      isEditingExistingRecord: widget.documentId != null,
+      timestamp: finalDate,
+      description: _descriptionController.text,
+      location: _locationController.text,
+      status: _occurrenceStatus,
+      selectedUpdateTitle: _selectedOccurrenceUpdateTitle,
+      updateNote: _occurrenceUpdateController.text,
+      authorId: authorId,
+      authorName: authorName,
+    );
   }
 
   List<Widget> _buildTrainingMetaFields() {
@@ -3308,8 +2782,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return;
     }
 
-    _returnDateController.text =
-        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    _returnDateController.text = _formatDatePtBr(date);
   }
 
   Widget _buildTopActionRow() {
@@ -3354,14 +2827,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   String _descriptionLabel() {
-    if (widget.category == 'Treino') return 'Descrição do treino';
-    if (widget.category == 'Saude') return 'Detalhes';
-    if (widget.category == 'Rotina') {
-      return _selectedSubtype == _SheetSubtype.feeding
-          ? 'Observações da alimentação'
-          : 'Detalhes da rotina';
-    }
-    return 'Descrição da ocorrência';
+    return ActivityFormLabels.descriptionLabel(
+      category: widget.category,
+      subtype: _selectedSubtype,
+      feedingSubtype: _SheetSubtype.feeding,
+    );
   }
 
   Widget _buildSaveButton(Color tColor) {
@@ -3399,12 +2869,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   String _saveButtonLabel() {
-    if (widget.category == 'Treino') return 'SALVAR TREINO';
-    if (widget.category == 'Saude') return 'SALVAR PRONTUÁRIO';
-    if (widget.category == 'Rotina') return 'SALVAR ROTINA';
-    return _occurrenceStatus == OccurrenceFormController.statusInProgress
-        ? 'SALVAR EM ANDAMENTO'
-        : 'CONCLUIR OCORRÊNCIA';
+    return ActivityFormLabels.saveButtonLabel(
+      category: widget.category,
+      occurrenceStatus: _occurrenceStatus,
+    );
   }
 
   void _handlePrimarySave() {
@@ -3470,356 +2938,85 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
+  void _setFormDataValue(String label, String? value) {
+    setState(() {
+      if (value == null) {
+        _formData.remove(label);
+      } else {
+        _formData[label] = value;
+      }
+    });
+  }
+
   List<Widget> _buildDynamicFields() {
-    switch (_selectedSubtype) {
-      case _SheetSubtype.searchCapture:
-        return [
-          _buildChipGroup('Idade da Trilha', [
-            '< 30 min',
-            '30m - 2h',
-            '2h - 6h',
-            '> 6h',
-          ]),
-          _buildChipGroup('Terreno', ['Urbano', 'Mata', 'Rural', 'Misto']),
-          _buildChipGroup('Artigo de Odor', [
-            'Roupa',
-            'Objeto',
-            'Veículo',
-            'Odor de Cena',
-          ]),
-          _buildTrackingAction(
-            startLabel: 'INICIAR RASTREIO TÁTICO',
-            startIcon: Icons.satellite_alt_rounded,
-            backgroundColor: const Color(0xFFFBBF24),
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.only(bottom: 24),
-          ),
-        ];
-      case _SheetSubtype.guardProtection:
-        return [
-          _buildChipGroup('Cenário', [
-            'Abordagem',
-            'Edificação',
-            'Perseguição',
-            'Estampido',
-          ]),
-          _buildChipGroup('Figurante', [
-            'Manga',
-            'Traje Completo',
-            'Focinheira',
-            'Civil',
-          ]),
-          _buildChipGroup('Controle/Out', [
-            'Solta Limpa',
-            'Comando Extra',
-            'Correção Mecânica',
-          ]),
-          const SizedBox(height: 8),
-          TacticalTextField(
-            controller: _objetivoTreinoController,
-            labelText: 'Objetivo do Treino',
-            prefixIcon: Icons.flag_rounded,
-          ),
-          const SizedBox(height: 16),
-        ];
-      case _SheetSubtype.scentWork:
-        return [
-          _buildChipGroup('Direção do Vento', [
-            'Face',
-            'Cauda',
-            'Lateral',
-            'Sem Vento',
-          ]),
-          _buildChipGroup('Dificuldade', [
-            'Cenário Limpo',
-            'Distratores',
-            'Efeito Chaminé',
-            'Delta T',
-          ]),
-          _buildChipGroup('Resposta Final', [
-            'Sentado',
-            'Deitado',
-            'Ativo',
-            'Congelamento',
-          ]),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: HudSelectField<String>(
-              label: 'Tipo de Odor',
-              icon: Icons.science_rounded,
-              value: _formData['Tipo de Odor'] as String?,
-              placeholder: 'Selecione o odor',
-              accent: _hudAmber,
-              items: const [
-                'Maconha',
-                'Cocaína',
-                'Crack',
-                'Sintéticos',
-                'Nose MP',
-                'Outros',
-              ],
-              labelBuilder: (item) => item,
-              onChanged: (val) =>
-                  setState(() => _formData['Tipo de Odor'] = val),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TacticalTextField(
-                  controller: _tempController,
-                  keyboardType: TextInputType.number,
-                  labelText: 'Temp (°C)',
-                  prefixIcon: Icons.thermostat_rounded,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TacticalTextField(
-                  controller: _humidityController,
-                  keyboardType: TextInputType.number,
-                  labelText: 'Umidade (%)',
-                  prefixIcon: Icons.water_drop_rounded,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: _pullCurrentWeather,
-              icon: const Icon(
-                Icons.cloud_sync_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: Text(
-                'CAPTURAR CLIMA (GPS)',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B4F72),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ];
-      case _SheetSubtype.obedience:
-        return [
-          TacticalTextField(
-            controller: _objetivoTreinoController,
-            labelText: 'Objetivos do Treino',
-            prefixIcon: Icons.flag_rounded,
-          ),
-          const SizedBox(height: 16),
-          _buildChipGroup('Distração', ['Baixa', 'Média', 'Alta', 'Extrema']),
-          _buildChipGroup('Guia', ['Off-leash', 'Misto', 'Com Guia']),
-          _buildChipGroup('Teve êxito?', ['Sim', 'Não']),
-          TacticalTextField(
-            controller: _dificuldadesController,
-            labelText: 'Dificuldades Encontradas',
-            prefixIcon: Icons.warning_amber_rounded,
-            maxLines: 3,
-            minLines: 2,
-          ),
-          const SizedBox(height: 16),
-        ];
-      case _SheetSubtype.leisureConditioning:
-        return [
-          _buildChipGroup('Atividade', [
-            'Passeio Livre',
-            'Bolinha/Tug',
-            'Socialização',
-            'Esteira',
-            'Natação',
-          ]),
-          _buildChipGroup('Intensidade', [
-            'Regenerativo',
-            'Moderado',
-            'Alta Intensidade',
-          ]),
-        ];
-      case _SheetSubtype.walk:
-        return [
-          _buildChipGroup('Tipo de Piso', [
-            'Asfalto',
-            'Grama',
-            'Terra',
-            'Misto',
-          ]),
-          _buildChipGroup('Guia', ['Curta', 'Longa', 'Livre']),
-          const SizedBox(height: 12),
-          _buildTrackingAction(
-            startLabel: 'INICIAR RASTREIO DE PASSEIO',
-            startIcon: Icons.directions_walk_rounded,
-            backgroundColor: const Color(0xFF43A047),
-            foregroundColor: Colors.white,
-            isLightMode: true,
-            padding: const EdgeInsets.only(bottom: 24),
-          ),
-        ];
-      default:
-        return [];
+    if (!DynamicSubtypeFields.handles(_selectedSubtype)) {
+      return const [];
     }
+
+    return [
+      DynamicSubtypeFields(
+        subtype: _selectedSubtype,
+        formData: _formData,
+        accentColor: _getCategoryColor(),
+        odorAccentColor: _hudAmber,
+        objectiveController: _objetivoTreinoController,
+        difficultiesController: _dificuldadesController,
+        temperatureController: _tempController,
+        humidityController: _humidityController,
+        onChanged: _setFormDataValue,
+        onOdorChanged: (value) {
+          setState(() => _formData['Tipo de Odor'] = value);
+        },
+        onPullWeather: _pullCurrentWeather,
+        trackingActionBuilder: _buildTrackingAction,
+      ),
+    ];
   }
 
   List<Widget> _buildDetecaoGrouped() {
     return [
-      HudExpansionSection(
-        title: 'Detalhes da apreensão',
-        icon: Icons.shield_rounded,
-        iconColor: Colors.orangeAccent,
-        initiallyExpanded: true,
-        children: [
-          TacticalTextField(
-            controller: _naturezaOcorrenciaController,
-            labelText: 'Natureza da ocorrência',
-            prefixIcon: Icons.category_rounded,
-          ),
-          const SizedBox(height: 16),
-          ..._buildCategorySpecificFields(),
-        ],
-      ),
-      const SizedBox(height: 12),
-      HudExpansionSection(
-        title: 'Contexto & Local',
-        icon: Icons.location_on_rounded,
-        iconColor: const Color(0xFF4ECDE4),
-        children: [
-          _buildTopActionRow(),
-          const SizedBox(height: 16),
-          _buildLocationTimeRow(),
-        ],
-      ),
-      const SizedBox(height: 12),
-      HudExpansionSection(
-        title: 'Relatório & Anexos',
-        icon: Icons.photo_library_rounded,
-        iconColor: const Color(0xFF1B8A4C),
-        children: [
-          _buildDescriptionField(),
-          const SizedBox(height: 24),
-          _buildImageGallery(),
-        ],
+      OccurrenceDetectionGroupedSections(
+        natureController: _naturezaOcorrenciaController,
+        specificFields: _buildCategorySpecificFields(),
+        topActionRow: _buildTopActionRow(),
+        locationTimeRow: _buildLocationTimeRow(),
+        descriptionField: _buildDescriptionField(),
+        imageGallery: _buildImageGallery(),
       ),
     ];
   }
 
   List<Widget> _buildBuscaPessoaGrouped() {
     return [
-      HudExpansionSection(
-        title: 'Detalhes da Busca',
-        icon: Icons.person_search_rounded,
-        iconColor: Colors.redAccent,
-        initiallyExpanded: true,
-        children: [
-          TacticalTextField(
-            controller: _naturezaOcorrenciaController,
-            labelText: 'Natureza da ocorrência',
-            prefixIcon: Icons.category_rounded,
-          ),
-          const SizedBox(height: 16),
-          _buildChipGroup('Tipo de Busca', [
-            _SheetSubtype.searchCapture,
-            'Pessoa Desaparecida',
-          ]),
-          TacticalTextField(
-            controller: _odorObjetoController,
-            labelText: 'Objeto Fonte de Odor',
-            prefixIcon: Icons.search,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TacticalTextField(
-                  controller: _tempoDesaparecimentoController,
-                  labelText: 'Tempo Desaparecido',
-                  prefixIcon: Icons.access_time,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TacticalTextField(
-                  controller: _durationController,
-                  labelText: 'Duração (Busca)',
-                  prefixIcon: Icons.timer,
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      HudExpansionSection(
-        title: 'Teatro de Operações',
-        icon: Icons.terrain_rounded,
-        iconColor: Colors.amber,
-        children: [
-          _buildTopActionRow(),
-          const SizedBox(height: 16),
-          _buildLocationTimeRow(),
-          const SizedBox(height: 16),
-          TacticalTextField(
-            controller: _condicaoTerrenoController,
-            labelText: 'Condições / Terreno',
-            prefixIcon: Icons.terrain,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _pullCurrentWeather,
-              icon: const Icon(Icons.cloud_sync, color: Colors.white),
-              label: Text(
-                'PUXAR CLIMA ATUAL (GPS)',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4ECDE4).withAlpha(50),
-                foregroundColor: const Color(0xFF4ECDE4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildTrackingAction(
-            startLabel: 'INICIAR RASTREIO TÁTICO',
-            startIcon: Icons.satellite_alt_rounded,
-            backgroundColor: const Color(0xFFFBBF24),
-            foregroundColor: Colors.black,
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      HudExpansionSection(
-        title: 'Relatório & Anexos',
-        icon: Icons.photo_library_rounded,
-        iconColor: const Color(0xFF1B8A4C),
-        children: [
-          _buildDescriptionField(),
-          const SizedBox(height: 24),
-          _buildImageGallery(),
-        ],
+      OccurrencePersonSearchGroupedSections(
+        natureController: _naturezaOcorrenciaController,
+        searchCaptureSubtype: _SheetSubtype.searchCapture,
+        selectedSearchType: _formData['Tipo de Busca'] as String?,
+        accentColor: _getCategoryColor(),
+        odorObjectController: _odorObjetoController,
+        missingTimeController: _tempoDesaparecimentoController,
+        durationController: _durationController,
+        terrainConditionController: _condicaoTerrenoController,
+        onPullWeather: _pullCurrentWeather,
+        onSearchTypeChanged: (value) {
+          setState(() {
+            if (value == null) {
+              _formData.remove('Tipo de Busca');
+            } else {
+              _formData['Tipo de Busca'] = value;
+            }
+          });
+        },
+        topActionRow: _buildTopActionRow(),
+        locationTimeRow: _buildLocationTimeRow(),
+        trackingAction: _buildTrackingAction(
+          startLabel: 'INICIAR RASTREIO TÁTICO',
+          startIcon: Icons.satellite_alt_rounded,
+          backgroundColor: const Color(0xFFFBBF24),
+          foregroundColor: Colors.black,
+        ),
+        descriptionField: _buildDescriptionField(),
+        imageGallery: _buildImageGallery(),
       ),
     ];
   }
@@ -3834,155 +3031,47 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   ];
 
   List<Widget> _buildCategorySpecificFields() {
-    if (!_isOccurrenceCategory) return [];
-
-    switch (_selectedSubtype) {
-      case _SheetSubtype.detection:
-        return _buildDetectionOccurrenceFields();
-      case _SheetSubtype.supportVehicle:
-        return _buildSupportVehicleFields();
-      case _SheetSubtype.missingPerson:
-        return _buildMissingPersonFields();
-      case _SheetSubtype.serviceOrder:
-        return _buildServiceOrderFields();
-      case _SheetSubtype.event:
-        return _buildEventFields();
-      default:
-        return [];
+    if (!_isOccurrenceCategory ||
+        !OccurrenceSpecificFields.handles(_selectedSubtype)) {
+      return const [];
     }
-  }
 
-  List<Widget> _buildDetectionOccurrenceFields() {
     return [
-      OccurrenceDetectionFields(
+      OccurrenceSpecificFields(
+        subtype: _selectedSubtype,
+        formData: _formData,
         drugs: _detecaoDrogas,
         drugOptions: _detectionDrugOptions,
-        accentColor: _hudCyan,
+        accentColor: _getCategoryColor(),
+        detectionAccentColor: _hudCyan,
         supportTeamController: _equipeController,
         reportNumberController: _boController,
+        garrisonController: _guarnicaoController,
+        situationController: _situacaoController,
+        outcomeController: _desfechoController,
+        odorObjectController: _odorObjetoController,
+        missingTimeController: _tempoDesaparecimentoController,
+        durationController: _durationController,
+        terrainConditionController: _condicaoTerrenoController,
+        orderNumberController: _numeroOsController,
+        audienceController: _publicoController,
+        themeController: _temaController,
         onAddDrug: _addDrug,
         onRemoveDrug: _removeDrug,
         onDrugTypeChanged: (drug, type) {
           setState(() => drug['tipo'] = type);
         },
+        onSearchTypeChanged: (value) {
+          setState(() {
+            if (value == null) {
+              _formData.remove('Tipo de Busca');
+            } else {
+              _formData['Tipo de Busca'] = value;
+            }
+          });
+        },
+        onPullWeather: _pullCurrentWeather,
       ),
-    ];
-  }
-
-  List<Widget> _buildSupportVehicleFields() {
-    return [
-      TacticalTextField(
-        controller: _guarnicaoController,
-        labelText: 'Guarnição apoiada',
-        prefixIcon: Icons.local_police,
-      ),
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _situacaoController,
-        labelText: 'Situação encontrada',
-        prefixIcon: Icons.warning,
-      ),
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _desfechoController,
-        labelText: 'Desfecho da intervenção',
-        prefixIcon: Icons.check_circle,
-      ),
-      const SizedBox(height: 24),
-    ];
-  }
-
-  List<Widget> _buildMissingPersonFields() {
-    return [
-      _buildChipGroup('Tipo de Busca', [
-        _SheetSubtype.searchCapture,
-        'Pessoa Desaparecida',
-      ]),
-      TacticalTextField(
-        controller: _odorObjetoController,
-        labelText: 'Objeto Fonte de Odor',
-        prefixIcon: Icons.search,
-      ),
-      const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: TacticalTextField(
-              controller: _tempoDesaparecimentoController,
-              labelText: 'Tempo Desaparecido',
-              prefixIcon: Icons.access_time,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TacticalTextField(
-              controller: _durationController,
-              labelText: 'Duração (Busca)',
-              prefixIcon: Icons.timer,
-              keyboardType: TextInputType.number,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 24),
-      TacticalTextField(
-        controller: _condicaoTerrenoController,
-        labelText: 'Condições / Terreno',
-        prefixIcon: Icons.terrain,
-      ),
-      const SizedBox(height: 12),
-      SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton.icon(
-          onPressed: _pullCurrentWeather,
-          icon: const Icon(Icons.cloud_sync, color: Colors.white),
-          label: Text(
-            'PUXAR CLIMA ATUAL (GPS)',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1B8A4C),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 24),
-    ];
-  }
-
-  List<Widget> _buildServiceOrderFields() {
-    return [
-      TacticalTextField(
-        controller: _numeroOsController,
-        labelText: 'Número da Ordem de Serviço',
-        prefixIcon: Icons.numbers,
-      ),
-      const SizedBox(height: 24),
-    ];
-  }
-
-  List<Widget> _buildEventFields() {
-    return [
-      TacticalTextField(
-        controller: _publicoController,
-        keyboardType: TextInputType.number,
-        labelText: 'Público estimado',
-        prefixIcon: Icons.groups_rounded,
-      ),
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _temaController,
-        labelText: 'Tema (Ex: Cão Cidadão)',
-        prefixIcon: Icons.lightbulb_rounded,
-      ),
-      const SizedBox(height: 24),
     ];
   }
 
@@ -4005,7 +3094,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       },
       onRemovePhoto: (index) {
         setState(() {
-          _mediaAttachments[index]['caption']?.dispose();
+          MediaAttachmentRows.disposeCaption(_mediaAttachments[index]);
           _mediaAttachments.removeAt(index);
           if (_activePhotoIndex >= _mediaAttachments.length) {
             _activePhotoIndex = _mediaAttachments.length - 1;
@@ -4017,66 +3106,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Future<void> _pickPdf() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-      allowMultiple: false,
-    );
-    if (result != null && result.files.single.path != null) {
+    final result = await const PdfAttachmentService().pickPdf();
+    if (result != null) {
       setState(() {
-        _examePdfFile = File(result.files.single.path!);
-        _examePdfName = result.files.single.name;
+        _examePdfFile = result.file;
+        _examePdfName = result.name;
       });
       HapticFeedback.lightImpact();
     }
-  }
-
-  Widget _buildChipGroup(String label, List<String> options) {
-    final selectedOption = _formData[label] as String?;
-    return HudToggleChipGroup(
-      label: label,
-      options: options,
-      selectedOption: selectedOption,
-      accent: _getCategoryColor(),
-      onChanged: (value) {
-        setState(() {
-          if (value == null) {
-            _formData.remove(label);
-          } else {
-            _formData[label] = value;
-          }
-        });
-      },
-    );
-  }
-
-  Widget _buildChoiceChipGroup({
-    required String label,
-    required List<String> options,
-    required String? selectedOption,
-    required ValueChanged<String> onSelected,
-  }) {
-    return HudChoiceChipGroup(
-      label: label,
-      options: options,
-      selectedOption: selectedOption,
-      accent: _getCategoryColor(),
-      onSelected: onSelected,
-    );
-  }
-
-  Widget _buildMultiChipGroup({
-    required String label,
-    required List<String> options,
-    required Set<String> selectedOptions,
-    required ValueChanged<String> onToggle,
-  }) {
-    return HudMultiChipGroup(
-      label: label,
-      options: options,
-      selectedOptions: selectedOptions,
-      accent: _getCategoryColor(),
-      onToggle: onToggle,
-    );
   }
 }

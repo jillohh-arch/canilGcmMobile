@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'media_attachment_rows.dart';
 import 'tactical_text_field.dart';
 
 class MediaAttachmentGallery extends StatelessWidget {
@@ -150,8 +151,10 @@ class MediaAttachmentGallery extends StatelessWidget {
               return GestureDetector(
                 onTap: () => onSelectPhoto(index),
                 child: _PhotoTile(
-                  file: media['file'] as File,
-                  status: media['status']?.toString() ?? 'pending',
+                  file: MediaAttachmentRows.file(media),
+                  status:
+                      media['status']?.toString() ??
+                      MediaAttachmentRows.statusPending,
                   isSelected: isSelected,
                   onRemove: () => onRemovePhoto(index),
                 ),
@@ -162,7 +165,9 @@ class MediaAttachmentGallery extends StatelessWidget {
         const SizedBox(height: 12),
         if (activePhotoIndex >= 0 && activePhotoIndex < mediaAttachments.length)
           TacticalTextField(
-            controller: mediaAttachments[activePhotoIndex]['caption'],
+            controller: MediaAttachmentRows.captionController(
+              mediaAttachments[activePhotoIndex],
+            ),
             labelText: 'Descrição da foto ${activePhotoIndex + 1} *',
           ),
       ],
