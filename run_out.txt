@@ -1,0 +1,34 @@
+﻿flutter : O sistema não 
+pode encontrar o caminho 
+especificado.
+No linha:1 caractere:1
++ flutter run --debug 
+--stacktrace 2>&1 | 
+Out-File -FilePath 
+"run_out.t ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (O s  
+  istema não p...o espec   
+ ificado.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+Could not find an option 
+named "--stacktrace".
+
+Run 'flutter -h' (or 
+'flutter <command> -h') 
+for available flutter 
+commands and options.

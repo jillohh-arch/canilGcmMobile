@@ -1,0 +1,331 @@
+﻿flutter : O sistema não 
+pode encontrar o caminho 
+especificado.
+No linha:1 caractere:1
++ flutter build apk 
+--debug 2>&1 | Out-File 
+-FilePath "build_out.txt" 
+- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo         
+     : NotSpecified: (O s  
+  istema não p...o espec   
+ ificado.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+Running Gradle task 'assembleDebug'...                          
+/c:/users/ji:1:12: Error: 
+Unable to decode bytes as 
+UTF-8.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+           ^
+/c:/users/ji:1:3: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+  ^^^^^^^
+/c:/users/ji:1:13: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+            ^
+/c:/users/ji:1:20: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                   
+^^^^^^^^^
+/c:/users/ji:1:32: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+    ^^^^^^^
+/c:/users/ji:1:40: Error: 
+A function declaration 
+needs an explicit list of 
+parameters.
+Try adding a parameter 
+list to the function 
+declaration.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+            ^^^^^^^^^^^^
+/c:/users/ji:1:52: Error: 
+Expected '{' before this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+                        ^
+/c:/users/ji:1:52: Error: 
+Expected a declaration, 
+but got '.'.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+                        ^
+/c:/users/ji:1:1: Error: 
+Type 'O' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+^
+/c:/users/ji:1:11: Error: 
+Type 'n' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+          ^
+/c:/users/ji:1:15: Error: 
+Type 'pode' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+              ^^^^
+/c:/users/ji:1:30: Error: 
+'o' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+  ^
+/c:/users/ji:1:13: 
+Context: This isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+            ^
+/c:/users/ji:1:1: Error: 
+'O' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+^
+/c:/users/ji:1:11: Error: 
+'n' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+          ^
+/c:/users/ji:1:15: Error: 
+'pode' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+              ^^^^
+/c:/users/ji: Error: No 
+'main' method found.
+Try adding a method named 
+'main' to your program.
+
+Bad state: Generating 
+kernel failed!
+
+O sistema n├åo pode 
+encontrar o caminho 
+especificado.
+
+Building native assets for 
+package:objective_c failed.
+Compilation of hook 
+returned with exit code: 1.
+To reproduce run:
+C:\flutter\bin\cache\dart-s
+dk\bin\dart compile kernel 
+--packages=C:\Projetos\cani
+l-gcm\.dart_tool\package_co
+nfig.json --output=C:\Proje
+tos\canil-gcm\.dart_tool\ho
+oks_runner\objective_c\3b9d
+2aae4f\hook.dill --depfile=
+C:\Projetos\canil-gcm\.dart
+_tool\hooks_runner\objectiv
+e_c\3b9d2aae4f\hook.dill.d 
+C:\Users\Ji&Fer\AppData\Loc
+al\Pub\Cache\hosted\pub.dev
+\objective_c-9.3.0\hook\bui
+ld.dart
+stderr:
+/c:/users/ji:1:12: Error: 
+Unable to decode bytes as 
+UTF-8.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+           ^
+/c:/users/ji:1:3: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+  ^^^^^^^
+/c:/users/ji:1:13: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+            ^
+/c:/users/ji:1:20: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                   
+^^^^^^^^^
+/c:/users/ji:1:32: Error: 
+Expected ';' after this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+    ^^^^^^^
+/c:/users/ji:1:40: Error: 
+A function declaration 
+needs an explicit list of 
+parameters.
+Try adding a parameter 
+list to the function 
+declaration.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+            ^^^^^^^^^^^^
+/c:/users/ji:1:52: Error: 
+Expected '{' before this.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+                        ^
+/c:/users/ji:1:52: Error: 
+Expected a declaration, 
+but got '.'.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+                        ^
+/c:/users/ji:1:1: Error: 
+Type 'O' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+^
+/c:/users/ji:1:11: Error: 
+Type 'n' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+          ^
+/c:/users/ji:1:15: Error: 
+Type 'pode' not found.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+              ^^^^
+/c:/users/ji:1:30: Error: 
+'o' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+                           
+  ^
+/c:/users/ji:1:13: 
+Context: This isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+            ^
+/c:/users/ji:1:1: Error: 
+'O' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+^
+/c:/users/ji:1:11: Error: 
+'n' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+          ^
+/c:/users/ji:1:15: Error: 
+'pode' isn't a type.
+O sistema n├â┬»├é┬┐├é┬¢o 
+pode encontrar o caminho 
+especificado.
+              ^^^^
+/c:/users/ji: Error: No 
+'main' method found.
+Try adding a method named 
+'main' to your program.
+Bad state: Generating 
+kernel failed!
+O sistema n├åo pode 
+encontrar o caminho 
+especificado.
+
+stdout:
+Compiling C:\Users\Ji to 
+kernel file C:\Projetos\can
+il-gcm\.dart_tool\hooks_run
+ner\objective_c\3b9d2aae4f\
+hook.dill.
+
+
+Target dart_build failed: 
+Error: Building native 
+assets failed. See the 
+logs for more details.
+
+
+FAILURE: Build failed with 
+an exception.
+
+* What went wrong:
+Execution failed for task '
+:app:compileFlutterBuildDeb
+ug'.
+> Process 'command 'C:\flut
+ter\bin\flutter.bat'' 
+finished with non-zero 
+exit value 1
+
+* Try:
+> Run with --stacktrace 
+option to get the stack 
+trace.
+> Run with --info or 
+--debug option to get more 
+log output.
+> Run with --scan to get 
+full insights.
+> Get more help at 
+https://help.gradle.org.
+
+BUILD FAILED in 12s
+Running Gradle task 'assembleDebug'...                             12,9s
+Gradle task assembleDebug 
+failed with exit code 1

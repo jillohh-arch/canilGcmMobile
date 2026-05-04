@@ -1,0 +1,134 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function emailMatchesRa(ra) {
+      return signedIn()
+        && (
+          request.auth.token.email == ra + '@gcm.com.br'
+          || request.auth.token.email == ra + '@canilgcm.com'
+        );
+    }
+
+    function isValidActiveShiftFor(ra) {
+      return request.resource.data.keys().hasOnly([
+          'shiftId',
+          'handlerId',
+          'dogId',
+          'status',
+          'startedAt',
+          'updatedAt',
+          'lastDogSwitchAt',
+          'endedAt'
+        ])
+        && request.resource.data.handlerId == ra
+        && request.resource.data.dogId is string
+        && request.resource.data.dogId.size() > 0
+        && request.resource.data.status in ['active', 'ended'];
+    }
+
+    function isValidShiftLogCreate() {
+      return request.resource.data.keys().hasOnly([
+          'id',
+          'handlerId',
+          'initialDogId',
+          'currentDogId',
+          'status',
+          'startedAt',
+          'endedAt',
+          'dogSwitches',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id is string
+        && request.resource.data.handlerId is string
+        && request.resource.data.initialDogId is string
+        && request.resource.data.currentDogId is string
+        && request.resource.data.status == 'active'
+        && request.resource.data.startedAt is timestamp
+        && request.resource.data.endedAt == null
+        && request.resource.data.dogSwitches is list
+        && emailMatchesRa(request.resource.data.handlerId);
+    }
+
+    function isValidShiftLogUpdate() {
+      return request.resource.data.handlerId == resource.data.handlerId
+        && request.resource.data.initialDogId == resource.data.initialDogId
+        && request.resource.data.startedAt == resource.data.startedAt
+        && request.resource.data.status in ['active', 'ended']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'currentDogId',
+          'dogSwitches',
+          'status',
+          'endedAt',
+          'updatedAt'
+        ]);
+    }
+
+    // Current operational state: one document per RA.
+    // Mobile writes only its own RA. Web dashboards can read all active shifts.
+    match /active_shifts/{ra} {
+      allow read: if signedIn();
+      allow create, update: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
+      allow delete: if false;
+    }
+
+    // Historical/audit log for shifts. Created by the mobile app when a shift
+    // starts, then updated when the handler switches K9 or ends the shift.
+    match /shift_logs/{shiftId} {
+      allow read: if signedIn();
+      allow create: if isValidShiftLogCreate();
+      allow update: if signedIn()
+        && emailMatchesRa(resource.data.handlerId)
+        && isValidShiftLogUpdate();
+      allow delete: if false;
+    }
+
+    // Existing mobile collections are kept in compatibility mode for now:
+    // authenticated users can keep using the current admin/profile/activity
+    // screens without a custom-claims migration. Hardening these collections
+    // should be the next rules pass once admin claims are configured.
+    match /users/{ra} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /dogs/{dogId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /trainings/{trainingId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /health_logs/{healthLogId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /occurrence_natures/{natureId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /routines/{routineId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

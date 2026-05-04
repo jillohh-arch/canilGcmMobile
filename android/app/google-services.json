@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "418249404282",
+    "project_id": "canil-gcm",
+    "storage_bucket": "canil-gcm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:418249404282:android:f1dffc921f41ea6318b0c3",
+        "android_client_info": {
+          "package_name": "com.example.canil_gcm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "418249404282-j66bahlkdpnsmgmtadvdhmfastm150b2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.canil_gcm",
+            "certificate_hash": "6158a43ccdcc343ba9ce381813725e04dc48c967"
+          }
+        },
+        {
+          "client_id": "418249404282-c8lon1aohjpcr571jmn5tmlqeb9ejtf0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrPAhfigX4URxY898i6OwJZ5ndS_FzAnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "418249404282-c8lon1aohjpcr571jmn5tmlqeb9ejtf0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

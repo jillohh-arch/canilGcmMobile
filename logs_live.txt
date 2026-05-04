@@ -1,0 +1,32 @@
+﻿flutter : O sistema não 
+pode encontrar o caminho 
+especificado.
+No linha:1 caractere:34
++ ... B_CACHE = 
+"C:\pub_cache"; flutter 
+logs -d 38080DLJG001UB 
+2>&1 | Out-F ...
++                          
+     ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (O s  
+  istema não p...o espec   
+ ificado.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+Showing Pixel 8 Pro logs:

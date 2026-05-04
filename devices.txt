@@ -1,0 +1,34 @@
+﻿flutter : O sistema não 
+pode encontrar o caminho 
+especificado.
+No linha:1 caractere:1
++ flutter devices 2>&1 | 
+Out-File "devices.txt" 
+-Encoding utf8; Get-Con ...
++ ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (O s  
+  istema não p...o espec   
+ ificado.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+O sistema não pode 
+encontrar o caminho 
+especificado.
+Found 4 connected devices:
+  Pixel 8 Pro (mobile) ÔÇó 38080DLJG001UB ÔÇó android-arm64  ÔÇó Android 16 (API 36)
+  Windows (desktop)    ÔÇó windows        ÔÇó windows-x64    ÔÇó Microsoft Windows [vers├åo 10.0.26200.8037]
+  Chrome (web)         ÔÇó chrome         ÔÇó web-javascript ÔÇó Google Chrome 146.0.7680.178
+  Edge (web)           ÔÇó edge           ÔÇó web-javascript ÔÇó Microsoft Edge 145.0.3800.97
+
+Run "flutter emulators" to list and start any available device emulators.
+
+If you expected another device to be detected, please run "flutter doctor" to diagnose potential issues. You may also try increasing the time to wait for connected devices with the "--device-timeout" flag. Visit https://flutter.dev/setup/ for troubleshooting tips.

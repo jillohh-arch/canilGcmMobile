@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isPdf() {
+      return request.resource.contentType == 'application/pdf';
+    }
+
+    function underMegabytes(sizeMb) {
+      return request.resource.size < sizeMb * 1024 * 1024;
+    }
+
+    function canWriteImage(sizeMb) {
+      return signedIn() && isImage() && underMegabytes(sizeMb);
+    }
+
+    function canWritePdf(sizeMb) {
+      return signedIn() && isPdf() && underMegabytes(sizeMb);
+    }
+
+    match /profile_photos/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /users/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /routines/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /trainings/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /incidents/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /health/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWriteImage(10);
+      allow delete: if signedIn();
+    }
+
+    match /health/exams/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canWritePdf(20);
+      allow delete: if signedIn();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

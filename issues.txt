@@ -1,0 +1,6 @@
+﻿INFO|LINT|UNNECESSARY_NULLABLE_FOR_FINAL_VARIABLE_DECLARATIONS|C:\\Projetos\\canil-gcm\\lib\\services\\auth_service.dart|30|34|10|Type could be non-nullable.
+INFO|LINT|AWAIT_ONLY_FUTURES|C:\\Projetos\\canil-gcm\\lib\\services\\auth_service.dart|33|53|5|Uses 'await' on an instance of 'GoogleSignInAuthentication', which is not a subtype of 'Future'.
+INFO|LINT|LIBRARY_PRIVATE_TYPES_IN_PUBLIC_API|C:\\Projetos\\canil-gcm\\lib\\views\\auth\\login_screen.dart|10|3|17|Invalid use of a private type in a public API.
+INFO|LINT|LIBRARY_PRIVATE_TYPES_IN_PUBLIC_API|C:\\Projetos\\canil-gcm\\lib\\views\\dogs\\dog_form_screen.dart|15|3|19|Invalid use of a private type in a public API.
+INFO|LINT|USE_SUPER_PARAMETERS|C:\\Projetos\\canil-gcm\\lib\\views\\users\\user_management_screen.dart|8|9|20|Parameter 'key' could be a super parameter.
+INFO|LINT|LIBRARY_PRIVATE_TYPES_IN_PUBLIC_API|C:\\Projetos\\canil-gcm\\lib\\views\\users\\user_management_screen.dart|11|3|26|Invalid use of a private type in a public API.

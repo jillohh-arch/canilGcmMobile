@@ -1,0 +1,310 @@
+﻿
+04-07 22:20:56.573  1462  
+2105 D BiometricLogger: 
+Error! Modality: face, 
+latency: 1747
+04-07 22:20:56.629   968  
+1435 I Lyric   : zuma_csis_
+core_driver.cc:261: 
+[FEIRQ] CSIS Core context 
+0: event IspFe.csis_core_pd
+_err.LogicalChannel0LateCon
+figError #1, category: 16, 
+count: 1, timestamp: 
+93519829865022
+04-07 22:20:56.630   968 
+16996 I Lyric   : 
+retiming_node.cc:1714: 
+Front(hal id: 7), Over the 
+past 1.576776897s there 
+were 50 responses sent and 
+45 of them had no error. 
+FPS: 31.7103 Non-error 
+FPS: 28.5392
+04-07 22:20:56.633  1192 
+17029 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 48, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:56.633  1192 
+17029 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 5, frame number 46, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:56.633  1192 
+17029 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 47, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:56.634  1192 
+17029 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 49, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:56.634  1192 
+17029 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 50, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:56.635  1192 
+32024 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:56.635  1192 
+32024 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:56.635  1192 
+32024 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:56.635  1192 
+32024 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:56.925 31855 
+32082 I 
+FeatureInitializeWorker: 
+Error=[]
+04-07 22:20:57.062 31855 
+31877 W TaskUtilities: 
+ftx: 13: ERROR
+04-07 22:20:57.070 31855 
+31877 W TaskUtilities: 
+ftx: 13: ERROR
+04-07 22:20:57.085 31855 
+31877 W TaskUtilities: 
+ftx: 13: ERROR
+04-07 22:20:57.204  1192 
+32120 I android.hardware.bi
+ometrics.face-service.pixel
+: Unrecoverable error set 
+to : kCancelled
+04-07 22:20:57.233  1192 
+20957 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 2, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:57.258  1462  
+1530 V WindowManager:     s
+tartWCT=WindowContainerTran
+saction { changes= {} 
+hops= [] flags= 0 
+errorCallbackToken=null 
+taskFragmentOrganizer=null 
+}
+04-07 22:20:57.260   537 
+12448 E gralloc5: ERROR: 
+Format allocation info not 
+found for format: 3b
+04-07 22:20:57.260   537 
+12448 E gralloc5: ERROR: 
+Format allocation info not 
+found for format: 0
+04-07 22:20:57.260   537 
+12448 E gralloc5: ERROR: 
+Unrecognized and/or 
+unsupported format 
+(<unrecognized format> 
+0x3b) and usage (CPU_READ_N
+EVER|CPU_WRITE_NEVER|GPU_TE
+XTURE|GPU_RENDER_TARGET|COM
+POSER_OVERLAY 0xb00)
+04-07 22:20:57.261   537 
+12448 E gralloc5: ERROR: 
+Format allocation info not 
+found for format: 3b
+04-07 22:20:57.261   537 
+12448 E gralloc5: ERROR: 
+Format allocation info not 
+found for format: 0
+04-07 22:20:57.261   537 
+12448 E gralloc5: ERROR: 
+Unrecognized and/or 
+unsupported format 
+(<unrecognized format> 
+0x3b) and usage (CPU_READ_N
+EVER|CPU_WRITE_NEVER|GPU_TE
+XTURE|GPU_RENDER_TARGET|COM
+POSER_OVERLAY 0xb00)
+04-07 22:20:57.276   968 
+16995 I Lyric   : 
+retiming_node.cc:1714: 
+Front(hal id: 7), Over the 
+past 45.065511ms there 
+were 4 responses sent and 
+0 of them had no error. 
+FPS: 88.7597 Non-error 
+FPS: 0
+04-07 22:20:57.277   968  
+1435 I Lyric   : zuma_csis_
+core_driver.cc:261: 
+[FEIRQ] CSIS Core context 
+0: event IspFe.csis_core_pd
+_err.LogicalChannel0LateCon
+figError #1, category: 16, 
+count: 1, timestamp: 
+93520478602693
+04-07 22:20:57.277  1192 
+20957 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 5, frame number 0, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:57.277  1192 
+20957 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 1, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:57.277  1192 
+32090 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:57.277  1192 
+20957 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 3, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:57.277  1192 
+20957 D 
+ACameraDeviceVendor: 
+Device error received, 
+code 3, frame number 4, 
+request ID 0, subseq ID 0 
+physical camera ID 
+04-07 22:20:57.278  1192 
+32090 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:57.278  1192 
+32090 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:57.278  1192 
+32090 I android.hardware.bi
+ometrics.face-service.pixel
+: SetRecoverableError : kCa
+meraCaptureCallbackErrorGen
+eric
+04-07 22:20:57.385  1462  
+2105 I AuthenticationPolicy
+Service: AuthenticationStat
+eListener#onAuthenticationE
+rror
+04-07 22:20:57.385  1462  
+2105 D AcquisitionClient: 
+onErrorInternal code: 5, 
+finish: true
+04-07 22:20:57.385  2176 
+17237 D BiometricStatusRepo
+sitoryImpl: 
+authenticationState 
+updated: Error(biometricSou
+rceType=FACE, 
+errString=Opera├º├úo 
+facial cancelada., 
+errCode=5, requestReason=De
+viceEntryAuthentication)
+04-07 22:20:57.385  1462  
+2105 D BiometricLogger: 
+Error! Modality: face, 
+latency: 361
+04-07 22:21:03.414 30797 
+30797 D 
+WindowOnBackDispatcher: set
+TopOnBackInvokedCallback 
+(unwrapped): io.flutter.emb
+edding.android.FlutterActiv
+ity$1@28991ca
+04-07 22:21:03.556 30797 
+30797 E flutter : [ERROR:fl
+utter/runtime/dart_vm_initi
+alizer.cc(40)] Unhandled 
+Exception: Exception: 
+Falha ao buscar registros 
+m├®dicos: [cloud_firestore/
+permission-denied] The 
+caller does not have 
+permission to execute the 
+specified operation.
+04-07 22:21:03.556 30797 
+30797 E flutter : #0      H
+ealthViewModel.fetchHealthL
+ogsForDog (package:canil_gc
+m/viewmodels/health_viewmod
+el.dart:63:7)
+04-07 22:21:03.556 30797 
+30797 E flutter : 
+<asynchronous suspension>
+04-07 22:21:03.556 30797 
+30797 E flutter : 
+04-07 22:21:03.557 30797 
+30797 E flutter : [ERROR:fl
+utter/runtime/dart_vm_initi
+alizer.cc(40)] Unhandled 
+Exception: Exception: 
+Falha ao buscar treinos: [c
+loud_firestore/permission-d
+enied] The caller does not 
+have permission to execute 
+the specified operation.
+04-07 22:21:03.557 30797 
+30797 E flutter : #0      T
+rainingViewModel.fetchTrain
+ingsForDog (package:canil_g
+cm/viewmodels/training_view
+model.dart:66:7)
+04-07 22:21:03.557 30797 
+30797 E flutter : 
+<asynchronous suspension>
+04-07 22:21:03.557 30797 
+30797 E flutter : 
+04-07 22:21:07.891 27571 
+27643 E msys    : E[N WA]_W
+AJMNSStreamImplOnMNSFailure
+(287)=>[LogLevel:I] WAJMNSS
+tream/impl/callback/onMNSFa
+ilure/p=0xb4000071e171b700 
+(error=MNSTCPSocketReceive(
+): Software caused 
+connection abort)
+04-07 22:21:11.848 30797 
+30980 V NativeCrypto: SSL 
+shutdown failed: 
+ssl=0xb4000071d1582018: 
+I/O error during system 
+call, Software caused 
+connection abort
+
+
