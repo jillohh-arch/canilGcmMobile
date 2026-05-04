@@ -43,7 +43,7 @@ class OccurrenceQuickActionGrid extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Somente atalhos úteis para atuação no local.',
+                    'Atalhos úteis para atuação no local.',
                     style: GoogleFonts.inter(
                       color: Colors.white54,
                       fontSize: 12,
@@ -58,36 +58,52 @@ class OccurrenceQuickActionGrid extends StatelessWidget {
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
-            final width = (constraints.maxWidth - 10) / 2;
-            return Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: actions
-                  .map(
-                    (action) => OccurrenceQuickActionCard(
-                      title: action.title,
-                      icon: action.icon,
-                      color: action.color,
-                      assetPath: action.assetPath,
-                      width: width,
-                      enabled: enabled,
-                      onTap: () => onActionSelected(action),
-                    ),
-                  )
-                  .toList(),
+            final cardWidth = (constraints.maxWidth - 10) / 2;
+            return Column(
+              children: [
+                for (var i = 0; i < actions.length; i += 2) ...[
+                  Row(
+                    children: [
+                      OccurrenceQuickActionCard(
+                        title: actions[i].title,
+                        icon: actions[i].icon,
+                        color: actions[i].color,
+                        assetPath: actions[i].assetPath,
+                        width: cardWidth,
+                        enabled: enabled,
+                        onTap: () => onActionSelected(actions[i]),
+                      ),
+                      const SizedBox(width: 10),
+                      if (i + 1 < actions.length)
+                        OccurrenceQuickActionCard(
+                          title: actions[i + 1].title,
+                          icon: actions[i + 1].icon,
+                          color: actions[i + 1].color,
+                          assetPath: actions[i + 1].assetPath,
+                          width: cardWidth,
+                          enabled: enabled,
+                          onTap: () => onActionSelected(actions[i + 1]),
+                        )
+                      else
+                        SizedBox(width: cardWidth),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ],
             );
           },
         ),
-        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          height: 50,
+          height: 46,
           child: OutlinedButton.icon(
             onPressed: enabled ? onOpenEventCenter : null,
             icon: Icon(Icons.add_rounded, color: accentColor),
             label: Text(
               'OUTRO EVENTO / CENTRAL',
               style: GoogleFonts.robotoMono(
+                fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,
               ),

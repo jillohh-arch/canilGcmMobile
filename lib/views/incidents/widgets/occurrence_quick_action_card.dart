@@ -23,88 +23,85 @@ class OccurrenceQuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = width.clamp(132.0, 164.0).toDouble();
-    final hasFullAsset = (assetPath ?? '').isNotEmpty;
-
     return SizedBox(
       width: width,
-      height: height,
+      height: 126,
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: enabled ? onTap : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          padding: hasFullAsset
-              ? EdgeInsets.zero
-              : const EdgeInsets.fromLTRB(9, 10, 9, 10),
+          padding: EdgeInsets.zero,
           decoration: BoxDecoration(
-            color: hasFullAsset ? Colors.transparent : const Color(0xFF0B1220),
+            color: const Color(0xFF0B1220),
             borderRadius: BorderRadius.circular(6),
-            border: hasFullAsset
-                ? null
-                : Border.all(color: color.withAlpha(85)),
-            boxShadow: [
-              BoxShadow(
-                color: color.withAlpha(hasFullAsset ? 28 : 14),
-                blurRadius: hasFullAsset ? 18 : 12,
-              ),
-            ],
+            border: Border.all(color: color.withAlpha(92)),
+            boxShadow: [BoxShadow(color: color.withAlpha(16), blurRadius: 12)],
           ),
-          child: hasFullAsset
-              ? _FullImageCard(action: this)
-              : _IconCard(action: this),
+          child: _CompactActionCard(action: this),
         ),
       ),
     );
   }
 }
 
-class _FullImageCard extends StatelessWidget {
+class _CompactActionCard extends StatelessWidget {
   final OccurrenceQuickActionCard action;
 
-  const _FullImageCard({required this.action});
+  const _CompactActionCard({required this.action});
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
-      child: Image.asset(
-        action.assetPath!,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Center(
-          child: _FallbackIcon(icon: action.icon, color: action.color),
-        ),
-      ),
-    );
-  }
-}
-
-class _IconCard extends StatelessWidget {
-  final OccurrenceQuickActionCard action;
-
-  const _IconCard({required this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _FallbackIcon(icon: action.icon, color: action.color),
-        const SizedBox(height: 10),
-        Text(
-          action.title.toUpperCase(),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.robotoMono(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.7,
-            height: 1.12,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if ((action.assetPath ?? '').isNotEmpty)
+            Image.asset(
+              action.assetPath!,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+            ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF070B12).withAlpha(20),
+                  const Color(0xFF070B12).withAlpha(160),
+                  const Color(0xFF070B12).withAlpha(235),
+                ],
+                stops: const [0.0, 0.52, 1.0],
+              ),
+            ),
           ),
-        ),
-      ],
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FallbackIcon(icon: action.icon, color: action.color),
+                const Spacer(),
+                Text(
+                  action.title.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.robotoMono(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.55,
+                    height: 1.08,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -118,14 +115,14 @@ class _FallbackIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 54,
-      height: 54,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
-        color: color.withAlpha(18),
+        color: const Color(0xFF050914).withAlpha(180),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withAlpha(110)),
+        border: Border.all(color: color.withAlpha(145)),
       ),
-      child: Icon(icon, color: color, size: 30),
+      child: Icon(icon, color: color, size: 20),
     );
   }
 }

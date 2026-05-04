@@ -193,7 +193,7 @@ class OccurrenceCommandHeader extends StatelessWidget {
                     child: _CrewMeta(
                       title: 'K9',
                       name: dogName.isNotEmpty ? dogName : 'K9',
-                      subtitle: 'Em serviÃ§o',
+                      subtitle: 'Em serviço',
                       imageUrl: dogImageUrl,
                       fallbackIcon: Icons.pets_rounded,
                       accent: accent,
@@ -260,7 +260,7 @@ class OccurrenceCommandHeader extends StatelessWidget {
 
   String _safeNature(String value) {
     final trimmed = value.trim();
-    return trimmed.isEmpty ? 'AveriguaÃ§Ã£o' : trimmed;
+    return trimmed.isEmpty ? 'Averiguação' : trimmed;
   }
 }
 
@@ -284,7 +284,7 @@ class _AppMark extends StatelessWidget {
       child: Image.asset(
         'assets/app_icon.png',
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) =>
+        errorBuilder: (_, _, _) =>
             Icon(Icons.shield_rounded, color: accent, size: 22),
       ),
     );
@@ -418,7 +418,7 @@ class _Avatar extends StatelessWidget {
               ? Image.network(
                   imageUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (_, _, _) =>
                       Icon(fallbackIcon, color: accent, size: 24),
                 )
               : Icon(fallbackIcon, color: accent, size: 24),
@@ -471,49 +471,6 @@ class _WideMetric extends StatelessWidget {
             style: GoogleFonts.oxanium(
               color: Colors.white,
               fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color accent;
-
-  const _CompactMetric({
-    required this.icon,
-    required this.label,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 86),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(150),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accent.withAlpha(95)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: accent, size: 14),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.robotoMono(
-              color: Colors.white70,
-              fontSize: 8.5,
               fontWeight: FontWeight.w900,
             ),
           ),

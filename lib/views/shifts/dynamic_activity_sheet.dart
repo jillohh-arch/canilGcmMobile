@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -30,42 +31,56 @@ import '../../services/firestore_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/weather_service.dart';
 import '../../utils/firestore_date.dart';
+import '../../widgets/activity_common_fields.dart';
+import '../../widgets/activity_category_menu_sheet.dart';
+import '../../widgets/activity_save_controls.dart';
+import '../../widgets/activity_tracking_action.dart';
+import '../../widgets/health_activity_fields.dart';
 import '../../widgets/hud_chip_group.dart';
 import '../../widgets/hud_controls.dart';
-import '../../widgets/location_time_row.dart';
+import '../../widgets/hud_expansion_section.dart';
 import '../../widgets/media_attachment_gallery.dart';
 import '../../widgets/quick_location_actions.dart';
+import '../../widgets/routine_activity_fields.dart';
 import '../../widgets/tactical_text_field.dart';
 import '../incidents/controllers/occurrence_form_controller.dart';
 import '../incidents/controllers/occurrence_payload_builder.dart';
 import '../incidents/widgets/occurrence_command_header.dart';
 import '../incidents/widgets/occurrence_active_context_summary.dart';
+import '../incidents/widgets/occurrence_active_footer.dart';
+import '../incidents/widgets/event_details_bottom_sheet.dart';
+import '../incidents/widgets/occurrence_detection_fields.dart';
 import '../incidents/widgets/occurrence_nature_search.dart';
 import '../incidents/widgets/occurrence_close_wizard.dart';
 import '../incidents/widgets/occurrence_event_center_sheet.dart';
 import '../incidents/widgets/occurrence_event_catalog.dart';
-import '../incidents/widgets/occurrence_location_map.dart';
+import '../incidents/widgets/occurrence_compact_location_block.dart';
+import '../incidents/widgets/occurrence_form_scaffold.dart';
+import '../incidents/widgets/occurrence_initial_data_sheet.dart';
+import '../incidents/widgets/occurrence_location_map_sheet.dart';
 import '../incidents/widgets/occurrence_timeline_preview.dart';
 import '../incidents/widgets/occurrence_quick_action.dart';
 import '../incidents/widgets/occurrence_quick_action_catalog.dart';
 import '../incidents/widgets/occurrence_quick_action_grid.dart';
 import '../incidents/widgets/occurrence_quick_action_options_sheet.dart';
+import '../incidents/widgets/occurrence_quick_update_catalog.dart';
 import '../incidents/widgets/occurrence_quick_update_shortcuts.dart';
+import '../incidents/widgets/occurrence_stage_panels.dart';
 import '../incidents/widgets/occurrence_start_screen.dart';
 import 'live_tracking_screen.dart';
 
 abstract final class _SheetSubtype {
-  static const detection = 'DetecÃ§Ã£o';
-  static const supportVehicle = 'Apoio Ã  Viatura/GuarniÃ§Ã£o';
+  static const detection = 'Detecção';
+  static const supportVehicle = 'Apoio à Viatura/Guarnição';
   static const missingPerson = 'Busca de Pessoa';
-  static const serviceOrder = 'Ordem de ServiÃ§o (O.S.)';
+  static const serviceOrder = 'Ordem de Serviço (O.S.)';
   static const event = 'Palestra/Evento (RP)';
 
-  static const obedience = 'ObediÃªncia';
+  static const obedience = 'Obediência';
   static const scentWork = 'Faro';
-  static const guardProtection = 'Guarda e ProteÃ§Ã£o';
+  static const guardProtection = 'Guarda e Proteção';
   static const searchCapture = 'Busca & Captura';
-  static const physicalConditioning = 'Condicionamento FÃ­sico';
+  static const physicalConditioning = 'Condicionamento Físico';
   static const leisureConditioning = 'Lazer/Condicionamento';
 
   static const consultation = 'Consulta';
@@ -73,24 +88,14 @@ abstract final class _SheetSubtype {
   static const exam = 'Exame';
   static const bath = 'Banho';
 
-  static const feeding = 'AlimentaÃ§Ã£o';
+  static const feeding = 'Alimentação';
   static const cleaning = 'Limpeza';
   static const walk = 'Passeio';
   static const rest = 'Descanso';
   static const play = 'Brincadeira';
-  static const brushing = 'EscovaÃ§Ã£o';
+  static const brushing = 'Escovação';
   static const other = 'Outros';
   static const narcoticsSearch = 'Busca de Entorpecentes';
-}
-
-class _OccurrenceQuickUpdateShortcut {
-  final String title;
-  final String template;
-
-  const _OccurrenceQuickUpdateShortcut({
-    required this.title,
-    required this.template,
-  });
 }
 
 class _OccurrenceEventChange {
@@ -142,7 +147,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   bool get _isOccurrenceCategory {
     final category = widget.category.toLowerCase();
-    return category == 'ocorrencia' || category == 'ocorrÃªncia';
+    return category == 'ocorrencia' || category == 'ocorrência';
   }
 
   bool get _isExistingOccurrence =>
@@ -351,7 +356,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         _setOccurrenceNatureTextFromSelected();
       });
     } catch (e) {
-      debugPrint('Erro ao carregar naturezas de ocorrÃªncia: $e');
+      debugPrint('Erro ao carregar naturezas de ocorrência: $e');
     }
   }
 
@@ -367,7 +372,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
 
     if (widget.category == 'Treino') {
-      // Carrega campos da coleÃ§Ã£o trainings
+      // Carrega campos da coleção trainings
       _selectedSubtype = d['trainingType'];
       _locationController.text = d['location'] ?? '';
       _descriptionController.text = d['handlerNotes'] ?? '';
@@ -377,31 +382,36 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       }
       if (d['metadata'] != null) {
         _formData.addAll(Map<String, dynamic>.from(d['metadata']));
-        final storedTemperature = _formData['Temperatura (Â°C)'];
+        final storedTemperature = _metadataValue('Temperatura (°C)');
         if (storedTemperature != null) {
           _tempController.text = storedTemperature.toString();
         }
-        if (_formData['Umidade (%)'] != null) {
-          _humidityController.text = _formData['Umidade (%)'].toString();
+        final storedHumidity = _metadataValue('Umidade (%)');
+        if (storedHumidity != null) {
+          _humidityController.text = storedHumidity.toString();
         }
       }
     } else if (widget.category == 'Rotina') {
-      // Carrega campos da coleÃ§Ã£o routines (schema prÃ³prio)
+      // Carrega campos da coleção routines (schema próprio)
       _selectedSubtype = d['activityType'];
       _descriptionController.text = d['notes'] ?? '';
       if (d['metadata'] != null) {
         _formData.addAll(Map<String, dynamic>.from(d['metadata']));
-        if (_formData['Marca da RaÃ§Ã£o'] != null) {
-          _racaoMarcaController.text = _formData['Marca da RaÃ§Ã£o'].toString();
+        final rationBrand = _metadataValue('Marca da Ração');
+        if (rationBrand != null) {
+          _racaoMarcaController.text = rationBrand.toString();
         }
-        if (_formData['Quantidade (g)'] != null) {
-          _racaoQtdController.text = _formData['Quantidade (g)'].toString();
+        final rationAmount = _metadataValue('Quantidade (g)');
+        if (rationAmount != null) {
+          _racaoQtdController.text = rationAmount.toString();
         }
-        if (_formData['DuraÃ§Ã£o (min)'] != null) {
-          _durationController.text = _formData['DuraÃ§Ã£o (min)'].toString();
+        final duration = _metadataValue('Duração (min)');
+        if (duration != null) {
+          _durationController.text = duration.toString();
         }
-        if (_formData['DistÃ¢ncia (km)'] != null) {
-          _distanciaController.text = _formData['DistÃ¢ncia (km)'].toString();
+        final distance = _metadataValue('Distância (km)');
+        if (distance != null) {
+          _distanciaController.text = distance.toString();
         }
       }
     } else if (_isOccurrenceCategory || widget.category == 'Evento') {
@@ -482,6 +492,14 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (match.isNotEmpty) {
       _selectedSubtypeImagePath = match.first['image'];
     }
+  }
+
+  dynamic _metadataValue(String key) {
+    return _formData[key] ?? _formData[_legacyMojibakeKey(key)];
+  }
+
+  String _legacyMojibakeKey(String value) {
+    return latin1.decode(utf8.encode(value));
   }
 
   void _populateOccurrenceExtraFields(Map<String, dynamic> extraFields) {
@@ -687,7 +705,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (_isSaving) {
       HapticFeedback.lightImpact();
       _showOperationalSnack(
-        'Aguarde a sincronizaÃ§Ã£o terminar antes de sair.',
+        'Aguarde a sincronização terminar antes de sair.',
         backgroundColor: const Color(0xFFFBBF24),
         foregroundColor: Colors.black,
       );
@@ -741,8 +759,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   String _successSaveMessage() {
     if (_isOccurrenceCategory || widget.category == 'Evento') {
       return _occurrenceStatus == OccurrenceFormController.statusInProgress
-          ? 'OcorrÃªncia salva em andamento no Firebase.'
-          : 'OcorrÃªncia concluÃ­da e sincronizada.';
+          ? 'Ocorrência salva em andamento no Firebase.'
+          : 'Ocorrência concluída e sincronizada.';
     }
 
     if (widget.category == 'Treino') {
@@ -752,7 +770,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return 'Rotina salva no Firebase.';
     }
     if (widget.category == 'Saude') {
-      return 'ProntuÃ¡rio salvo no Firebase.';
+      return 'Prontuário salvo no Firebase.';
     }
 
     return 'Registro salvo no Firebase.';
@@ -762,20 +780,20 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   final _tempController = TextEditingController();
   final _humidityController = TextEditingController();
 
-  // OcorrÃªncia - mÃ³dulo: detecÃ§Ã£o
+  // Ocorrência - módulo: detecção
   final List<Map<String, dynamic>> _detecaoDrogas =
       []; // { 'tipo': String, 'quantidade': TextEditingController, 'especificar': TextEditingController }
   final _equipeController = TextEditingController();
   final _boController = TextEditingController();
   final _naturezaOcorrenciaController =
-      TextEditingController(); // Natureza da ocorrÃªncia
+      TextEditingController(); // Natureza da ocorrência
 
-  // OcorrÃªncia - mÃ³dulo: apoio
+  // Ocorrência - módulo: apoio
   final _guarnicaoController = TextEditingController();
   final _situacaoController = TextEditingController();
   final _desfechoController = TextEditingController();
 
-  // SaÃºde - campos adicionais
+  // Saúde - campos adicionais
   final _vetNameController = TextEditingController();
   final _clinicaController = TextEditingController();
   final _motivoController = TextEditingController();
@@ -796,15 +814,15 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   File? _examePdfFile;
   String? _examePdfName;
 
-  // OcorrÃªncia - mÃ³dulo: busca e captura
+  // Ocorrência - módulo: busca e captura
   final _odorObjetoController = TextEditingController();
   final _tempoDesaparecimentoController = TextEditingController();
   final _condicaoTerrenoController = TextEditingController();
 
-  // OcorrÃªncia - mÃ³dulo: O.S.
+  // Ocorrência - módulo: O.S.
   final _numeroOsController = TextEditingController();
 
-  // Fotos / mÃ­dias globais
+  // Fotos / mídias globais
   final List<Map<String, dynamic>> _mediaAttachments =
       []; // { 'file': File, 'caption': TextEditingController }
 
@@ -950,7 +968,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao obter endereÃ§o: $e')));
+        ).showSnackBar(SnackBar(content: Text('Erro ao obter endereço: $e')));
       }
     }
   }
@@ -974,7 +992,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         }
       }
     } catch (_) {
-      // MantÃ©m o ponto manual no mapa mesmo que a conversÃ£o de endereÃ§o falhe.
+      // Mantém o ponto manual no mapa mesmo que a conversão de endereço falhe.
     }
   }
 
@@ -1054,7 +1072,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           _humidityController.text = weather['humidity'].toString();
           if (_condicaoTerrenoController.text.isEmpty) {
             _condicaoTerrenoController.text =
-                "Temp mÃ©dia: ${weather['temperature']}Â°C / Umidade: ${weather['humidity']}%";
+                "Temp média: ${weather['temperature']}°C / Umidade: ${weather['humidity']}%";
           }
         });
         HapticFeedback.mediumImpact();
@@ -1115,7 +1133,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         if (compressed != null) {
           compressedImages.add(compressed);
         } else {
-          // Se a compressÃ£o falhar, usa a imagem original.
+          // Se a compressão falhar, usa a imagem original.
           compressedImages.add(originalFile);
         }
       }
@@ -1186,7 +1204,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
     if (mounted) {
       setState(() {
-        _saveStatus = 'Fazendo upload de mÃ­dia(s)...';
+        _saveStatus = 'Fazendo upload de mídia(s)...';
       });
     }
 
@@ -1294,7 +1312,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       dogName: widget.dogName,
       handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,
       activityType: _selectedSubtype!,
-      status: 'ConcluÃ­do',
+      status: 'Concluído',
       timestamp: _resolveFormTimestamp(),
       notes: _descriptionController.text.isNotEmpty
           ? _descriptionController.text
@@ -1368,7 +1386,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
     if (_selectedSubtype == _SheetSubtype.scentWork) {
       if (_tempController.text.isNotEmpty) {
-        _formData['Temperatura (Â°C)'] = _tempController.text;
+        _formData['Temperatura (°C)'] = _tempController.text;
       }
       if (_humidityController.text.isNotEmpty) {
         _formData['Umidade (%)'] = _humidityController.text;
@@ -1412,7 +1430,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (_selectedSubtype == null || _selectedSubtype!.trim().isEmpty) {
       if (_isOccurrenceCategory) {
         _selectedSubtype = _naturezaOcorrenciaController.text.trim().isEmpty
-            ? 'AveriguaÃ§Ã£o'
+            ? 'Averiguação'
             : _naturezaOcorrenciaController.text.trim();
         if (_naturezaOcorrenciaController.text.trim().isEmpty) {
           _naturezaOcorrenciaController.text = _selectedSubtype!;
@@ -1443,26 +1461,26 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         if (widget.category == 'Rotina') {
           _setSaveStatus('Validando rotina...');
           if (_selectedSubtype == _SheetSubtype.feeding) {
-            _formData['Marca da RaÃ§Ã£o'] = _racaoMarcaController.text;
+            _formData['Marca da Ração'] = _racaoMarcaController.text;
             _formData['Quantidade (g)'] = _racaoQtdController.text;
           }
           if (_durationController.text.isNotEmpty) {
-            _formData['DuraÃ§Ã£o (min)'] = _durationController.text;
+            _formData['Duração (min)'] = _durationController.text;
           }
           if (_distanciaController.text.isNotEmpty) {
-            _formData['DistÃ¢ncia (km)'] = _distanciaController.text;
+            _formData['Distância (km)'] = _distanciaController.text;
           }
           _setSaveStatus('Salvando rotina no Firebase...');
           await _saveRoutine(authVM: authVM, routineVM: routineVM);
         } else if (widget.category == 'Treino') {
           _setSaveStatus('Validando treino...');
           if (_durationController.text.isNotEmpty) {
-            _formData['DuraÃ§Ã£o (min)'] = _durationController.text;
+            _formData['Duração (min)'] = _durationController.text;
           }
           _setSaveStatus('Salvando treino no Firebase...');
           await _saveTraining(trainingVM: trainingVM, authVM: authVM);
         } else if (_isOccurrenceCategory || widget.category == 'Evento') {
-          _setSaveStatus('Validando ocorrÃªncia...');
+          _setSaveStatus('Validando ocorrência...');
           final currentRa =
               HandlerIdentityService.raFromUser(authVM.user) ?? '';
           final currentOperatorName = _currentOperatorName(
@@ -1472,13 +1490,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           );
 
           if (_activeIncidentId == null) {
-            _setSaveStatus('Verificando ocorrÃªncia aberta...');
+            _setSaveStatus('Verificando ocorrência aberta...');
             final openIncident = await incidentVM.findOpenIncident(
               dogId: widget.dogId,
             );
             if (openIncident != null) {
               throw Exception(
-                'JÃ¡ existe uma ocorrÃªncia em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
+                'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
               );
             }
           }
@@ -1487,7 +1505,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
               _occurrenceStatus != OccurrenceFormController.statusInProgress;
           if (finalizing && _descriptionController.text.trim().isEmpty) {
             throw Exception(
-              'Preencha a descriÃ§Ã£o final antes de encerrar a ocorrÃªncia.',
+              'Preencha a descrição final antes de encerrar a ocorrência.',
             );
           }
           if (finalizing && _selectedOccurrenceOutcomes.isEmpty) {
@@ -1497,10 +1515,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           }
           if (_selectedSubtype!.trim().isEmpty ||
               _naturezaOcorrenciaController.text.trim().isEmpty) {
-            throw Exception('Informe a natureza da ocorrÃªncia.');
+            throw Exception('Informe a natureza da ocorrência.');
           }
 
-          _setSaveStatus('Preparando anexos da ocorrÃªncia...');
+          _setSaveStatus('Preparando anexos da ocorrência...');
           final List<Map<String, dynamic>> uploadedMedia =
               await _uploadAllMedia('incidents');
           final List<Map<String, dynamic>> finalMedia =
@@ -1578,10 +1596,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           );
 
           if (_activeIncidentId != null) {
-            _setSaveStatus('Atualizando ocorrÃªncia no Firebase...');
+            _setSaveStatus('Atualizando ocorrência no Firebase...');
             await incidentVM.updateIncident(inc);
           } else {
-            _setSaveStatus('Criando ocorrÃªncia no Firebase...');
+            _setSaveStatus('Criando ocorrência no Firebase...');
             await incidentVM.saveIncident(inc);
             _activeIncidentId = inc.id;
             _activeOccurrenceStartedAt = inc.startedAt;
@@ -1593,7 +1611,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
             }
           }
         } else if (widget.category == 'Saude') {
-          _setSaveStatus('Salvando prontuÃ¡rio no Firebase...');
+          _setSaveStatus('Salvando prontuário no Firebase...');
           await _saveHealth(healthVM: healthVM);
         }
 
@@ -1614,11 +1632,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         if (mounted) {
           final message = _cleanSaveError(e);
           _setSaveStatus(
-            'Falha ao salvar. Verifique conexÃ£o/permissÃ£o.',
+            'Falha ao salvar. Verifique conexão/permissão.',
             failed: true,
           );
           _showOperationalSnack(
-            message.isEmpty ? 'NÃ£o foi possÃ­vel salvar o registro.' : message,
+            message.isEmpty ? 'Não foi possível salvar o registro.' : message,
             backgroundColor: const Color(0xFFE53935),
             icon: Icons.error_outline_rounded,
           );
@@ -1718,7 +1736,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
               stretchModes: const [StretchMode.zoomBackground],
               title: Text(
                 _isOccurrenceCategory
-                    ? 'OCORRÃŠNCIA'
+                    ? 'OCORRÊNCIA'
                     : _selectedSubtype?.toUpperCase() ?? '',
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w900,
@@ -1768,330 +1786,46 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   Widget _buildOccurrenceFormScaffold() {
     final tColor = _getCategoryColor();
+    final statusLabel =
+        _occurrenceStatus == OccurrenceFormController.statusCompleted
+        ? 'FECHADA'
+        : widget.documentId == null
+        ? 'NOVA'
+        : 'ABERTA';
 
-    return Scaffold(
+    return OccurrenceFormScaffold(
       backgroundColor: _hudBackground,
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned(
-              top: 80,
-              left: -120,
-              child: _buildHudGlow(_hudCyan.withAlpha(36), 240),
-            ),
-            Positioned(
-              right: -140,
-              bottom: 120,
-              child: _buildHudGlow(_hudCyan.withAlpha(24), 280),
-            ),
-            Column(
-              children: [
-                if (!_hasActiveOccurrenceRecord) _buildOccurrenceTopBar(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    physics: const BouncingScrollPhysics(),
-                    child: _buildOccurrenceStepperContent(
-                      tColor,
-                      includeControls: false,
-                    ),
-                  ),
-                ),
-                if (!_showOccurrenceFinalization)
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: _hudBackground.withAlpha(244),
-                      border: const Border(
-                        top: BorderSide(color: Color(0x3300E5FF)),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _hudCyan.withAlpha(30),
-                          blurRadius: 20,
-                          offset: const Offset(0, -8),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                    child: _buildOccurrenceActiveFooter(tColor),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHudGlow(Color color, double size) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color, blurRadius: size / 2, spreadRadius: 18),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOccurrenceTopBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 8, 16, 10),
-      decoration: BoxDecoration(
-        color: _hudBackground.withAlpha(246),
-        border: const Border(bottom: BorderSide(color: Color(0x2200E5FF))),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            onPressed: _isSaving ? null : () => _closeForm(false),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  'K9-INCIDENT COMMAND',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.robotoMono(
-                    color: _hudCyan,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4.0,
-                    shadows: [
-                      Shadow(color: _hudCyan.withAlpha(160), blurRadius: 12),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.documentId == null
-                      ? 'NOVA OCORRÃŠNCIA'
-                      : 'OCORRÃŠNCIA OPERACIONAL',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.6,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: _hudPanel,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: _hudCyan.withAlpha(120)),
-              boxShadow: [
-                BoxShadow(color: _hudCyan.withAlpha(35), blurRadius: 14),
-              ],
-            ),
-            child: Text(
-              _occurrenceStatus == OccurrenceFormController.statusCompleted
-                  ? 'FECHADA'
-                  : widget.documentId == null
-                  ? 'NOVA'
-                  : 'ABERTA',
-              style: GoogleFonts.robotoMono(
-                color: _hudCyan,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ),
-        ],
-      ),
+      panelColor: _hudPanel,
+      accentColor: _hudCyan,
+      showTopBar: !_hasActiveOccurrenceRecord,
+      isSaving: _isSaving,
+      modeLabel: widget.documentId == null
+          ? 'NOVA OCORRÊNCIA'
+          : 'OCORRÊNCIA OPERACIONAL',
+      statusLabel: statusLabel,
+      content: _buildOccurrenceStepperContent(tColor, includeControls: false),
+      footer: _showOccurrenceFinalization
+          ? null
+          : _buildOccurrenceActiveFooter(tColor),
+      onBack: () => _closeForm(false),
     );
   }
 
   Widget _buildMenuSheet(BuildContext context) {
-    return Container(
-      key: const ValueKey('MenuSheet'),
-      decoration: const BoxDecoration(
-        color: Color(0xFF171717),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black54,
-            offset: Offset(0, -6),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 20),
-              width: 48,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(80),
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'SELECIONE A CATEGORIA',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          Expanded(child: _buildBentoMenu()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBentoMenu() {
-    return _buildCarouselMenu(_currentCategoryCards);
-  }
-
-  Widget _buildCarouselMenu(List<Map<String, dynamic>> cards) {
-    if (_currentMenuPage >= cards.length) {
+    if (_currentMenuPage >= _currentCategoryCards.length) {
       _currentMenuPage = 0;
     }
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: PageView.builder(
-            controller: _menuPageController,
-            itemCount: cards.length,
-            onPageChanged: (index) {
-              HapticFeedback.selectionClick();
-              setState(() {
-                _currentMenuPage = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final card = cards[index];
-              return AnimatedBuilder(
-                animation: _menuPageController,
-                builder: (context, child) {
-                  double value = 1.0;
-                  if (_menuPageController.position.haveDimensions) {
-                    value = (_menuPageController.page ?? 0) - index;
-                  } else {
-                    value = (_currentMenuPage - index).toDouble();
-                  }
-
-                  double scale = (1 - (value.abs() * 0.15)).clamp(0.85, 1.0);
-                  double opacity = (1 - (value.abs() * 0.5)).clamp(0.5, 1.0);
-                  bool isFocused = _currentMenuPage == index;
-
-                  return Opacity(
-                    opacity: opacity,
-                    child: Transform.scale(
-                      scale: scale,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 20,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: isFocused
-                              ? [
-                                  BoxShadow(
-                                    color: (card['glow'] as Color).withAlpha(
-                                      150,
-                                    ),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : [],
-                        ),
-                        child: InkWell(
-                          onTap: () {
-                            if (!isFocused) {
-                              _menuPageController.animateToPage(
-                                index,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOutCubic,
-                              );
-                            } else {
-                              _selectSubtype(
-                                card['id'],
-                                imagePath: card['image'],
-                              );
-                            }
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Hero(
-                              tag: 'hero_category_${card['id']}',
-                              child: Image.asset(
-                                card['image'],
-                                fit: BoxFit.cover,
-                                alignment: Alignment.bottomCenter,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 32),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cards[_currentMenuPage]['glow'],
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                elevation: 0,
-              ),
-              onPressed: () => _selectSubtype(
-                cards[_currentMenuPage]['id'],
-                imagePath: cards[_currentMenuPage]['image'],
-              ),
-              child: Text(
-                'CONFIRMAR SELEÇÃO',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    return ActivityCategoryMenuSheet(
+      cards: _currentCategoryCards,
+      currentPage: _currentMenuPage,
+      pageController: _menuPageController,
+      onPageChanged: (index) {
+        HapticFeedback.selectionClick();
+        setState(() => _currentMenuPage = index);
+      },
+      onCardConfirmed: (card) =>
+          _selectSubtype(card['id'], imagePath: card['image']),
     );
   }
 
@@ -2175,16 +1909,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return _buildOccurrenceStartScreenV2(tColor);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildOccurrenceCommandHeader(tColor),
-        const SizedBox(height: 12),
-        _buildOccurrenceActiveContextSummary(tColor),
-        const SizedBox(height: 14),
-        _buildOccurrenceQuickActionGrid(tColor),
-        ..._buildOccurrenceTimelinePreview(),
-      ],
+    return OccurrenceActivePanel(
+      commandHeader: _buildOccurrenceCommandHeader(tColor),
+      contextSummary: _buildOccurrenceActiveContextSummary(tColor),
+      quickActions: _buildOccurrenceQuickActionGrid(tColor),
+      timelinePreview: _buildOccurrenceTimelinePreview(),
     );
   }
 
@@ -2281,43 +2010,21 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     Color tColor,
     bool canShowFinalResults,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildOccurrenceCommandHeader(tColor, showOperationalMetrics: true),
-        const SizedBox(height: 12),
-        _buildOccurrenceCloseStep(canShowFinalResults),
-      ],
+    return OccurrenceFinalizationPanel(
+      commandHeader: _buildOccurrenceCommandHeader(
+        tColor,
+        showOperationalMetrics: true,
+      ),
+      closeStep: _buildOccurrenceCloseStep(canShowFinalResults),
     );
   }
 
   Widget _buildOccurrenceInitialDataPanel(Color tColor) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _hudPanel.withAlpha(190),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: tColor.withAlpha(70)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'DADOS ESSENCIAIS',
-            style: GoogleFonts.robotoMono(
-              color: tColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildOccurrenceNatureStep(),
-          const SizedBox(height: 12),
-          _buildOccurrenceCompactLocationBlock(tColor),
-        ],
-      ),
+    return OccurrenceInitialDataPanel(
+      accentColor: tColor,
+      panelColor: _hudPanel,
+      natureStep: _buildOccurrenceNatureStep(),
+      locationBlock: _buildOccurrenceCompactLocationBlock(tColor),
     );
   }
 
@@ -2351,196 +2058,46 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-        return Container(
-          margin: const EdgeInsets.all(14),
-          padding: EdgeInsets.fromLTRB(0, 0, 0, bottomInset),
-          decoration: BoxDecoration(
-            color: _hudBackground,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: tColor.withAlpha(125)),
-            boxShadow: [BoxShadow(color: tColor.withAlpha(35), blurRadius: 24)],
-          ),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.edit_note_rounded, color: tColor, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'EDITAR DADOS ESSENCIAIS',
-                        style: GoogleFonts.robotoMono(
-                          color: tColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                      color: Colors.white54,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _buildOccurrenceInitialDataPanel(tColor),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: () {
-                      setState(() {});
-                      Navigator.of(context).pop();
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: tColor,
-                      foregroundColor: _hudBackground,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    child: Text(
-                      'CONCLUIR EDIÇÃO',
-                      style: GoogleFonts.robotoMono(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return OccurrenceInitialDataSheet(
+          accentColor: tColor,
+          backgroundColor: _hudBackground,
+          child: _buildOccurrenceInitialDataPanel(tColor),
+          onDone: () {
+            setState(() {});
+            Navigator.of(context).pop();
+          },
         );
       },
     );
   }
 
   Widget _buildOccurrenceCompactLocationBlock(Color tColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildOccurrenceMiniCommandButton(
-                icon: Icons.gps_fixed_rounded,
-                label: _locationController.text.trim().isEmpty
-                    ? 'CAPTURAR GPS'
-                    : 'ATUALIZAR GPS',
-                color: _hudAmber,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _fetchCurrentAddress();
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildOccurrenceMiniCommandButton(
-                icon: Icons.schedule_rounded,
-                label: 'HORA ATUAL',
-                color: _hudGreen,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  _setTimeToNow();
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TacticalTextField(
-          controller: _locationController,
-          labelText: 'EndereÃ§o / Local',
-          prefixIcon: Icons.location_on_rounded,
-        ),
-        const SizedBox(height: 12),
-        TacticalTextField(
-          controller: _timeController,
-          labelText: 'Hora de inÃ­cio',
-          prefixIcon: Icons.schedule_rounded,
-          readOnly: true,
-        ),
-        if (_selectedLocationLatLng != null) ...[
-          const SizedBox(height: 12),
-          _buildOccurrenceMapAdjustButton(tColor),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildOccurrenceMiniCommandButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, color: color, size: 18),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.robotoMono(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.0,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: color.withAlpha(16),
-          side: BorderSide(color: color.withAlpha(125)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-        ),
+    return OccurrenceCompactLocationBlock(
+      hasLocation: _locationController.text.trim().isNotEmpty,
+      showMapAdjust: _selectedLocationLatLng != null,
+      gpsColor: _hudAmber,
+      timeColor: _hudGreen,
+      accentColor: tColor,
+      locationField: TacticalTextField(
+        controller: _locationController,
+        labelText: 'Endereço / Local',
+        prefixIcon: Icons.location_on_rounded,
       ),
-    );
-  }
-
-  Widget _buildOccurrenceMapAdjustButton(Color tColor) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: _showOccurrenceLocationMapSheet,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: tColor.withAlpha(13),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: tColor.withAlpha(95)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.map_rounded, color: tColor, size: 18),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                'AJUSTAR PONTO NO MAPA',
-                style: GoogleFonts.robotoMono(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            Icon(Icons.open_in_full_rounded, color: tColor, size: 16),
-          ],
-        ),
+      timeField: TacticalTextField(
+        controller: _timeController,
+        labelText: 'Hora de início',
+        prefixIcon: Icons.schedule_rounded,
+        readOnly: true,
       ),
+      onCaptureGps: () {
+        HapticFeedback.mediumImpact();
+        _fetchCurrentAddress();
+      },
+      onSetCurrentTime: () {
+        HapticFeedback.mediumImpact();
+        _setTimeToNow();
+      },
+      onAdjustMap: _showOccurrenceLocationMapSheet,
     );
   }
 
@@ -2555,88 +2112,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          margin: const EdgeInsets.all(14),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-          decoration: BoxDecoration(
-            color: _hudBackground,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _hudCyan.withAlpha(140)),
-            boxShadow: [
-              BoxShadow(color: _hudCyan.withAlpha(40), blurRadius: 24),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: _hudCyan.withAlpha(18),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: _hudCyan.withAlpha(120)),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: _hudCyan,
-                      size: 19,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'AJUSTE DO LOCAL',
-                      style: GoogleFonts.robotoMono(
-                        color: _hudCyan,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.6,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    color: Colors.white54,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              OccurrenceLocationMap(
-                location: location,
-                onLocationChanged: (point) {
-                  _selectOccurrenceLocation(point);
-                },
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _hudCyan,
-                    foregroundColor: _hudBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: Text(
-                    'CONFIRMAR LOCAL',
-                    style: GoogleFonts.robotoMono(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return OccurrenceLocationMapSheet(
+          location: location,
+          accentColor: _hudCyan,
+          backgroundColor: _hudBackground,
+          onLocationChanged: _selectOccurrenceLocation,
         );
       },
     );
@@ -2711,110 +2191,32 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Widget _buildOccurrenceActiveFooter(Color tColor) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildSaveStatusPanel(tColor),
-        if (_showOccurrenceFinalization)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isSaving
-                      ? null
-                      : () => setState(() {
-                          _showOccurrenceFinalization = false;
-                          _occurrenceStatus =
-                              OccurrenceFormController.statusInProgress;
-                          _occurrenceSuccessful = null;
-                        }),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Color(0x4400E5FF)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: Text(
-                    'VOLTAR',
-                    style: GoogleFonts.robotoMono(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: _buildPrimarySaveButton(_hudRed),
-                ),
-              ),
-            ],
-          )
-        else if (!_hasActiveOccurrenceRecord)
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: _isSaving ? null : _saveOccurrenceInProgress,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(
-                'INICIAR OCORRÃŠNCIA',
-                style: GoogleFonts.robotoMono(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: tColor,
-                foregroundColor: _hudBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          )
-        else
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: _isSaving
-                  ? null
-                  : () {
-                      setState(() {
-                        _occurrenceFinishSubmitted = false;
-                        _showOccurrenceFinalization = true;
-                        _occurrenceStatus =
-                            OccurrenceFormController.statusCompleted;
-                        _occurrenceController.setStatus(
-                          OccurrenceFormController.statusCompleted,
-                        );
-                        _copyOccurrenceControllerToFields(
-                          includeOutcomes: false,
-                        );
-                      });
-                    },
-              icon: const Icon(Icons.flag_rounded),
-              label: Text(
-                'FINALIZAR OCORRÃŠNCIA',
-                style: GoogleFonts.robotoMono(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: _hudRed,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-      ],
+    return OccurrenceActiveFooter(
+      showFinalization: _showOccurrenceFinalization,
+      hasActiveOccurrenceRecord: _hasActiveOccurrenceRecord,
+      isSaving: _isSaving,
+      accentColor: tColor,
+      backgroundColor: _hudBackground,
+      dangerColor: _hudRed,
+      saveStatusPanel: _buildSaveStatusPanel(tColor),
+      finalSaveButton: _buildPrimarySaveButton(_hudRed),
+      onCancelFinalization: () => setState(() {
+        _showOccurrenceFinalization = false;
+        _occurrenceStatus = OccurrenceFormController.statusInProgress;
+        _occurrenceSuccessful = null;
+      }),
+      onStartOccurrence: _saveOccurrenceInProgress,
+      onRequestFinalization: () {
+        setState(() {
+          _occurrenceFinishSubmitted = false;
+          _showOccurrenceFinalization = true;
+          _occurrenceStatus = OccurrenceFormController.statusCompleted;
+          _occurrenceController.setStatus(
+            OccurrenceFormController.statusCompleted,
+          );
+          _copyOccurrenceControllerToFields(includeOutcomes: false);
+        });
+      },
     );
   }
 
@@ -2876,7 +2278,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       });
       _showOperationalSnack(
         _cleanSaveError(e).isEmpty
-            ? 'NÃ£o foi possÃ­vel sincronizar o evento.'
+            ? 'Não foi possível sincronizar o evento.'
             : _cleanSaveError(e),
         backgroundColor: const Color(0xFFE53935),
         icon: Icons.error_outline_rounded,
@@ -2900,7 +2302,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       );
       if (openIncident != null) {
         throw Exception(
-          'JÃ¡ existe uma ocorrÃªncia em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
+          'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
         );
       }
     }
@@ -2931,7 +2333,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         : null;
     final effectiveNature = (_selectedSubtype?.trim().isNotEmpty ?? false)
         ? _selectedSubtype!
-        : 'AveriguaÃ§Ã£o';
+        : 'Averiguação';
     final effectiveManualNature =
         _naturezaOcorrenciaController.text.trim().isNotEmpty
         ? _naturezaOcorrenciaController.text.trim()
@@ -3020,13 +2422,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       }
     }
     final elapsedLabel = startedAt == null
-        ? 'NÃ£o iniciada'
+        ? 'Não iniciada'
         : _formatElapsedDuration(DateTime.now().difference(startedAt));
     final nature = _selectedSubtype == _SheetSubtype.other
         ? (_naturezaOcorrenciaController.text.trim().isEmpty
               ? 'Outros'
               : _naturezaOcorrenciaController.text.trim())
-        : (_selectedSubtype ?? 'AveriguaÃ§Ã£o');
+        : (_selectedSubtype ?? 'Averiguação');
 
     return OccurrenceCommandHeader(
       nature: nature,
@@ -3158,7 +2560,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
     _occurrenceSuccessful =
         !(results.contains('Nada Localizado') ||
-            results.contains('Sem constataÃ§Ã£o'));
+            results.contains('Sem constatação'));
 
     final details = wizardData['details'] is Map
         ? Map<String, dynamic>.from(wizardData['details'] as Map)
@@ -3219,7 +2621,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       }
     }
 
-    if (results.contains('VeÃ­culo detido')) {
+    if (results.contains('Veículo detido')) {
       _disposeDynamicResultRows(_detainedVehicles, ['tipo', 'placa']);
       _detainedVehicles.clear();
       final tipo = detail('veiculo_tipo');
@@ -3232,7 +2634,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       }
     }
 
-    if (results.contains('IndivÃ­duo detido')) {
+    if (results.contains('Indivíduo detido')) {
       _disposeDynamicResultRows(_detainedIndividuals, ['quantidade']);
       _detainedIndividuals.clear();
       final quantidade = detail('individuo_quantidade');
@@ -3242,7 +2644,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         });
       }
       final destino = detail('individuo_destino');
-      if (destino.isNotEmpty) _formData['Destino do indivÃ­duo'] = destino;
+      if (destino.isNotEmpty) _formData['Destino do indivíduo'] = destino;
     }
 
     final bo = detail('bo_numero');
@@ -3254,7 +2656,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (apoio.isNotEmpty) _formData['Apoio prestado'] = apoio;
     final encaminhamento = detail('encaminhamento_observacao');
     if (encaminhamento.isNotEmpty) {
-      _formData['Encaminhamento mÃ©dico'] = encaminhamento;
+      _formData['Encaminhamento médico'] = encaminhamento;
     }
 
     _syncOccurrenceController();
@@ -3316,7 +2718,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     return [
       const SizedBox(height: 16),
       _buildChoiceChipGroup(
-        label: 'Status da ocorrÃªncia',
+        label: 'Status da ocorrência',
         options: const [
           OccurrenceFormController.statusInProgress,
           OccurrenceFormController.statusCompleted,
@@ -3334,15 +2736,15 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         const SizedBox(height: 8),
         _buildChoiceChipGroup(
           label: 'Desfecho Operacional',
-          options: const ['Com Ãªxito', 'Sem Ãªxito'],
+          options: const ['Com êxito', 'Sem êxito'],
           selectedOption: _occurrenceSuccessful == true
-              ? 'Com Ãªxito'
+              ? 'Com êxito'
               : _occurrenceSuccessful == false
-              ? 'Sem Ãªxito'
+              ? 'Sem êxito'
               : null,
           onSelected: (value) {
             setState(() {
-              _occurrenceSuccessful = value == 'Com Ãªxito';
+              _occurrenceSuccessful = value == 'Com êxito';
             });
           },
         ),
@@ -3368,7 +2770,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       if (_selectedSubtype != null) const SizedBox(height: 12),
       TacticalTextField(
         controller: _occurrenceUpdateController,
-        labelText: 'AtualizaÃ§Ã£o desta etapa',
+        labelText: 'Atualização desta etapa',
         prefixIcon: Icons.timeline_rounded,
         maxLines: 3,
         minLines: 2,
@@ -3378,9 +2780,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   List<Widget> _buildOccurrenceQuickUpdateShortcuts() {
-    final shortcuts = _occurrenceQuickUpdateShortcutsForSubtype(
-      _selectedSubtype,
-    );
+    final shortcuts = OccurrenceQuickUpdateCatalog.forSubtype(_selectedSubtype);
     if (shortcuts.isEmpty) {
       return const [];
     }
@@ -3400,118 +2800,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     ];
   }
 
-  List<_OccurrenceQuickUpdateShortcut>
-  _occurrenceQuickUpdateShortcutsForSubtype(String? subtype) {
-    const common = [
-      _OccurrenceQuickUpdateShortcut(
-        title: 'Conduzido a Santa Casa',
-        template: 'Conduzido Ã  Santa Casa para avaliaÃ§Ã£o/perÃ­cia mÃ©dica.',
-      ),
-      _OccurrenceQuickUpdateShortcut(
-        title: 'Apresentado no DP',
-        template:
-            'OcorrÃªncia apresentada no Distrito Policial para as providÃªncias cabÃ­veis.',
-      ),
-      _OccurrenceQuickUpdateShortcut(
-        title: 'Aguardando perÃ­cia',
-        template:
-            'Equipe aguardando perÃ­cia para continuidade da ocorrÃªncia.',
-      ),
-      _OccurrenceQuickUpdateShortcut(
-        title: 'Aguardando vaga',
-        template:
-            'Equipe aguardando vaga/recepÃ§Ã£o para prosseguimento da apresentaÃ§Ã£o.',
-      ),
-      _OccurrenceQuickUpdateShortcut(
-        title: 'Encerrada apresentaÃ§Ã£o',
-        template:
-            'ApresentaÃ§Ã£o encerrada, aguardando consolidaÃ§Ã£o do desfecho final.',
-      ),
-    ];
-
-    switch (subtype) {
-      case _SheetSubtype.detection:
-      case _SheetSubtype.narcoticsSearch:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Material localizado',
-            template:
-                'K9 indicou positivamente e o material foi localizado no ponto de busca.',
-          ),
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Aguardando pesagem',
-            template:
-                'Material apreendido, aguardando pesagem/quantificaÃ§Ã£o oficial.',
-          ),
-          ...common,
-        ];
-      case _SheetSubtype.missingPerson:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Varredura em andamento',
-            template:
-                'Varredura em andamento na area informada com apoio do K9.',
-          ),
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Pessoa localizada',
-            template:
-                'Pessoa localizada e equipe seguindo para os procedimentos posteriores.',
-          ),
-          ...common,
-        ];
-      case _SheetSubtype.supportVehicle:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Apoio no local',
-            template:
-                'Equipe no local prestando apoio operacional Ã  guarniÃ§Ã£o solicitante.',
-          ),
-          _OccurrenceQuickUpdateShortcut(
-            title: 'GuarniÃ§Ã£o apoiada',
-            template:
-                'Apoio prestado Ã  guarniÃ§Ã£o no local, ocorrÃªncia seguindo em atendimento.',
-          ),
-          ...common,
-        ];
-      case _SheetSubtype.serviceOrder:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'FiscalizaÃ§Ã£o em andamento',
-            template:
-                'FiscalizaÃ§Ã£o em andamento conforme Ordem de ServiÃ§o, sem desfecho final atÃ© o momento.',
-          ),
-          ...common,
-        ];
-      case _SheetSubtype.event:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'AÃ§Ã£o educativa em andamento',
-            template:
-                'AÃ§Ã£o educativa/palestra em andamento com acompanhamento da equipe.',
-          ),
-          ...common,
-        ];
-      case _SheetSubtype.other:
-        return const [
-          _OccurrenceQuickUpdateShortcut(
-            title: 'Local preservado',
-            template:
-                'Local preservado pela equipe atÃ© a chegada/atuaÃ§Ã£o do Ã³rgÃ£o competente.',
-          ),
-          _OccurrenceQuickUpdateShortcut(
-            title: 'TrÃ¢nsito sinalizado',
-            template:
-                'TrÃ¢nsito sinalizado e fluxo organizado para seguranÃ§a no local.',
-          ),
-          ...common,
-        ];
-      default:
-        return common;
-    }
-  }
-
   void _applyOccurrenceQuickUpdateShortcut(
-    _OccurrenceQuickUpdateShortcut shortcut,
+    OccurrenceQuickUpdateShortcut shortcut,
   ) {
     HapticFeedback.selectionClick();
     setState(() {
@@ -3613,7 +2903,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         }
       }
     } catch (_) {
-      // MantÃ©m a coordenada mesmo quando o endereÃ§o textual nÃ£o puder ser resolvido.
+      // Mantém a coordenada mesmo quando o endereço textual não puder ser resolvido.
     }
 
     HapticFeedback.lightImpact();
@@ -3642,326 +2932,86 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
         return StatefulBuilder(
-          builder: (context, setSheetState) => Padding(
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: Container(
-              margin: const EdgeInsets.all(14),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              decoration: BoxDecoration(
-                color: _hudBackground,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _hudCyan.withAlpha(135)),
-                boxShadow: [
-                  BoxShadow(color: _hudCyan.withAlpha(38), blurRadius: 24),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: _hudCyan.withAlpha(18),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: _hudCyan.withAlpha(120)),
-                          ),
-                          child: const Icon(
-                            Icons.timeline_rounded,
-                            color: _hudCyan,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'DETALHES DO EVENTO',
-                            style: GoogleFonts.robotoMono(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close_rounded),
-                          color: Colors.white54,
-                        ),
-                      ],
+          builder: (context, setSheetState) => OccurrenceEventDetailsSheet(
+            update: update,
+            titleController: titleController,
+            descriptionController: descriptionController,
+            timestampLabel: _formatOccurrenceEventTimestamp(update.timestamp),
+            eventLocation: eventLocation,
+            eventAttachments: eventAttachments,
+            pendingPhotoCount: pendingPhotos.length,
+            backgroundColor: _hudBackground,
+            panelColor: _hudPanel,
+            accentColor: _hudCyan,
+            successColor: _hudGreen,
+            warningColor: _hudAmber,
+            dangerColor: _hudRed,
+            onAddPhotos: () async {
+              final files = await _pickOccurrenceEventPhotos();
+              if (files.isEmpty) return;
+              setSheetState(() => pendingPhotos.addAll(files));
+            },
+            onCaptureLocation: () async {
+              try {
+                final eventPoint = await _captureOccurrenceEventLocation();
+                setSheetState(() {
+                  eventLocation = eventPoint.address;
+                  eventLatitude = eventPoint.point.latitude;
+                  eventLongitude = eventPoint.point.longitude;
+                });
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Não foi possível capturar o local: $e'),
+                  ),
+                );
+              }
+            },
+            onDelete: () => Navigator.of(
+              context,
+            ).pop(const _OccurrenceEventChange.delete()),
+            onSave: () async {
+              try {
+                final uploaded = await _uploadOccurrenceEventPhotos(
+                  pendingPhotos,
+                );
+                eventAttachments.addAll(uploaded);
+                final edited = IncidentProgressUpdate(
+                  title: titleController.text.trim().isEmpty
+                      ? update.title
+                      : titleController.text.trim(),
+                  description: descriptionController.text.trim(),
+                  timestamp: update.timestamp,
+                  location: eventLocation.trim(),
+                  latitude: eventLatitude,
+                  longitude: eventLongitude,
+                  authorId: update.authorId,
+                  authorName: update.authorName,
+                  attachments: eventAttachments,
+                );
+                if (!context.mounted) return;
+                Navigator.of(
+                  context,
+                ).pop(_OccurrenceEventChange.update(edited));
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _cleanSaveError(e).isEmpty
+                          ? 'Não foi possível salvar as evidências.'
+                          : _cleanSaveError(e),
                     ),
-                    const SizedBox(height: 12),
-                    _buildEventDetailLine(
-                      icon: Icons.schedule_rounded,
-                      label: 'Data e hora',
-                      value: _formatOccurrenceEventTimestamp(update.timestamp),
-                      color: _hudCyan,
-                    ),
-                    if ((update.authorName ?? '').isNotEmpty)
-                      _buildEventDetailLine(
-                        icon: Icons.person_rounded,
-                        label: 'Operador',
-                        value: update.authorName!,
-                        color: _hudGreen,
-                      ),
-                    if (eventLocation.isNotEmpty)
-                      _buildEventDetailLine(
-                        icon: Icons.location_on_rounded,
-                        label: 'Local',
-                        value: eventLocation,
-                        color: _hudAmber,
-                      ),
-                    const SizedBox(height: 12),
-                    TacticalTextField(
-                      controller: titleController,
-                      labelText: 'TÃ­tulo do evento',
-                      prefixIcon: Icons.label_rounded,
-                    ),
-                    const SizedBox(height: 10),
-                    TacticalTextField(
-                      controller: descriptionController,
-                      labelText: 'ObservaÃ§Ã£o',
-                      prefixIcon: Icons.notes_rounded,
-                      maxLines: 4,
-                      minLines: 2,
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _hudPanel.withAlpha(220),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: _hudCyan.withAlpha(65)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'EVIDÃŠNCIAS DO EVENTO',
-                            style: GoogleFonts.robotoMono(
-                              color: _hudCyan,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (eventAttachments.isEmpty && pendingPhotos.isEmpty)
-                            Text(
-                              'Nenhuma foto anexada a este evento.',
-                              style: GoogleFonts.inter(
-                                color: Colors.white54,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          else ...[
-                            ...eventAttachments.map(
-                              (item) => _buildEventAttachmentRow(
-                                label:
-                                    (item['caption'] as String?)
-                                            ?.trim()
-                                            .isNotEmpty ==
-                                        true
-                                    ? item['caption'] as String
-                                    : 'Foto sincronizada',
-                                icon: Icons.cloud_done_rounded,
-                                color: _hudGreen,
-                              ),
-                            ),
-                            ...pendingPhotos.asMap().entries.map(
-                              (entry) => _buildEventAttachmentRow(
-                                label: 'Foto pendente ${entry.key + 1}',
-                                icon: Icons.photo_camera_rounded,
-                                color: _hudAmber,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final files =
-                                        await _pickOccurrenceEventPhotos();
-                                    if (files.isEmpty) return;
-                                    setSheetState(
-                                      () => pendingPhotos.addAll(files),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add_a_photo_rounded),
-                                  label: Text(
-                                    'FOTO',
-                                    style: GoogleFonts.robotoMono(
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.0,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: _hudCyan,
-                                    side: BorderSide(
-                                      color: _hudCyan.withAlpha(150),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () async {
-                                    try {
-                                      final eventPoint =
-                                          await _captureOccurrenceEventLocation();
-                                      setSheetState(() {
-                                        eventLocation = eventPoint.address;
-                                        eventLatitude =
-                                            eventPoint.point.latitude;
-                                        eventLongitude =
-                                            eventPoint.point.longitude;
-                                      });
-                                    } catch (e) {
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'NÃ£o foi possÃ­vel capturar o local: $e',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.my_location_rounded),
-                                  label: Text(
-                                    'GPS',
-                                    style: GoogleFonts.robotoMono(
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.0,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: _hudAmber,
-                                    side: BorderSide(
-                                      color: _hudAmber.withAlpha(150),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).pop(const _OccurrenceEventChange.delete()),
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            label: Text(
-                              'EXCLUIR',
-                              style: GoogleFonts.robotoMono(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _hudRed,
-                              side: BorderSide(color: _hudRed.withAlpha(150)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              try {
-                                final uploaded =
-                                    await _uploadOccurrenceEventPhotos(
-                                      pendingPhotos,
-                                    );
-                                eventAttachments.addAll(uploaded);
-                                final edited = IncidentProgressUpdate(
-                                  title: titleController.text.trim().isEmpty
-                                      ? update.title
-                                      : titleController.text.trim(),
-                                  description: descriptionController.text
-                                      .trim(),
-                                  timestamp: update.timestamp,
-                                  location: eventLocation.trim(),
-                                  latitude: eventLatitude,
-                                  longitude: eventLongitude,
-                                  authorId: update.authorId,
-                                  authorName: update.authorName,
-                                  attachments: eventAttachments,
-                                );
-                                if (!context.mounted) return;
-                                Navigator.of(
-                                  context,
-                                ).pop(_OccurrenceEventChange.update(edited));
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      _cleanSaveError(e).isEmpty
-                                          ? 'NÃ£o foi possÃ­vel salvar as evidÃªncias.'
-                                          : _cleanSaveError(e),
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.save_rounded),
-                            label: Text(
-                              'SALVAR',
-                              style: GoogleFonts.robotoMono(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _hudCyan,
-                              foregroundColor: _hudBackground,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+                );
+              }
+            },
           ),
         );
       },
     );
-
     titleController.dispose();
     descriptionController.dispose();
     if (result == null || !mounted) return;
@@ -3969,80 +3019,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     await _applyOccurrenceEventChange(index, result);
   }
 
-  Widget _buildEventAttachmentRow({
-    required String label,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventDetailLine({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 17),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  style: GoogleFonts.robotoMono(
-                    color: color,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatOccurrenceEventTimestamp(DateTime timestamp) {
     return '${timestamp.day.toString().padLeft(2, '0')}/'
         '${timestamp.month.toString().padLeft(2, '0')}/'
-        '${timestamp.year} Ã s '
+        '${timestamp.year} às '
         '${timestamp.hour.toString().padLeft(2, '0')}:'
         '${timestamp.minute.toString().padLeft(2, '0')}';
   }
@@ -4093,7 +3073,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       if (!mounted) return;
       _setSaveStatus('Linha do tempo sincronizada.');
       _showOperationalSnack(
-        change.delete ? 'Evento excluÃ­do.' : 'Evento atualizado.',
+        change.delete ? 'Evento excluído.' : 'Evento atualizado.',
         backgroundColor: const Color(0xFF123044),
         icon: change.delete
             ? Icons.delete_outline_rounded
@@ -4110,7 +3090,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       });
       _showOperationalSnack(
         _cleanSaveError(e).isEmpty
-            ? 'NÃ£o foi possÃ­vel sincronizar o evento.'
+            ? 'Não foi possível sincronizar o evento.'
             : _cleanSaveError(e),
         backgroundColor: const Color(0xFFE53935),
         icon: Icons.error_outline_rounded,
@@ -4126,7 +3106,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _syncOccurrenceController();
     return _occurrenceController.resultSummary(
       nature: _selectedSubtype,
-      fallback: _formData['Resultado da Busca'] ?? 'AveriguaÃ§Ã£o',
+      fallback: _formData['Resultado da Busca'] ?? 'Averiguação',
     );
   }
 
@@ -4199,7 +3179,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           title: 'Registro inicial',
           description: _descriptionController.text.trim().isNotEmpty
               ? _descriptionController.text.trim()
-              : 'OcorrÃªncia registrada pela equipe.',
+              : 'Ocorrência registrada pela equipe.',
           timestamp: finalDate,
           location: _locationController.text.trim(),
           authorId: authorId,
@@ -4212,8 +3192,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       final progressTitle =
           _selectedOccurrenceUpdateTitle ??
           (_occurrenceStatus == OccurrenceFormController.statusInProgress
-              ? 'AtualizaÃ§Ã£o operacional'
-              : 'Encerramento da ocorrÃªncia');
+              ? 'Atualização operacional'
+              : 'Encerramento da ocorrência');
       updates.add(
         IncidentProgressUpdate(
           title: progressTitle,
@@ -4228,7 +3208,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       updates.add(
         IncidentProgressUpdate(
           title: 'Registro atualizado',
-          description: 'Dados da ocorrÃªncia atualizados.',
+          description: 'Dados da ocorrência atualizados.',
           timestamp: finalDate,
           location: _locationController.text.trim(),
           authorId: authorId,
@@ -4246,12 +3226,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
 
     return [
-      const SizedBox(height: 24),
-      TacticalTextField(
-        controller: _durationController,
-        keyboardType: TextInputType.number,
-        labelText: 'DuraÃ§Ã£o (Minutos)',
-        prefixIcon: Icons.timer_rounded,
+      TrainingActivityFields(
+        visible: true,
+        durationController: _durationController,
       ),
     ];
   }
@@ -4261,49 +3238,20 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return const [];
     }
 
-    final fields = <Widget>[];
-
-    if (_selectedSubtype == _SheetSubtype.feeding) {
-      fields.addAll([
-        const SizedBox(height: 16),
-        TacticalTextField(
-          controller: _racaoMarcaController,
-          labelText: 'Marca da raÃ§Ã£o',
-          prefixIcon: Icons.shopping_bag_rounded,
-        ),
-        const SizedBox(height: 16),
-        TacticalTextField(
-          controller: _racaoQtdController,
-          keyboardType: TextInputType.number,
-          labelText: 'Quantidade (em gramas)',
-          prefixIcon: Icons.scale_rounded,
-        ),
-      ]);
-    } else if (_selectedSubtype == _SheetSubtype.play ||
-        _selectedSubtype == _SheetSubtype.walk) {
-      fields.addAll([
-        const SizedBox(height: 16),
-        TacticalTextField(
-          controller: _durationController,
-          keyboardType: TextInputType.number,
-          labelText: 'DuraÃ§Ã£o (Minutos)',
-          prefixIcon: Icons.timer_rounded,
-        ),
-      ]);
-      if (_selectedSubtype == _SheetSubtype.walk) {
-        fields.addAll([
-          const SizedBox(height: 16),
-          TacticalTextField(
-            controller: _distanciaController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            labelText: 'DistÃ¢ncia (km)',
-            prefixIcon: Icons.straighten_rounded,
-          ),
-        ]);
-      }
-    }
-
-    return fields;
+    return [
+      RoutineActivityFields(
+        visible: true,
+        isFeeding: _selectedSubtype == _SheetSubtype.feeding,
+        isPlayOrWalk:
+            _selectedSubtype == _SheetSubtype.play ||
+            _selectedSubtype == _SheetSubtype.walk,
+        isWalk: _selectedSubtype == _SheetSubtype.walk,
+        rationBrandController: _racaoMarcaController,
+        rationAmountController: _racaoQtdController,
+        durationController: _durationController,
+        distanceController: _distanciaController,
+      ),
+    ];
   }
 
   List<Widget> _buildHealthMetaFields() {
@@ -4312,124 +3260,25 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
 
     return [
-      ..._buildHealthResponsibleFields(),
-      ..._buildHealthReasonFields(),
-      ..._buildVaccineFields(),
-      ..._buildExamFields(),
-      ..._buildBathFields(),
-      ..._buildReturnScheduleFields(),
-    ];
-  }
-
-  List<Widget> _buildHealthResponsibleFields() {
-    return [
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _vetNameController,
-        labelText: _selectedSubtype == _SheetSubtype.bath
-            ? 'Nome do(a) ResponsÃ¡vel'
-            : 'Nome do(a) VeterinÃ¡rio(a)',
-        prefixIcon: Icons.person_rounded,
-      ),
-    ];
-  }
-
-  List<Widget> _buildHealthReasonFields() {
-    if (_selectedSubtype != _SheetSubtype.consultation &&
-        _selectedSubtype != _SheetSubtype.exam) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 24),
-      TacticalTextField(
-        controller: _motivoController,
-        labelText: 'Motivo',
-        prefixIcon: Icons.info_outline_rounded,
-      ),
-    ];
-  }
-
-  List<Widget> _buildVaccineFields() {
-    if (_selectedSubtype != _SheetSubtype.vaccine) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 16),
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: HudSelectField<String>(
-          label: 'Tipo de Vacina *',
-          icon: Icons.vaccines_outlined,
-          value: _selectedVacina,
-          placeholder: 'Selecione o tipo de vacina',
-          accent: _hudCyan,
-          items: const [
-            'V10/V8',
-            'AntirrÃ¡bica',
-            'GiÃ¡rdia',
-            'Gripe Canina',
-            'Leishmaniose',
-            'Outra',
-          ],
-          labelBuilder: (item) => item,
-          onChanged: (val) => setState(() {
-            _selectedVacina = val;
-            _tipoVacinaController.text = val ?? '';
-          }),
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildExamFields() {
-    if (_selectedSubtype != _SheetSubtype.exam) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _tipoExameController,
-        labelText: 'Tipo de Exame',
-        prefixIcon: Icons.biotech_rounded,
-      ),
-    ];
-  }
-
-  List<Widget> _buildBathFields() {
-    if (_selectedSubtype != _SheetSubtype.bath) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _produtosBanhoController,
-        labelText: 'Produtos Utilizados (para controle de alergias)',
-        prefixIcon: Icons.spa_rounded,
-      ),
-    ];
-  }
-
-  List<Widget> _buildReturnScheduleFields() {
-    if (_selectedSubtype != _SheetSubtype.consultation &&
-        _selectedSubtype != _SheetSubtype.vaccine) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 24),
-      TacticalTextField(
-        controller: _returnDateController,
-        keyboardType: TextInputType.datetime,
-        readOnly: true,
-        onTap: _pickReturnDate,
-        labelText: _selectedSubtype == _SheetSubtype.vaccine
-            ? 'Data da PrÃ³xima Dose *'
-            : 'Data de Retorno (Opcional)',
-        prefixIcon: Icons.calendar_month_rounded,
+      HealthActivityFields(
+        subtype: _selectedSubtype,
+        consultationSubtype: _SheetSubtype.consultation,
+        vaccineSubtype: _SheetSubtype.vaccine,
+        examSubtype: _SheetSubtype.exam,
+        bathSubtype: _SheetSubtype.bath,
+        accentColor: _hudCyan,
+        responsibleController: _vetNameController,
+        reasonController: _motivoController,
+        vaccineTypeController: _tipoVacinaController,
+        examTypeController: _tipoExameController,
+        bathProductsController: _produtosBanhoController,
+        returnDateController: _returnDateController,
+        selectedVaccine: _selectedVacina,
+        onVaccineChanged: (val) => setState(() {
+          _selectedVacina = val;
+          _tipoVacinaController.text = val ?? '';
+        }),
+        onPickReturnDate: _pickReturnDate,
       ),
     ];
   }
@@ -4480,179 +3329,143 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Widget _buildLocationTimeRow() {
-    return LocationTimeRow(
-      locationField: TacticalTextField(
-        controller: _locationController,
-        labelText: widget.category == 'Saude'
-            ? 'Local / ClÃ­nica'
-            : 'EndereÃ§o / Local',
-        prefixIcon: Icons.location_on_rounded,
-      ),
-      timeField: TacticalTextField(
-        controller: _timeController,
-        labelText: 'Hora',
-        readOnly: true,
-      ),
+    return ActivityLocationTimeFields(
+      locationController: _locationController,
+      timeController: _timeController,
+      isHealth: widget.category == 'Saude',
     );
   }
 
   Widget _buildDescriptionField() {
-    return TacticalTextField(
+    return ActivityDescriptionField(
       controller: _descriptionController,
-      maxLines: 5,
-      minLines: 3,
-      labelText: widget.category == 'Treino'
-          ? 'DescriÃ§Ã£o do treino'
-          : widget.category == 'Saude'
-          ? 'Detalhes'
-          : widget.category == 'Rotina'
-          ? (_selectedSubtype == _SheetSubtype.feeding
-                ? 'ObservaÃ§Ãµes da alimentaÃ§Ã£o'
-                : 'Detalhes da rotina')
-          : 'DescriÃ§Ã£o da ocorrÃªncia',
-      prefixIcon: Icons.notes_rounded,
-      suffixIcon: GestureDetector(
-        onLongPressStart: (_) => _listen(),
-        onLongPressEnd: (_) => _stopListening(),
-        onTap: () {
-          if (_isListening) {
-            _stopListening();
-          } else {
-            _listen();
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Icon(
-            _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-            color: _isListening ? Colors.redAccent : Colors.white54,
-          ),
-        ),
-      ),
+      labelText: _descriptionLabel(),
+      isListening: _isListening,
+      onStartListening: _listen,
+      onStopListening: _stopListening,
+      onToggleListening: () {
+        if (_isListening) {
+          _stopListening();
+        } else {
+          _listen();
+        }
+      },
     );
   }
 
+  String _descriptionLabel() {
+    if (widget.category == 'Treino') return 'Descrição do treino';
+    if (widget.category == 'Saude') return 'Detalhes';
+    if (widget.category == 'Rotina') {
+      return _selectedSubtype == _SheetSubtype.feeding
+          ? 'Observações da alimentação'
+          : 'Detalhes da rotina';
+    }
+    return 'Descrição da ocorrência';
+  }
+
   Widget _buildSaveButton(Color tColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildSaveStatusPanel(tColor),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: _buildPrimarySaveButton(tColor),
-        ),
-      ],
+    return ActivitySaveButton(
+      accentColor: tColor,
+      foregroundColor: _hudBackground,
+      isSaving: _isSaving,
+      isCompressing: _isCompressing,
+      saveFailed: _saveFailed,
+      saveStatus: _saveStatus,
+      idleLabel: _saveButtonLabel(),
+      onSave: _handlePrimarySave,
     );
   }
 
   Widget _buildPrimarySaveButton(Color tColor) {
-    return ElevatedButton(
-      onPressed: (_isSaving || _isCompressing)
-          ? null
-          : () {
-              HapticFeedback.heavyImpact();
-              _save();
-            },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _isSaving ? Colors.black45 : tColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        elevation: 0,
-      ),
-      child: _isSaving
-          ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    _saveStatus,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            )
-          : Text(
-              widget.category == 'Treino'
-                  ? 'SALVAR TREINO'
-                  : widget.category == 'Saude'
-                  ? 'SALVAR PRONTUÃRIO'
-                  : widget.category == 'Rotina'
-                  ? 'SALVAR ROTINA'
-                  : _occurrenceStatus ==
-                        OccurrenceFormController.statusInProgress
-                  ? 'SALVAR EM ANDAMENTO'
-                  : 'CONCLUIR OCORRÃŠNCIA',
-              style: GoogleFonts.robotoMono(
-                fontWeight: FontWeight.w900,
-                color: _hudBackground,
-                fontSize: 15,
-                letterSpacing: 1.6,
-              ),
-            ),
+    return ActivityPrimarySaveButton(
+      accentColor: tColor,
+      foregroundColor: _hudBackground,
+      isSaving: _isSaving,
+      isCompressing: _isCompressing,
+      saveStatus: _saveStatus,
+      idleLabel: _saveButtonLabel(),
+      onSave: _handlePrimarySave,
     );
   }
 
   Widget _buildSaveStatusPanel(Color accent) {
-    if (!_isSaving && !_saveFailed) {
-      return const SizedBox.shrink();
+    return ActivitySaveStatusPanel(
+      accentColor: accent,
+      isSaving: _isSaving,
+      saveFailed: _saveFailed,
+      saveStatus: _saveStatus,
+    );
+  }
+
+  String _saveButtonLabel() {
+    if (widget.category == 'Treino') return 'SALVAR TREINO';
+    if (widget.category == 'Saude') return 'SALVAR PRONTUÁRIO';
+    if (widget.category == 'Rotina') return 'SALVAR ROTINA';
+    return _occurrenceStatus == OccurrenceFormController.statusInProgress
+        ? 'SALVAR EM ANDAMENTO'
+        : 'CONCLUIR OCORRÊNCIA';
+  }
+
+  void _handlePrimarySave() {
+    HapticFeedback.heavyImpact();
+    _save();
+  }
+
+  Widget _buildTrackingAction({
+    required String startLabel,
+    required IconData startIcon,
+    required Color backgroundColor,
+    required Color foregroundColor,
+    bool isLightMode = false,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    EdgeInsetsGeometry capturedMargin = EdgeInsets.zero,
+  }) {
+    final distance = _formData['_trackingDistance'];
+    return ActivityTrackingAction(
+      hasRoute: _formData.containsKey('_trackingRoute'),
+      distanceMeters: distance is num ? distance : null,
+      startLabel: startLabel,
+      startIcon: startIcon,
+      startBackgroundColor: backgroundColor,
+      startForegroundColor: foregroundColor,
+      padding: padding,
+      capturedMargin: capturedMargin,
+      onStart: () => _openLiveTracking(isLightMode: isLightMode),
+    );
+  }
+
+  Future<void> _openLiveTracking({bool isLightMode = false}) async {
+    HapticFeedback.lightImpact();
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LiveTrackingScreen(isLightMode: isLightMode),
+      ),
+    );
+
+    if (result == null || result is! Map || !mounted) {
+      return;
     }
 
-    final statusColor = _saveFailed ? const Color(0xFFE53935) : accent;
-    final statusText = _saveStatus.isEmpty
-        ? (_saveFailed ? 'Falha ao salvar.' : 'Sincronizando...')
-        : _saveStatus;
+    final distanceMeters = result['distanceMeters'];
+    final durationSeconds = result['durationSeconds'];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(235),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: statusColor.withAlpha(150)),
-        boxShadow: [
-          BoxShadow(color: statusColor.withAlpha(30), blurRadius: 16),
-        ],
-      ),
-      child: Row(
-        children: [
-          if (_isSaving)
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                color: statusColor,
-                strokeWidth: 2,
-              ),
-            )
-          else
-            Icon(Icons.error_outline_rounded, color: statusColor, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              statusText,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
+    setState(() {
+      _formData['_trackingRoute'] = result['route'];
+      _formData['_trackingDistance'] = distanceMeters;
+      if (durationSeconds is num) {
+        _durationController.text = (durationSeconds / 60).floor().toString();
+      }
+      if (distanceMeters is num) {
+        _distanciaController.text = (distanceMeters / 1000).toStringAsFixed(2);
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Rastreamento finalizado. Distância e tempo calculados.'),
+        backgroundColor: Color(0xFF1B8A4C),
       ),
     );
   }
@@ -4671,106 +3484,23 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           _buildChipGroup('Artigo de Odor', [
             'Roupa',
             'Objeto',
-            'VeÃ­culo',
+            'Veículo',
             'Odor de Cena',
           ]),
-          if (_formData.containsKey('_trackingRoute'))
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B8A4C).withAlpha(40),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF1B8A4C)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF1B8A4C),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Rota capturada: ${(_formData['_trackingDistance'] as double).toStringAsFixed(0)} m',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    HapticFeedback.lightImpact();
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const LiveTrackingScreen(),
-                      ),
-                    );
-                    if (result != null && result is Map) {
-                      setState(() {
-                        _formData['_trackingRoute'] = result['route'];
-                        _formData['_trackingDistance'] =
-                            result['distanceMeters'];
-                        _durationController.text =
-                            (result['durationSeconds'] / 60).floor().toString();
-                        if (result['distanceMeters'] != null) {
-                          _distanciaController.text =
-                              ((result['distanceMeters'] as num) / 1000)
-                                  .toStringAsFixed(2);
-                        }
-                      });
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Rastreamento finalizado. DistÃ¢ncia e tempo calculados.',
-                            ),
-                            backgroundColor: Color(0xFF1B8A4C),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.satellite_alt_rounded,
-                    color: Colors.black,
-                  ),
-                  label: Text(
-                    'INICIAR RASTREIO TÃTICO',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFBBF24), // Amber
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
+          _buildTrackingAction(
+            startLabel: 'INICIAR RASTREIO TÁTICO',
+            startIcon: Icons.satellite_alt_rounded,
+            backgroundColor: const Color(0xFFFBBF24),
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.only(bottom: 24),
+          ),
         ];
       case _SheetSubtype.guardProtection:
         return [
-          _buildChipGroup('CenÃ¡rio', [
+          _buildChipGroup('Cenário', [
             'Abordagem',
-            'EdificaÃ§Ã£o',
-            'PerseguiÃ§Ã£o',
+            'Edificação',
+            'Perseguição',
             'Estampido',
           ]),
           _buildChipGroup('Figurante', [
@@ -4782,7 +3512,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           _buildChipGroup('Controle/Out', [
             'Solta Limpa',
             'Comando Extra',
-            'CorreÃ§Ã£o MecÃ¢nica',
+            'Correção Mecânica',
           ]),
           const SizedBox(height: 8),
           TacticalTextField(
@@ -4794,16 +3524,16 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         ];
       case _SheetSubtype.scentWork:
         return [
-          _buildChipGroup('DireÃ§Ã£o do Vento', [
+          _buildChipGroup('Direção do Vento', [
             'Face',
             'Cauda',
             'Lateral',
             'Sem Vento',
           ]),
           _buildChipGroup('Dificuldade', [
-            'CenÃ¡rio Limpo',
+            'Cenário Limpo',
             'Distratores',
-            'Efeito ChaminÃ©',
+            'Efeito Chaminé',
             'Delta T',
           ]),
           _buildChipGroup('Resposta Final', [
@@ -4823,9 +3553,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
               accent: _hudAmber,
               items: const [
                 'Maconha',
-                'CocaÃ­na',
+                'Cocaína',
                 'Crack',
-                'SintÃ©ticos',
+                'Sintéticos',
                 'Nose MP',
                 'Outros',
               ],
@@ -4840,7 +3570,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
                 child: TacticalTextField(
                   controller: _tempController,
                   keyboardType: TextInputType.number,
-                  labelText: 'Temp (Â°C)',
+                  labelText: 'Temp (°C)',
                   prefixIcon: Icons.thermostat_rounded,
                 ),
               ),
@@ -4892,14 +3622,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
             prefixIcon: Icons.flag_rounded,
           ),
           const SizedBox(height: 16),
-          _buildChipGroup('DistraÃ§Ã£o', [
-            'Baixa',
-            'MÃ©dia',
-            'Alta',
-            'Extrema',
-          ]),
+          _buildChipGroup('Distração', ['Baixa', 'Média', 'Alta', 'Extrema']),
           _buildChipGroup('Guia', ['Off-leash', 'Misto', 'Com Guia']),
-          _buildChipGroup('Teve Ãªxito?', ['Sim', 'NÃ£o']),
+          _buildChipGroup('Teve êxito?', ['Sim', 'Não']),
           TacticalTextField(
             controller: _dificuldadesController,
             labelText: 'Dificuldades Encontradas',
@@ -4914,9 +3639,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           _buildChipGroup('Atividade', [
             'Passeio Livre',
             'Bolinha/Tug',
-            'SocializaÃ§Ã£o',
+            'Socialização',
             'Esteira',
-            'NataÃ§Ã£o',
+            'Natação',
           ]),
           _buildChipGroup('Intensidade', [
             'Regenerativo',
@@ -4934,66 +3659,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           ]),
           _buildChipGroup('Guia', ['Curta', 'Longa', 'Livre']),
           const SizedBox(height: 12),
-          Padding(
+          _buildTrackingAction(
+            startLabel: 'INICIAR RASTREIO DE PASSEIO',
+            startIcon: Icons.directions_walk_rounded,
+            backgroundColor: const Color(0xFF43A047),
+            foregroundColor: Colors.white,
+            isLightMode: true,
             padding: const EdgeInsets.only(bottom: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  HapticFeedback.lightImpact();
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const LiveTrackingScreen(isLightMode: true),
-                    ),
-                  );
-                  if (result != null && result is Map) {
-                    setState(() {
-                      _formData['_trackingRoute'] = result['route'];
-                      _formData['_trackingDistance'] = result['distanceMeters'];
-                      _durationController.text =
-                          (result['durationSeconds'] / 60).floor().toString();
-                      if (result['distanceMeters'] != null) {
-                        _distanciaController.text =
-                            ((result['distanceMeters'] as num) / 1000)
-                                .toStringAsFixed(2);
-                      }
-                    });
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Rastreamento finalizado. DistÃ¢ncia e tempo calculados.',
-                          ),
-                          backgroundColor: Color(0xFF1B8A4C),
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(
-                  Icons.directions_walk_rounded,
-                  color: Colors.white,
-                ),
-                label: Text(
-                  'INICIAR RASTREIO DE PASSEIO',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF43A047),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
           ),
         ];
       default:
@@ -5003,364 +3675,160 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   List<Widget> _buildDetecaoGrouped() {
     return [
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+      HudExpansionSection(
+        title: 'Detalhes da apreensão',
+        icon: Icons.shield_rounded,
+        iconColor: Colors.orangeAccent,
+        initiallyExpanded: true,
+        children: [
+          TacticalTextField(
+            controller: _naturezaOcorrenciaController,
+            labelText: 'Natureza da ocorrência',
+            prefixIcon: Icons.category_rounded,
           ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(Icons.shield_rounded, color: Colors.orangeAccent),
-          title: Text(
-            'Detalhes da apreensÃ£o',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            TacticalTextField(
-              controller: _naturezaOcorrenciaController,
-              labelText: 'Natureza da ocorrência',
-              prefixIcon: Icons.category_rounded,
-            ),
-            const SizedBox(height: 16),
-            ..._buildCategorySpecificFields(),
-          ],
-        ),
+          const SizedBox(height: 16),
+          ..._buildCategorySpecificFields(),
+        ],
       ),
       const SizedBox(height: 12),
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(
-            Icons.location_on_rounded,
-            color: Color(0xFF4ECDE4),
-          ),
-          title: Text(
-            'Contexto & Local',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            _buildTopActionRow(),
-            const SizedBox(height: 16),
-            _buildLocationTimeRow(),
-          ],
-        ),
+      HudExpansionSection(
+        title: 'Contexto & Local',
+        icon: Icons.location_on_rounded,
+        iconColor: const Color(0xFF4ECDE4),
+        children: [
+          _buildTopActionRow(),
+          const SizedBox(height: 16),
+          _buildLocationTimeRow(),
+        ],
       ),
       const SizedBox(height: 12),
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(
-            Icons.photo_library_rounded,
-            color: Color(0xFF1B8A4C),
-          ),
-          title: Text(
-            'RelatÃ³rio & Anexos',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            _buildDescriptionField(),
-            const SizedBox(height: 24),
-            _buildImageGallery(),
-          ],
-        ),
+      HudExpansionSection(
+        title: 'Relatório & Anexos',
+        icon: Icons.photo_library_rounded,
+        iconColor: const Color(0xFF1B8A4C),
+        children: [
+          _buildDescriptionField(),
+          const SizedBox(height: 24),
+          _buildImageGallery(),
+        ],
       ),
     ];
   }
 
   List<Widget> _buildBuscaPessoaGrouped() {
     return [
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+      HudExpansionSection(
+        title: 'Detalhes da Busca',
+        icon: Icons.person_search_rounded,
+        iconColor: Colors.redAccent,
+        initiallyExpanded: true,
+        children: [
+          TacticalTextField(
+            controller: _naturezaOcorrenciaController,
+            labelText: 'Natureza da ocorrência',
+            prefixIcon: Icons.category_rounded,
           ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(
-            Icons.person_search_rounded,
-            color: Colors.redAccent,
+          const SizedBox(height: 16),
+          _buildChipGroup('Tipo de Busca', [
+            _SheetSubtype.searchCapture,
+            'Pessoa Desaparecida',
+          ]),
+          TacticalTextField(
+            controller: _odorObjetoController,
+            labelText: 'Objeto Fonte de Odor',
+            prefixIcon: Icons.search,
           ),
-          title: Text(
-            'Detalhes da Busca',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            TacticalTextField(
-              controller: _naturezaOcorrenciaController,
-              labelText: 'Natureza da ocorrência',
-              prefixIcon: Icons.category_rounded,
-            ),
-            const SizedBox(height: 16),
-            _buildChipGroup('Tipo de Busca', [
-              _SheetSubtype.searchCapture,
-              'Pessoa Desaparecida',
-            ]),
-            TacticalTextField(
-              controller: _odorObjetoController,
-              labelText: 'Objeto Fonte de Odor',
-              prefixIcon: Icons.search,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TacticalTextField(
-                    controller: _tempoDesaparecimentoController,
-                    labelText: 'Tempo Desaparecido',
-                    prefixIcon: Icons.access_time,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TacticalTextField(
-                    controller: _durationController,
-                    labelText: 'DuraÃ§Ã£o (Busca)',
-                    prefixIcon: Icons.timer,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 12),
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(Icons.terrain_rounded, color: Colors.amber),
-          title: Text(
-            'Teatro de OperaÃ§Ãµes',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            _buildTopActionRow(),
-            const SizedBox(height: 16),
-            _buildLocationTimeRow(),
-            const SizedBox(height: 16),
-            TacticalTextField(
-              controller: _condicaoTerrenoController,
-              labelText: 'CondiÃ§Ãµes / Terreno',
-              prefixIcon: Icons.terrain,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _pullCurrentWeather,
-                icon: const Icon(Icons.cloud_sync, color: Colors.white),
-                label: Text(
-                  'PUXAR CLIMA ATUAL (GPS)',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4ECDE4).withAlpha(50),
-                  foregroundColor: const Color(0xFF4ECDE4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  elevation: 0,
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TacticalTextField(
+                  controller: _tempoDesaparecimentoController,
+                  labelText: 'Tempo Desaparecido',
+                  prefixIcon: Icons.access_time,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (_formData.containsKey('_trackingRoute'))
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B8A4C).withAlpha(40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TacticalTextField(
+                  controller: _durationController,
+                  labelText: 'Duração (Busca)',
+                  prefixIcon: Icons.timer,
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      HudExpansionSection(
+        title: 'Teatro de Operações',
+        icon: Icons.terrain_rounded,
+        iconColor: Colors.amber,
+        children: [
+          _buildTopActionRow(),
+          const SizedBox(height: 16),
+          _buildLocationTimeRow(),
+          const SizedBox(height: 16),
+          TacticalTextField(
+            controller: _condicaoTerrenoController,
+            labelText: 'Condições / Terreno',
+            prefixIcon: Icons.terrain,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _pullCurrentWeather,
+              icon: const Icon(Icons.cloud_sync, color: Colors.white),
+              label: Text(
+                'PUXAR CLIMA ATUAL (GPS)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4ECDE4).withAlpha(50),
+                foregroundColor: const Color(0xFF4ECDE4),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF1B8A4C)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF1B8A4C),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Rota capturada: ${(_formData['_trackingDistance'] as double).toStringAsFixed(0)} m',
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    HapticFeedback.lightImpact();
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const LiveTrackingScreen(),
-                      ),
-                    );
-                    if (result != null && result is Map) {
-                      setState(() {
-                        _formData['_trackingRoute'] = result['route'];
-                        _formData['_trackingDistance'] =
-                            result['distanceMeters'];
-                        _durationController.text =
-                            (result['durationSeconds'] / 60).floor().toString();
-                        if (result['distanceMeters'] != null) {
-                          _distanciaController.text =
-                              ((result['distanceMeters'] as num) / 1000)
-                                  .toStringAsFixed(2);
-                        }
-                      });
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Rastreamento finalizado. DistÃ¢ncia e tempo calculados.',
-                            ),
-                            backgroundColor: Color(0xFF1B8A4C),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.satellite_alt_rounded,
-                    color: Colors.black,
-                  ),
-                  label: Text(
-                    'INICIAR RASTREIO TÃTICO',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFBBF24),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
+                elevation: 0,
               ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 12),
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          maintainState: true,
-          collapsedBackgroundColor: const Color(0xFF1E1E1E),
-          backgroundColor: const Color(0xFF161616),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const Icon(
-            Icons.photo_library_rounded,
-            color: Color(0xFF1B8A4C),
-          ),
-          title: Text(
-            'RelatÃ³rio & Anexos',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: Colors.white,
             ),
           ),
-          childrenPadding: const EdgeInsets.all(16),
-          children: [
-            _buildDescriptionField(),
-            const SizedBox(height: 24),
-            _buildImageGallery(),
-          ],
-        ),
+          const SizedBox(height: 16),
+          _buildTrackingAction(
+            startLabel: 'INICIAR RASTREIO TÁTICO',
+            startIcon: Icons.satellite_alt_rounded,
+            backgroundColor: const Color(0xFFFBBF24),
+            foregroundColor: Colors.black,
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      HudExpansionSection(
+        title: 'Relatório & Anexos',
+        icon: Icons.photo_library_rounded,
+        iconColor: const Color(0xFF1B8A4C),
+        children: [
+          _buildDescriptionField(),
+          const SizedBox(height: 24),
+          _buildImageGallery(),
+        ],
       ),
     ];
   }
 
   List<String> get _detectionDrugOptions => [
     'Maconha',
-    'CocaÃ­na',
+    'Cocaína',
     'Crack',
-    'SintÃ©ticos',
+    'Sintéticos',
     'Nose MP',
     'Outros',
   ];
@@ -5386,117 +3854,38 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   List<Widget> _buildDetectionOccurrenceFields() {
     return [
-      Text(
-        'ENTORPECENTES LOCALIZADOS',
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: Colors.white54,
-          letterSpacing: 1.0,
-        ),
+      OccurrenceDetectionFields(
+        drugs: _detecaoDrogas,
+        drugOptions: _detectionDrugOptions,
+        accentColor: _hudCyan,
+        supportTeamController: _equipeController,
+        reportNumberController: _boController,
+        onAddDrug: _addDrug,
+        onRemoveDrug: _removeDrug,
+        onDrugTypeChanged: (drug, type) {
+          setState(() => drug['tipo'] = type);
+        },
       ),
-      const SizedBox(height: 12),
-      ...List.generate(_detecaoDrogas.length, _buildDetectionDrugRow),
-      OutlinedButton.icon(
-        onPressed: _addDrug,
-        icon: const Icon(Icons.add, size: 16, color: Colors.white),
-        label: Text(
-          'ADICIONAR ENTORPECENTE',
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.white24),
-        ),
-      ),
-      const SizedBox(height: 24),
-      TacticalTextField(
-        controller: _equipeController,
-        labelText: 'Equipe de Apoio (GCMs)',
-        prefixIcon: Icons.group,
-      ),
-      const SizedBox(height: 16),
-      TacticalTextField(
-        controller: _boController,
-        labelText: 'NÃºmero do BO',
-        prefixIcon: Icons.assignment,
-      ),
-      const SizedBox(height: 24),
     ];
-  }
-
-  Widget _buildDetectionDrugRow(int index) {
-    final obj = _detecaoDrogas[index];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: HudSelectField<String>(
-              label: 'Entorpecente',
-              icon: Icons.science_rounded,
-              value: _detectionDrugOptions.contains(obj['tipo'])
-                  ? obj['tipo'] as String?
-                  : 'Outros',
-              placeholder: 'Tipo',
-              accent: _hudCyan,
-              items: _detectionDrugOptions,
-              labelBuilder: (item) => item,
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => obj['tipo'] = val);
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (obj['tipo'] == 'Outros')
-            Expanded(
-              flex: 2,
-              child: TacticalTextField(
-                controller: obj['especificar'],
-                labelText: 'Especificar',
-              ),
-            ),
-          if (obj['tipo'] == 'Outros') const SizedBox(width: 8),
-          Expanded(
-            flex: 1,
-            child: TacticalTextField(
-              controller: obj['quantidade'],
-              labelText: 'Qtd/G',
-              keyboardType: TextInputType.number,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.remove_circle, color: Colors.redAccent),
-            onPressed: () => _removeDrug(index),
-          ),
-        ],
-      ),
-    );
   }
 
   List<Widget> _buildSupportVehicleFields() {
     return [
       TacticalTextField(
         controller: _guarnicaoController,
-        labelText: 'GuarniÃ§Ã£o apoiada',
+        labelText: 'Guarnição apoiada',
         prefixIcon: Icons.local_police,
       ),
       const SizedBox(height: 16),
       TacticalTextField(
         controller: _situacaoController,
-        labelText: 'SituaÃ§Ã£o encontrada',
+        labelText: 'Situação encontrada',
         prefixIcon: Icons.warning,
       ),
       const SizedBox(height: 16),
       TacticalTextField(
         controller: _desfechoController,
-        labelText: 'Desfecho da intervenÃ§Ã£o',
+        labelText: 'Desfecho da intervenção',
         prefixIcon: Icons.check_circle,
       ),
       const SizedBox(height: 24),
@@ -5528,7 +3917,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           Expanded(
             child: TacticalTextField(
               controller: _durationController,
-              labelText: 'DuraÃ§Ã£o (Busca)',
+              labelText: 'Duração (Busca)',
               prefixIcon: Icons.timer,
               keyboardType: TextInputType.number,
             ),
@@ -5538,7 +3927,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       const SizedBox(height: 24),
       TacticalTextField(
         controller: _condicaoTerrenoController,
-        labelText: 'CondiÃ§Ãµes / Terreno',
+        labelText: 'Condições / Terreno',
         prefixIcon: Icons.terrain,
       ),
       const SizedBox(height: 12),
@@ -5572,7 +3961,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     return [
       TacticalTextField(
         controller: _numeroOsController,
-        labelText: 'NÃºmero da Ordem de ServiÃ§o',
+        labelText: 'Número da Ordem de Serviço',
         prefixIcon: Icons.numbers,
       ),
       const SizedBox(height: 24),
@@ -5584,13 +3973,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       TacticalTextField(
         controller: _publicoController,
         keyboardType: TextInputType.number,
-        labelText: 'PÃºblico estimado',
+        labelText: 'Público estimado',
         prefixIcon: Icons.groups_rounded,
       ),
       const SizedBox(height: 16),
       TacticalTextField(
         controller: _temaController,
-        labelText: 'Tema (Ex: CÃ£o CidadÃ£o)',
+        labelText: 'Tema (Ex: Cão Cidadão)',
         prefixIcon: Icons.lightbulb_rounded,
       ),
       const SizedBox(height: 24),

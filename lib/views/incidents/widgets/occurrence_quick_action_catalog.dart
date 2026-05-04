@@ -23,18 +23,21 @@ class OccurrenceQuickActionCatalog {
         description: 'K9 empregado em varredura operacional.',
         icon: Icons.pets_rounded,
         color: green,
+        assetPath: 'assets/images/actions/k9_emprego.png',
       ),
       OccurrenceQuickAction(
         title: 'Busca feita',
         description: 'Busca realizada pela equipe no ponto indicado.',
         icon: Icons.search_rounded,
         color: cyan,
+        assetPath: 'assets/images/actions/k9_busca.png',
       ),
       const OccurrenceQuickAction(
         title: 'Material localizado',
         description: 'Material localizado pela equipe.',
         icon: Icons.inventory_2_rounded,
         color: Color(0xFF9B5CFF),
+        assetPath: 'assets/images/actions/k9_materialEncontrado.png',
         options: [
           OccurrenceQuickAction(
             title: 'Entorpecente localizado',
@@ -67,12 +70,14 @@ class OccurrenceQuickActionCatalog {
         description: 'Parte conduzida para providências posteriores.',
         icon: Icons.person_rounded,
         color: Color(0xFFFF8A3D),
+        assetPath: 'assets/images/actions/k9_parteConduzida.png',
       ),
       const OccurrenceQuickAction(
         title: 'Sem alteração',
         description: 'Nada ilícito localizado ou constatado no local.',
         icon: Icons.cancel_rounded,
         color: Colors.white54,
+        assetPath: 'assets/images/actions/k9_naoConstatado.png',
       ),
     ];
   }

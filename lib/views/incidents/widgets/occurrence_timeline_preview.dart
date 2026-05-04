@@ -193,8 +193,8 @@ class _OccurrenceTimelineTile extends StatelessWidget {
               child: Column(
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: eventColor.withAlpha(isLatest ? 35 : 18),
                       shape: BoxShape.circle,
@@ -204,17 +204,19 @@ class _OccurrenceTimelineTile extends StatelessWidget {
                         ? Icon(
                             _iconForTitle(update.title),
                             color: eventColor,
-                            size: 17,
+                            size: 20,
                           )
-                        : ClipOval(
+                        : Padding(
+                            padding: const EdgeInsets.all(1.5),
                             child: Image.asset(
                               assetPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                _iconForTitle(update.title),
-                                color: eventColor,
-                                size: 17,
-                              ),
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                    _iconForTitle(update.title),
+                                    color: eventColor,
+                                    size: 20,
+                                  ),
                             ),
                           ),
                   ),
@@ -336,29 +338,37 @@ class _OccurrenceTimelineTile extends StatelessWidget {
   }
 
   Color _colorForTitle(String title, Color fallback) {
-    final value = title.toUpperCase();
-    if (value.contains('ABORDAGEM')) return const Color(0xFFFFB300);
-    if (value.contains('K9') ||
-        value.contains('CÃO') ||
-        value.contains('CAO')) {
+    final value = _normalizeTitle(title);
+    if (value.contains('abordagem')) return const Color(0xFFFFB300);
+    if (value.contains('k9') ||
+        value.contains('cao') ||
+        value.contains('emprego')) {
       return const Color(0xFF00F5A0);
     }
-    if (value.contains('BUSCA')) return const Color(0xFF42A5F5);
-    if (value.contains('MATERIAL') ||
-        value.contains('ENTORPECENTE') ||
-        value.contains('ARMA') ||
-        value.contains('MUNIÇÃO')) {
+    if (value.contains('busca')) return const Color(0xFF42A5F5);
+    if (value.contains('material') ||
+        value.contains('entorpecente') ||
+        value.contains('arma') ||
+        value.contains('municao') ||
+        value.contains('objeto')) {
       return const Color(0xFFB388FF);
     }
-    if (value.contains('CONDUZ')) return const Color(0xFFFF8A65);
-    if (value.contains('ALTERAÇÃO')) return Colors.blueGrey;
-    if (value.contains('ENCERR')) return const Color(0xFF00E5FF);
+    if (value.contains('conduz')) return const Color(0xFFFF8A65);
+    if (value.contains('alteracao') ||
+        value.contains('constata') ||
+        value.contains('constatado') ||
+        value.contains('nada')) {
+      return Colors.blueGrey;
+    }
+    if (value.contains('encerr')) return const Color(0xFF00E5FF);
     return fallback;
   }
 
   IconData _iconForTitle(String title) {
-    final value = title.toLowerCase();
-    if (value.contains('cão') || value.contains('k9')) {
+    final value = _normalizeTitle(title);
+    if (value.contains('cao') ||
+        value.contains('k9') ||
+        value.contains('emprego')) {
       return Icons.pets_rounded;
     }
     if (value.contains('busca')) {
@@ -367,7 +377,8 @@ class _OccurrenceTimelineTile extends StatelessWidget {
     if (value.contains('material') ||
         value.contains('entorpecente') ||
         value.contains('arma') ||
-        value.contains('munição')) {
+        value.contains('municao') ||
+        value.contains('objeto')) {
       return Icons.inventory_2_rounded;
     }
     if (value.contains('conduz')) {
@@ -379,18 +390,56 @@ class _OccurrenceTimelineTile extends StatelessWidget {
     if (value.contains('encerr')) {
       return Icons.flag_rounded;
     }
-    if (value.contains('alteração')) {
+    if (value.contains('alteracao') ||
+        value.contains('constata') ||
+        value.contains('constatado') ||
+        value.contains('nada')) {
       return Icons.highlight_off_rounded;
     }
     return Icons.timeline_rounded;
   }
 
   String? _assetForTitle(String title) {
-    final value = title.toLowerCase();
+    final value = _normalizeTitle(title);
     if (value.contains('abordagem')) {
       return 'assets/images/actions/k9_abordagem_timeline.png';
     }
+    if (value.contains('cao') ||
+        value.contains('k9') ||
+        value.contains('emprego')) {
+      return 'assets/images/actions/k9_emprego_timeline.png';
+    }
+    if (value.contains('busca')) {
+      return 'assets/images/actions/k9_busca_timeline.png';
+    }
+    if (value.contains('material') ||
+        value.contains('entorpecente') ||
+        value.contains('arma') ||
+        value.contains('municao') ||
+        value.contains('objeto')) {
+      return 'assets/images/actions/k9_materialEncontrado_timeline.png';
+    }
+    if (value.contains('conduz')) {
+      return 'assets/images/actions/k9_parteConduzida_timeline.png';
+    }
+    if (value.contains('alteracao') ||
+        value.contains('constata') ||
+        value.contains('constatado') ||
+        value.contains('nada')) {
+      return 'assets/images/actions/k9_naoConstatado_timeline.png';
+    }
     return null;
+  }
+
+  String _normalizeTitle(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp('[áàâãä]'), 'a')
+        .replaceAll(RegExp('[éèêë]'), 'e')
+        .replaceAll(RegExp('[íìîï]'), 'i')
+        .replaceAll(RegExp('[óòôõö]'), 'o')
+        .replaceAll(RegExp('[úùûü]'), 'u')
+        .replaceAll('ç', 'c');
   }
 
   String _formatHour(DateTime timestamp) {
