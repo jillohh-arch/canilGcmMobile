@@ -15,7 +15,6 @@ import '../../viewmodels/routine_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/user_viewmodel.dart';
 import '../../viewmodels/dog_viewmodel.dart';
-import '../../services/handler_identity_service.dart';
 import '../../services/form_metadata_reader.dart';
 import '../../services/location_resolution_service.dart';
 import '../../services/media_processing_service.dart';
@@ -79,7 +78,7 @@ import '../incidents/widgets/occurrence_start_screen.dart';
 import 'controllers/activity_sheet_occurrence_ctrl.dart';
 import 'controllers/activity_sheet_training_ctrl.dart';
 import 'controllers/activity_sheet_routine_ctrl.dart';
-import 'controllers/activity_record_payload_builder.dart';
+import 'controllers/activity_sheet_health_ctrl.dart';
 import 'live_tracking_screen.dart';
 
 abstract final class _SheetSubtype {
@@ -160,6 +159,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   // ---------------------------------------------------------------------------
   late final ActivitySheetRoutineCtrl _routineCtrl;
 
+  // ---------------------------------------------------------------------------
+  // Health controller (Fase 4)
+  // ---------------------------------------------------------------------------
+  late final ActivitySheetHealthCtrl _healthCtrl;
+
   // Getters Opção B: o State lê do controller ativo
   TextEditingController get _locationController =>
       _isOccurrenceCategory
@@ -174,7 +178,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
               ? _trainingCtrl.descriptionController
               : widget.category == 'Rotina'
                   ? _routineCtrl.descriptionController
-                  : _descriptionCtrlOther;
+                  : widget.category == 'Saude'
+                      ? _healthCtrl.descriptionController
+                      : _descriptionCtrlOther;
   TextEditingController get _timeController =>
       _isOccurrenceCategory
           ? _occCtrl.timeController
@@ -182,7 +188,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
               ? _trainingCtrl.timeController
               : widget.category == 'Rotina'
                   ? _routineCtrl.timeController
-                  : _timeCtrlOther;
+                  : widget.category == 'Saude'
+                      ? _healthCtrl.timeController
+                      : _timeCtrlOther;
   // durationController: Treino -> _trainingCtrl, Rotina -> _routineCtrl
   TextEditingController get _durationController =>
       widget.category == 'Treino'
@@ -204,7 +212,24 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _routineCtrl.racaoQtdController;
   TextEditingController get _distanciaController =>
       _routineCtrl.distanciaController;
+  // Saúde: campos específicos (Fase 4)
+  TextEditingController get _vetNameController =>
+      _healthCtrl.vetNameController;
+  TextEditingController get _motivoController =>
+      _healthCtrl.motivoController;
+  TextEditingController get _tipoVacinaController =>
+      _healthCtrl.tipoVacinaController;
+  TextEditingController get _tipoExameController =>
+      _healthCtrl.tipoExameController;
+  TextEditingController get _produtosBanhoController =>
+      _healthCtrl.produtosBanhoController;
+  TextEditingController get _returnDateController =>
+      _healthCtrl.returnDateController;
+  String? get _selectedVacina => _healthCtrl.selectedVacina;
+  File? get _examePdfFile => _healthCtrl.examePdfFile;
+  String? get _examePdfName => _healthCtrl.examePdfName;
 
+  TextEditingController get _naturezaOcorrenciaController =>
       _occCtrl.naturezaController;
   FocusNode get _occurrenceNatureFocusNode => _occCtrl.naturezaFocusNode;
   FocusNode get _occurrenceUpdateFocusNode => _occCtrl.updateFocusNode;
@@ -303,6 +328,15 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         if (mounted) setState(() {});
       },
     );
+    _healthCtrl = ActivitySheetHealthCtrl(
+      dogId: widget.dogId,
+      dogName: widget.dogName,
+      documentId: widget.documentId,
+      initialData: widget.initialData,
+      onStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
     _speechDictation = SpeechDictationService();
     if (_isOccurrenceCategory) {
       _occCtrl.init();
@@ -310,6 +344,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _trainingCtrl.init();
     } else if (widget.category == 'Rotina') {
       _routineCtrl.init();
+    } else if (widget.category == 'Saude') {
+      _healthCtrl.init();
     }
     _menuPageController = PageController(viewportFraction: 0.80);
     _menuPageController.addListener(() {
@@ -334,6 +370,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _occCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
       _trainingCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
       _routineCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
+      _healthCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
     }
     if (_isOccurrenceCategory) {
       _occCtrl.loadNatures();
@@ -382,48 +419,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   void _populateTrainingEditData(Map<String, dynamic> data) {
+    // Campos de texto populados por _trainingCtrl.init()
     _selectedSubtype = data['trainingType'];
-    _locationController.text = data['location'] ?? '';
-    _descriptionController.text = data['handlerNotes'] ?? '';
-    if (data['searchDuration'] != null) {
-      _durationController.text = ((data['searchDuration'] as num) ~/ 60)
-          .toString();
-    }
-    if (data['metadata'] != null) {
-      _formData.addAll(Map<String, dynamic>.from(data['metadata']));
-      final storedTemperature = _metadataValue('Temperatura (°C)');
-      if (storedTemperature != null) {
-        _tempController.text = storedTemperature.toString();
-      }
-      final storedHumidity = _metadataValue('Umidade (%)');
-      if (storedHumidity != null) {
-        _humidityController.text = storedHumidity.toString();
-      }
-    }
   }
 
   void _populateRoutineEditData(Map<String, dynamic> data) {
+    // Campos de texto populados por _routineCtrl.init()
     _selectedSubtype = data['activityType'];
-    _descriptionController.text = data['notes'] ?? '';
-    if (data['metadata'] == null) return;
-
-    _formData.addAll(Map<String, dynamic>.from(data['metadata']));
-    final rationBrand = _metadataValue('Marca da Ração');
-    if (rationBrand != null) {
-      _racaoMarcaController.text = rationBrand.toString();
-    }
-    final rationAmount = _metadataValue('Quantidade (g)');
-    if (rationAmount != null) {
-      _racaoQtdController.text = rationAmount.toString();
-    }
-    final duration = _metadataValue('Duração (min)');
-    if (duration != null) {
-      _durationController.text = duration.toString();
-    }
-    final distance = _metadataValue('Distância (km)');
-    if (distance != null) {
-      _distanciaController.text = distance.toString();
-    }
   }
 
   void _populateOccurrenceEditData(Map<String, dynamic> data) {
@@ -496,17 +498,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   void _populateHealthEditData(Map<String, dynamic> data) {
+    // Campos de texto populados por _healthCtrl.init()
     _selectedSubtype = data['logType'];
-    final obs = data['healthObservations'] as String? ?? '';
-    _descriptionController.text = obs;
-    if (obs.contains('Retorno agendado: ')) {
-      final split = obs.split('Retorno agendado: ');
-      if (split.length > 1) {
-        _returnDateController.text = split[1].trim();
-        _descriptionController.text = split[0].trim();
-      }
-    }
-    _vetNameController.text = data['vetName'] ?? '';
   }
 
   void _applySelectedSubtypeImage() {
@@ -648,7 +641,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   String? _selectedSubtypeImagePath;
   final Map<String, dynamic> _formData = {};
   // _occurrenceNatures agora via getter => _occCtrl.natures
-  String? _selectedVacina; // para dropdown de vacina (Saúde)
+  // _selectedVacina, _examePdfFile, _examePdfName: agora getters => _healthCtrl (Fase 4)
 
   bool _isCompressing = false;
   bool _isSaving = false;
@@ -659,12 +652,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   bool _isListening = false;
   int _activePhotoIndex = -1;
   bool _didAutoPrimeOccurrenceStart = false;
-
-  // _timeController, _locationController, _descriptionController agora são getters
-  // _occurrenceNatureFocusNode, _occurrenceUpdateController, _occurrenceUpdateFocusNode
-  // agora são getters delegando para _occCtrl
-  // _durationController agora é um getter delegando para _trainingCtrl ou _durationCtrlOther
-  final _returnDateController = TextEditingController(); // Saúde
+  // _timeController, _locationController, _descriptionController: getters por categoria
+  // _returnDateController: getter => _healthCtrl.returnDateController (Fase 4)
 
   void _setSaveStatus(String status, {bool failed = false}) {
     if (!mounted) return;
@@ -745,31 +734,21 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
-  // Saúde - campos adicionais (a migrar na Fase 4)
-  final _vetNameController = TextEditingController();
-  final _clinicaController = TextEditingController();
-  final _motivoController = TextEditingController();
-  final _tipoVacinaController = TextEditingController();
-  final _tipoExameController = TextEditingController();
-  final _produtosBanhoController = TextEditingController();
+  // Saúde: todos os campos agora são getters delegando para _healthCtrl (Fase 4)
+  // _vetNameController, _clinicaController, _motivoController, _tipoVacinaController,
+  // _tipoExameController, _produtosBanhoController, _returnDateController,
+  // _materiaisController, _selectedVacina, _examePdfFile, _examePdfName
+
   // Faro / clima e campos de treino: migrados para _trainingCtrl (Fase 2)
   // _tempController, _humidityController, _objetivoTreinoController,
   // _dificuldadesController agora são getters delegando para _trainingCtrl
 
-  // Rotina campos adicionais
-  final _racaoMarcaController = TextEditingController();
-  final _racaoQtdController = TextEditingController();
-  final _distanciaController = TextEditingController();
-
-  // PDF/arquivo para Exames (Saúde)
-  File? _examePdfFile;
-  String? _examePdfName;
+  // Rotina campos adicionais: migrados para _routineCtrl (Fase 3)
+  // _racaoMarcaController, _racaoQtdController, _distanciaController
 
   // Fotos / mídias globais
   final List<Map<String, dynamic>> _mediaAttachments = [];
 
-  // Restantes ainda no State (Fases 2-4)
-  final _materiaisController = TextEditingController();
   // _occurrenceController agora encapsulado no _occCtrl
   // Estado de ocorrência: todos os campos abaixo são getters => _occCtrl
 
@@ -780,19 +759,12 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _occCtrl.dispose();
     _trainingCtrl.dispose();
     _routineCtrl.dispose();
+    _healthCtrl.dispose();
     _locationCtrlOther.dispose();
     _descriptionCtrlOther.dispose();
     _timeCtrlOther.dispose();
     _durationCtrlOther.dispose();
-    _returnDateController.dispose();
-    _materiaisController.dispose();
-    _vetNameController.dispose();
-    _clinicaController.dispose();
-    _motivoController.dispose();
-    _tipoVacinaController.dispose();
-    _tipoExameController.dispose();
-    // _produtosBanhoController (Saúde) — ainda aqui até Fase 4
-    _produtosBanhoController.dispose();
+    // _returnDateController, _vetNameController, etc. agora em _healthCtrl (Fase 4)
     // _racaoMarcaController, _racaoQtdController, _distanciaController: migrados para _routineCtrl
 
     MediaAttachmentRows.disposeAll(_mediaAttachments);
@@ -1036,12 +1008,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
-  Future<String?> _uploadExamePdf() async {
-    if (_examePdfFile == null) return null;
-    if (mounted) setState(() => _saveStatus = 'Enviando PDF do Exame...');
-    return const PdfAttachmentService().uploadExamPdf(_examePdfFile!);
-  }
-
   DateTime _resolveFormTimestamp() {
     final baseTimestamp = widget.initialData?['_rawDate'] ?? DateTime.now();
     return const PtBrDateTimeService().withTimeText(
@@ -1050,93 +1016,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
-  void _prepareRoutineMetadata() {
-    if (_selectedSubtype == _SheetSubtype.feeding) {
-      _formData['Marca da Ração'] = _racaoMarcaController.text;
-      _formData['Quantidade (g)'] = _racaoQtdController.text;
-    }
-    if (_durationController.text.isNotEmpty) {
-      _formData['Duração (min)'] = _durationController.text;
-    }
-    if (_distanciaController.text.isNotEmpty) {
-      _formData['Distância (km)'] = _distanciaController.text;
-    }
-  }
-
-  void _prepareHealthMetadata() {
-    if (_returnDateController.text.isNotEmpty) {
-      _formData['Data de Retorno'] = _returnDateController.text;
-    }
-  }
-
-  void _prepareTrainingMetadata() {
-    // Migrado para _trainingCtrl.buildMetadata(subtype: _selectedSubtype)
-    // Chamado em _saveTraining via o próprio controller.
-  }
-
-  Future<void> _saveRoutine({
-    required AuthViewModel authVM,
-    required RoutineViewModel routineVM,
-  }) async {
-    final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-    final List<Map<String, dynamic>> finalMedia = await _uploadAllMedia(
-      'routines',
-    );
-
-    final routine = ActivityRecordPayloadBuilder.routine(
-      documentId: widget.documentId,
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      currentRa: currentRa,
-      initialHandlerId: widget.initialData?['_rawHandlerId']?.toString(),
-      activityType: _selectedSubtype!,
-      timestamp: _resolveFormTimestamp(),
-      notes: _descriptionController.text,
-      mediaAttachments: finalMedia,
-      metadata: _formData,
-    );
-
-    if (widget.documentId != null) {
-      await routineVM.updateRoutine(routine);
-    } else {
-      await routineVM.addRoutine(routine);
-    }
-  }
-
-  Future<void> _saveHealth({required HealthViewModel healthVM}) async {
-    final List<Map<String, dynamic>> finalMedia = await _uploadAllMedia(
-      'health',
-    );
-    final String? pdfUrl = await _uploadExamePdf();
-
-    if (pdfUrl != null) {
-      finalMedia.add({
-        'url': pdfUrl,
-        'caption': 'PDF do Exame: ${_examePdfName ?? "documento.pdf"}',
-        'type': 'pdf',
-      });
-    }
-
-    _prepareHealthMetadata();
-
-    final hLog = ActivityRecordPayloadBuilder.healthLog(
-      documentId: widget.documentId,
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      date: widget.initialData?['_rawDate'] ?? DateTime.now(),
-      logType: _selectedSubtype!,
-      observations: _descriptionController.text,
-      returnDate: _returnDateController.text,
-      vetName: _vetNameController.text,
-      mediaAttachments: finalMedia,
-    );
-
-    if (widget.documentId != null) {
-      await healthVM.updateHealthLog(hLog);
-    } else {
-      await healthVM.addHealthLog(hLog);
-    }
-  }
+  // _uploadExamePdf, _prepareHealthMetadata, _saveHealth:
+  // migrados para ActivitySheetHealthCtrl (Fase 4)
 
   Future<void> _saveTraining({
     required TrainingViewModel trainingVM,
@@ -1317,13 +1198,29 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
       try {
         if (widget.category == 'Rotina') {
-          _setSaveStatus('Validando rotina...');
-          _prepareRoutineMetadata();
           _setSaveStatus('Salvando rotina no Firebase...');
-          await _saveRoutine(authVM: authVM, routineVM: routineVM);
+          await _routineCtrl.save(
+            routineVM: routineVM,
+            authVM: authVM,
+            selectedSubtype: _selectedSubtype,
+            formData: _formData,
+            mediaAttachments: _mediaAttachments,
+            resolvedTimestamp: _resolveFormTimestamp(),
+            onStatus: (msg) {
+              if (mounted) setState(() => _saveStatus = msg);
+            },
+            isMounted: () => mounted,
+            onUploading: (a) {
+              if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
+            },
+            onUploaded: (a, url) {
+              if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
+            },
+            onPending: (a) {
+              if (mounted) setState(() => MediaAttachmentRows.markPending(a));
+            },
+          );
         } else if (widget.category == 'Treino') {
-          _setSaveStatus('Validando treino...');
-          _prepareTrainingMetadata();
           _setSaveStatus('Salvando treino no Firebase...');
           await _saveTraining(trainingVM: trainingVM, authVM: authVM);
         } else if (_isOccurrenceCategory || widget.category == 'Evento') {
@@ -1334,7 +1231,25 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           );
         } else if (widget.category == 'Saude') {
           _setSaveStatus('Salvando prontuário no Firebase...');
-          await _saveHealth(healthVM: healthVM);
+          await _healthCtrl.save(
+            healthVM: healthVM,
+            selectedSubtype: _selectedSubtype,
+            formData: _formData,
+            mediaAttachments: _mediaAttachments,
+            onStatus: (msg) {
+              if (mounted) setState(() => _saveStatus = msg);
+            },
+            isMounted: () => mounted,
+            onUploading: (a) {
+              if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
+            },
+            onUploaded: (a, url) {
+              if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
+            },
+            onPending: (a) {
+              if (mounted) setState(() => MediaAttachmentRows.markPending(a));
+            },
+          );
         }
 
         if (mounted) {
@@ -2795,8 +2710,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         returnDateController: _returnDateController,
         selectedVaccine: _selectedVacina,
         onVaccineChanged: (val) => setState(() {
-          _selectedVacina = val;
-          _tipoVacinaController.text = val ?? '';
+          _healthCtrl.selectedVacina = val;
+          _healthCtrl.tipoVacinaController.text = val ?? '';
         }),
         onPickReturnDate: _pickReturnDate,
       ),
@@ -3131,8 +3046,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       onPickImage: _pickImage,
       onPickPdf: _pickPdf,
       onRemovePdf: () => setState(() {
-        _examePdfFile = null;
-        _examePdfName = null;
+        _healthCtrl.examePdfFile = null;
+        _healthCtrl.examePdfName = null;
       }),
       onSelectPhoto: (index) {
         setState(() => _activePhotoIndex = index);
@@ -3155,8 +3070,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final result = await const PdfAttachmentService().pickPdf();
     if (result != null) {
       setState(() {
-        _examePdfFile = result.file;
-        _examePdfName = result.name;
+        _healthCtrl.examePdfFile = result.file;
+        _healthCtrl.examePdfName = result.name;
       });
       HapticFeedback.lightImpact();
     }
