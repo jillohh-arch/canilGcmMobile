@@ -548,7 +548,7 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00E5FF).withOpacity(0.4),
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
@@ -614,7 +614,7 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                           color: const Color(0xFF0B1220),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                           ),
                         ),
                         child: Column(
@@ -660,7 +660,7 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                           color: const Color(0xFF0B1220),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                           ),
                         ),
                         child: Column(
@@ -765,7 +765,7 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
@@ -802,7 +802,7 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF00E5FF).withOpacity(0.5),
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
                                 blurRadius: 20,
                                 offset: const Offset(0, 4),
                               ),
@@ -850,7 +850,7 @@ class _TacticalGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF4ECDE4).withOpacity(0.025)
+      ..color = const Color(0xFF4ECDE4).withValues(alpha: 0.025)
       ..strokeWidth = 0.5;
     const step = 28.0;
     for (double x = 0; x < size.width; x += step) {

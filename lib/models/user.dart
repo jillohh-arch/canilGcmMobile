@@ -44,4 +44,28 @@ class UserModel {
       'xp': xp,
     };
   }
+
+  UserModel copyWith({
+    String? ra,
+    String? name,
+    String? callsign,
+    String? unit,
+    String? accessLevel,
+    Object? photoUrl = _sentinel,
+    List<String>? userBadges,
+    int? xp,
+  }) {
+    return UserModel(
+      ra: ra ?? this.ra,
+      name: name ?? this.name,
+      callsign: callsign ?? this.callsign,
+      unit: unit ?? this.unit,
+      accessLevel: accessLevel ?? this.accessLevel,
+      photoUrl: photoUrl == _sentinel ? this.photoUrl : photoUrl as String?,
+      userBadges: userBadges ?? this.userBadges,
+      xp: xp ?? this.xp,
+    );
+  }
+
+  static const _sentinel = Object();
 }

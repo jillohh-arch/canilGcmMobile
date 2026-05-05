@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 import '../models/dog.dart';
+import '../models/incident.dart';
 import '../models/occurrence_nature.dart';
 import '../models/routine_model.dart';
 import 'gamification_service.dart';
@@ -88,7 +89,7 @@ class FirestoreService {
   }
 
   // --- Incidents CRUD ---
-  Future<void> saveIncident(dynamic incident) async {
+  Future<void> saveIncident(Incident incident) async {
     await _db.collection('incidents').doc(incident.id).set(incident.toJson());
   }
 
@@ -97,12 +98,13 @@ class FirestoreService {
   }
 
   Future<List<dynamic>> getIncidents({String? dogId}) async {
-    Query query = _db.collection('incidents');
+    Query query = _db
+        .collection('incidents')
+        .orderBy('date', descending: true);
     if (dogId != null) {
       query = query.where('dogId', isEqualTo: dogId);
     }
-    // final snapshot = await query.orderBy('date', descending: true).get();
-    final snapshot = await query.get(); // Deixe assim apenas para testar
+    final snapshot = await query.get();
 
     return snapshot.docs.map((doc) {
       final data = Map<String, dynamic>.from(doc.data() as Map);
@@ -112,19 +114,21 @@ class FirestoreService {
   }
 
   Future<List<dynamic>> getOpenIncidents({String? dogId}) async {
-    final snapshot = await _db
+    Query query = _db
         .collection('incidents')
-        .where('status', whereIn: ['Em andamento', 'Aberta'])
-        .get();
+        .where('status', whereIn: ['Em andamento', 'Aberta']);
 
-    return snapshot.docs
-        .map((doc) {
-          final data = Map<String, dynamic>.from(doc.data());
-          data['id'] = doc.id;
-          return data;
-        })
-        .where((data) => dogId == null || data['dogId'] == dogId)
-        .toList();
+    if (dogId != null) {
+      query = query.where('dogId', isEqualTo: dogId);
+    }
+
+    final snapshot = await query.get();
+
+    return snapshot.docs.map((doc) {
+      final data = Map<String, dynamic>.from(doc.data() as Map);
+      data['id'] = doc.id;
+      return data;
+    }).toList();
   }
 
   Future<List<OccurrenceNature>> getOccurrenceNatures() async {

@@ -16,7 +16,6 @@ import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/user_viewmodel.dart';
 import '../../viewmodels/dog_viewmodel.dart';
 import '../../services/handler_identity_service.dart';
-import '../../services/firestore_service.dart';
 import '../../services/form_metadata_reader.dart';
 import '../../services/location_resolution_service.dart';
 import '../../services/media_processing_service.dart';
@@ -77,6 +76,9 @@ import '../incidents/widgets/occurrence_quick_update_catalog.dart';
 import '../incidents/widgets/occurrence_specific_fields.dart';
 import '../incidents/widgets/occurrence_stage_panels.dart';
 import '../incidents/widgets/occurrence_start_screen.dart';
+import 'controllers/activity_sheet_occurrence_ctrl.dart';
+import 'controllers/activity_sheet_training_ctrl.dart';
+import 'controllers/activity_sheet_routine_ctrl.dart';
 import 'controllers/activity_record_payload_builder.dart';
 import 'live_tracking_screen.dart';
 
@@ -143,8 +145,126 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   bool get _hasActiveOccurrenceRecord =>
       _isExistingOccurrence || _activeIncidentId != null;
 
-  bool _showStartNatureEditor = false;
-  bool _didAutoPrimeOccurrenceStart = false;
+  // ---------------------------------------------------------------------------
+  // Occurrence controller (Fase 1)
+  // ---------------------------------------------------------------------------
+  late final ActivitySheetOccurrenceCtrl _occCtrl;
+
+  // ---------------------------------------------------------------------------
+  // Training controller (Fase 2)
+  // ---------------------------------------------------------------------------
+  late final ActivitySheetTrainingCtrl _trainingCtrl;
+
+  // ---------------------------------------------------------------------------
+  // Routine controller (Fase 3)
+  // ---------------------------------------------------------------------------
+  late final ActivitySheetRoutineCtrl _routineCtrl;
+
+  // Getters Opção B: o State lê do controller ativo
+  TextEditingController get _locationController =>
+      _isOccurrenceCategory
+          ? _occCtrl.locationController
+          : widget.category == 'Treino'
+              ? _trainingCtrl.locationController
+              : _locationCtrlOther; // Rotina/Saúde não usam location no form
+  TextEditingController get _descriptionController =>
+      _isOccurrenceCategory
+          ? _occCtrl.descriptionController
+          : widget.category == 'Treino'
+              ? _trainingCtrl.descriptionController
+              : widget.category == 'Rotina'
+                  ? _routineCtrl.descriptionController
+                  : _descriptionCtrlOther;
+  TextEditingController get _timeController =>
+      _isOccurrenceCategory
+          ? _occCtrl.timeController
+          : widget.category == 'Treino'
+              ? _trainingCtrl.timeController
+              : widget.category == 'Rotina'
+                  ? _routineCtrl.timeController
+                  : _timeCtrlOther;
+  // durationController: Treino -> _trainingCtrl, Rotina -> _routineCtrl
+  TextEditingController get _durationController =>
+      widget.category == 'Treino'
+          ? _trainingCtrl.durationController
+          : widget.category == 'Rotina'
+              ? _routineCtrl.durationController
+              : _durationCtrlOther;
+  TextEditingController get _tempController => _trainingCtrl.tempController;
+  TextEditingController get _humidityController =>
+      _trainingCtrl.humidityController;
+  TextEditingController get _objetivoTreinoController =>
+      _trainingCtrl.objetivoController;
+  TextEditingController get _dificuldadesController =>
+      _trainingCtrl.dificuldadesController;
+  // Rotina: campos específicos
+  TextEditingController get _racaoMarcaController =>
+      _routineCtrl.racaoMarcaController;
+  TextEditingController get _racaoQtdController =>
+      _routineCtrl.racaoQtdController;
+  TextEditingController get _distanciaController =>
+      _routineCtrl.distanciaController;
+
+      _occCtrl.naturezaController;
+  FocusNode get _occurrenceNatureFocusNode => _occCtrl.naturezaFocusNode;
+  FocusNode get _occurrenceUpdateFocusNode => _occCtrl.updateFocusNode;
+  TextEditingController get _occurrenceUpdateController =>
+      _occCtrl.updateController;
+  TextEditingController get _equipeController => _occCtrl.equipeController;
+  TextEditingController get _boController => _occCtrl.boController;
+  TextEditingController get _guarnicaoController =>
+      _occCtrl.guarnicaoController;
+  TextEditingController get _situacaoController => _occCtrl.situacaoController;
+  TextEditingController get _desfechoController => _occCtrl.desfechoController;
+  TextEditingController get _odorObjetoController =>
+      _occCtrl.odorObjetoController;
+  TextEditingController get _tempoDesaparecimentoController =>
+      _occCtrl.tempoDesaparecimentoController;
+  TextEditingController get _condicaoTerrenoController =>
+      _occCtrl.condicaoTerrenoController;
+  TextEditingController get _numeroOsController =>
+      _occCtrl.numeroOsController;
+  TextEditingController get _orgaoController => _occCtrl.orgaoController;
+  TextEditingController get _publicoController => _occCtrl.publicoController;
+  TextEditingController get _temaController => _occCtrl.temaController;
+
+  // Getters de listas e estado de ocorrência
+  List<Map<String, dynamic>> get _detecaoDrogas => _occCtrl.detecaoDrogas;
+  List<Map<String, dynamic>> get _detainedIndividuals =>
+      _occCtrl.detainedIndividuals;
+  List<Map<String, dynamic>> get _seizedObjects => _occCtrl.seizedObjects;
+  List<Map<String, dynamic>> get _detainedVehicles =>
+      _occCtrl.detainedVehicles;
+  List<IncidentProgressUpdate> get _occurrenceTimeline => _occCtrl.timeline;
+  Set<String> get _selectedOccurrenceOutcomes => _occCtrl.selectedOutcomes;
+  LatLng? get _selectedLocationLatLng => _occCtrl.selectedLocationLatLng;
+
+  // Estado de ocorrência (leitura/escrita proxied)
+  String get _occurrenceStatus => _occCtrl.status;
+  set _occurrenceStatus(String v) => _occCtrl.status = v;
+  bool? get _occurrenceSuccessful => _occCtrl.successful;
+  set _occurrenceSuccessful(bool? v) => _occCtrl.successful = v;
+  bool get _showOccurrenceFinalization => _occCtrl.showFinalization;
+  set _showOccurrenceFinalization(bool v) => _occCtrl.showFinalization = v;
+  bool get _occurrenceFinishSubmitted => _occCtrl.finishSubmitted;
+  set _occurrenceFinishSubmitted(bool v) => _occCtrl.finishSubmitted = v;
+  String? get _activeIncidentId => _occCtrl.activeIncidentId;
+  set _activeIncidentId(String? v) => _occCtrl.activeIncidentId = v;
+  DateTime? get _activeOccurrenceStartedAt => _occCtrl.activeStartedAt;
+  set _activeOccurrenceStartedAt(DateTime? v) => _occCtrl.activeStartedAt = v;
+  bool get _showStartNatureEditor => _occCtrl.showStartNatureEditor;
+  set _showStartNatureEditor(bool v) => _occCtrl.showStartNatureEditor = v;
+  String? get _selectedOccurrenceUpdateTitle => _occCtrl.selectedUpdateTitle;
+  set _selectedOccurrenceUpdateTitle(String? v) =>
+      _occCtrl.selectedUpdateTitle = v;
+  List<OccurrenceNature> get _occurrenceNatures => _occCtrl.natures;
+
+  // Rotina/Saúde: controladores fallback (Saúde — Fase 4)
+  final _locationCtrlOther = TextEditingController();
+  final _descriptionCtrlOther = TextEditingController();
+  final _timeCtrlOther = TextEditingController();
+  final _durationCtrlOther = TextEditingController(); // nenhuma categoria restante usa
+
 
   late PageController _menuPageController;
   int _currentMenuPage = 0;
@@ -156,14 +276,40 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   @override
   void initState() {
     super.initState();
+    _occCtrl = ActivitySheetOccurrenceCtrl(
+      dogId: widget.dogId,
+      dogName: widget.dogName,
+      documentId: widget.documentId,
+      initialData: widget.initialData,
+      onStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    _trainingCtrl = ActivitySheetTrainingCtrl(
+      dogId: widget.dogId,
+      dogName: widget.dogName,
+      documentId: widget.documentId,
+      initialData: widget.initialData,
+      onStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    _routineCtrl = ActivitySheetRoutineCtrl(
+      dogId: widget.dogId,
+      dogName: widget.dogName,
+      documentId: widget.documentId,
+      initialData: widget.initialData,
+      onStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
     _speechDictation = SpeechDictationService();
-    _activeIncidentId = widget.documentId;
-    if (widget.initialData?['startedAt'] != null) {
-      _activeOccurrenceStartedAt = parseFirestoreDate(
-        widget.initialData!['startedAt'],
-      );
-    } else if (widget.initialData?['_rawDate'] is DateTime) {
-      _activeOccurrenceStartedAt = widget.initialData!['_rawDate'] as DateTime;
+    if (_isOccurrenceCategory) {
+      _occCtrl.init();
+    } else if (widget.category == 'Treino') {
+      _trainingCtrl.init();
+    } else if (widget.category == 'Rotina') {
+      _routineCtrl.init();
     }
     _menuPageController = PageController(viewportFraction: 0.80);
     _menuPageController.addListener(() {
@@ -172,13 +318,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         setState(() => _currentMenuPage = page);
       }
     });
-    _descriptionController.addListener(_onOccurrenceDescriptionChanged);
+    _occCtrl.descriptionController.addListener(_onOccurrenceDescriptionChanged);
     if (_isOccurrenceCategory && widget.initialData == null) {
       _showMenu = false;
       _selectedSubtype = null;
       _selectedSubtypeImagePath = 'assets/images/k9_tactical_background.png';
-      _occurrenceController.startNewOccurrence();
-      _copyOccurrenceControllerToFields();
     }
     if (widget.initialData != null) {
       _showMenu = false;
@@ -186,10 +330,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
     // Set default time to now when creating a new record
     if (widget.initialData == null) {
-      _timeController.text = _formatTimeOfDay(DateTime.now());
+      _timeCtrlOther.text = _formatTimeOfDay(DateTime.now());
+      _occCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
+      _trainingCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
+      _routineCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
     }
     if (_isOccurrenceCategory) {
-      _loadOccurrenceNatures();
+      _occCtrl.loadNatures();
       if (widget.initialData == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _didAutoPrimeOccurrenceStart) return;
@@ -207,18 +354,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 
-  Future<void> _loadOccurrenceNatures() async {
-    try {
-      final remoteNatures = await FirestoreService().getOccurrenceNatures();
-      if (!mounted || remoteNatures.isEmpty) return;
-      setState(() {
-        _occurrenceNatures = remoteNatures;
-        _setOccurrenceNatureTextFromSelected();
-      });
-    } catch (e) {
-      debugPrint('Erro ao carregar naturezas de ocorrência: $e');
-    }
-  }
+  // _loadOccurrenceNatures foi migrado para _occCtrl.loadNatures()
 
   void _populateEditData() {
     final d = widget.initialData!;
@@ -414,7 +550,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     final lat = snapshot.locationLat;
     final lng = snapshot.locationLng;
     if (lat != null && lng != null) {
-      _selectedLocationLatLng = LatLng(lat, lng);
+      _occCtrl.selectedLocationLatLng = LatLng(lat, lng);
     }
 
     final details = snapshot.detailedResults;
@@ -511,26 +647,24 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   String? _selectedSubtype;
   String? _selectedSubtypeImagePath;
   final Map<String, dynamic> _formData = {};
-  List<OccurrenceNature> _occurrenceNatures = OccurrenceNatureSeed.items;
-  String? _selectedVacina; // for vaccine dropdown
+  // _occurrenceNatures agora via getter => _occCtrl.natures
+  String? _selectedVacina; // para dropdown de vacina (Saúde)
 
   bool _isCompressing = false;
   bool _isSaving = false;
-  bool _occurrenceFinishSubmitted = false;
+  // _occurrenceFinishSubmitted agora via getter => _occCtrl.finishSubmitted
   String _saveStatus = '';
   bool _saveFailed = false;
   late SpeechDictationService _speechDictation;
   bool _isListening = false;
   int _activePhotoIndex = -1;
+  bool _didAutoPrimeOccurrenceStart = false;
 
-  final _timeController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _occurrenceNatureFocusNode = FocusNode();
-  final _occurrenceUpdateController = TextEditingController();
-  final _occurrenceUpdateFocusNode = FocusNode();
-  final _durationController = TextEditingController();
-  final _returnDateController = TextEditingController();
+  // _timeController, _locationController, _descriptionController agora são getters
+  // _occurrenceNatureFocusNode, _occurrenceUpdateController, _occurrenceUpdateFocusNode
+  // agora são getters delegando para _occCtrl
+  // _durationController agora é um getter delegando para _trainingCtrl ou _durationCtrlOther
+  final _returnDateController = TextEditingController(); // Saúde
 
   void _setSaveStatus(String status, {bool failed = false}) {
     if (!mounted) return;
@@ -611,120 +745,57 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
   }
 
-  // Faro / clima fields
-  final _tempController = TextEditingController();
-  final _humidityController = TextEditingController();
-
-  // Ocorrência - módulo: detecção
-  final List<Map<String, dynamic>> _detecaoDrogas =
-      []; // { 'tipo': String, 'quantidade': TextEditingController, 'especificar': TextEditingController }
-  final _equipeController = TextEditingController();
-  final _boController = TextEditingController();
-  final _naturezaOcorrenciaController =
-      TextEditingController(); // Natureza da ocorrência
-
-  // Ocorrência - módulo: apoio
-  final _guarnicaoController = TextEditingController();
-  final _situacaoController = TextEditingController();
-  final _desfechoController = TextEditingController();
-
-  // Saúde - campos adicionais
+  // Saúde - campos adicionais (a migrar na Fase 4)
   final _vetNameController = TextEditingController();
   final _clinicaController = TextEditingController();
   final _motivoController = TextEditingController();
   final _tipoVacinaController = TextEditingController();
   final _tipoExameController = TextEditingController();
   final _produtosBanhoController = TextEditingController();
-
-  // Treino campos adicionais
-  final _objetivoTreinoController = TextEditingController();
-  final _dificuldadesController = TextEditingController();
+  // Faro / clima e campos de treino: migrados para _trainingCtrl (Fase 2)
+  // _tempController, _humidityController, _objetivoTreinoController,
+  // _dificuldadesController agora são getters delegando para _trainingCtrl
 
   // Rotina campos adicionais
   final _racaoMarcaController = TextEditingController();
   final _racaoQtdController = TextEditingController();
   final _distanciaController = TextEditingController();
 
-  // PDF/arquivo para Exames
+  // PDF/arquivo para Exames (Saúde)
   File? _examePdfFile;
   String? _examePdfName;
 
-  // Ocorrência - módulo: busca e captura
-  final _odorObjetoController = TextEditingController();
-  final _tempoDesaparecimentoController = TextEditingController();
-  final _condicaoTerrenoController = TextEditingController();
-
-  // Ocorrência - módulo: O.S.
-  final _numeroOsController = TextEditingController();
-
   // Fotos / mídias globais
-  final List<Map<String, dynamic>> _mediaAttachments =
-      []; // { 'file': File, 'caption': TextEditingController }
+  final List<Map<String, dynamic>> _mediaAttachments = [];
 
-  // Restantes
-  final _orgaoController = TextEditingController();
+  // Restantes ainda no State (Fases 2-4)
   final _materiaisController = TextEditingController();
-  final _publicoController = TextEditingController();
-  final _temaController = TextEditingController();
-  final OccurrenceFormController _occurrenceController =
-      OccurrenceFormController();
-  String _occurrenceStatus = OccurrenceFormController.statusCompleted;
-  bool? _occurrenceSuccessful = true;
-  final Set<String> _selectedOccurrenceOutcomes = {};
-  final List<IncidentProgressUpdate> _occurrenceTimeline = [];
-  String? _selectedOccurrenceUpdateTitle;
-  bool _showOccurrenceFinalization = false;
-  String? _activeIncidentId;
-  DateTime? _activeOccurrenceStartedAt;
-  LatLng? _selectedLocationLatLng;
-
-  final List<Map<String, dynamic>> _detainedIndividuals = [];
-  final List<Map<String, dynamic>> _seizedObjects = [];
-  final List<Map<String, dynamic>> _detainedVehicles = [];
+  // _occurrenceController agora encapsulado no _occCtrl
+  // Estado de ocorrência: todos os campos abaixo são getters => _occCtrl
 
   @override
   void dispose() {
-    _descriptionController.removeListener(_onOccurrenceDescriptionChanged);
-    _timeController.dispose();
-    _locationController.dispose();
-    _descriptionController.dispose();
-    _occurrenceNatureFocusNode.dispose();
-    _occurrenceUpdateController.dispose();
-    _occurrenceUpdateFocusNode.dispose();
-    _durationController.dispose();
+    _occCtrl.descriptionController
+        .removeListener(_onOccurrenceDescriptionChanged);
+    _occCtrl.dispose();
+    _trainingCtrl.dispose();
+    _routineCtrl.dispose();
+    _locationCtrlOther.dispose();
+    _descriptionCtrlOther.dispose();
+    _timeCtrlOther.dispose();
+    _durationCtrlOther.dispose();
     _returnDateController.dispose();
-    _tempController.dispose();
-    _humidityController.dispose();
-    _orgaoController.dispose();
     _materiaisController.dispose();
-    _publicoController.dispose();
-    _temaController.dispose();
-    _equipeController.dispose();
-    _boController.dispose();
-    _naturezaOcorrenciaController.dispose();
-    _guarnicaoController.dispose();
-    _situacaoController.dispose();
-    _desfechoController.dispose();
-    _odorObjetoController.dispose();
-    _tempoDesaparecimentoController.dispose();
-    _condicaoTerrenoController.dispose();
-    _numeroOsController.dispose();
     _vetNameController.dispose();
     _clinicaController.dispose();
     _motivoController.dispose();
     _tipoVacinaController.dispose();
     _tipoExameController.dispose();
+    // _produtosBanhoController (Saúde) — ainda aqui até Fase 4
     _produtosBanhoController.dispose();
-    _objetivoTreinoController.dispose();
-    _dificuldadesController.dispose();
-    _racaoMarcaController.dispose();
-    _racaoQtdController.dispose();
-    _distanciaController.dispose();
-    _disposeDrugRows();
+    // _racaoMarcaController, _racaoQtdController, _distanciaController: migrados para _routineCtrl
+
     MediaAttachmentRows.disposeAll(_mediaAttachments);
-    _disposeDynamicResultRows(_detainedIndividuals, ['quantidade']);
-    _disposeDynamicResultRows(_seizedObjects, ['descricao', 'quantidade']);
-    _disposeDynamicResultRows(_detainedVehicles, ['tipo', 'placa']);
     _menuPageController.dispose();
     super.dispose();
   }
@@ -747,9 +818,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       ..addAll(nextRows);
   }
 
-  void _disposeDrugRows() {
-    OccurrenceDynamicRows.disposeDrugs(_detecaoDrogas);
-  }
+  // _disposeDrugRows foi migrado para _occCtrl.dispose()
 
   void _selectSubtype(String type, {String? imagePath}) {
     HapticFeedback.lightImpact();
@@ -762,9 +831,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           imagePath ?? 'assets/images/k9_tactical_background.png';
       _formData.clear();
       if (_isOccurrenceCategory) {
-        _occurrenceController.status = OccurrenceFormController.statusCompleted;
-        _occurrenceController.successful = true;
-        _occurrenceController.selectNature(type);
+        _occCtrl.status = OccurrenceFormController.statusCompleted;
+        _occCtrl.successful = true;
+        _occCtrl.selectNatureById(type);
         _copyOccurrenceControllerToFields();
         _occurrenceTimeline.clear();
         _selectedOccurrenceUpdateTitle = null;
@@ -781,7 +850,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           .currentHighAccuracy();
       setState(() {
         _locationController.text = location.address;
-        _selectedLocationLatLng = location.point;
+        _occCtrl.selectedLocationLatLng = location.point;
       });
       HapticFeedback.mediumImpact();
     } catch (e) {
@@ -794,7 +863,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   Future<void> _selectOccurrenceLocation(LatLng point) async {
-    setState(() => _selectedLocationLatLng = point);
+    setState(() => _occCtrl.selectedLocationLatLng = point);
     final address = await const LocationResolutionService().addressForPoint(
       point,
     );
@@ -1001,17 +1070,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   void _prepareTrainingMetadata() {
-    if (_durationController.text.isNotEmpty) {
-      _formData['Duração (min)'] = _durationController.text;
-    }
-    if (_selectedSubtype == _SheetSubtype.scentWork) {
-      if (_tempController.text.isNotEmpty) {
-        _formData['Temperatura (°C)'] = _tempController.text;
-      }
-      if (_humidityController.text.isNotEmpty) {
-        _formData['Umidade (%)'] = _humidityController.text;
-      }
-    }
+    // Migrado para _trainingCtrl.buildMetadata(subtype: _selectedSubtype)
+    // Chamado em _saveTraining via o próprio controller.
   }
 
   Future<void> _saveRoutine({
@@ -1082,33 +1142,26 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     required TrainingViewModel trainingVM,
     required AuthViewModel authVM,
   }) async {
-    final List<Map<String, dynamic>> finalMedia = await _uploadAllMedia(
-      'trainings',
+    await _trainingCtrl.save(
+      trainingVM: trainingVM,
+      authVM: authVM,
+      selectedSubtype: _selectedSubtype,
+      formData: _formData,
+      mediaAttachments: _mediaAttachments,
+      onStatus: (msg) {
+        if (mounted) setState(() => _saveStatus = msg);
+      },
+      isMounted: () => mounted,
+      onUploading: (a) {
+        if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
+      },
+      onUploaded: (a, url) {
+        if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
+      },
+      onPending: (a) {
+        if (mounted) setState(() => MediaAttachmentRows.markPending(a));
+      },
     );
-    final currentRa =
-        widget.initialData?['_rawHandlerId'] as String? ??
-        HandlerIdentityService.raFromUser(authVM.user) ??
-        '';
-
-    final session = ActivityRecordPayloadBuilder.trainingSession(
-      documentId: widget.documentId,
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      currentRa: currentRa,
-      date: widget.initialData?['_rawDate'] ?? DateTime.now(),
-      trainingType: _selectedSubtype!,
-      location: _locationController.text,
-      notes: _descriptionController.text,
-      durationMinutes: _durationController.text,
-      mediaAttachments: finalMedia,
-      metadata: _formData,
-    );
-
-    if (widget.documentId != null) {
-      await trainingVM.updateTrainingSession(session);
-    } else {
-      await trainingVM.addTrainingSession(session);
-    }
   }
 
   Future<List<Map<String, dynamic>>>
@@ -1881,7 +1934,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
           _occurrenceFinishSubmitted = false;
           _showOccurrenceFinalization = true;
           _occurrenceStatus = OccurrenceFormController.statusCompleted;
-          _occurrenceController.setStatus(
+          _occCtrl.setStatus(
             OccurrenceFormController.statusCompleted,
           );
           _copyOccurrenceControllerToFields(includeOutcomes: false);
@@ -2191,7 +2244,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     setState(() {
       _selectedSubtype = option.name;
       _naturezaOcorrenciaController.text = option.label;
-      _occurrenceController.selectNature(option.name);
+      _occCtrl.selectNatureById(option.name);
       _copyOccurrenceControllerToFields();
     });
   }
@@ -2302,14 +2355,14 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   void _applyOccurrenceWizardData(Map<String, dynamic> wizardData) {
     final wizardResult = OccurrenceWizardResult.fromMap(wizardData);
     _occurrenceStatus = OccurrenceFormController.statusCompleted;
-    _occurrenceController.setStatus(OccurrenceFormController.statusCompleted);
+    _occCtrl.setStatus(OccurrenceFormController.statusCompleted);
 
     _descriptionController.text = wizardResult.report;
 
     _selectedOccurrenceOutcomes
       ..clear()
       ..addAll(wizardResult.results);
-    _occurrenceController.outcomes
+    _occCtrl.selectedOutcomes
       ..clear()
       ..addAll(wizardResult.results);
 
@@ -2386,7 +2439,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         accent: _getCategoryColor(),
         onStatusSelected: (value) {
           setState(() {
-            _occurrenceController.setStatus(value);
+            _occCtrl.setStatus(value);
             _copyOccurrenceControllerToFields(includeOutcomes: false);
           });
         },
@@ -2631,34 +2684,27 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   String _resolveIncidentResultSummary() {
-    _syncOccurrenceController();
-    return _occurrenceController.resultSummary(
-      nature: _selectedSubtype,
-      fallback: _formData['Resultado da Busca'] ?? 'Averiguação',
+    return _occCtrl.resultSummary(
+      fallback: (_formData['Resultado da Busca'] ?? 'Averiguação').toString(),
     );
   }
 
   void _syncOccurrenceController() {
-    _occurrenceController.status = _occurrenceStatus;
-    _occurrenceController.successful = _occurrenceSuccessful;
-    _occurrenceController.outcomes
+    _occCtrl.status = _occurrenceStatus;
+    _occCtrl.successful = _occurrenceSuccessful;
+    _occCtrl.selectedOutcomes
       ..clear()
       ..addAll(_selectedOccurrenceOutcomes);
   }
 
   void _copyOccurrenceControllerToFields({bool includeOutcomes = true}) {
-    _occurrenceStatus = _occurrenceController.status;
-    _occurrenceSuccessful = _occurrenceController.successful;
-    if (!includeOutcomes) {
-      return;
-    }
-    _selectedOccurrenceOutcomes
-      ..clear()
-      ..addAll(_occurrenceController.outcomes);
+    // Status e successful são lidos diretamente via getters proxied para _occCtrl
+    if (!includeOutcomes) return;
+    // selectedOutcomes já é um getter para _occCtrl.selectedOutcomes
   }
 
   List<String> _outcomeOptionsForOccurrenceSubtype(String? subtype) {
-    return _occurrenceController.outcomeOptionsForNature(subtype);
+    return _occCtrl.outcomeOptionsForNature(subtype);
   }
 
   void _ensureOutcomeDetailRow(String option) {
@@ -3116,3 +3162,4 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 }
+

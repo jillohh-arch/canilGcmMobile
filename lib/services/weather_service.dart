@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class WeatherService {
@@ -23,7 +24,7 @@ class WeatherService {
       }
       return null;
     } catch (e) {
-      print("Erro ao coletar clima: $e");
+      debugPrint('[WeatherService] Erro ao coletar clima: $e');
       return null;
     }
   }

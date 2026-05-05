@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:uuid/uuid.dart';
 
@@ -43,13 +44,13 @@ class StorageService {
       }
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
-        print("[StorageService] Aviso object-not-found (ignorado): ${e.message}");
+        debugPrint('[StorageService] Aviso object-not-found (ignorado): ${e.message}');
         return null;
       }
-      print("[StorageService] Erro Firebase: ${e.code} - ${e.message}");
+      debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
       throw Exception('Falha ao subir arquivo: ${e.message}');
     } catch (e) {
-      print("[StorageService] Erro genérico: $e");
+      debugPrint('[StorageService] Erro genérico: $e');
       throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
     }
   }
@@ -81,12 +82,12 @@ class StorageService {
       await ref.delete();
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
-        print("Aviso: Arquivo não encontrado no servidor. Ignorando...");
+        debugPrint('[StorageService] Aviso: Arquivo não encontrado no servidor. Ignorando...');
       } else {
-        print("Erro ao deletar: ${e.message}");
+        debugPrint('[StorageService] Erro ao deletar: ${e.message}');
       }
     } catch (e) {
-      print("Erro genérico ao deletar: $e");
+      debugPrint('[StorageService] Erro genérico ao deletar: $e');
     }
   }
 }

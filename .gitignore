@@ -43,3 +43,42 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Arquivos de diagnóstico e logs temporários gerados na raiz
+analyze.txt
+analyze_main.txt
+analyze_new.txt
+analyze_out.txt
+analyze_output.txt
+analyze_output_utf8.txt
+build_log.txt
+build_out.txt
+devices.txt
+flutter_errors.txt
+flutter_log.txt
+issues.txt
+logs_live.txt
+run_err.txt
+run_out.txt
+save_errors.txt
+
+# Imagens de diagnóstico e screenshots temporários
+dash.png
+dash_fixed.png
+dash_m3.png
+after_rules.png
+guards.png
+k9s_m3.png
+new_dogcard.png
+new_tab.png
+screen.png
+screen_final.png
+screen_profile.png
+screen_reinstall.png
+screenshot.png
+screenshot2.png
+verified_dash.png
+flutter_01.png
+
+# Scripts utilitários temporários
+/scratch/

@@ -25,15 +25,15 @@ class AchievementModal extends StatelessWidget {
                 width: 320,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: badge.color.withOpacity(0.5),
+                    color: badge.color.withValues(alpha: 0.5),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: badge.color.withOpacity(0.3),
+                      color: badge.color.withValues(alpha: 0.3),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -72,13 +72,13 @@ class AchievementModal extends StatelessWidget {
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  badge.color.withOpacity(0.8),
-                                  badge.color.withOpacity(0.2),
+                                  badge.color.withValues(alpha: 0.8),
+                                  badge.color.withValues(alpha: 0.2),
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: badge.color.withOpacity(0.6),
+                                  color: badge.color.withValues(alpha: 0.6),
                                   blurRadius: 10,
                                   spreadRadius: 2,
                                 ),
@@ -110,7 +110,7 @@ class AchievementModal extends StatelessWidget {
                       badge.description,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                         height: 1.4,
                       ),

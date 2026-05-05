@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -146,7 +146,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
           fontSize: 12,
           fontWeight: FontWeight.w900,
           letterSpacing: 3.0,
-          color: Colors.cyanAccent.withOpacity(0.7),
+          color: Colors.cyanAccent.withValues(alpha: 0.7),
         ),
       ),
       centerTitle: true,
@@ -170,14 +170,14 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.cyanAccent.withOpacity(
+                    color: Colors.cyanAccent.withValues(alpha: 
                       0.3 + (_pulseController.value * 0.7),
                     ),
                     width: 2 + (_pulseController.value * 1),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.cyanAccent.withOpacity(
+                      color: Colors.cyanAccent.withValues(alpha: 
                         0.4 * _pulseController.value,
                       ),
                       blurRadius: 15 + (15 * _pulseController.value),
@@ -263,12 +263,12 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: barColor.withOpacity(0.3),
+                        color: barColor.withValues(alpha: 0.3),
                         width: 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: barColor.withOpacity(0.2),
+                          color: barColor.withValues(alpha: 0.2),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -338,7 +338,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
               Icon(
                 Icons.query_builder,
                 size: 24,
-                color: Colors.cyanAccent.withOpacity(0.5),
+                color: Colors.cyanAccent.withValues(alpha: 0.5),
               ),
               isSelected: false,
             ),
@@ -351,7 +351,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
               Icon(
                 Icons.water_drop_outlined,
                 size: 24,
-                color: Colors.cyanAccent.withOpacity(0.5),
+                color: Colors.cyanAccent.withValues(alpha: 0.5),
               ),
               isSelected: false,
             ),
@@ -376,7 +376,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF082F49).withOpacity(0.3)
+              ? const Color(0xFF082F49).withValues(alpha: 0.3)
               : const Color(0xFF111827),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(6),
@@ -387,13 +387,13 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
           border: Border.all(
             color: isSelected
                 ? Colors.cyanAccent
-                : Colors.cyanAccent.withOpacity(0.2),
+                : Colors.cyanAccent.withValues(alpha: 0.2),
             width: isSelected ? 1.5 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.cyanAccent.withOpacity(0.15),
+                    color: Colors.cyanAccent.withValues(alpha: 0.15),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),
@@ -409,7 +409,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                 child: Icon(
                   Icons.edit_rounded,
                   size: 14,
-                  color: Colors.cyanAccent.withOpacity(0.85),
+                  color: Colors.cyanAccent.withValues(alpha: 0.85),
                 ),
               ),
             Column(
@@ -425,7 +425,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                     fontWeight: FontWeight.bold,
                     color: isSelected
                         ? Colors.cyanAccent
-                        : Colors.cyanAccent.withOpacity(0.7),
+                        : Colors.cyanAccent.withValues(alpha: 0.7),
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 1,
@@ -450,7 +450,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                     style: GoogleFonts.robotoMono(
                       fontSize: 7,
                       fontWeight: FontWeight.w900,
-                      color: Colors.cyanAccent.withOpacity(0.68),
+                      color: Colors.cyanAccent.withValues(alpha: 0.68),
                       letterSpacing: 0.7,
                     ),
                   ),
@@ -513,7 +513,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                 decoration: InputDecoration(
                   suffixText: 'kg',
                   suffixStyle: GoogleFonts.robotoMono(
-                    color: Colors.cyanAccent.withOpacity(0.75),
+                    color: Colors.cyanAccent.withValues(alpha: 0.75),
                     fontWeight: FontWeight.w900,
                   ),
                   filled: true,
@@ -623,7 +623,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
         height: 120, // Altura do gráfico
         width: double.infinity,
         decoration: BoxDecoration(
-          color: const Color(0xFF082F49).withOpacity(0.15),
+          color: const Color(0xFF082F49).withValues(alpha: 0.15),
           borderRadius: const BorderRadius.only(
             bottomLeft: Radius.circular(6),
             bottomRight: Radius.circular(6),
@@ -632,7 +632,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
           border: Border.all(color: Colors.cyanAccent, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.cyanAccent.withOpacity(0.05),
+              color: Colors.cyanAccent.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -649,7 +649,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                   Icon(
                     Icons.show_chart,
                     size: 14,
-                    color: Colors.cyanAccent.withOpacity(0.8),
+                    color: Colors.cyanAccent.withValues(alpha: 0.8),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -657,7 +657,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                     style: GoogleFonts.oxanium(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: Colors.cyanAccent.withOpacity(0.8),
+                      color: Colors.cyanAccent.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -668,9 +668,9 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Divider(color: Colors.cyan.withOpacity(0.1), height: 1),
-                  Divider(color: Colors.cyan.withOpacity(0.1), height: 1),
-                  Divider(color: Colors.cyan.withOpacity(0.1), height: 1),
+                  Divider(color: Colors.cyan.withValues(alpha: 0.1), height: 1),
+                  Divider(color: Colors.cyan.withValues(alpha: 0.1), height: 1),
+                  Divider(color: Colors.cyan.withValues(alpha: 0.1), height: 1),
                 ],
               ),
             ),
@@ -741,13 +741,13 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                   12,
                 ), // Corte tático nas bordas
                 side: BorderSide(
-                  color: accentColor.withOpacity(0.4),
+                  color: accentColor.withValues(alpha: 0.4),
                   width: 1.5,
                 ),
               ),
               shadows: [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -763,7 +763,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.15),
+                    color: accentColor.withValues(alpha: 0.15),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(6),
                       topRight: Radius.circular(6),
@@ -899,10 +899,10 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF030712),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accentColor.withOpacity(0.8), width: 1.5),
+        border: Border.all(color: accentColor.withValues(alpha: 0.8), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.3),
+            color: accentColor.withValues(alpha: 0.3),
             blurRadius: 10,
             spreadRadius: 1,
           ),
@@ -974,7 +974,7 @@ class WeightChartPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
 
     final paintGlow = Paint()
-      ..color = Colors.cyanAccent.withOpacity(0.4)
+      ..color = Colors.cyanAccent.withValues(alpha: 0.4)
       ..strokeWidth = 6
       ..style = PaintingStyle.stroke
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);

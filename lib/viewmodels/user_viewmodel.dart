@@ -108,17 +108,8 @@ class UserViewModel extends ChangeNotifier {
       if (userIndex != -1) {
         final user = _users[userIndex];
         if (!user.userBadges.contains(badgeId)) {
-          final updatedBadges = List<String>.from(user.userBadges)
-            ..add(badgeId);
-          final updatedUser = UserModel(
-            ra: user.ra,
-            name: user.name,
-            callsign: user.callsign,
-            unit: user.unit,
-            accessLevel: user.accessLevel,
-            photoUrl: user.photoUrl,
-            userBadges: updatedBadges,
-            xp: user.xp,
+          final updatedUser = user.copyWith(
+            userBadges: [...user.userBadges, badgeId],
           );
           await _firestoreService.saveUser(updatedUser);
         }
