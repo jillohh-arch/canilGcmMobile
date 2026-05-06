@@ -368,9 +368,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
           _occurrenceFinishSubmitted = false;
           _showOccurrenceFinalization = true;
           _occurrenceStatus = OccurrenceFormController.statusCompleted;
-          _occCtrl.setStatus(
-            OccurrenceFormController.statusCompleted,
-          );
+          _occCtrl.setStatus(OccurrenceFormController.statusCompleted);
           _copyOccurrenceControllerToFields(includeOutcomes: false);
         });
       },
@@ -399,6 +397,11 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
       _occurrenceStatus = OccurrenceFormController.statusInProgress;
       _occurrenceSuccessful = null;
       _selectedOccurrenceUpdateTitle = null;
+      _ensureInitialOccurrenceTimelineEntry(
+        timestamp: _activeOccurrenceStartedAt ?? _resolveFormTimestamp(),
+        authorId: operatorContext.ra,
+        authorName: operatorContext.name,
+      );
       _occurrenceTimeline.add(update);
       _occurrenceUpdateController.clear();
     });
@@ -455,6 +458,11 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
     }
 
     _activeOccurrenceStartedAt ??= _resolveFormTimestamp();
+    _ensureInitialOccurrenceTimelineEntry(
+      timestamp: _activeOccurrenceStartedAt,
+      authorId: currentRa,
+      authorName: currentOperatorName,
+    );
     final inc = _buildActiveOccurrenceSnapshot(
       currentRa: currentRa,
       currentOperatorName: currentOperatorName,
@@ -969,8 +977,8 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
   }
 
   Future<ResolvedLocation> _captureOccurrenceEventLocation() async {
-    final location =
-        await const LocationResolutionService().currentHighAccuracy();
+    final location = await const LocationResolutionService()
+        .currentHighAccuracy();
     HapticFeedback.lightImpact();
     return location;
   }
@@ -1024,8 +1032,8 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
                 );
               }
             },
-            onDelete: () => Navigator.of(context)
-                .pop(const OccurrenceEventChange.delete()),
+            onDelete: () =>
+                Navigator.of(context).pop(const OccurrenceEventChange.delete()),
             onSave: () async {
               try {
                 final uploaded = await _uploadOccurrenceEventPhotos(
@@ -1033,9 +1041,9 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
                 );
                 draft.addAttachments(uploaded);
                 if (!context.mounted) return;
-                Navigator.of(context).pop(
-                  OccurrenceEventChange.update(draft.toProgressUpdate()),
-                );
+                Navigator.of(
+                  context,
+                ).pop(OccurrenceEventChange.update(draft.toProgressUpdate()));
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1094,8 +1102,9 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
 
     setState(() {
       _isSaving = true;
-      _saveStatus =
-          change.delete ? 'Excluindo evento...' : 'Atualizando evento...';
+      _saveStatus = change.delete
+          ? 'Excluindo evento...'
+          : 'Atualizando evento...';
       _saveFailed = false;
       if (change.delete) {
         _occurrenceTimeline.removeAt(index);
@@ -1142,8 +1151,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
 
   String _resolveIncidentResultSummary() {
     return _occCtrl.resultSummary(
-      fallback:
-          (_formData['Resultado da Busca'] ?? 'Averiguação').toString(),
+      fallback: (_formData['Resultado da Busca'] ?? 'Averiguação').toString(),
     );
   }
 
@@ -1198,6 +1206,12 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
     );
   }
 
-  List<String> get _detectionDrugOptions =>
-      ['Maconha', 'Cocaína', 'Crack', 'Sintéticos', 'Nose MP', 'Outros'];
+  List<String> get _detectionDrugOptions => [
+    'Maconha',
+    'Cocaína',
+    'Crack',
+    'Sintéticos',
+    'Nose MP',
+    'Outros',
+  ];
 }

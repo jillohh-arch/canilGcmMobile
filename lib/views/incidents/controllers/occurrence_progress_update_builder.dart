@@ -23,7 +23,7 @@ abstract final class OccurrenceProgressUpdateBuilder {
     if (updates.isEmpty && isNewRecord) {
       updates.add(
         IncidentProgressUpdate(
-          title: 'Registro inicial',
+          title: 'Início da ocorrência',
           description: cleanDescription.isNotEmpty
               ? cleanDescription
               : 'Ocorrência registrada pela equipe.',

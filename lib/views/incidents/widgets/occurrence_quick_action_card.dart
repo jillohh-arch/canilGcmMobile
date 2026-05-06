@@ -52,29 +52,41 @@ class _CompactActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const actionArtSize = 82.0;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: Stack(
         fit: StackFit.expand,
         children: [
           if ((action.assetPath ?? '').isNotEmpty)
-            Image.asset(
-              action.assetPath!,
-              fit: BoxFit.cover,
-              alignment: Alignment.centerRight,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Opacity(
+                opacity: action.enabled ? 0.95 : 0.42,
+                child: SizedBox.square(
+                  dimension: actionArtSize,
+                  child: Image.asset(
+                    action.assetPath!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(),
+                  ),
+                ),
+              ),
             ),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
                 colors: [
-                  const Color(0xFF070B12).withAlpha(20),
-                  const Color(0xFF070B12).withAlpha(160),
+                  const Color(0xFF070B12).withAlpha(45),
+                  const Color(0xFF070B12).withAlpha(130),
                   const Color(0xFF070B12).withAlpha(235),
                 ],
-                stops: const [0.0, 0.52, 1.0],
+                stops: const [0.0, 0.46, 1.0],
               ),
             ),
           ),

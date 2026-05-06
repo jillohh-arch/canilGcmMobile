@@ -152,6 +152,18 @@ class _TimelineMetaChip extends StatelessWidget {
   }
 }
 
+class _OccurrenceEventVisual {
+  final Color color;
+  final IconData icon;
+  final String? assetPath;
+
+  const _OccurrenceEventVisual({
+    required this.color,
+    required this.icon,
+    this.assetPath,
+  });
+}
+
 class _OccurrenceTimelineTile extends StatelessWidget {
   final IncidentProgressUpdate update;
   final Color accent;
@@ -167,8 +179,9 @@ class _OccurrenceTimelineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eventColor = _colorForTitle(update.title, accent);
-    final assetPath = _assetForTitle(update.title);
+    final eventVisual = _visualForTitle(update.title, accent);
+    final eventColor = eventVisual.color;
+    final assetPath = eventVisual.assetPath;
 
     return InkWell(
       borderRadius: BorderRadius.circular(6),
@@ -201,11 +214,7 @@ class _OccurrenceTimelineTile extends StatelessWidget {
                       border: Border.all(color: eventColor.withAlpha(150)),
                     ),
                     child: assetPath == null
-                        ? Icon(
-                            _iconForTitle(update.title),
-                            color: eventColor,
-                            size: 20,
-                          )
+                        ? Icon(eventVisual.icon, color: eventColor, size: 20)
                         : Padding(
                             padding: const EdgeInsets.all(1.5),
                             child: Image.asset(
@@ -213,7 +222,7 @@ class _OccurrenceTimelineTile extends StatelessWidget {
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) =>
                                   Icon(
-                                    _iconForTitle(update.title),
+                                    eventVisual.icon,
                                     color: eventColor,
                                     size: 20,
                                   ),
@@ -337,98 +346,92 @@ class _OccurrenceTimelineTile extends StatelessWidget {
     );
   }
 
-  Color _colorForTitle(String title, Color fallback) {
+  _OccurrenceEventVisual _visualForTitle(String title, Color fallback) {
     final value = _normalizeTitle(title);
-    if (value.contains('abordagem')) return const Color(0xFFFFB300);
-    if (value.contains('k9') ||
-        value.contains('cao') ||
-        value.contains('emprego')) {
-      return const Color(0xFF00F5A0);
-    }
-    if (value.contains('busca')) return const Color(0xFF42A5F5);
-    if (value.contains('material') ||
-        value.contains('entorpecente') ||
-        value.contains('arma') ||
-        value.contains('municao') ||
-        value.contains('objeto')) {
-      return const Color(0xFFB388FF);
-    }
-    if (value.contains('conduz')) return const Color(0xFFFF8A65);
-    if (value.contains('alteracao') ||
-        value.contains('constata') ||
-        value.contains('constatado') ||
-        value.contains('nada')) {
-      return Colors.blueGrey;
-    }
-    if (value.contains('encerr')) return const Color(0xFF00E5FF);
-    return fallback;
-  }
 
-  IconData _iconForTitle(String title) {
-    final value = _normalizeTitle(title);
-    if (value.contains('cao') ||
-        value.contains('k9') ||
-        value.contains('emprego')) {
-      return Icons.pets_rounded;
+    if (_matchesAny(value, const ['inicio', 'registro inicial'])) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFF00E5FF),
+        icon: Icons.play_arrow_rounded,
+      );
     }
-    if (value.contains('busca')) {
-      return Icons.search_rounded;
+
+    if (_matchesAny(value, const [
+      'sem alteracao',
+      'sem constatacao',
+      'nao constatado',
+      'nada ilicito',
+      'nada localizado',
+    ])) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFFCFD8DC),
+        icon: Icons.highlight_off_rounded,
+        assetPath: 'assets/images/actions/k9_naoConstatado_timeline.png',
+      );
     }
-    if (value.contains('material') ||
-        value.contains('entorpecente') ||
-        value.contains('arma') ||
-        value.contains('municao') ||
-        value.contains('objeto')) {
-      return Icons.inventory_2_rounded;
-    }
-    if (value.contains('conduz')) {
-      return Icons.person_rounded;
-    }
+
     if (value.contains('abordagem')) {
-      return Icons.person_search_rounded;
+      return const _OccurrenceEventVisual(
+        color: Color(0xFFFFB300),
+        icon: Icons.person_search_rounded,
+        assetPath: 'assets/images/actions/k9_abordagem_timeline.png',
+      );
     }
+
+    if (_matchesAny(value, const ['cao em acao', 'k9', 'emprego'])) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFF00A8FF),
+        icon: Icons.pets_rounded,
+        assetPath: 'assets/images/actions/k9_emprego_timeline.png',
+      );
+    }
+
+    if (value.contains('busca')) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFF44D62C),
+        icon: Icons.search_rounded,
+        assetPath: 'assets/images/actions/k9_busca_timeline.png',
+      );
+    }
+
+    if (_matchesAny(value, const [
+      'material',
+      'entorpecente',
+      'droga',
+      'arma',
+      'municao',
+      'objeto',
+    ])) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFFB388FF),
+        icon: Icons.inventory_2_rounded,
+        assetPath: 'assets/images/actions/k9_materialEncontrado_timeline.png',
+      );
+    }
+
+    if (_matchesAny(value, const ['parte', 'conduz', 'detido'])) {
+      return const _OccurrenceEventVisual(
+        color: Color(0xFFFF8A3D),
+        icon: Icons.person_rounded,
+        assetPath: 'assets/images/actions/k9_parteConduzida_timeline.png',
+      );
+    }
+
     if (value.contains('encerr')) {
-      return Icons.flag_rounded;
+      return const _OccurrenceEventVisual(
+        color: Color(0xFF00E5FF),
+        icon: Icons.flag_rounded,
+      );
     }
-    if (value.contains('alteracao') ||
-        value.contains('constata') ||
-        value.contains('constatado') ||
-        value.contains('nada')) {
-      return Icons.highlight_off_rounded;
-    }
-    return Icons.timeline_rounded;
+
+    return _OccurrenceEventVisual(
+      color: fallback,
+      icon: Icons.timeline_rounded,
+    );
   }
 
-  String? _assetForTitle(String title) {
-    final value = _normalizeTitle(title);
-    if (value.contains('abordagem')) {
-      return 'assets/images/actions/k9_abordagem_timeline.png';
-    }
-    if (value.contains('cao') ||
-        value.contains('k9') ||
-        value.contains('emprego')) {
-      return 'assets/images/actions/k9_emprego_timeline.png';
-    }
-    if (value.contains('busca')) {
-      return 'assets/images/actions/k9_busca_timeline.png';
-    }
-    if (value.contains('material') ||
-        value.contains('entorpecente') ||
-        value.contains('arma') ||
-        value.contains('municao') ||
-        value.contains('objeto')) {
-      return 'assets/images/actions/k9_materialEncontrado_timeline.png';
-    }
-    if (value.contains('conduz')) {
-      return 'assets/images/actions/k9_parteConduzida_timeline.png';
-    }
-    if (value.contains('alteracao') ||
-        value.contains('constata') ||
-        value.contains('constatado') ||
-        value.contains('nada')) {
-      return 'assets/images/actions/k9_naoConstatado_timeline.png';
-    }
-    return null;
+  bool _matchesAny(String value, List<String> tokens) {
+    return tokens.any(value.contains);
   }
 
   String _normalizeTitle(String value) {

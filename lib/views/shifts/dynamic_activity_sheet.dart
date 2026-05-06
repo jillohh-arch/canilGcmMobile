@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -175,35 +175,32 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   // Getters Opção B: o State lê do controller ativo conforme a categoria.
   // Ocorrência + Evento → _occCtrl; Treino → _trainingCtrl;
   // Rotina → _routineCtrl; Saúde → _healthCtrl.
-  TextEditingController get _locationController =>
-      _isOccurrenceOrEventCategory
-          ? _occCtrl.locationController
-          : widget.category == 'Treino'
-              ? _trainingCtrl.locationController
-              : _locationCtrlOther; // Rotina não usa campo location
+  TextEditingController get _locationController => _isOccurrenceOrEventCategory
+      ? _occCtrl.locationController
+      : widget.category == 'Treino'
+      ? _trainingCtrl.locationController
+      : _locationCtrlOther; // Rotina não usa campo location
   TextEditingController get _descriptionController =>
       _isOccurrenceOrEventCategory
-          ? _occCtrl.descriptionController
-          : widget.category == 'Treino'
-              ? _trainingCtrl.descriptionController
-              : widget.category == 'Rotina'
-                  ? _routineCtrl.descriptionController
-                  : _healthCtrl.descriptionController; // Saúde (categoria padrão)
-  TextEditingController get _timeController =>
-      _isOccurrenceOrEventCategory
-          ? _occCtrl.timeController
-          : widget.category == 'Treino'
-              ? _trainingCtrl.timeController
-              : widget.category == 'Rotina'
-                  ? _routineCtrl.timeController
-                  : _healthCtrl.timeController; // Saúde (categoria padrão)
+      ? _occCtrl.descriptionController
+      : widget.category == 'Treino'
+      ? _trainingCtrl.descriptionController
+      : widget.category == 'Rotina'
+      ? _routineCtrl.descriptionController
+      : _healthCtrl.descriptionController; // Saúde (categoria padrão)
+  TextEditingController get _timeController => _isOccurrenceOrEventCategory
+      ? _occCtrl.timeController
+      : widget.category == 'Treino'
+      ? _trainingCtrl.timeController
+      : widget.category == 'Rotina'
+      ? _routineCtrl.timeController
+      : _healthCtrl.timeController; // Saúde (categoria padrão)
   // durationController: Treino -> _trainingCtrl, Rotina -> _routineCtrl
-  TextEditingController get _durationController =>
-      widget.category == 'Treino'
-          ? _trainingCtrl.durationController
-          : widget.category == 'Rotina'
-              ? _routineCtrl.durationController
-              : _durationCtrlOther;
+  TextEditingController get _durationController => widget.category == 'Treino'
+      ? _trainingCtrl.durationController
+      : widget.category == 'Rotina'
+      ? _routineCtrl.durationController
+      : _durationCtrlOther;
   TextEditingController get _tempController => _trainingCtrl.tempController;
   TextEditingController get _humidityController =>
       _trainingCtrl.humidityController;
@@ -219,10 +216,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   TextEditingController get _distanciaController =>
       _routineCtrl.distanciaController;
   // Saúde: campos específicos (Fase 4)
-  TextEditingController get _vetNameController =>
-      _healthCtrl.vetNameController;
-  TextEditingController get _motivoController =>
-      _healthCtrl.motivoController;
+  TextEditingController get _vetNameController => _healthCtrl.vetNameController;
+  TextEditingController get _motivoController => _healthCtrl.motivoController;
   TextEditingController get _tipoVacinaController =>
       _healthCtrl.tipoVacinaController;
   TextEditingController get _tipoExameController =>
@@ -253,8 +248,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _occCtrl.tempoDesaparecimentoController;
   TextEditingController get _condicaoTerrenoController =>
       _occCtrl.condicaoTerrenoController;
-  TextEditingController get _numeroOsController =>
-      _occCtrl.numeroOsController;
+  TextEditingController get _numeroOsController => _occCtrl.numeroOsController;
   TextEditingController get _publicoController => _occCtrl.publicoController;
   TextEditingController get _temaController => _occCtrl.temaController;
 
@@ -263,8 +257,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   List<Map<String, dynamic>> get _detainedIndividuals =>
       _occCtrl.detainedIndividuals;
   List<Map<String, dynamic>> get _seizedObjects => _occCtrl.seizedObjects;
-  List<Map<String, dynamic>> get _detainedVehicles =>
-      _occCtrl.detainedVehicles;
+  List<Map<String, dynamic>> get _detainedVehicles => _occCtrl.detainedVehicles;
   List<IncidentProgressUpdate> get _occurrenceTimeline => _occCtrl.timeline;
   Set<String> get _selectedOccurrenceOutcomes => _occCtrl.selectedOutcomes;
   LatLng? get _selectedLocationLatLng => _occCtrl.selectedLocationLatLng;
@@ -294,7 +287,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   // _durationCtrlOther: duração de busca em Ocorrência/Evento.
   final _locationCtrlOther = TextEditingController();
   final _durationCtrlOther = TextEditingController();
-
 
   late PageController _menuPageController;
   int _currentMenuPage = 0;
@@ -474,32 +466,80 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   void _populateOccurrenceTimeline(Map<String, dynamic> data) {
+    _occurrenceTimeline.clear();
+
     if (data['progressUpdates'] is List) {
-      _occurrenceTimeline
-        ..clear()
-        ..addAll(
-          (data['progressUpdates'] as List).map(
-            (e) => IncidentProgressUpdate.fromJson(
-              Map<String, dynamic>.from(e as Map),
-            ),
+      _occurrenceTimeline.addAll(
+        (data['progressUpdates'] as List).map(
+          (e) => IncidentProgressUpdate.fromJson(
+            Map<String, dynamic>.from(e as Map),
           ),
-        );
+        ),
+      );
+    }
+
+    _ensureInitialOccurrenceTimelineEntry(
+      timestamp: _timelineStartFromOccurrenceData(data),
+      authorId: data['_rawHandlerId']?.toString(),
+    );
+  }
+
+  DateTime _timelineStartFromOccurrenceData(Map<String, dynamic> data) {
+    if (data['startedAt'] != null) {
+      return parseFirestoreDate(data['startedAt']);
+    }
+    if (data['_rawDate'] is DateTime) {
+      return data['_rawDate'] as DateTime;
+    }
+    if (data['date'] != null) {
+      return parseFirestoreDate(data['date']);
+    }
+    return _activeOccurrenceStartedAt ?? _resolveFormTimestamp();
+  }
+
+  IncidentProgressUpdate _initialOccurrenceTimelineEntry({
+    DateTime? timestamp,
+    String? authorId,
+    String? authorName,
+  }) {
+    final description = _descriptionController.text.trim();
+
+    return IncidentProgressUpdate(
+      title: 'Início da ocorrência',
+      description: description.isNotEmpty
+          ? description
+          : 'Ocorrência iniciada pela equipe.',
+      timestamp:
+          timestamp ?? _activeOccurrenceStartedAt ?? _resolveFormTimestamp(),
+      location: _locationController.text.trim(),
+      authorId: authorId,
+      authorName: authorName,
+    );
+  }
+
+  bool _isInitialOccurrenceTimelineEntry(IncidentProgressUpdate update) {
+    final normalized = const TextMatchService().normalizePtBr(update.title);
+    return normalized.contains('inicio') ||
+        normalized.contains('registro inicial');
+  }
+
+  void _ensureInitialOccurrenceTimelineEntry({
+    DateTime? timestamp,
+    String? authorId,
+    String? authorName,
+  }) {
+    if (_occurrenceTimeline.any(_isInitialOccurrenceTimelineEntry)) {
       return;
     }
 
-    if (_descriptionController.text.isEmpty) return;
-    _occurrenceTimeline
-      ..clear()
-      ..add(
-        IncidentProgressUpdate(
-          title: 'Registro inicial',
-          description: _descriptionController.text,
-          timestamp: data['_rawDate'] is DateTime
-              ? data['_rawDate'] as DateTime
-              : DateTime.now(),
-          location: _locationController.text,
-        ),
-      );
+    _occurrenceTimeline.insert(
+      0,
+      _initialOccurrenceTimelineEntry(
+        timestamp: timestamp,
+        authorId: authorId,
+        authorName: authorName,
+      ),
+    );
   }
 
   void _populateHealthEditData(Map<String, dynamic> data) {
@@ -516,7 +556,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _selectedSubtypeImagePath = cardImage;
     }
   }
-
 
   void _populateOccurrenceExtraFields(Map<String, dynamic> extraFields) {
     final snapshot = OccurrenceExtraFieldsSnapshot(extraFields);
@@ -756,8 +795,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   @override
   void dispose() {
-    _occCtrl.descriptionController
-        .removeListener(_onOccurrenceDescriptionChanged);
+    _occCtrl.descriptionController.removeListener(
+      _onOccurrenceDescriptionChanged,
+    );
     _occCtrl.dispose();
     _trainingCtrl.dispose();
     _routineCtrl.dispose();
@@ -1128,12 +1168,18 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     );
 
     final finalDate = _occurrenceSaveDate();
+    final startedAt = _occurrenceStartedAtOr(finalDate);
+    _activeOccurrenceStartedAt ??= startedAt;
+    _ensureInitialOccurrenceTimelineEntry(
+      timestamp: startedAt,
+      authorId: operatorContext.ra,
+      authorName: operatorContext.name,
+    );
     final incidentUpdates = _buildIncidentProgressUpdates(
       finalDate,
       authorId: operatorContext.ra,
       authorName: operatorContext.name,
     );
-    final startedAt = _occurrenceStartedAtOr(finalDate);
 
     final inc = _buildOccurrenceIncident(
       currentRa: operatorContext.ra,
@@ -1147,6 +1193,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     if (_activeIncidentId != null) {
       _setSaveStatus('Atualizando ocorrência no Firebase...');
       await incidentVM.updateIncident(inc);
+      _occurrenceTimeline
+        ..clear()
+        ..addAll(incidentUpdates);
       return;
     }
 
@@ -1154,6 +1203,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     await incidentVM.saveIncident(inc);
     _activeIncidentId = inc.id;
     _activeOccurrenceStartedAt = inc.startedAt;
+    _occurrenceTimeline
+      ..clear()
+      ..addAll(incidentUpdates);
 
     await _grantOccurrenceBadgesIfNeeded(
       userVM: userVM,
@@ -1483,5 +1535,4 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
     return _buildStandardFormContent(tColor);
   }
-
 }

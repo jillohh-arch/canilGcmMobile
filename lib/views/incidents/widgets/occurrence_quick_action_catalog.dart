@@ -22,14 +22,14 @@ class OccurrenceQuickActionCatalog {
         title: 'Cão em ação',
         description: 'K9 empregado em varredura operacional.',
         icon: Icons.pets_rounded,
-        color: green,
+        color: cyan,
         assetPath: 'assets/images/actions/k9_emprego.png',
       ),
       OccurrenceQuickAction(
         title: 'Busca feita',
         description: 'Busca realizada pela equipe no ponto indicado.',
         icon: Icons.search_rounded,
-        color: cyan,
+        color: green,
         assetPath: 'assets/images/actions/k9_busca.png',
       ),
       const OccurrenceQuickAction(
