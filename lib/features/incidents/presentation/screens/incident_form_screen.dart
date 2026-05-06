@@ -9,7 +9,7 @@ import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/theme/app_theme.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
-import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import '../widgets/occurrence_nature_search.dart';
 
 class IncidentFormScreen extends StatefulWidget {

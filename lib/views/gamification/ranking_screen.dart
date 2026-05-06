@@ -10,7 +10,7 @@ import 'package:canil_gcm/services/gamification_service.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';
 import '../../utils/badges_data.dart';
 import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/widgets/gamification_progress_widgets.dart';

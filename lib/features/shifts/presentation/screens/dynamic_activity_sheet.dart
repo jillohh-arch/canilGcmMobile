@@ -14,7 +14,7 @@ import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/services/location_resolution_service.dart';
 import 'package:canil_gcm/services/media_processing_service.dart';
 import 'package:canil_gcm/services/media_attachment_upload_service.dart';

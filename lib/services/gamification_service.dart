@@ -4,7 +4,7 @@ import '../models/badge_progress.dart';
 import '../models/level_progress.dart';
 import '../models/weekly_mission_progress.dart';
 import '../models/user.dart';
-import '../models/dog.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 class GamificationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

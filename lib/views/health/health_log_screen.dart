@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/theme/app_theme.dart';
-import '../../models/health_log_model.dart';
+import 'package:canil_gcm/models/health_log_model.dart';
 import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 
 class HealthLogScreen extends StatefulWidget {

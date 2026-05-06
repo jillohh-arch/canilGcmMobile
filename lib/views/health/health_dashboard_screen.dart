@@ -6,9 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/models/dog.dart';
-import '../../models/health_log_model.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/models/health_log_model.dart';
 
 class HealthDashboardScreen extends StatefulWidget {
   const HealthDashboardScreen({super.key});

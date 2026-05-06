@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
-import '../models/dog.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 import '../models/routine_model.dart';

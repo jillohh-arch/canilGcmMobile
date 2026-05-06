@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/dog.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/services/firestore_service.dart';
 
 class DogViewModel extends ChangeNotifier {

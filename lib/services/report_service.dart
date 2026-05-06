@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../models/dog.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 // Generic activity entry used for the report table
 class ReportEntry {
