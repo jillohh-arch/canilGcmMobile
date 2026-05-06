@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:canil_gcm/models/incident.dart';
-import 'package:canil_gcm/views/incidents/controllers/occurrence_payload_builder.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_payload_builder.dart';
 
 void main() {
   group('Incident', () {

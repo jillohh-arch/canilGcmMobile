@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../viewmodels/live_tracking_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/live_tracking_viewmodel.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
   final bool isLightMode;

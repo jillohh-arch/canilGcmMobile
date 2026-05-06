@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
+import 'package:canil_gcm/theme/app_theme.dart';
 import '../../models/health_log_model.dart';
-import '../../viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 
 class HealthLogScreen extends StatefulWidget {
   final String dogId;
@@ -22,8 +22,10 @@ class _HealthLogScreenState extends State<HealthLogScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<HealthViewModel>(context, listen: false)
-          .fetchHealthLogsForDog(widget.dogId);
+      Provider.of<HealthViewModel>(
+        context,
+        listen: false,
+      ).fetchHealthLogsForDog(widget.dogId);
     });
   }
 
@@ -48,11 +50,20 @@ class _HealthLogScreenState extends State<HealthLogScreen>
           indicatorColor: AppTheme.amber,
           labelColor: AppTheme.amber,
           unselectedLabelColor: cs.onSurfaceVariant,
-          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
-          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500, fontSize: 13),
+          labelStyle: GoogleFonts.poppins(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+          unselectedLabelStyle: GoogleFonts.poppins(
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.timeline_rounded), text: 'Histórico'),
-            Tab(icon: Icon(Icons.add_circle_outline_rounded), text: 'Novo Registro'),
+            Tab(
+              icon: Icon(Icons.add_circle_outline_rounded),
+              text: 'Novo Registro',
+            ),
           ],
         ),
       ),
@@ -60,7 +71,10 @@ class _HealthLogScreenState extends State<HealthLogScreen>
         controller: _tabController,
         children: [
           _HealthTimeline(dogId: widget.dogId),
-          _NewHealthLogForm(dogId: widget.dogId, onSaved: () => _tabController.animateTo(0)),
+          _NewHealthLogForm(
+            dogId: widget.dogId,
+            onSaved: () => _tabController.animateTo(0),
+          ),
         ],
       ),
     );
@@ -83,10 +97,11 @@ class _HealthTimelineState extends State<_HealthTimeline> {
   @override
   Widget build(BuildContext context) {
     final hVM = Provider.of<HealthViewModel>(context);
-    final logs = hVM.healthLogs
-        .where((l) => _filter == 'Todos' || l.logType == _filter)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final logs =
+        hVM.healthLogs
+            .where((l) => _filter == 'Todos' || l.logType == _filter)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     return Column(
       children: [
@@ -107,7 +122,11 @@ class _HealthTimelineState extends State<_HealthTimeline> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (f != 'Todos') ...[
-                        Icon(_logIcon(f), size: 13, color: isSelected ? color : Colors.white70),
+                        Icon(
+                          _logIcon(f),
+                          size: 13,
+                          color: isSelected ? color : Colors.white70,
+                        ),
                         const SizedBox(width: 4),
                       ],
                       Text(f),
@@ -118,7 +137,9 @@ class _HealthTimelineState extends State<_HealthTimeline> {
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: isSelected ? color : Colors.white70,
                   ),
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
                   selectedColor: color.withAlpha(40),
                   side: BorderSide(color: isSelected ? color : Colors.white12),
                   checkmarkColor: color,
@@ -134,19 +155,16 @@ class _HealthTimelineState extends State<_HealthTimeline> {
           child: hVM.isLoading
               ? const Center(child: CircularProgressIndicator())
               : logs.isEmpty
-                  ? _EmptyHealth(filter: _filter)
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                      itemCount: logs.length,
-                      itemBuilder: (context, i) {
-                        final log = logs[i];
-                        final isLast = i == logs.length - 1;
-                        return _HealthTimelineItem(
-                          log: log,
-                          isLast: isLast,
-                        );
-                      },
-                    ),
+              ? _EmptyHealth(filter: _filter)
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  itemCount: logs.length,
+                  itemBuilder: (context, i) {
+                    final log = logs[i];
+                    final isLast = i == logs.length - 1;
+                    return _HealthTimelineItem(log: log, isLast: isLast);
+                  },
+                ),
         ),
       ],
     );
@@ -227,7 +245,10 @@ class _HealthTimelineItemState extends State<_HealthTimelineItem> {
                       children: [
                         // Log type badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: color.withAlpha(30),
                             borderRadius: BorderRadius.circular(6),
@@ -253,7 +274,9 @@ class _HealthTimelineItemState extends State<_HealthTimelineItem> {
                         ),
                         const SizedBox(width: 6),
                         Icon(
-                          _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                          _expanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
                           size: 18,
                           color: Colors.white70,
                         ),
@@ -361,7 +384,11 @@ class _EmptyHealth extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.health_and_safety_outlined, size: 56, color: Colors.white12),
+          Icon(
+            Icons.health_and_safety_outlined,
+            size: 56,
+            color: Colors.white12,
+          ),
           const SizedBox(height: 12),
           Text(
             filter == 'Todos'
@@ -412,8 +439,12 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
         dogId: widget.dogId,
         date: DateTime.now(),
         logType: _selectedLogType,
-        weight: double.tryParse(_weightController.text.trim().replaceAll(',', '.')),
-        vaccines: _selectedLogType == 'Vacina' && _vaccineNameController.text.trim().isNotEmpty
+        weight: double.tryParse(
+          _weightController.text.trim().replaceAll(',', '.'),
+        ),
+        vaccines:
+            _selectedLogType == 'Vacina' &&
+                _vaccineNameController.text.trim().isNotEmpty
             ? [_vaccineNameController.text.trim()]
             : [],
         healthObservations: _observationsController.text.trim(),
@@ -468,9 +499,14 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
                   onTap: () => setState(() => _selectedLogType = type),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
-                      color: isSelected ? color.withAlpha(40) : cs.surfaceContainerHighest,
+                      color: isSelected
+                          ? color.withAlpha(40)
+                          : cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: isSelected ? color : Colors.white12,
@@ -480,13 +516,19 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(icon, size: 16, color: isSelected ? color : Colors.white70),
+                        Icon(
+                          icon,
+                          size: 16,
+                          color: isSelected ? color : Colors.white70,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           type,
                           style: GoogleFonts.poppins(
                             fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: isSelected ? color : Colors.white60,
                           ),
                         ),
@@ -507,7 +549,9 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
                   labelText: 'Ex: V10, Antirrábica, Giardíase...',
                   prefixIcon: Icon(Icons.vaccines_rounded),
                 ),
-                validator: (val) => val == null || val.isEmpty ? 'Informe o nome da vacina' : null,
+                validator: (val) => val == null || val.isEmpty
+                    ? 'Informe o nome da vacina'
+                    : null,
               ),
               const SizedBox(height: 20),
             ],
@@ -516,7 +560,9 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
             const SizedBox(height: 10),
             TextFormField(
               controller: _weightController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'Ex: 28.5 kg',
                 prefixIcon: Icon(Icons.monitor_weight_outlined),
@@ -533,8 +579,9 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
                 labelText: 'Sintomas, dosagem, histórico...',
                 alignLabelWithHint: true,
               ),
-              validator: (value) =>
-                  value == null || value.isEmpty ? 'Adicione ao menos uma observação' : null,
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Adicione ao menos uma observação'
+                  : null,
             ),
             const SizedBox(height: 32),
 
@@ -548,17 +595,25 @@ class _NewHealthLogFormState extends State<_NewHealthLogForm> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 2,
+                            ),
                           )
                         : Icon(_logIcon(_selectedLogType), size: 22),
                     label: Text(
                       viewModel.isLoading ? 'SALVANDO...' : 'SALVAR PRONTUÁRIO',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: selectedColor,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
                     onPressed: viewModel.isLoading ? null : _saveHealthLog,
                   );
@@ -594,12 +649,18 @@ class _SectionLabel extends StatelessWidget {
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 (IconData, Color) _iconAndColor(String logType) {
   switch (logType) {
-    case 'Vacina':    return (Icons.vaccines_rounded,        const Color(0xFFEF5350));
-    case 'Consulta':  return (Icons.local_hospital_rounded,       const Color(0xFF66BB6A));
-    case 'Exame':     return (Icons.biotech_rounded,          const Color(0xFF7E57C2));
-    case 'Medicação': return (Icons.medication_rounded,       const Color(0xFFFF7043));
-    case 'Banho':     return (Icons.water_drop_rounded,       const Color(0xFF29B6F6));
-    default:          return (Icons.medical_services_rounded, const Color(0xFFEF5350));
+    case 'Vacina':
+      return (Icons.vaccines_rounded, const Color(0xFFEF5350));
+    case 'Consulta':
+      return (Icons.local_hospital_rounded, const Color(0xFF66BB6A));
+    case 'Exame':
+      return (Icons.biotech_rounded, const Color(0xFF7E57C2));
+    case 'Medicação':
+      return (Icons.medication_rounded, const Color(0xFFFF7043));
+    case 'Banho':
+      return (Icons.water_drop_rounded, const Color(0xFF29B6F6));
+    default:
+      return (Icons.medical_services_rounded, const Color(0xFFEF5350));
   }
 }
 

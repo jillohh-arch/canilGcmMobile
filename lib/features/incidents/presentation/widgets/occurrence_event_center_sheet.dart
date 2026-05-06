@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../widgets/tactical_text_field.dart';
+import 'package:canil_gcm/widgets/tactical_text_field.dart';
 import 'occurrence_event_category.dart';
 import 'occurrence_quick_action.dart';
 

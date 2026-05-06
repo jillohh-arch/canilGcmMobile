@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../widgets/activity_weather_button.dart';
-import '../../../widgets/hud_chip_group.dart';
-import '../../../widgets/hud_expansion_section.dart';
-import '../../../widgets/tactical_text_field.dart';
+import 'package:canil_gcm/widgets/activity_weather_button.dart';
+import 'package:canil_gcm/widgets/hud_chip_group.dart';
+import 'package:canil_gcm/widgets/hud_expansion_section.dart';
+import 'package:canil_gcm/widgets/tactical_text_field.dart';
 
 class OccurrenceDetectionGroupedSections extends StatelessWidget {
   final TextEditingController natureController;

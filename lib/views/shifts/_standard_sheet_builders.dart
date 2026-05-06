@@ -372,8 +372,7 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
         _durationController.text = (durationSeconds / 60).floor().toString();
       }
       if (distanceMeters is num) {
-        _distanciaController.text =
-            (distanceMeters / 1000).toStringAsFixed(2);
+        _distanciaController.text = (distanceMeters / 1000).toStringAsFixed(2);
       }
     });
 

@@ -3,23 +3,23 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../models/incident.dart';
-import '../../../models/occurrence_nature.dart';
-import '../../../services/firestore_service.dart';
-import '../../../services/media_attachment_upload_service.dart';
-import '../../../services/occurrence_event_media_service.dart';
-import '../../../services/storage_service.dart';
-import '../../../services/text_match_service.dart';
-import '../../../utils/firestore_date.dart';
-import '../../../widgets/media_attachment_rows.dart';
-import '../../incidents/controllers/occurrence_display_text.dart';
-import '../../incidents/controllers/occurrence_dynamic_rows.dart';
-import '../../incidents/controllers/occurrence_extra_fields_snapshot.dart';
-import '../../incidents/controllers/occurrence_form_controller.dart';
-import '../../incidents/controllers/occurrence_payload_builder.dart';
-import '../../incidents/controllers/occurrence_progress_update_builder.dart';
-import '../../incidents/controllers/occurrence_save_validator.dart';
-import '../../incidents/controllers/occurrence_wizard_result.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
+import 'package:canil_gcm/services/firestore_service.dart';
+import 'package:canil_gcm/services/media_attachment_upload_service.dart';
+import 'package:canil_gcm/services/occurrence_event_media_service.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/services/text_match_service.dart';
+import 'package:canil_gcm/utils/firestore_date.dart';
+import 'package:canil_gcm/widgets/media_attachment_rows.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_display_text.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_dynamic_rows.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_extra_fields_snapshot.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_form_controller.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_payload_builder.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_progress_update_builder.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_save_validator.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_wizard_result.dart';
 
 // ---------------------------------------------------------------------------
 // Subtype constants (espelhados aqui para evitar dependência circular)
@@ -170,8 +170,7 @@ class ActivitySheetOccurrenceCtrl {
     descriptionController.text = data['description'] ?? '';
     status = OccurrenceFormController.normalizeStatus(data['status']);
     successful = data['operationalSuccess'] as bool?;
-    showFinalization =
-        status != OccurrenceFormController.statusInProgress;
+    showFinalization = status != OccurrenceFormController.statusInProgress;
 
     if (data['extraFields'] is Map) {
       _populateExtraFields(
@@ -188,8 +187,9 @@ class ActivitySheetOccurrenceCtrl {
     selectedOutcomes
       ..clear()
       ..addAll(
-        List<String>.from(rawOutcomes)
-            .map(OccurrenceFormController.normalizeOutcome),
+        List<String>.from(
+          rawOutcomes,
+        ).map(OccurrenceFormController.normalizeOutcome),
       );
   }
 
@@ -351,20 +351,17 @@ class ActivitySheetOccurrenceCtrl {
 
   void _hydrateDetainedIndividuals(dynamic rows) {
     if (rows is! List) return;
-    _replaceDynamicRows(
-      detainedIndividuals,
-      ['quantidade'],
-      OccurrenceDynamicRows.hydrateDetainedIndividuals(rows),
-    );
+    _replaceDynamicRows(detainedIndividuals, [
+      'quantidade',
+    ], OccurrenceDynamicRows.hydrateDetainedIndividuals(rows));
   }
 
   void _hydrateSeizedObjects(dynamic rows) {
     if (rows is! List) return;
-    _replaceDynamicRows(
-      seizedObjects,
-      ['descricao', 'quantidade'],
-      OccurrenceDynamicRows.hydrateSeizedObjects(rows),
-    );
+    _replaceDynamicRows(seizedObjects, [
+      'descricao',
+      'quantidade',
+    ], OccurrenceDynamicRows.hydrateSeizedObjects(rows));
   }
 
   void _hydrateDrugRows(dynamic rows) {
@@ -378,11 +375,10 @@ class ActivitySheetOccurrenceCtrl {
 
   void _hydrateDetainedVehicles(dynamic rows) {
     if (rows is! List) return;
-    _replaceDynamicRows(
-      detainedVehicles,
-      ['tipo', 'placa'],
-      OccurrenceDynamicRows.hydrateDetainedVehicles(rows),
-    );
+    _replaceDynamicRows(detainedVehicles, [
+      'tipo',
+      'placa',
+    ], OccurrenceDynamicRows.hydrateDetainedVehicles(rows));
   }
 
   void addDrug() {
@@ -625,10 +621,12 @@ class ActivitySheetOccurrenceCtrl {
 
   void _addWizardDrugRow({required String type, required String amount}) {
     if (type.isEmpty && amount.isEmpty) return;
-    detecaoDrogas.add(OccurrenceDynamicRows.drug(
-      type: type.isEmpty ? 'Maconha' : type,
-      amount: amount,
-    ));
+    detecaoDrogas.add(
+      OccurrenceDynamicRows.drug(
+        type: type.isEmpty ? 'Maconha' : type,
+        amount: amount,
+      ),
+    );
   }
 
   void _applyWizardSeizedObjectResult(OccurrenceWizardResult r) {
@@ -677,15 +675,10 @@ class ActivitySheetOccurrenceCtrl {
     return files;
   }
 
-  Future<List<Map<String, dynamic>>> uploadEventPhotos(
-    List<File> files,
-  ) async {
+  Future<List<Map<String, dynamic>>> uploadEventPhotos(List<File> files) async {
     return OccurrenceEventMediaService(
       storageService: StorageService(),
-    ).uploadPhotos(
-      files: files,
-      incidentIdOrDogId: activeIncidentId ?? dogId,
-    );
+    ).uploadPhotos(files: files, incidentIdOrDogId: activeIncidentId ?? dogId);
   }
 
   // -------------------------------------------------------------------------
@@ -796,10 +789,10 @@ class ActivitySheetOccurrenceCtrl {
     updateFocusNode.dispose();
     OccurrenceDynamicRows.disposeDrugs(detecaoDrogas);
     OccurrenceDynamicRows.disposeRows(detainedIndividuals, ['quantidade']);
-    OccurrenceDynamicRows.disposeRows(
-      seizedObjects,
-      ['descricao', 'quantidade'],
-    );
+    OccurrenceDynamicRows.disposeRows(seizedObjects, [
+      'descricao',
+      'quantidade',
+    ]);
     OccurrenceDynamicRows.disposeRows(detainedVehicles, ['tipo', 'placa']);
   }
 }

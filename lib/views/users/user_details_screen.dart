@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/user.dart';
-import '../../viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
 
 class UserDetailsScreen extends StatelessWidget {
   final UserModel user;
@@ -13,9 +13,17 @@ class UserDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isAdmin = user.accessLevel == 'Admin';
-    final gradient = isAdmin 
-      ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1565C0), Color(0xFF0D47A1)])
-      : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF37474F), Color(0xFF263238)]);
+    final gradient = isAdmin
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF37474F), Color(0xFF263238)],
+          );
 
     return Scaffold(
       body: CustomScrollView(
@@ -37,8 +45,16 @@ class UserDetailsScreen extends StatelessWidget {
                         CircleAvatar(
                           radius: 56,
                           backgroundColor: Colors.white24,
-                          backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                          child: user.photoUrl == null ? const Icon(Icons.person, size: 56, color: Colors.white) : null,
+                          backgroundImage: user.photoUrl != null
+                              ? NetworkImage(user.photoUrl!)
+                              : null,
+                          child: user.photoUrl == null
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 56,
+                                  color: Colors.white,
+                                )
+                              : null,
                         ),
                       ],
                     ),
@@ -55,16 +71,28 @@ class UserDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   user.callsign.toUpperCase(),
-                  style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                  style: GoogleFonts.poppins(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
                 if (user.name.isNotEmpty)
                   Text(
                     user.name,
-                    style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 Text(
                   isAdmin ? 'ADMINISTRADOR' : 'CONDUTOR',
-                  style: GoogleFonts.poppins(fontSize: 13, color: cs.primary, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 32),
 
@@ -77,7 +105,10 @@ class UserDetailsScreen extends StatelessWidget {
                       _CompactStat(value: user.ra, label: 'RA'),
                       if (user.name.isNotEmpty)
                         _CompactStat(value: user.name, label: 'Nome'),
-                      _CompactStat(value: user.unit.isEmpty ? '--' : user.unit, label: 'Unidade'),
+                      _CompactStat(
+                        value: user.unit.isEmpty ? '--' : user.unit,
+                        label: 'Unidade',
+                      ),
                     ],
                   ),
                 ),
@@ -104,8 +135,18 @@ class _CompactStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800)),
-        Text(label.toUpperCase(), style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.grey[500])),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.poppins(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[500],
+          ),
+        ),
       ],
     );
   }
@@ -118,27 +159,49 @@ class _LinkedDogsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dogVM = Provider.of<DogViewModel>(context);
-    final linkedDogs = dogVM.dogs.where((d) => d.conductorRa == userRa).toList();
+    final linkedDogs = dogVM.dogs
+        .where((d) => d.conductorRa == userRa)
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('K9s VINCULADOS', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.grey[400])),
+          Text(
+            'K9s VINCULADOS',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: Colors.grey[400],
+            ),
+          ),
           const SizedBox(height: 16),
           if (linkedDogs.isEmpty)
-            Text('Nenhum K9 vinculado a este condutor.', style: TextStyle(color: Colors.grey[600]))
+            Text(
+              'Nenhum K9 vinculado a este condutor.',
+              style: TextStyle(color: Colors.grey[600]),
+            )
           else
-            ...linkedDogs.map((dog) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundImage: dog.profileImageUrl != null ? NetworkImage(dog.profileImageUrl!) : null,
-                child: dog.profileImageUrl == null ? const FaIcon(FontAwesomeIcons.dog, size: 20) : null,
+            ...linkedDogs.map(
+              (dog) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundImage: dog.profileImageUrl != null
+                      ? NetworkImage(dog.profileImageUrl!)
+                      : null,
+                  child: dog.profileImageUrl == null
+                      ? const FaIcon(FontAwesomeIcons.dog, size: 20)
+                      : null,
+                ),
+                title: Text(
+                  dog.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(dog.breed),
               ),
-              title: Text(dog.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(dog.breed),
-            )),
+            ),
         ],
       ),
     );

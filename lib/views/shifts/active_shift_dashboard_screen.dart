@@ -7,17 +7,17 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import '../../services/weather_service.dart';
+import 'package:canil_gcm/services/weather_service.dart';
 
-import '../../viewmodels/shift_viewmodel.dart';
-import '../../viewmodels/dog_viewmodel.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/training_viewmodel.dart';
-import '../../viewmodels/incident_viewmodel.dart';
-import '../../viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 import '../../models/dog.dart';
-import '../../services/handler_identity_service.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
 import 'dart:ui';
 
 const _hudBackground = Color(0xFF070B14);

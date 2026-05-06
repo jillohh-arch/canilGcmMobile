@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../../models/incident.dart';
-import '../../../services/location_resolution_service.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/services/location_resolution_service.dart';
 
 class OccurrenceEventChange {
   final bool delete;

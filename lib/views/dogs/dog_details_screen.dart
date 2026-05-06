@@ -3,14 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/dog.dart';
-import '../../theme/app_theme.dart';
+import 'package:canil_gcm/theme/app_theme.dart';
 import '../health/health_log_screen.dart';
 import '../../models/health_log_model.dart';
-import '../../viewmodels/training_viewmodel.dart';
-import '../../viewmodels/dog_viewmodel.dart';
-import '../../viewmodels/health_viewmodel.dart';
-import '../../viewmodels/incident_viewmodel.dart';
-import '../incidents/occurrence_flow_screen.dart';
+import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import '../trainings/training_log_screen.dart';
 
 class DogDetailsScreen extends StatefulWidget {

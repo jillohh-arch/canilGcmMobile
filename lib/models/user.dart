@@ -1,7 +1,7 @@
 class UserModel {
   final String ra;
-  final String name;      // Nome real do operador
-  final String callsign;  // Nome de guerra
+  final String name; // Nome real do operador
+  final String callsign; // Nome de guerra
   final String unit;
   final String accessLevel; // 'Admin' ou 'Condutor'
   final String? photoUrl;
@@ -27,7 +27,9 @@ class UserModel {
       unit: json['unit'] ?? '',
       accessLevel: json['accessLevel'] ?? 'Condutor',
       photoUrl: json['photoUrl'],
-      userBadges: json['userBadges'] != null ? List<String>.from(json['userBadges']) : [],
+      userBadges: json['userBadges'] != null
+          ? List<String>.from(json['userBadges'])
+          : [],
       xp: json['xp'] ?? 0,
     );
   }

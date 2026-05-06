@@ -44,7 +44,9 @@ class StorageService {
       }
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
-        debugPrint('[StorageService] Aviso object-not-found (ignorado): ${e.message}');
+        debugPrint(
+          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
+        );
         return null;
       }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
@@ -69,7 +71,8 @@ class StorageService {
       'webp': 'image/webp',
       'pdf': 'application/pdf',
       'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
     return map[ext] ?? 'application/octet-stream';
   }
@@ -82,7 +85,9 @@ class StorageService {
       await ref.delete();
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
-        debugPrint('[StorageService] Aviso: Arquivo não encontrado no servidor. Ignorando...');
+        debugPrint(
+          '[StorageService] Aviso: Arquivo não encontrado no servidor. Ignorando...',
+        );
       } else {
         debugPrint('[StorageService] Erro ao deletar: ${e.message}');
       }

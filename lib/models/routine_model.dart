@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/firestore_date.dart';
+import 'package:canil_gcm/utils/firestore_date.dart';
 
 /// Represents an operational routine entry (Alimentação, Limpeza, Passeio, etc.)
 /// stored in the Firestore 'routines' collection, separate from 'trainings'.

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../models/incident.dart';
-import '../../viewmodels/incident_viewmodel.dart';
-import '../../theme/app_theme.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/theme/app_theme.dart';
 
 class GlobalIncidentsScreen extends StatefulWidget {
   const GlobalIncidentsScreen({super.key});

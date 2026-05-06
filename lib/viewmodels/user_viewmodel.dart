@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../services/firestore_service.dart';
-import '../services/handler_identity_service.dart';
+import 'package:canil_gcm/services/firestore_service.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
 
 class UserViewModel extends ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

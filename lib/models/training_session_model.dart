@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/firestore_date.dart';
+import 'package:canil_gcm/utils/firestore_date.dart';
 
 class TrainingSessionModel {
   final String? id;

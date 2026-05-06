@@ -1,5 +1,5 @@
-import '../viewmodels/auth_viewmodel.dart';
-import '../viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'handler_identity_service.dart';
 
 class OperatorContext {

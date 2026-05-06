@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'occurrence_flow_form.dart';
 
 class OccurrenceFlowScreen extends StatelessWidget {

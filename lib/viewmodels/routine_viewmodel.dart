@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/routine_model.dart';
-import '../services/gamification_service.dart';
+import 'package:canil_gcm/services/gamification_service.dart';
 
 class RoutineViewModel extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

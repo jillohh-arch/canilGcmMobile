@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../models/incident.dart';
-import '../viewmodels/shift_viewmodel.dart';
-import '../viewmodels/dog_viewmodel.dart';
-import '../viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'shifts/active_shift_dashboard_screen.dart';
 import 'shifts/daily_timeline_screen.dart';
 import 'health/health_dashboard_screen.dart';
 import 'profile/profile_screen.dart';
 import 'gamification/ranking_screen.dart';
-import 'incidents/occurrence_flow_screen.dart';
+import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'shifts/dynamic_activity_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/permission_service.dart';
+import 'package:canil_gcm/services/permission_service.dart';
 
 class MainRootScreen extends StatefulWidget {
   const MainRootScreen({super.key});

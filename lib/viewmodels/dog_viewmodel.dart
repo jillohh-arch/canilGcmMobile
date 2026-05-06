@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/dog.dart';
-import '../services/firestore_service.dart';
+import 'package:canil_gcm/services/firestore_service.dart';
 
 class DogViewModel extends ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();

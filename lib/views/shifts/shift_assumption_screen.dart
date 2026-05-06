@@ -9,13 +9,13 @@ import 'package:provider/provider.dart';
 
 import '../../models/dog.dart';
 import '../../models/user.dart';
-import '../../services/handler_identity_service.dart';
-import '../../services/permission_service.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/dog_viewmodel.dart';
-import '../../viewmodels/shift_viewmodel.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../widgets/hud_panel.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/services/permission_service.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/widgets/hud_panel.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);

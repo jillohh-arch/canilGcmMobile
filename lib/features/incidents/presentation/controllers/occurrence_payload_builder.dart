@@ -1,4 +1,4 @@
-import '../../../models/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'occurrence_form_controller.dart';
 
 class OccurrencePayloadBuilder {

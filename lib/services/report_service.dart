@@ -31,8 +31,8 @@ class ReportService {
     final pdf = pw.Document();
 
     // ── Load font ────────────────────────────────────────────────────────────
-    final font      = await PdfGoogleFonts.interRegular();
-    final fontBold  = await PdfGoogleFonts.interBold();
+    final font = await PdfGoogleFonts.interRegular();
+    final fontBold = await PdfGoogleFonts.interBold();
     final fontBlack = await PdfGoogleFonts.interExtraBold();
 
     // Sort entries by date ascending
@@ -62,13 +62,23 @@ class ReportService {
               children: [
                 _infoBlock('CÃO K9', dog.name.toUpperCase(), fontBold, font),
                 pw.SizedBox(width: 24),
-                _infoBlock('MATRÍCULA', dog.registrationNumber ?? 'N/A', fontBold, font),
+                _infoBlock(
+                  'MATRÍCULA',
+                  dog.registrationNumber ?? 'N/A',
+                  fontBold,
+                  font,
+                ),
                 pw.SizedBox(width: 24),
                 _infoBlock('RAÇA', dog.breed, fontBold, font),
                 pw.SizedBox(width: 24),
                 _infoBlock('CONDUTOR', conductorCallsign, fontBold, font),
                 pw.Spacer(),
-                _infoBlock('PERÍODO', period.isNotEmpty ? period : _formatDate(DateTime.now()), fontBold, font),
+                _infoBlock(
+                  'PERÍODO',
+                  period.isNotEmpty ? period : _formatDate(DateTime.now()),
+                  fontBold,
+                  font,
+                ),
               ],
             ),
           ),
@@ -76,37 +86,51 @@ class ReportService {
           pw.SizedBox(height: 20),
           pw.Text(
             'RELATÓRIO DE ATIVIDADES TÁTICAS',
-            style: pw.TextStyle(font: fontBlack, fontSize: 13, color: PdfColors.grey800, letterSpacing: 1.5),
+            style: pw.TextStyle(
+              font: fontBlack,
+              fontSize: 13,
+              color: PdfColors.grey800,
+              letterSpacing: 1.5,
+            ),
           ),
           pw.SizedBox(height: 10),
 
           // ── Activity Table ─────────────────────────────────────────────
           pw.Table(
             columnWidths: {
-              0: const pw.FixedColumnWidth(72),  // Date
-              1: const pw.FixedColumnWidth(42),  // Time
-              2: const pw.FlexColumnWidth(1.2),  // Type
-              3: const pw.FlexColumnWidth(1.5),  // Location
-              4: const pw.FlexColumnWidth(2.5),  // Observations
+              0: const pw.FixedColumnWidth(72), // Date
+              1: const pw.FixedColumnWidth(42), // Time
+              2: const pw.FlexColumnWidth(1.2), // Type
+              3: const pw.FlexColumnWidth(1.5), // Location
+              4: const pw.FlexColumnWidth(2.5), // Observations
             },
             border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
             children: [
               // Header row
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: PdfColors.grey800),
-                children: ['DATA', 'HORA', 'TIPO', 'LOCAL', 'OBSERVAÇÕES']
-                    .map((h) => _tableHeader(h, fontBold))
-                    .toList(),
+                children: [
+                  'DATA',
+                  'HORA',
+                  'TIPO',
+                  'LOCAL',
+                  'OBSERVAÇÕES',
+                ].map((h) => _tableHeader(h, fontBold)).toList(),
               ),
               // Data rows
               ...sorted.asMap().entries.map((entry) {
                 final odd = entry.key.isOdd;
-                final e   = entry.value;
+                final e = entry.value;
                 return pw.TableRow(
-                  decoration: pw.BoxDecoration(color: odd ? PdfColors.grey50 : PdfColors.white),
+                  decoration: pw.BoxDecoration(
+                    color: odd ? PdfColors.grey50 : PdfColors.white,
+                  ),
                   children: [
                     _tableCell(_formatDate(e.date), font),
-                    _tableCell('${e.date.hour.toString().padLeft(2,'0')}:${e.date.minute.toString().padLeft(2,'0')}', font),
+                    _tableCell(
+                      '${e.date.hour.toString().padLeft(2, '0')}:${e.date.minute.toString().padLeft(2, '0')}',
+                      font,
+                    ),
                     _tableCell(e.type, font),
                     _tableCell(e.location, font),
                     _tableCell(e.observations, font),
@@ -119,7 +143,11 @@ class ReportService {
           pw.SizedBox(height: 20),
           pw.Text(
             'Total de registros: ${sorted.length}',
-            style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.grey600),
+            style: pw.TextStyle(
+              font: fontBold,
+              fontSize: 10,
+              color: PdfColors.grey600,
+            ),
           ),
           pw.SizedBox(height: 48),
 
@@ -132,9 +160,19 @@ class ReportService {
                   children: [
                     pw.Container(height: 1, color: PdfColors.grey700),
                     pw.SizedBox(height: 6),
-                    pw.Text('Assinatura do GCM Responsável', style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey600)),
+                    pw.Text(
+                      'Assinatura do GCM Responsável',
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: 10,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                     pw.SizedBox(height: 2),
-                    pw.Text(conductorCallsign.toUpperCase(), style: pw.TextStyle(font: fontBold, fontSize: 11)),
+                    pw.Text(
+                      conductorCallsign.toUpperCase(),
+                      style: pw.TextStyle(font: fontBold, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
@@ -145,9 +183,19 @@ class ReportService {
                   children: [
                     pw.Container(height: 1, color: PdfColors.grey700),
                     pw.SizedBox(height: 6),
-                    pw.Text('Data / Hora do Relatório', style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey600)),
+                    pw.Text(
+                      'Data / Hora do Relatório',
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: 10,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                     pw.SizedBox(height: 2),
-                    pw.Text(_formatDate(DateTime.now()), style: pw.TextStyle(font: fontBold, fontSize: 11)),
+                    pw.Text(
+                      _formatDate(DateTime.now()),
+                      style: pw.TextStyle(font: fontBold, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
@@ -162,7 +210,11 @@ class ReportService {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
-  static pw.Widget _buildHeader(String institution, pw.Font fontBlack, pw.Font fontBold) {
+  static pw.Widget _buildHeader(
+    String institution,
+    pw.Font fontBlack,
+    pw.Font fontBold,
+  ) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
@@ -171,21 +223,44 @@ class ReportService {
           children: [
             // Shield icon placeholder
             pw.Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: const pw.BoxDecoration(
                 color: PdfColors.grey800,
                 shape: pw.BoxShape.circle,
               ),
               child: pw.Center(
-                child: pw.Text('K9', style: pw.TextStyle(font: fontBlack, fontSize: 11, color: PdfColors.white)),
+                child: pw.Text(
+                  'K9',
+                  style: pw.TextStyle(
+                    font: fontBlack,
+                    fontSize: 11,
+                    color: PdfColors.white,
+                  ),
+                ),
               ),
             ),
             pw.SizedBox(width: 12),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(institution, style: pw.TextStyle(font: fontBlack, fontSize: 13, letterSpacing: 1)),
-                pw.Text('SISTEMA DE GESTÃO CANINA — RELATÓRIO OFICIAL', style: pw.TextStyle(font: fontBold, fontSize: 9, color: PdfColors.grey600, letterSpacing: 0.8)),
+                pw.Text(
+                  institution,
+                  style: pw.TextStyle(
+                    font: fontBlack,
+                    fontSize: 13,
+                    letterSpacing: 1,
+                  ),
+                ),
+                pw.Text(
+                  'SISTEMA DE GESTÃO CANINA — RELATÓRIO OFICIAL',
+                  style: pw.TextStyle(
+                    font: fontBold,
+                    fontSize: 9,
+                    color: PdfColors.grey600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ],
             ),
           ],
@@ -199,19 +274,47 @@ class ReportService {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text('Documento de uso interno — não divulgar sem autorização', style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey500)),
-        pw.Text('Pág. ${ctx.pageNumber} / ${ctx.pagesCount}', style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey500)),
+        pw.Text(
+          'Documento de uso interno — não divulgar sem autorização',
+          style: pw.TextStyle(
+            font: font,
+            fontSize: 8,
+            color: PdfColors.grey500,
+          ),
+        ),
+        pw.Text(
+          'Pág. ${ctx.pageNumber} / ${ctx.pagesCount}',
+          style: pw.TextStyle(
+            font: font,
+            fontSize: 8,
+            color: PdfColors.grey500,
+          ),
+        ),
       ],
     );
   }
 
-  static pw.Widget _sectionDivider() => pw.Container(height: 2, color: PdfColors.grey800);
+  static pw.Widget _sectionDivider() =>
+      pw.Container(height: 2, color: PdfColors.grey800);
 
-  static pw.Widget _infoBlock(String label, String value, pw.Font bold, pw.Font regular) {
+  static pw.Widget _infoBlock(
+    String label,
+    String value,
+    pw.Font bold,
+    pw.Font regular,
+  ) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(label, style: pw.TextStyle(font: bold, fontSize: 8, color: PdfColors.grey600, letterSpacing: 0.8)),
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            font: bold,
+            fontSize: 8,
+            color: PdfColors.grey600,
+            letterSpacing: 0.8,
+          ),
+        ),
         pw.SizedBox(height: 3),
         pw.Text(value, style: pw.TextStyle(font: bold, fontSize: 11)),
       ],
@@ -223,7 +326,12 @@ class ReportService {
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       child: pw.Text(
         text,
-        style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.white, letterSpacing: 0.5),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 8,
+          color: PdfColors.white,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -231,10 +339,13 @@ class ReportService {
   static pw.Widget _tableCell(String text, pw.Font font) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey800)),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey800),
+      ),
     );
   }
 
   static String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year}';
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }

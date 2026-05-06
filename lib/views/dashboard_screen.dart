@@ -3,21 +3,21 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../viewmodels/dog_viewmodel.dart';
-import '../viewmodels/auth_viewmodel.dart';
-import '../viewmodels/shift_viewmodel.dart';
-import '../viewmodels/incident_viewmodel.dart';
-import '../viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import '../models/dog.dart';
 import '../models/user.dart';
-import '../models/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'dogs/dog_details_screen.dart';
 import 'users/user_management_screen.dart';
-import '../theme/app_theme.dart';
+import 'package:canil_gcm/theme/app_theme.dart';
 import 'trainings/training_log_screen.dart';
-import '../services/handler_identity_service.dart';
-import '../services/permission_service.dart';
-import 'incidents/occurrence_flow_screen.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/services/permission_service.dart';
+import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);
@@ -1234,7 +1234,11 @@ class _SmallDogCard extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: dog.profileImageUrl != null
-                    ? Image.network(dog.profileImageUrl!, fit: BoxFit.cover, alignment: Alignment.topCenter)
+                    ? Image.network(
+                        dog.profileImageUrl!,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      )
                     : Container(
                         color: _hudPanelAlt,
                         child: Center(

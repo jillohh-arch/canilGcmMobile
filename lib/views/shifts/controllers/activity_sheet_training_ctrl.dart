@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/handler_identity_service.dart';
-import '../../../services/media_attachment_upload_service.dart';
-import '../../../services/pt_br_date_time_service.dart';
-import '../../../services/storage_service.dart';
-import '../../../viewmodels/auth_viewmodel.dart';
-import '../../../viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/services/media_attachment_upload_service.dart';
+import 'package:canil_gcm/services/pt_br_date_time_service.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
 
 import 'activity_record_payload_builder.dart';
 
@@ -75,8 +75,8 @@ class ActivitySheetTrainingCtrl {
     descriptionController.text = data['handlerNotes'] ?? '';
 
     if (data['searchDuration'] != null) {
-      durationController.text =
-          ((data['searchDuration'] as num) ~/ 60).toString();
+      durationController.text = ((data['searchDuration'] as num) ~/ 60)
+          .toString();
     }
 
     if (data['metadata'] is Map) {

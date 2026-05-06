@@ -1,4 +1,4 @@
-import '../../../widgets/activity_card_catalog.dart';
+import 'package:canil_gcm/widgets/activity_card_catalog.dart';
 
 abstract final class OccurrenceDisplayText {
   static String effectiveNature(String? selectedSubtype) {

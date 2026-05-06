@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../../services/media_attachment_upload_service.dart';
-import '../../../services/pdf_attachment_service.dart';
-import '../../../services/pt_br_date_time_service.dart';
-import '../../../services/storage_service.dart';
-import '../../../viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/services/media_attachment_upload_service.dart';
+import 'package:canil_gcm/services/pdf_attachment_service.dart';
+import 'package:canil_gcm/services/pt_br_date_time_service.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 
 import 'activity_record_payload_builder.dart';
 

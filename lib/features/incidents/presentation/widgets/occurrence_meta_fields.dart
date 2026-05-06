@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../models/incident.dart';
-import '../../../widgets/hud_chip_group.dart';
-import '../../../widgets/tactical_text_field.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/widgets/hud_chip_group.dart';
+import 'package:canil_gcm/widgets/tactical_text_field.dart';
 import '../controllers/occurrence_form_controller.dart';
 import 'occurrence_quick_update_catalog.dart';
 import 'occurrence_quick_update_shortcuts.dart';

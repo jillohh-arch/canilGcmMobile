@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../models/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
 
 class OccurrenceTimelinePreview extends StatelessWidget {
   final List<IncidentProgressUpdate> updates;

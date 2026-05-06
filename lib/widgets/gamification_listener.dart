@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../viewmodels/auth_viewmodel.dart';
-import '../viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import '../models/user.dart';
 import '../utils/badges_data.dart';
 import '../main.dart';
@@ -20,7 +20,8 @@ class GamificationListener extends StatefulWidget {
   State<GamificationListener> createState() => _GamificationListenerState();
 }
 
-class _GamificationListenerState extends State<GamificationListener> with WidgetsBindingObserver {
+class _GamificationListenerState extends State<GamificationListener>
+    with WidgetsBindingObserver {
   bool _isForeground = true;
   List<String> _knownBadges = [];
   String? _currentRa;
@@ -36,23 +37,29 @@ class _GamificationListenerState extends State<GamificationListener> with Widget
   void _initNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings(
-      requestSoundPermission: true,
-      requestBadgePermission: true,
-      requestAlertPermission: true,
-    );
-        
-    const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsIOS);
-        
+
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+          requestSoundPermission: true,
+          requestBadgePermission: true,
+          requestAlertPermission: true,
+        );
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsIOS,
+        );
+
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
     );
     // Notification permission on Android 13+ is required to post notifications
-    await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-    AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
 
     if (mounted) {
       setState(() {
@@ -78,10 +85,14 @@ class _GamificationListenerState extends State<GamificationListener> with Widget
 
   void _processUsersUpdate(UserViewModel userVM, AuthViewModel authVM) {
     final firebaseUser = authVM.user;
-    if (firebaseUser == null || firebaseUser.email == null || userVM.users.isEmpty) return;
-    
+    if (firebaseUser == null ||
+        firebaseUser.email == null ||
+        userVM.users.isEmpty) {
+      return;
+    }
+
     final ra = firebaseUser.email!.split('@').first;
-    
+
     UserModel? currentUserData;
     try {
       currentUserData = userVM.users.firstWhere((u) => u.ra == ra);
@@ -96,7 +107,9 @@ class _GamificationListenerState extends State<GamificationListener> with Widget
       return;
     }
 
-    final newBadges = currentUserData.userBadges.where((b) => !_knownBadges.contains(b)).toList();
+    final newBadges = currentUserData.userBadges
+        .where((b) => !_knownBadges.contains(b))
+        .toList();
     if (newBadges.isNotEmpty) {
       for (final badgeId in newBadges) {
         _knownBadges.add(badgeId);
@@ -128,18 +141,20 @@ class _GamificationListenerState extends State<GamificationListener> with Widget
   Future<void> _showLocalNotification(BadgeData badge) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'gamification_channel', 
-      'Conquistas K9',
-      channelDescription: 'Notificações de badges do sistema de gamificação',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-      color: Colors.blueAccent,
+          'gamification_channel',
+          'Conquistas K9',
+          channelDescription:
+              'Notificações de badges do sistema de gamificação',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+          color: Colors.blueAccent,
+        );
+
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
     );
-    
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-        
+
     await flutterLocalNotificationsPlugin.show(
       id: badge.id.hashCode,
       title: 'Conquista Desbloqueada! 🏆',

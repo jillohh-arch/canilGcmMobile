@@ -10,20 +10,20 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../viewmodels/shift_viewmodel.dart';
-import '../../viewmodels/training_viewmodel.dart';
-import '../../viewmodels/incident_viewmodel.dart';
-import '../../viewmodels/health_viewmodel.dart';
-import '../../viewmodels/routine_viewmodel.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../viewmodels/dog_viewmodel.dart';
-import '../../models/incident.dart';
-import '../../services/report_service.dart';
-import '../../services/handler_identity_service.dart';
-import '../../widgets/hud_tab_bar.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/routine_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/services/report_service.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/widgets/hud_tab_bar.dart';
 import '../../models/training_session_model.dart';
-import '../incidents/occurrence_flow_screen.dart';
+import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'dynamic_activity_sheet.dart';
 
 class _IncidentQuickProgressShortcut {

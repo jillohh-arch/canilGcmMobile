@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/health_log_model.dart';
-import '../services/firestore_service.dart';
-import '../services/gamification_service.dart';
+import 'package:canil_gcm/services/firestore_service.dart';
+import 'package:canil_gcm/services/gamification_service.dart';
 
 class HealthViewModel extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -26,7 +26,9 @@ class HealthViewModel extends ChangeNotifier {
     try {
       _setLoading(true);
 
-      final docRef = await _firestore.collection('health_logs').add(log.toJson());
+      final docRef = await _firestore
+          .collection('health_logs')
+          .add(log.toJson());
       await _syncDogHealthSnapshot(log);
 
       final newLog = HealthLogModel.fromJson(log.toJson(), docRef.id);

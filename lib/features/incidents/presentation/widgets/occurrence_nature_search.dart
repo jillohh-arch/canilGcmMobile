@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../models/occurrence_nature.dart';
+import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 
 typedef OccurrenceNatureFieldBuilder =
     Widget Function(

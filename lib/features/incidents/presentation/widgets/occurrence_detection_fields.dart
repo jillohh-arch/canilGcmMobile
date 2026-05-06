@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../widgets/hud_controls.dart';
-import '../../../widgets/tactical_text_field.dart';
+import 'package:canil_gcm/widgets/hud_controls.dart';
+import 'package:canil_gcm/widgets/tactical_text_field.dart';
 
 class OccurrenceDetectionFields extends StatelessWidget {
   final List<Map<String, dynamic>> drugs;

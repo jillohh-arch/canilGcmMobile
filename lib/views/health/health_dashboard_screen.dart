@@ -1,12 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../viewmodels/shift_viewmodel.dart';
-import '../../viewmodels/health_viewmodel.dart';
-import '../../viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
 import '../../models/dog.dart';
 import '../../models/health_log_model.dart';
 
@@ -170,15 +170,15 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.cyanAccent.withValues(alpha: 
-                      0.3 + (_pulseController.value * 0.7),
+                    color: Colors.cyanAccent.withValues(
+                      alpha: 0.3 + (_pulseController.value * 0.7),
                     ),
                     width: 2 + (_pulseController.value * 1),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.cyanAccent.withValues(alpha: 
-                        0.4 * _pulseController.value,
+                      color: Colors.cyanAccent.withValues(
+                        alpha: 0.4 * _pulseController.value,
                       ),
                       blurRadius: 15 + (15 * _pulseController.value),
                       spreadRadius: 2 + (5 * _pulseController.value),
@@ -899,7 +899,10 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF030712),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accentColor.withValues(alpha: 0.8), width: 1.5),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.8),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: accentColor.withValues(alpha: 0.3),

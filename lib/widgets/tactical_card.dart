@@ -62,10 +62,8 @@ class _TacticalCardState extends State<TacticalCard>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _scaleAnimation,
-      builder: (context, child) => Transform.scale(
-        scale: _scaleAnimation.value,
-        child: child,
-      ),
+      builder: (context, child) =>
+          Transform.scale(scale: _scaleAnimation.value, child: child),
       child: GestureDetector(
         onTapDown: (_) => _controller.reverse(),
         onTapUp: (_) {
@@ -76,8 +74,9 @@ class _TacticalCardState extends State<TacticalCard>
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           height: widget.height,
-          constraints:
-              widget.height == null ? const BoxConstraints(minHeight: 148) : null,
+          constraints: widget.height == null
+              ? const BoxConstraints(minHeight: 148)
+              : null,
           decoration: BoxDecoration(
             gradient: widget.gradient,
             borderRadius: BorderRadius.circular(6),
@@ -177,7 +176,10 @@ class _TacticalCardState extends State<TacticalCard>
                     if (widget.stats.isNotEmpty) ...[
                       const SizedBox(height: 14),
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(40),
                           borderRadius: BorderRadius.circular(6),
@@ -187,9 +189,13 @@ class _TacticalCardState extends State<TacticalCard>
                           children: [
                             for (int i = 0; i < widget.stats.length; i++) ...[
                               if (i > 0)
-                                Container(width: 1, height: 28, color: Colors.white24),
+                                Container(
+                                  width: 1,
+                                  height: 28,
+                                  color: Colors.white24,
+                                ),
                               Expanded(child: widget.stats[i]),
-                            ]
+                            ],
                           ],
                         ),
                       ),

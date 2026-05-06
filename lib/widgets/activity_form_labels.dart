@@ -1,4 +1,4 @@
-import '../views/incidents/controllers/occurrence_form_controller.dart';
+import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_form_controller.dart';
 
 abstract final class ActivityFormLabels {
   static String descriptionLabel({

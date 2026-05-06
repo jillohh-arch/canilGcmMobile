@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/handler_identity_service.dart';
-import '../../../services/media_attachment_upload_service.dart';
-import '../../../services/pt_br_date_time_service.dart';
-import '../../../services/storage_service.dart';
-import '../../../viewmodels/auth_viewmodel.dart';
-import '../../../viewmodels/routine_viewmodel.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/services/media_attachment_upload_service.dart';
+import 'package:canil_gcm/services/pt_br_date_time_service.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/routine_viewmodel.dart';
 import 'activity_record_payload_builder.dart';
 
 /// Controller que encapsula todo o estado e lógica da categoria Rotina
@@ -143,10 +143,7 @@ class ActivitySheetRoutineCtrl {
     );
 
     final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-    final metadata = {
-      ...formData,
-      ...buildMetadata(subtype: selectedSubtype),
-    };
+    final metadata = {...formData, ...buildMetadata(subtype: selectedSubtype)};
 
     final routine = ActivityRecordPayloadBuilder.routine(
       documentId: documentId,

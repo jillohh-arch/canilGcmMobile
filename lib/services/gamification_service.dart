@@ -628,11 +628,12 @@ class GamificationService {
       _db.collection('incidents').where('handlerId', isEqualTo: ra).get(),
       _db.collection('dogs').where('conductorRa', isEqualTo: ra).get(),
       _db
-          .collection('users')
-          .doc(ra)
-          .collection('weekly_missions')
-          .doc(weekKey)
-          .get() as Future<Object>,
+              .collection('users')
+              .doc(ra)
+              .collection('weekly_missions')
+              .doc(weekKey)
+              .get()
+          as Future<Object>,
     ]);
 
     final shiftSnapshot = results[0] as QuerySnapshot;

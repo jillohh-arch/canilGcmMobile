@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../models/incident.dart';
-import '../../services/handler_identity_service.dart';
-import '../../viewmodels/incident_viewmodel.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../theme/app_theme.dart';
-import '../../models/occurrence_nature.dart';
-import '../../viewmodels/dog_viewmodel.dart';
-import 'widgets/occurrence_nature_search.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/theme/app_theme.dart';
+import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
+import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
+import '../widgets/occurrence_nature_search.dart';
 
 class IncidentFormScreen extends StatefulWidget {
   final String dogId;
@@ -802,7 +802,9 @@ class _NewIncidentFormState extends State<_NewIncidentForm> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                                color: const Color(
+                                  0xFF00E5FF,
+                                ).withValues(alpha: 0.5),
                                 blurRadius: 20,
                                 offset: const Offset(0, 4),
                               ),

@@ -9,7 +9,7 @@ import 'viewmodels/user_viewmodel.dart';
 import 'viewmodels/dog_viewmodel.dart';
 import 'viewmodels/training_viewmodel.dart';
 import 'viewmodels/health_viewmodel.dart';
-import 'viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'viewmodels/routine_viewmodel.dart';
 import 'viewmodels/shift_viewmodel.dart';
 import 'services/handler_identity_service.dart';

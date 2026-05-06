@@ -7,18 +7,18 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
 import '../../models/badge_progress.dart';
 import '../../models/level_progress.dart';
 import '../../models/user.dart';
 import '../../models/weekly_mission_progress.dart';
-import '../../services/handler_identity_service.dart';
-import '../../services/storage_service.dart';
-import '../../services/gamification_service.dart';
+import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/services/gamification_service.dart';
 import '../../utils/badges_data.dart';
-import '../../widgets/gamification_progress_widgets.dart';
+import 'package:canil_gcm/widgets/gamification_progress_widgets.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);

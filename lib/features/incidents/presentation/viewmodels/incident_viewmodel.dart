@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/incident.dart';
-import '../services/firestore_service.dart';
-import '../services/gamification_service.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/services/firestore_service.dart';
+import 'package:canil_gcm/services/gamification_service.dart';
 
 class IncidentViewModel extends ChangeNotifier {
   final FirestoreService _db = FirestoreService();

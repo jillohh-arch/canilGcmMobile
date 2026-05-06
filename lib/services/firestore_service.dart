@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 import '../models/dog.dart';
-import '../models/incident.dart';
-import '../models/occurrence_nature.dart';
+import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 import '../models/routine_model.dart';
 import 'gamification_service.dart';
 
@@ -98,9 +98,7 @@ class FirestoreService {
   }
 
   Future<List<dynamic>> getIncidents({String? dogId}) async {
-    Query query = _db
-        .collection('incidents')
-        .orderBy('date', descending: true);
+    Query query = _db.collection('incidents').orderBy('date', descending: true);
     if (dogId != null) {
       query = query.where('dogId', isEqualTo: dogId);
     }

@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/user.dart';
-import '../../viewmodels/user_viewmodel.dart';
-import '../../services/storage_service.dart';
-import '../../widgets/tactical_card.dart';
+import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/services/storage_service.dart';
+import 'package:canil_gcm/widgets/tactical_card.dart';
 import 'user_details_screen.dart';
 
 class UserManagementScreen extends StatefulWidget {
