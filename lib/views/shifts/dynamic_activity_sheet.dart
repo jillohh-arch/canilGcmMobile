@@ -15,7 +15,6 @@ import '../../viewmodels/routine_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/user_viewmodel.dart';
 import '../../viewmodels/dog_viewmodel.dart';
-import '../../services/form_metadata_reader.dart';
 import '../../services/location_resolution_service.dart';
 import '../../services/media_processing_service.dart';
 import '../../services/media_attachment_upload_service.dart';
@@ -138,6 +137,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     return category == 'ocorrencia' || category == 'ocorrência';
   }
 
+  /// Verdadeiro para Ocorrência e Evento — ambos usam _occCtrl para salvar.
+  bool get _isOccurrenceOrEventCategory =>
+      _isOccurrenceCategory || widget.category == 'Evento';
+
   bool get _isExistingOccurrence =>
       _isOccurrenceCategory && widget.documentId != null;
 
@@ -164,33 +167,31 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   // ---------------------------------------------------------------------------
   late final ActivitySheetHealthCtrl _healthCtrl;
 
-  // Getters Opção B: o State lê do controller ativo
+  // Getters Opção B: o State lê do controller ativo conforme a categoria.
+  // Ocorrência + Evento → _occCtrl; Treino → _trainingCtrl;
+  // Rotina → _routineCtrl; Saúde → _healthCtrl.
   TextEditingController get _locationController =>
-      _isOccurrenceCategory
+      _isOccurrenceOrEventCategory
           ? _occCtrl.locationController
           : widget.category == 'Treino'
               ? _trainingCtrl.locationController
-              : _locationCtrlOther; // Rotina/Saúde não usam location no form
+              : _locationCtrlOther; // Rotina não usa campo location
   TextEditingController get _descriptionController =>
-      _isOccurrenceCategory
+      _isOccurrenceOrEventCategory
           ? _occCtrl.descriptionController
           : widget.category == 'Treino'
               ? _trainingCtrl.descriptionController
               : widget.category == 'Rotina'
                   ? _routineCtrl.descriptionController
-                  : widget.category == 'Saude'
-                      ? _healthCtrl.descriptionController
-                      : _descriptionCtrlOther;
+                  : _healthCtrl.descriptionController; // Saúde (categoria padrão)
   TextEditingController get _timeController =>
-      _isOccurrenceCategory
+      _isOccurrenceOrEventCategory
           ? _occCtrl.timeController
           : widget.category == 'Treino'
               ? _trainingCtrl.timeController
               : widget.category == 'Rotina'
                   ? _routineCtrl.timeController
-                  : widget.category == 'Saude'
-                      ? _healthCtrl.timeController
-                      : _timeCtrlOther;
+                  : _healthCtrl.timeController; // Saúde (categoria padrão)
   // durationController: Treino -> _trainingCtrl, Rotina -> _routineCtrl
   TextEditingController get _durationController =>
       widget.category == 'Treino'
@@ -249,7 +250,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _occCtrl.condicaoTerrenoController;
   TextEditingController get _numeroOsController =>
       _occCtrl.numeroOsController;
-  TextEditingController get _orgaoController => _occCtrl.orgaoController;
   TextEditingController get _publicoController => _occCtrl.publicoController;
   TextEditingController get _temaController => _occCtrl.temaController;
 
@@ -284,11 +284,11 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _occCtrl.selectedUpdateTitle = v;
   List<OccurrenceNature> get _occurrenceNatures => _occCtrl.natures;
 
-  // Rotina/Saúde: controladores fallback (Saúde — Fase 4)
+  // Fallback para categorias sem controller dedicado para o campo.
+  // _locationCtrlOther: Rotina não tem campo de localização.
+  // _durationCtrlOther: duração de busca em Ocorrência/Evento.
   final _locationCtrlOther = TextEditingController();
-  final _descriptionCtrlOther = TextEditingController();
-  final _timeCtrlOther = TextEditingController();
-  final _durationCtrlOther = TextEditingController(); // nenhuma categoria restante usa
+  final _durationCtrlOther = TextEditingController();
 
 
   late PageController _menuPageController;
@@ -364,13 +364,13 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _showMenu = false;
       _populateEditData();
     }
-    // Set default time to now when creating a new record
+    // Inicializa hora atual para todos os controllers (novo registro)
     if (widget.initialData == null) {
-      _timeCtrlOther.text = _formatTimeOfDay(DateTime.now());
-      _occCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
-      _trainingCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
-      _routineCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
-      _healthCtrl.timeController.text = _formatTimeOfDay(DateTime.now());
+      final nowTime = _formatTimeOfDay(DateTime.now());
+      _occCtrl.timeController.text = nowTime;
+      _trainingCtrl.timeController.text = nowTime;
+      _routineCtrl.timeController.text = nowTime;
+      _healthCtrl.timeController.text = nowTime;
     }
     if (_isOccurrenceCategory) {
       _occCtrl.loadNatures();
@@ -512,9 +512,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 
-  dynamic _metadataValue(String key) {
-    return FormMetadataReader(_formData).value(key);
-  }
 
   void _populateOccurrenceExtraFields(Map<String, dynamic> extraFields) {
     final snapshot = OccurrenceExtraFieldsSnapshot(extraFields);
@@ -761,8 +758,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _routineCtrl.dispose();
     _healthCtrl.dispose();
     _locationCtrlOther.dispose();
-    _descriptionCtrlOther.dispose();
-    _timeCtrlOther.dispose();
     _durationCtrlOther.dispose();
     // _returnDateController, _vetNameController, etc. agora em _healthCtrl (Fase 4)
     // _racaoMarcaController, _racaoQtdController, _distanciaController: migrados para _routineCtrl
