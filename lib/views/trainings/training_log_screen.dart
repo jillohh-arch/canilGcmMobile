@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:canil_gcm/theme/app_theme.dart';
-import '../../models/training_session_model.dart';
+import 'package:canil_gcm/models/training_session_model.dart';
 import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
-import 'package:canil_gcm/views/shifts/dynamic_activity_sheet.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);

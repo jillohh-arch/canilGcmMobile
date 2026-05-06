@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../models/tracking_capture_result.dart';
+import 'package:canil_gcm/features/shifts/domain/tracking_capture_result.dart';
 
 class LiveTrackingStartResult {
   final String? errorMessage;

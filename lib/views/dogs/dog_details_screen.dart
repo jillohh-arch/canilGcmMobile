@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../../models/dog.dart';
+import 'package:canil_gcm/models/dog.dart';
 import 'package:canil_gcm/theme/app_theme.dart';
 import '../health/health_log_screen.dart';
 import '../../models/health_log_model.dart';

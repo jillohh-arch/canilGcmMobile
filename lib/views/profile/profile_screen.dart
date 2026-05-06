@@ -9,10 +9,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import '../../models/badge_progress.dart';
 import '../../models/level_progress.dart';
-import '../../models/user.dart';
+import 'package:canil_gcm/models/user.dart';
 import '../../models/weekly_mission_progress.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';
 import 'package:canil_gcm/services/storage_service.dart';

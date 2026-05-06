@@ -11,10 +11,10 @@ import 'viewmodels/training_viewmodel.dart';
 import 'viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'viewmodels/routine_viewmodel.dart';
-import 'viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'services/handler_identity_service.dart';
 import 'views/main_root_screen.dart';
-import 'views/shifts/shift_assumption_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'views/auth/login_screen.dart';
 import 'widgets/gamification_listener.dart';
 

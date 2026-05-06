@@ -9,14 +9,14 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:canil_gcm/services/weather_service.dart';
 
-import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
-import '../../models/dog.dart';
+import 'package:canil_gcm/models/dog.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';
 import 'dart:ui';
 

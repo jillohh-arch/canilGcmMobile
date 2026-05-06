@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/badge_progress.dart';
-import '../../models/user.dart';
+import 'package:canil_gcm/models/user.dart';
 import '../../models/weekly_mission_progress.dart';
 import 'package:canil_gcm/services/gamification_service.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';

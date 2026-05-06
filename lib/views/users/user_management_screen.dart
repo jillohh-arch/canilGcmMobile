@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../models/user.dart';
+import 'package:canil_gcm/models/user.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/services/storage_service.dart';
 import 'package:canil_gcm/widgets/tactical_card.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:canil_gcm/views/shifts/dynamic_activity_sheet.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 
 class OccurrenceFlowForm extends StatelessWidget {
   final String dogId;

@@ -7,13 +7,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/dog.dart';
-import '../../models/user.dart';
+import 'package:canil_gcm/models/dog.dart';
+import 'package:canil_gcm/models/user.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';
 import 'package:canil_gcm/services/permission_service.dart';
 import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/widgets/hud_panel.dart';
 

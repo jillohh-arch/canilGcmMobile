@@ -74,10 +74,10 @@ import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_qui
 import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_specific_fields.dart';
 import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_stage_panels.dart';
 import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_start_screen.dart';
-import 'controllers/activity_sheet_occurrence_ctrl.dart';
-import 'controllers/activity_sheet_training_ctrl.dart';
-import 'controllers/activity_sheet_routine_ctrl.dart';
-import 'controllers/activity_sheet_health_ctrl.dart';
+import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_occurrence_ctrl.dart';
+import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_training_ctrl.dart';
+import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_routine_ctrl.dart';
+import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_health_ctrl.dart';
 import 'live_tracking_screen.dart';
 
 part '_occurrence_sheet_builders.dart';

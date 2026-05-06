@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:canil_gcm/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/viewmodels/dog_viewmodel.dart';
-import '../../models/dog.dart';
+import 'package:canil_gcm/models/dog.dart';
 import '../../models/health_log_model.dart';
 
 class HealthDashboardScreen extends StatefulWidget {

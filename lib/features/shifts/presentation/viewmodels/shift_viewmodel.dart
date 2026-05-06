@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../models/active_shift_session.dart';
+import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 import 'package:canil_gcm/services/gamification_service.dart';
 import 'package:canil_gcm/services/handler_identity_service.dart';
-import 'package:canil_gcm/services/shift_service.dart';
+import 'package:canil_gcm/features/shifts/data/shift_service.dart';
 
 class ShiftViewModel extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;

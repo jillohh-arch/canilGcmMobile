@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/active_shift_session.dart';
+import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 
 class ShiftService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
