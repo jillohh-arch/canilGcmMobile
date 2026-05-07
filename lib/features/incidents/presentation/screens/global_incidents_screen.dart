@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/theme/app_theme.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 class GlobalIncidentsScreen extends StatefulWidget {
   const GlobalIncidentsScreen({super.key});

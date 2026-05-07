@@ -1,6 +1,6 @@
-import 'package:canil_gcm/models/health_log_model.dart';
-import 'package:canil_gcm/models/routine_model.dart';
-import 'package:canil_gcm/models/training_session_model.dart';
+import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/features/routine/domain/routine_model.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 
 abstract final class ActivityRecordPayloadBuilder {
   static RoutineModel routine({

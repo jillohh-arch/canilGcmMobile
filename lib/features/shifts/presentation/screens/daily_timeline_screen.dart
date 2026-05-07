@@ -11,18 +11,18 @@ import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/routine_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
-import 'package:canil_gcm/services/report_service.dart';
-import 'package:canil_gcm/services/handler_identity_service.dart';
-import 'package:canil_gcm/widgets/hud_tab_bar.dart';
-import 'package:canil_gcm/models/training_session_model.dart';
+import 'package:canil_gcm/core/services/report_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/widgets/hud_tab_bar.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'dynamic_activity_sheet.dart';
 

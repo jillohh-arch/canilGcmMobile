@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 
 class ShiftService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  ShiftService({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
+
+  final FirebaseFirestore _db;
 
   DocumentReference<Map<String, dynamic>> _activeShiftDoc(String handlerId) {
     return _db.collection('active_shifts').doc(handlerId);

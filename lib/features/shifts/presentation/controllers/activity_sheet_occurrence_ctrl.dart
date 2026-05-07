@@ -5,13 +5,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
-import 'package:canil_gcm/services/firestore_service.dart';
-import 'package:canil_gcm/services/media_attachment_upload_service.dart';
-import 'package:canil_gcm/services/occurrence_event_media_service.dart';
-import 'package:canil_gcm/services/storage_service.dart';
-import 'package:canil_gcm/services/text_match_service.dart';
-import 'package:canil_gcm/utils/firestore_date.dart';
-import 'package:canil_gcm/widgets/media_attachment_rows.dart';
+import 'package:canil_gcm/features/incidents/data/incident_service.dart';
+import 'package:canil_gcm/core/services/media_attachment_upload_service.dart';
+import 'package:canil_gcm/core/services/occurrence_event_media_service.dart';
+import 'package:canil_gcm/core/services/storage_service.dart';
+import 'package:canil_gcm/core/services/text_match_service.dart';
+import 'package:canil_gcm/core/utils/firestore_date.dart';
+import 'package:canil_gcm/core/widgets/media_attachment_rows.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_display_text.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_dynamic_rows.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_extra_fields_snapshot.dart';
@@ -331,7 +331,7 @@ class ActivitySheetOccurrenceCtrl {
 
   Future<void> loadNatures() async {
     try {
-      final remote = await FirestoreService().getOccurrenceNatures();
+      final remote = await IncidentService().getOccurrenceNatures();
       if (remote.isEmpty) return;
       natures = remote;
       _setNatureTextFromSelected();

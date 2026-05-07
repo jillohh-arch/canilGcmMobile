@@ -4,20 +4,20 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import 'package:canil_gcm/services/weather_service.dart';
+import 'package:canil_gcm/core/services/weather_service.dart';
 
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/auth_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'dart:ui';
 
 const _hudBackground = Color(0xFF070B14);
@@ -38,6 +38,7 @@ class ActiveShiftDashboardScreen extends StatefulWidget {
 
 class _ActiveShiftDashboardScreenState
     extends State<ActiveShiftDashboardScreen> {
+  final DogService _dogService = DogService();
   String? _lastFetchedDogId;
 
   @override
@@ -207,28 +208,19 @@ class _ActiveShiftDashboardScreenState
         );
         final dogId = shiftVM.activeDogId!;
 
-        return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('dogs')
-              .doc(dogId)
-              .snapshots(),
+        return StreamBuilder<Dog?>(
+          stream: _dogService.watchDog(dogId),
           builder: (context, snapshot) {
-            Dog dog;
-            if (snapshot.hasData && snapshot.data!.exists) {
-              try {
-                final data = snapshot.data!.data() as Map<String, dynamic>;
-                data['id'] = snapshot.data!.id;
-                dog = Dog.fromJson(data);
-              } catch (e) {
-                dog = dogVM.dogs.firstWhere(
-                  (d) => d.id == dogId,
-                  orElse: () => dogVM.dogs.first,
-                );
-              }
-            } else {
-              dog = dogVM.dogs.firstWhere(
-                (d) => d.id == dogId,
-                orElse: () => dogVM.dogs.first,
+            final dog = snapshot.data ?? _localDogFallback(dogVM, dogId);
+            if (dog == null) {
+              return const Scaffold(
+                backgroundColor: _hudBackground,
+                body: Center(
+                  child: Text(
+                    'K9 do turno não encontrado.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               );
             }
 
@@ -240,6 +232,13 @@ class _ActiveShiftDashboardScreenState
         );
       },
     );
+  }
+
+  Dog? _localDogFallback(DogViewModel dogVM, String dogId) {
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog;
+    }
+    return dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null;
   }
 
   Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/services/firestore_service.dart';
+import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 
 class DogViewModel extends ChangeNotifier {
-  final FirestoreService _firestoreService = FirestoreService();
+  final DogService _dogService = DogService();
 
   List<Dog> _dogs = [];
   bool _isLoading = false;
@@ -19,7 +19,7 @@ class DogViewModel extends ChangeNotifier {
 
   void _listenToDogs() {
     _setLoading(true);
-    _firestoreService.getDogs().listen(
+    _dogService.getDogs().listen(
       (dogsData) {
         _dogs = dogsData;
         _setLoading(false);
@@ -33,7 +33,7 @@ class DogViewModel extends ChangeNotifier {
 
   Future<void> saveDog(Dog dog) async {
     try {
-      await _firestoreService.saveDog(dog);
+      await _dogService.saveDog(dog);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -43,7 +43,7 @@ class DogViewModel extends ChangeNotifier {
 
   Future<void> updateDogWeight(String dogId, double weight) async {
     try {
-      await _firestoreService.updateDogWeight(dogId, weight);
+      await _dogService.updateDogWeight(dogId, weight);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -53,7 +53,7 @@ class DogViewModel extends ChangeNotifier {
 
   Future<void> deleteDog(String id) async {
     try {
-      await _firestoreService.deleteDog(id);
+      await _dogService.deleteDog(id);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

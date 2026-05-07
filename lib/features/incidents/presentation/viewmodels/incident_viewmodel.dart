@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
-import 'package:canil_gcm/services/firestore_service.dart';
-import 'package:canil_gcm/services/gamification_service.dart';
+import 'package:canil_gcm/features/incidents/data/incident_service.dart';
+import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 
 class IncidentViewModel extends ChangeNotifier {
-  final FirestoreService _db = FirestoreService();
+  final IncidentService _db = IncidentService();
   List<Incident> _incidents = [];
   bool _isLoading = false;
 

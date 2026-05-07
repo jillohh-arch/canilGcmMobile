@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:canil_gcm/widgets/quick_location_actions.dart';
+import 'package:canil_gcm/core/widgets/quick_location_actions.dart';
 import 'occurrence_location_map.dart';
 
 class OccurrenceLocationStep extends StatelessWidget {

@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:canil_gcm/models/health_log_model.dart';
-import 'package:canil_gcm/models/routine_model.dart';
-import 'package:canil_gcm/models/training_session_model.dart';
-import 'package:canil_gcm/utils/firestore_date.dart';
+import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/features/routine/domain/routine_model.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/core/utils/firestore_date.dart';
 
 void main() {
   group('parseFirestoreDate', () {

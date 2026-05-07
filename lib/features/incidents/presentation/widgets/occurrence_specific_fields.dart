@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:canil_gcm/widgets/activity_card_catalog.dart';
+import 'package:canil_gcm/core/widgets/activity_card_catalog.dart';
 import 'occurrence_category_fields.dart';
 import 'occurrence_detection_fields.dart';
 

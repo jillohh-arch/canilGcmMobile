@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
-import 'package:canil_gcm/services/gamification_service.dart';
-import 'package:canil_gcm/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/features/auth/data/auth_service.dart';
+import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 import 'package:canil_gcm/features/shifts/data/shift_service.dart';
+import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 
 class ShiftViewModel extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthService _authService = AuthService();
   final ShiftService _shiftService = ShiftService();
 
   StreamSubscription<User?>? _authSubscription;
@@ -31,8 +32,8 @@ class ShiftViewModel extends ChangeNotifier {
   bool get hasActiveShift => _session?.isActive ?? false;
 
   ShiftViewModel() {
-    _authSubscription = _auth.authStateChanges().listen(_bindToUser);
-    _bindToUser(_auth.currentUser);
+    _authSubscription = _authService.authStateChanges.listen(_bindToUser);
+    _bindToUser(_authService.currentUser);
   }
 
   Future<void> startShift(String dogId) async {
@@ -154,7 +155,8 @@ class ShiftViewModel extends ChangeNotifier {
   }
 
   String? _resolveHandlerId() {
-    return _boundRa ?? HandlerIdentityService.raFromUser(_auth.currentUser);
+    return _boundRa ??
+        HandlerIdentityService.raFromUser(_authService.currentUser);
   }
 
   void _clearSession({bool notify = true}) {

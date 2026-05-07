@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:canil_gcm/utils/firestore_date.dart';
+import 'package:canil_gcm/core/utils/firestore_date.dart';
 
 class IncidentProgressUpdate {
   final String title;
