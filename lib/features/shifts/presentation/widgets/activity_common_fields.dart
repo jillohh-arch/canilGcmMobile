@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
 import 'location_time_row.dart';
-import 'tactical_text_field.dart';
 
 class ActivityLocationTimeFields extends StatelessWidget {
   final TextEditingController locationController;

@@ -570,8 +570,14 @@ class _DogInfoCockpitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String ageStr = '${dog.age} anos';
     final String sexStr = dog.sex == 'M' ? 'Macho' : 'Fêmea';
-    final String weightStr = dog.weight != null
-        ? '${dog.weight!.toStringAsFixed(1)} kg'
+    final healthSnapshot = _effectiveHealthSnapshot(context);
+    final effectiveWeight = healthSnapshot.weight ?? dog.weight;
+    final readinessBreakdown = dog.calculateReadinessBreakdown(
+      lastBathOverride: healthSnapshot.lastBathDate,
+      weightOverride: effectiveWeight,
+    );
+    final String weightStr = effectiveWeight != null
+        ? '${effectiveWeight.toStringAsFixed(1)} kg'
         : '-- kg';
     final raStr = dog.conductorRa != null && dog.conductorRa!.isNotEmpty
         ? dog.conductorRa!
@@ -621,10 +627,7 @@ class _DogInfoCockpitCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _buildReadinessBar(
-            _calculateOperationalReadiness(dog),
-            _calculateReadinessBreakdown(dog),
-          ),
+          _buildReadinessBar(readinessBreakdown.total, readinessBreakdown),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -658,13 +661,27 @@ class _DogInfoCockpitCard extends StatelessWidget {
     );
   }
 
-  int _calculateOperationalReadiness(Dog dog) {
-    return _calculateReadinessBreakdown(dog).total;
-  }
+  ({double? weight, DateTime? lastBathDate}) _effectiveHealthSnapshot(
+    BuildContext context,
+  ) {
+    final healthLogs =
+        Provider.of<HealthViewModel>(
+            context,
+          ).healthLogs.where((log) => log.dogId == dog.id).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
-  ({int total, int vacinacao, int peso, int higiene, int treino})
-  _calculateReadinessBreakdown(Dog dog) {
-    return dog.calculateReadinessBreakdown();
+    double? latestWeight;
+    DateTime? latestBathDate;
+
+    for (final log in healthLogs) {
+      latestWeight ??= log.weight;
+      if (latestBathDate == null && log.logType == 'Banho') {
+        latestBathDate = log.date;
+      }
+      if (latestWeight != null && latestBathDate != null) break;
+    }
+
+    return (weight: latestWeight, lastBathDate: latestBathDate);
   }
 
   Widget _buildReadinessBar(
@@ -945,10 +962,7 @@ class _ShiftMetricsCockpitCardState extends State<_ShiftMetricsCockpitCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Get total registries
-    final int hLogs = Provider.of<HealthViewModel>(context).healthLogs.length;
-    final int tLogs = Provider.of<TrainingViewModel>(context).trainings.length;
-    final int todayLogs = hLogs + tLogs; // Just a mock combination of logs
+    final int todayLogs = _countTodayRecords(context);
 
     return Container(
       height: 130,
@@ -994,7 +1008,7 @@ class _ShiftMetricsCockpitCardState extends State<_ShiftMetricsCockpitCard> {
             ],
           ),
           Text(
-            '$todayLogs Registros hoje',
+            '$todayLogs registro${todayLogs == 1 ? '' : 's'} hoje',
             style: GoogleFonts.robotoMono(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1004,6 +1018,31 @@ class _ShiftMetricsCockpitCardState extends State<_ShiftMetricsCockpitCard> {
         ],
       ),
     );
+  }
+
+  int _countTodayRecords(BuildContext context) {
+    final healthLogs = Provider.of<HealthViewModel>(context).healthLogs;
+    final trainings = Provider.of<TrainingViewModel>(context).trainings;
+    final incidents = Provider.of<IncidentViewModel>(context).incidents;
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    bool isToday(DateTime value) {
+      return !value.isBefore(startOfDay) && value.isBefore(endOfDay);
+    }
+
+    final healthCount = healthLogs.where((log) {
+      return log.dogId == widget.dog.id && isToday(log.date);
+    }).length;
+    final trainingCount = trainings.where((training) {
+      return training.dogId == widget.dog.id && isToday(training.date);
+    }).length;
+    final incidentCount = incidents.where((incident) {
+      return incident.dogId == widget.dog.id && isToday(incident.date);
+    }).length;
+
+    return healthCount + trainingCount + incidentCount;
   }
 }
 

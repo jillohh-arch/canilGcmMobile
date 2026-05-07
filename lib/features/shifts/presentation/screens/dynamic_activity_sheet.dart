@@ -27,14 +27,7 @@ import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/text_match_service.dart';
 import 'package:canil_gcm/core/services/weather_capture_service.dart';
 import 'package:canil_gcm/core/utils/firestore_date.dart';
-import 'package:canil_gcm/core/widgets/activity_form_body.dart';
 import 'package:canil_gcm/core/widgets/activity_card_catalog.dart';
-import 'package:canil_gcm/core/widgets/activity_common_fields.dart';
-import 'package:canil_gcm/core/widgets/activity_category_menu_sheet.dart';
-import 'package:canil_gcm/core/widgets/activity_form_labels.dart';
-import 'package:canil_gcm/core/widgets/activity_form_scaffold.dart';
-import 'package:canil_gcm/core/widgets/activity_save_controls.dart';
-import 'package:canil_gcm/core/widgets/activity_tracking_action.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/dynamic_subtype_fields.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/training_activity_fields.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_activity_fields.dart';
@@ -43,6 +36,13 @@ import 'package:canil_gcm/core/widgets/media_attachment_gallery.dart';
 import 'package:canil_gcm/core/widgets/quick_location_actions.dart';
 import 'package:canil_gcm/features/routine/presentation/widgets/routine_activity_fields.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_category_menu_sheet.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_common_fields.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_form_body.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_form_labels.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_form_scaffold.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_save_controls.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/activity_tracking_action.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_form_controller.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_display_text.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_dynamic_rows.dart';
@@ -1372,6 +1372,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
             selectedSubtype: _selectedSubtype,
             formData: _formData,
             mediaAttachments: _mediaAttachments,
+            resolvedTimestamp: _resolveFormTimestamp(),
             onStatus: (msg) {
               if (mounted) setState(() => _saveStatus = msg);
             },

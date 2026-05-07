@@ -27,12 +27,12 @@ class HealthViewModel extends ChangeNotifier {
       _setLoading(true);
 
       final newLog = await _healthService.addHealthLog(log);
-      await _syncDogHealthSnapshot(log);
       _healthLogs.insert(0, newLog);
 
       developer.log('Health log added: ${newLog.id}', name: 'HealthViewModel');
 
-      await GamificationService().evaluateHealthLog(log.dogId, log.logType);
+      await _syncDogHealthSnapshotSafely(newLog);
+      await _evaluateGamificationSafely(newLog);
 
       _setLoading(false);
     } catch (e) {
@@ -52,12 +52,12 @@ class HealthViewModel extends ChangeNotifier {
       _setLoading(true);
       await _healthService.updateHealthLog(log);
 
-      await _syncDogHealthSnapshot(log);
-
       final index = _healthLogs.indexWhere((h) => h.id == log.id);
       if (index != -1) {
         _healthLogs[index] = log;
       }
+
+      await _syncDogHealthSnapshotSafely(log);
 
       developer.log('Health log updated: ${log.id}', name: 'HealthViewModel');
       _setLoading(false);
@@ -119,5 +119,29 @@ class HealthViewModel extends ChangeNotifier {
       lastBathDate: isBathLog ? log.date : null,
       weight: log.weight,
     );
+  }
+
+  Future<void> _syncDogHealthSnapshotSafely(HealthLogModel log) async {
+    try {
+      await _syncDogHealthSnapshot(log);
+    } catch (e) {
+      developer.log(
+        'Health log saved, but dog health snapshot sync failed: $e',
+        name: 'HealthViewModel',
+        error: e,
+      );
+    }
+  }
+
+  Future<void> _evaluateGamificationSafely(HealthLogModel log) async {
+    try {
+      await GamificationService().evaluateHealthLog(log.dogId, log.logType);
+    } catch (e) {
+      developer.log(
+        'Health log saved, but gamification evaluation failed: $e',
+        name: 'HealthViewModel',
+        error: e,
+      );
+    }
   }
 }

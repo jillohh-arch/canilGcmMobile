@@ -126,6 +126,7 @@ class ActivitySheetHealthCtrl {
     required String? selectedSubtype,
     required Map<String, dynamic> formData,
     required List<Map<String, dynamic>> mediaAttachments,
+    required DateTime resolvedTimestamp,
     required void Function(String) onStatus,
     required bool Function() isMounted,
     required void Function(Map<String, dynamic>) onUploading,
@@ -150,15 +151,21 @@ class ActivitySheetHealthCtrl {
       });
     }
 
+    final logType = selectedSubtype?.trim();
+    if (logType == null || logType.isEmpty) {
+      throw Exception('Selecione o tipo de prontuário.');
+    }
+
     final hLog = ActivityRecordPayloadBuilder.healthLog(
       documentId: documentId,
       dogId: dogId,
       dogName: dogName,
-      date: initialData?['_rawDate'] ?? DateTime.now(),
-      logType: selectedSubtype!,
-      observations: descriptionController.text,
+      date: resolvedTimestamp,
+      logType: logType,
+      observations: _buildObservations(logType),
       returnDate: returnDateController.text,
       vetName: vetNameController.text,
+      vaccines: _selectedVaccines(logType),
       mediaAttachments: finalMedia,
     );
 
@@ -201,6 +208,50 @@ class ActivitySheetHealthCtrl {
       base: rawDate ?? DateTime.now(),
       timeText: timeController.text,
     );
+  }
+
+  String _buildObservations(String logType) {
+    final details = <String>[];
+    final description = descriptionController.text.trim();
+    if (description.isNotEmpty) {
+      details.add(description);
+    }
+
+    if (logType == 'Banho') {
+      final products = produtosBanhoController.text.trim();
+      if (products.isNotEmpty) {
+        details.add('Produtos utilizados: $products');
+      }
+    }
+
+    if (logType == 'Consulta' || logType == 'Exame') {
+      final reason = motivoController.text.trim();
+      if (reason.isNotEmpty) {
+        details.add('Motivo: $reason');
+      }
+    }
+
+    if (logType == 'Exame') {
+      final examType = tipoExameController.text.trim();
+      if (examType.isNotEmpty) {
+        details.add('Tipo de exame: $examType');
+      }
+    }
+
+    if (logType == 'Vacina') {
+      final vaccine = tipoVacinaController.text.trim();
+      if (vaccine.isNotEmpty) {
+        details.add('Vacina: $vaccine');
+      }
+    }
+
+    return details.isEmpty ? '$logType registrado.' : details.join('\n');
+  }
+
+  List<String> _selectedVaccines(String logType) {
+    if (logType != 'Vacina') return const [];
+    final vaccine = (selectedVacina ?? tipoVacinaController.text).trim();
+    return vaccine.isNotEmpty ? [vaccine] : const [];
   }
 
   // -------------------------------------------------------------------------

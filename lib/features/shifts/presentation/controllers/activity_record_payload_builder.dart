@@ -40,6 +40,7 @@ abstract final class ActivityRecordPayloadBuilder {
     required String observations,
     required String returnDate,
     required String vetName,
+    required List<String> vaccines,
     required List<Map<String, dynamic>> mediaAttachments,
   }) {
     return HealthLogModel(
@@ -48,6 +49,7 @@ abstract final class ActivityRecordPayloadBuilder {
       dogName: dogName,
       date: date,
       logType: logType,
+      vaccines: vaccines,
       healthObservations: observations + _returnDateSuffix(returnDate),
       vetName: _optionalText(vetName),
       mediaAttachments: _optionalMedia(mediaAttachments),
