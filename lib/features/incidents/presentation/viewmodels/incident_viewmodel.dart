@@ -11,15 +11,46 @@ class IncidentViewModel extends ChangeNotifier {
   List<Incident> get incidents => _incidents;
   bool get isLoading => _isLoading;
 
+  void _sortIncidents() {
+    _incidents.sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  void _upsertIncident(Incident incident) {
+    final index = _incidents.indexWhere((i) => i.id == incident.id);
+    if (index == -1) {
+      _incidents.insert(0, incident);
+    } else {
+      _incidents[index] = incident;
+    }
+    _sortIncidents();
+  }
+
+  void _replaceWithFetchedIncidents(List<Incident> fetched, {String? dogId}) {
+    final fetchedIds = fetched
+        .map((incident) => incident.id)
+        .where((id) => id.trim().isNotEmpty)
+        .toSet();
+
+    final localOpenIncidents = _incidents.where((incident) {
+      if (!incident.isInProgress) return false;
+      if (dogId != null && incident.dogId != dogId) return false;
+      if (incident.id.trim().isEmpty) return false;
+      return !fetchedIds.contains(incident.id);
+    });
+
+    _incidents = [...fetched, ...localOpenIncidents];
+    _sortIncidents();
+  }
+
   Future<void> fetchIncidentsForDog(String dogId) async {
     _isLoading = true;
     notifyListeners();
     try {
       final raw = await _db.getIncidents(dogId: dogId);
-      _incidents = raw
+      final fetched = raw
           .map((json) => Incident.fromJson(json as Map<String, dynamic>))
           .toList();
-      _incidents.sort((a, b) => b.date.compareTo(a.date));
+      _replaceWithFetchedIncidents(fetched, dogId: dogId);
     } catch (e) {
       debugPrint('Error fetching incidents: $e');
     } finally {
@@ -33,10 +64,10 @@ class IncidentViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final raw = await _db.getIncidents();
-      _incidents = raw
+      final fetched = raw
           .map((json) => Incident.fromJson(json as Map<String, dynamic>))
           .toList();
-      _incidents.sort((a, b) => b.date.compareTo(a.date));
+      _replaceWithFetchedIncidents(fetched);
     } catch (e) {
       debugPrint('Error fetching all incidents: $e');
     } finally {
@@ -47,7 +78,7 @@ class IncidentViewModel extends ChangeNotifier {
 
   Future<void> saveIncident(Incident incident) async {
     await _db.saveIncident(incident);
-    _incidents.insert(0, incident);
+    _upsertIncident(incident);
 
     // GAMIFICATION TRIGGER
     if (incident.handlerId.isNotEmpty && incident.status == 'Concluída') {
@@ -71,7 +102,11 @@ class IncidentViewModel extends ChangeNotifier {
             .toList()
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    return incidents.first;
+    final openIncident = incidents.first;
+    _upsertIncident(openIncident);
+    notifyListeners();
+
+    return openIncident;
   }
 
   Future<void> updateIncident(Incident incident) async {
@@ -83,10 +118,7 @@ class IncidentViewModel extends ChangeNotifier {
         orElse: () => null,
       );
       await _db.saveIncident(incident); // set() handles upsert
-      final index = _incidents.indexWhere((i) => i.id == incident.id);
-      if (index != -1) {
-        _incidents[index] = incident;
-      }
+      _upsertIncident(incident);
 
       final wasClosed = previous?.status == 'Concluída';
       if (incident.handlerId.isNotEmpty &&
@@ -100,6 +132,7 @@ class IncidentViewModel extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error updating incident: $e');
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

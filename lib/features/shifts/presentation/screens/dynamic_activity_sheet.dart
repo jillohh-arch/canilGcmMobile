@@ -146,11 +146,27 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   bool get _isOccurrenceOrEventCategory =>
       _isOccurrenceCategory || widget.category == 'Evento';
 
+  String? _nonEmptyId(String? value) {
+    final id = value?.trim();
+    return id == null || id.isEmpty ? null : id;
+  }
+
+  String? get _initialOccurrenceDocumentId {
+    return _nonEmptyId(widget.documentId) ??
+        _nonEmptyId(widget.initialData?['id']?.toString());
+  }
+
+  String? get _activeIncidentDocumentId {
+    return _nonEmptyId(_activeIncidentId) ?? _initialOccurrenceDocumentId;
+  }
+
+  bool get _hasActiveIncidentDocument => _activeIncidentDocumentId != null;
+
   bool get _isExistingOccurrence =>
-      _isOccurrenceCategory && widget.documentId != null;
+      _isOccurrenceCategory && _initialOccurrenceDocumentId != null;
 
   bool get _hasActiveOccurrenceRecord =>
-      _isExistingOccurrence || _activeIncidentId != null;
+      _isExistingOccurrence || _hasActiveIncidentDocument;
 
   // ---------------------------------------------------------------------------
   // Occurrence controller (Fase 1)
@@ -715,7 +731,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       return;
     }
 
-    Navigator.pop(context, result || _activeIncidentId != null);
+    Navigator.pop(context, result || _hasActiveIncidentDocument);
   }
 
   void _showOperationalSnack(
@@ -1103,7 +1119,9 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   }
 
   DateTime _occurrenceSaveDate() {
-    return _activeIncidentId == null ? _resolveFormTimestamp() : DateTime.now();
+    return !_hasActiveIncidentDocument
+        ? _resolveFormTimestamp()
+        : DateTime.now();
   }
 
   DateTime _occurrenceStartedAtOr(DateTime fallbackDate) {
@@ -1111,6 +1129,78 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         (widget.initialData?['startedAt'] != null
             ? parseFirestoreDate(widget.initialData!['startedAt'])
             : widget.initialData?['_rawDate'] ?? fallbackDate);
+  }
+
+  bool _isFinalizingOccurrence() {
+    return _occurrenceStatus != OccurrenceFormController.statusInProgress;
+  }
+
+  bool _sameOccurrenceProgressUpdate(
+    IncidentProgressUpdate left,
+    IncidentProgressUpdate right,
+  ) {
+    return left.title == right.title &&
+        left.description == right.description &&
+        left.timestamp.isAtSameMomentAs(right.timestamp);
+  }
+
+  void _mergeOpenIncidentTimeline(Incident openIncident) {
+    if (openIncident.progressUpdates.isEmpty) return;
+
+    final current = List<IncidentProgressUpdate>.from(_occurrenceTimeline);
+    _occurrenceTimeline.clear();
+
+    for (final update in openIncident.progressUpdates) {
+      if (!_occurrenceTimeline.any(
+        (existing) => _sameOccurrenceProgressUpdate(existing, update),
+      )) {
+        _occurrenceTimeline.add(update);
+      }
+    }
+
+    for (final update in current) {
+      if (!_occurrenceTimeline.any(
+        (existing) => _sameOccurrenceProgressUpdate(existing, update),
+      )) {
+        _occurrenceTimeline.add(update);
+      }
+    }
+  }
+
+  void _adoptOpenIncidentForCurrentOccurrence(Incident openIncident) {
+    final id = _nonEmptyId(openIncident.id);
+    if (id == null) return;
+
+    _activeIncidentId = id;
+    _activeOccurrenceStartedAt = openIncident.startedAt;
+    _mergeOpenIncidentTimeline(openIncident);
+
+    if (_locationController.text.trim().isEmpty) {
+      _locationController.text = openIncident.location;
+    }
+    if (_selectedSubtype == null || _selectedSubtype!.trim().isEmpty) {
+      _selectedSubtype = openIncident.type;
+      _setOccurrenceNatureTextFromSelected();
+    }
+  }
+
+  Future<void> _attachOpenIncidentIfAllowed({
+    required IncidentViewModel incidentVM,
+    required bool allowAttach,
+  }) async {
+    if (_hasActiveIncidentDocument) return;
+
+    _setSaveStatus('Verificando ocorrência aberta...');
+    final openIncident = await incidentVM.findOpenIncident(dogId: widget.dogId);
+    if (openIncident == null) return;
+
+    if (!allowAttach) {
+      throw Exception(
+        'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
+      );
+    }
+
+    _adoptOpenIncidentForCurrentOccurrence(openIncident);
   }
 
   Future<void> _grantOccurrenceBadgesIfNeeded({
@@ -1148,17 +1238,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _setSaveStatus('Validando ocorrência...');
     final operatorContext = _operatorContext(authVM: authVM, userVM: userVM);
 
-    if (_activeIncidentId == null) {
-      _setSaveStatus('Verificando ocorrência aberta...');
-      final openIncident = await incidentVM.findOpenIncident(
-        dogId: widget.dogId,
-      );
-      if (openIncident != null) {
-        throw Exception(
-          'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
-        );
-      }
-    }
+    await _attachOpenIncidentIfAllowed(
+      incidentVM: incidentVM,
+      allowAttach: _isFinalizingOccurrence() || _occurrenceTimeline.isNotEmpty,
+    );
 
     _validateOccurrenceBeforeSave();
 
@@ -1190,7 +1273,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       progressUpdates: incidentUpdates,
     );
 
-    if (_activeIncidentId != null) {
+    if (_hasActiveIncidentDocument) {
       _setSaveStatus('Atualizando ocorrência no Firebase...');
       await incidentVM.updateIncident(inc);
       _occurrenceTimeline
@@ -1407,7 +1490,7 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     required List<IncidentProgressUpdate> progressUpdates,
   }) {
     return OccurrencePayloadBuilder.buildIncident(
-      documentId: _activeIncidentId,
+      documentId: _activeIncidentDocumentId,
       dogId: widget.dogId,
       dogName: widget.dogName,
       handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,

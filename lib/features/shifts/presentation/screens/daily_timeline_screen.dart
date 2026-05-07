@@ -243,14 +243,14 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
         children: [
           _buildHeaderDate(),
           _buildDateSelector(),
+          _buildOpenIncidentsSection(dogId),
           _buildTimelineList(dogId, filterType: 'Ocorrência'),
         ],
       ),
     );
   }
 
-  // Mantido como fallback para uma possível visão compacta de ocorrências abertas.
-  // ignore: unused_element
+  // Mostra ocorrências abertas para retomada rápida.
   Widget _buildOpenIncidentsSection(String dogId) {
     final iVM = Provider.of<IncidentViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context, listen: false);
@@ -4112,6 +4112,14 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
 
     if (entries.isEmpty) {
       final bool isIncidentsTab = filterType == 'Ocorrência';
+      final hasOpenIncidents =
+          isIncidentsTab &&
+          iVM.incidents.any(
+            (incident) => incident.dogId == dogId && incident.isInProgress,
+          );
+      if (hasOpenIncidents) {
+        return const SizedBox.shrink();
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),

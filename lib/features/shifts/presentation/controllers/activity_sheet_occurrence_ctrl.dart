@@ -140,7 +140,14 @@ class ActivitySheetOccurrenceCtrl {
     } else if (initialData?['_rawDate'] is DateTime) {
       activeStartedAt = initialData!['_rawDate'] as DateTime;
     }
-    activeIncidentId = documentId;
+    activeIncidentId =
+        _nonEmptyText(documentId) ??
+        _nonEmptyText(initialData?['id']?.toString());
+  }
+
+  String? _nonEmptyText(String? value) {
+    final text = value?.trim();
+    return text == null || text.isEmpty ? null : text;
   }
 
   // -------------------------------------------------------------------------

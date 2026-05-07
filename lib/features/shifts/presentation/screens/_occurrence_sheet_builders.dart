@@ -446,16 +446,10 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
     required String currentOperatorName,
     required DateTime updatedAt,
   }) async {
-    if (_activeIncidentId == null) {
-      final openIncident = await incidentVM.findOpenIncident(
-        dogId: widget.dogId,
-      );
-      if (openIncident != null) {
-        throw Exception(
-          'Já existe uma ocorrência em andamento para este K9. Continue ou encerre o registro aberto antes de iniciar outro.',
-        );
-      }
-    }
+    await _attachOpenIncidentIfAllowed(
+      incidentVM: incidentVM,
+      allowAttach: _occurrenceTimeline.isNotEmpty,
+    );
 
     _activeOccurrenceStartedAt ??= _resolveFormTimestamp();
     _ensureInitialOccurrenceTimelineEntry(
@@ -469,7 +463,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
       updatedAt: updatedAt,
     );
 
-    if (_activeIncidentId == null) {
+    if (!_hasActiveIncidentDocument) {
       await incidentVM.saveIncident(inc);
       _activeIncidentId = inc.id;
       _activeOccurrenceStartedAt = inc.startedAt;
@@ -523,7 +517,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
     }
 
     return OccurrencePayloadBuilder.buildIncident(
-      documentId: _activeIncidentId,
+      documentId: _activeIncidentDocumentId,
       dogId: widget.dogId,
       dogName: widget.dogName,
       handlerId: widget.initialData?['_rawHandlerId'] ?? currentRa,
@@ -804,9 +798,6 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
     _selectedOccurrenceOutcomes
       ..clear()
       ..addAll(wizardResult.results);
-    _occCtrl.selectedOutcomes
-      ..clear()
-      ..addAll(wizardResult.results);
 
     _occurrenceSuccessful = wizardResult.successful;
 
@@ -972,7 +963,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
       storageService: StorageService(),
     ).uploadPhotos(
       files: files,
-      incidentIdOrDogId: _activeIncidentId ?? widget.dogId,
+      incidentIdOrDogId: _activeIncidentDocumentId ?? widget.dogId,
     );
   }
 
@@ -1078,7 +1069,7 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
   }
 
   Future<void> _syncActiveOccurrenceSnapshot(DateTime updatedAt) async {
-    if (_activeIncidentId == null) return;
+    if (!_hasActiveIncidentDocument) return;
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
     final userVM = Provider.of<UserViewModel>(context, listen: false);
@@ -1156,11 +1147,13 @@ extension _OccurrenceSheetBuilders on _DynamicActivitySheetState {
   }
 
   void _syncOccurrenceController() {
+    final selectedOutcomes = Set<String>.from(_selectedOccurrenceOutcomes);
+
     _occCtrl.status = _occurrenceStatus;
     _occCtrl.successful = _occurrenceSuccessful;
     _occCtrl.selectedOutcomes
       ..clear()
-      ..addAll(_selectedOccurrenceOutcomes);
+      ..addAll(selectedOutcomes);
   }
 
   void _copyOccurrenceControllerToFields({bool includeOutcomes = true}) {

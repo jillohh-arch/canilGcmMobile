@@ -20,8 +20,12 @@ class OccurrencePayloadBuilder {
     required List<String> outcomes,
     required List<IncidentProgressUpdate> progressUpdates,
   }) {
+    final normalizedDocumentId = documentId?.trim();
+
     return Incident(
-      id: documentId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: normalizedDocumentId == null || normalizedDocumentId.isEmpty
+          ? DateTime.now().millisecondsSinceEpoch.toString()
+          : normalizedDocumentId,
       dogId: dogId,
       dogName: dogName,
       handlerId: handlerId,

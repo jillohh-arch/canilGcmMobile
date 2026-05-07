@@ -130,5 +130,29 @@ void main() {
       expect(extraFields['locationLat'], -22.56);
       expect(extraFields['locationLng'], -47.40);
     });
+
+    test('generates a safe incident id when document id is blank', () {
+      final incident = OccurrencePayloadBuilder.buildIncident(
+        documentId: '   ',
+        dogId: 'dog-1',
+        dogName: 'Apolo',
+        handlerId: '12345',
+        startedAt: DateTime.utc(2026, 5, 6, 10),
+        updatedAt: DateTime.utc(2026, 5, 6, 11),
+        location: 'Base GCM',
+        description: 'Ocorrencia registrada',
+        result: 'Em andamento',
+        type: 'Averiguacao',
+        extraFields: const {},
+        mediaAttachments: const [],
+        status: 'Em andamento',
+        operationalSuccess: null,
+        outcomes: const [],
+        progressUpdates: const [],
+      );
+
+      expect(incident.id.trim(), isNotEmpty);
+      expect(incident.id, isNot(''));
+    });
   });
 }
