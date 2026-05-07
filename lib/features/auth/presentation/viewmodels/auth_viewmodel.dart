@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:canil_gcm/features/auth/data/auth_service.dart';
@@ -8,13 +10,14 @@ class AuthViewModel extends ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _errorMessage;
+  StreamSubscription<User?>? _authSubscription;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
   AuthViewModel() {
-    _authService.authStateChanges.listen((User? user) {
+    _authSubscription = _authService.authStateChanges.listen((User? user) {
       _user = user;
       notifyListeners();
     });
@@ -72,5 +75,11 @@ class AuthViewModel extends ChangeNotifier {
       default:
         return 'Não foi possível realizar o login. Verifique os dados e tente novamente.';
     }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

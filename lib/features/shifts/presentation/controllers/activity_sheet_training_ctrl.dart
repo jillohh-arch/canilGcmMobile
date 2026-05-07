@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:canil_gcm/core/domain/activity_subtype_ids.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/media_attachment_upload_service.dart';
 import 'package:canil_gcm/core/services/pt_br_date_time_service.dart';
@@ -100,12 +101,11 @@ class ActivitySheetTrainingCtrl {
   /// Retorna o mapa de metadados de treino para ser mesclado ao [formData]
   /// do State antes do salvamento.
   Map<String, dynamic> buildMetadata({required String? subtype}) {
-    const scentWorkSubtype = 'Faro'; // ActivitySubtypeIds.scentWork
     final meta = <String, dynamic>{};
     if (durationController.text.isNotEmpty) {
       meta['Duração (min)'] = durationController.text;
     }
-    if (subtype == scentWorkSubtype) {
+    if (subtype == ActivitySubtypeIds.scentWork) {
       if (tempController.text.isNotEmpty) {
         meta['Temperatura (°C)'] = tempController.text;
       }

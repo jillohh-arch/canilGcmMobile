@@ -48,11 +48,11 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
     return [
       RoutineActivityFields(
         visible: true,
-        isFeeding: _selectedSubtype == _SheetSubtype.feeding,
+        isFeeding: _selectedSubtype == ActivitySubtypeIds.feeding,
         isPlayOrWalk:
-            _selectedSubtype == _SheetSubtype.play ||
-            _selectedSubtype == _SheetSubtype.walk,
-        isWalk: _selectedSubtype == _SheetSubtype.walk,
+            _selectedSubtype == ActivitySubtypeIds.play ||
+            _selectedSubtype == ActivitySubtypeIds.walk,
+        isWalk: _selectedSubtype == ActivitySubtypeIds.walk,
         rationBrandController: _racaoMarcaController,
         rationAmountController: _racaoQtdController,
         durationController: _durationController,
@@ -69,10 +69,10 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
     return [
       HealthActivityFields(
         subtype: _selectedSubtype,
-        consultationSubtype: _SheetSubtype.consultation,
-        vaccineSubtype: _SheetSubtype.vaccine,
-        examSubtype: _SheetSubtype.exam,
-        bathSubtype: _SheetSubtype.bath,
+        consultationSubtype: ActivitySubtypeIds.consultation,
+        vaccineSubtype: ActivitySubtypeIds.vaccine,
+        examSubtype: ActivitySubtypeIds.exam,
+        bathSubtype: ActivitySubtypeIds.bath,
         accentColor: _kHudCyan,
         responsibleController: _vetNameController,
         reasonController: _motivoController,
@@ -163,7 +163,7 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
     return ActivityFormLabels.descriptionLabel(
       category: widget.category,
       subtype: _selectedSubtype,
-      feedingSubtype: _SheetSubtype.feeding,
+      feedingSubtype: ActivitySubtypeIds.feeding,
     );
   }
 
@@ -302,7 +302,7 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
   Widget _buildImageGallery() {
     return MediaAttachmentGallery(
       isCompressing: _isCompressing,
-      showPdfAttachment: _selectedSubtype == _SheetSubtype.exam,
+      showPdfAttachment: _selectedSubtype == ActivitySubtypeIds.exam,
       pdfName: _examePdfFile != null ? (_examePdfName ?? 'arquivo.pdf') : null,
       mediaAttachments: _mediaAttachments,
       activePhotoIndex: _activePhotoIndex,

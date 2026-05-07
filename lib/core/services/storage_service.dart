@@ -7,9 +7,14 @@ class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final Uuid _uuid = const Uuid();
 
-  /// Faz o upload da foto e retorna a URL pública gerada pelo Storage
-  Future<String?> uploadProfileImage(File file, String folder) async {
+  /// Faz upload de uma imagem JPEG e retorna a URL pública gerada pelo Storage.
+  Future<String?> uploadImage(File file, String folder) async {
     return uploadFile(file, folder, mimeType: 'image/jpeg', extension: 'jpg');
+  }
+
+  /// Mantido para chamadas semânticas de foto de perfil.
+  Future<String?> uploadProfileImage(File file, String folder) {
+    return uploadImage(file, folder);
   }
 
   /// Método genérico de upload: suporta imagens, PDFs e qualquer arquivo.

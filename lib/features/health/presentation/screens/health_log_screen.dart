@@ -92,7 +92,14 @@ class _HealthTimeline extends StatefulWidget {
 
 class _HealthTimelineState extends State<_HealthTimeline> {
   String _filter = 'Todos';
-  final _filters = ['Todos', 'Vacina', 'Consulta', 'Exame', 'Medicação'];
+  final _filters = [
+    'Todos',
+    'Vacina',
+    'Consulta',
+    'Exame',
+    'Medicação',
+    'Banho',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -420,7 +427,13 @@ class _NewHealthLogForm extends StatefulWidget {
 class _NewHealthLogFormState extends State<_NewHealthLogForm> {
   final _formKey = GlobalKey<FormState>();
   String _selectedLogType = 'Consulta';
-  final List<String> _logTypes = ['Consulta', 'Vacina', 'Exame', 'Medicação'];
+  final List<String> _logTypes = [
+    'Consulta',
+    'Vacina',
+    'Exame',
+    'Medicação',
+    'Banho',
+  ];
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _observationsController = TextEditingController();
   final TextEditingController _vaccineNameController = TextEditingController();

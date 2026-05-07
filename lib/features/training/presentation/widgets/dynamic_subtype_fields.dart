@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:canil_gcm/core/widgets/activity_card_catalog.dart';
+import 'package:canil_gcm/core/domain/activity_subtype_ids.dart';
 import 'scent_work_activity_fields.dart';
 import 'tracking_activity_fields.dart';
 import 'training_subtype_fields.dart';

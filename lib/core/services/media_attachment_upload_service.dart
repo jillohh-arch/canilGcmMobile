@@ -1,4 +1,4 @@
-import 'package:canil_gcm/core/widgets/media_attachment_rows.dart';
+import 'package:canil_gcm/core/controllers/media_attachment_rows.dart';
 import 'storage_service.dart';
 
 class MediaAttachmentUploadService {
@@ -27,7 +27,7 @@ class MediaAttachmentUploadService {
 
       onUploading?.call(attachment);
 
-      final url = await storageService.uploadProfileImage(
+      final url = await storageService.uploadImage(
         MediaAttachmentRows.file(attachment),
         folder,
       );

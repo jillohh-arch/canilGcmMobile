@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'media_attachment_rows.dart';
-import 'tactical_text_field.dart';
+import 'package:canil_gcm/core/controllers/media_attachment_rows.dart';
+import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
 class MediaAttachmentGallery extends StatelessWidget {
   final bool isCompressing;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
@@ -8,6 +10,7 @@ class DogViewModel extends ChangeNotifier {
   List<Dog> _dogs = [];
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<List<Dog>>? _dogsSubscription;
 
   List<Dog> get dogs => _dogs;
   bool get isLoading => _isLoading;
@@ -19,7 +22,7 @@ class DogViewModel extends ChangeNotifier {
 
   void _listenToDogs() {
     _setLoading(true);
-    _dogService.getDogs().listen(
+    _dogsSubscription = _dogService.getDogs().listen(
       (dogsData) {
         _dogs = dogsData;
         _setLoading(false);
@@ -75,5 +78,11 @@ class DogViewModel extends ChangeNotifier {
     if (dog.lastVaccineDate == null) return true; // No vaccines ever
     final diff = DateTime.now().difference(dog.lastVaccineDate!);
     return diff.inDays > 365;
+  }
+
+  @override
+  void dispose() {
+    _dogsSubscription?.cancel();
+    super.dispose();
   }
 }
