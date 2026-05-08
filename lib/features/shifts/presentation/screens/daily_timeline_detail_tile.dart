@@ -45,49 +45,4 @@ extension _DailyTimelineDetailTile on _DailyTimelineScreenState {
             ),
     );
   }
-
-  Widget _buildTimelineDetailIcon(IconData icon, Color accent) {
-    return Container(
-      width: 26,
-      height: 26,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: accent.withAlpha(22),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accent.withAlpha(110)),
-      ),
-      child: Icon(icon, size: 14, color: accent.withAlpha(230)),
-    );
-  }
-
-  Widget _buildTimelineDetailText(String label, String value, bool expanded) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: GoogleFonts.robotoMono(
-            color: Colors.white38,
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.7,
-          ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        const SizedBox(height: 5),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: expanded ? 12 : 13,
-            fontWeight: expanded ? FontWeight.w500 : FontWeight.w800,
-            height: 1.35,
-          ),
-          overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          maxLines: expanded ? null : 2,
-        ),
-      ],
-    );
-  }
 }

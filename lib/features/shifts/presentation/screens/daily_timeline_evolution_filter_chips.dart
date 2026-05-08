@@ -18,7 +18,7 @@ extension _DailyTimelineEvolutionFilterChips on _DailyTimelineScreenState {
               setState(() => _selectedTrainingFilter = null);
             },
           ),
-          ..._DailyTimelineScreenState._trainingCategories.map(
+          ..._trainingCategories.map(
             (cat) => Padding(
               padding: const EdgeInsets.only(left: 8),
               child: _FilterChip(

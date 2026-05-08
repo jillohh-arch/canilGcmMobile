@@ -28,66 +28,126 @@ import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'dynamic_activity_sheet.dart';
 
+part 'daily_timeline_app_shell.dart';
+part 'daily_timeline_data_loader.dart';
+part 'daily_timeline_date_chip.dart';
 part 'daily_timeline_date_controls.dart';
+part 'daily_timeline_date_selector.dart';
 part 'daily_timeline_detail_helpers.dart';
+part 'daily_timeline_detail_icon.dart';
 part 'daily_timeline_detail_panel.dart';
+part 'daily_timeline_detail_text.dart';
 part 'daily_timeline_detail_tile.dart';
 part 'daily_timeline_entry_builders.dart';
 part 'daily_timeline_entry_data.dart';
+part 'daily_timeline_entry_incident_builder.dart';
+part 'daily_timeline_entry_routine_health_builders.dart';
 part 'daily_timeline_entry_actions.dart';
 part 'daily_timeline_entry_expanded_content.dart';
 part 'daily_timeline_entry_incident_sections.dart';
+part 'daily_timeline_entry_incident_outcomes.dart';
+part 'daily_timeline_entry_incident_progress_section.dart';
+part 'daily_timeline_entry_documents.dart';
+part 'daily_timeline_entry_editor.dart';
 part 'daily_timeline_entry_media.dart';
+part 'daily_timeline_entry_photo_gallery.dart';
+part 'daily_timeline_entry_training_builder.dart';
+part 'daily_timeline_entry_tracking_distance.dart';
+part 'daily_timeline_entry_tracking_route.dart';
 part 'daily_timeline_entry_tracking.dart';
 part 'daily_timeline_evolution_attention.dart';
+part 'daily_timeline_evolution_attention_alerts.dart';
 part 'daily_timeline_evolution_chart.dart';
+part 'daily_timeline_evolution_chart_bars.dart';
+part 'daily_timeline_evolution_category_visual.dart';
 part 'daily_timeline_evolution_chart_data.dart';
 part 'daily_timeline_evolution_chart_legend.dart';
+part 'daily_timeline_evolution_chart_titles.dart';
+part 'daily_timeline_evolution_competency_card.dart';
+part 'daily_timeline_evolution_competency_data.dart';
+part 'daily_timeline_evolution_competency_icon.dart';
+part 'daily_timeline_evolution_competency_share_badge.dart';
 part 'daily_timeline_evolution_competencies.dart';
 part 'daily_timeline_evolution_filter_chips.dart';
+part 'daily_timeline_evolution_formatters.dart';
 part 'daily_timeline_evolution_last_training.dart';
 part 'daily_timeline_evolution_metrics.dart';
+part 'daily_timeline_evolution_recent_session_tile.dart';
 part 'daily_timeline_evolution_recent_sessions.dart';
+part 'daily_timeline_evolution_recent_sessions_empty.dart';
 part 'daily_timeline_evolution_scope.dart';
+part 'daily_timeline_evolution_scope_card.dart';
 part 'daily_timeline_evolution_sections.dart';
+part 'daily_timeline_evolution_stat_rows.dart';
+part 'daily_timeline_evolution_stale_category_alerts.dart';
 part 'daily_timeline_evolution_summary.dart';
 part 'daily_timeline_evolution_titles.dart';
 part 'daily_timeline_evolution_training_query.dart';
+part 'daily_timeline_evolution_volume_alert.dart';
+part 'daily_timeline_evolution_week_comparison_copy.dart';
+part 'daily_timeline_evolution_week_comparison_style.dart';
 part 'daily_timeline_evolution_week_comparison.dart';
 part 'daily_timeline_export.dart';
+part 'daily_timeline_filter_chip.dart';
 part 'daily_timeline_incident_close_controls.dart';
 part 'daily_timeline_incident_close_form.dart';
-part 'daily_timeline_incident_close_options.dart';
+part 'daily_timeline_incident_close_operational_outcome.dart';
+part 'daily_timeline_incident_close_results.dart';
+part 'daily_timeline_incident_close_save.dart';
+part 'daily_timeline_incident_common_progress_shortcuts.dart';
 part 'daily_timeline_incident_close_sheet.dart';
-part 'daily_timeline_incident_chips.dart';
+part 'daily_timeline_incident_badge.dart';
+part 'daily_timeline_incident_meta_pill.dart';
+part 'daily_timeline_incident_default_outcomes.dart';
+part 'daily_timeline_incident_outcome_summary.dart';
+part 'daily_timeline_incident_outcome_style.dart';
 part 'daily_timeline_incident_outcomes.dart';
+part 'daily_timeline_incident_progress_shortcuts.dart';
 part 'daily_timeline_incident_progress_styles.dart';
-part 'daily_timeline_incident_shortcuts.dart';
+part 'daily_timeline_incident_selection_chip.dart';
 part 'daily_timeline_incident_shared_widgets.dart';
-part 'daily_timeline_incident_styles.dart';
+part 'daily_timeline_incident_status_style.dart';
 part 'daily_timeline_incident_time_formatters.dart';
-part 'daily_timeline_incident_update_controls.dart';
+part 'daily_timeline_incident_type_progress_shortcuts.dart';
+part 'daily_timeline_incident_update_actions.dart';
 part 'daily_timeline_incident_update_form.dart';
-part 'daily_timeline_incident_update_options.dart';
+part 'daily_timeline_incident_update_header.dart';
+part 'daily_timeline_incident_update_note.dart';
+part 'daily_timeline_incident_update_outcome_section.dart';
+part 'daily_timeline_incident_update_save.dart';
 part 'daily_timeline_incident_update_sheet.dart';
+part 'daily_timeline_incident_update_shortcut_section.dart';
 part 'daily_timeline_item.dart';
+part 'daily_timeline_item_card.dart';
 part 'daily_timeline_item_header.dart';
+part 'daily_timeline_item_indicator.dart';
 part 'daily_timeline_item_presentation.dart';
 part 'daily_timeline_list.dart';
 part 'daily_timeline_map_helpers.dart';
 part 'daily_timeline_models.dart';
 part 'daily_timeline_occurrences_tab.dart';
+part 'daily_timeline_operator_helpers.dart';
 part 'daily_timeline_open_incident_card.dart';
 part 'daily_timeline_open_incident_card_actions.dart';
 part 'daily_timeline_open_incident_card_details.dart';
 part 'daily_timeline_open_incident_card_header.dart';
 part 'daily_timeline_open_incident_latest_update.dart';
+part 'daily_timeline_open_incident_latest_update_icon.dart';
+part 'daily_timeline_open_incident_outcome_badges.dart';
+part 'daily_timeline_open_incident_stat_tile.dart';
 part 'daily_timeline_open_incident_stats.dart';
+part 'daily_timeline_open_incidents_data.dart';
+part 'daily_timeline_open_incidents_header.dart';
 part 'daily_timeline_progress.dart';
 part 'daily_timeline_progress_helpers.dart';
 part 'daily_timeline_progress_node.dart';
+part 'daily_timeline_progress_node_card.dart';
+part 'daily_timeline_progress_node_header.dart';
+part 'daily_timeline_progress_node_meta.dart';
+part 'daily_timeline_progress_node_rail.dart';
+part 'daily_timeline_stat_box.dart';
 part 'daily_timeline_text_helpers.dart';
-part 'daily_timeline_widgets.dart';
+part 'daily_timeline_training_categories.dart';
 
 class DailyTimelineScreen extends StatefulWidget {
   const DailyTimelineScreen({super.key});
@@ -102,39 +162,13 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
   String? _selectedTrainingFilter; // null = Todos
   late TabController _tabController;
 
-  static const _trainingCategories = [
-    'Faro',
-    'Busca & Captura',
-    'Guarda',
-    'Obediência',
-  ];
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    // Ensure incidents are loaded when this screen opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-      if (shiftVM.hasActiveShift) {
-        Provider.of<IncidentViewModel>(
-          context,
-          listen: false,
-        ).fetchIncidentsForDog(shiftVM.activeDogId!);
-        Provider.of<TrainingViewModel>(
-          context,
-          listen: false,
-        ).fetchTrainingsForDog(shiftVM.activeDogId!);
-        Provider.of<RoutineViewModel>(
-          context,
-          listen: false,
-        ).fetchRoutinesForDog(shiftVM.activeDogId!);
-        Provider.of<HealthViewModel>(
-          context,
-          listen: false,
-        ).fetchHealthLogsForDog(shiftVM.activeDogId!);
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _loadTimelineDataForActiveShift(),
+    );
   }
 
   @override
@@ -143,108 +177,14 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     super.dispose();
   }
 
-  String _currentOperatorId() {
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    return HandlerIdentityService.raFromUser(authVM.user) ?? '';
-  }
-
-  String _currentOperatorName(String currentRa) {
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final userVM = Provider.of<UserViewModel>(context, listen: false);
-    return userVM.displayNameFor(ra: currentRa, firebaseUser: authVM.user);
-  }
-
-  IncidentProgressUpdate _authoredIncidentUpdate({
-    required String title,
-    required String description,
-    required DateTime timestamp,
-    String? location,
-  }) {
-    final currentRa = _currentOperatorId();
-    return IncidentProgressUpdate(
-      title: title,
-      description: description,
-      timestamp: timestamp,
-      location: location,
-      authorId: currentRa,
-      authorName: _currentOperatorName(currentRa),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     if (!shiftVM.hasActiveShift) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF121212),
-        body: Center(
-          child: Text(
-            'Nenhum turno ativo.',
-            style: GoogleFonts.inter(color: Colors.white),
-          ),
-        ),
-      );
+      return _buildNoActiveShiftScaffold();
     }
 
     final dogId = shiftVM.activeDogId!;
-    return Scaffold(
-      backgroundColor: _hudBackground,
-      appBar: AppBar(
-        title: Text(
-          'LINHA DO TEMPO',
-          style: GoogleFonts.oxanium(
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            color: Colors.white,
-            letterSpacing: 1.4,
-          ),
-        ),
-        backgroundColor: _hudBackground,
-        elevation: 0,
-        centerTitle: false,
-        actions: [
-          IconButton(
-            tooltip: 'Exportar PDF',
-            icon: const Icon(
-              Icons.picture_as_pdf_rounded,
-              color: Color(0xFFFBBF24),
-            ),
-            onPressed: () => _exportPdf(context, dogId),
-          ),
-          const SizedBox(width: 8),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(74),
-          child: HudTabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.shield_outlined, size: 22),
-                text: 'Ocorrências',
-              ),
-              Tab(
-                icon: Icon(Icons.track_changes_rounded, size: 22),
-                text: 'Treinos',
-              ),
-              Tab(
-                icon: Icon(Icons.bar_chart_rounded, size: 22),
-                text: 'Evolução',
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Tab 1: ocorrências
-          _buildOccurrencesTab(dogId),
-          // Tab 2: treinos e rotina
-          _buildTrainingsTab(dogId),
-          // Tab 3: evolução
-          _buildEvolutionTab(dogId),
-        ],
-      ),
-    );
+    return _buildTimelineScaffold(dogId);
   }
 }

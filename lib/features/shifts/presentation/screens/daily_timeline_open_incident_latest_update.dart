@@ -22,20 +22,7 @@ extension _DailyTimelineOpenIncidentLatestUpdate on _DailyTimelineScreenState {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: progressStyle.iconBackground,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              progressStyle.icon,
-              size: 16,
-              color: progressStyle.iconColor,
-            ),
-          ),
+          _buildIncidentLatestUpdateIcon(progressStyle),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

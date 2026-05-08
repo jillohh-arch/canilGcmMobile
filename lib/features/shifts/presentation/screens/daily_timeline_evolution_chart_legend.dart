@@ -5,7 +5,7 @@ extension _DailyTimelineEvolutionChartLegend on _DailyTimelineScreenState {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _DailyTimelineScreenState._trainingCategories.map((category) {
+      children: _trainingCategories.map((category) {
         final visual = _resolveEvolutionCategoryVisual(category);
         return _buildEvolutionLegendChip(
           label: category,

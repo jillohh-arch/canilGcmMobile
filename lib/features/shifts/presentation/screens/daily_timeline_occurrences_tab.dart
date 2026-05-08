@@ -19,24 +19,9 @@ extension _DailyTimelineOccurrencesTab on _DailyTimelineScreenState {
 
   // Mostra ocorrências abertas para retomada rápida.
   Widget _buildOpenIncidentsSection(String dogId) {
-    final iVM = Provider.of<IncidentViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context, listen: false);
-    final dogName = dogVM.dogs
-        .firstWhere(
-          (d) => d.id == dogId,
-          orElse: () => dogVM.dogs.isNotEmpty
-              ? dogVM.dogs.first
-              : throw Exception('Cão não encontrado'),
-        )
-        .name;
-
-    final openIncidents =
-        iVM.incidents
-            .where(
-              (incident) => incident.dogId == dogId && incident.isInProgress,
-            )
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final dogName = _resolveTimelineDogName(dogId, dogVM);
+    final openIncidents = _openIncidentsForDog(dogId);
 
     if (openIncidents.isEmpty) {
       return const SizedBox.shrink();
@@ -47,51 +32,7 @@ extension _DailyTimelineOccurrencesTab on _DailyTimelineScreenState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFBBF24).withAlpha(28),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: const Color(0xFFFBBF24).withAlpha(90),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.pending_actions_rounded,
-                  color: Color(0xFFFBBF24),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'OCORRÊNCIAS EM ANDAMENTO',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${openIncidents.length} caso(s) aberto(s) para continuidade',
-                      style: GoogleFonts.inter(
-                        color: Colors.white54,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          _buildOpenIncidentsHeader(openIncidents.length),
           const SizedBox(height: 12),
           ...openIncidents.map(
             (incident) => _buildOpenIncidentCard(

@@ -10,18 +10,8 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
   }) {
     final deltaMinutes = currentMinutes - previousMinutes;
     final deltaSessions = currentSessions - previousSessions;
-    final isUp = deltaMinutes > 0;
-    final isDown = deltaMinutes < 0;
-    final accent = isUp
-        ? const Color(0xFF4ADE80)
-        : isDown
-        ? const Color(0xFFF87171)
-        : const Color(0xFF94A3B8);
-    final icon = isUp
-        ? Icons.trending_up_rounded
-        : isDown
-        ? Icons.trending_down_rounded
-        : Icons.remove_rounded;
+    final style = _resolveEvolutionWeekComparisonStyle(deltaMinutes);
+    final accent = style.accent;
     final scopeText = scopeLabel ?? 'performance';
 
     return Container(
@@ -42,7 +32,7 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
               color: accent.withAlpha(24),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(icon, color: accent, size: 22),
+            child: Icon(style.icon, color: accent, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -64,8 +54,8 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
                 Text(
                   _buildEvolutionWeekComparisonHeadline(
                     previousMinutes: previousMinutes,
-                    isUp: isUp,
-                    isDown: isDown,
+                    isUp: style.isUp,
+                    isDown: style.isDown,
                     scopeText: scopeText,
                   ),
                   style: GoogleFonts.oxanium(
@@ -96,37 +86,5 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
         ],
       ),
     );
-  }
-
-  String _buildEvolutionWeekComparisonHeadline({
-    required double previousMinutes,
-    required bool isUp,
-    required bool isDown,
-    required String scopeText,
-  }) {
-    if (previousMinutes <= 0) {
-      return 'Primeira base comparável de $scopeText';
-    }
-    if (isUp) {
-      return '$scopeText acima da semana anterior';
-    }
-    if (isDown) {
-      return '$scopeText abaixo da semana anterior';
-    }
-    return 'Mesmo volume de $scopeText na semana anterior';
-  }
-
-  String _buildEvolutionWeekComparisonDetail({
-    required double currentMinutes,
-    required double previousMinutes,
-    required int currentSessions,
-    required double deltaMinutes,
-    required int deltaSessions,
-  }) {
-    if (previousMinutes <= 0) {
-      return 'Esta semana soma ${_formatEvolutionMinutes(currentMinutes)} em $currentSessions sessão(ões).';
-    }
-
-    return '${deltaMinutes.abs().toStringAsFixed(0)} min e ${deltaSessions.abs()} sessão(ões) de diferença • ${((deltaMinutes.abs() / previousMinutes) * 100).toStringAsFixed(0)}% em relação à semana passada.';
   }
 }
