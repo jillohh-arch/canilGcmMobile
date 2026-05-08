@@ -51,8 +51,7 @@ extension _DailyTimelineEvolutionMetrics on _DailyTimelineScreenState {
     return '${minutes.toStringAsFixed(0)} min';
   }
 
-  List<({double minutes, String? primaryCategory, Set<String> categories})>
-  _buildDailyTrainingSummaries(String dogId) {
+  List<_DailyTrainingSummary> _buildDailyTrainingSummaries(String dogId) {
     final trainings = _getPerformanceTrainings(dogId, lastDays: 7);
     final now = DateTime.now();
     final start = DateTime(

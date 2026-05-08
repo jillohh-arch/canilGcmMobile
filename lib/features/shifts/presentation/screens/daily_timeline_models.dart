@@ -78,6 +78,28 @@ class _TimelineListData {
   });
 }
 
+class _TimelineTilePresentation {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final String mainMetric;
+
+  const _TimelineTilePresentation({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.mainMetric,
+  });
+}
+
+typedef _DailyTrainingSummary = ({
+  double minutes,
+  String? primaryCategory,
+  Set<String> categories,
+});
+
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);
 const _hudCyan = Color(0xFF00E5FF);
