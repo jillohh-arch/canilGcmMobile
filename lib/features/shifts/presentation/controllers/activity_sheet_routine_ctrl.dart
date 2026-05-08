@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/core/services/media_attachment_upload_service.dart';
 import 'package:canil_gcm/core/services/pt_br_date_time_service.dart';
-import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
+
+import 'activity_media_uploader.dart';
 import 'activity_record_payload_builder.dart';
 
 /// Controller que encapsula todo o estado e lógica da categoria Rotina
@@ -128,15 +128,14 @@ class ActivitySheetRoutineCtrl {
     required List<Map<String, dynamic>> mediaAttachments,
     required DateTime resolvedTimestamp,
     required void Function(String) onStatus,
-    required bool Function() isMounted,
     required void Function(Map<String, dynamic>) onUploading,
     required void Function(Map<String, dynamic>, String) onUploaded,
     required void Function(Map<String, dynamic>) onPending,
   }) async {
     onStatus('Fazendo upload de mídias...');
-    final finalMedia = await _uploadMedia(
+    final finalMedia = await ActivityMediaUploader.upload(
       attachments: mediaAttachments,
-      isMounted: isMounted,
+      folder: 'routines',
       onUploading: onUploading,
       onUploaded: onUploaded,
       onPending: onPending,
@@ -163,29 +162,6 @@ class ActivitySheetRoutineCtrl {
     } else {
       await routineVM.addRoutine(routine);
     }
-  }
-
-  // -------------------------------------------------------------------------
-  // Upload de mídias (via callbacks para manter setState no State)
-  // -------------------------------------------------------------------------
-
-  Future<List<Map<String, dynamic>>> _uploadMedia({
-    required List<Map<String, dynamic>> attachments,
-    required bool Function() isMounted,
-    required void Function(Map<String, dynamic>) onUploading,
-    required void Function(Map<String, dynamic>, String) onUploaded,
-    required void Function(Map<String, dynamic>) onPending,
-  }) async {
-    if (attachments.isEmpty) return const [];
-    return MediaAttachmentUploadService(
-      storageService: StorageService(),
-    ).uploadAll(
-      attachments: attachments,
-      folder: 'routines',
-      onUploading: onUploading,
-      onUploaded: onUploaded,
-      onPending: onPending,
-    );
   }
 
   // -------------------------------------------------------------------------

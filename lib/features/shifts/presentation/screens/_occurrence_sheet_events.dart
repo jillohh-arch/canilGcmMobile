@@ -263,9 +263,7 @@ extension _OccurrenceSheetEvents on _DynamicActivitySheetState {
   }
 
   Future<List<File>> _pickOccurrenceEventPhotos() async {
-    final files = await OccurrenceEventMediaService(
-      storageService: StorageService(),
-    ).pickCompressedPhotos();
+    final files = await _occCtrl.pickEventPhotos();
     if (files.isEmpty) return const [];
     HapticFeedback.lightImpact();
     return files;
@@ -274,12 +272,7 @@ extension _OccurrenceSheetEvents on _DynamicActivitySheetState {
   Future<List<Map<String, dynamic>>> _uploadOccurrenceEventPhotos(
     List<File> files,
   ) async {
-    return OccurrenceEventMediaService(
-      storageService: StorageService(),
-    ).uploadPhotos(
-      files: files,
-      incidentIdOrDogId: _activeIncidentDocumentId ?? widget.dogId,
-    );
+    return _occCtrl.uploadEventPhotos(files);
   }
 
   Future<ResolvedLocation> _captureOccurrenceEventLocation() async {

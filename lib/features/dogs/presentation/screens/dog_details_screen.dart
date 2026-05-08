@@ -781,7 +781,18 @@ class _CockpitBento extends StatelessWidget {
 
               try {
                 await dogVM.updateDogWeight(dog.id, val);
+              } catch (e) {
+                if (!context.mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao atualizar peso: $e'),
+                    backgroundColor: const Color(0xFFE53935),
+                  ),
+                );
+                return;
+              }
 
+              try {
                 final hLog = HealthLogModel(
                   dogId: dog.id,
                   dogName: dog.name,
@@ -795,7 +806,7 @@ class _CockpitBento extends StatelessWidget {
                 if (!context.mounted) return;
                 messenger.showSnackBar(
                   const SnackBar(
-                    content: Text('Peso atualizado em tempo real.'),
+                    content: Text('Peso atualizado e histórico registrado.'),
                     backgroundColor: Color(0xFF66BB6A),
                   ),
                 );
@@ -803,8 +814,10 @@ class _CockpitBento extends StatelessWidget {
                 if (!context.mounted) return;
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Erro ao atualizar peso: $e'),
-                    backgroundColor: const Color(0xFFE53935),
+                    content: Text(
+                      'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
+                    ),
+                    backgroundColor: const Color(0xFFFBBF24),
                   ),
                 );
               }
@@ -820,6 +833,14 @@ class _CockpitBento extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _cleanHealthError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Falha ao salvar registro médico: ', '')
+        .trim();
   }
 }
 

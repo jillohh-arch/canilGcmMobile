@@ -17,12 +17,10 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/services/media_processing_service.dart';
-import 'package:canil_gcm/core/services/media_attachment_upload_service.dart';
 import 'package:canil_gcm/core/services/operator_context_service.dart';
 import 'package:canil_gcm/core/services/pdf_attachment_service.dart';
 import 'package:canil_gcm/core/services/pt_br_date_time_service.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
-import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/text_match_service.dart';
 import 'package:canil_gcm/core/services/weather_capture_service.dart';
 import 'package:canil_gcm/core/domain/activity_subtype_ids.dart';
@@ -31,7 +29,6 @@ import 'package:canil_gcm/core/utils/firestore_date.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/dynamic_subtype_fields.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/training_activity_fields.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_activity_fields.dart';
-import 'package:canil_gcm/features/incidents/data/occurrence_event_media_service.dart';
 import 'package:canil_gcm/core/widgets/quick_location_actions.dart';
 import 'package:canil_gcm/features/routine/presentation/widgets/routine_activity_fields.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
@@ -87,9 +84,12 @@ part '_occurrence_sheet_context.dart';
 part '_occurrence_sheet_events.dart';
 part '_occurrence_sheet_wizard.dart';
 part '_standard_sheet_builders.dart';
+part '_standard_sheet_controls.dart';
+part '_standard_sheet_fields.dart';
 part '_dynamic_activity_sheet_actions.dart';
 part '_dynamic_activity_sheet_accessors.dart';
 part '_dynamic_activity_sheet_hydration.dart';
+part '_dynamic_activity_sheet_save.dart';
 part '_dynamic_activity_sheet_occurrence_save.dart';
 
 // Constantes HUD (compartilhadas com part files)
@@ -393,171 +393,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
 
   // _uploadExamePdf, _prepareHealthMetadata, _saveHealth:
   // migrados para ActivitySheetHealthCtrl (Fase 4)
-
-  Future<void> _saveTraining({
-    required TrainingViewModel trainingVM,
-    required AuthViewModel authVM,
-  }) async {
-    await _trainingCtrl.save(
-      trainingVM: trainingVM,
-      authVM: authVM,
-      selectedSubtype: _selectedSubtype,
-      formData: _formData,
-      mediaAttachments: _mediaAttachments,
-      onStatus: (msg) {
-        if (mounted) setState(() => _saveStatus = msg);
-      },
-      isMounted: () => mounted,
-      onUploading: (a) {
-        if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
-      },
-      onUploaded: (a, url) {
-        if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
-      },
-      onPending: (a) {
-        if (mounted) setState(() => MediaAttachmentRows.markPending(a));
-      },
-    );
-  }
-
-  Future<bool> _save({bool closeAfterSave = true}) async {
-    if (_isOccurrenceCategory) {
-      _syncSelectedOccurrenceNatureFromText();
-    }
-    if (_selectedSubtype == null || _selectedSubtype!.trim().isEmpty) {
-      if (_isOccurrenceCategory) {
-        _selectedSubtype = _naturezaOcorrenciaController.text.trim().isEmpty
-            ? 'Averiguação'
-            : _naturezaOcorrenciaController.text.trim();
-        if (_naturezaOcorrenciaController.text.trim().isEmpty) {
-          _naturezaOcorrenciaController.text = _selectedSubtype!;
-        }
-      } else {
-        return false;
-      }
-    }
-    if (_isSaving) return false;
-    HapticFeedback.lightImpact();
-
-    if (_formKey.currentState!.validate()) {
-      final authVM = Provider.of<AuthViewModel>(context, listen: false);
-      final routineVM = Provider.of<RoutineViewModel>(context, listen: false);
-      final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
-      final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
-      final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-      final userVM = Provider.of<UserViewModel>(context, listen: false);
-
-      _formKey.currentState!.save();
-      setState(() {
-        _isSaving = true;
-        _saveStatus = 'Preparando dados...';
-        _saveFailed = false;
-      });
-
-      try {
-        if (widget.category == 'Rotina') {
-          _setSaveStatus('Salvando rotina no Firebase...');
-          await _routineCtrl.save(
-            routineVM: routineVM,
-            authVM: authVM,
-            selectedSubtype: _selectedSubtype,
-            formData: _formData,
-            mediaAttachments: _mediaAttachments,
-            resolvedTimestamp: _resolveFormTimestamp(),
-            onStatus: (msg) {
-              if (mounted) setState(() => _saveStatus = msg);
-            },
-            isMounted: () => mounted,
-            onUploading: (a) {
-              if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
-            },
-            onUploaded: (a, url) {
-              if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
-            },
-            onPending: (a) {
-              if (mounted) setState(() => MediaAttachmentRows.markPending(a));
-            },
-          );
-        } else if (widget.category == 'Treino') {
-          _setSaveStatus('Salvando treino no Firebase...');
-          await _saveTraining(trainingVM: trainingVM, authVM: authVM);
-        } else if (_isOccurrenceCategory || widget.category == 'Evento') {
-          await _saveOccurrenceOrEvent(
-            authVM: authVM,
-            incidentVM: incidentVM,
-            userVM: userVM,
-          );
-        } else if (widget.category == 'Saude') {
-          _setSaveStatus('Salvando prontuário no Firebase...');
-          await _healthCtrl.save(
-            healthVM: healthVM,
-            selectedSubtype: _selectedSubtype,
-            formData: _formData,
-            mediaAttachments: _mediaAttachments,
-            resolvedTimestamp: _resolveFormTimestamp(),
-            onStatus: (msg) {
-              if (mounted) setState(() => _saveStatus = msg);
-            },
-            isMounted: () => mounted,
-            onUploading: (a) {
-              if (mounted) setState(() => MediaAttachmentRows.markUploading(a));
-            },
-            onUploaded: (a, url) {
-              if (mounted) setState(() => MediaAttachmentRows.markDone(a, url));
-            },
-            onPending: (a) {
-              if (mounted) setState(() => MediaAttachmentRows.markPending(a));
-            },
-          );
-        }
-
-        if (mounted) {
-          _setSaveStatus('Sincronizado com Firebase.');
-          HapticFeedback.mediumImpact();
-          _showOperationalSnack(
-            _successSaveMessage(),
-            backgroundColor: const Color(0xFF1B8A4C),
-            icon: Icons.cloud_done_rounded,
-          );
-          if (closeAfterSave) {
-            Navigator.pop(context, true);
-          }
-        }
-        return true;
-      } catch (e) {
-        if (mounted) {
-          final message = _cleanSaveError(e);
-          _setSaveStatus(
-            'Falha ao salvar. Verifique conexão/permissão.',
-            failed: true,
-          );
-          _showOperationalSnack(
-            message.isEmpty ? 'Não foi possível salvar o registro.' : message,
-            backgroundColor: const Color(0xFFE53935),
-            icon: Icons.error_outline_rounded,
-          );
-        }
-        return false;
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isSaving = false;
-          });
-        }
-      }
-    }
-
-    return false;
-  }
-
-  void _saveOccurrenceInProgress() {
-    setState(() {
-      _occurrenceStatus = OccurrenceFormController.statusInProgress;
-      _occurrenceSuccessful = null;
-      _showOccurrenceFinalization = false;
-    });
-    _save(closeAfterSave: false);
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -203,26 +203,12 @@ extension _DynamicActivitySheetActions on _DynamicActivitySheetState {
       });
     }
 
-    return MediaAttachmentUploadService(
-      storageService: StorageService(),
-    ).uploadAll(
+    return _occCtrl.uploadAllMedia(
       attachments: _mediaAttachments,
       folder: folder,
-      onUploading: (attachment) {
-        if (mounted) {
-          _updateState(() => MediaAttachmentRows.markUploading(attachment));
-        }
-      },
-      onUploaded: (attachment, url) {
-        if (mounted) {
-          _updateState(() => MediaAttachmentRows.markDone(attachment, url));
-        }
-      },
-      onPending: (attachment) {
-        if (mounted) {
-          _updateState(() => MediaAttachmentRows.markPending(attachment));
-        }
-      },
+      onUploading: _markMediaUploading,
+      onUploaded: _markMediaUploaded,
+      onPending: _markMediaPending,
     );
   }
 

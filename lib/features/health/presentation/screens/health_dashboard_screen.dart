@@ -586,6 +586,18 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
 
     try {
       await dogVM.updateDogWeight(dog.id, result);
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar peso: $e'),
+          backgroundColor: const Color(0xFFE53935),
+        ),
+      );
+      return;
+    }
+
+    try {
       await healthVM.addHealthLog(
         HealthLogModel(
           dogId: dog.id,
@@ -600,7 +612,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Peso atualizado e sincronizado.'),
+          content: Text('Peso atualizado e histórico registrado.'),
           backgroundColor: Color(0xFF1B8A4C),
         ),
       );
@@ -608,11 +620,21 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Erro ao atualizar peso: $e'),
-          backgroundColor: const Color(0xFFE53935),
+          content: Text(
+            'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
+          ),
+          backgroundColor: const Color(0xFFFBBF24),
         ),
       );
     }
+  }
+
+  String _cleanHealthError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Falha ao salvar registro médico: ', '')
+        .trim();
   }
 
   // Novo módulo visual: O Gráfico integrado

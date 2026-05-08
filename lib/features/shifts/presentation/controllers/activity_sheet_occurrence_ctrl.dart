@@ -6,7 +6,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/incidents/data/incident_service.dart';
-import 'package:canil_gcm/core/services/media_attachment_upload_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/text_match_service.dart';
 import 'package:canil_gcm/core/utils/firestore_date.dart';
@@ -20,6 +19,8 @@ import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_progress_update_builder.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_save_validator.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_wizard_result.dart';
+
+import 'activity_media_uploader.dart';
 
 // ---------------------------------------------------------------------------
 // Subtype constants (espelhados aqui para evitar dependência circular)
@@ -699,9 +700,7 @@ class ActivitySheetOccurrenceCtrl {
     required void Function(Map<String, dynamic>, String) onUploaded,
     required void Function(Map<String, dynamic>) onPending,
   }) {
-    return MediaAttachmentUploadService(
-      storageService: StorageService(),
-    ).uploadAll(
+    return ActivityMediaUploader.upload(
       attachments: attachments,
       folder: folder,
       onUploading: onUploading,
