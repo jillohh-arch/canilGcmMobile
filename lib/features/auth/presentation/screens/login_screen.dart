@@ -7,6 +7,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 
+part 'login_screen_widgets.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -145,102 +147,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ── Brand Identity ─────────────────────────────────────
-                      Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _hudCyan.withAlpha(18),
-                                border: Border.all(
-                                  color: _hudCyan.withAlpha(190),
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _hudCyan.withAlpha(95),
-                                    blurRadius: 34,
-                                    spreadRadius: 3,
-                                  ),
-                                ],
-                              ),
-                              child: Image.asset(
-                                'assets/images/logo-canil.png',
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'CANIL GCM',
-                              style: GoogleFonts.oxanium(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 4,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'SISTEMA TÁTICO OPERACIONAL K9',
-                              style: GoogleFonts.robotoMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: _hudCyan.withAlpha(210),
-                                letterSpacing: 2.0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const _LoginBrand(),
                       const SizedBox(height: 56),
 
                       // ── Error Message ──────────────────────────────────────
                       if (authVM.errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: _hudDanger.withAlpha(18),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: _hudDanger.withAlpha(130),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _hudDanger.withAlpha(35),
-                                blurRadius: 18,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: _hudDanger,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  authVM.errorMessage!,
-                                  style: GoogleFonts.robotoMono(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _LoginErrorBanner(message: authVM.errorMessage!),
                         const SizedBox(height: 24),
                       ],
 
                       // ── Inputs ─────────────────────────────────────────────
-                      _buildPremiumTextField(
+                      _PremiumTextField(
                         controller: _raController,
                         label: 'IDENTIFICAÇÃO R.A.',
                         icon: Icons.badge_rounded,
@@ -249,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             v == null || v.isEmpty ? 'Informe o R.A.' : null,
                       ),
                       const SizedBox(height: 16),
-                      _buildPremiumTextField(
+                      _PremiumTextField(
                         controller: _passwordController,
                         label: 'CHAVE DE ACESSO',
                         icon: Icons.key_rounded,
@@ -264,80 +181,33 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 40),
 
                       // ── Primary Action ─────────────────────────────────────
-                      authVM.isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(color: _hudCyan),
-                            )
-                          : SizedBox(
-                              height: 58,
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  HapticFeedback.mediumImpact();
-                                  if (_formKey.currentState!.validate()) {
-                                    final ra = _raController.text.trim();
-                                    final pass = _passwordController.text
-                                        .trim();
-                                    final success = await authVM
-                                        .signInWithRaAndPassword(ra, pass);
-                                    if (success) {
-                                      await _secureStorage.write(
-                                        key: 'cached_ra',
-                                        value: ra,
-                                      );
-                                      await _secureStorage.write(
-                                        key: 'cached_password',
-                                        value: pass,
-                                      );
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _hudCyan,
-                                  foregroundColor: _hudBackground,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  elevation: 10,
-                                  shadowColor: _hudCyan.withAlpha(120),
-                                ),
-                                child: Text(
-                                  'ACESSAR SISTEMA',
-                                  style: GoogleFonts.oxanium(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 15,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ),
-                            ),
+                      _LoginPrimaryAction(
+                        isLoading: authVM.isLoading,
+                        onPressed: () async {
+                          HapticFeedback.mediumImpact();
+                          if (_formKey.currentState!.validate()) {
+                            final ra = _raController.text.trim();
+                            final pass = _passwordController.text.trim();
+                            final success = await authVM
+                                .signInWithRaAndPassword(ra, pass);
+                            if (success) {
+                              await _secureStorage.write(
+                                key: 'cached_ra',
+                                value: ra,
+                              );
+                              await _secureStorage.write(
+                                key: 'cached_password',
+                                value: pass,
+                              );
+                            }
+                          }
+                        },
+                      ),
                       const SizedBox(height: 24),
 
                       // ── Biometrics & Social ────────────────────────────────
-                      Center(
-                        child: Text(
-                          'AUTENTICAÇÃO SECUNDÁRIA',
-                          style: GoogleFonts.robotoMono(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white38,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Biometria
-                          _SocialButton(
-                            iconWidget: const Icon(
-                              Icons.fingerprint_rounded,
-                              color: Colors.white70,
-                              size: 28,
-                            ),
-                            onTap: () => _handleBiometricLogin(authVM),
-                          ),
-                        ],
+                      _SecondaryAuthSection(
+                        onBiometricTap: () => _handleBiometricLogin(authVM),
                       ),
                       const SizedBox(height: 32),
                     ],
@@ -351,106 +221,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildPremiumTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool obscureText = false,
-    bool isPassword = false,
-    VoidCallback? onTogglePassword,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: validator,
-      cursorColor: _hudCyan,
-      style: GoogleFonts.robotoMono(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-      ),
-      decoration: InputDecoration(
-        labelText: label.toUpperCase(),
-        labelStyle: GoogleFonts.robotoMono(
-          color: _hudCyan.withAlpha(190),
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1,
-        ),
-        prefixIcon: Icon(icon, color: _hudCyan.withAlpha(180), size: 20),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  obscureText
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: _hudCyan.withAlpha(130),
-                ),
-                onPressed: onTogglePassword,
-              )
-            : null,
-        filled: true,
-        fillColor: _hudPanel.withAlpha(210),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: _hudCyan.withAlpha(45), width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: _hudCyan, width: 1.4),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: _hudDanger.withAlpha(130)),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: _hudDanger),
-        ),
-        errorStyle: GoogleFonts.robotoMono(
-          color: _hudDanger,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _raController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  final Widget iconWidget;
-  final VoidCallback onTap;
-
-  const _SocialButton({required this.iconWidget, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF101827).withAlpha(220),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF00E5FF).withAlpha(80)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00E5FF).withAlpha(28),
-              blurRadius: 18,
-            ),
-          ],
-        ),
-        child: iconWidget,
-      ),
-    );
   }
 }

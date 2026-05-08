@@ -89,6 +89,8 @@ part '_standard_sheet_fields.dart';
 part '_dynamic_activity_sheet_actions.dart';
 part '_dynamic_activity_sheet_accessors.dart';
 part '_dynamic_activity_sheet_hydration.dart';
+part '_dynamic_activity_sheet_status.dart';
+part '_dynamic_activity_sheet_layout.dart';
 part '_dynamic_activity_sheet_save.dart';
 part '_dynamic_activity_sheet_occurrence_save.dart';
 
@@ -241,12 +243,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
   }
 
-  void _onOccurrenceDescriptionChanged() {
-    if (_isOccurrenceCategory && mounted) {
-      setState(() {});
-    }
-  }
-
   // _loadOccurrenceNatures foi migrado para _occCtrl.loadNatures()
 
   bool _showMenu = true;
@@ -267,90 +263,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   bool _didAutoPrimeOccurrenceStart = false;
   // _timeController, _locationController, _descriptionController: getters por categoria
   // _returnDateController: getter => _healthCtrl.returnDateController (Fase 4)
-
-  void _setSaveStatus(String status, {bool failed = false}) {
-    if (!mounted) return;
-    setState(() {
-      _saveStatus = status;
-      _saveFailed = failed;
-    });
-  }
-
-  void _updateState(VoidCallback update) {
-    if (!mounted) return;
-    setState(update);
-  }
-
-  void _closeForm([bool result = false]) {
-    if (_isSaving) {
-      HapticFeedback.lightImpact();
-      _showOperationalSnack(
-        'Aguarde a sincronização terminar antes de sair.',
-        backgroundColor: const Color(0xFFFBBF24),
-        foregroundColor: Colors.black,
-      );
-      return;
-    }
-
-    Navigator.pop(context, result || _hasActiveIncidentDocument);
-  }
-
-  void _showOperationalSnack(
-    String message, {
-    Color backgroundColor = const Color(0xFF121826),
-    Color foregroundColor = Colors.white,
-    IconData? icon,
-  }) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: backgroundColor,
-        content: Row(
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 18, color: foregroundColor),
-              const SizedBox(width: 10),
-            ],
-            Expanded(
-              child: Text(
-                message,
-                style: GoogleFonts.inter(
-                  color: foregroundColor,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _cleanSaveError(Object error) {
-    final raw = error.toString();
-    return raw
-        .replaceFirst('Exception: ', '')
-        .replaceFirst('FirebaseException: ', '')
-        .trim();
-  }
-
-  String _formatTimeOfDay(DateTime value) {
-    return const PtBrDateTimeService().time(value);
-  }
-
-  String _formatDatePtBr(DateTime value) {
-    return const PtBrDateTimeService().date(value);
-  }
-
-  String _successSaveMessage() {
-    return ActivityFormLabels.successSaveMessage(
-      category: widget.category,
-      isOccurrenceCategory: _isOccurrenceCategory,
-      occurrenceStatus: _occurrenceStatus,
-    );
-  }
 
   // Saúde: todos os campos agora são getters delegando para _healthCtrl (Fase 4)
   // _vetNameController, _clinicaController, _motivoController, _tipoVacinaController,
@@ -418,87 +330,5 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
         ),
       ),
     );
-  }
-
-  Widget _buildFormScaffold() {
-    if (_isOccurrenceCategory) {
-      return _buildOccurrenceFormScaffold();
-    }
-
-    return ActivityFormScaffold(
-      title: _selectedSubtype?.toUpperCase() ?? '',
-      imagePath: _selectedSubtypeImagePath,
-      heroTag: _selectedSubtype == null
-          ? null
-          : 'hero_category_$_selectedSubtype',
-      isSaving: _isSaving,
-      onBack: _handleStandardFormBack,
-      child: _buildFormContent(),
-    );
-  }
-
-  void _handleStandardFormBack() {
-    if (widget.fullScreen || widget.initialData != null) {
-      _closeForm(false);
-      return;
-    }
-
-    final savedPage = _currentMenuPage;
-    setState(() {
-      _showMenu = true;
-      _selectedSubtype = null;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_menuPageController.hasClients) {
-        _menuPageController.jumpToPage(savedPage);
-      }
-    });
-  }
-
-  Widget _buildMenuSheet(BuildContext context) {
-    if (_currentMenuPage >= _currentCategoryCards.length) {
-      _currentMenuPage = 0;
-    }
-
-    return ActivityCategoryMenuSheet(
-      cards: _currentCategoryCards,
-      currentPage: _currentMenuPage,
-      pageController: _menuPageController,
-      onPageChanged: (index) {
-        HapticFeedback.selectionClick();
-        setState(() => _currentMenuPage = index);
-      },
-      onCardConfirmed: (card) =>
-          _selectSubtype(card['id'], imagePath: card['image']),
-    );
-  }
-
-  Color _getCategoryColor() {
-    if (_isOccurrenceCategory) {
-      if (_occurrenceStatus == OccurrenceFormController.statusCanceled) {
-        return _kHudRed;
-      }
-      if (_occurrenceStatus == OccurrenceFormController.statusCompleted) {
-        return _kHudGreen;
-      }
-      return _kHudCyan;
-    }
-    return ActivityCardCatalog.glowFor(
-      category: widget.category,
-      id: _selectedSubtype,
-      fallback: const Color(0xFF1B8A4C),
-    );
-  }
-
-  Widget _buildFormContent() {
-    final tColor = _getCategoryColor();
-    if (_isOccurrenceCategory) {
-      return _buildOccurrenceStepperContent(tColor);
-    }
-    if (_selectedSubtype == ActivitySubtypeIds.detection ||
-        _selectedSubtype == ActivitySubtypeIds.missingPerson) {
-      return _buildGroupedFormContent(tColor);
-    }
-    return _buildStandardFormContent(tColor);
   }
 }
