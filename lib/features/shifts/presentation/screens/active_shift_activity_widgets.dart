@@ -92,7 +92,7 @@ class _TodayActivitiesCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'ÚLTIMAS ATIVIDADES',
+                    'ATIVIDADES DE HOJE',
                     style: GoogleFonts.robotoMono(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -102,13 +102,24 @@ class _TodayActivitiesCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(
-                'HOJE',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: _hudAmber,
-                  letterSpacing: 1.0,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: _hudAmber.withAlpha(28),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _hudAmber.withAlpha(120)),
+                ),
+                child: Text(
+                  '${entries.length}',
+                  style: GoogleFonts.robotoMono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: _hudAmber,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ],

@@ -5,11 +5,10 @@ extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
     return CustomScrollView(
       slivers: [
         _buildHeroHeader(context, dog, callsign),
-        const _CockpitSectionHeader(),
         _HealthAlertBanner(dogId: dog.id),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Column(
               children: [
                 _DogInfoCockpitCard(dog: dog),
@@ -48,36 +47,6 @@ extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
               dog: dog,
               callsign: callsign,
               onTap: () => _showDogSwitcher(context, dog),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CockpitSectionHeader extends StatelessWidget {
-  const _CockpitSectionHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-        child: Row(
-          children: [
-            Text(
-              'PAINEL DE COMANDO',
-              style: GoogleFonts.robotoMono(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-                color: _hudCyan.withAlpha(220),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(height: 1, color: _hudCyan.withAlpha(70)),
             ),
           ],
         ),

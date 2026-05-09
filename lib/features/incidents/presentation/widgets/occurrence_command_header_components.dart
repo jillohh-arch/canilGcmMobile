@@ -1,32 +1,5 @@
 part of 'occurrence_command_header.dart';
 
-class _AppMark extends StatelessWidget {
-  final Color accent;
-
-  const _AppMark({required this.accent});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 34,
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF07101C),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accent.withAlpha(145)),
-        boxShadow: [BoxShadow(color: accent.withAlpha(28), blurRadius: 12)],
-      ),
-      child: Image.asset(
-        'assets/app_icon.png',
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) =>
-            Icon(Icons.shield_rounded, color: accent, size: 22),
-      ),
-    );
-  }
-}
-
 class _ClipboardIcon extends StatelessWidget {
   final Color accent;
 
@@ -47,80 +20,161 @@ class _ClipboardIcon extends StatelessWidget {
   }
 }
 
-class _CrewMeta extends StatelessWidget {
-  final String title;
-  final String name;
-  final String subtitle;
-  final String? imageUrl;
-  final IconData fallbackIcon;
-  final Color accent;
-  final bool alignEnd;
+/// Bloco "binômio" — apresenta K9 + condutor como UMA unidade visual:
+/// dois avatares circulares com leve sobreposição no centro, nomes
+/// lado a lado abaixo, e os labels "K9"/"GCM" como rótulos pequenos
+/// na cor do respectivo agente.
+///
+/// Substitui o pattern anterior (avatares nas pontas + divisor central)
+/// que comunicava separação em vez de união.
+class _BinomiumBlock extends StatelessWidget {
+  final String dogName;
+  final String? dogImageUrl;
+  final Color dogAccent;
+  final String operatorName;
+  final String? operatorImageUrl;
+  final Color operatorAccent;
 
-  const _CrewMeta({
-    required this.title,
-    required this.name,
-    required this.subtitle,
-    required this.imageUrl,
-    required this.fallbackIcon,
-    required this.accent,
-    required this.alignEnd,
+  const _BinomiumBlock({
+    required this.dogName,
+    required this.dogImageUrl,
+    required this.dogAccent,
+    required this.operatorName,
+    required this.operatorImageUrl,
+    required this.operatorAccent,
   });
 
   @override
   Widget build(BuildContext context) {
-    final avatar = _Avatar(
-      imageUrl: imageUrl,
-      fallbackIcon: fallbackIcon,
-      accent: accent,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _AvatarPair(
+          dogImageUrl: dogImageUrl,
+          dogAccent: dogAccent,
+          operatorImageUrl: operatorImageUrl,
+          operatorAccent: operatorAccent,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: _NameLabel(
+                name: dogName.isNotEmpty ? dogName : 'K9',
+                label: 'K9',
+                accent: dogAccent,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Flexible(
+              child: _NameLabel(
+                name: operatorName.isNotEmpty ? operatorName : 'Condutor',
+                label: 'GCM',
+                accent: operatorAccent,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
-    final texts = Expanded(
-      child: Column(
-        crossAxisAlignment: alignEnd
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+  }
+}
+
+/// Par de avatares circulares com leve sobreposição no centro.
+/// O cão à esquerda, o GCM à direita. Sobreposição de ~14px comunica
+/// "estes dois estão juntos" sem virar uma única blob.
+class _AvatarPair extends StatelessWidget {
+  final String? dogImageUrl;
+  final Color dogAccent;
+  final String? operatorImageUrl;
+  final Color operatorAccent;
+
+  const _AvatarPair({
+    required this.dogImageUrl,
+    required this.dogAccent,
+    required this.operatorImageUrl,
+    required this.operatorAccent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const avatarSize = 60.0;
+    const overlap = 14.0;
+    return SizedBox(
+      width: avatarSize * 2 - overlap,
+      height: avatarSize,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            style: GoogleFonts.robotoMono(
-              color: accent,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.8,
+          Positioned(
+            left: 0,
+            child: _Avatar(
+              imageUrl: dogImageUrl,
+              fallbackIcon: Icons.pets_rounded,
+              accent: dogAccent,
+              size: avatarSize,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            name.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.oxanium(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              color: Colors.white60,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          Positioned(
+            right: 0,
+            child: _Avatar(
+              imageUrl: operatorImageUrl,
+              fallbackIcon: Icons.badge_rounded,
+              accent: operatorAccent,
+              size: avatarSize,
             ),
           ),
         ],
       ),
     );
+  }
+}
 
-    return Row(
-      children: alignEnd
-          ? [texts, const SizedBox(width: 8), avatar]
-          : [avatar, const SizedBox(width: 8), texts],
+/// Nome do agente (K9 ou GCM) com label pequeno embaixo na cor de accent.
+class _NameLabel extends StatelessWidget {
+  final String name;
+  final String label;
+  final Color accent;
+
+  const _NameLabel({
+    required this.name,
+    required this.label,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          name.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.oxanium(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.8,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: GoogleFonts.robotoMono(
+            color: accent,
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.8,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -129,23 +183,26 @@ class _Avatar extends StatelessWidget {
   final String? imageUrl;
   final IconData fallbackIcon;
   final Color accent;
+  final double size;
 
   const _Avatar({
     required this.imageUrl,
     required this.fallbackIcon,
     required this.accent,
+    this.size = 54,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 54,
-      height: 54,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: accent.withAlpha(180)),
-        boxShadow: [BoxShadow(color: accent.withAlpha(35), blurRadius: 12)],
+        color: const Color(0xFF07101C),
+        border: Border.all(color: accent.withAlpha(180), width: 2),
+        boxShadow: [BoxShadow(color: accent.withAlpha(40), blurRadius: 14)],
       ),
       child: ClipOval(
         child: Container(
@@ -155,9 +212,9 @@ class _Avatar extends StatelessWidget {
                   imageUrl!,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) =>
-                      Icon(fallbackIcon, color: accent, size: 24),
+                      Icon(fallbackIcon, color: accent, size: size * 0.45),
                 )
-              : Icon(fallbackIcon, color: accent, size: 24),
+              : Icon(fallbackIcon, color: accent, size: size * 0.45),
         ),
       ),
     );

@@ -17,9 +17,6 @@ class _DogInfoCockpitCard extends StatelessWidget {
     final String weightStr = effectiveWeight != null
         ? '${effectiveWeight.toStringAsFixed(1)} kg'
         : '-- kg';
-    final raStr = dog.conductorRa != null && dog.conductorRa!.isNotEmpty
-        ? dog.conductorRa!
-        : 'S/N';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -55,16 +52,7 @@ class _DogInfoCockpitCard extends StatelessWidget {
               letterSpacing: 2.0,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'RA: $raStr',
-            style: GoogleFonts.robotoMono(
-              fontSize: 14,
-              color: Colors.white54,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildReadinessBar(readinessBreakdown.total, readinessBreakdown),
           const SizedBox(height: 24),
           Row(

@@ -6,7 +6,7 @@ extension _DailyTimelineEntryData on _DailyTimelineScreenState {
     final iVM = Provider.of<IncidentViewModel>(context);
     final hVM = Provider.of<HealthViewModel>(context);
     final rVM = Provider.of<RoutineViewModel>(context);
-    final dogVM = Provider.of<DogViewModel>(context, listen: false);
+    final dogVM = Provider.of<DogViewModel>(context);
     final dogName = _resolveTimelineDogName(dogId, dogVM);
     final dayRange = _selectedTimelineDayRange();
 

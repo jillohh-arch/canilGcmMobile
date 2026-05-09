@@ -2,14 +2,11 @@ part of 'daily_timeline_screen.dart';
 
 extension _DailyTimelineEntryBuilders on _DailyTimelineScreenState {
   String _resolveTimelineDogName(String dogId, DogViewModel dogVM) {
-    return dogVM.dogs
-        .firstWhere(
-          (dog) => dog.id == dogId,
-          orElse: () => dogVM.dogs.isNotEmpty
-              ? dogVM.dogs.first
-              : throw Exception('Cão não encontrado'),
-        )
-        .name;
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog.name;
+    }
+
+    return 'K9';
   }
 
   ({DateTime start, DateTime end}) _selectedTimelineDayRange() {

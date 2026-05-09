@@ -19,7 +19,7 @@ extension _DailyTimelineOccurrencesTab on _DailyTimelineScreenState {
 
   // Mostra ocorrências abertas para retomada rápida.
   Widget _buildOpenIncidentsSection(String dogId) {
-    final dogVM = Provider.of<DogViewModel>(context, listen: false);
+    final dogVM = Provider.of<DogViewModel>(context);
     final dogName = _resolveTimelineDogName(dogId, dogVM);
     final openIncidents = _openIncidentsForDog(dogId);
 

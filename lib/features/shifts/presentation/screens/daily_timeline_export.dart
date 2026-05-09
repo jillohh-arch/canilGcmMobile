@@ -10,10 +10,17 @@ extension _DailyTimelineExport on _DailyTimelineScreenState {
     final userVM = Provider.of<UserViewModel>(ctx, listen: false);
     final dogVM = Provider.of<DogViewModel>(ctx, listen: false);
 
-    final dog = dogVM.dogs.firstWhere(
-      (d) => d.id == dogId,
-      orElse: () => dogVM.dogs.first,
-    );
+    final matchingDogs = dogVM.dogs.where((dog) => dog.id == dogId);
+    if (matchingDogs.isEmpty) {
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(
+          content: Text('Aguarde o carregamento dos dados do K9.'),
+        ),
+      );
+      return;
+    }
+    final dog = matchingDogs.first;
     final fbUser = authVM.user;
     final currentRa = HandlerIdentityService.raFromUser(fbUser);
     final userModel = userVM.users.cast<dynamic>().firstWhere(

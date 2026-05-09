@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Card de ação rápida da ocorrência.
+///
+/// Quando há [assetPath], usa a própria arte como conteúdo do card
+/// (a imagem já é um card completo: título, subtítulo, ícone e
+/// ilustração). Quando não há arte (ex.: subopções de "Material
+/// localizado"), exibe um fallback compacto com ícone + título.
 class OccurrenceQuickActionCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -23,118 +29,147 @@ class OccurrenceQuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasAsset = (assetPath ?? '').isNotEmpty;
     return SizedBox(
       width: width,
-      height: 126,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: enabled ? onTap : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.zero,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0B1220),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withAlpha(92)),
-            boxShadow: [BoxShadow(color: color.withAlpha(16), blurRadius: 12)],
+      height: width, // 1:1 — respeita o aspect das artes
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: enabled ? onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B1220),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: color.withAlpha(enabled ? 110 : 50),
+                width: 1.2,
+              ),
+              boxShadow: enabled
+                  ? [
+                      BoxShadow(
+                        color: color.withAlpha(22),
+                        blurRadius: 14,
+                        spreadRadius: 0.5,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: hasAsset
+                  ? _ArtworkCard(
+                      assetPath: assetPath!,
+                      title: title,
+                      icon: icon,
+                      color: color,
+                      enabled: enabled,
+                    )
+                  : _FallbackCard(
+                      title: title,
+                      icon: icon,
+                      color: color,
+                      enabled: enabled,
+                    ),
+            ),
           ),
-          child: _CompactActionCard(action: this),
         ),
       ),
     );
   }
 }
 
-class _CompactActionCard extends StatelessWidget {
-  final OccurrenceQuickActionCard action;
+/// Mostra a arte ocupando o card inteiro. A arte já contém todos os
+/// elementos visuais (título, ícone, ilustração) — então não há
+/// sobreposição de gradiente nem ícone fallback.
+class _ArtworkCard extends StatelessWidget {
+  final String assetPath;
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool enabled;
 
-  const _CompactActionCard({required this.action});
+  const _ArtworkCard({
+    required this.assetPath,
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.enabled,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const actionArtSize = 82.0;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if ((action.assetPath ?? '').isNotEmpty)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Opacity(
-                opacity: action.enabled ? 0.95 : 0.42,
-                child: SizedBox.square(
-                  dimension: actionArtSize,
-                  child: Image.asset(
-                    action.assetPath!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox(),
-                  ),
-                ),
-              ),
-            ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [
-                  const Color(0xFF070B12).withAlpha(45),
-                  const Color(0xFF070B12).withAlpha(130),
-                  const Color(0xFF070B12).withAlpha(235),
-                ],
-                stops: const [0.0, 0.46, 1.0],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _FallbackIcon(icon: action.icon, color: action.color),
-                const Spacer(),
-                Text(
-                  action.title.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.robotoMono(
-                    color: Colors.white,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.55,
-                    height: 1.08,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _FallbackCard(
+          title: title,
+          icon: icon,
+          color: color,
+          enabled: enabled,
+        ),
       ),
     );
   }
 }
 
-class _FallbackIcon extends StatelessWidget {
+/// Card fallback usado quando a ação não tem [assetPath] (subopções)
+/// ou se a arte falhar ao carregar.
+class _FallbackCard extends StatelessWidget {
+  final String title;
   final IconData icon;
   final Color color;
+  final bool enabled;
 
-  const _FallbackIcon({required this.icon, required this.color});
+  const _FallbackCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.enabled,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: const Color(0xFF050914).withAlpha(180),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withAlpha(145)),
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: color.withAlpha(enabled ? 28 : 14),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withAlpha(enabled ? 150 : 70)),
+            ),
+            child: Icon(
+              icon,
+              color: enabled ? color : color.withAlpha(120),
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title.toUpperCase(),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.robotoMono(
+              color: enabled ? Colors.white : Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.55,
+              height: 1.15,
+            ),
+          ),
+        ],
       ),
-      child: Icon(icon, color: color, size: 20),
     );
   }
 }

@@ -80,75 +80,33 @@ class OccurrenceCommandHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final centerMaxWidth = (constraints.maxWidth - 144)
-                      .clamp(120.0, 210.0)
-                      .toDouble();
-
-                  return SizedBox(
-                    height: 42,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (onBack != null)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: IconButton(
-                                onPressed: onBack,
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: centerMaxWidth,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _AppMark(accent: accent),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'K9 COMANDO',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.robotoMono(
-                                      color: Colors.white70,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+              SizedBox(
+                height: 42,
+                child: Row(
+                  children: [
+                    if (onBack != null)
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: IconButton(
+                          onPressed: onBack,
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: _HeaderChip(
-                            label: _displayStatus(status),
-                            color: statusColor,
-                          ),
-                        ),
-                      ],
+                      ),
+                    const Spacer(),
+                    _HeaderChip(
+                      label: _displayStatus(status),
+                      color: statusColor,
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -189,37 +147,13 @@ class OccurrenceCommandHeader extends StatelessWidget {
               const SizedBox(height: 16),
               Container(height: 1, color: Colors.white.withAlpha(22)),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _CrewMeta(
-                      title: 'K9',
-                      name: dogName.isNotEmpty ? dogName : 'K9',
-                      subtitle: 'Em serviço',
-                      imageUrl: dogImageUrl,
-                      fallbackIcon: Icons.pets_rounded,
-                      accent: accent,
-                      alignEnd: false,
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 48,
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    color: Colors.white.withAlpha(35),
-                  ),
-                  Expanded(
-                    child: _CrewMeta(
-                      title: 'GCM',
-                      name: operatorName.isNotEmpty ? operatorName : 'Condutor',
-                      subtitle: 'Condutor',
-                      imageUrl: operatorImageUrl,
-                      fallbackIcon: Icons.badge_rounded,
-                      accent: const Color(0xFF00F5A0),
-                      alignEnd: true,
-                    ),
-                  ),
-                ],
+              _BinomiumBlock(
+                dogName: dogName,
+                dogImageUrl: dogImageUrl,
+                dogAccent: accent,
+                operatorName: operatorName,
+                operatorImageUrl: operatorImageUrl,
+                operatorAccent: const Color(0xFF00F5A0),
               ),
               if (showOperationalMetrics) ...[
                 const SizedBox(height: 12),

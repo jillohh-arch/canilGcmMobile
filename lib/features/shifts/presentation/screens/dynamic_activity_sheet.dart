@@ -82,6 +82,7 @@ import 'live_tracking_screen.dart';
 part '_occurrence_sheet_builders.dart';
 part '_occurrence_sheet_context.dart';
 part '_occurrence_sheet_events.dart';
+part '_occurrence_sheet_event_details.dart';
 part '_occurrence_sheet_wizard.dart';
 part '_standard_sheet_builders.dart';
 part '_standard_sheet_controls.dart';

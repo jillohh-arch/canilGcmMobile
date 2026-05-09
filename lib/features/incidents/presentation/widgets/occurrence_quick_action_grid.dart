@@ -30,27 +30,14 @@ class OccurrenceQuickActionGrid extends StatelessWidget {
             Icon(Icons.bolt_rounded, color: accentColor, size: 22),
             const SizedBox(width: 8),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'REGISTROS RÁPIDOS',
-                    style: GoogleFonts.robotoMono(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  Text(
-                    'Atalhos úteis para atuação no local.',
-                    style: GoogleFonts.inter(
-                      color: Colors.white54,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'REGISTROS RÁPIDOS',
+                style: GoogleFonts.robotoMono(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
               ),
             ),
           ],
