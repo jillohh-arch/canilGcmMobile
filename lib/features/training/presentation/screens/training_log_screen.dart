@@ -13,6 +13,7 @@ part 'training_log_session_widgets.dart';
 part 'training_session_card_parts.dart';
 part 'training_session_detail_parts.dart';
 part 'training_new_form.dart';
+part 'training_new_form_widgets.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);

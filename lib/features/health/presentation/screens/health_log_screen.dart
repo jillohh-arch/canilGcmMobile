@@ -8,6 +8,7 @@ import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmod
 part 'health_log_timeline.dart';
 part 'health_log_timeline_widgets.dart';
 part 'health_log_new_form.dart';
+part 'health_log_new_form_widgets.dart';
 part 'health_log_helpers.dart';
 
 class HealthLogScreen extends StatefulWidget {

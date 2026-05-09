@@ -48,10 +48,9 @@ extension _OccurrenceCloseWizardDrugFields on _OccurrenceCloseWizardState {
           Expanded(
             flex: 3,
             child: DropdownButtonFormField<String>(
-              initialValue:
-                  _OccurrenceCloseWizardState._drugOptions.contains(entry.type)
+              initialValue: _occurrenceCloseDrugOptions.contains(entry.type)
                   ? entry.type
-                  : _OccurrenceCloseWizardState._drugOptions.first,
+                  : _occurrenceCloseDrugOptions.first,
               dropdownColor: _OccurrenceCloseWizardState._panel,
               iconEnabledColor: _OccurrenceCloseWizardState._cyan,
               style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
@@ -59,7 +58,7 @@ extension _OccurrenceCloseWizardDrugFields on _OccurrenceCloseWizardState {
                 hint: 'Tipo de entorpecente',
                 icon: Icons.science_rounded,
               ),
-              items: _OccurrenceCloseWizardState._drugOptions
+              items: _occurrenceCloseDrugOptions
                   .map(
                     (option) => DropdownMenuItem<String>(
                       value: option,

@@ -68,7 +68,7 @@ extension _OccurrenceCloseWizardSteps on _OccurrenceCloseWizardState {
               return Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: _resultOptions.map((option) {
+                children: _occurrenceCloseResultOptions.map((option) {
                   final selected = _selectedResults.contains(option.label);
                   final blockedByNone =
                       _selectedResults.contains('Sem constatação') &&

@@ -7,6 +7,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/live_tracking_viewmodel.dart';
 
+part 'live_tracking_map_style.dart';
+part 'live_tracking_widgets.dart';
+
 class LiveTrackingScreen extends StatefulWidget {
   final bool isLightMode;
 
@@ -20,111 +23,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   GoogleMapController? _mapController;
   late final LiveTrackingViewModel _viewModel;
   LatLng? _lastAnimatedPoint;
-
-  final String _darkMapStyle = '''
-  [
-    {
-      "elementType": "geometry",
-      "stylers": [{"color": "#212121"}]
-    },
-    {
-      "elementType": "labels.icon",
-      "stylers": [{"visibility": "off"}]
-    },
-    {
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#757575"}]
-    },
-    {
-      "elementType": "labels.text.stroke",
-      "stylers": [{"color": "#212121"}]
-    },
-    {
-      "featureType": "administrative",
-      "elementType": "geometry",
-      "stylers": [{"color": "#757575"}]
-    },
-    {
-      "featureType": "administrative.country",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#9e9e9e"}]
-    },
-    {
-      "featureType": "administrative.land_parcel",
-      "stylers": [{"visibility": "off"}]
-    },
-    {
-      "featureType": "administrative.locality",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#bdbdbd"}]
-    },
-    {
-      "featureType": "poi",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#757575"}]
-    },
-    {
-      "featureType": "poi.park",
-      "elementType": "geometry",
-      "stylers": [{"color": "#181818"}]
-    },
-    {
-      "featureType": "poi.park",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#616161"}]
-    },
-    {
-      "featureType": "poi.park",
-      "elementType": "labels.text.stroke",
-      "stylers": [{"color": "#1b1b1b"}]
-    },
-    {
-      "featureType": "road",
-      "elementType": "geometry.fill",
-      "stylers": [{"color": "#2c2c2c"}]
-    },
-    {
-      "featureType": "road",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#8a8a8a"}]
-    },
-    {
-      "featureType": "road.arterial",
-      "elementType": "geometry",
-      "stylers": [{"color": "#373737"}]
-    },
-    {
-      "featureType": "road.highway",
-      "elementType": "geometry",
-      "stylers": [{"color": "#3c3c3c"}]
-    },
-    {
-      "featureType": "road.highway.controlled_access",
-      "elementType": "geometry",
-      "stylers": [{"color": "#4e4e4e"}]
-    },
-    {
-      "featureType": "road.local",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#616161"}]
-    },
-    {
-      "featureType": "transit",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#757575"}]
-    },
-    {
-      "featureType": "water",
-      "elementType": "geometry",
-      "stylers": [{"color": "#000000"}]
-    },
-    {
-      "featureType": "water",
-      "elementType": "labels.text.fill",
-      "stylers": [{"color": "#3d3d3d"}]
-    }
-  ]
-  ''';
 
   @override
   void initState() {
@@ -196,6 +94,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     Navigator.pop(context, result.toMap());
   }
 
+  String _formatDistance() {
+    if (_totalDistanceMeters > 999) {
+      return '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km';
+    }
+    return '${_totalDistanceMeters.toStringAsFixed(0)} m';
+  }
+
   String _formatTime(int seconds) {
     final minutes = (seconds / 60).floor();
     final remainingSeconds = seconds % 60;
@@ -216,156 +121,30 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Colors.black45,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
+        leading: const _CloseTrackingButton(),
       ),
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(-23.5505, -46.6333),
-              zoom: 12,
-            ),
-            style: _darkMapStyle,
+          _TrackingMap(
+            routePoints: _routePoints,
+            isLightMode: widget.isLightMode,
+            mapStyle: _darkTrackingMapStyle,
             onMapCreated: (controller) {
               _mapController = controller;
               _centerToUserLocation();
             },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            compassEnabled: false,
-            polylines: {
-              Polyline(
-                polylineId: const PolylineId('tracking_route'),
-                points: _routePoints,
-                color: widget.isLightMode
-                    ? const Color(0xFF26C6DA)
-                    : const Color(0xFFFBBF24),
-                width: 5,
-                jointType: JointType.round,
-                endCap: Cap.roundCap,
-                startCap: Cap.roundCap,
-              ),
-            },
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(180),
-                    border: const Border(
-                      top: BorderSide(color: Colors.white12, width: 1),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _MetricBox(
-                            label: 'DISTANCIA',
-                            value: _totalDistanceMeters > 999
-                                ? '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km'
-                                : '${_totalDistanceMeters.toStringAsFixed(0)} m',
-                          ),
-                          _MetricBox(
-                            label: 'TEMPO',
-                            value: _formatTime(_elapsedSeconds),
-                          ),
-                          if (!widget.isLightMode)
-                            _MetricBox(
-                              label: 'VELOCIDADE',
-                              value: '${_calculateSpeed()} km/h',
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isTracking
-                              ? _stopAndSave
-                              : _startTracking,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isTracking
-                                ? const Color(0xFFC62828)
-                                : const Color(0xFF1B8A4C),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            _isTracking
-                                ? 'ENCERRAR E SALVAR'
-                                : 'INICIAR RASTREIO TATICO',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          _TrackingControlPanel(
+            isTracking: _isTracking,
+            isLightMode: widget.isLightMode,
+            distanceLabel: _formatDistance(),
+            timeLabel: _formatTime(_elapsedSeconds),
+            speedLabel: '${_calculateSpeed()} km/h',
+            onStartTracking: _startTracking,
+            onStopAndSave: _stopAndSave,
           ),
         ],
       ),
-    );
-  }
-}
-
-class _MetricBox extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _MetricBox({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.white54,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-          ),
-        ),
-      ],
     );
   }
 }

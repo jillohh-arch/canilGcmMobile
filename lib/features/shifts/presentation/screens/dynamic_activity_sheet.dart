@@ -89,6 +89,7 @@ part '_standard_sheet_fields.dart';
 part '_dynamic_activity_sheet_actions.dart';
 part '_dynamic_activity_sheet_accessors.dart';
 part '_dynamic_activity_sheet_hydration.dart';
+part '_dynamic_activity_sheet_lifecycle.dart';
 part '_dynamic_activity_sheet_status.dart';
 part '_dynamic_activity_sheet_layout.dart';
 part '_dynamic_activity_sheet_save.dart';
@@ -159,59 +160,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   @override
   void initState() {
     super.initState();
-    _occCtrl = ActivitySheetOccurrenceCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: () {
-        if (mounted) setState(() {});
-      },
-    );
-    _trainingCtrl = ActivitySheetTrainingCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: () {
-        if (mounted) setState(() {});
-      },
-    );
-    _routineCtrl = ActivitySheetRoutineCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: () {
-        if (mounted) setState(() {});
-      },
-    );
-    _healthCtrl = ActivitySheetHealthCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: () {
-        if (mounted) setState(() {});
-      },
-    );
+    _initActivityControllers();
     _speechDictation = SpeechDictationService();
-    if (_isOccurrenceCategory) {
-      _occCtrl.init();
-    } else if (widget.category == 'Treino') {
-      _trainingCtrl.init();
-    } else if (widget.category == 'Rotina') {
-      _routineCtrl.init();
-    } else if (widget.category == 'Saude') {
-      _healthCtrl.init();
-    }
-    _menuPageController = PageController(viewportFraction: 0.80);
-    _menuPageController.addListener(() {
-      final page = _menuPageController.page?.round();
-      if (page != null && page != _currentMenuPage) {
-        setState(() => _currentMenuPage = page);
-      }
-    });
+    _initSelectedActivityController();
+    _initMenuPager();
     _occCtrl.descriptionController.addListener(_onOccurrenceDescriptionChanged);
     if (_isOccurrenceCategory && widget.initialData == null) {
       _showMenu = false;
@@ -222,24 +174,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
       _showMenu = false;
       _populateEditData();
     }
-    // Inicializa hora atual para todos os controllers (novo registro)
-    if (widget.initialData == null) {
-      final nowTime = _formatTimeOfDay(DateTime.now());
-      _occCtrl.timeController.text = nowTime;
-      _trainingCtrl.timeController.text = nowTime;
-      _routineCtrl.timeController.text = nowTime;
-      _healthCtrl.timeController.text = nowTime;
-    }
+    _primeNewRecordTime();
     if (_isOccurrenceCategory) {
       _occCtrl.loadNatures();
-      if (widget.initialData == null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || _didAutoPrimeOccurrenceStart) return;
-          _didAutoPrimeOccurrenceStart = true;
-          _setTimeToNow();
-          _fetchCurrentAddress();
-        });
-      }
+      _scheduleOccurrenceStartContext();
     }
   }
 
@@ -287,17 +225,8 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     _occCtrl.descriptionController.removeListener(
       _onOccurrenceDescriptionChanged,
     );
-    _occCtrl.dispose();
-    _trainingCtrl.dispose();
-    _routineCtrl.dispose();
-    _healthCtrl.dispose();
-    _locationCtrlOther.dispose();
-    _durationCtrlOther.dispose();
-    // _returnDateController, _vetNameController, etc. agora em _healthCtrl (Fase 4)
-    // _racaoMarcaController, _racaoQtdController, _distanciaController: migrados para _routineCtrl
-
-    MediaAttachmentRows.disposeAll(_mediaAttachments);
-    _menuPageController.dispose();
+    _disposeActivityControllers();
+    _disposeSheetResources();
     super.dispose();
   }
 
