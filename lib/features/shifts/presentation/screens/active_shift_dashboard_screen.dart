@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 
 part 'active_shift_dashboard_widgets.dart';
 part 'active_shift_metrics_widgets.dart';
+part 'active_shift_health_alert.dart';
 part 'active_shift_activity_widgets.dart';
 part 'active_shift_readiness.dart';
 part 'active_shift_cockpit.dart';

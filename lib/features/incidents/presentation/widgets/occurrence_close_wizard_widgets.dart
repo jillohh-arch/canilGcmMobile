@@ -95,88 +95,105 @@ class _ClosingRoadmap extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Row(
-            children: List.generate(3, (index) {
-              final active = index <= currentStep;
-              final done = index < currentStep;
-              return Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: active
-                                  ? const Color(0xFF00E5FF).withAlpha(25)
-                                  : Colors.transparent,
-                              border: Border.all(
-                                color: active
-                                    ? const Color(0xFF00E5FF)
-                                    : Colors.white24,
-                              ),
-                              boxShadow: active
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFF00E5FF,
-                                        ).withAlpha(70),
-                                        blurRadius: 12,
-                                      ),
-                                    ]
-                                  : null,
+            children: List.generate(
+              3,
+              (index) => _RoadmapStep(
+                index: index,
+                label: labels[index],
+                currentStep: currentStep,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoadmapStep extends StatelessWidget {
+  final int index;
+  final String label;
+  final int currentStep;
+
+  const _RoadmapStep({
+    required this.index,
+    required this.label,
+    required this.currentStep,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = index <= currentStep;
+    final done = index < currentStep;
+
+    return Expanded(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: active
+                        ? const Color(0xFF00E5FF).withAlpha(25)
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: active ? const Color(0xFF00E5FF) : Colors.white24,
+                    ),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withAlpha(70),
+                              blurRadius: 12,
                             ),
-                            child: Center(
-                              child: done
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      color: Color(0xFF00F5A0),
-                                      size: 20,
-                                    )
-                                  : Text(
-                                      '${index + 1}',
-                                      style: GoogleFonts.oxanium(
-                                        color: active
-                                            ? const Color(0xFF00E5FF)
-                                            : Colors.white38,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            labels[index],
-                            maxLines: 1,
-                            style: GoogleFonts.robotoMono(
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    child: done
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Color(0xFF00F5A0),
+                            size: 20,
+                          )
+                        : Text(
+                            '${index + 1}',
+                            style: GoogleFonts.oxanium(
                               color: active
                                   ? const Color(0xFF00E5FF)
-                                  : Colors.white30,
-                              fontSize: 9,
+                                  : Colors.white38,
+                              fontSize: 15,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 1.1,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    if (index < 2)
-                      Container(
-                        width: 34,
-                        height: 2,
-                        color: index < currentStep
-                            ? const Color(0xFF00F5A0)
-                            : Colors.white12,
-                      ),
-                  ],
+                  ),
                 ),
-              );
-            }),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  maxLines: 1,
+                  style: GoogleFonts.robotoMono(
+                    color: active ? const Color(0xFF00E5FF) : Colors.white30,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
           ),
+          if (index < 2)
+            Container(
+              width: 34,
+              height: 2,
+              color: index < currentStep
+                  ? const Color(0xFF00F5A0)
+                  : Colors.white12,
+            ),
         ],
       ),
     );
@@ -287,77 +304,6 @@ class _NarrationButton extends StatelessWidget {
   }
 }
 
-class _ResultCard extends StatelessWidget {
-  final double width;
-  final _ResultOption option;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ResultCard({
-    required this.width,
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 96,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: selected
-                ? option.color.withAlpha(28)
-                : const Color(0xFF0B1220),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? option.color : Colors.white12,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(color: option.color.withAlpha(40), blurRadius: 14)]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: option.color.withAlpha(24),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(option.icon, color: option.color, size: 20),
-              ),
-              const SizedBox(height: 9),
-              Text(
-                option.label.toUpperCase(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.oxanium(
-                  color: selected ? Colors.white : Colors.white60,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.7,
-                  height: 1.1,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _EvidenceNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -391,27 +337,4 @@ class _EvidenceNotice extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DrugEntry {
-  String type;
-  final TextEditingController quantityController;
-
-  _DrugEntry() : type = 'Maconha', quantityController = TextEditingController();
-
-  void dispose() {
-    quantityController.dispose();
-  }
-}
-
-class _ResultOption {
-  final String label;
-  final IconData icon;
-  final Color color;
-
-  const _ResultOption({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
 }

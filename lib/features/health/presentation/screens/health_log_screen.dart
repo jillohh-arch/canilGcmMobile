@@ -6,6 +6,7 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 
 part 'health_log_timeline.dart';
+part 'health_log_timeline_widgets.dart';
 part 'health_log_new_form.dart';
 part 'health_log_helpers.dart';
 

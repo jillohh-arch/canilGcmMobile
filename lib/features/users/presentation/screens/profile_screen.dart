@@ -25,6 +25,8 @@ part 'profile_hero_widgets.dart';
 part 'profile_edit_widgets.dart';
 part 'profile_identification_widgets.dart';
 part 'profile_gamification_sections.dart';
+part 'profile_gamification_widgets.dart';
+part 'profile_badge_gallery_widgets.dart';
 part 'profile_shift_section.dart';
 
 const _hudBackground = Color(0xFF070B14);
@@ -246,37 +248,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildBadgeStatusCard({required String title, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.robotoMono(
-            color: _hudCyan.withAlpha(210),
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _hudPanel.withAlpha(235),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _hudCyan.withAlpha(65)),
-            boxShadow: [
-              BoxShadow(color: _hudCyan.withAlpha(20), blurRadius: 18),
-            ],
-          ),
-          child: child,
-        ),
-      ],
     );
   }
 }

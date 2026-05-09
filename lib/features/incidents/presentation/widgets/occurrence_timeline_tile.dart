@@ -39,18 +39,6 @@ class _TimelineMetaChip extends StatelessWidget {
   }
 }
 
-class _OccurrenceEventVisual {
-  final Color color;
-  final IconData icon;
-  final String? assetPath;
-
-  const _OccurrenceEventVisual({
-    required this.color,
-    required this.icon,
-    this.assetPath,
-  });
-}
-
 class _OccurrenceTimelineTile extends StatelessWidget {
   final IncidentProgressUpdate update;
   final Color accent;
@@ -66,7 +54,7 @@ class _OccurrenceTimelineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eventVisual = _visualForTitle(update.title, accent);
+    final eventVisual = _visualForTimelineTitle(update.title, accent);
     final eventColor = eventVisual.color;
 
     return InkWell(
@@ -111,105 +99,6 @@ class _OccurrenceTimelineTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  _OccurrenceEventVisual _visualForTitle(String title, Color fallback) {
-    final value = _normalizeTitle(title);
-
-    if (_matchesAny(value, const ['inicio', 'registro inicial'])) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFF00E5FF),
-        icon: Icons.play_arrow_rounded,
-      );
-    }
-
-    if (_matchesAny(value, const [
-      'sem alteracao',
-      'sem constatacao',
-      'nao constatado',
-      'nada ilicito',
-      'nada localizado',
-    ])) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFFCFD8DC),
-        icon: Icons.highlight_off_rounded,
-        assetPath: 'assets/images/actions/k9_naoConstatado_timeline.png',
-      );
-    }
-
-    if (value.contains('abordagem')) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFFFFB300),
-        icon: Icons.person_search_rounded,
-        assetPath: 'assets/images/actions/k9_abordagem_timeline.png',
-      );
-    }
-
-    if (_matchesAny(value, const ['cao em acao', 'k9', 'emprego'])) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFF00A8FF),
-        icon: Icons.pets_rounded,
-        assetPath: 'assets/images/actions/k9_emprego_timeline.png',
-      );
-    }
-
-    if (value.contains('busca')) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFF44D62C),
-        icon: Icons.search_rounded,
-        assetPath: 'assets/images/actions/k9_busca_timeline.png',
-      );
-    }
-
-    if (_matchesAny(value, const [
-      'material',
-      'entorpecente',
-      'droga',
-      'arma',
-      'municao',
-      'objeto',
-    ])) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFFB388FF),
-        icon: Icons.inventory_2_rounded,
-        assetPath: 'assets/images/actions/k9_materialEncontrado_timeline.png',
-      );
-    }
-
-    if (_matchesAny(value, const ['parte', 'conduz', 'detido'])) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFFFF8A3D),
-        icon: Icons.person_rounded,
-        assetPath: 'assets/images/actions/k9_parteConduzida_timeline.png',
-      );
-    }
-
-    if (value.contains('encerr')) {
-      return const _OccurrenceEventVisual(
-        color: Color(0xFF00E5FF),
-        icon: Icons.flag_rounded,
-      );
-    }
-
-    return _OccurrenceEventVisual(
-      color: fallback,
-      icon: Icons.timeline_rounded,
-    );
-  }
-
-  bool _matchesAny(String value, List<String> tokens) {
-    return tokens.any(value.contains);
-  }
-
-  String _normalizeTitle(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll(RegExp('[áàâãä]'), 'a')
-        .replaceAll(RegExp('[éèêë]'), 'e')
-        .replaceAll(RegExp('[íìîï]'), 'i')
-        .replaceAll(RegExp('[óòôõö]'), 'o')
-        .replaceAll(RegExp('[úùûü]'), 'u')
-        .replaceAll('ç', 'c');
   }
 }
 

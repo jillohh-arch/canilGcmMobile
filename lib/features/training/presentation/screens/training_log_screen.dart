@@ -11,6 +11,7 @@ part 'training_log_overview_widgets.dart';
 part 'training_log_chart_widgets.dart';
 part 'training_log_session_widgets.dart';
 part 'training_session_card_parts.dart';
+part 'training_session_detail_parts.dart';
 part 'training_new_form.dart';
 
 const _hudBackground = Color(0xFF070B14);

@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 part 'occurrence_close_wizard_widgets.dart';
+part 'occurrence_close_wizard_result_card.dart';
+part 'occurrence_close_wizard_models.dart';
+part 'occurrence_close_wizard_drug_fields.dart';
 part 'occurrence_close_wizard_steps.dart';
 
 class OccurrenceCloseWizard extends StatefulWidget {

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 
+part 'occurrence_timeline_event_visuals.dart';
 part 'occurrence_timeline_tile.dart';
 
 class OccurrenceTimelinePreview extends StatelessWidget {

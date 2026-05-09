@@ -5,6 +5,8 @@ import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 
+part 'global_incidents_components.dart';
+
 class GlobalIncidentsScreen extends StatefulWidget {
   const GlobalIncidentsScreen({super.key});
 
@@ -90,41 +92,11 @@ class _IncidentFeedCard extends StatefulWidget {
 class _IncidentFeedCardState extends State<_IncidentFeedCard> {
   bool _expanded = false;
 
-  Color _resultColor(String result) {
-    final r = result.toLowerCase();
-    if (r.contains('êxito') ||
-        r.contains('exito') ||
-        r.contains('sucesso') ||
-        r.contains('localiz')) {
-      return AppTheme.statusActive;
-    }
-    if (r.contains('falso') || r.contains('negativo')) {
-      return AppTheme.statusLeave;
-    }
-    if (r.contains('cancel')) return AppTheme.statusAlert;
-    return const Color(0xFF4ECDE4);
-  }
-
-  IconData _typeIcon(String? type) {
-    switch (type) {
-      case 'Busca de Entorpecentes':
-        return Icons.track_changes_rounded;
-      case 'Apoio à Viatura':
-        return Icons.local_police_rounded;
-      case 'Varredura de Local':
-        return Icons.radar_rounded;
-      case 'Busca de Pessoa':
-        return Icons.person_search_rounded;
-      default:
-        return Icons.report_rounded;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final inc = widget.incident;
     final cs = Theme.of(context).colorScheme;
-    final rColor = _resultColor(inc.result);
+    final rColor = _globalIncidentResultColor(inc.result);
     final now = DateTime.now();
     final diff = now.difference(inc.date);
     final timeAgo = diff.inDays > 0
@@ -160,7 +132,11 @@ class _IncidentFeedCardState extends State<_IncidentFeedCard> {
                         width: 1,
                       ),
                     ),
-                    child: Icon(_typeIcon(inc.type), size: 18, color: rColor),
+                    child: Icon(
+                      _globalIncidentTypeIcon(inc.type),
+                      size: 18,
+                      color: rColor,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -261,43 +237,6 @@ class _IncidentFeedCardState extends State<_IncidentFeedCard> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TagIcon extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Color color;
-  const _TagIcon({required this.icon, required this.text, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }

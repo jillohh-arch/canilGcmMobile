@@ -13,7 +13,9 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import '../widgets/occurrence_nature_search.dart';
 
 part 'incident_feed_widgets.dart';
+part 'incident_feed_components.dart';
 part 'incident_new_form.dart';
+part 'incident_new_hero_widgets.dart';
 part 'incident_new_form_widgets.dart';
 part 'incident_tactical_grid_painter.dart';
 

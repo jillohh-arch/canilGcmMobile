@@ -41,21 +41,7 @@ class _HudDogSelectionCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(child: _DogBackdrop(dog: dog)),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      _hudBackground.withAlpha(20),
-                      _hudBackground.withAlpha(90),
-                      _hudBackground.withAlpha(245),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            const Positioned.fill(child: _DogCardScrim()),
             Positioned(top: 12, left: 12, child: HudCorner(_hudCyan, size: 22)),
             Positioned(
               top: 12,
@@ -78,29 +64,7 @@ class _HudDogSelectionCard extends StatelessWidget {
                     const Spacer(),
                     _ReadinessBar(value: readiness),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DogMetric(
-                            icon: Icons.monitor_weight_outlined,
-                            label: 'PESO',
-                            value: dog.weight != null
-                                ? '${dog.weight!.toStringAsFixed(1)} KG'
-                                : '-- KG',
-                            color: _hudCyan,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _DogMetric(
-                            icon: Icons.schedule_rounded,
-                            label: 'IDADE',
-                            value: '${dog.age} ANOS',
-                            color: _hudAmber,
-                          ),
-                        ),
-                      ],
-                    ),
+                    _DogMetricRow(dog: dog),
                     const SizedBox(height: 10),
                     _WideMetric(
                       icon: Icons.track_changes_rounded,
@@ -141,263 +105,22 @@ class _HudDogSelectionCard extends StatelessWidget {
   }
 }
 
-class _DogBackdrop extends StatelessWidget {
-  final Dog dog;
-
-  const _DogBackdrop({required this.dog});
+class _DogCardScrim extends StatelessWidget {
+  const _DogCardScrim();
 
   @override
   Widget build(BuildContext context) {
-    if (dog.profileImageUrl == null || dog.profileImageUrl!.isEmpty) {
-      return Container(
-        color: _hudPanelDeep,
-        child: Center(
-          child: FaIcon(
-            FontAwesomeIcons.dog,
-            size: 86,
-            color: _hudCyan.withAlpha(80),
-          ),
-        ),
-      );
-    }
-
-    return CachedNetworkImage(
-      imageUrl: dog.profileImageUrl!,
-      fit: BoxFit.cover,
-      alignment: Alignment.topCenter,
-      placeholder: (context, url) => const Center(
-        child: CircularProgressIndicator(color: _hudCyan, strokeWidth: 2),
-      ),
-      errorWidget: (context, url, error) => Container(
-        color: _hudPanelDeep,
-        child: Center(
-          child: FaIcon(
-            FontAwesomeIcons.dog,
-            size: 72,
-            color: _hudCyan.withAlpha(80),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DogIdentity extends StatelessWidget {
-  final Dog dog;
-
-  const _DogIdentity({required this.dog});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: _hudBackground.withAlpha(185),
-            border: Border.all(color: _hudCyan.withAlpha(80)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                dog.name.toUpperCase(),
-                softWrap: true,
-                style: GoogleFonts.oxanium(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                  height: 1.0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                dog.breed.toUpperCase(),
-                softWrap: true,
-                style: GoogleFonts.robotoMono(
-                  color: _hudCyan,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReadinessBar extends StatelessWidget {
-  final int value;
-
-  const _ReadinessBar({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = value >= 75
-        ? _hudGreen
-        : value >= 45
-        ? _hudAmber
-        : _hudRed;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'PRONTIDÃO OPERACIONAL',
-              style: GoogleFonts.robotoMono(
-                color: Colors.white60,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.4,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '$value%',
-              style: GoogleFonts.oxanium(
-                color: color,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            _hudBackground.withAlpha(20),
+            _hudBackground.withAlpha(90),
+            _hudBackground.withAlpha(245),
           ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: _hudBackground,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: value.clamp(0, 100) / 100,
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: [
-                  BoxShadow(color: color.withAlpha(120), blurRadius: 8),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DogMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _DogMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 88),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _hudPanel.withAlpha(226),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withAlpha(110)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            softWrap: true,
-            style: GoogleFonts.oxanium(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.robotoMono(
-              color: Colors.white54,
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WideMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _WideMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _hudBackground.withAlpha(205),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _hudCyan.withAlpha(70)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: _hudCyan, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.robotoMono(
-                color: Colors.white54,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.oxanium(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
       ),
     );
   }

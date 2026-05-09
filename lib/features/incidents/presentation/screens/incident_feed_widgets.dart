@@ -63,45 +63,11 @@ class _IncidentFeedCard extends StatefulWidget {
 class _IncidentFeedCardState extends State<_IncidentFeedCard> {
   bool _expanded = false;
 
-  Color _resultColor(String result) {
-    final r = result.toLowerCase();
-    if (r.contains('êxito') ||
-        r.contains('exito') ||
-        r.contains('sucesso') ||
-        r.contains('localiz')) {
-      return AppTheme.statusActive;
-    }
-    if (r.contains('falso') || r.contains('negativo')) {
-      return AppTheme.statusLeave;
-    }
-    if (r.contains('cancel')) {
-      return AppTheme.statusAlert;
-    }
-    return const Color(0xFF4ECDE4);
-  }
-
-  IconData _typeIcon(String? type) {
-    switch (type) {
-      case 'Busca de Entorpecentes':
-        return Icons.track_changes_rounded;
-      case 'Apoio à Viatura':
-        return Icons.local_police_rounded;
-      case 'Varredura de Local':
-        return Icons.radar_rounded;
-      case 'Busca de Pessoa':
-        return Icons.person_search_rounded;
-      case 'Outros':
-        return Icons.report_gmailerrorred_rounded;
-      default:
-        return Icons.report_rounded;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final inc = widget.incident;
     final cs = Theme.of(context).colorScheme;
-    final rColor = _resultColor(inc.displayResult);
+    final rColor = _incidentFeedResultColor(inc.displayResult);
     final now = DateTime.now();
     final diff = now.difference(inc.date);
     final timeAgo = diff.inDays > 0
@@ -145,7 +111,11 @@ class _IncidentFeedCardState extends State<_IncidentFeedCard> {
                         width: 1,
                       ),
                     ),
-                    child: Icon(_typeIcon(inc.type), size: 18, color: rColor),
+                    child: Icon(
+                      _incidentFeedTypeIcon(inc.type),
+                      size: 18,
+                      color: rColor,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -188,67 +158,19 @@ class _IncidentFeedCardState extends State<_IncidentFeedCard> {
               // Location tag
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: cs.outlineVariant, width: 0.5),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          size: 11,
-                          color: const Color(0xFF4ECDE4),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          inc.location,
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _IncidentFeedTag(
+                    icon: Icons.location_on_rounded,
+                    text: inc.location,
+                    iconColor: const Color(0xFF4ECDE4),
+                    textColor: cs.onSurface,
                   ),
                   const SizedBox(width: 8),
                   // Handler tag
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: cs.outlineVariant, width: 0.5),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.badge_outlined,
-                          size: 11,
-                          color: cs.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'RA ${inc.handlerId}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _IncidentFeedTag(
+                    icon: Icons.badge_outlined,
+                    text: 'RA ${inc.handlerId}',
+                    iconColor: cs.onSurfaceVariant,
+                    textColor: cs.onSurfaceVariant,
                   ),
                 ],
               ),

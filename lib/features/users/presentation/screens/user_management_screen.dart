@@ -9,6 +9,7 @@ import 'package:canil_gcm/core/widgets/tactical_card.dart';
 import 'user_details_screen.dart';
 
 part 'user_form_sheet.dart';
+part 'user_form_widgets.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});

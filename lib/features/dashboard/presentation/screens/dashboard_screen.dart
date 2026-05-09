@@ -22,11 +22,15 @@ import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flo
 part 'dashboard_shared_widgets.dart';
 part 'dashboard_profile_widgets.dart';
 part 'dashboard_open_incident_widgets.dart';
+part 'dashboard_incident_components.dart';
 part 'dashboard_dog_cards.dart';
+part 'dashboard_dog_card_components.dart';
 part 'dashboard_k9s_tab.dart';
+part 'dashboard_k9s_header.dart';
 part 'dashboard_k9s_actions.dart';
 part 'dashboard_quick_close_sheet.dart';
 part 'dashboard_quick_close_rules.dart';
+part 'dashboard_training_components.dart';
 part 'dashboard_training_tab.dart';
 
 const _hudBackground = Color(0xFF070B14);

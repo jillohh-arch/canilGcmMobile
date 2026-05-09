@@ -1,0 +1,265 @@
+part of 'media_attachment_gallery.dart';
+
+class _PdfAttachment extends StatelessWidget {
+  final String? pdfName;
+  final VoidCallback onPickPdf;
+  final VoidCallback onRemovePdf;
+
+  const _PdfAttachment({
+    required this.pdfName,
+    required this.onPickPdf,
+    required this.onRemovePdf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (pdfName == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: OutlinedButton.icon(
+          onPressed: onPickPdf,
+          icon: const Icon(
+            Icons.upload_file_rounded,
+            size: 16,
+            color: Colors.redAccent,
+          ),
+          label: Text(
+            'ANEXAR LAUDO (PDF)',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Colors.redAccent),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.picture_as_pdf_rounded,
+            color: Colors.redAccent,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              pdfName ?? 'arquivo.pdf',
+              style: GoogleFonts.inter(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white38, size: 18),
+            onPressed: onRemovePdf,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoStrip extends StatelessWidget {
+  final List<Map<String, dynamic>> mediaAttachments;
+  final int activePhotoIndex;
+  final ValueChanged<int> onSelectPhoto;
+  final ValueChanged<int> onRemovePhoto;
+
+  const _PhotoStrip({
+    required this.mediaAttachments,
+    required this.activePhotoIndex,
+    required this.onSelectPhoto,
+    required this.onRemovePhoto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: mediaAttachments.length,
+            itemBuilder: (context, index) {
+              final media = mediaAttachments[index];
+              final isSelected = index == activePhotoIndex;
+              return GestureDetector(
+                onTap: () => onSelectPhoto(index),
+                child: _PhotoTile(
+                  file: MediaAttachmentRows.file(media),
+                  status:
+                      media['status']?.toString() ??
+                      MediaAttachmentRows.statusPending,
+                  isSelected: isSelected,
+                  onRemove: () => onRemovePhoto(index),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (activePhotoIndex >= 0 && activePhotoIndex < mediaAttachments.length)
+          TacticalTextField(
+            controller: MediaAttachmentRows.captionController(
+              mediaAttachments[activePhotoIndex],
+            ),
+            labelText: 'Descrição da foto ${activePhotoIndex + 1} *',
+          ),
+      ],
+    );
+  }
+}
+
+class _AttachPhotoButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _AttachPhotoButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.camera_alt, size: 16, color: Colors.white70),
+      label: Text(
+        'ANEXAR FOTO',
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white70,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Colors.white12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+    );
+  }
+}
+
+class _CompressionStatus extends StatelessWidget {
+  const _CompressionStatus();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'COMPRIMINDO IMAGEM...',
+          style: GoogleFonts.inter(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const LinearProgressIndicator(color: Colors.white70),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _PhotoTile extends StatelessWidget {
+  final File file;
+  final String status;
+  final bool isSelected;
+  final VoidCallback onRemove;
+
+  const _PhotoTile({
+    required this.file,
+    required this.status,
+    required this.isSelected,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isSelected ? const Color(0xFFFBBF24) : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(file, fit: BoxFit.cover),
+            ),
+          ),
+          if (status == MediaAttachmentRows.statusUploading)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            )
+          else if (status == MediaAttachmentRows.statusDone)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF43A047),
+                  size: 32,
+                ),
+              ),
+            ),
+          if (status == MediaAttachmentRows.statusPending)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: InkWell(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 16, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

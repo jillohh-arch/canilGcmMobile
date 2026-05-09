@@ -16,6 +16,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 
 part 'main_root_actions.dart';
+part 'main_root_action_widgets.dart';
 part 'main_root_widgets.dart';
 
 class MainRootScreen extends StatefulWidget {

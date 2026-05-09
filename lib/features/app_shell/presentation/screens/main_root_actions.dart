@@ -1,7 +1,6 @@
 part of 'main_root_screen.dart';
 
 extension _MainRootActions on _MainRootScreenState {
-  // Helper para construir os itens da barra de navegação
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return MaterialButton(
@@ -71,7 +70,7 @@ extension _MainRootActions on _MainRootScreenState {
     final dogVM = Provider.of<DogViewModel>(context, listen: false);
     final dogName = dogVM.dogs
         .firstWhere(
-          (d) => d.id == dogId,
+          (dog) => dog.id == dogId,
           orElse: () => dogVM.dogs.isNotEmpty
               ? dogVM.dogs.first
               : throw Exception('Cão não encontrado'),
@@ -85,85 +84,55 @@ extension _MainRootActions on _MainRootScreenState {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
       ),
-      builder: (BuildContext bc) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 24.0,
-              horizontal: 16.0,
+      builder: (menuContext) {
+        return _ActionSheetContent(
+          options: [
+            _buildMenuOption(
+              context,
+              menuContext,
+              'OCORRÊNCIA',
+              Icons.local_police_outlined,
+              Colors.redAccent,
+              dogId,
+              dogName,
+              _MainRootScreenState._categoryOccurrence,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Título do Menu
-                Text(
-                  'CENTRAL DE REGISTRO',
-                  style: GoogleFonts.oxanium(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.cyanAccent.withValues(alpha: 0.8),
-                    letterSpacing: 2.0,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Grid de Opções
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _buildMenuOption(
-                      context,
-                      bc,
-                      'OCORRÊNCIA',
-                      Icons.local_police_outlined,
-                      Colors.redAccent,
-                      dogId,
-                      dogName,
-                      _MainRootScreenState._categoryOccurrence,
-                    ),
-                    _buildMenuOption(
-                      context,
-                      bc,
-                      'TREINO',
-                      Icons.track_changes,
-                      Colors.orangeAccent,
-                      dogId,
-                      dogName,
-                      'Treino',
-                    ),
-                    _buildMenuOption(
-                      context,
-                      bc,
-                      'SAÚDE',
-                      Icons.medical_services_outlined,
-                      const Color(0xFFFF00FF),
-                      dogId,
-                      dogName,
-                      'Saude',
-                    ),
-                    _buildMenuOption(
-                      context,
-                      bc,
-                      'ROTINA',
-                      Icons.assignment_outlined,
-                      Colors.cyanAccent,
-                      dogId,
-                      dogName,
-                      'Rotina',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-              ],
+            _buildMenuOption(
+              context,
+              menuContext,
+              'TREINO',
+              Icons.track_changes,
+              Colors.orangeAccent,
+              dogId,
+              dogName,
+              'Treino',
             ),
-          ),
+            _buildMenuOption(
+              context,
+              menuContext,
+              'SAÚDE',
+              Icons.medical_services_outlined,
+              const Color(0xFFFF00FF),
+              dogId,
+              dogName,
+              'Saude',
+            ),
+            _buildMenuOption(
+              context,
+              menuContext,
+              'ROTINA',
+              Icons.assignment_outlined,
+              Colors.cyanAccent,
+              dogId,
+              dogName,
+              'Rotina',
+            ),
+          ],
         );
       },
     );
   }
 
-  // Design Tático dos Botões do Menu
   Widget _buildMenuOption(
     BuildContext rootContext,
     BuildContext menuContext,
@@ -174,7 +143,10 @@ extension _MainRootActions on _MainRootScreenState {
     String dogName,
     String category,
   ) {
-    return InkWell(
+    return _ActionMenuOption(
+      title: title,
+      icon: icon,
+      color: color,
       onTap: () async {
         final rootNavigator = Navigator.of(rootContext, rootNavigator: true);
         if (category == _MainRootScreenState._categoryOccurrence) {
@@ -213,7 +185,6 @@ extension _MainRootActions on _MainRootScreenState {
         if (Navigator.of(menuContext).canPop()) {
           Navigator.of(menuContext).pop();
         }
-        // Abre o formulário correto
         Future.microtask(() {
           if (!mounted) return;
           if (category == _MainRootScreenState._categoryOccurrence) {
@@ -240,38 +211,6 @@ extension _MainRootActions on _MainRootScreenState {
           );
         });
       },
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 150, // Largura para caber 2 botões por linha
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.15),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: GoogleFonts.shareTechMono(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
