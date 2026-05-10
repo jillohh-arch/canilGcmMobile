@@ -17,10 +17,13 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/core/widgets/hud_panel.dart';
 
-part 'shift_assumption_widgets.dart';
+part 'shift_assumption_header.dart';
+part 'shift_assumption_controls.dart';
+part 'shift_assumption_empty_state.dart';
 part 'shift_assumption_dog_card_widgets.dart';
 part 'shift_assumption_dog_visuals.dart';
 part 'shift_assumption_dog_metrics.dart';
+part 'shift_assumption_readiness.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);

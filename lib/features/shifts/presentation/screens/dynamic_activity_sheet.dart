@@ -81,19 +81,37 @@ import 'live_tracking_screen.dart';
 
 part '_occurrence_sheet_builders.dart';
 part '_occurrence_sheet_context.dart';
+part '_occurrence_sheet_command_header.dart';
+part '_occurrence_sheet_initial_data.dart';
+part '_occurrence_sheet_active_snapshot.dart';
 part '_occurrence_sheet_events.dart';
 part '_occurrence_sheet_event_details.dart';
+part '_occurrence_sheet_event_registration.dart';
+part '_occurrence_sheet_event_sync.dart';
+part '_occurrence_sheet_grouped_fields.dart';
+part '_occurrence_sheet_helpers.dart';
 part '_occurrence_sheet_wizard.dart';
+part '_occurrence_sheet_wizard_results.dart';
 part '_standard_sheet_builders.dart';
 part '_standard_sheet_controls.dart';
 part '_standard_sheet_fields.dart';
 part '_dynamic_activity_sheet_actions.dart';
+part '_dynamic_activity_sheet_environment_actions.dart';
+part '_dynamic_activity_sheet_media_actions.dart';
+part '_dynamic_activity_sheet_media_status.dart';
 part '_dynamic_activity_sheet_accessors.dart';
 part '_dynamic_activity_sheet_hydration.dart';
+part '_dynamic_activity_sheet_occurrence_hydration.dart';
+part '_dynamic_activity_sheet_occurrence_extra_fields.dart';
+part '_dynamic_activity_sheet_occurrence_nature.dart';
+part '_dynamic_activity_sheet_occurrence_timeline.dart';
 part '_dynamic_activity_sheet_lifecycle.dart';
 part '_dynamic_activity_sheet_status.dart';
 part '_dynamic_activity_sheet_layout.dart';
 part '_dynamic_activity_sheet_save.dart';
+part '_dynamic_activity_sheet_category_save.dart';
+part '_dynamic_activity_sheet_occurrence_open_incident.dart';
+part '_dynamic_activity_sheet_occurrence_payload.dart';
 part '_dynamic_activity_sheet_occurrence_save.dart';
 
 // Constantes HUD (compartilhadas com part files)

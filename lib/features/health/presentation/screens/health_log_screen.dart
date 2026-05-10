@@ -6,9 +6,16 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 
 part 'health_log_timeline.dart';
-part 'health_log_timeline_widgets.dart';
+part 'health_log_filter_bar.dart';
+part 'health_log_timeline_list.dart';
+part 'health_log_timeline_item.dart';
+part 'health_log_timeline_item_body.dart';
+part 'health_log_expanded_details.dart';
+part 'health_log_empty_state.dart';
 part 'health_log_new_form.dart';
-part 'health_log_new_form_widgets.dart';
+part 'health_log_type_selector.dart';
+part 'health_log_form_fields.dart';
+part 'health_log_save_button.dart';
 part 'health_log_helpers.dart';
 
 class HealthLogScreen extends StatefulWidget {

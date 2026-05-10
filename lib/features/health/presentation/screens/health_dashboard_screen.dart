@@ -12,11 +12,18 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 
 part 'health_dashboard_helpers.dart';
 part 'health_bio_header.dart';
+part 'health_bio_avatar.dart';
+part 'health_readiness_hud_bar.dart';
 part 'health_sensor_cards.dart';
-part 'health_sensor_card_widgets.dart';
+part 'health_sensor_card.dart';
+part 'health_weight_update_dialog.dart';
 part 'health_weight_section.dart';
 part 'health_timeline_section.dart';
 part 'health_timeline_log_card.dart';
+part 'health_timeline_log_card_header.dart';
+part 'health_timeline_log_card_body.dart';
+part 'health_timeline_log_attachments.dart';
+part 'health_timeline_log_style.dart';
 part 'health_weight_chart_painter.dart';
 
 class HealthDashboardScreen extends StatefulWidget {

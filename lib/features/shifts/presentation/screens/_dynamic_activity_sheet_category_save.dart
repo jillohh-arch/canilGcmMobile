@@ -1,0 +1,104 @@
+// ignore_for_file: invalid_use_of_protected_member
+
+part of 'dynamic_activity_sheet.dart';
+
+extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
+  Future<void> _saveByCategory({
+    required AuthViewModel authVM,
+    required RoutineViewModel routineVM,
+    required TrainingViewModel trainingVM,
+    required IncidentViewModel incidentVM,
+    required HealthViewModel healthVM,
+    required UserViewModel userVM,
+  }) async {
+    if (widget.category == 'Rotina') {
+      await _saveRoutine(routineVM: routineVM, authVM: authVM);
+      return;
+    }
+
+    if (widget.category == 'Treino') {
+      _setSaveStatus('Salvando treino no Firebase...');
+      await _saveTraining(trainingVM: trainingVM, authVM: authVM);
+      return;
+    }
+
+    if (_isOccurrenceCategory || widget.category == 'Evento') {
+      await _saveOccurrenceOrEvent(
+        authVM: authVM,
+        incidentVM: incidentVM,
+        userVM: userVM,
+      );
+      return;
+    }
+
+    if (widget.category == 'Saude') {
+      await _saveHealth(healthVM: healthVM);
+    }
+  }
+
+  Future<void> _saveTraining({
+    required TrainingViewModel trainingVM,
+    required AuthViewModel authVM,
+  }) async {
+    await _trainingCtrl.save(
+      trainingVM: trainingVM,
+      authVM: authVM,
+      selectedSubtype: _selectedSubtype,
+      formData: _formData,
+      mediaAttachments: _mediaAttachments,
+      onStatus: (msg) {
+        if (mounted) setState(() => _saveStatus = msg);
+      },
+      onUploading: _markMediaUploading,
+      onUploaded: _markMediaUploaded,
+      onPending: _markMediaPending,
+    );
+  }
+
+  Future<void> _saveRoutine({
+    required RoutineViewModel routineVM,
+    required AuthViewModel authVM,
+  }) async {
+    _setSaveStatus('Salvando rotina no Firebase...');
+    await _routineCtrl.save(
+      routineVM: routineVM,
+      authVM: authVM,
+      selectedSubtype: _selectedSubtype,
+      formData: _formData,
+      mediaAttachments: _mediaAttachments,
+      resolvedTimestamp: _resolveFormTimestamp(),
+      onStatus: (msg) {
+        if (mounted) setState(() => _saveStatus = msg);
+      },
+      onUploading: _markMediaUploading,
+      onUploaded: _markMediaUploaded,
+      onPending: _markMediaPending,
+    );
+  }
+
+  Future<void> _saveHealth({required HealthViewModel healthVM}) async {
+    _setSaveStatus('Salvando prontuário no Firebase...');
+    await _healthCtrl.save(
+      healthVM: healthVM,
+      selectedSubtype: _selectedSubtype,
+      formData: _formData,
+      mediaAttachments: _mediaAttachments,
+      resolvedTimestamp: _resolveFormTimestamp(),
+      onStatus: (msg) {
+        if (mounted) setState(() => _saveStatus = msg);
+      },
+      onUploading: _markMediaUploading,
+      onUploaded: _markMediaUploaded,
+      onPending: _markMediaPending,
+    );
+  }
+
+  void _saveOccurrenceInProgress() {
+    setState(() {
+      _occurrenceStatus = OccurrenceFormController.statusInProgress;
+      _occurrenceSuccessful = null;
+      _showOccurrenceFinalization = false;
+    });
+    _save(closeAfterSave: false);
+  }
+}

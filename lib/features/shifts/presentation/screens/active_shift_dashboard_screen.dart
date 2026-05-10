@@ -21,12 +21,22 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
-part 'active_shift_dashboard_widgets.dart';
-part 'active_shift_metrics_widgets.dart';
+part 'active_shift_dog_info_card.dart';
+part 'active_shift_dog_readiness_summary.dart';
+part 'active_shift_cockpit_mini_stat.dart';
+part 'active_shift_weather_card.dart';
+part 'active_shift_shift_metrics_card.dart';
+part 'active_shift_today_record_counter.dart';
 part 'active_shift_health_alert.dart';
-part 'active_shift_activity_widgets.dart';
+part 'active_shift_activity_entry.dart';
+part 'active_shift_today_activities_card.dart';
+part 'active_shift_activity_row.dart';
+part 'active_shift_pulsing_indicator.dart';
 part 'active_shift_readiness.dart';
 part 'active_shift_cockpit.dart';
+part 'active_shift_hero_visuals.dart';
+part 'active_shift_hero_identity.dart';
+part 'active_shift_status_pill.dart';
 part 'active_shift_dog_switcher.dart';
 
 const _hudBackground = Color(0xFF070B14);
