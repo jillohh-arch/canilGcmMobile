@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+part 'occurrence_active_footer_actions.dart';
+
 class OccurrenceActiveFooter extends StatelessWidget {
   final bool showFinalization;
   final bool hasActiveOccurrenceRecord;
@@ -36,76 +38,28 @@ class OccurrenceActiveFooter extends StatelessWidget {
       children: [
         saveStatusPanel,
         if (showFinalization)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isSaving ? null : onCancelFinalization,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Color(0x4400E5FF)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: Text(
-                    'VOLTAR',
-                    style: GoogleFonts.robotoMono(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: SizedBox(height: 52, child: finalSaveButton)),
-            ],
+          _OccurrenceFinalizationActionRow(
+            isSaving: isSaving,
+            finalSaveButton: finalSaveButton,
+            onCancelFinalization: onCancelFinalization,
           )
         else if (!hasActiveOccurrenceRecord)
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: isSaving ? null : onStartOccurrence,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(
-                'INICIAR OCORRÊNCIA',
-                style: GoogleFonts.robotoMono(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: backgroundColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
+          _OccurrencePrimaryFooterButton(
+            label: 'INICIAR OCORRÊNCIA',
+            icon: Icons.play_arrow_rounded,
+            backgroundColor: accentColor,
+            foregroundColor: backgroundColor,
+            isSaving: isSaving,
+            onPressed: onStartOccurrence,
           )
         else
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: isSaving ? null : onRequestFinalization,
-              icon: const Icon(Icons.flag_rounded),
-              label: Text(
-                'FINALIZAR OCORRÊNCIA',
-                style: GoogleFonts.robotoMono(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: dangerColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
+          _OccurrencePrimaryFooterButton(
+            label: 'FINALIZAR OCORRÊNCIA',
+            icon: Icons.flag_rounded,
+            backgroundColor: dangerColor,
+            foregroundColor: Colors.white,
+            isSaving: isSaving,
+            onPressed: onRequestFinalization,
           ),
       ],
     );

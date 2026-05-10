@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 
+part 'occurrence_nature_search_hint.dart';
+part 'occurrence_nature_search_options.dart';
+
 typedef OccurrenceNatureFieldBuilder =
     Widget Function(
       BuildContext context,
@@ -50,14 +53,7 @@ class OccurrenceNatureSearch extends StatelessWidget {
           optionsViewBuilder: _buildOptionsView,
         ),
         const SizedBox(height: 8),
-        Text(
-          'Digite parte da natureza ou do código. A busca ignora acentos.',
-          style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(115),
-            fontSize: 11,
-            height: 1.35,
-          ),
-        ),
+        const _OccurrenceNatureSearchHint(),
       ],
     );
   }
@@ -86,95 +82,11 @@ class OccurrenceNatureSearch extends StatelessWidget {
     AutocompleteOnSelected<OccurrenceNature> onSelected,
     Iterable<OccurrenceNature> options,
   ) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width - 32,
-          constraints: const BoxConstraints(maxHeight: 280),
-          margin: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            color: panelColor,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: accent.withAlpha(130)),
-            boxShadow: [BoxShadow(color: accent.withAlpha(35), blurRadius: 18)],
-          ),
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            shrinkWrap: true,
-            itemCount: options.length,
-            itemBuilder: (context, index) {
-              final option = options.elementAt(index);
-              return InkWell(
-                onTap: () => onSelected(option),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accent.withAlpha(16),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: accent.withAlpha(100)),
-                        ),
-                        child: Text(
-                          option.code.isEmpty ? 'MAN' : option.code,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.robotoMono(
-                            color: accent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              option.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              option.group,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.robotoMono(
-                                color: Colors.white.withAlpha(115),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
+    return _OccurrenceNatureOptionsView(
+      panelColor: panelColor,
+      accent: accent,
+      options: options,
+      onSelected: onSelected,
     );
   }
 }

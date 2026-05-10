@@ -3,13 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-part 'occurrence_close_wizard_widgets.dart';
+part 'occurrence_close_wizard_notices.dart';
+part 'occurrence_close_wizard_roadmap.dart';
+part 'occurrence_close_wizard_step_shell.dart';
 part 'occurrence_close_wizard_result_card.dart';
 part 'occurrence_close_wizard_models.dart';
 part 'occurrence_close_wizard_config.dart';
 part 'occurrence_close_wizard_drug_fields.dart';
+part 'occurrence_close_wizard_speech.dart';
+part 'occurrence_close_wizard_navigation.dart';
 part 'occurrence_close_wizard_flow.dart';
 part 'occurrence_close_wizard_steps.dart';
+part 'occurrence_close_wizard_detail_fields.dart';
 
 class OccurrenceCloseWizard extends StatefulWidget {
   final VoidCallback onCancel;

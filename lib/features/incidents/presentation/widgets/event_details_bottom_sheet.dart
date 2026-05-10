@@ -4,7 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
-part 'event_details_bottom_sheet_components.dart';
+part 'event_details_bottom_sheet_header.dart';
+part 'event_details_bottom_sheet_evidence.dart';
+part 'event_details_bottom_sheet_actions.dart';
+part 'event_details_bottom_sheet_detail_line.dart';
 
 class OccurrenceEventDetailsSheet extends StatelessWidget {
   final IncidentProgressUpdate update;

@@ -4,7 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 
 part 'occurrence_timeline_event_visuals.dart';
-part 'occurrence_timeline_tile.dart';
+part 'occurrence_timeline_event_body.dart';
+part 'occurrence_timeline_leading_visual.dart';
+part 'occurrence_timeline_meta.dart';
+part 'occurrence_timeline_tile_card.dart';
 
 class OccurrenceTimelinePreview extends StatelessWidget {
   final List<IncidentProgressUpdate> updates;

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-part 'occurrence_command_header_components.dart';
+part 'occurrence_command_header_binomium.dart';
+part 'occurrence_command_header_metrics.dart';
+part 'occurrence_command_header_visuals.dart';
 
 class OccurrenceCommandHeader extends StatelessWidget {
   final String nature;

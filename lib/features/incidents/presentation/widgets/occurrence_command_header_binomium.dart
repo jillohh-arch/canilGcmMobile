@@ -1,32 +1,5 @@
 part of 'occurrence_command_header.dart';
 
-class _ClipboardIcon extends StatelessWidget {
-  final Color accent;
-
-  const _ClipboardIcon({required this.accent});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: accent.withAlpha(16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: accent.withAlpha(135)),
-      ),
-      child: Icon(Icons.assignment_rounded, color: accent, size: 25),
-    );
-  }
-}
-
-/// Bloco "binômio" — apresenta K9 + condutor como UMA unidade visual:
-/// dois avatares circulares com leve sobreposição no centro, nomes
-/// lado a lado abaixo, e os labels "K9"/"GCM" como rótulos pequenos
-/// na cor do respectivo agente.
-///
-/// Substitui o pattern anterior (avatares nas pontas + divisor central)
-/// que comunicava separação em vez de união.
 class _BinomiumBlock extends StatelessWidget {
   final String dogName;
   final String? dogImageUrl;
@@ -83,9 +56,6 @@ class _BinomiumBlock extends StatelessWidget {
   }
 }
 
-/// Par de avatares circulares com leve sobreposição no centro.
-/// O cão à esquerda, o GCM à direita. Sobreposição de ~14px comunica
-/// "estes dois estão juntos" sem virar uma única blob.
 class _AvatarPair extends StatelessWidget {
   final String? dogImageUrl;
   final Color dogAccent;
@@ -103,6 +73,7 @@ class _AvatarPair extends StatelessWidget {
   Widget build(BuildContext context) {
     const avatarSize = 60.0;
     const overlap = 14.0;
+
     return SizedBox(
       width: avatarSize * 2 - overlap,
       height: avatarSize,
@@ -133,7 +104,6 @@ class _AvatarPair extends StatelessWidget {
   }
 }
 
-/// Nome do agente (K9 ou GCM) com label pequeno embaixo na cor de accent.
 class _NameLabel extends StatelessWidget {
   final String name;
   final String label;
@@ -216,97 +186,6 @@ class _Avatar extends StatelessWidget {
                 )
               : Icon(fallbackIcon, color: accent, size: size * 0.45),
         ),
-      ),
-    );
-  }
-}
-
-class _WideMetric extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String label;
-  final Color accent;
-
-  const _WideMetric({
-    required this.icon,
-    required this.title,
-    required this.label,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(150),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accent.withAlpha(95)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: accent, size: 16),
-          const SizedBox(width: 8),
-          Text(
-            title.toUpperCase(),
-            style: GoogleFonts.robotoMono(
-              color: Colors.white.withAlpha(115),
-              fontSize: 8.5,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.oxanium(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _HeaderChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withAlpha(14),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withAlpha(150)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: GoogleFonts.robotoMono(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-            ),
-          ),
-        ],
       ),
     );
   }
