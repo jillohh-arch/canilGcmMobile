@@ -5,7 +5,12 @@ import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
 part 'event_details_bottom_sheet_header.dart';
+part 'event_details_bottom_sheet_frame.dart';
+part 'event_details_bottom_sheet_form.dart';
+part 'event_details_bottom_sheet_meta.dart';
 part 'event_details_bottom_sheet_evidence.dart';
+part 'event_details_bottom_sheet_evidence_actions.dart';
+part 'event_details_bottom_sheet_evidence_rows.dart';
 part 'event_details_bottom_sheet_actions.dart';
 part 'event_details_bottom_sheet_detail_line.dart';
 
@@ -51,84 +56,49 @@ class OccurrenceEventDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        margin: const EdgeInsets.all(14),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: accentColor.withAlpha(135)),
-          boxShadow: [
-            BoxShadow(color: accentColor.withAlpha(38), blurRadius: 24),
-          ],
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Header(accentColor: accentColor),
-              const SizedBox(height: 12),
-              _EventDetailLine(
-                icon: Icons.schedule_rounded,
-                label: 'Data e hora',
-                value: timestampLabel,
-                color: accentColor,
-              ),
-              if ((update.authorName ?? '').isNotEmpty)
-                _EventDetailLine(
-                  icon: Icons.person_rounded,
-                  label: 'Operador',
-                  value: update.authorName!,
-                  color: successColor,
-                ),
-              if (eventLocation.isNotEmpty)
-                _EventDetailLine(
-                  icon: Icons.location_on_rounded,
-                  label: 'Local',
-                  value: eventLocation,
-                  color: warningColor,
-                ),
-              const SizedBox(height: 12),
-              TacticalTextField(
-                controller: titleController,
-                labelText: 'Título do evento',
-                prefixIcon: Icons.label_rounded,
-              ),
-              const SizedBox(height: 10),
-              TacticalTextField(
-                controller: descriptionController,
-                labelText: 'Observação',
-                prefixIcon: Icons.notes_rounded,
-                maxLines: 4,
-                minLines: 2,
-              ),
-              const SizedBox(height: 14),
-              _EvidencePanel(
-                panelColor: panelColor,
-                accentColor: accentColor,
-                successColor: successColor,
-                warningColor: warningColor,
-                eventAttachments: eventAttachments,
-                pendingPhotoCount: pendingPhotoCount,
-                onAddPhotos: onAddPhotos,
-                onCaptureLocation: onCaptureLocation,
-              ),
-              const SizedBox(height: 14),
-              _EventDetailsActions(
-                backgroundColor: backgroundColor,
-                accentColor: accentColor,
-                dangerColor: dangerColor,
-                onDelete: onDelete,
-                onSave: onSave,
-              ),
-            ],
+    return _EventDetailsFrame(
+      bottomInset: MediaQuery.of(context).viewInsets.bottom,
+      backgroundColor: backgroundColor,
+      accentColor: accentColor,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Header(accentColor: accentColor),
+          const SizedBox(height: 12),
+          _EventDetailsMetaList(
+            update: update,
+            timestampLabel: timestampLabel,
+            eventLocation: eventLocation,
+            accentColor: accentColor,
+            successColor: successColor,
+            warningColor: warningColor,
           ),
-        ),
+          const SizedBox(height: 12),
+          _EventDetailsFormFields(
+            titleController: titleController,
+            descriptionController: descriptionController,
+          ),
+          const SizedBox(height: 14),
+          _EvidencePanel(
+            panelColor: panelColor,
+            accentColor: accentColor,
+            successColor: successColor,
+            warningColor: warningColor,
+            eventAttachments: eventAttachments,
+            pendingPhotoCount: pendingPhotoCount,
+            onAddPhotos: onAddPhotos,
+            onCaptureLocation: onCaptureLocation,
+          ),
+          const SizedBox(height: 14),
+          _EventDetailsActions(
+            backgroundColor: backgroundColor,
+            accentColor: accentColor,
+            dangerColor: dangerColor,
+            onDelete: onDelete,
+            onSave: onSave,
+          ),
+        ],
       ),
     );
   }

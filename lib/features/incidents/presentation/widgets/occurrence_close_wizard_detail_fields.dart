@@ -32,120 +32,30 @@ extension _OccurrenceCloseWizardDetailFields on _OccurrenceCloseWizardState {
   }
 
   List<Widget> _fieldsFor(String result) {
-    List<Widget> spaced(List<Widget> fields) {
-      return [
-        for (var i = 0; i < fields.length; i++) ...[
-          fields[i],
-          if (i < fields.length - 1) const SizedBox(height: 10),
-        ],
-      ];
+    if (result == 'Droga apreendida') {
+      return _spaced([_drugRowsField()]);
     }
 
-    if (result == 'Droga apreendida') {
-      return spaced([_drugRowsField()]);
-    }
-    if (result == 'Objetos apreendidos') {
-      return spaced([
-        _detailField(
-          'Descrição dos objetos',
-          'objetos_descricao',
-          Icons.inventory_2_rounded,
-        ),
-        _detailField(
-          'Quantidade',
-          'objetos_quantidade',
-          Icons.numbers_rounded,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
-      ]);
-    }
-    if (result == 'Veículo detido') {
-      return spaced([
-        _detailField(
-          'Tipo de veículo',
-          'veiculo_tipo',
-          Icons.directions_car_rounded,
-        ),
-        _detailField('Placa', 'veiculo_placa', Icons.pin_rounded),
-      ]);
-    }
-    if (result == 'Indivíduo detido') {
-      return spaced([
-        _detailField(
-          'Quantidade de indivíduos',
-          'individuo_quantidade',
-          Icons.group_rounded,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
-        _detailField(
-          'Destino / apresentação',
-          'individuo_destino',
-          Icons.account_balance_rounded,
-        ),
-      ]);
-    }
-    if (result == 'Apoio prestado') {
-      return spaced([
-        _detailField(
-          'Apoio prestado a',
-          'apoio_destino',
-          Icons.handshake_rounded,
-        ),
-        _detailField(
-          'Observação do apoio',
-          'apoio_observacao',
-          Icons.notes_rounded,
-        ),
-      ]);
-    }
-    if (result == 'BO elaborado') {
-      return spaced([
-        _detailField('Número do BO', 'bo_numero', Icons.article_rounded),
-      ]);
-    }
-    if (result == 'Encaminhamento médico') {
-      return spaced([
-        _detailField(
-          'Local de encaminhamento',
-          'encaminhamento_local',
-          Icons.local_hospital_rounded,
-        ),
-        _detailField(
-          'Observação médica',
-          'encaminhamento_observacao',
-          Icons.medical_information_rounded,
-        ),
-      ]);
-    }
-    return spaced([
-      _detailField(
-        'Descrição',
-        '${result}_descricao',
-        Icons.description_rounded,
-      ),
-    ]);
+    final specs = _detailSpecsForResult(result);
+    return _spaced(specs.map(_detailField).toList());
   }
 
-  Widget _detailField(
-    String label,
-    String key,
-    IconData icon, {
-    TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters,
-    String? suffixText,
-  }) {
+  List<Widget> _spaced(List<Widget> fields) {
+    return [
+      for (var i = 0; i < fields.length; i++) ...[
+        fields[i],
+        if (i < fields.length - 1) const SizedBox(height: 10),
+      ],
+    ];
+  }
+
+  Widget _detailField(_CloseDetailFieldSpec spec) {
     return TextField(
-      controller: _detailController(key),
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
+      controller: _detailController(spec.key),
+      keyboardType: spec.keyboardType,
+      inputFormatters: spec.inputFormatters,
       style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
-      decoration: _fieldDecoration(
-        hint: label,
-        icon: icon,
-        suffixText: suffixText,
-      ),
+      decoration: _fieldDecoration(hint: spec.label, icon: spec.icon),
     );
   }
 }

@@ -5,6 +5,9 @@ import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 
 part 'occurrence_nature_search_hint.dart';
 part 'occurrence_nature_search_options.dart';
+part 'occurrence_nature_search_option_badge.dart';
+part 'occurrence_nature_search_option_texts.dart';
+part 'occurrence_nature_search_option_tile.dart';
 
 typedef OccurrenceNatureFieldBuilder =
     Widget Function(

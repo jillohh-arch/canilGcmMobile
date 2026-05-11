@@ -5,6 +5,8 @@ import 'package:canil_gcm/core/widgets/hud_controls.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
 part 'occurrence_detection_drug_list.dart';
+part 'occurrence_detection_drug_add_button.dart';
+part 'occurrence_detection_drug_row.dart';
 part 'occurrence_detection_support_fields.dart';
 
 class OccurrenceDetectionFields extends StatelessWidget {

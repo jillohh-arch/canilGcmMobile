@@ -14,9 +14,16 @@ import '../widgets/occurrence_nature_search.dart';
 
 part 'incident_feed_widgets.dart';
 part 'incident_feed_components.dart';
+part 'incident_feed_card.dart';
+part 'incident_feed_card_header.dart';
+part 'incident_feed_card_sections.dart';
+part 'incident_feed_empty_state.dart';
 part 'incident_new_form.dart';
 part 'incident_new_hero_widgets.dart';
-part 'incident_new_form_widgets.dart';
+part 'incident_new_context_widgets.dart';
+part 'incident_new_info_card.dart';
+part 'incident_new_nature_field.dart';
+part 'incident_new_start_button.dart';
 part 'incident_tactical_grid_painter.dart';
 
 class IncidentFormScreen extends StatefulWidget {

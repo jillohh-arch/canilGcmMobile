@@ -5,15 +5,27 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 part 'occurrence_close_wizard_notices.dart';
 part 'occurrence_close_wizard_roadmap.dart';
+part 'occurrence_close_wizard_roadmap_header.dart';
+part 'occurrence_close_wizard_roadmap_step.dart';
 part 'occurrence_close_wizard_step_shell.dart';
+part 'occurrence_close_wizard_instruction_box.dart';
+part 'occurrence_close_wizard_narration_button.dart';
 part 'occurrence_close_wizard_result_card.dart';
 part 'occurrence_close_wizard_models.dart';
 part 'occurrence_close_wizard_config.dart';
 part 'occurrence_close_wizard_drug_fields.dart';
+part 'occurrence_close_wizard_drug_add_button.dart';
+part 'occurrence_close_wizard_drug_entry_row.dart';
 part 'occurrence_close_wizard_speech.dart';
 part 'occurrence_close_wizard_navigation.dart';
+part 'occurrence_close_wizard_field_decoration.dart';
+part 'occurrence_close_wizard_finish_payload.dart';
 part 'occurrence_close_wizard_flow.dart';
+part 'occurrence_close_wizard_report_step.dart';
+part 'occurrence_close_wizard_result_step.dart';
+part 'occurrence_close_wizard_details_step.dart';
 part 'occurrence_close_wizard_steps.dart';
+part 'occurrence_close_wizard_detail_specs.dart';
 part 'occurrence_close_wizard_detail_fields.dart';
 
 class OccurrenceCloseWizard extends StatefulWidget {
