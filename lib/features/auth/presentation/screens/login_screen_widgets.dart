@@ -19,9 +19,9 @@ class _LoginBrand extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _LoginScreenState._hudCyan.withAlpha(95),
-                  blurRadius: 34,
-                  spreadRadius: 3,
+                  color: _LoginScreenState._hudCyan.withAlpha(60),
+                  blurRadius: 16,
+                  spreadRadius: 1,
                 ),
               ],
             ),
@@ -44,7 +44,7 @@ class _LoginBrand extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'SISTEMA TÁTICO OPERACIONAL K9',
+            'SISTEMA OPERACIONAL K9 — CANIL GCM',
             style: GoogleFonts.robotoMono(
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -238,56 +238,38 @@ class _SecondaryAuthSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          'AUTENTICAÇÃO SECUNDÁRIA',
-          style: GoogleFonts.robotoMono(
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
-            color: Colors.white38,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _SocialButton(
-          iconWidget: const Icon(
-            Icons.fingerprint_rounded,
-            color: Colors.white70,
-            size: 28,
-          ),
-          onTap: onBiometricTap,
-        ),
-      ],
-    );
+    // Descontinuado — biometria agora é primária
+    return const SizedBox.shrink();
   }
 }
 
-class _SocialButton extends StatelessWidget {
-  final Widget iconWidget;
-  final VoidCallback onTap;
+class _BiometricPrimaryAction extends StatelessWidget {
+  final VoidCallback onPressed;
 
-  const _SocialButton({required this.iconWidget, required this.onTap});
+  const _BiometricPrimaryAction({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF101827).withAlpha(220),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: _LoginScreenState._hudCyan.withAlpha(80)),
-          boxShadow: [
-            BoxShadow(
-              color: _LoginScreenState._hudCyan.withAlpha(28),
-              blurRadius: 18,
-            ),
-          ],
+    return SizedBox(
+      height: 64,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.fingerprint_rounded, size: 30),
+        label: Text(
+          'ENTRAR COM BIOMETRIA',
+          style: GoogleFonts.oxanium(
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+            letterSpacing: 1.0,
+          ),
         ),
-        child: iconWidget,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _LoginScreenState._hudCyan,
+          foregroundColor: _LoginScreenState._hudBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          elevation: 6,
+          shadowColor: _LoginScreenState._hudCyan.withAlpha(80),
+        ),
       ),
     );
   }

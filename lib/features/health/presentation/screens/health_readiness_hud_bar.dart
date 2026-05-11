@@ -31,7 +31,7 @@ class _ReadinessHudBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'PRONTIDÃO OPERACIONAL',
+              'PRONTIDÃO',
               style: GoogleFonts.oxanium(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,

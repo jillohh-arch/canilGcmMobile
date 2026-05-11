@@ -26,9 +26,9 @@ class _HudDogSelectionCard extends StatelessWidget {
           border: Border.all(color: _hudCyan.withAlpha(125), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: _hudCyan.withAlpha(28),
-              blurRadius: 24,
-              spreadRadius: 1,
+              color: _hudCyan.withAlpha(18),
+              blurRadius: 14,
+              spreadRadius: 0,
             ),
             const BoxShadow(
               color: Colors.black54,
@@ -42,12 +42,6 @@ class _HudDogSelectionCard extends StatelessWidget {
           children: [
             Positioned.fill(child: _DogBackdrop(dog: dog)),
             const Positioned.fill(child: _DogCardScrim()),
-            Positioned(top: 12, left: 12, child: HudCorner(_hudCyan, size: 22)),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: HudCorner(_hudCyan, flip: true, size: 22),
-            ),
             Positioned(
               top: 18,
               right: 18,
@@ -62,6 +56,8 @@ class _HudDogSelectionCard extends StatelessWidget {
                 child: Column(
                   children: [
                     const Spacer(),
+                    _DogIdentity(dog: dog),
+                    const SizedBox(height: 14),
                     _ReadinessBar(value: readiness),
                     const SizedBox(height: 14),
                     _DogMetricRow(dog: dog),
@@ -71,8 +67,6 @@ class _HudDogSelectionCard extends StatelessWidget {
                       label: 'ÚLTIMO TREINO',
                       value: lastTraining,
                     ),
-                    const SizedBox(height: 12),
-                    _DogIdentity(dog: dog),
                     const SizedBox(height: 16),
                     _StartShiftButton(isStarting: isStarting),
                   ],

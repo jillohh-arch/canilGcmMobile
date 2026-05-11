@@ -68,15 +68,6 @@ extension _ActiveShiftReadiness on _ActiveShiftDashboardScreenState {
       readinessStreak: streak,
     );
     await dogVM.saveDog(updatedDog);
-
-    if (((streak['days90'] as int?) ?? 0) >= 30 &&
-        dog.conductorRa == currentRa) {
-      await userVM.grantBadge(currentRa, 'guardiao');
-    }
-    if (((streak['days95'] as int?) ?? 0) >= 90 &&
-        dog.conductorRa == currentRa) {
-      await userVM.grantBadge(currentRa, 'sentinela_da_saude');
-    }
   }
 
   int _calculateOperationalReadiness(Dog dog) {

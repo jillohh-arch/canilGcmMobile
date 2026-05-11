@@ -54,7 +54,7 @@ extension _DailyTimelineList on _DailyTimelineScreenState {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 16, 10, 32),
+      padding: const EdgeInsets.fromLTRB(0, 16, 10, 100),
       itemCount: entries.length,
       itemBuilder: (context, index) => _buildTimelineTile(
         entry: entries[index],

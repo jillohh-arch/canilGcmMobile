@@ -18,11 +18,11 @@ const _healthDashboardMonthNames = [
 
 String _formatMilitaryDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
-  final month = _healthDashboardMonthNames[date.month];
-  final year = date.year.toString().substring(2);
+  final month = date.month.toString().padLeft(2, '0');
+  final year = date.year.toString();
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
-  return '$day$month$year - $hour:${minute}h';
+  return '$day/$month/$year às $hour:$minute';
 }
 
 String _formatShortDate(DateTime? date) {
@@ -39,7 +39,7 @@ extension _HealthDashboardScaffoldParts on _HealthDashboardScreenState {
       backgroundColor: const Color(0xFF030712),
       elevation: 0,
       title: Text(
-        'BIO-SURVEILLANCE',
+        'SAÚDE DO K9',
         style: GoogleFonts.oxanium(
           fontSize: 12,
           fontWeight: FontWeight.w900,

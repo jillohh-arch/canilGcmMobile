@@ -3,9 +3,9 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 import 'package:canil_gcm/features/health/data/health_service.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 
 class HealthViewModel extends ChangeNotifier {
   final HealthService _healthService = HealthService();
@@ -32,7 +32,14 @@ class HealthViewModel extends ChangeNotifier {
       developer.log('Health log added: ${newLog.id}', name: 'HealthViewModel');
 
       await _syncDogHealthSnapshotSafely(newLog);
-      await _evaluateGamificationSafely(newLog);
+
+      AuditService.log(
+        action: 'create',
+        entityType: 'health',
+        entityId: newLog.id ?? '',
+        summary: 'Registro de saúde criado: ${newLog.logType} — ${newLog.dogId}',
+        after: {'logType': newLog.logType, 'dogId': newLog.dogId, 'observations': newLog.healthObservations},
+      );
 
       _setLoading(false);
     } catch (e) {
@@ -59,6 +66,14 @@ class HealthViewModel extends ChangeNotifier {
 
       await _syncDogHealthSnapshotSafely(log);
 
+      AuditService.log(
+        action: 'update',
+        entityType: 'health',
+        entityId: log.id ?? '',
+        summary: 'Registro de saúde editado: ${log.logType} — ${log.dogId}',
+        after: {'logType': log.logType, 'dogId': log.dogId, 'observations': log.healthObservations},
+      );
+
       developer.log('Health log updated: ${log.id}', name: 'HealthViewModel');
       _setLoading(false);
     } catch (e) {
@@ -77,6 +92,13 @@ class HealthViewModel extends ChangeNotifier {
       _setLoading(true);
       await _healthService.deleteHealthLog(id);
       _healthLogs.removeWhere((h) => h.id == id);
+
+      AuditService.log(
+        action: 'delete',
+        entityType: 'health',
+        entityId: id,
+        summary: 'Registro de saúde excluído: $id',
+      );
 
       developer.log('Health log deleted: $id', name: 'HealthViewModel');
       _setLoading(false);
@@ -133,15 +155,4 @@ class HealthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _evaluateGamificationSafely(HealthLogModel log) async {
-    try {
-      await GamificationService().evaluateHealthLog(log.dogId, log.logType);
-    } catch (e) {
-      developer.log(
-        'Health log saved, but gamification evaluation failed: $e',
-        name: 'HealthViewModel',
-        error: e,
-      );
-    }
-  }
 }

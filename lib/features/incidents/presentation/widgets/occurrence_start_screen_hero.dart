@@ -68,9 +68,9 @@ class _OccurrenceStartDogAvatar extends StatelessWidget {
         border: Border.all(color: accentColor, width: 2),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withAlpha(95),
-            blurRadius: 36,
-            spreadRadius: 2,
+            color: accentColor.withAlpha(50),
+            blurRadius: 16,
+            spreadRadius: 1,
           ),
         ],
       ),

@@ -118,7 +118,7 @@ class _HudGlow extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(color: color, blurRadius: size / 2, spreadRadius: 18),
+            BoxShadow(color: color, blurRadius: size / 2, spreadRadius: 6),
           ],
         ),
       ),

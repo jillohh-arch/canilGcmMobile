@@ -103,23 +103,9 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> grantBadge(String ra, String badgeId) async {
-    try {
-      final userIndex = _users.indexWhere((u) => u.ra == ra);
-      if (userIndex != -1) {
-        final user = _users[userIndex];
-        if (!user.userBadges.contains(badgeId)) {
-          final updatedUser = user.copyWith(
-            userBadges: [...user.userBadges, badgeId],
-          );
-          await _userService.saveUser(updatedUser);
-        }
-      }
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-    }
-  }
+  /// Descontinuado — gamificação removida.
+  Future<void> grantBadge(String ra, String badgeId) async {}
+}
 
   Future<void> deleteUser(String ra) async {
     try {

@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/data/auth_service.dart';
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 import 'package:canil_gcm/features/shifts/data/shift_service.dart';
 import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 
 class ShiftViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -55,12 +55,20 @@ class ShiftViewModel extends ChangeNotifier {
         dogId: dogId,
         startedAt: startedAt,
       );
-      await GamificationService().evaluateShiftStart(resolvedHandlerId);
       _session = ActiveShiftSession(
         handlerId: resolvedHandlerId,
         dogId: dogId,
         startedAt: startedAt,
       );
+
+      AuditService.log(
+        action: 'create',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'Turno iniciado: condutor $resolvedHandlerId com K9 $dogId',
+        after: {'handlerId': resolvedHandlerId, 'dogId': dogId, 'startedAt': startedAt.toIso8601String()},
+      );
+
       _setLoading(false);
     } catch (e) {
       _error = 'Falha ao sincronizar turno: $e';
@@ -108,6 +116,15 @@ class ShiftViewModel extends ChangeNotifier {
 
     try {
       await _shiftService.endShift(resolvedHandlerId);
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'Turno encerrado: condutor $resolvedHandlerId',
+        after: {'endedAt': DateTime.now().toIso8601String()},
+      );
+
       _clearSession();
       _setLoading(false);
     } catch (e) {

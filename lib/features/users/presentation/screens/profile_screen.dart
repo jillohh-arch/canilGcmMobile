@@ -10,23 +10,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
-import 'package:canil_gcm/features/gamification/domain/badge_progress.dart';
-import 'package:canil_gcm/features/gamification/domain/level_progress.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
-import 'package:canil_gcm/features/gamification/domain/weekly_mission_progress.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
-import 'package:canil_gcm/features/gamification/domain/badges_data.dart';
-import 'package:canil_gcm/features/gamification/presentation/widgets/gamification_progress_widgets.dart';
 
 part 'profile_screen_sections.dart';
 part 'profile_hero_widgets.dart';
 part 'profile_edit_widgets.dart';
 part 'profile_identification_widgets.dart';
-part 'profile_gamification_sections.dart';
-part 'profile_gamification_widgets.dart';
-part 'profile_badge_gallery_widgets.dart';
 part 'profile_shift_section.dart';
 
 const _hudBackground = Color(0xFF070B14);
@@ -51,33 +42,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSaving = false;
   bool _isEndingShift = false;
   File? _newPhotoFile;
-  Future<Map<String, BadgeProgress>>? _badgeProgressFuture;
-  Future<List<WeeklyMissionProgress>>? _weeklyMissionFuture;
-  String? _badgeProgressRa;
-  String? _weeklyMissionRa;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _callsignController = TextEditingController();
-  }
-
-  void _ensureBadgeProgressLoaded(String? ra) {
-    if (ra == null || ra.isEmpty) return;
-    if (_badgeProgressRa == ra && _badgeProgressFuture != null) return;
-    _badgeProgressRa = ra;
-    _badgeProgressFuture = GamificationService().getBadgeProgress(ra);
-  }
-
-  void _ensureWeeklyMissionsLoaded(String? ra) {
-    if (ra == null || ra.isEmpty) return;
-    if (_weeklyMissionRa == ra && _weeklyMissionFuture != null) return;
-    _weeklyMissionRa = ra;
-    _weeklyMissionFuture = (() async {
-      await GamificationService().syncWeeklyMissions(ra);
-      return GamificationService().getWeeklyMissionProgress(ra);
-    })();
   }
 
   @override
@@ -207,13 +177,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _nameController.text = nameStr;
         }
 
-        final int xp = userModel?.xp ?? 0;
-        final int level = GamificationService.calculateLevel(xp);
-        final LevelProgress levelProgress =
-            GamificationService.getLevelProgress(xp);
-        _ensureBadgeProgressLoaded(currentRa);
-        _ensureWeeklyMissionsLoaded(currentRa);
-
         return Scaffold(
           backgroundColor: _hudBackground,
           body: CustomScrollView(
@@ -223,8 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 callsign: callsign,
                 nameStr: nameStr,
                 raStr: raStr,
-                level: level,
-                xp: xp,
+                level: 0,
+                xp: 0,
               ),
               if (_isEditMode)
                 _buildProfileEditSliver(
@@ -239,11 +202,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 raStr: raStr,
                 userModel: userModel,
               ),
-              _buildTacticalEvolutionSliver(levelProgress),
-              if (userModel != null) _buildBadgeGallerySliver(userModel),
-              if (userModel != null && _badgeProgressFuture != null)
-                _buildBadgeProgressSliver(userModel),
               _buildShiftActionsSliver(authVM: authVM, shiftVM: shiftVM),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
         );

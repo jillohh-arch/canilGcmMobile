@@ -9,7 +9,6 @@ import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dash
 import 'package:canil_gcm/features/shifts/presentation/screens/daily_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_dashboard_screen.dart';
 import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
-import 'package:canil_gcm/features/gamification/presentation/screens/ranking_screen.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,7 +43,6 @@ class _MainRootScreenState extends State<MainRootScreen> {
     const DailyTimelineScreen(),
     const HealthDashboardScreen(),
     const ProfileScreen(),
-    const RankingScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -228,10 +226,9 @@ class _MainRootScreenState extends State<MainRootScreen> {
                 ),
                 // Espaço central reservado para o FAB (Não mexer aqui)
                 const SizedBox(width: 32),
-                // Lado Direito: Saúde, Ranking e Perfil
+                // Lado Direito: Saúde e Perfil
                 Row(
                   children: [
-                    _buildNavItem(4, Icons.leaderboard_outlined, 'Rank'),
                     _buildNavItem(2, Icons.medical_services_outlined, 'Saúde'),
                     _buildNavItem(3, Icons.person_outline, 'Perfil'),
                   ],

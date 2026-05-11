@@ -31,7 +31,7 @@ extension _DynamicActivitySheetOccurrenceSave on _DynamicActivitySheetState {
         _selectedSubtype == ActivitySubtypeIds.narcoticsSearch;
 
     if (isDetection && hasDetectedDrugs) {
-      await userVM.grantBadge(currentRa, 'faro_afiado');
+      // Badge removida — gamificação descontinuada
     }
   }
 

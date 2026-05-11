@@ -19,7 +19,7 @@ class _ReadinessBar extends StatelessWidget {
         Row(
           children: [
             Text(
-              'PRONTIDÃO OPERACIONAL',
+              'PRONTIDÃO',
               style: GoogleFonts.robotoMono(
                 color: Colors.white60,
                 fontSize: 10,

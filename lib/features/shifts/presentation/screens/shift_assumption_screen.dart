@@ -15,7 +15,6 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/core/widgets/hud_panel.dart';
 
 part 'shift_assumption_header.dart';
 part 'shift_assumption_controls.dart';
@@ -80,10 +79,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     }
 
     if (userModel != null) {
-      await Provider.of<UserViewModel>(
-        context,
-        listen: false,
-      ).grantBadge(userModel.ra, 'pe_na_estrada');
+      // Badge removida — gamificação descontinuada
     }
   }
 

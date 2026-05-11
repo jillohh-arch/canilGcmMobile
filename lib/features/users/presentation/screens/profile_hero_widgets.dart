@@ -156,8 +156,6 @@ class _ProfileHeroContent extends StatelessWidget {
             nameStr: nameStr,
             raStr: raStr,
           ),
-          const SizedBox(height: 12),
-          _ProfileLevelChip(level: level, xp: xp),
           const SizedBox(height: 20),
         ],
       ),
@@ -197,9 +195,9 @@ class _ProfileAvatar extends StatelessWidget {
               border: Border.all(color: _hudCyan, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: _hudCyan.withAlpha(110),
-                  blurRadius: 30,
-                  spreadRadius: 3,
+                  color: _hudCyan.withAlpha(60),
+                  blurRadius: 16,
+                  spreadRadius: 2,
                 ),
               ],
             ),

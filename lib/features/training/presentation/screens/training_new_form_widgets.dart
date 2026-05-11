@@ -305,7 +305,7 @@ class _SaveTrainingButton extends StatelessWidget {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: color,
+              backgroundColor: const Color(0xFF00E5FF),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),

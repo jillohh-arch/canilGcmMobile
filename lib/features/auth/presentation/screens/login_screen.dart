@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
@@ -105,29 +104,17 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: _hudBackground,
       body: Stack(
         children: [
-          // ── Background Image ──────────────────────────────────────────────
+          // ── Background sólido com gradiente sutil ─────────────────────────
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/k9_tactical_background.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          // ── Gradient Overlay & Blur ───────────────────────────────────────
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      _hudBackground,
-                      _hudBackground.withAlpha(220),
-                      _hudBackground.withAlpha(90),
-                    ],
-                  ),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _hudPanel,
+                    _hudBackground,
+                  ],
                 ),
               ),
             ),
@@ -156,6 +143,31 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 24),
                       ],
 
+                      // ── Biometria (primária) ──────────────────────────────
+                      _BiometricPrimaryAction(
+                        onPressed: () => _handleBiometricLogin(authVM),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // ── Divisor ───────────────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.white12)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'ou entre com senha',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.white38,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.white12)),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
                       // ── Inputs ─────────────────────────────────────────────
                       _PremiumTextField(
                         controller: _raController,
@@ -168,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       _PremiumTextField(
                         controller: _passwordController,
-                        label: 'CHAVE DE ACESSO',
+                        label: 'SENHA',
                         icon: Icons.key_rounded,
                         obscureText: _obscurePassword,
                         isPassword: true,
@@ -178,9 +190,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         validator: (v) =>
                             v == null || v.isEmpty ? 'Senha obrigatória' : null,
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 32),
 
-                      // ── Primary Action ─────────────────────────────────────
+                      // ── Botão Entrar (secundário) ─────────────────────────
                       _LoginPrimaryAction(
                         isLoading: authVM.isLoading,
                         onPressed: () async {
@@ -202,12 +214,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             }
                           }
                         },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ── Biometrics & Social ────────────────────────────────
-                      _SecondaryAuthSection(
-                        onBiometricTap: () => _handleBiometricLogin(authVM),
                       ),
                       const SizedBox(height: 32),
                     ],

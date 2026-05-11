@@ -19,9 +19,9 @@ class _NewIncidentHero extends StatelessWidget {
             border: Border.all(color: const Color(0xFF00E5FF), width: 3),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
-                blurRadius: 30,
-                spreadRadius: 5,
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                blurRadius: 16,
+                spreadRadius: 2,
               ),
             ],
             image: profileImageUrl != null && profileImageUrl.isNotEmpty

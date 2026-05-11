@@ -15,7 +15,6 @@ import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/app_shell/presentation/screens/main_root_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/login_screen.dart';
-import 'package:canil_gcm/features/gamification/presentation/widgets/gamification_listener.dart';
 
 final GlobalKey<NavigatorState> globalNavigatorKey =
     GlobalKey<NavigatorState>();
@@ -55,7 +54,7 @@ class GcmK9App extends StatelessWidget {
       theme: AppTheme.darkTheme,
       navigatorKey: globalNavigatorKey,
       builder: (context, child) {
-        return GamificationListener(child: child ?? const SizedBox.shrink());
+        return child ?? const SizedBox.shrink();
       },
       home: Consumer3<AuthViewModel, ShiftViewModel, UserViewModel>(
         builder: (context, authVM, shiftVM, userVM, _) {

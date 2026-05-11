@@ -3,9 +3,9 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 import 'package:canil_gcm/features/training/data/training_service.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 
 class TrainingViewModel extends ChangeNotifier {
   final TrainingService _trainingService = TrainingService();
@@ -37,26 +37,18 @@ class TrainingViewModel extends ChangeNotifier {
 
       _trainings.insert(0, newSession);
 
+      AuditService.log(
+        action: 'create',
+        entityType: 'training',
+        entityId: newSession.id ?? '',
+        summary: 'Treino registrado: ${session.trainingType} — ${session.dogId}',
+        after: {'trainingType': session.trainingType, 'dogId': session.dogId, 'duration': session.searchDuration},
+      );
+
       developer.log(
         'Training session added: ${newSession.id}',
         name: 'TrainingViewModel',
       );
-
-      // GAMIFICATION TRIGGER
-      if (session.handlerId.isNotEmpty) {
-        bool hasDistraction = false;
-        if (session.metadata != null &&
-            session.metadata!['ambiente_com_distracao'] == true) {
-          hasDistraction = true;
-        }
-
-        await GamificationService().evaluateTrainingSession(
-          session.handlerId,
-          session.trainingType,
-          session.searchDuration ?? 0,
-          hasDistraction,
-        );
-      }
 
       _setLoading(false);
     } catch (e) {

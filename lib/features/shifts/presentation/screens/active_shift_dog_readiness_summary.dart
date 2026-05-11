@@ -18,7 +18,7 @@ class _DogReadinessSummary extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'PRONTIDÃO OPERACIONAL',
+              'PRONTIDÃO',
               style: GoogleFonts.robotoMono(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,

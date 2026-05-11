@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/data/incident_service.dart';
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 
 class IncidentViewModel extends ChangeNotifier {
   final IncidentService _db = IncidentService();
@@ -77,17 +77,19 @@ class IncidentViewModel extends ChangeNotifier {
   }
 
   Future<void> saveIncident(Incident incident) async {
+    final isNew = !_incidents.any((i) => i.id == incident.id);
     await _db.saveIncident(incident);
     _upsertIncident(incident);
 
-    // GAMIFICATION TRIGGER
-    if (incident.handlerId.isNotEmpty && incident.status == 'Concluída') {
-      await GamificationService().evaluateIncidents(
-        incident.handlerId,
-        incident.displayResult,
-        incident.type ?? '',
-      );
-    }
+    AuditService.log(
+      action: isNew ? 'create' : 'update',
+      entityType: 'incidents',
+      entityId: incident.id,
+      summary: isNew
+          ? 'Ocorrência criada: ${incident.type ?? 'Sem tipo'}'
+          : 'Ocorrência atualizada: ${incident.type ?? 'Sem tipo'}',
+      after: {'status': incident.status, 'type': incident.type, 'location': incident.location},
+    );
 
     notifyListeners();
   }
@@ -113,23 +115,16 @@ class IncidentViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final previous = _incidents.cast<Incident?>().firstWhere(
-        (i) => i?.id == incident.id,
-        orElse: () => null,
-      );
       await _db.saveIncident(incident); // set() handles upsert
       _upsertIncident(incident);
 
-      final wasClosed = previous?.status == 'Concluída';
-      if (incident.handlerId.isNotEmpty &&
-          incident.status == 'Concluída' &&
-          !wasClosed) {
-        await GamificationService().evaluateIncidents(
-          incident.handlerId,
-          incident.displayResult,
-          incident.type ?? '',
-        );
-      }
+      AuditService.log(
+        action: 'update',
+        entityType: 'incidents',
+        entityId: incident.id,
+        summary: 'Ocorrência editada: ${incident.type ?? 'Sem tipo'} — ${incident.status}',
+        after: {'status': incident.status, 'type': incident.type, 'result': incident.displayResult},
+      );
     } catch (e) {
       debugPrint('Error updating incident: $e');
       rethrow;
@@ -143,8 +138,20 @@ class IncidentViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
+      final deleted = _incidents.cast<Incident?>().firstWhere(
+        (i) => i?.id == id,
+        orElse: () => null,
+      );
       await _db.deleteIncident(id);
       _incidents.removeWhere((i) => i.id == id);
+
+      AuditService.log(
+        action: 'delete',
+        entityType: 'incidents',
+        entityId: id,
+        summary: 'Ocorrência excluída: ${deleted?.type ?? id}',
+        before: {'status': deleted?.status, 'type': deleted?.type},
+      );
     } catch (e) {
       debugPrint('Error deleting incident: $e');
     } finally {

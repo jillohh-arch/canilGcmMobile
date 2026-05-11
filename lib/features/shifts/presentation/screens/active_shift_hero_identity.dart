@@ -69,9 +69,9 @@ class _HeroDogAvatar extends StatelessWidget {
         border: Border.all(color: _hudCyan, width: 3),
         boxShadow: [
           BoxShadow(
-            color: _hudCyan.withAlpha(110),
-            blurRadius: 34,
-            spreadRadius: 4,
+            color: _hudCyan.withAlpha(60),
+            blurRadius: 16,
+            spreadRadius: 2,
           ),
         ],
       ),

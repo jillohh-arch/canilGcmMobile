@@ -2,9 +2,9 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 
-import 'package:canil_gcm/features/gamification/data/gamification_service.dart';
 import 'package:canil_gcm/features/routine/data/routine_service.dart';
 import 'package:canil_gcm/features/routine/domain/routine_model.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 
 class RoutineViewModel extends ChangeNotifier {
   final RoutineService _routineService = RoutineService();
@@ -27,9 +27,14 @@ class RoutineViewModel extends ChangeNotifier {
       final newRoutine = await _routineService.addRoutine(routine);
       _routines.insert(0, newRoutine);
 
-      if (routine.handlerId.isNotEmpty) {
-        await GamificationService().evaluateRoutine(routine.handlerId);
-      }
+      AuditService.log(
+        action: 'create',
+        entityType: 'routine',
+        entityId: newRoutine.id ?? '',
+        summary:
+            'Rotina registrada: ${routine.activityType} — ${routine.dogId}',
+        after: {'category': routine.activityType, 'dogId': routine.dogId},
+      );
 
       developer.log(
         'Routine added: ${newRoutine.id}',
@@ -60,6 +65,14 @@ class RoutineViewModel extends ChangeNotifier {
         _routines[index] = routine;
       }
 
+      AuditService.log(
+        action: 'update',
+        entityType: 'routine',
+        entityId: routine.id ?? '',
+        summary: 'Rotina editada: ${routine.activityType} — ${routine.dogId}',
+        after: {'category': routine.activityType, 'dogId': routine.dogId},
+      );
+
       developer.log('Routine updated: ${routine.id}', name: 'RoutineViewModel');
       _setLoading(false);
     } catch (e) {
@@ -79,6 +92,13 @@ class RoutineViewModel extends ChangeNotifier {
 
       await _routineService.deleteRoutine(id);
       _routines.removeWhere((r) => r.id == id);
+
+      AuditService.log(
+        action: 'delete',
+        entityType: 'routine',
+        entityId: id,
+        summary: 'Rotina excluída: $id',
+      );
 
       developer.log('Routine deleted: $id', name: 'RoutineViewModel');
       _setLoading(false);

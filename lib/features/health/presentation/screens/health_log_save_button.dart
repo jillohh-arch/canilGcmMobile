@@ -34,8 +34,8 @@ class _SaveHealthLogButton extends StatelessWidget {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: selectedColor,
-              foregroundColor: Colors.white,
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: const Color(0xFF030712),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

@@ -102,7 +102,7 @@ class ObedienceActivityFields extends StatelessWidget {
         ),
         HudToggleChipGroup(
           label: 'Guia',
-          options: const ['Off-leash', 'Misto', 'Com Guia'],
+          options: const ['Sem guia', 'Misto', 'Com guia'],
           selectedOption: selectedLead,
           accent: accent,
           onChanged: (value) => onChanged('Guia', value),
