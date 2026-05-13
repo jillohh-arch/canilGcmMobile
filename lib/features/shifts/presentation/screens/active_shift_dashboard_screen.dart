@@ -104,19 +104,63 @@ class _ActiveShiftDashboardScreenState
   }
 
   Future<void> _loadDashboardData(String dogId) async {
-    final results = await Future.wait([
-      _dashboardService.getQuickActions(),
-      _dashboardService.getActiveAlerts(dogId),
-      _dashboardService.countActiveAlerts(dogId),
-      _dashboardService.getWeatherData('default'),
-    ]);
+    // Carrega dados em paralelo, tolerando falhas individuais
+    List<QuickAction> quickActions = [];
+    List<DashboardAlert> alerts = [];
+    int totalAlerts = 0;
+    WeatherData? weather;
+
+    try {
+      quickActions = await _dashboardService.getQuickActions();
+    } catch (_) {}
+
+    try {
+      alerts = await _dashboardService.getActiveAlerts(dogId);
+    } catch (_) {}
+
+    try {
+      totalAlerts = await _dashboardService.countActiveAlerts(dogId);
+    } catch (_) {}
+
+    try {
+      weather = await _dashboardService.getWeatherData('default');
+    } catch (_) {}
+
+    // Fallback: busca clima via API se Firestore não retornou
+    if (weather == null) {
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.low,
+          ),
+        );
+        final result = await WeatherService().getCurrentWeather(
+          position.latitude,
+          position.longitude,
+        );
+        if (result != null) {
+          final temp = (result['temperature'] as num?)?.toDouble() ?? 0;
+          final hum = (result['humidity'] as num?)?.toInt() ?? 0;
+          weather = WeatherData(
+            temperatura: temp,
+            umidade: hum,
+            riscoTermico: temp >= 35
+                ? 'ALTO'
+                : temp >= 30
+                    ? 'MODERADO'
+                    : 'BAIXO',
+            atualizadoEm: DateTime.now(),
+          );
+        }
+      } catch (_) {}
+    }
 
     if (!mounted) return;
     setState(() {
-      _quickActions = results[0] as List<QuickAction>;
-      _alerts = results[1] as List<DashboardAlert>;
-      _totalAlerts = results[2] as int;
-      _weatherData = results[3] as WeatherData?;
+      _quickActions = quickActions;
+      _alerts = alerts;
+      _totalAlerts = totalAlerts;
+      _weatherData = weather;
     });
   }
 

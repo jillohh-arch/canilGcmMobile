@@ -1,7 +1,16 @@
 part of 'active_shift_dashboard_screen.dart';
 
 extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
-  Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
+  Widget _buildCockpit(
+    BuildContext context,
+    Dog dog,
+    String callsign,
+  ) {
+    // Foto do condutor logado (Firebase Auth ou UserModel)
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final conductorPhoto = _resolveConductorPhoto(authVM, userVM);
+
     return CustomScrollView(
       slivers: [
         // 1. Cabeçalho do turno
@@ -11,6 +20,7 @@ extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
             child: _ShiftHeader(
               dog: dog,
               callsign: callsign,
+              conductorPhotoUrl: conductorPhoto,
               onSwitchDog: () => _showDogSwitcher(context, dog),
             ),
           ),
@@ -69,5 +79,20 @@ extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
         ),
       ],
     );
+  }
+
+  String? _resolveConductorPhoto(AuthViewModel authVM, UserViewModel userVM) {
+    // Tenta foto do Firebase Auth
+    final fbPhoto = authVM.user?.photoURL;
+    if (fbPhoto != null && fbPhoto.isNotEmpty) return fbPhoto;
+
+    // Tenta foto do UserModel pelo RA
+    final ra = HandlerIdentityService.raFromUser(authVM.user);
+    if (ra != null) {
+      final userModel = userVM.findByRa(ra);
+      if (userModel?.photoUrl != null) return userModel!.photoUrl;
+    }
+
+    return null;
   }
 }

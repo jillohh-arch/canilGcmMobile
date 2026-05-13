@@ -48,29 +48,35 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    try {
-      final results = await Future.wait([
-        _service.getVaccines(widget.dog.id),
-        _service.getAptitudes(widget.dog.id),
-        _service.getRecentRecords(widget.dog.id),
-        _resolveHandlerName(),
-      ]);
+    List<VaccineRecord> vaccines = [];
+    List<DogAptitude> aptitudes = [];
+    List<RecentRecord> recentRecords = [];
+    String? handlerName;
 
-      if (!mounted) return;
-      setState(() {
-        _vaccines = results[0] as List<VaccineRecord>;
-        _aptitudes = results[1] as List<DogAptitude>;
-        _recentRecords = results[2] as List<RecentRecord>;
-        _handlerName = results[3] as String?;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Não foi possível carregar o perfil do cão.';
-        _loading = false;
-      });
-    }
+    try {
+      vaccines = await _service.getVaccines(widget.dog.id);
+    } catch (_) {}
+
+    try {
+      aptitudes = await _service.getAptitudes(widget.dog.id);
+    } catch (_) {}
+
+    try {
+      recentRecords = await _service.getRecentRecords(widget.dog.id);
+    } catch (_) {}
+
+    try {
+      handlerName = await _resolveHandlerName();
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _vaccines = vaccines;
+      _aptitudes = aptitudes;
+      _recentRecords = recentRecords;
+      _handlerName = handlerName;
+      _loading = false;
+    });
   }
 
   Future<String?> _resolveHandlerName() async {

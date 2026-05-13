@@ -4,11 +4,13 @@ part of 'active_shift_dashboard_screen.dart';
 class _ShiftHeader extends StatelessWidget {
   final Dog dog;
   final String callsign;
+  final String? conductorPhotoUrl;
   final VoidCallback onSwitchDog;
 
   const _ShiftHeader({
     required this.dog,
     required this.callsign,
+    this.conductorPhotoUrl,
     required this.onSwitchDog,
   });
 
@@ -20,13 +22,13 @@ class _ShiftHeader extends StatelessWidget {
     final statusColor = shiftVM.hasActiveShift ? _hudGreen : Colors.white38;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
           // Avatares sobrepostos (cão + condutor)
           SizedBox(
-            width: 72,
-            height: 44,
+            width: 80,
+            height: 50,
             child: Stack(
               children: [
                 Positioned(
@@ -35,22 +37,22 @@ class _ShiftHeader extends StatelessWidget {
                     imageUrl: dog.profileImageUrl,
                     fallbackIcon: Icons.pets_rounded,
                     borderColor: _hudCyan,
-                    size: 40,
+                    size: 46,
                   ),
                 ),
                 Positioned(
-                  left: 28,
+                  left: 32,
                   child: _CircleAvatar(
-                    imageUrl: null,
+                    imageUrl: conductorPhotoUrl,
                     fallbackIcon: Icons.person,
                     borderColor: Colors.white38,
-                    size: 40,
+                    size: 46,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           // Texto dinâmico
           Expanded(
             child: Column(
@@ -60,18 +62,18 @@ class _ShiftHeader extends StatelessWidget {
                   '${dog.name} • $callsign',
                   style: GoogleFonts.inter(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Container(
-                      width: 7,
-                      height: 7,
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
                         color: statusColor,
                         shape: BoxShape.circle,
@@ -82,7 +84,7 @@ class _ShiftHeader extends StatelessWidget {
                       status,
                       style: GoogleFonts.inter(
                         color: statusColor,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -90,7 +92,7 @@ class _ShiftHeader extends StatelessWidget {
                       ' • $elapsed',
                       style: GoogleFonts.inter(
                         color: Colors.white54,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -104,8 +106,8 @@ class _ShiftHeader extends StatelessWidget {
             onTap: onSwitchDog,
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: _hudCyan.withAlpha(120)),
