@@ -16,6 +16,8 @@ import 'package:canil_gcm/core/services/storage_service.dart';
 
 part 'profile_screen_sections.dart';
 part 'profile_hero_widgets.dart';
+part 'profile_hero_background.dart';
+part 'profile_hero_content.dart';
 part 'profile_edit_widgets.dart';
 part 'profile_identification_widgets.dart';
 part 'profile_shift_section.dart';

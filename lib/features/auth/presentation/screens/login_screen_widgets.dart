@@ -231,18 +231,6 @@ class _LoginPrimaryAction extends StatelessWidget {
   }
 }
 
-class _SecondaryAuthSection extends StatelessWidget {
-  final VoidCallback onBiometricTap;
-
-  const _SecondaryAuthSection({required this.onBiometricTap});
-
-  @override
-  Widget build(BuildContext context) {
-    // Descontinuado — biometria agora é primária
-    return const SizedBox.shrink();
-  }
-}
-
 class _BiometricPrimaryAction extends StatelessWidget {
   final VoidCallback onPressed;
 

@@ -105,7 +105,6 @@ class UserViewModel extends ChangeNotifier {
 
   /// Descontinuado — gamificação removida.
   Future<void> grantBadge(String ra, String badgeId) async {}
-}
 
   Future<void> deleteUser(String ra) async {
     try {

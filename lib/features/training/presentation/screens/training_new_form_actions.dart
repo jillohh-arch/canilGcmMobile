@@ -1,11 +1,11 @@
-part of 'health_log_screen.dart';
+part of 'training_log_screen.dart';
 
-class _SaveHealthLogButton extends StatelessWidget {
-  final String selectedLogType;
+class _SaveTrainingButton extends StatelessWidget {
+  final String selectedTrainingType;
   final VoidCallback onPressed;
 
-  const _SaveHealthLogButton({
-    required this.selectedLogType,
+  const _SaveTrainingButton({
+    required this.selectedTrainingType,
     required this.onPressed,
   });
 
@@ -14,7 +14,7 @@ class _SaveHealthLogButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: Consumer<HealthViewModel>(
+      child: Consumer<TrainingViewModel>(
         builder: (context, viewModel, child) {
           return ElevatedButton.icon(
             icon: viewModel.isLoading
@@ -26,14 +26,14 @@ class _SaveHealthLogButton extends StatelessWidget {
                       strokeWidth: 2,
                     ),
                   )
-                : Icon(_logIcon(selectedLogType), size: 22),
+                : const Icon(Icons.save_rounded, size: 22),
             label: Text(
-              viewModel.isLoading ? 'SALVANDO...' : 'SALVAR PRONTUÁRIO',
+              viewModel.isLoading ? 'SALVANDO...' : 'SALVAR TREINO',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00E5FF),
-              foregroundColor: const Color(0xFF030712),
+              foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

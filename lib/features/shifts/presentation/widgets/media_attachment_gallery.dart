@@ -6,6 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/controllers/media_attachment_rows.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
+part 'media_attachment_gallery_actions.dart';
+part 'media_attachment_gallery_pdf.dart';
+part 'media_attachment_gallery_photo_strip.dart';
+part 'media_attachment_gallery_photo_tile.dart';
 part 'media_attachment_gallery_widgets.dart';
 
 class MediaAttachmentGallery extends StatelessWidget {
@@ -39,15 +43,7 @@ class MediaAttachmentGallery extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ANEXOS PERICIAIS / FOTOS',
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: Colors.white54,
-            letterSpacing: 1.0,
-          ),
-        ),
+        const _MediaAttachmentSectionLabel(),
         const SizedBox(height: 12),
         if (isCompressing) const _CompressionStatus(),
         if (showPdfAttachment)
