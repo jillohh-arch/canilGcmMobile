@@ -15,6 +15,11 @@ class Dog {
   final double? idealWeightMax;
   final DateTime? lastBathDate;
   final Map<String, dynamic>? readinessStreak;
+  final List<String>? specialties;
+  final String? cor;
+  final String? microchip;
+  final String? observacoes;
+  final String? condicaoCorporal;
 
   Dog({
     required this.id,
@@ -33,6 +38,11 @@ class Dog {
     this.idealWeightMax,
     this.lastBathDate,
     this.readinessStreak,
+    this.specialties,
+    this.cor,
+    this.microchip,
+    this.observacoes,
+    this.condicaoCorporal,
   });
 
   factory Dog.fromJson(Map<String, dynamic> json) {
@@ -65,6 +75,13 @@ class Dog {
           ? DateTime.parse(json['lastBathDate'])
           : null,
       readinessStreak: json['readinessStreak'],
+      specialties: json['specialties'] != null
+          ? List<String>.from(json['specialties'] as List)
+          : null,
+      cor: json['cor'],
+      microchip: json['microchip'],
+      observacoes: json['observacoes'],
+      condicaoCorporal: json['condicaoCorporal'],
     );
   }
 
@@ -88,6 +105,11 @@ class Dog {
       if (idealWeightMax != null) 'idealWeightMax': idealWeightMax,
       if (lastBathDate != null) 'lastBathDate': lastBathDate!.toIso8601String(),
       if (readinessStreak != null) 'readinessStreak': readinessStreak,
+      if (specialties != null) 'specialties': specialties,
+      if (cor != null) 'cor': cor,
+      if (microchip != null) 'microchip': microchip,
+      if (observacoes != null) 'observacoes': observacoes,
+      if (condicaoCorporal != null) 'condicaoCorporal': condicaoCorporal,
     };
   }
 
@@ -108,6 +130,11 @@ class Dog {
     double? idealWeightMax,
     DateTime? lastBathDate,
     Map<String, dynamic>? readinessStreak,
+    List<String>? specialties,
+    String? cor,
+    String? microchip,
+    String? observacoes,
+    String? condicaoCorporal,
   }) {
     return Dog(
       id: id ?? this.id,
@@ -126,6 +153,11 @@ class Dog {
       idealWeightMax: idealWeightMax ?? this.idealWeightMax,
       lastBathDate: lastBathDate ?? this.lastBathDate,
       readinessStreak: readinessStreak ?? this.readinessStreak,
+      specialties: specialties ?? this.specialties,
+      cor: cor ?? this.cor,
+      microchip: microchip ?? this.microchip,
+      observacoes: observacoes ?? this.observacoes,
+      condicaoCorporal: condicaoCorporal ?? this.condicaoCorporal,
     );
   }
 

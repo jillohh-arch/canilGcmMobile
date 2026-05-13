@@ -4,53 +4,70 @@ extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
   Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
     return CustomScrollView(
       slivers: [
-        _buildHeroHeader(context, dog, callsign),
-        _HealthAlertBanner(dogId: dog.id),
+        // 1. Cabeçalho do turno
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Column(
-              children: [
-                _DogInfoCockpitCard(dog: dog),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _WeatherCockpitCard()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _ShiftMetricsCockpitCard(dog: dog)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _TodayActivitiesCard(dogId: dog.id),
-                const SizedBox(height: 100),
-              ],
+          child: SafeArea(
+            bottom: false,
+            child: _ShiftHeader(
+              dog: dog,
+              callsign: callsign,
+              onSwitchDog: () => _showDogSwitcher(context, dog),
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildHeroHeader(BuildContext context, Dog dog, String callsign) {
-    return SliverAppBar(
-      expandedHeight: 320,
-      pinned: true,
-      backgroundColor: _hudBackground,
-      iconTheme: const IconThemeData(color: Colors.white),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            _HeroDogBackdrop(dog: dog),
-            const _HeroDogScrim(),
-            _HeroDogIdentity(
+        // 2. Card de resumo superior (indicadores)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _ShiftIndicatorsCard(
               dog: dog,
-              callsign: callsign,
-              onTap: () => _showDogSwitcher(context, dog),
+              totalAlerts: _totalAlerts,
+              weatherData: _weatherData,
             ),
-          ],
+          ),
         ),
-      ),
+        // 3. Registros Rápidos
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _QuickActionsSection(
+              dog: dog,
+              actions: _quickActions,
+            ),
+          ),
+        ),
+        // 4. Alertas
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _AlertsSection(
+              alerts: _alerts,
+              totalAlerts: _totalAlerts,
+            ),
+          ),
+        ),
+        // 5. Atividades de Hoje
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _TodayActivitiesSection(dogId: dog.id),
+          ),
+        ),
+        // 6. Card do Cão
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _DogProfileCard(dog: dog),
+          ),
+        ),
+        // 7. Condições climáticas
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+            child: _ConditionsCard(weatherData: _weatherData),
+          ),
+        ),
+      ],
     );
   }
 }

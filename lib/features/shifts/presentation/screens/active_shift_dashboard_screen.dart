@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -17,31 +15,28 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 
-part 'active_shift_dog_info_card.dart';
-part 'active_shift_dog_readiness_summary.dart';
-part 'active_shift_cockpit_mini_stat.dart';
-part 'active_shift_weather_card.dart';
-part 'active_shift_shift_metrics_card.dart';
-part 'active_shift_today_record_counter.dart';
-part 'active_shift_health_alert.dart';
-part 'active_shift_activity_entry.dart';
-part 'active_shift_today_activities_card.dart';
-part 'active_shift_activity_row.dart';
-part 'active_shift_pulsing_indicator.dart';
-part 'active_shift_readiness.dart';
+import 'dynamic_activity_sheet.dart';
+
+part 'active_shift_header.dart';
+part 'active_shift_indicators_card.dart';
+part 'active_shift_quick_actions.dart';
+part 'active_shift_alerts_section.dart';
+part 'active_shift_today_section.dart';
+part 'active_shift_dog_profile_card.dart';
+part 'active_shift_conditions_card.dart';
 part 'active_shift_cockpit.dart';
-part 'active_shift_hero_visuals.dart';
-part 'active_shift_hero_identity.dart';
-part 'active_shift_status_pill.dart';
+part 'active_shift_readiness.dart';
 part 'active_shift_dog_switcher.dart';
 
 const _hudBackground = Color(0xFF070B14);
 const _hudPanel = Color(0xFF0B1220);
-const _hudPanelAlt = Color(0xFF111827);
 const _hudCyan = Color(0xFF00E5FF);
 const _hudGreen = Color(0xFF00E58A);
 const _hudAmber = Color(0xFFFBBF24);
@@ -58,7 +53,14 @@ class ActiveShiftDashboardScreen extends StatefulWidget {
 class _ActiveShiftDashboardScreenState
     extends State<ActiveShiftDashboardScreen> {
   final DogService _dogService = DogService();
+  final DashboardService _dashboardService = DashboardService();
   String? _lastFetchedDogId;
+
+  // Dados dinâmicos carregados do Firestore
+  List<QuickAction> _quickActions = [];
+  List<DashboardAlert> _alerts = [];
+  int _totalAlerts = 0;
+  WeatherData? _weatherData;
 
   @override
   void didChangeDependencies() {
@@ -69,6 +71,7 @@ class _ActiveShiftDashboardScreenState
     if (dogId != null && dogId != _lastFetchedDogId) {
       _lastFetchedDogId = dogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadDashboardData(dogId);
         Provider.of<TrainingViewModel>(
           context,
           listen: false,
@@ -81,11 +84,16 @@ class _ActiveShiftDashboardScreenState
           context,
           listen: false,
         ).fetchIncidentsForDog(dogId);
+        Provider.of<RoutineViewModel>(
+          context,
+          listen: false,
+        ).fetchRoutinesForDog(dogId);
 
         final dogVM = Provider.of<DogViewModel>(context, listen: false);
         final userVM = Provider.of<UserViewModel>(context, listen: false);
         final authVM = Provider.of<AuthViewModel>(context, listen: false);
-        final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
+        final currentRa =
+            HandlerIdentityService.raFromUser(authVM.user) ?? '';
 
         try {
           final dog = dogVM.dogs.firstWhere((d) => d.id == dogId);
@@ -95,27 +103,36 @@ class _ActiveShiftDashboardScreenState
     }
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  Future<void> _loadDashboardData(String dogId) async {
+    final results = await Future.wait([
+      _dashboardService.getQuickActions(),
+      _dashboardService.getActiveAlerts(dogId),
+      _dashboardService.countActiveAlerts(dogId),
+      _dashboardService.getWeatherData('default'),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _quickActions = results[0] as List<QuickAction>;
+      _alerts = results[1] as List<DashboardAlert>;
+      _totalAlerts = results[2] as int;
+      _weatherData = results[3] as WeatherData?;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<
-      ShiftViewModel,
-      DogViewModel,
-      AuthViewModel,
-      UserViewModel
-    >(
+    return Consumer4<ShiftViewModel, DogViewModel, AuthViewModel,
+        UserViewModel>(
       builder: (context, shiftVM, dogVM, authVM, userVM, _) {
         if (!shiftVM.hasActiveShift) {
           return const Scaffold(
             backgroundColor: _hudBackground,
             body: Center(
               child: Text(
-                'Nenhum turno ativo.',
-                style: TextStyle(color: Colors.white),
+                'Nenhum turno ativo.\nInicie um turno para acessar o dashboard.',
+                style: TextStyle(color: Colors.white54, fontSize: 14),
+                textAlign: TextAlign.center,
               ),
             ),
           );
