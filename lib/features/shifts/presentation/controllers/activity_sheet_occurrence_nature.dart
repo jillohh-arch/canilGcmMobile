@@ -61,9 +61,13 @@ extension ActivitySheetOccurrenceNature on ActivitySheetOccurrenceCtrl {
     onStateChanged();
   }
 
-  Future<void> loadNatures() async {
+  Future<void> loadNatures({
+    Future<List<OccurrenceNature>> Function()? fetcher,
+  }) async {
     try {
-      final remote = await IncidentService().getOccurrenceNatures();
+      final remote = fetcher != null
+          ? await fetcher()
+          : OccurrenceNatureSeed.items;
       if (remote.isEmpty) return;
       natures = remote;
       _setNatureTextFromSelected();

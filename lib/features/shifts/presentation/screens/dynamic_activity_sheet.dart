@@ -195,7 +195,12 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
     }
     _primeNewRecordTime();
     if (_isOccurrenceCategory) {
-      _occCtrl.loadNatures();
+      _occCtrl.loadNatures(
+        fetcher: () => Provider.of<IncidentViewModel>(
+          context,
+          listen: false,
+        ).fetchNatures(),
+      );
       _scheduleOccurrenceStartContext();
     }
   }

@@ -5,7 +5,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
-import 'package:canil_gcm/features/incidents/data/incident_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/text_match_service.dart';
 import 'package:canil_gcm/core/utils/firestore_date.dart';
@@ -20,7 +19,7 @@ import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_save_validator.dart';
 import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_wizard_result.dart';
 
-import 'activity_media_uploader.dart';
+import 'package:canil_gcm/core/services/activity_media_uploader.dart';
 
 part 'activity_sheet_occurrence_populate.dart';
 part 'activity_sheet_occurrence_nature.dart';

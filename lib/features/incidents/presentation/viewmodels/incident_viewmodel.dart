@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
+import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/incidents/data/incident_service.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 
 class IncidentViewModel extends ChangeNotifier {
   final IncidentService _db = IncidentService();
   List<Incident> _incidents = [];
+  List<OccurrenceNature> _natures = [];
   bool _isLoading = false;
 
   List<Incident> get incidents => _incidents;
+  List<OccurrenceNature> get natures => _natures;
   bool get isLoading => _isLoading;
 
   void _sortIncidents() {
     _incidents.sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  Future<List<OccurrenceNature>> fetchNatures() async {
+    try {
+      final remote = await _db.getOccurrenceNatures();
+      if (remote.isNotEmpty) {
+        _natures = remote;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[IncidentViewModel] Erro ao carregar naturezas: $e');
+    }
+    return _natures;
   }
 
   void _upsertIncident(Incident incident) {

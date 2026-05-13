@@ -5,7 +5,7 @@ import 'package:canil_gcm/core/services/pt_br_date_time_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 
-import 'activity_media_uploader.dart';
+import 'package:canil_gcm/core/services/activity_media_uploader.dart';
 import 'activity_record_payload_builder.dart';
 
 /// Controller que encapsula todo o estado e lógica da categoria Rotina
