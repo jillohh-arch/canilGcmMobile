@@ -5,7 +5,10 @@ import 'package:canil_gcm/features/incidents/data/incident_service.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 
 class IncidentViewModel extends ChangeNotifier {
-  final IncidentService _db = IncidentService();
+  IncidentViewModel() : _db = IncidentService();
+  IncidentViewModel.withService(this._db);
+
+  final IncidentService _db;
   List<Incident> _incidents = [];
   List<OccurrenceNature> _natures = [];
   bool _isLoading = false;

@@ -8,8 +8,14 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 
 class HealthViewModel extends ChangeNotifier {
-  final HealthService _healthService = HealthService();
-  final DogService _dogService = DogService();
+  HealthViewModel()
+      : _healthService = HealthService(),
+        _dogService = DogService();
+
+  HealthViewModel.withServices(this._healthService, this._dogService);
+
+  final HealthService _healthService;
+  final DogService _dogService;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
