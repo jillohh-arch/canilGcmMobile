@@ -29,6 +29,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final LocalAuthentication _localAuth = LocalAuthentication();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricAndAutoPrompt();
+  }
+
+  Future<void> _checkBiometricAndAutoPrompt() async {
+    try {
+      final canCheck =
+          await _localAuth.canCheckBiometrics ||
+          await _localAuth.isDeviceSupported();
+      if (!canCheck) return;
+
+      final cachedRa = await _secureStorage.read(key: 'cached_ra');
+      final cachedPass = await _secureStorage.read(key: 'cached_password');
+      final hasCredentials =
+          cachedRa != null &&
+          cachedPass != null &&
+          cachedRa.isNotEmpty &&
+          cachedPass.isNotEmpty;
+
+      if (mounted) {
+        setState(() => _biometricAvailable = true);
+      }
+
+      // Auto-trigger biometria se houver credenciais salvas
+      if (hasCredentials && mounted) {
+        final authVM = Provider.of<AuthViewModel>(context, listen: false);
+        await _handleBiometricLogin(authVM);
+      }
+    } catch (_) {
+      // Biometria indisponível — segue com login manual
+    }
+  }
 
   void _showSnack(String message) {
     if (!mounted) return;
@@ -145,10 +181,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
 
                       // ── Biometria (primária) ──────────────────────────────
-                      _BiometricPrimaryAction(
-                        onPressed: () => _handleBiometricLogin(authVM),
-                      ),
-                      const SizedBox(height: 32),
+                      if (_biometricAvailable) ...[
+                        _BiometricPrimaryAction(
+                          onPressed: () => _handleBiometricLogin(authVM),
+                        ),
+                        const SizedBox(height: 32),
+                      ],
 
                       // ── Divisor ───────────────────────────────────────────
                       Row(
