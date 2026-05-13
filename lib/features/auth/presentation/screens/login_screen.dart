@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 
 part 'login_screen_widgets.dart';
+part 'login_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

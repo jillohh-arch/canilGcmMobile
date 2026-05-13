@@ -21,6 +21,7 @@ import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flo
 
 part 'dashboard_shared_widgets.dart';
 part 'dashboard_profile_widgets.dart';
+part 'dashboard_greeting_card.dart';
 part 'dashboard_open_incident_widgets.dart';
 part 'dashboard_open_incident_actions.dart';
 part 'dashboard_open_incident_header.dart';
@@ -43,6 +44,7 @@ part 'dashboard_quick_close_frame.dart';
 part 'dashboard_quick_close_header.dart';
 part 'dashboard_quick_close_note_field.dart';
 part 'dashboard_quick_close_rules.dart';
+part 'dashboard_quick_close_styling.dart';
 part 'dashboard_training_components.dart';
 part 'dashboard_training_tab.dart';
 

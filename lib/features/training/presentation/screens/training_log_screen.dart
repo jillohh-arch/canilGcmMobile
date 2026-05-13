@@ -8,9 +8,11 @@ import 'package:canil_gcm/features/training/presentation/viewmodels/training_vie
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 
 part 'training_log_overview_widgets.dart';
+part 'training_log_summary_widgets.dart';
 part 'training_log_chart_widgets.dart';
 part 'training_log_session_widgets.dart';
 part 'training_session_card_parts.dart';
+part 'training_session_card_details.dart';
 part 'training_session_detail_parts.dart';
 part 'training_new_form.dart';
 part 'training_new_form_widgets.dart';

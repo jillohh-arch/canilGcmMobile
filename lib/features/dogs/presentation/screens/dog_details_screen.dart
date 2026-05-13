@@ -17,6 +17,7 @@ import 'package:canil_gcm/features/training/presentation/screens/training_log_sc
 
 part 'dog_details_widgets.dart';
 part 'dog_details_header.dart';
+part 'dog_details_hero_widgets.dart';
 part 'dog_details_bento.dart';
 part 'dog_details_training_bento.dart';
 part 'dog_details_health_bento.dart';
@@ -24,6 +25,7 @@ part 'dog_details_traits_bento.dart';
 part 'dog_weight_dialog.dart';
 part 'dog_details_mission_log.dart';
 part 'dog_details_mission_log_widgets.dart';
+part 'dog_details_mission_log_parts.dart';
 
 class DogDetailsScreen extends StatefulWidget {
   final Dog dog;

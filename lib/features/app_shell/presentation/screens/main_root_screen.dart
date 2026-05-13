@@ -15,7 +15,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 
 part 'main_root_actions.dart';
+part 'main_root_action_sheet.dart';
 part 'main_root_action_widgets.dart';
+part 'main_root_exit_dialog.dart';
 part 'main_root_widgets.dart';
 
 class MainRootScreen extends StatefulWidget {
@@ -75,78 +77,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
-
-        final rootNavigator = Navigator.of(context, rootNavigator: true);
-        if (rootNavigator.canPop()) {
-          rootNavigator.pop();
-          return;
-        }
-
-        final localNavigator = Navigator.of(context);
-        if (localNavigator.canPop()) {
-          localNavigator.pop();
-          return;
-        }
-
-        // Se não estiver no dashboard ativo (aba 0), voltar para a aba 0
-        if (_currentIndex != 0) {
-          setState(() {
-            _currentIndex = 0;
-          });
-          return;
-        }
-
-        // Se estiver na aba 0, pedir confirmação para fechar o app
-        final shouldExit = await showDialog<bool>(
-          context: context,
-          useRootNavigator: true,
-          builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF1C1C1E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-            title: const Text(
-              'Encerrar Aplicativo?',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: const Text(
-              'Tem certeza que deseja fechar o aplicativo e encerrar sua sessão no dispositivo?',
-              style: TextStyle(color: Colors.white70),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text(
-                  'Cancelar',
-                  style: TextStyle(
-                    color: Color(0xFF00E5FF),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE53935),
-                ),
-                child: const Text(
-                  'Sair',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-
-        if (shouldExit == true) {
-          SystemNavigator.pop();
-        }
+        await _handleBackNavigation(context);
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF030712),
