@@ -58,14 +58,14 @@ class NutritionViewModel extends ChangeNotifier {
     // O stream atualiza automaticamente
   }
 
-  /// Calcula conformidade: % de refeições dentro da tolerância (±5%).
+  /// Calcula conformidade: % de refeições dentro da tolerância (±10%).
   void _calculateConformity() {
     if (_todayFeedings.isEmpty) {
       _conformityPercent = 0.0;
       return;
     }
     final conformCount =
-        _todayFeedings.where((f) => f.divergencePercent.abs() <= 5.0).length;
+        _todayFeedings.where((f) => f.divergencePercent.abs() <= 10.0).length;
     _conformityPercent = (conformCount / _todayFeedings.length) * 100;
   }
 

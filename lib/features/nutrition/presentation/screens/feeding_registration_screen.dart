@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
@@ -14,11 +17,13 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 class FeedingRegistrationScreen extends StatefulWidget {
   final String dogId;
   final String dogName;
+  final String? initialPeriod;
 
   const FeedingRegistrationScreen({
     super.key,
     required this.dogId,
     required this.dogName,
+    this.initialPeriod,
   });
 
   @override
@@ -32,24 +37,35 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   String _selectedPeriod = 'manha';
   final _amountController = TextEditingController();
   final _observationsController = TextEditingController();
+  final _divergenceReasonController = TextEditingController();
   bool _saving = false;
+  File? _photoFile;
+  DateTime _selectedTime = DateTime.now();
+  String _timeOption = 'agora'; // 'agora' | '5min' | '15min' | 'custom'
 
   @override
   void initState() {
     super.initState();
-    // Pré-seleciona período baseado na hora atual
-    final hour = DateTime.now().hour;
-    if (hour >= 11 && hour < 15) {
-      _selectedPeriod = 'almoco';
-    } else if (hour >= 15) {
-      _selectedPeriod = 'noite';
+    // Usa período inicial se fornecido, senão seleciona baseado na hora
+    if (widget.initialPeriod != null) {
+      _selectedPeriod = widget.initialPeriod!;
+    } else {
+      final hour = DateTime.now().hour;
+      if (hour >= 11 && hour < 15) {
+        _selectedPeriod = 'almoco';
+      } else if (hour >= 15) {
+        _selectedPeriod = 'noite';
+      }
     }
+    // Listener para atualizar campo de divergência quando quantidade muda
+    _amountController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _amountController.dispose();
     _observationsController.dispose();
+    _divergenceReasonController.dispose();
     super.dispose();
   }
 
@@ -95,6 +111,14 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                     const SizedBox(height: 20),
                     // Quantidade
                     _buildAmountField(prescription),
+                    const SizedBox(height: 20),
+                    // Divergência condicional
+                    _buildDivergenceField(prescription),
+                    // Horário
+                    _buildTimeSelector(),
+                    const SizedBox(height: 20),
+                    // Foto
+                    _buildPhotoField(),
                     const SizedBox(height: 20),
                     // Observações
                     _buildObservationsField(),
@@ -280,6 +304,296 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     );
   }
 
+  /// Campo condicional de motivo da divergência — aparece só quando quantidade diverge >10%.
+  Widget _buildDivergenceField(dynamic prescription) {
+    if (prescription == null) return const SizedBox.shrink();
+    final amountText = _amountController.text.trim();
+    final amount = int.tryParse(amountText);
+    if (amount == null || amount <= 0) return const SizedBox.shrink();
+
+    final prescribedPerMeal = prescription.amountPerMeal as int;
+    final divergence = Feeding.calculateDivergence(amount, prescribedPerMeal);
+    if (divergence.abs() <= 10) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.warning.withAlpha(15),
+            border: Border.all(color: AppTheme.warning.withAlpha(60)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: AppTheme.warning, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Divergência de ${divergence > 0 ? '+' : ''}${divergence.toStringAsFixed(0)}% da prescrição',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.warning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          'MOTIVO DA DIVERGÊNCIA',
+          style: GoogleFonts.inter(
+            color: AppTheme.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(8),
+            border: Border.all(color: AppTheme.warning.withAlpha(40)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TextField(
+            controller: _divergenceReasonController,
+            maxLines: 2,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 13,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ex: pós-treino intenso, orientação veterinária...',
+              hintStyle: GoogleFonts.inter(
+                color: AppTheme.textTertiary.withAlpha(100),
+                fontSize: 12,
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// Seletor de horário: Agora / Há 5min / Há 15min / Editar.
+  Widget _buildTimeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'HORÁRIO',
+          style: GoogleFonts.inter(
+            color: AppTheme.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            _buildTimeChip('agora', 'Agora · ${DateFormat('HH:mm').format(DateTime.now())}'),
+            _buildTimeChip('5min', 'Há 5min'),
+            _buildTimeChip('15min', 'Há 15min'),
+            _buildTimeChip('custom', 'Editar'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeChip(String value, String label) {
+    final selected = _timeOption == value;
+    final color = selected ? _nutritionColor : AppTheme.textTertiary;
+
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.selectionClick();
+        if (value == 'custom') {
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay.fromDateTime(_selectedTime),
+          );
+          if (picked != null) {
+            final now = DateTime.now();
+            setState(() {
+              _timeOption = 'custom';
+              _selectedTime = DateTime(
+                  now.year, now.month, now.day, picked.hour, picked.minute);
+            });
+          }
+        } else {
+          setState(() {
+            _timeOption = value;
+            final now = DateTime.now();
+            switch (value) {
+              case 'agora':
+                _selectedTime = now;
+                break;
+              case '5min':
+                _selectedTime = now.subtract(const Duration(minutes: 5));
+                break;
+              case '15min':
+                _selectedTime = now.subtract(const Duration(minutes: 15));
+                break;
+            }
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withAlpha(selected ? 20 : 8),
+          border: Border.all(color: color.withAlpha(selected ? 80 : 30)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          value == 'custom' && _timeOption == 'custom'
+              ? DateFormat('HH:mm').format(_selectedTime)
+              : label,
+          style: GoogleFonts.inter(
+            color: color,
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Campo de foto opcional da balança.
+  Widget _buildPhotoField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FOTO DA BALANÇA (OPCIONAL)',
+          style: GoogleFonts.inter(
+            color: AppTheme.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickPhoto,
+          child: Container(
+            width: double.infinity,
+            height: _photoFile != null ? 120 : 60,
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(30)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: _photoFile != null
+                ? Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.file(
+                          _photoFile!,
+                          width: double.infinity,
+                          height: 120,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _photoFile = null),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error.withAlpha(200),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.camera_alt_outlined,
+                          color: AppTheme.textTertiary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Tirar foto ou escolher da galeria',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textTertiary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppTheme.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt, color: _nutritionColor),
+                title: Text('Câmera',
+                    style: GoogleFonts.inter(color: AppTheme.textPrimary)),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library, color: _nutritionColor),
+                title: Text('Galeria',
+                    style: GoogleFonts.inter(color: AppTheme.textPrimary)),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final xFile = await picker.pickImage(
+      source: source,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      imageQuality: 85,
+    );
+
+    if (xFile != null) {
+      setState(() => _photoFile = File(xFile.path));
+    }
+  }
+
   Widget _buildObservationsField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,24 +749,29 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final fedBy = authVM.user?.uid ?? 'unknown';
 
+      // Usa horário selecionado
+      final feedTime = _timeOption == 'agora' ? DateTime.now() : _selectedTime;
+
       final feeding = Feeding(
         period: _selectedPeriod,
         amountGrams: amount,
         prescriptionAtTime: prescriptionAtTime,
         divergencePercent: divergence,
-        divergenceReason: divergence.abs() > 5
-            ? _observationsController.text.trim().isNotEmpty
-                ? _observationsController.text.trim()
+        divergenceReason: divergence.abs() > 10
+            ? _divergenceReasonController.text.trim().isNotEmpty
+                ? _divergenceReasonController.text.trim()
                 : null
             : null,
         observations: _observationsController.text.trim().isNotEmpty
             ? _observationsController.text.trim()
             : null,
-        fedAt: DateTime.now(),
+        fedAt: feedTime,
         fedBy: fedBy,
       );
 
       await vm.addFeeding(widget.dogId, feeding);
+
+      // TODO: upload _photoFile to Storage if not null
 
       if (!mounted) return;
       HapticFeedback.mediumImpact();

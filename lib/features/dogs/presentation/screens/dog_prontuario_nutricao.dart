@@ -35,7 +35,7 @@ extension _DogProntuarioNutricao on _DogProntuarioTabScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('NUTRIÇÃO', action: 'Histórico →'),
+        _buildSectionLabel('NUTRIÇÃO', action: 'Ver tudo →'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -265,64 +265,82 @@ extension _DogProntuarioNutricao on _DogProntuarioTabScreenState {
     final bgAlpha = done ? 15 : 8;
     final borderAlpha = done ? 50 : 30;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: slotColor.withAlpha(bgAlpha),
-        border: Border.all(color: slotColor.withAlpha(borderAlpha)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Icon(iconData, color: slotColor, size: 18),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: slotColor,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          if (done) ...[
-            Text(
-              '${feeding.amountGrams}g',
-              style: GoogleFonts.inter(
-                color: _textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (feeding.divergencePercent.abs() > 0)
-              Text(
-                '${feeding.divergencePercent > 0 ? '+' : ''}${feeding.divergencePercent.toStringAsFixed(0)}%',
-                style: GoogleFonts.inter(
-                  color: feeding.divergencePercent.abs() <= 5
-                      ? _greenAccent
-                      : _redAccent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: done
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              final dog = _getActiveDog();
+              if (dog == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FeedingRegistrationScreen(
+                    dogId: dog.id,
+                    dogName: dog.name,
+                    initialPeriod: period,
+                  ),
                 ),
-              ),
-          ] else ...[
+              );
+            },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: slotColor.withAlpha(bgAlpha),
+          border: Border.all(color: slotColor.withAlpha(borderAlpha)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Icon(iconData, color: slotColor, size: 18),
+            const SizedBox(height: 4),
             Text(
-              '—',
+              label,
               style: GoogleFonts.inter(
-                color: _dimMuted,
-                fontSize: 13,
+                color: slotColor,
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              'pendente',
-              style: GoogleFonts.inter(
-                color: _dimMuted,
-                fontSize: 9,
+            const SizedBox(height: 4),
+            if (done) ...[
+              Text(
+                '${feeding.amountGrams}g',
+                style: GoogleFonts.inter(
+                  color: _textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
+              if (feeding.divergencePercent.abs() > 0)
+                Text(
+                  '${feeding.divergencePercent > 0 ? '+' : ''}${feeding.divergencePercent.toStringAsFixed(0)}%',
+                  style: GoogleFonts.inter(
+                    color: feeding.divergencePercent.abs() <= 10
+                        ? _greenAccent
+                        : _redAccent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ] else ...[
+              Text(
+                '—',
+                style: GoogleFonts.inter(
+                  color: _dimMuted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'pendente',
+                style: GoogleFonts.inter(
+                  color: _dimMuted,
+                  fontSize: 9,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
