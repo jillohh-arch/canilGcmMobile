@@ -28,15 +28,15 @@ class _ActiveIncidentBanner extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0B1220).withAlpha(244),
+              color: const Color(0xFF0E1A1F).withAlpha(244),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: const Color(0xFFFFB84D).withAlpha(190),
+                color: AppTheme.warning.withAlpha(190),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFB84D).withAlpha(46),
+                  color: AppTheme.warning.withAlpha(46),
                   blurRadius: 18,
                   spreadRadius: 1,
                 ),
@@ -53,15 +53,15 @@ class _ActiveIncidentBanner extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFB84D).withAlpha(24),
+                    color: AppTheme.warning.withAlpha(24),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: const Color(0xFFFFB84D).withAlpha(150),
+                      color: AppTheme.warning.withAlpha(150),
                     ),
                   ),
                   child: const Icon(
                     Icons.pending_actions_rounded,
-                    color: Color(0xFFFFB84D),
+                    color: AppTheme.warning,
                     size: 22,
                   ),
                 ),
@@ -73,8 +73,8 @@ class _ActiveIncidentBanner extends StatelessWidget {
                     children: [
                       Text(
                         'OCORRÊNCIA EM ANDAMENTO',
-                        style: GoogleFonts.robotoMono(
-                          color: const Color(0xFFFFB84D),
+                        style: GoogleFonts.inter(
+                          color: AppTheme.warning,
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.2,
@@ -85,7 +85,7 @@ class _ActiveIncidentBanner extends StatelessWidget {
                         title.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.oxanium(
+                        style: GoogleFonts.inter(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
@@ -113,13 +113,13 @@ class _ActiveIncidentBanner extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFB84D),
+                    color: AppTheme.warning,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     'CONTINUAR',
-                    style: GoogleFonts.robotoMono(
-                      color: const Color(0xFF070B14),
+                    style: GoogleFonts.inter(
+                      color: AppTheme.background,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.7,

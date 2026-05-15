@@ -19,7 +19,7 @@ class _ProfileEditSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -56,7 +56,7 @@ class _ProfileSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         color: _hudCyan.withAlpha(210),
         fontSize: 11,
         fontWeight: FontWeight.w800,
@@ -82,13 +82,13 @@ class _ProfileEditField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       cursorColor: _hudCyan,
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         color: Colors.white,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.robotoMono(
+        labelStyle: GoogleFonts.inter(
           color: _hudCyan.withAlpha(180),
           fontSize: 14,
         ),
@@ -99,7 +99,7 @@ class _ProfileEditField extends StatelessWidget {
         border: _profileEditBorder(_hudCyan.withAlpha(60)),
         enabledBorder: _profileEditBorder(_hudCyan.withAlpha(60)),
         focusedBorder: _profileEditBorder(_hudCyan),
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
@@ -118,21 +118,21 @@ class _ProfileReadonlyRaField extends StatelessWidget {
     return TextFormField(
       initialValue: raStr,
       readOnly: true,
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         color: Colors.white54,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         labelText: 'R.A. (somente leitura)',
-        labelStyle: GoogleFonts.robotoMono(color: Colors.white38, fontSize: 14),
-        prefixIcon: const Icon(
+        labelStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+        prefixIcon: Icon(
           Icons.lock_outline_rounded,
           color: Colors.white24,
         ),
         filled: true,
         fillColor: _hudPanel.withAlpha(150),
         border: _profileEditBorder(_hudCyan.withAlpha(35)),
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
@@ -163,10 +163,10 @@ class _ProfileSaveButton extends StatelessWidget {
                   strokeWidth: 2,
                 ),
               )
-            : const Icon(Icons.save_rounded, color: _hudBackground),
+            : Icon(Icons.save_rounded, color: _hudBackground),
         label: Text(
           isSaving ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES',
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             color: _hudBackground,
             fontSize: 14,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TacticalTextField extends StatelessWidget {
@@ -28,7 +29,7 @@ class TacticalTextField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.onChanged,
-    this.accent = const Color(0xFF00E5FF),
+    this.accent = AppTheme.primary,
   });
 
   @override
@@ -48,7 +49,7 @@ class TacticalTextField extends StatelessWidget {
       ),
       decoration: InputDecoration(
         labelText: labelText.toUpperCase(),
-        labelStyle: GoogleFonts.robotoMono(
+        labelStyle: GoogleFonts.inter(
           color: accent.withAlpha(185),
           fontSize: 11,
           fontWeight: FontWeight.w800,

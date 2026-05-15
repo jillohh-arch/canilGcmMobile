@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evento de Saúde - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(231, 76, 60, 0.15);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text { flex: 1; }
+
+  .header-subtitle {
+    color: #e74c3c;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .dog-status {
+    background: rgba(231, 76, 60, 0.04);
+    border: 1px solid rgba(231, 76, 60, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ds-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #e74c3c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e74c3c;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .ds-info { flex: 1; }
+
+  .ds-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ds-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  /* Scroll */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label:first-of-type { margin-top: 0; }
+
+  .section-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* TIPO DE EVENTO - CARDS */
+  .type-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 13px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+  }
+
+  .type-card:hover {
+    background: rgba(77, 208, 225, 0.04);
+    border-color: rgba(77, 208, 225, 0.3);
+  }
+
+  .type-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .type-icon.vaccine { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .type-icon.antipara { background: rgba(155, 89, 182, 0.12); color: #9b59b6; }
+  .type-icon.exam { background: rgba(52, 152, 219, 0.12); color: #3498db; }
+  .type-icon.consult { background: rgba(77, 208, 225, 0.12); color: #4dd0e1; }
+  .type-icon.med { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .type-icon.symptom { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+  .type-icon.surgery { background: rgba(230, 126, 34, 0.12); color: #e67e22; }
+  .type-icon.other { background: rgba(149, 165, 166, 0.12); color: #95a5a6; }
+
+  .type-info { flex: 1; min-width: 0; }
+
+  .type-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .type-desc {
+    color: #7a8a92;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .type-arrow {
+    color: #5a7280;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* Aviso destacado pra sintomas */
+  .symptom-warning {
+    background: rgba(231, 76, 60, 0.05);
+    border-left: 3px solid #e74c3c;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 8px 0 0 0;
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .symptom-warning strong {
+    color: #e74c3c;
+  }
+
+  /* ===== TELA B: FORMULÁRIO ===== */
+
+  /* Tipo selecionado em destaque */
+  .type-selected {
+    background: rgba(155, 89, 182, 0.06);
+    border: 1px solid rgba(155, 89, 182, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .type-selected-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(155, 89, 182, 0.15);
+    color: #9b59b6;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .type-selected-info { flex: 1; }
+
+  .type-selected-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+  }
+
+  .type-selected-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .type-selected-change {
+    color: #9b59b6;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  .field-input::placeholder { color: #5a7280; }
+
+  textarea.field-input {
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  /* Date input */
+  .date-input-wrap {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .date-input-icon {
+    color: #4dd0e1;
+    font-size: 14px;
+  }
+
+  .date-input-text {
+    flex: 1;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .date-input-text.placeholder {
+    color: #5a7280;
+  }
+
+  /* Chips */
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 7px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .chip.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Field row pra grids */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* Veterinário com autocomplete */
+  .vet-input-wrap {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .vet-icon {
+    color: #4dd0e1;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .vet-info { flex: 1; min-width: 0; }
+
+  .vet-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .vet-crmv {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .vet-clear {
+    color: #5a7280;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* Microcopy informativo */
+  .info-card {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .info-card strong {
+    color: #4dd0e1;
+  }
+
+  /* PDF anexo */
+  .pdf-attach {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1.5px dashed rgba(77, 208, 225, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .pdf-attach-icon {
+    font-size: 28px;
+    color: #4dd0e1;
+    margin-bottom: 6px;
+  }
+
+  .pdf-attach-title {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .pdf-attach-desc {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  /* PDF anexado */
+  .pdf-attached {
+    background: rgba(46, 204, 113, 0.05);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pdf-attached-icon {
+    color: #2ecc71;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .pdf-attached-info { flex: 1; min-width: 0; }
+
+  .pdf-attached-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pdf-attached-size {
+    color: #7a8a92;
+    font-size: 9px;
+  }
+
+  .pdf-attached-remove {
+    color: #e74c3c;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(231, 76, 60, 0.04);
+    border-left: 3px solid #e74c3c;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong {
+    color: #e74c3c;
+  }
+
+  .comparison-box {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .comparison-box strong {
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: SELEÇÃO DO TIPO DE EVENTO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — TIPO DE EVENTO DE SAÚDE
+    <small>1ª etapa · escolha a categoria do evento</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">NOVO REGISTRO</div>
+          <div class="header-main">Evento de Saúde</div>
+        </div>
+        <div class="header-icon">⚕</div>
+      </div>
+
+      <div class="dog-status">
+        <div class="ds-avatar">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">14:32 · 14/05/2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="section-label">
+        <span>TIPO DE EVENTO</span>
+        <span class="section-help">selecione um</span>
+      </div>
+
+      <!-- Vacinação -->
+      <div class="type-card">
+        <div class="type-icon vaccine">💉</div>
+        <div class="type-info">
+          <div class="type-name">Vacinação</div>
+          <div class="type-desc">V10, raiva, gripe canina, giárdia</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Antiparasitário -->
+      <div class="type-card">
+        <div class="type-icon antipara">🛡</div>
+        <div class="type-info">
+          <div class="type-name">Antiparasitário</div>
+          <div class="type-desc">Antipulgas, carrapaticidas, vermífugo</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Exame -->
+      <div class="type-card">
+        <div class="type-icon exam">🔬</div>
+        <div class="type-info">
+          <div class="type-name">Exame</div>
+          <div class="type-desc">Hemograma, bioquímico, raio-x, ultrassom</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Consulta -->
+      <div class="type-card">
+        <div class="type-icon consult">🩺</div>
+        <div class="type-info">
+          <div class="type-name">Consulta veterinária</div>
+          <div class="type-desc">Rotina, especialidade, retorno</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Medicação -->
+      <div class="type-card">
+        <div class="type-icon med">💊</div>
+        <div class="type-info">
+          <div class="type-name">Medicação</div>
+          <div class="type-desc">Antibiótico, anti-inflamatório, contínuo</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Sintoma observado -->
+      <div class="type-card">
+        <div class="type-icon symptom">⚠</div>
+        <div class="type-info">
+          <div class="type-name">Sintoma observado</div>
+          <div class="type-desc">Mancando, vômito, ferida, mudança comportamental</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <div class="symptom-warning">
+        <strong>Importante:</strong> condutor registra <strong>sintomas observados</strong>. 
+        Diagnóstico de lesão ou doença é responsabilidade exclusiva do veterinário 
+        (anexado posteriormente como laudo).
+      </div>
+
+      <!-- Cirurgia -->
+      <div class="type-card">
+        <div class="type-icon surgery">🏥</div>
+        <div class="type-info">
+          <div class="type-name">Cirurgia e procedimento</div>
+          <div class="type-desc">Castração, sutura, internação</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+      <!-- Outro -->
+      <div class="type-card">
+        <div class="type-icon other">📋</div>
+        <div class="type-info">
+          <div class="type-name">Outro</div>
+          <div class="type-desc">Personalizado</div>
+        </div>
+        <span class="type-arrow">›</span>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA B: FORMULÁRIO ANTIPARASITÁRIO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — FORMULÁRIO ANTIPARASITÁRIO (BRAVECTO)
+    <small>Cenário com nuance: próxima dose vazia/opcional · varia por medicamento</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header roxo (antiparasitário) -->
+    <div class="page-header" style="border-bottom-color: rgba(155, 89, 182, 0.2);">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#9b59b6;">NOVO REGISTRO · ANTIPARASITÁRIO</div>
+          <div class="header-main">Registrar aplicação</div>
+        </div>
+        <div class="header-icon" style="background:rgba(155, 89, 182, 0.12); color:#9b59b6;">🛡</div>
+      </div>
+
+      <div class="dog-status" style="background:rgba(155, 89, 182, 0.04); border-color: rgba(155, 89, 182, 0.2);">
+        <div class="ds-avatar" style="border-color:#9b59b6; color:#9b59b6;">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">14:48 · 14/05/2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Tipo selecionado -->
+      <div class="type-selected">
+        <div class="type-selected-icon">🛡</div>
+        <div class="type-selected-info">
+          <div class="type-selected-label">TIPO DE EVENTO</div>
+          <div class="type-selected-name">Antiparasitário</div>
+        </div>
+        <span class="type-selected-change">Trocar</span>
+      </div>
+
+      <!-- Medicamento -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>MEDICAMENTO</span>
+        </div>
+        <input class="field-input" type="text" value="Bravecto" placeholder="Ex: Bravecto, NexGard, Simparic..." />
+        <div class="chips-row" style="margin-top: 8px;">
+          <span class="chip selected">Bravecto</span>
+          <span class="chip">NexGard</span>
+          <span class="chip">Simparic</span>
+          <span class="chip">Frontline</span>
+          <span class="chip">Vermífugo</span>
+        </div>
+      </div>
+
+      <!-- Lote e validade -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>LOTE E VALIDADE</span>
+          <span class="section-help">opcional</span>
+        </div>
+        <div class="field-row">
+          <div>
+            <input class="field-input" type="text" placeholder="Lote" value="LK824B" />
+          </div>
+          <div>
+            <div class="date-input-wrap">
+              <span class="date-input-icon">📅</span>
+              <span class="date-input-text">10/2027</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data de aplicação -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>DATA DA APLICAÇÃO</span>
+        </div>
+        <div class="date-input-wrap">
+          <span class="date-input-icon">📅</span>
+          <span class="date-input-text">14/05/2026 (hoje)</span>
+        </div>
+      </div>
+
+      <!-- AVISO IMPORTANTE: próxima dose varia por medicamento -->
+      <div class="info-card">
+        <strong>Próxima dose</strong> varia conforme o medicamento (Bravecto trimestral · NexGard mensal · etc). 
+        Preencha apenas se quiser receber lembrete.
+      </div>
+
+      <!-- Próxima dose (OPCIONAL e VAZIA) -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>PRÓXIMA DOSE</span>
+          <span class="section-help">opcional · gera lembrete</span>
+        </div>
+        <div class="date-input-wrap">
+          <span class="date-input-icon">📅</span>
+          <span class="date-input-text placeholder">Toque pra escolher data</span>
+        </div>
+      </div>
+
+      <!-- Veterinário responsável -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>VETERINÁRIO RESPONSÁVEL</span>
+          <span class="section-help">opcional · aplicação de rotina</span>
+        </div>
+        <div class="vet-input-wrap">
+          <span class="vet-icon">👤</span>
+          <div class="vet-info">
+            <div class="vet-name">Dra. Ana Souza</div>
+            <div class="vet-crmv">CRMV-SP 12345</div>
+          </div>
+          <span class="vet-clear">✕</span>
+        </div>
+      </div>
+
+      <!-- PDF anexo -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>DOCUMENTO ANEXO</span>
+          <span class="section-help">recomendado</span>
+        </div>
+        <div class="pdf-attached">
+          <span class="pdf-attached-icon">📄</span>
+          <div class="pdf-attached-info">
+            <div class="pdf-attached-name">nota_fiscal_bravecto.pdf</div>
+            <div class="pdf-attached-size">240 KB · anexado agora</div>
+          </div>
+          <span class="pdf-attached-remove">✕</span>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="section-help">opcional</span>
+        </div>
+        <textarea class="field-input" placeholder="Reação? Observações relevantes?"></textarea>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="cta-btn">💾 REGISTRAR EVENTO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <div class="lesson-box">
+    <strong>NUANCE IMPORTANTE — ANTIPARASITÁRIO:</strong> Diferente de vacinas (que têm intervalo padrão fixo), antiparasitários variam por medicamento (Bravecto trimestral · NexGard mensal · Simparic mensal · Frontline mensal). O app <strong>NÃO sugere próxima dose</strong>. Campo aparece vazio e opcional, com microcopy educativa explicando essa variação.
+  </div>
+
+  <div class="comparison-box">
+    <strong>COMPARATIVO — COMO MUDA POR TIPO DE EVENTO:</strong><br><br>
+    <strong>Vacinação (V10):</strong> próxima dose pré-preenchida em +12 meses (editável)<br>
+    <strong>Antiparasitário (Bravecto):</strong> próxima dose vazia · usuário preenche se quiser<br>
+    <strong>Exame:</strong> sem próxima dose · campo "data do retorno" se houver<br>
+    <strong>Sintoma observado:</strong> sem próxima dose · pede descrição detalhada<br>
+    <strong>Consulta:</strong> próxima dose como "retorno marcado" se houver
+  </div>
+
+  <h3 style="margin-top: 20px;">TELA A — SELEÇÃO DE TIPO</h3>
+  <ul>
+    <li>Header vermelho institucional (saúde · cuidado · atenção)</li>
+    <li>Status do cão com data atual</li>
+    <li><strong>8 categorias</strong> em cards verticais com ícone semântico colorido + nome + descrição curta</li>
+    <li>Cores por categoria: vacina verde · antiparasitário roxo · exame azul · consulta ciano · medicação amarelo · sintoma vermelho · cirurgia laranja · outro cinza</li>
+    <li><strong>Aviso destacado após "Sintoma observado"</strong>: "condutor registra sintomas observados · diagnóstico de lesão é responsabilidade do veterinário"</li>
+    <li>Educa o uso correto · respeita o que você definiu</li>
+    <li>Tap em qualquer categoria → tela B com formulário específico</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA B — FORMULÁRIO ANTIPARASITÁRIO</h3>
+  <ul>
+    <li>Header roxo coerente com cor da categoria</li>
+    <li>Tipo selecionado em destaque · botão "Trocar" pra voltar</li>
+    <li><strong>Campo Medicamento com chips de sugestão</strong>: Bravecto · NexGard · Simparic · Frontline · Vermífugo</li>
+    <li>Permite também texto livre pra produtos não listados</li>
+    <li>Lote e validade opcionais lado a lado · útil pra auditoria mas não obrigatório</li>
+    <li>Data de aplicação default "hoje" · editável</li>
+    <li><strong>Card informativo destacado</strong> explica por que próxima dose não é sugerida</li>
+    <li><strong>Próxima dose vazia e opcional</strong> · placeholder "Toque pra escolher data"</li>
+    <li>Microcopy "opcional · gera lembrete" explica o uso</li>
+    <li><strong>Veterinário com autocomplete</strong> · vets registrados antes aparecem · primeira vez preenche</li>
+    <li>"opcional · aplicação de rotina" comunica que medicação dada pelo condutor não exige veterinário</li>
+    <li><strong>PDF anexo já anexado</strong> no exemplo (nota fiscal do Bravecto) · mostra estado pós-anexo</li>
+    <li>Observações opcional</li>
+    <li>CTA "REGISTRAR EVENTO" ciano fill</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">VARIAÇÕES POR TIPO (próximas implementações)</h3>
+  <ul>
+    <li><strong>Vacinação:</strong> chip de vacina (V10/Raiva/Giárdia/etc) · próxima dose calculada automaticamente · veterinário obrigatório</li>
+    <li><strong>Exame:</strong> tipo do exame · laboratório · próxima data se retorno marcado · PDF do laudo recomendado</li>
+    <li><strong>Consulta:</strong> motivo · veterinário obrigatório · próxima data se retorno · atestado anexo</li>
+    <li><strong>Medicação:</strong> nome · dosagem · frequência · duração · prescrição anexa</li>
+    <li><strong>Sintoma observado:</strong> descrição obrigatória · foto opcional · gravidade auto-avaliada · campo "ação tomada" (descansou/levou ao vet/aguardando)</li>
+    <li><strong>Cirurgia:</strong> tipo · veterinário · clínica · relatório cirúrgico obrigatório · próximo retorno</li>
+    <li><strong>Outro:</strong> nome customizado · descrição livre</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">REGRAS TRANSVERSAIS</h3>
+  <ul>
+    <li>Qualquer condutor de plantão pode registrar evento de saúde</li>
+    <li>Trilha de auditoria registra autoria (você ou GCM Silva)</li>
+    <li>App nunca afirma "lesão" sem laudo veterinário anexo</li>
+    <li>PDF anexo sempre recomendado · obrigatório em exames, consultas, cirurgias</li>
+    <li>Veterinário com autocomplete reduz redigitação ao longo do tempo</li>
+    <li>Local opcional (PDF do atestado já tem)</li>
+    <li>Notificação de lembrete só se próxima dose preenchida</li>
+  </ul>
+</div>
+
+</body>
+</html>

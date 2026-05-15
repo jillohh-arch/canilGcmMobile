@@ -12,9 +12,9 @@ class _ClosingRoadmap extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1220),
+        color: const Color(0xFF0E1A1F),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF00E5FF).withAlpha(75)),
+        border: Border.all(color: AppTheme.primary.withAlpha(75)),
       ),
       child: Column(
         children: [

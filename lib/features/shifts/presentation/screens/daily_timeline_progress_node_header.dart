@@ -12,7 +12,7 @@ extension _DailyTimelineProgressNodeHeader on _DailyTimelineScreenState {
       children: [
         Text(
           'ETAPA ${(index + 1).toString().padLeft(2, '0')}',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: accent.withAlpha(210),
             fontSize: 9,
             fontWeight: FontWeight.w900,
@@ -23,7 +23,7 @@ extension _DailyTimelineProgressNodeHeader on _DailyTimelineScreenState {
         Expanded(
           child: Text(
             title.toUpperCase(),
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               color: progressStyle.titleColor,
               fontSize: 12,
               fontWeight: FontWeight.w900,

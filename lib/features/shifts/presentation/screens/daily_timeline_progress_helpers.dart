@@ -22,7 +22,7 @@ extension _DailyTimelineProgressHelpers on _DailyTimelineScreenState {
             constraints: const BoxConstraints(maxWidth: 180),
             child: Text(
               label,
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: Colors.white60,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,

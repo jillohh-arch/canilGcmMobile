@@ -20,7 +20,7 @@ extension _DailyTimelineEvolutionTitles on _DailyTimelineScreenState {
           Expanded(
             child: Text(
               title,
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,

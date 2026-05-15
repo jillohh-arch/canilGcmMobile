@@ -34,7 +34,7 @@ extension _DailyTimelineEntryPhotoGallery on _DailyTimelineScreenState {
       margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color: const Color(0xFF070B14),
+        color: AppTheme.background,
         border: Border.all(color: color.withAlpha(120)),
         boxShadow: [BoxShadow(color: color.withAlpha(35), blurRadius: 12)],
       ),

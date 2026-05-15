@@ -29,7 +29,7 @@ class _OccurrenceMapAdjustButton extends StatelessWidget {
             Expanded(
               child: Text(
                 'AJUSTAR PONTO NO MAPA',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,

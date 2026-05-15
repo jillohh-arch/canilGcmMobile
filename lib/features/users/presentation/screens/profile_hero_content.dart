@@ -106,12 +106,12 @@ class _ProfileAvatar extends StatelessWidget {
           ),
           if (isEditMode)
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
+              padding: EdgeInsets.all(6),
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _hudCyan,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.camera_alt_rounded,
                 size: 16,
                 color: _hudBackground,
@@ -140,7 +140,7 @@ class _ProfileIdentityBlock extends StatelessWidget {
       children: [
         Text(
           callsign.toUpperCase(),
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             fontSize: 22,
             fontWeight: FontWeight.w900,
             color: Colors.white,
@@ -150,7 +150,7 @@ class _ProfileIdentityBlock extends StatelessWidget {
         ),
         if (nameStr.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 2),
+            padding: EdgeInsets.only(top: 2),
             child: Text(
               nameStr,
               style: GoogleFonts.inter(
@@ -164,7 +164,7 @@ class _ProfileIdentityBlock extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           'RA: $raStr',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontSize: 13,
             color: _hudCyan.withAlpha(180),
             fontWeight: FontWeight.w600,

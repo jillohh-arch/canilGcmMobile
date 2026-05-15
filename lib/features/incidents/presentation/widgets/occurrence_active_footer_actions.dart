@@ -27,7 +27,7 @@ class _OccurrenceFinalizationActionRow extends StatelessWidget {
             ),
             child: Text(
               'VOLTAR',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.2,
               ),
@@ -68,7 +68,7 @@ class _OccurrencePrimaryFooterButton extends StatelessWidget {
         icon: Icon(icon),
         label: Text(
           label,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             letterSpacing: 1.0,
           ),

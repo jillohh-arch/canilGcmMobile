@@ -129,7 +129,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         color: _cyan,
         fontSize: 11,
         fontWeight: FontWeight.w800,

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manutenção Operacional - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(46, 204, 113, 0.15);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #2ecc71;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Status operacional do cão */
+  .op-status {
+    background: rgba(46, 204, 113, 0.06);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 4px;
+  }
+
+  .op-status-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .op-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #2ecc71;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .op-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .op-binomio {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .op-status-label {
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .op-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .op-badge {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .op-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(46, 204, 113, 0.15);
+  }
+
+  .op-stat {
+    text-align: center;
+  }
+
+  .op-stat-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .op-stat-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* Scroll content */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Section */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Alerta de manutenção pendente (cenário hipotético) */
+  .maintenance-alert {
+    background: rgba(241, 196, 15, 0.06);
+    border-left: 3px solid #f1c40f;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .alert-icon {
+    color: #f1c40f;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .alert-content {
+    flex: 1;
+  }
+
+  .alert-title {
+    color: #f1c40f;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .alert-text {
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  /* Quick config */
+  .quick-config {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+
+  .config-row {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  .config-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .config-icon {
+    color: #4dd0e1;
+    font-size: 15px;
+    width: 22px;
+    flex-shrink: 0;
+  }
+
+  .config-content {
+    flex: 1;
+  }
+
+  .config-key {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    margin-bottom: 1px;
+  }
+
+  .config-val {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .config-chev {
+    color: #5a7280;
+    font-size: 13px;
+  }
+
+  /* Toggle Rastreador */
+  .tracker-toggle {
+    background: rgba(77, 208, 225, 0.05);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tracker-icon-big {
+    width: 38px;
+    height: 38px;
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .tracker-info {
+    flex: 1;
+  }
+
+  .tracker-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .tracker-desc {
+    color: #7a8a92;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .switch {
+    width: 42px;
+    height: 24px;
+    background: #4dd0e1;
+    border-radius: 12px;
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .switch-handle {
+    width: 18px;
+    height: 18px;
+    background: #050d10;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    transition: all 0.2s;
+  }
+
+  /* O que foi treinado (multi-select rápido) */
+  .quick-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .quick-tag {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 7px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .quick-tag.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  .quick-tag-check {
+    margin-right: 4px;
+    color: #4dd0e1;
+  }
+
+  /* Desempenho */
+  .rating-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .rating-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .rating-btn.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Observação compacta */
+  .obs-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  .obs-input::placeholder {
+    color: #5a7280;
+  }
+
+  /* Histórico recente */
+  .recent-section {
+    margin-bottom: 16px;
+  }
+
+  .recent-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .recent-date {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 600;
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .recent-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .recent-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .recent-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .recent-stats {
+    display: flex;
+    gap: 8px;
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .see-all-link {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    padding: 8px;
+    cursor: pointer;
+  }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-save-with-tracker {
+    background: #2ecc71;
+  }
+
+  /* Comparativo lado a lado */
+  .compare-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 30px auto;
+  }
+
+  .compare-title {
+    color: #4dd0e1;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .compare-box {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .compare-box h4 {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .compare-box.formation h4 { color: #f1c40f; }
+  .compare-box.maintenance h4 { color: #2ecc71; }
+
+  .compare-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .compare-list li {
+    padding: 3px 0;
+    padding-left: 14px;
+    position: relative;
+    font-size: 11px;
+  }
+
+  .compare-list li:before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 20px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+  <div class="phone-label">MANUTENÇÃO OPERACIONAL · BONO</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">MANUTENÇÃO OPERACIONAL</div>
+          <div class="header-main">Busca & Captura</div>
+        </div>
+        <div class="header-icon">🎯</div>
+      </div>
+
+      <!-- Status do cão -->
+      <div class="op-status">
+        <div class="op-status-top">
+          <div class="op-avatar">BONO</div>
+          <div class="op-info">
+            <div class="op-binomio">Bono · GCM Ragonha</div>
+            <div class="op-status-label">
+              <span class="op-dot"></span>
+              OPERACIONAL HÁ 18 MESES
+            </div>
+          </div>
+          <span class="op-badge">FORMADO</span>
+        </div>
+        <div class="op-stats">
+          <div class="op-stat">
+            <div class="op-stat-label">SESSÕES</div>
+            <div class="op-stat-value">87</div>
+          </div>
+          <div class="op-stat">
+            <div class="op-stat-label">ÚLTIMA</div>
+            <div class="op-stat-value">7 dias</div>
+          </div>
+          <div class="op-stat">
+            <div class="op-stat-label">DIST. TOTAL</div>
+            <div class="op-stat-value">42 km</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll -->
+    <div class="scroll-area">
+
+      <!-- Alerta (aparece se passou tempo demais) -->
+      <div class="maintenance-alert">
+        <div class="alert-icon">⏰</div>
+        <div class="alert-content">
+          <div class="alert-title">Recomendado treino semanal</div>
+          <div class="alert-text">Última manutenção há 7 dias. Mantenha a rotina pra preservar o cão afiado.</div>
+        </div>
+      </div>
+
+      <!-- Rastreador ativo -->
+      <div class="tracker-toggle">
+        <div class="tracker-icon-big">📡</div>
+        <div class="tracker-info">
+          <div class="tracker-name">Rastreador GPS</div>
+          <div class="tracker-desc">Distância e trajeto registrados automaticamente</div>
+        </div>
+        <div class="switch">
+          <div class="switch-handle"></div>
+        </div>
+      </div>
+
+      <!-- Quick config (campos essenciais) -->
+      <div class="section-label">
+        <span>CONFIGURAÇÃO RÁPIDA</span>
+      </div>
+
+      <div class="quick-config">
+        <div class="config-row">
+          <span class="config-icon">👤</span>
+          <div class="config-content">
+            <div class="config-key">FIGURANTE</div>
+            <div class="config-val">Fig. Souza</div>
+          </div>
+          <span class="config-chev">›</span>
+        </div>
+        <div class="config-row">
+          <span class="config-icon">🧥</span>
+          <div class="config-content">
+            <div class="config-key">OBJETO DE ODOR</div>
+            <div class="config-val">Camiseta</div>
+          </div>
+          <span class="config-chev">›</span>
+        </div>
+        <div class="config-row">
+          <span class="config-icon">🌆</span>
+          <div class="config-content">
+            <div class="config-key">AMBIENTE</div>
+            <div class="config-val">Urbano</div>
+          </div>
+          <span class="config-chev">›</span>
+        </div>
+      </div>
+
+      <!-- O que foi reforçado (multi-select rápido) -->
+      <div class="section-label">
+        <span>O QUE FOI REFORÇADO</span>
+      </div>
+
+      <div class="quick-tags">
+        <div class="quick-tag selected"><span class="quick-tag-check">✓</span>Rastreamento</div>
+        <div class="quick-tag selected"><span class="quick-tag-check">✓</span>Indicação passiva</div>
+        <div class="quick-tag">Indicação ativa</div>
+        <div class="quick-tag selected"><span class="quick-tag-check">✓</span>Contenção</div>
+        <div class="quick-tag">Indicação em altura</div>
+        <div class="quick-tag">Indicação em veículo</div>
+        <div class="quick-tag">Cruzamento de pistas</div>
+      </div>
+
+      <!-- Desempenho -->
+      <div class="section-label">
+        <span>DESEMPENHO DA SESSÃO</span>
+      </div>
+
+      <div class="rating-row">
+        <div class="rating-btn">Ruim</div>
+        <div class="rating-btn">Regular</div>
+        <div class="rating-btn active">Bom</div>
+        <div class="rating-btn">Ótimo</div>
+      </div>
+
+      <!-- Observação -->
+      <div class="section-label">
+        <span>OBSERVAÇÕES</span>
+        <span style="color:#5a7280; font-size:9px; font-weight:500; letter-spacing:0;">opcional</span>
+      </div>
+
+      <textarea class="obs-input" placeholder="Notas sobre a sessão, comportamento, ajustes..."></textarea>
+
+      <!-- Histórico recente -->
+      <div class="recent-section">
+        <div class="section-label">
+          <span>SESSÕES RECENTES</span>
+        </div>
+
+        <div class="recent-card">
+          <span class="recent-date">03/05</span>
+          <div class="recent-info">
+            <div class="recent-title">Manutenção urbana</div>
+            <div class="recent-meta">Rastreamento · Contenção · Bom</div>
+          </div>
+          <div class="recent-stats">
+            <span>📏 524m</span>
+            <span>⏱ 18min</span>
+          </div>
+        </div>
+
+        <div class="recent-card">
+          <span class="recent-date">26/04</span>
+          <div class="recent-info">
+            <div class="recent-title">Manutenção mata</div>
+            <div class="recent-meta">Rastreamento · Indicação · Ótimo</div>
+          </div>
+          <div class="recent-stats">
+            <span>📏 1.2km</span>
+            <span>⏱ 24min</span>
+          </div>
+        </div>
+
+        <div class="recent-card">
+          <span class="recent-date">19/04</span>
+          <div class="recent-info">
+            <div class="recent-title">Manutenção rasteira</div>
+            <div class="recent-meta">Indicação em altura · Bom</div>
+          </div>
+          <div class="recent-stats">
+            <span>📏 380m</span>
+            <span>⏱ 14min</span>
+          </div>
+        </div>
+
+        <div class="see-all-link">Ver todas as 87 sessões →</div>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="btn-cancel">Cancelar</button>
+      <button class="btn-save btn-save-with-tracker">▶ INICIAR COM RASTREADOR</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Comparativo Formação vs Manutenção -->
+<div class="compare-container">
+  <div class="compare-title">FORMAÇÃO vs MANUTENÇÃO — DIFERENÇAS DE REGISTRO</div>
+  <div class="compare-grid">
+    <div class="compare-box formation">
+      <h4>🟡 FORMAÇÃO (Thor em M2)</h4>
+      <ul class="compare-list">
+        <li>Estrutura em módulos (M1/M2/M3)</li>
+        <li>Marcos progressivos numerados</li>
+        <li>Cada sessão amarrada a um marco específico</li>
+        <li>Orientador obrigatório</li>
+        <li>Registro denso: marco + figurante + objeto + ambiente</li>
+        <li>Resultado classificado (Completa/Checagem/Perda)</li>
+        <li>Estatísticas de evolução por marco</li>
+        <li>Avaliação final ao terminar M3</li>
+        <li>4 abas dedicadas: Roadmap, Módulo atual, Histórico, Estatísticas</li>
+      </ul>
+    </div>
+    <div class="compare-box maintenance">
+      <h4>🟢 MANUTENÇÃO (Bono operacional)</h4>
+      <ul class="compare-list">
+        <li>Sem módulos · estado único "Operacional"</li>
+        <li>Sem marcos · multi-select rápido de capacidades reforçadas</li>
+        <li>Sem orientador obrigatório (condutor decide)</li>
+        <li>Registro leve: 3 campos essenciais + tags</li>
+        <li>Desempenho simples (Ruim/Regular/Bom/Ótimo)</li>
+        <li>Tracking opcional (toggle do Rastreador)</li>
+        <li>Tela única com scroll · sem abas</li>
+        <li>Alerta de tempo sem manutenção</li>
+        <li>Histórico recente em cards compactos</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Notas -->
+<div style="width: 100%; display: flex; justify-content: center;">
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>Header verde (operacional) vs amarelo (formação) — comunicação visual clara</li>
+      <li>Status do cão com 3 métricas: sessões totais, última, distância acumulada</li>
+      <li>Badge "FORMADO" + "OPERACIONAL HÁ 18 MESES" valoriza histórico</li>
+      <li>Alerta de tempo desde última manutenção (semanal recomendado)</li>
+      <li>Rastreador GPS como toggle (opcional, ligado por padrão)</li>
+      <li>3 campos essenciais (Figurante / Objeto / Ambiente) — menos que formação</li>
+      <li>Multi-select rápido de capacidades reforçadas (chips)</li>
+      <li>Sem marcos · sem módulos · sem fases</li>
+      <li>Sessões recentes com distância e tempo do Rastreador</li>
+      <li>"Ver todas as 87 sessões" mostra histórico longo do cão operacional</li>
+      <li>CTA verde quando Rastreador está ligado ("Iniciar com rastreador") · ciano quando desligado ("Salvar")</li>
+      <li>Tela inteira em uma rolagem · sem abas (fricção mínima)</li>
+      <li>Comparativo final destaca a diferença filosófica das duas telas</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

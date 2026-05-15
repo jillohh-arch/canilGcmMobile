@@ -12,7 +12,7 @@ extension _DailyTimelineEntryIncidentOutcomes on _DailyTimelineScreenState {
       const SizedBox(height: 12),
       Text(
         'RESULTADOS FINAIS',
-        style: GoogleFonts.oxanium(
+        style: GoogleFonts.inter(
           color: color.withAlpha(230),
           fontSize: 10,
           fontWeight: FontWeight.w900,

@@ -18,7 +18,7 @@ const _occurrenceCloseResultOptions = [
   _ResultOption(
     label: 'Objetos apreendidos',
     icon: Icons.inventory_2_rounded,
-    color: Color(0xFFFFB84D),
+    color: AppTheme.warning,
   ),
   _ResultOption(
     label: 'Veículo detido',
@@ -33,17 +33,17 @@ const _occurrenceCloseResultOptions = [
   _ResultOption(
     label: 'Apoio prestado',
     icon: Icons.handshake_rounded,
-    color: Color(0xFF00F5A0),
+    color: AppTheme.success,
   ),
   _ResultOption(
     label: 'BO elaborado',
     icon: Icons.article_rounded,
-    color: Color(0xFF00E5FF),
+    color: AppTheme.primary,
   ),
   _ResultOption(
     label: 'Encaminhamento médico',
     icon: Icons.local_hospital_rounded,
-    color: Color(0xFFFF3B5C),
+    color: AppTheme.error,
   ),
   _ResultOption(
     label: 'Sem constatação',

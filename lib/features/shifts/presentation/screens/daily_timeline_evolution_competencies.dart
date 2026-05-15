@@ -15,7 +15,7 @@ extension _DailyTimelineEvolutionCompetencies on _DailyTimelineScreenState {
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
             child: Text(
               'COMPETÊNCIAS TRABALHADAS',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: _hudCyan.withAlpha(210),
                 fontSize: 10,
                 fontWeight: FontWeight.w800,

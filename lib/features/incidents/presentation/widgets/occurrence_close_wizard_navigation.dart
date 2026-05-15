@@ -55,7 +55,7 @@ extension _OccurrenceCloseWizardNavigation on _OccurrenceCloseWizardState {
             ),
             child: Text(
               _currentStep == 0 ? 'CANCELAR' : 'VOLTAR',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.3,
               ),
@@ -82,7 +82,7 @@ extension _OccurrenceCloseWizardNavigation on _OccurrenceCloseWizardState {
             ),
             child: Text(
               _currentStep == 2 ? 'CONCLUIR OCORRÊNCIA' : 'PRÓXIMO',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.5,
               ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -114,13 +115,14 @@ part '_dynamic_activity_sheet_occurrence_open_incident.dart';
 part '_dynamic_activity_sheet_occurrence_payload.dart';
 part '_dynamic_activity_sheet_occurrence_save.dart';
 
-// Constantes HUD (compartilhadas com part files)
-const Color _kHudBackground = Color(0xFF070B14);
-const Color _kHudPanel = Color(0xFF0B1220);
-const Color _kHudCyan = Color(0xFF00E5FF);
-const Color _kHudAmber = Color(0xFFFFB84D);
-const Color _kHudGreen = Color(0xFF00F5A0);
-const Color _kHudRed = Color(0xFFFF3B5C);
+// Aliases de cor — mapeiam para tokens do AppTheme.
+// Mantidos como const para compatibilidade com part files existentes.
+const Color _kHudBackground = AppTheme.background;
+const Color _kHudPanel = Color(0xFF0E1A1F);
+const Color _kHudCyan = AppTheme.primary;
+const Color _kHudAmber = AppTheme.warning;
+const Color _kHudGreen = AppTheme.success;
+const Color _kHudRed = AppTheme.error;
 
 class DynamicActivitySheet extends StatefulWidget {
   final String category; // 'Ocorrencia', 'Treino', 'Rotina', 'Evento', 'Saude'

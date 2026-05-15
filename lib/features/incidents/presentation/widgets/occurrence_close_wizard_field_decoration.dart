@@ -9,19 +9,19 @@ extension _OccurrenceCloseWizardFieldDecoration on _OccurrenceCloseWizardState {
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.inter(color: Colors.white38),
-      counterStyle: GoogleFonts.robotoMono(color: Colors.white38, fontSize: 9),
+      counterStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 9),
       prefixIcon: icon == null
           ? null
           : Icon(icon, color: _OccurrenceCloseWizardState._cyan, size: 18),
       suffixText: suffixText,
-      suffixStyle: GoogleFonts.robotoMono(
+      suffixStyle: GoogleFonts.inter(
         color: _OccurrenceCloseWizardState._cyan,
         fontSize: 12,
         fontWeight: FontWeight.w900,
       ),
       filled: true,
       fillColor: const Color(0xFF0A1322),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(
@@ -30,7 +30,7 @@ extension _OccurrenceCloseWizardFieldDecoration on _OccurrenceCloseWizardState {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(
+        borderSide: BorderSide(
           color: _OccurrenceCloseWizardState._cyan,
           width: 1.4,
         ),

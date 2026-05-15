@@ -36,7 +36,7 @@ class _CustomEventComposer extends StatelessWidget {
             icon: const Icon(Icons.add_rounded),
             label: Text(
               'REGISTRAR EVENTO',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.1,
               ),

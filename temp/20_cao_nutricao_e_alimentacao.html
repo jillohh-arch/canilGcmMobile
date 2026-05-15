@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cão/Prontuário v3 + Nutrição - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER UNIVERSAL (mantido) */
+  .universal-header {
+    padding: 8px 16px 14px 16px;
+    background: rgba(77, 208, 225, 0.04);
+    border-bottom: 1px solid rgba(77, 208, 225, 0.12);
+    flex-shrink: 0;
+  }
+
+  .uh-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatars-stack {
+    display: flex;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .avatar-small.condutor {
+    border-color: rgba(77, 208, 225, 0.5);
+    margin-left: -10px;
+  }
+
+  .uh-info { flex: 1; min-width: 0; }
+
+  .uh-binomio {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .uh-turno {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .turno-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .uh-time {
+    color: #b0c4cc;
+    font-weight: 500;
+  }
+
+  .uh-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .uh-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* SCROLL AREA */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* FICHA DO CÃO */
+  .dog-card {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.08), rgba(46, 204, 113, 0.04));
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 14px 0 16px 0;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .dog-photo {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 3px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .dog-info { flex: 1; min-width: 0; }
+
+  .dog-name {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .dog-meta {
+    color: #b0c4cc;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .dog-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    padding: 3px 9px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-link {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Status médico - 4 cards */
+  .health-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .health-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    padding: 10px 12px;
+    cursor: pointer;
+  }
+
+  .health-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .health-card-icon {
+    font-size: 14px;
+  }
+
+  .health-card-name {
+    color: #b0c4cc;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    flex: 1;
+  }
+
+  .health-card-status {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .health-card-status.ok { background: #2ecc71; }
+  .health-card-status.warn { background: #f1c40f; }
+
+  .health-card-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .health-card-sub {
+    color: #7a8a92;
+    font-size: 9px;
+  }
+
+  /* Especialidades chips */
+  .spec-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .spec-chip {
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    color: #2ecc71;
+    padding: 5px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .spec-chip.formation {
+    background: rgba(241, 196, 15, 0.1);
+    border-color: rgba(241, 196, 15, 0.3);
+    color: #f1c40f;
+  }
+
+  /* GRÁFICO DE PESO (simplificado visual) */
+  .weight-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .weight-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .weight-current {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .weight-value {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .weight-unit {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .weight-trend {
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .weight-chart {
+    height: 50px;
+    background: linear-gradient(180deg, rgba(77, 208, 225, 0.15), transparent);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .weight-line {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    height: 30px;
+  }
+
+  .weight-points {
+    color: #5a7280;
+    font-size: 8px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  /* ===== SEÇÃO NUTRIÇÃO ===== */
+  .nutrition-card {
+    background: rgba(230, 126, 34, 0.04);
+    border: 1px solid rgba(230, 126, 34, 0.2);
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  /* Prescrição vigente */
+  .prescription-bar {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .prescription-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(230, 126, 34, 0.15);
+    color: #e67e22;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .prescription-info { flex: 1; min-width: 0; }
+
+  .prescription-label {
+    color: #e67e22;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 1px;
+  }
+
+  .prescription-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .prescription-source {
+    color: #7a8a92;
+    font-size: 9px;
+  }
+
+  /* Today refeições */
+  .today-meals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .meal-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .meal-card.done {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.3);
+  }
+
+  .meal-card.pending {
+    background: rgba(241, 196, 15, 0.04);
+    border-color: rgba(241, 196, 15, 0.3);
+    border-style: dashed;
+  }
+
+  .meal-name {
+    color: #b0c4cc;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .meal-card.done .meal-name { color: #2ecc71; }
+  .meal-card.pending .meal-name { color: #f1c40f; }
+
+  .meal-amount {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+
+  .meal-time {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  /* Conformidade semanal */
+  .conformity-card {
+    background: rgba(46, 204, 113, 0.05);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .conformity-icon {
+    color: #2ecc71;
+    font-size: 18px;
+  }
+
+  .conformity-info { flex: 1; }
+
+  .conformity-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .conformity-desc {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .conformity-link {
+    color: #2ecc71;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* CTAs */
+  .cta-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .cta-btn {
+    width: 100%;
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .cta-btn.primary {
+    background: rgba(230, 126, 34, 0.1);
+    border: 1px solid rgba(230, 126, 34, 0.4);
+    color: #e67e22;
+  }
+
+  .cta-btn.secondary {
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    color: #e74c3c;
+  }
+
+  /* Documents/laudos list */
+  .doc-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .doc-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .doc-info { flex: 1; min-width: 0; }
+
+  .doc-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .doc-meta {
+    color: #7a8a92;
+    font-size: 9px;
+  }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #050d10;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 0 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #5a7280;
+  }
+
+  .nav-item.active {
+    color: #4dd0e1;
+  }
+
+  .nav-icon { font-size: 18px; }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .fab-center {
+    width: 54px;
+    height: 54px;
+    background: #4dd0e1;
+    color: #050d10;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(77, 208, 225, 0.3);
+    cursor: pointer;
+    margin-top: -28px;
+    border: 4px solid #050d10;
+  }
+
+  /* ===== TELA B: REGISTRAR ALIMENTAÇÃO ===== */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(230, 126, 34, 0.2);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text { flex: 1; }
+
+  .header-subtitle {
+    color: #e67e22;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(230, 126, 34, 0.12);
+    color: #e67e22;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .dog-status-orange {
+    background: rgba(230, 126, 34, 0.04);
+    border: 1px solid rgba(230, 126, 34, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ds-avatar-orange {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #e67e22;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e67e22;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .ds-info { flex: 1; }
+
+  .ds-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ds-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  /* Quick meal selector (chips horizontais grandes) */
+  .meal-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .meal-option {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 8px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .meal-option.selected {
+    background: rgba(230, 126, 34, 0.1);
+    border-color: #e67e22;
+  }
+
+  .meal-option-icon {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .meal-option-name {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .meal-option.selected .meal-option-name {
+    color: #e67e22;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* Input grande pra quantidade */
+  .amount-input-wrap {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .amount-input-wrap.divergent {
+    background: rgba(241, 196, 15, 0.06);
+    border-color: rgba(241, 196, 15, 0.4);
+  }
+
+  .amount-input-num {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 800;
+    font-family: inherit;
+    text-align: right;
+    outline: none;
+    width: 100%;
+  }
+
+  .amount-input-unit {
+    color: #4dd0e1;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .amount-input-wrap.divergent .amount-input-unit {
+    color: #f1c40f;
+  }
+
+  /* Prescription comparison */
+  .prescription-compare {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.4;
+    margin-top: 6px;
+  }
+
+  .prescription-compare strong { color: #4dd0e1; }
+
+  .prescription-compare.divergent {
+    background: rgba(241, 196, 15, 0.06);
+    border-left-color: #f1c40f;
+  }
+
+  .prescription-compare.divergent strong { color: #f1c40f; }
+
+  /* Reason field (aparece se divergente) */
+  .reason-input {
+    width: 100%;
+    background: rgba(241, 196, 15, 0.04);
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 50px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .reason-input::placeholder { color: #5a7280; }
+
+  /* Time chips */
+  .time-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .time-chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 7px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .time-chip.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Photo and obs (opcional) */
+  .optional-action {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px dashed rgba(77, 208, 225, 0.3);
+    border-radius: 10px;
+    padding: 12px;
+    color: #4dd0e1;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .obs-input-small {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 50px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .obs-input-small::placeholder { color: #5a7280; }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .save-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(230, 126, 34, 0.04);
+    border-left: 3px solid #e67e22;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong { color: #e67e22; }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: CÃO COM SEÇÃO NUTRIÇÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — CÃO / PRONTUÁRIO COM NUTRIÇÃO
+    <small>Versão atualizada · seção Nutrição entre status médico e laudos</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header universal -->
+    <div class="universal-header">
+      <div class="uh-row">
+        <div class="avatars-stack">
+          <div class="avatar-small">BONO</div>
+          <div class="avatar-small condutor">RAG</div>
+        </div>
+        <div class="uh-info">
+          <div class="uh-binomio">Bono · GCM Ragonha</div>
+          <div class="uh-turno">
+            <span class="turno-dot"></span>
+            <span>Turno ativo</span>
+            <span class="uh-time">· há 5h</span>
+          </div>
+        </div>
+        <div class="uh-actions">
+          <button class="uh-btn">⇄</button>
+          <button class="uh-btn">👤</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Ficha do cão -->
+      <div class="dog-card">
+        <div class="dog-photo">BONO</div>
+        <div class="dog-info">
+          <div class="dog-name">Bono</div>
+          <div class="dog-meta">Malinois · 6 anos · 28kg</div>
+          <span class="dog-badge">● OPERACIONAL HÁ 4 ANOS</span>
+        </div>
+      </div>
+
+      <!-- Status médico -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>STATUS MÉDICO</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-card">
+          <div class="health-card-top">
+            <span class="health-card-icon">💉</span>
+            <span class="health-card-name">VACINAS</span>
+            <span class="health-card-status ok"></span>
+          </div>
+          <div class="health-card-value">Em dia</div>
+          <div class="health-card-sub">Próx: 12/2026</div>
+        </div>
+
+        <div class="health-card">
+          <div class="health-card-top">
+            <span class="health-card-icon">🛡</span>
+            <span class="health-card-name">ANTIPULGAS</span>
+            <span class="health-card-status warn"></span>
+          </div>
+          <div class="health-card-value">Em 15 dias</div>
+          <div class="health-card-sub">Bravecto · vence 29/05</div>
+        </div>
+
+        <div class="health-card">
+          <div class="health-card-top">
+            <span class="health-card-icon">⚖</span>
+            <span class="health-card-name">PESO</span>
+            <span class="health-card-status ok"></span>
+          </div>
+          <div class="health-card-value">28kg</div>
+          <div class="health-card-sub">Estável · 30 dias</div>
+        </div>
+
+        <div class="health-card">
+          <div class="health-card-top">
+            <span class="health-card-icon">🔬</span>
+            <span class="health-card-name">EXAMES</span>
+            <span class="health-card-status ok"></span>
+          </div>
+          <div class="health-card-value">Em dia</div>
+          <div class="health-card-sub">Último: 03/2026</div>
+        </div>
+      </div>
+
+      <!-- Especialidades -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>ESPECIALIDADES</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="spec-chips">
+        <span class="spec-chip">● Detecção (Drogas)</span>
+        <span class="spec-chip">● Busca & Captura</span>
+        <span class="spec-chip formation">◔ Guarda & Proteção</span>
+      </div>
+
+      <!-- ===== NUTRIÇÃO (seção nova) ===== -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>🥩 NUTRIÇÃO</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-link">Ver tudo →</span>
+      </div>
+
+      <div class="nutrition-card">
+        <!-- Prescrição -->
+        <div class="prescription-bar">
+          <div class="prescription-icon">📋</div>
+          <div class="prescription-info">
+            <div class="prescription-label">PRESCRIÇÃO VIGENTE</div>
+            <div class="prescription-value">800g/dia · ração premium</div>
+            <div class="prescription-source">Laudo nutricional · Dra. Ana Souza</div>
+          </div>
+        </div>
+
+        <!-- Refeições de hoje -->
+        <div class="today-meals">
+          <div class="meal-card done">
+            <div class="meal-name">MANHÃ ✓</div>
+            <div class="meal-amount">400g</div>
+            <div class="meal-time">07:15 · você</div>
+          </div>
+          <div class="meal-card pending">
+            <div class="meal-name">NOITE</div>
+            <div class="meal-amount">—</div>
+            <div class="meal-time">pendente</div>
+          </div>
+        </div>
+
+        <!-- Conformidade -->
+        <div class="conformity-card">
+          <span class="conformity-icon">✓</span>
+          <div class="conformity-info">
+            <div class="conformity-title">Conformidade em dia</div>
+            <div class="conformity-desc">100% da semana · 5.6kg em 7 dias</div>
+          </div>
+          <span class="conformity-link">›</span>
+        </div>
+      </div>
+
+      <!-- Evolução do peso -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>EVOLUÇÃO DO PESO</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-link">Ver tudo →</span>
+      </div>
+
+      <div class="weight-card">
+        <div class="weight-top">
+          <div class="weight-current">
+            <span class="weight-value">28.0</span>
+            <span class="weight-unit">kg</span>
+          </div>
+          <span class="weight-trend">↗ ESTÁVEL</span>
+        </div>
+        <div class="weight-chart">
+          <svg class="weight-line" viewBox="0 0 300 30" preserveAspectRatio="none">
+            <polyline points="0,18 50,16 100,17 150,15 200,14 250,14 300,12" 
+              stroke="#4dd0e1" stroke-width="2" fill="none" />
+            <circle cx="300" cy="12" r="3" fill="#4dd0e1" />
+          </svg>
+        </div>
+        <div class="weight-points">
+          <span>NOV</span>
+          <span>DEZ</span>
+          <span>JAN</span>
+          <span>FEV</span>
+          <span>MAR</span>
+          <span>ABR</span>
+          <span>MAI</span>
+        </div>
+      </div>
+
+      <!-- Laudos -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>LAUDOS E DOCUMENTOS</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-link">Ver tudo →</span>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">📄</div>
+        <div class="doc-info">
+          <div class="doc-name">Laudo nutricional</div>
+          <div class="doc-meta">Dra. Ana Souza · CRMV 12345 · 04/2026</div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">📄</div>
+        <div class="doc-info">
+          <div class="doc-name">Certificação Detecção - Drogas</div>
+          <div class="doc-meta">Avaliador externo · 11/2024</div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">📄</div>
+        <div class="doc-info">
+          <div class="doc-name">Curso K9 ANCC</div>
+          <div class="doc-meta">Anatomia, condicionamento · 03/2023</div>
+        </div>
+      </div>
+
+      <!-- CTAs -->
+      <div class="cta-stack">
+        <button class="cta-btn primary">🥩 REGISTRAR ALIMENTAÇÃO</button>
+        <button class="cta-btn secondary">⚕ REGISTRAR EVENTO DE SAÚDE</button>
+      </div>
+
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Turno</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Histórico</span>
+      </div>
+      <div class="fab-center">🛡</div>
+      <div class="nav-item">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Treino</span>
+      </div>
+      <div class="nav-item active">
+        <span class="nav-icon">🐕</span>
+        <span class="nav-label">Cão</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA B: REGISTRAR ALIMENTAÇÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — REGISTRAR ALIMENTAÇÃO
+    <small>Ação rápida · comparação automática com prescrição</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>19:42</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR · NUTRIÇÃO</div>
+          <div class="header-main">Alimentação</div>
+        </div>
+        <div class="header-icon">🥩</div>
+      </div>
+
+      <div class="dog-status-orange">
+        <div class="ds-avatar-orange">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">19:42 · refeição da noite</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area" style="padding-top: 14px;">
+
+      <!-- Refeição -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>REFEIÇÃO</span>
+        </div>
+        <div class="meal-selector">
+          <div class="meal-option">
+            <div class="meal-option-icon">🌅</div>
+            <div class="meal-option-name">Manhã</div>
+          </div>
+          <div class="meal-option selected">
+            <div class="meal-option-icon">🌙</div>
+            <div class="meal-option-name">Noite</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quantidade -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>QUANTIDADE</span>
+          <span class="field-help">prescrição: 400g/refeição</span>
+        </div>
+        <div class="amount-input-wrap">
+          <input class="amount-input-num" type="number" value="400" />
+          <span class="amount-input-unit">gramas</span>
+        </div>
+
+        <div class="prescription-compare">
+          <strong>✓ Dentro da prescrição</strong> · 400g de 400g previstos pra esta refeição
+        </div>
+      </div>
+
+      <!-- Horário (chips de horário) -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>HORÁRIO</span>
+        </div>
+        <div class="time-chips">
+          <span class="time-chip selected">Agora · 19:42</span>
+          <span class="time-chip">Há 10min</span>
+          <span class="time-chip">Há 30min</span>
+          <span class="time-chip">Editar</span>
+        </div>
+      </div>
+
+      <!-- Foto da balança (opcional) -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>FOTO DA BALANÇA</span>
+          <span class="field-help">opcional · evidência adicional</span>
+        </div>
+        <button class="optional-action">📷 ADICIONAR FOTO</button>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="field-help">opcional</span>
+        </div>
+        <textarea class="obs-input-small" placeholder="Recusou? Comeu rápido? Sobrou?"></textarea>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="save-btn">💾 REGISTRAR ALIMENTAÇÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA C: ALIMENTAÇÃO COM DIVERGÊNCIA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA C — VARIAÇÃO COM DIVERGÊNCIA
+    <small>Quantidade diferente da prescrição · pede motivo opcional</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>19:42</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR · NUTRIÇÃO</div>
+          <div class="header-main">Alimentação</div>
+        </div>
+        <div class="header-icon">🥩</div>
+      </div>
+
+      <div class="dog-status-orange">
+        <div class="ds-avatar-orange">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">19:42 · refeição da noite</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area" style="padding-top: 14px;">
+
+      <div class="field-group">
+        <div class="field-label">
+          <span>REFEIÇÃO</span>
+        </div>
+        <div class="meal-selector">
+          <div class="meal-option">
+            <div class="meal-option-icon">🌅</div>
+            <div class="meal-option-name">Manhã</div>
+          </div>
+          <div class="meal-option selected">
+            <div class="meal-option-icon">🌙</div>
+            <div class="meal-option-name">Noite</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quantidade DIVERGENTE -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>QUANTIDADE</span>
+          <span class="field-help">prescrição: 400g/refeição</span>
+        </div>
+        <div class="amount-input-wrap divergent">
+          <input class="amount-input-num" type="number" value="500" />
+          <span class="amount-input-unit">gramas</span>
+        </div>
+
+        <div class="prescription-compare divergent">
+          <strong>⚠ Acima da prescrição</strong> · 500g vs 400g previstos · <strong>+25% acima</strong>
+        </div>
+      </div>
+
+      <!-- Motivo aparece automaticamente -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>MOTIVO DA DIVERGÊNCIA</span>
+          <span class="field-help">opcional · mas recomendado</span>
+        </div>
+        <textarea class="reason-input" placeholder="Por que a quantidade diferiu? Ex: pós-treino intenso, orientação veterinária...">Sessão de Bolinha em campo pela tarde (10 reps · 50m). Acréscimo pra recuperação.</textarea>
+      </div>
+
+      <!-- Horário -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>HORÁRIO</span>
+        </div>
+        <div class="time-chips">
+          <span class="time-chip selected">Agora · 19:42</span>
+          <span class="time-chip">Há 10min</span>
+          <span class="time-chip">Há 30min</span>
+        </div>
+      </div>
+
+      <!-- Foto (recomendada quando divergente) -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>FOTO DA BALANÇA</span>
+          <span class="field-help" style="color:#f1c40f;">recomendado em divergências</span>
+        </div>
+        <button class="optional-action">📷 ADICIONAR FOTO</button>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="save-btn">💾 REGISTRAR ALIMENTAÇÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <div class="lesson-box">
+    <strong>FILOSOFIA DA NUTRIÇÃO COMO SEÇÃO PRÓPRIA:</strong> Alimentação não é evento de saúde comum. É registro diário, comparado contra prescrição, com agregação semanal/mensal. Por isso ganha seção própria no Prontuário (entre Status Médico e Laudos), com cor laranja distinta (#e67e22) — institucional mas separada do "ciano principal" e do "vermelho de saúde médica".
+  </div>
+
+  <h3 style="margin-top: 20px;">TELA A — CÃO/PRONTUÁRIO COM NUTRIÇÃO</h3>
+  <ul>
+    <li>Mantida estrutura geral do mockup 11 (Ficha · Status médico · Especialidades · Peso · Laudos)</li>
+    <li><strong>Nova seção "🥩 NUTRIÇÃO"</strong> entre Especialidades e Evolução do peso</li>
+    <li>Card laranja distinto · cor #e67e22 mantém identidade própria sem conflitar com saúde médica (vermelho)</li>
+    <li><strong>Prescrição vigente em destaque</strong>: 800g/dia · ração premium · referência ao laudo nutricional vigente</li>
+    <li>Mostra a fonte: "Dra. Ana Souza" · auditável</li>
+    <li><strong>Refeições de hoje em grid 2x2</strong>:
+      <ul style="padding-left:24px; margin-top:4px;">
+        <li>"MANHÃ ✓" verde · 400g · 07:15 · você</li>
+        <li>"NOITE" amarelo dashed · "—" · pendente</li>
+      </ul>
+    </li>
+    <li><strong>Card de conformidade</strong>: "✓ Conformidade em dia · 100% da semana · 5.6kg em 7 dias"</li>
+    <li>Cálculo automático: prescrição × dias = total esperado · vs real registrado</li>
+    <li><strong>2 CTAs no rodapé:</strong> 🥩 REGISTRAR ALIMENTAÇÃO (laranja) + ⚕ REGISTRAR EVENTO DE SAÚDE (vermelho) · ações distintas</li>
+    <li>Bottom nav simplificado: Turno · Histórico · 🛡 FAB · Treino · Cão — sem Rotina</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA B — REGISTRAR ALIMENTAÇÃO (CONFORME)</h3>
+  <ul>
+    <li>Header laranja coerente com seção Nutrição</li>
+    <li>Status do cão com "refeição da noite" · contexto temporal</li>
+    <li><strong>Seletor de refeição</strong> em grid 2x2: 🌅 Manhã · 🌙 Noite — simples e visual</li>
+    <li>Suporta mais refeições no futuro (almoço, tarde) se necessário</li>
+    <li><strong>Campo Quantidade gigante</strong> (28px) · "400" + "gramas" · destaque pra precisão</li>
+    <li>Microcopy do label mostra prescrição: "prescrição: 400g/refeição"</li>
+    <li><strong>Comparação automática em verde</strong> quando dentro: "✓ Dentro da prescrição · 400g de 400g previstos"</li>
+    <li><strong>Horário em chips inteligentes</strong>: "Agora · 19:42" · "Há 10min" · "Há 30min" · "Editar"</li>
+    <li>Permite registrar refeições passadas sem digitar hora manualmente</li>
+    <li>Foto da balança opcional · evidência adicional pro arquivo</li>
+    <li>Observações opcional com placeholder educativo: "Recusou? Comeu rápido? Sobrou?"</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA C — VARIAÇÃO COM DIVERGÊNCIA</h3>
+  <ul>
+    <li>Cenário: 500g em vez de 400g previstos (caso real do Bono · sessão de bolinha pela tarde)</li>
+    <li><strong>Campo de quantidade fica amarelo</strong> automaticamente · sinaliza divergência</li>
+    <li><strong>Banner de comparação muda pra amarelo</strong>: "⚠ Acima da prescrição · 500g vs 400g · +25% acima"</li>
+    <li>Cálculo automático do percentual</li>
+    <li><strong>Campo "Motivo da divergência" aparece automaticamente</strong> quando há divergência</li>
+    <li>Microcopy: "opcional · mas recomendado" — não bloqueia mas estimula registro</li>
+    <li>Placeholder educativo: "Por que a quantidade diferiu? Ex: pós-treino intenso, orientação veterinária..."</li>
+    <li><strong>Foto da balança vira "recomendado em divergências"</strong> · destaque amarelo na microcopy</li>
+    <li>Tudo isso construindo trilha de auditoria robusta · defesa profissional</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PRINCÍPIO DA DEFESA PROFISSIONAL PROPORCIONAL</h3>
+  <ul>
+    <li><strong>Conformidade normal:</strong> registro rápido, simples, verde · sem fricção</li>
+    <li><strong>Divergência:</strong> automaticamente pede contexto · foto recomendada · motivo opcional</li>
+    <li>App NÃO impede divergência (condutor sabe o que faz) · só registra com cuidado</li>
+    <li>Caso real do laudo (800g vs 300g) é resolvido elegantemente:
+      <ul style="padding-left:24px; margin-top:4px;">
+        <li>Prescrição vigente: 800g (do laudo da Dra. Ana Souza)</li>
+        <li>Registros diários: dentro da prescrição = conformidade verde</li>
+        <li>Auditor questiona? PDF mostra laudo + 365 registros conformes + ✓</li>
+      </ul>
+    </li>
+    <li>Defesa proporcional · não chamativa · profissional</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">REGRAS TRANSVERSAIS</h3>
+  <ul>
+    <li>Trilha de auditoria registra cada alimentação (autoria + horário + quantidade)</li>
+    <li>Edição posterior gera badge "editado HH:MM" na timeline do histórico</li>
+    <li>Soft delete com motivo obrigatório (igual outros registros)</li>
+    <li>Foto preserva EXIF (data, GPS, dispositivo)</li>
+    <li>Categoria "🥩 Nutrição" como filtro próprio no Histórico (decisão sua)</li>
+    <li>Notificação opcional: lembrete de refeição pendente</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">COMPARATIVO: ANTES vs DEPOIS</h3>
+  <ul>
+    <li><strong>ANTES:</strong> Bottom nav com aba Rotina (alimentação + passeio + escovação + banho + limpeza + brincadeira)</li>
+    <li><strong>DEPOIS:</strong> 
+      <ul style="padding-left:24px; margin-top:4px;">
+        <li>Bottom nav simplificado · sem Rotina</li>
+        <li>Alimentação → seção Nutrição no Cão (ação rápida diária)</li>
+        <li>Passeio → Condicionamento Físico (cardiovascular)</li>
+        <li>Escovação · Banho · Limpeza · Brincadeira casual → cortados</li>
+      </ul>
+    </li>
+    <li>App fica focado em prestação de contas institucional · sem ruído de higiene básica</li>
+  </ul>
+</div>
+
+</body>
+</html>

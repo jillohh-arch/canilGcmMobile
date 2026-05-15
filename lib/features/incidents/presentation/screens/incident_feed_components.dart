@@ -1,4 +1,4 @@
-﻿part of 'incident_form_screen.dart';
+part of 'incident_form_screen.dart';
 
 Color _incidentFeedResultColor(String result) {
   final normalized = result.toLowerCase();
@@ -15,7 +15,7 @@ Color _incidentFeedResultColor(String result) {
   if (normalized.contains('cancel')) {
     return AppTheme.statusAlert;
   }
-  return const Color(0xFF4ECDE4);
+  return AppTheme.primary;
 }
 
 IconData _incidentFeedTypeIcon(String? type) {

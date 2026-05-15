@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 part 'occurrence_active_context_chip.dart';
@@ -50,21 +51,21 @@ class OccurrenceActiveContextSummary extends StatelessWidget {
                 icon: Icons.location_on_rounded,
                 label: 'Local',
                 value: location,
-                color: const Color(0xFF00E5FF),
+                color: AppTheme.primary,
                 backgroundColor: backgroundColor,
               ),
               _OccurrenceContextChip(
                 icon: Icons.groups_rounded,
                 label: 'Equipe',
                 value: team,
-                color: const Color(0xFFFFB84D),
+                color: AppTheme.warning,
                 backgroundColor: backgroundColor,
               ),
               _OccurrenceContextChip(
                 icon: Icons.schedule_rounded,
                 label: 'Iniciada',
                 value: startedLabel,
-                color: const Color(0xFF00F5A0),
+                color: AppTheme.success,
                 backgroundColor: backgroundColor,
               ),
             ],

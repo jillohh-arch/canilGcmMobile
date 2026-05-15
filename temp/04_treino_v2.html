@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registrar Treino - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  /* Contexto compacto */
+  .context-bar {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.15);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctx-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .ctx-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ctx-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ctx-time {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .ctx-gps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 500;
+    background: rgba(46, 204, 113, 0.08);
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+
+  .ctx-gps-dot {
+    width: 5px;
+    height: 5px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  /* Chips de modalidade */
+  .chips-section {
+    padding: 14px 16px 4px 16px;
+    flex-shrink: 0;
+  }
+
+  .chips-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .chips-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chips-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .chip {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .chip.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  .chip-icon {
+    font-size: 13px;
+  }
+
+  /* Form scroll */
+  .form-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  .form-scroll::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Section header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .section-action {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Sub-chips de categoria de comando */
+  .subchips-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin: 0 -16px 14px -16px;
+    padding: 0 16px 6px 16px;
+  }
+
+  .subchips-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .subchip {
+    flex-shrink: 0;
+    padding: 6px 11px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  .subchip.active {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: rgba(77, 208, 225, 0.4);
+    color: #4dd0e1;
+  }
+
+  .subchip-count {
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  /* Lista de comandos */
+  .commands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .command-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+  }
+
+  .command-item:hover {
+    background: rgba(77, 208, 225, 0.05);
+    border-color: rgba(77, 208, 225, 0.25);
+  }
+
+  .command-item.checked {
+    background: rgba(77, 208, 225, 0.1);
+    border-color: #4dd0e1;
+  }
+
+  .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: transparent;
+    flex-shrink: 0;
+  }
+
+  .command-item.checked .check-circle {
+    background: #4dd0e1;
+    border-color: #4dd0e1;
+    color: #050d10;
+  }
+
+  .command-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .command-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .command-desc {
+    color: #5a7280;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .stage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .stage-icon {
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* Cores por estágio */
+  .stage-1 {
+    background: rgba(149, 165, 166, 0.1);
+    color: #95a5a6;
+    border: 1px solid rgba(149, 165, 166, 0.25);
+  }
+
+  .stage-2 {
+    background: rgba(241, 196, 15, 0.1);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.25);
+  }
+
+  .stage-3 {
+    background: rgba(230, 126, 34, 0.1);
+    color: #e67e22;
+    border: 1px solid rgba(230, 126, 34, 0.25);
+  }
+
+  .stage-4 {
+    background: rgba(52, 152, 219, 0.1);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.25);
+  }
+
+  .stage-5 {
+    background: rgba(46, 204, 113, 0.1);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.25);
+  }
+
+  /* Botão adicionar comando */
+  .add-command-btn {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px dashed rgba(77, 208, 225, 0.4);
+    border-radius: 10px;
+    padding: 12px;
+    color: #4dd0e1;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+
+  .add-command-btn:hover {
+    background: rgba(77, 208, 225, 0.08);
+  }
+
+  /* Banner info */
+  .info-banner {
+    background: rgba(77, 208, 225, 0.05);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #b0c4cc;
+    line-height: 1.5;
+  }
+
+  .info-banner strong {
+    color: #4dd0e1;
+  }
+
+  /* Field group reaproveitado */
+  .field-group {
+    margin-bottom: 18px;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .field-label-text {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .field-optional {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  textarea.field-input {
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  /* Toggle */
+  .toggle-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .toggle-option {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .toggle-option.active {
+    background: rgba(77, 208, 225, 0.12);
+    color: #4dd0e1;
+  }
+
+  /* Rating */
+  .rating-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .rating-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .rating-btn.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Save bar */
+  .save-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 16px 20px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Legenda de estágios */
+  .stage-legend {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 30px;
+    width: 390px;
+  }
+
+  .stage-legend h4 {
+    color: #4dd0e1;
+    font-size: 11px;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 11px;
+    color: #b0c4cc;
+  }
+
+  .stage-row .stage-badge {
+    cursor: default;
+    flex-shrink: 0;
+    width: 130px;
+    justify-content: center;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 20px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons">
+        <span>4G</span>
+        <span>•••</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR ATIVIDADE</div>
+          <div class="header-main">Treino</div>
+        </div>
+      </div>
+      <div class="context-bar">
+        <div class="ctx-avatar">BONO</div>
+        <div class="ctx-info">
+          <div class="ctx-binomio">Bono · GCM Ragonha</div>
+          <div class="ctx-time">10/05/2026 · 14:32</div>
+        </div>
+        <div class="ctx-gps">
+          <span class="ctx-gps-dot"></span>
+          GPS preciso
+        </div>
+      </div>
+    </div>
+
+    <!-- Modalidade chips -->
+    <div class="chips-section">
+      <div class="chips-label">MODALIDADE</div>
+      <div class="chips-row">
+        <div class="chip active">
+          <span class="chip-icon">🎯</span>
+          Obediência
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🔍</span>
+          Busca
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🛡</span>
+          Proteção
+        </div>
+        <div class="chip">
+          <span class="chip-icon">👃</span>
+          Faro
+        </div>
+        <div class="chip">
+          <span class="chip-icon">💪</span>
+          Condicionamento
+        </div>
+      </div>
+    </div>
+
+    <!-- Form scroll -->
+    <div class="form-scroll">
+
+      <!-- Banner informativo -->
+      <div class="info-banner">
+        <strong>Biblioteca do Bono.</strong> Toque no comando pra marcar como treinado nesta sessão. Toque no estágio pra atualizar progresso.
+      </div>
+
+      <!-- Comandos -->
+      <div class="section-header">
+        <span class="section-label">COMANDOS TREINADOS HOJE</span>
+        <span class="section-action">⚙ Gerenciar</span>
+      </div>
+
+      <!-- Sub-chips de categoria -->
+      <div class="subchips-row">
+        <div class="subchip active">
+          Todos <span class="subchip-count">15</span>
+        </div>
+        <div class="subchip">
+          Operacionais <span class="subchip-count">7</span>
+        </div>
+        <div class="subchip">
+          Posicionais <span class="subchip-count">2</span>
+        </div>
+        <div class="subchip">
+          Posturais <span class="subchip-count">3</span>
+        </div>
+        <div class="subchip">
+          Habilidades <span class="subchip-count">3</span>
+        </div>
+      </div>
+
+      <!-- Lista de comandos -->
+      <div class="commands-list">
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Senta</div>
+            <div class="command-desc">Operacional</div>
+          </div>
+          <span class="stage-badge stage-5">
+            <span class="stage-icon">●</span> Operacional
+          </span>
+        </div>
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Deita</div>
+            <div class="command-desc">Operacional</div>
+          </div>
+          <span class="stage-badge stage-5">
+            <span class="stage-icon">●</span> Operacional
+          </span>
+        </div>
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Fica</div>
+            <div class="command-desc">Operacional</div>
+          </div>
+          <span class="stage-badge stage-5">
+            <span class="stage-icon">●</span> Operacional
+          </span>
+        </div>
+
+        <div class="command-item">
+          <span class="check-circle"></span>
+          <div class="command-info">
+            <div class="command-name">Junto à direita</div>
+            <div class="command-desc">Variação pra canhotos</div>
+          </div>
+          <span class="stage-badge stage-4">
+            <span class="stage-icon">◕</span> Consolidado
+          </span>
+        </div>
+
+        <div class="command-item">
+          <span class="check-circle"></span>
+          <div class="command-info">
+            <div class="command-name">Meio</div>
+            <div class="command-desc">Entra entre as pernas</div>
+          </div>
+          <span class="stage-badge stage-4">
+            <span class="stage-icon">◕</span> Consolidado
+          </span>
+        </div>
+
+        <div class="command-item">
+          <span class="check-circle"></span>
+          <div class="command-info">
+            <div class="command-name">Atravessa</div>
+            <div class="command-desc">Passa atravessando as pernas</div>
+          </div>
+          <span class="stage-badge stage-4">
+            <span class="stage-icon">◕</span> Consolidado
+          </span>
+        </div>
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Cumprimenta</div>
+            <div class="command-desc">Fica em duas patas</div>
+          </div>
+          <span class="stage-badge stage-5">
+            <span class="stage-icon">●</span> Operacional
+          </span>
+        </div>
+
+        <div class="command-item">
+          <span class="check-circle"></span>
+          <div class="command-info">
+            <div class="command-name">Abraço</div>
+            <div class="command-desc">Pula no colo</div>
+          </div>
+          <span class="stage-badge stage-5">
+            <span class="stage-icon">●</span> Operacional
+          </span>
+        </div>
+
+        <div class="command-item">
+          <span class="check-circle"></span>
+          <div class="command-info">
+            <div class="command-name">Jump</div>
+            <div class="command-desc">Salto sobre obstáculo</div>
+          </div>
+          <span class="stage-badge stage-4">
+            <span class="stage-icon">◕</span> Consolidado
+          </span>
+        </div>
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Hop</div>
+            <div class="command-desc">Sobe em mesa/cadeira</div>
+          </div>
+          <span class="stage-badge stage-3">
+            <span class="stage-icon">◑</span> Em desenvolvimento
+          </span>
+        </div>
+
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Parkour</div>
+            <div class="command-desc">Anda de lado na parede</div>
+          </div>
+          <span class="stage-badge stage-2">
+            <span class="stage-icon">◔</span> Introduzido
+          </span>
+        </div>
+
+      </div>
+
+      <!-- Adicionar comando -->
+      <button class="add-command-btn">+ Adicionar comando à biblioteca</button>
+
+      <!-- Duração + Condução -->
+      <div class="field-row">
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">DURAÇÃO</span>
+          </div>
+          <input class="field-input" placeholder="Ex: 25 min" value="25 min" />
+        </div>
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">CONDUÇÃO</span>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-option active">Com guia</div>
+            <div class="toggle-option">Sem guia</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desempenho geral -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">DESEMPENHO GERAL DA SESSÃO</span>
+        </div>
+        <div class="rating-row">
+          <div class="rating-btn">Ruim</div>
+          <div class="rating-btn">Regular</div>
+          <div class="rating-btn active">Bom</div>
+          <div class="rating-btn">Ótimo</div>
+        </div>
+      </div>
+
+      <!-- Observação -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">OBSERVAÇÕES</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <textarea class="field-input" placeholder="Avanços, dificuldades, pontos pra próxima sessão..."></textarea>
+      </div>
+
+    </div>
+
+    <!-- Save -->
+    <div class="save-bar">
+      <button class="btn-cancel">Cancelar</button>
+      <button class="btn-save">💾 SALVAR TREINO</button>
+    </div>
+
+  </div>
+
+  <!-- Legenda dos estágios -->
+  <div class="stage-legend">
+    <h4>LEGENDA DOS ESTÁGIOS</h4>
+    <div class="stage-row">
+      <span class="stage-badge stage-1"><span class="stage-icon">○</span> Não treinado</span>
+      <span>Comando ainda não introduzido ao cão</span>
+    </div>
+    <div class="stage-row">
+      <span class="stage-badge stage-2"><span class="stage-icon">◔</span> Introduzido</span>
+      <span>Cão conhece, executa às vezes</span>
+    </div>
+    <div class="stage-row">
+      <span class="stage-badge stage-3"><span class="stage-icon">◑</span> Em desenvolvimento</span>
+      <span>Executa com erros ou hesitação</span>
+    </div>
+    <div class="stage-row">
+      <span class="stage-badge stage-4"><span class="stage-icon">◕</span> Consolidado</span>
+      <span>Executa consistentemente</span>
+    </div>
+    <div class="stage-row">
+      <span class="stage-badge stage-5"><span class="stage-icon">●</span> Operacional</span>
+      <span>Executa sob qualquer contexto e distração</span>
+    </div>
+  </div>
+
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>Biblioteca por cão (Bono = 15 comandos cadastrados)</li>
+      <li>5 estágios discretos com cores semânticas (cinza → verde)</li>
+      <li>Tap no comando = marca como treinado nesta sessão</li>
+      <li>Tap no badge de estágio = abre modal pra atualizar (só condutor titular)</li>
+      <li>Sub-chips de categoria filtram a biblioteca (Todos / Operacionais / Posicionais / Posturais / Habilidades)</li>
+      <li>Contador em cada categoria mostra total de comandos</li>
+      <li>Botão "+ Adicionar comando" sempre visível no fim da lista</li>
+      <li>"⚙ Gerenciar" pra arquivar, renomear, reordenar</li>
+      <li>Banner explicativo orienta primeiro uso</li>
+      <li>Estágio aparece como badge colorido em cada comando</li>
+      <li>Avaliação geral da sessão separada do estágio do comando (uma é momentânea, outro é evolução)</li>
+      <li>Apolo terá biblioteca própria, começando vazia</li>
+      <li>Edição de estágio restrita ao condutor titular do cão</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

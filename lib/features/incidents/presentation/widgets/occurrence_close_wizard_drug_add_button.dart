@@ -12,7 +12,7 @@ extension _OccurrenceCloseWizardDrugAddButton on _OccurrenceCloseWizardState {
       icon: const Icon(Icons.add_rounded, size: 18),
       label: Text(
         'ADICIONAR ENTORPECENTE',
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.0,

@@ -9,7 +9,7 @@ extension _DailyTimelineProgress on _DailyTimelineScreenState {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(230),
+        color: AppTheme.background.withAlpha(230),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: accent.withAlpha(95)),
         boxShadow: [

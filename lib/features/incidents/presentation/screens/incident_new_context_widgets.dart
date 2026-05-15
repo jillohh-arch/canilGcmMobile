@@ -38,7 +38,7 @@ class _IncidentStartContextRow extends StatelessWidget {
               children: [
                 Text(
                   timeStr,
-                  style: GoogleFonts.oxanium(
+                  style: GoogleFonts.inter(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,

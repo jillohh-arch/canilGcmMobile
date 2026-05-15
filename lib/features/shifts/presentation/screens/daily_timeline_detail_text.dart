@@ -7,7 +7,7 @@ extension _DailyTimelineDetailText on _DailyTimelineScreenState {
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: Colors.white38,
             fontSize: 9,
             fontWeight: FontWeight.w800,

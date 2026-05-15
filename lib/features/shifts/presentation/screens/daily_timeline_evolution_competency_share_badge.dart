@@ -14,7 +14,7 @@ extension _DailyTimelineEvolutionCompetencyShareBadge
       ),
       child: Text(
         '${share.toStringAsFixed(0)}%',
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           color: color,
           fontSize: 10,
           fontWeight: FontWeight.w800,

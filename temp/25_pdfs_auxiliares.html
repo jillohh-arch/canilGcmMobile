@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDFs Auxiliares - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #1a1f24;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    padding: 30px 20px;
+  }
+
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .instructions {
+    color: #fff;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .instructions h1 {
+    color: #4dd0e1;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .instructions p {
+    color: #888;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Group por PDF */
+  .pdf-group {
+    margin-bottom: 40px;
+  }
+
+  .pdf-group-title {
+    color: #4dd0e1;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pdf-group-icon {
+    font-size: 18px;
+  }
+
+  .pdf-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+
+  .page-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .page-number {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+  }
+
+  /* Página A4 */
+  .page {
+    width: 100%;
+    max-width: 540px;
+    aspect-ratio: 210 / 297;
+    background: #ffffff;
+    color: #1a1a1a;
+    border-radius: 4px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    padding: 30px 32px;
+    position: relative;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header padrão (páginas internas) */
+  .page-header-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #0a8e9d;
+    margin-bottom: 16px;
+  }
+
+  .page-header-strip.weight { border-bottom-color: #2c6e91; }
+  .page-header-strip.nutrition { border-bottom-color: #c25e1f; }
+  .page-header-strip.history { border-bottom-color: #5a4080; }
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-brasao-mini {
+    width: 22px;
+    height: 22px;
+    background: #0a8e9d;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .header-brasao-mini.weight { background: #2c6e91; }
+  .header-brasao-mini.nutrition { background: #c25e1f; }
+  .header-brasao-mini.history { background: #5a4080; }
+
+  .header-brand-text {
+    color: #0a8e9d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .header-brand-text.weight { color: #2c6e91; }
+  .header-brand-text.nutrition { color: #c25e1f; }
+  .header-brand-text.history { color: #5a4080; }
+
+  .header-meta {
+    color: #6c7a83;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* Footer */
+  .page-footer-strip {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #d8e0e5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #6c7a83;
+    font-size: 8px;
+    font-weight: 500;
+  }
+
+  /* ===== CAPA ===== */
+  .page-capa {
+    justify-content: space-between;
+    text-align: center;
+    padding: 50px 32px;
+  }
+
+  .capa-brasao {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 4px solid #0a8e9d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px auto;
+    color: white;
+    font-size: 50px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .capa-brasao.vaccine { background: linear-gradient(135deg, #0a8e9d, #1a5560); border-color: #0a8e9d; }
+  .capa-brasao.weight { background: linear-gradient(135deg, #2c6e91, #1a4560); border-color: #2c6e91; }
+  .capa-brasao.nutrition { background: linear-gradient(135deg, #c25e1f, #8a3e10); border-color: #c25e1f; }
+  .capa-brasao.history { background: linear-gradient(135deg, #5a4080, #3a2a60); border-color: #5a4080; }
+
+  .capa-institution {
+    color: #0a8e9d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    margin-bottom: 4px;
+  }
+
+  .capa-institution.weight { color: #2c6e91; }
+  .capa-institution.nutrition { color: #c25e1f; }
+  .capa-institution.history { color: #5a4080; }
+
+  .capa-subtitle {
+    color: #6c7a83;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+  }
+
+  .capa-divider {
+    width: 60px;
+    height: 2px;
+    background: #0a8e9d;
+    margin: 0 auto 22px auto;
+  }
+
+  .capa-divider.weight { background: #2c6e91; }
+  .capa-divider.nutrition { background: #c25e1f; }
+  .capa-divider.history { background: #5a4080; }
+
+  .capa-doctype {
+    color: #6c7a83;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  .capa-title {
+    color: #1a1a1a;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+
+  .capa-subject {
+    color: #0a8e9d;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+
+  .capa-subject.weight { color: #2c6e91; }
+  .capa-subject.nutrition { color: #c25e1f; }
+  .capa-subject.history { color: #5a4080; }
+
+  .capa-meta {
+    background: #f4f8fa;
+    border: 1px solid #d8e0e5;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 18px;
+    text-align: left;
+  }
+
+  .capa-meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 10px;
+  }
+
+  .capa-meta-row:last-child { border-bottom: none; }
+
+  .capa-meta-key {
+    color: #6c7a83;
+    font-weight: 500;
+  }
+
+  .capa-meta-val {
+    color: #1a1a1a;
+    font-weight: 700;
+  }
+
+  .capa-doc-id {
+    background: #1a5560;
+    color: white;
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+
+  .capa-doc-id.weight { background: #1a4560; }
+  .capa-doc-id.nutrition { background: #8a3e10; }
+  .capa-doc-id.history { background: #3a2a60; }
+
+  .capa-footer {
+    color: #6c7a83;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+
+  .capa-footer strong {
+    color: #1a1a1a;
+    display: block;
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+
+  /* ===== SECTIONS COMUNS ===== */
+  .section-title {
+    color: #0a8e9d;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 3px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #0a8e9d;
+  }
+
+  .section-title.weight { color: #2c6e91; border-bottom-color: #2c6e91; }
+  .section-title.nutrition { color: #c25e1f; border-bottom-color: #c25e1f; }
+  .section-title.history { color: #5a4080; border-bottom-color: #5a4080; }
+
+  .section-subtitle {
+    color: #6c7a83;
+    font-size: 9px;
+    margin-bottom: 12px;
+  }
+
+  /* ===== PDF 1: CARTEIRA DE VACINAÇÃO ===== */
+  
+  /* Próximas doses card */
+  .upcoming-card {
+    background: #fef7e8;
+    border: 1px solid #f1c40f;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .upcoming-icon {
+    color: #b88a0c;
+    font-size: 14px;
+  }
+
+  .upcoming-text {
+    color: #6e5408;
+    font-size: 9px;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  .upcoming-text strong { color: #1a1a1a; }
+
+  /* Vaccine table */
+  .vac-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .vac-table thead {
+    background: #1a5560;
+  }
+
+  .vac-table th {
+    color: white;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 8px 10px;
+    text-align: left;
+  }
+
+  .vac-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 9px;
+    vertical-align: top;
+  }
+
+  .vac-table tr:last-child td { border-bottom: none; }
+  .vac-table tr:nth-child(even) td { background: #f8fafb; }
+
+  .vac-name {
+    font-weight: 700;
+    color: #1a1a1a;
+    font-size: 10px;
+  }
+
+  .vac-status {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .vac-status.ok {
+    background: #e8f5ed;
+    color: #1a6e3a;
+  }
+
+  .vac-status.warn {
+    background: #fef7e8;
+    color: #b88a0c;
+  }
+
+  .vac-mono {
+    font-family: 'SF Mono', monospace;
+    color: #6c7a83;
+    font-size: 8px;
+  }
+
+  /* Anexos */
+  .attachments-section {
+    background: #f4f8fa;
+    border-left: 3px solid #0a8e9d;
+    padding: 10px 12px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 12px;
+  }
+
+  .attachments-label {
+    color: #0a8e9d;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    color: #1a1a1a;
+    font-size: 9px;
+  }
+
+  .attachment-icon { color: #0a8e9d; font-size: 11px; }
+
+  /* ===== PDF 2: PESO ===== */
+  
+  /* Stats grid */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .stat-box {
+    background: #f4f8fa;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+
+  .stat-box-label {
+    color: #6c7a83;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+  }
+
+  .stat-box-value {
+    color: #1a1a1a;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .stat-box-unit {
+    color: #2c6e91;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* Chart area pra PDF peso */
+  .chart-box {
+    background: #f8fafb;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .chart-title {
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .chart-svg-wrap {
+    height: 110px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .chart-ideal-band-pdf {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: rgba(46, 204, 113, 0.1);
+    border-top: 1px dashed rgba(46, 204, 113, 0.5);
+    border-bottom: 1px dashed rgba(46, 204, 113, 0.5);
+  }
+
+  .chart-ideal-label-pdf {
+    position: absolute;
+    right: 6px;
+    color: #1a6e3a;
+    font-size: 7px;
+    font-weight: 700;
+    background: #fff;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .chart-x-labels {
+    display: flex;
+    justify-content: space-between;
+    color: #6c7a83;
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  /* Weight table */
+  .weight-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .weight-table thead {
+    background: #1a4560;
+  }
+
+  .weight-table th {
+    color: white;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 7px 10px;
+    text-align: left;
+  }
+
+  .weight-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 9px;
+  }
+
+  .weight-table tr:last-child td { border-bottom: none; }
+  .weight-table tr:nth-child(even) td { background: #f8fafb; }
+
+  .weight-val-cell {
+    font-weight: 800;
+    color: #1a1a1a;
+  }
+
+  .weight-trend-cell {
+    color: #1a6e3a;
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  /* Análise textual */
+  .analysis-box {
+    background: #eff4f7;
+    border-left: 3px solid #2c6e91;
+    padding: 10px 12px;
+    border-radius: 0 6px 6px 0;
+    margin-top: 12px;
+  }
+
+  .analysis-label {
+    color: #2c6e91;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .analysis-text {
+    color: #1a1a1a;
+    font-size: 9px;
+    line-height: 1.5;
+  }
+
+  /* ===== PDF 3: NUTRIÇÃO ===== */
+  
+  /* Prescrição em destaque */
+  .prescription-box-pdf {
+    background: #fdf2e8;
+    border: 2px solid #c25e1f;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .prescription-label-pdf {
+    color: #c25e1f;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    margin-bottom: 6px;
+  }
+
+  .prescription-amount-pdf {
+    color: #1a1a1a;
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .prescription-source-pdf {
+    color: #6c7a83;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+
+  .prescription-source-pdf strong { color: #1a1a1a; }
+
+  /* Conformidade card grande */
+  .conformity-pdf {
+    background: #e8f5ed;
+    border: 1px solid #2a9d52;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .conformity-percent-pdf {
+    color: #1a6e3a;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .conformity-percent-sub-pdf {
+    color: #1a6e3a;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .conformity-text-pdf {
+    color: #1a1a1a;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .conformity-text-pdf strong { font-weight: 700; }
+
+  /* Bar chart PDF */
+  .bar-chart-pdf {
+    background: #f8fafb;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .bar-area-pdf {
+    height: 90px;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #d8e0e5;
+    margin-bottom: 4px;
+  }
+
+  .bar-line-pdf {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed #c25e1f;
+  }
+
+  .bar-line-label-pdf {
+    position: absolute;
+    right: 0;
+    background: #fff;
+    color: #c25e1f;
+    font-size: 7px;
+    font-weight: 700;
+    padding: 0 4px;
+    transform: translateY(-50%);
+  }
+
+  .pdf-bar {
+    flex: 1;
+    background: #c25e1f;
+    opacity: 0.7;
+    border-radius: 1px;
+  }
+
+  .pdf-bar.divergent-up {
+    background: #b88a0c;
+    opacity: 0.85;
+  }
+
+  .pdf-bar.divergent-down {
+    background: #b88a0c;
+    opacity: 0.4;
+  }
+
+  .bar-x-labels-pdf {
+    display: flex;
+    justify-content: space-between;
+    color: #6c7a83;
+    font-size: 7px;
+    font-weight: 600;
+  }
+
+  /* Divergências */
+  .divergences-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .divergences-table thead {
+    background: #8a3e10;
+  }
+
+  .divergences-table th {
+    color: white;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 7px 10px;
+    text-align: left;
+  }
+
+  .divergences-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 9px;
+  }
+
+  .divergences-table tr:last-child td { border-bottom: none; }
+  .divergences-table tr:nth-child(even) td { background: #fdf6f0; }
+
+  .div-amount {
+    font-weight: 800;
+    color: #1a1a1a;
+  }
+
+  .div-percent {
+    color: #b88a0c;
+    font-weight: 700;
+    font-size: 9px;
+  }
+
+  /* ===== PDF 4: HISTÓRICO ===== */
+  
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .summary-box {
+    background: #f4f8fa;
+    border-left: 3px solid #5a4080;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+  }
+
+  .summary-box-label {
+    color: #5a4080;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+  }
+
+  .summary-box-val {
+    color: #1a1a1a;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+
+  .summary-box-sub {
+    color: #6c7a83;
+    font-size: 8px;
+  }
+
+  /* Category breakdown */
+  .breakdown-section {
+    background: #f8fafb;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .breakdown-title {
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .breakdown-row {
+    display: grid;
+    grid-template-columns: 16px 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 9px;
+  }
+
+  .breakdown-row:last-child { border-bottom: none; }
+
+  .breakdown-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .breakdown-dot.routine { background: #c25e1f; }
+  .breakdown-dot.health { background: #e74c3c; }
+  .breakdown-dot.training { background: #2a9d52; }
+  .breakdown-dot.occurrence { background: #0a8e9d; }
+
+  .breakdown-name {
+    color: #1a1a1a;
+    font-weight: 600;
+  }
+
+  .breakdown-count {
+    color: #1a1a1a;
+    font-weight: 800;
+    font-size: 11px;
+  }
+
+  .breakdown-percent {
+    color: #6c7a83;
+    font-size: 8px;
+    font-family: 'SF Mono', monospace;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Timeline summary */
+  .timeline-summary {
+    background: #f4f8fa;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .timeline-week {
+    background: #3a2a60;
+    color: white;
+    padding: 6px 12px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .timeline-day {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e8eef1;
+    font-size: 9px;
+  }
+
+  .timeline-day:last-child { border-bottom: none; }
+
+  .timeline-day-date {
+    color: #5a4080;
+    font-weight: 700;
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+
+  .timeline-day-events {
+    color: #1a1a1a;
+    font-size: 9px;
+    line-height: 1.5;
+  }
+
+  .timeline-day-events strong { font-weight: 700; }
+
+  /* Integrity sections (compartilhado entre todos) */
+  .integrity-mini {
+    background: #f8fafb;
+    border: 1px solid #d8e0e5;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 12px;
+  }
+
+  .integrity-mini-label {
+    color: #6c7a83;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+  }
+
+  .integrity-mini-hash {
+    font-family: 'SF Mono', monospace;
+    font-size: 7px;
+    color: #1a1a1a;
+    word-break: break-all;
+    line-height: 1.4;
+  }
+
+  /* Design notes */
+  .design-notes {
+    width: 100%;
+    max-width: 1280px;
+    margin: 40px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong { color: #4dd0e1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="instructions">
+    <h1>📄 4 PDFs AUXILIARES</h1>
+    <p>Carteira de Vacinação · Histórico de Peso · Relatório Nutricional · Histórico Mensal<br>
+    8 páginas em grid 4x2 · capa + página representativa de cada PDF</p>
+  </div>
+
+  <!-- ===== PDF 1: CARTEIRA DE VACINAÇÃO ===== -->
+  <div class="pdf-group">
+    <div class="pdf-group-title">
+      <span class="pdf-group-icon">💉</span>
+      PDF 1 — CARTEIRA DE VACINAÇÃO
+    </div>
+    <div class="pdf-pair">
+
+      <!-- Capa Vacinação -->
+      <div class="page-wrap">
+        <div class="page-number">CAPA</div>
+        <div class="page page-capa">
+          <div>
+            <div class="capa-brasao vaccine">💉</div>
+            <div class="capa-institution">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div>
+            <div class="capa-subtitle">CANIL K9 · CONTROLE SANITÁRIO</div>
+            
+            <div class="capa-divider"></div>
+            
+            <div class="capa-doctype">CARTEIRA DE VACINAÇÃO</div>
+            <div class="capa-title">Bono</div>
+            <div class="capa-subject">MALINOIS · 6 ANOS · CÃO OPERACIONAL</div>
+            
+            <div class="capa-meta">
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Período</span>
+                <span class="capa-meta-val">2022 — 2026</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Vacinas registradas</span>
+                <span class="capa-meta-val">12 aplicações</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Status atual</span>
+                <span class="capa-meta-val">Em dia</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Próxima dose</span>
+                <span class="capa-meta-val">29/05/2026 · Antipulgas</span>
+              </div>
+            </div>
+
+            <div class="capa-doc-id">VAC: 2026/05/0042-K9</div>
+          </div>
+
+          <div class="capa-footer">
+            <strong>CONDUTOR TITULAR</strong>
+            GCM Jilles Ragonha · RA 691755<br>
+            Emitido em 14/05/2026
+          </div>
+        </div>
+      </div>
+
+      <!-- Página interna Vacinação -->
+      <div class="page-wrap">
+        <div class="page-number">PÁGINA INTERNA — TABELA DE VACINAÇÃO</div>
+        <div class="page">
+          <div class="page-header-strip">
+            <div class="header-brand">
+              <div class="header-brasao-mini">💉</div>
+              <div class="header-brand-text">GCM LIMEIRA · CARTEIRA DE VACINAÇÃO</div>
+            </div>
+            <div class="header-meta">VAC 2026/05/0042-K9</div>
+          </div>
+
+          <div class="section-title">PRÓXIMAS DOSES</div>
+          <div class="section-subtitle">Programação prevista pelos próximos 12 meses</div>
+
+          <div class="upcoming-card">
+            <span class="upcoming-icon">⚠</span>
+            <div class="upcoming-text">
+              <strong>Antipulgas (Bravecto)</strong> vence em <strong>15 dias</strong> · agendar reaplicação trimestral
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top: 14px;">HISTÓRICO COMPLETO</div>
+          <div class="section-subtitle">12 vacinas registradas entre 2022 e 2026</div>
+
+          <table class="vac-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">VACINA</th>
+                <th style="width: 18%;">DATA</th>
+                <th style="width: 17%;">LOTE</th>
+                <th style="width: 27%;">VETERINÁRIO</th>
+                <th style="width: 18%;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="vac-name">V10</div></td>
+                <td>12/09/2025</td>
+                <td class="vac-mono">LK7821A</td>
+                <td>Dra. Ana Souza<br><span class="vac-mono">CRMV 12345</span></td>
+                <td><span class="vac-status ok">EM DIA</span></td>
+              </tr>
+              <tr>
+                <td><div class="vac-name">Raiva</div></td>
+                <td>18/01/2026</td>
+                <td class="vac-mono">MR9482B</td>
+                <td>Dr. Carlos Lima<br><span class="vac-mono">CRMV 8721</span></td>
+                <td><span class="vac-status ok">EM DIA</span></td>
+              </tr>
+              <tr>
+                <td><div class="vac-name">Bravecto</div></td>
+                <td>02/03/2026</td>
+                <td class="vac-mono">LK824B</td>
+                <td>Aplicado pelo condutor<br><span class="vac-mono">Trimestral</span></td>
+                <td><span class="vac-status warn">15 DIAS</span></td>
+              </tr>
+              <tr>
+                <td><div class="vac-name">Giárdia</div></td>
+                <td>20/11/2025</td>
+                <td class="vac-mono">GR5512A</td>
+                <td>Dra. Ana Souza<br><span class="vac-mono">CRMV 12345</span></td>
+                <td><span class="vac-status ok">EM DIA</span></td>
+              </tr>
+              <tr>
+                <td><div class="vac-name">V10</div></td>
+                <td>15/09/2024</td>
+                <td class="vac-mono">KJ4521C</td>
+                <td>Dra. Ana Souza<br><span class="vac-mono">CRMV 12345</span></td>
+                <td><span class="vac-status ok">CUMPRIDA</span></td>
+              </tr>
+              <tr>
+                <td><div class="vac-name">Raiva</div></td>
+                <td>22/01/2025</td>
+                <td class="vac-mono">MR8123A</td>
+                <td>Dr. Carlos Lima<br><span class="vac-mono">CRMV 8721</span></td>
+                <td><span class="vac-status ok">CUMPRIDA</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="attachments-section">
+            <div class="attachments-label">DOCUMENTOS ANEXOS</div>
+            <div class="attachment-item">
+              <span class="attachment-icon">📄</span>
+              <span>Comprovante V10 · 12/09/2025 · Clínica VetCenter</span>
+            </div>
+            <div class="attachment-item">
+              <span class="attachment-icon">📄</span>
+              <span>Atestado Raiva · 18/01/2026 · Vigilância Sanitária</span>
+            </div>
+            <div class="attachment-item">
+              <span class="attachment-icon">📄</span>
+              <span>NF Bravecto · 02/03/2026 · Lote LK824B</span>
+            </div>
+          </div>
+
+          <div class="integrity-mini">
+            <div class="integrity-mini-label">HASH SHA-256 · GERADO 14/05/2026 14:32</div>
+            <div class="integrity-mini-hash">b8f2d5a3c1e9f4b7d2a8c5e0f3b6d9a4c7e2f5b8d1a4c7e0f3b6d9a2c5e8f1b4</div>
+          </div>
+
+          <div class="page-footer-strip">
+            <span>GCM Limeira · Canil K9 · Carteira de Vacinação</span>
+            <span>Página 2 de 4</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== PDF 2: HISTÓRICO DE PESO ===== -->
+  <div class="pdf-group">
+    <div class="pdf-group-title">
+      <span class="pdf-group-icon">⚖</span>
+      PDF 2 — HISTÓRICO DE PESO
+    </div>
+    <div class="pdf-pair">
+
+      <!-- Capa Peso -->
+      <div class="page-wrap">
+        <div class="page-number">CAPA</div>
+        <div class="page page-capa">
+          <div>
+            <div class="capa-brasao weight">⚖</div>
+            <div class="capa-institution weight">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div>
+            <div class="capa-subtitle">CANIL K9 · MONITORAMENTO CLÍNICO</div>
+            
+            <div class="capa-divider weight"></div>
+            
+            <div class="capa-doctype">HISTÓRICO DE PESO</div>
+            <div class="capa-title">Bono</div>
+            <div class="capa-subject weight">42 PESAGENS · ÚLTIMOS 6 MESES</div>
+            
+            <div class="capa-meta">
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Período</span>
+                <span class="capa-meta-val">11/2025 — 05/2026</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Pesagens registradas</span>
+                <span class="capa-meta-val">42 medições</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Peso atual</span>
+                <span class="capa-meta-val">28,0 kg</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Faixa ideal</span>
+                <span class="capa-meta-val">26 — 30 kg</span>
+              </div>
+            </div>
+
+            <div class="capa-doc-id weight">PESO: 2026/05/0142-K9</div>
+          </div>
+
+          <div class="capa-footer">
+            <strong>FAIXA IDEAL CONFORME LAUDO NUTRICIONAL</strong>
+            Dra. Ana Souza · CRMV-SP 12345<br>
+            Emitido em 14/05/2026
+          </div>
+        </div>
+      </div>
+
+      <!-- Página interna Peso -->
+      <div class="page-wrap">
+        <div class="page-number">PÁGINA INTERNA — GRÁFICO + ANÁLISE</div>
+        <div class="page">
+          <div class="page-header-strip weight">
+            <div class="header-brand">
+              <div class="header-brasao-mini weight">⚖</div>
+              <div class="header-brand-text weight">GCM LIMEIRA · HISTÓRICO DE PESO</div>
+            </div>
+            <div class="header-meta">PESO 2026/05/0142-K9</div>
+          </div>
+
+          <div class="section-title weight">ESTATÍSTICAS DO PERÍODO</div>
+          <div class="section-subtitle">11/2025 — 05/2026 · 42 pesagens registradas</div>
+
+          <div class="stats-row">
+            <div class="stat-box">
+              <div class="stat-box-label">ATUAL</div>
+              <div class="stat-box-value">28,0<span class="stat-box-unit">kg</span></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-label">MÍNIMO</div>
+              <div class="stat-box-value">27,4<span class="stat-box-unit">kg</span></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-label">MÉDIA</div>
+              <div class="stat-box-value">27,8<span class="stat-box-unit">kg</span></div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-label">MÁXIMO</div>
+              <div class="stat-box-value">28,2<span class="stat-box-unit">kg</span></div>
+            </div>
+          </div>
+
+          <div class="chart-box">
+            <div class="chart-title">📊 Evolução do peso · últimos 6 meses</div>
+            <div class="chart-svg-wrap">
+              <!-- Faixa ideal 26-30kg -->
+              <div class="chart-ideal-band-pdf" style="top: 18%; height: 55%;">
+                <span class="chart-ideal-label-pdf" style="top: -8px;">IDEAL 26-30kg</span>
+              </div>
+              
+              <svg viewBox="0 0 480 110" style="width: 100%; height: 100%; position: absolute;" preserveAspectRatio="none">
+                <polyline 
+                  points="0,55 80,53 160,50 240,48 320,45 400,42 480,40"
+                  stroke="#2c6e91" 
+                  stroke-width="2" 
+                  fill="none" 
+                />
+                <polygon 
+                  points="0,55 80,53 160,50 240,48 320,45 400,42 480,40 480,110 0,110"
+                  fill="rgba(44, 110, 145, 0.1)" 
+                />
+                <circle cx="0" cy="55" r="3" fill="#2c6e91" />
+                <circle cx="80" cy="53" r="3" fill="#2c6e91" />
+                <circle cx="160" cy="50" r="3" fill="#2c6e91" />
+                <circle cx="240" cy="48" r="3" fill="#2c6e91" />
+                <circle cx="320" cy="45" r="3" fill="#2c6e91" />
+                <circle cx="400" cy="42" r="3" fill="#2c6e91" />
+                <circle cx="480" cy="40" r="4" fill="#2c6e91" stroke="#fff" stroke-width="1.5" />
+              </svg>
+            </div>
+            <div class="chart-x-labels">
+              <span>NOV</span>
+              <span>DEZ</span>
+              <span>JAN</span>
+              <span>FEV</span>
+              <span>MAR</span>
+              <span>ABR</span>
+              <span>MAI</span>
+            </div>
+          </div>
+
+          <table class="weight-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">DATA</th>
+                <th style="width: 20%;">PESO</th>
+                <th style="width: 25%;">VARIAÇÃO</th>
+                <th style="width: 33%;">REGISTRADO POR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>10/05/2026</td>
+                <td class="weight-val-cell">28,0 kg</td>
+                <td class="weight-trend-cell">→ Estável</td>
+                <td>GCM Ragonha · canil</td>
+              </tr>
+              <tr>
+                <td>26/04/2026</td>
+                <td class="weight-val-cell">27,9 kg</td>
+                <td class="weight-trend-cell">↑ +0,1 kg em 14d</td>
+                <td>GCM Ragonha · canil</td>
+              </tr>
+              <tr>
+                <td>12/04/2026</td>
+                <td class="weight-val-cell">27,8 kg</td>
+                <td class="weight-trend-cell">→ Estável</td>
+                <td>GCM Silva · canil</td>
+              </tr>
+              <tr>
+                <td>14/03/2026</td>
+                <td class="weight-val-cell">27,6 kg</td>
+                <td class="weight-trend-cell">→ Estável</td>
+                <td>GCM Ragonha · clínica vet</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="analysis-box">
+            <div class="analysis-label">📋 ANÁLISE TÉCNICA</div>
+            <div class="analysis-text">
+              Peso do cão K9 Bono manteve-se <strong>estável dentro da faixa ideal</strong> (26-30 kg) durante todo o período monitorado. Variação total no semestre: +0,6 kg (2,2% — não significativa). Conforme prescrição nutricional vigente da Dra. Ana Souza (CRMV-SP 12345), o cão demonstra <strong>boa resposta ao protocolo alimentar</strong> de 800 g/dia. Recomendação: manter monitoramento quinzenal.
+            </div>
+          </div>
+
+          <div class="integrity-mini">
+            <div class="integrity-mini-label">HASH SHA-256 · GERADO 14/05/2026 14:32</div>
+            <div class="integrity-mini-hash">c9a4e7b2d8f5c0a3e6b9d2f5a8c1e4b7d0a3f6c9b2e5a8d1c4f7b0e3a6d9c2f5</div>
+          </div>
+
+          <div class="page-footer-strip">
+            <span>GCM Limeira · Canil K9 · Histórico de Peso</span>
+            <span>Página 2 de 3</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== PDF 3: RELATÓRIO NUTRICIONAL ===== -->
+  <div class="pdf-group">
+    <div class="pdf-group-title">
+      <span class="pdf-group-icon">🥩</span>
+      PDF 3 — RELATÓRIO NUTRICIONAL
+    </div>
+    <div class="pdf-pair">
+
+      <!-- Capa Nutrição -->
+      <div class="page-wrap">
+        <div class="page-number">CAPA</div>
+        <div class="page page-capa">
+          <div>
+            <div class="capa-brasao nutrition">🥩</div>
+            <div class="capa-institution nutrition">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div>
+            <div class="capa-subtitle">CANIL K9 · ALIMENTAÇÃO E NUTRIÇÃO</div>
+            
+            <div class="capa-divider nutrition"></div>
+            
+            <div class="capa-doctype">RELATÓRIO NUTRICIONAL</div>
+            <div class="capa-title">Bono</div>
+            <div class="capa-subject nutrition">90 DIAS · CONFORMIDADE 95%</div>
+            
+            <div class="capa-meta">
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Período</span>
+                <span class="capa-meta-val">14/02 — 14/05/2026</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Refeições registradas</span>
+                <span class="capa-meta-val">180 refeições</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Conformidade</span>
+                <span class="capa-meta-val">171 conformes · 9 divergências</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Prescrição vigente</span>
+                <span class="capa-meta-val">800 g/dia</span>
+              </div>
+            </div>
+
+            <div class="capa-doc-id nutrition">NUT: 2026/05/0089-K9</div>
+          </div>
+
+          <div class="capa-footer">
+            <strong>PRESCRIÇÃO VIGENTE</strong>
+            Laudo nutricional Dra. Ana Souza · CRMV-SP 12345<br>
+            Emitido em 14/05/2026
+          </div>
+        </div>
+      </div>
+
+      <!-- Página interna Nutrição -->
+      <div class="page-wrap">
+        <div class="page-number">PÁGINA INTERNA — CONFORMIDADE + DIVERGÊNCIAS</div>
+        <div class="page">
+          <div class="page-header-strip nutrition">
+            <div class="header-brand">
+              <div class="header-brasao-mini nutrition">🥩</div>
+              <div class="header-brand-text nutrition">GCM LIMEIRA · RELATÓRIO NUTRICIONAL</div>
+            </div>
+            <div class="header-meta">NUT 2026/05/0089-K9</div>
+          </div>
+
+          <div class="section-title nutrition">PRESCRIÇÃO VIGENTE</div>
+          <div class="section-subtitle">Documento de referência institucional</div>
+
+          <div class="prescription-box-pdf">
+            <div class="prescription-label-pdf">PRESCRIÇÃO NUTRICIONAL</div>
+            <div class="prescription-amount-pdf">800 g/dia · ração premium</div>
+            <div class="prescription-source-pdf">
+              <strong>Laudo: Dra. Ana Souza</strong> · CRMV-SP 12345 · Vigente desde 04/2026<br>
+              Dividido em 2 refeições de 400 g (manhã e noite)
+            </div>
+          </div>
+
+          <div class="section-title nutrition">CONFORMIDADE</div>
+          <div class="section-subtitle">Aderência ao protocolo prescrito · últimos 90 dias</div>
+
+          <div class="conformity-pdf">
+            <div>
+              <span class="conformity-percent-pdf">95</span><span class="conformity-percent-sub-pdf">%</span>
+            </div>
+            <div class="conformity-text-pdf">
+              <strong>171 de 180 refeições conformes</strong><br>
+              9 divergências documentadas com justificativa institucional · cada divergência registrada com motivo no momento da aplicação
+            </div>
+          </div>
+
+          <div class="bar-chart-pdf">
+            <div class="chart-title">📊 Consumo diário · últimos 14 dias (g)</div>
+            <div class="bar-area-pdf">
+              <div class="bar-line-pdf" style="bottom: 75%;">
+                <span class="bar-line-label-pdf">PRESCRIÇÃO · 800g</span>
+              </div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar divergent-up" style="height: 95%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar divergent-down" style="height: 60%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar divergent-up" style="height: 90%;"></div>
+              <div class="pdf-bar" style="height: 75%;"></div>
+              <div class="pdf-bar" style="height: 50%;"></div>
+            </div>
+            <div class="bar-x-labels-pdf">
+              <span>01/05</span>
+              <span>05/05</span>
+              <span>09/05</span>
+              <span>13/05</span>
+            </div>
+          </div>
+
+          <div class="section-title nutrition" style="margin-top: 8px;">DIVERGÊNCIAS DOCUMENTADAS</div>
+          <div class="section-subtitle">9 ocorrências registradas com motivo · transparência total</div>
+
+          <table class="divergences-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">DATA</th>
+                <th style="width: 17%;">QUANTIDADE</th>
+                <th style="width: 16%;">DIVERGÊNCIA</th>
+                <th style="width: 47%;">JUSTIFICATIVA</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>13/05 · noite</td>
+                <td class="div-amount">500 g</td>
+                <td class="div-percent">+25%</td>
+                <td>Sessão de bolinha em campo (10 reps · 50m diagonais) · reposição pós-treino</td>
+              </tr>
+              <tr>
+                <td>09/05 · noite</td>
+                <td class="div-amount">300 g</td>
+                <td class="div-percent">-25%</td>
+                <td>Recusa parcial · cão demonstrou saciedade após sessão de manutenção em B&C</td>
+              </tr>
+              <tr>
+                <td>04/05 · noite</td>
+                <td class="div-amount">480 g</td>
+                <td class="div-percent">+20%</td>
+                <td>Treino intenso de Detecção · 3 sessões consecutivas no dia</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="integrity-mini">
+            <div class="integrity-mini-label">HASH SHA-256 · GERADO 14/05/2026 14:32</div>
+            <div class="integrity-mini-hash">d3f7a9b2c5e8d1f4b7a0c3e6f9b2d5a8c1e4f7b0a3d6c9b2e5f8a1d4c7b0e3a6</div>
+          </div>
+
+          <div class="page-footer-strip">
+            <span>GCM Limeira · Canil K9 · Relatório Nutricional</span>
+            <span>Página 2 de 4</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== PDF 4: HISTÓRICO MENSAL ===== -->
+  <div class="pdf-group">
+    <div class="pdf-group-title">
+      <span class="pdf-group-icon">📜</span>
+      PDF 4 — HISTÓRICO MENSAL
+    </div>
+    <div class="pdf-pair">
+
+      <!-- Capa Histórico -->
+      <div class="page-wrap">
+        <div class="page-number">CAPA</div>
+        <div class="page page-capa">
+          <div>
+            <div class="capa-brasao history">📜</div>
+            <div class="capa-institution history">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div>
+            <div class="capa-subtitle">CANIL K9 · PRESTAÇÃO DE CONTAS</div>
+            
+            <div class="capa-divider history"></div>
+            
+            <div class="capa-doctype">RELATÓRIO MENSAL</div>
+            <div class="capa-title">Maio 2026</div>
+            <div class="capa-subject history">BINÔMIO BONO · RAGONHA</div>
+            
+            <div class="capa-meta">
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Período</span>
+                <span class="capa-meta-val">01 — 14 de maio de 2026</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Total de registros</span>
+                <span class="capa-meta-val">87 eventos</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Ocorrências</span>
+                <span class="capa-meta-val">3 atendidas</span>
+              </div>
+              <div class="capa-meta-row">
+                <span class="capa-meta-key">Plantões</span>
+                <span class="capa-meta-val">11 plantões · 132h</span>
+              </div>
+            </div>
+
+            <div class="capa-doc-id history">HIST: 2026/05/0012-K9</div>
+          </div>
+
+          <div class="capa-footer">
+            <strong>RELATÓRIO DE PRESTAÇÃO DE CONTAS</strong>
+            Documento institucional para auditoria<br>
+            Emitido em 14/05/2026
+          </div>
+        </div>
+      </div>
+
+      <!-- Página interna Histórico -->
+      <div class="page-wrap">
+        <div class="page-number">PÁGINA INTERNA — RESUMO + TIMELINE</div>
+        <div class="page">
+          <div class="page-header-strip history">
+            <div class="header-brand">
+              <div class="header-brasao-mini history">📜</div>
+              <div class="header-brand-text history">GCM LIMEIRA · RELATÓRIO MENSAL</div>
+            </div>
+            <div class="header-meta">HIST 2026/05/0012-K9</div>
+          </div>
+
+          <div class="section-title history">RESUMO DO PERÍODO</div>
+          <div class="section-subtitle">01 a 14 de maio de 2026 · binômio Bono · Ragonha</div>
+
+          <div class="summary-grid">
+            <div class="summary-box">
+              <div class="summary-box-label">PLANTÕES</div>
+              <div class="summary-box-val">11</div>
+              <div class="summary-box-sub">132 horas trabalhadas</div>
+            </div>
+            <div class="summary-box">
+              <div class="summary-box-label">OCORRÊNCIAS</div>
+              <div class="summary-box-val">3</div>
+              <div class="summary-box-sub">2 com apreensão · 1 negativa</div>
+            </div>
+            <div class="summary-box">
+              <div class="summary-box-label">TREINOS</div>
+              <div class="summary-box-val">28</div>
+              <div class="summary-box-sub">3 especialidades</div>
+            </div>
+            <div class="summary-box">
+              <div class="summary-box-label">EVENTOS SAÚDE</div>
+              <div class="summary-box-val">2</div>
+              <div class="summary-box-sub">Antipulgas · consulta</div>
+            </div>
+          </div>
+
+          <div class="breakdown-section">
+            <div class="breakdown-title">Distribuição por categoria</div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot routine"></div>
+              <span class="breakdown-name">Nutrição</span>
+              <span class="breakdown-count">28</span>
+              <span class="breakdown-percent">32%</span>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot training"></div>
+              <span class="breakdown-name">Treinos</span>
+              <span class="breakdown-count">28</span>
+              <span class="breakdown-percent">32%</span>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot routine"></div>
+              <span class="breakdown-name">Condicionamento</span>
+              <span class="breakdown-count">14</span>
+              <span class="breakdown-percent">16%</span>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot occurrence"></div>
+              <span class="breakdown-name">Ocorrências</span>
+              <span class="breakdown-count">3</span>
+              <span class="breakdown-percent">3%</span>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot health"></div>
+              <span class="breakdown-name">Saúde</span>
+              <span class="breakdown-count">2</span>
+              <span class="breakdown-percent">2%</span>
+            </div>
+            <div class="breakdown-row">
+              <div class="breakdown-dot training"></div>
+              <span class="breakdown-name">Obediência · Comandos</span>
+              <span class="breakdown-count">12</span>
+              <span class="breakdown-percent">14%</span>
+            </div>
+          </div>
+
+          <div class="section-title history" style="margin-top: 12px;">TIMELINE RESUMIDA</div>
+          <div class="section-subtitle">Eventos representativos · timeline completa em anexo</div>
+
+          <div class="timeline-summary">
+            <div class="timeline-week">SEMANA DE 12-18 MAIO</div>
+            <div class="timeline-day">
+              <div class="timeline-day-date">14/05 · quarta · HOJE</div>
+              <div class="timeline-day-events">
+                Plantão 07:00-19:00 · 3 refeições · treino de Obediência · 1 passeio
+              </div>
+            </div>
+            <div class="timeline-day">
+              <div class="timeline-day-date">13/05 · terça</div>
+              <div class="timeline-day-events">
+                Plantão 07:00-19:00 · <strong>1 divergência alimentar documentada</strong> · sessão de Detecção
+              </div>
+            </div>
+            <div class="timeline-day">
+              <div class="timeline-day-date">12/05 · segunda</div>
+              <div class="timeline-day-events">
+                Plantão · <strong>1 ocorrência (Faro em Veículo · droga apreendida)</strong> · BO 2026/05/8721
+              </div>
+            </div>
+            <div class="timeline-week">SEMANA DE 05-11 MAIO</div>
+            <div class="timeline-day">
+              <div class="timeline-day-date">10/05 · sábado</div>
+              <div class="timeline-day-events">
+                Pesagem (28,0 kg) · sessão de Guarda &amp; Proteção · 2 refeições
+              </div>
+            </div>
+            <div class="timeline-day">
+              <div class="timeline-day-date">08/05 · quinta</div>
+              <div class="timeline-day-events">
+                <strong>1 ocorrência (Busca em Mata · negativa)</strong> · 2 horas de operação
+              </div>
+            </div>
+          </div>
+
+          <div class="integrity-mini">
+            <div class="integrity-mini-label">HASH SHA-256 · GERADO 14/05/2026 14:32</div>
+            <div class="integrity-mini-hash">e4b8d1c5f9a2e6d3b7c0f4a8e1d5c9b2f6a0d4e7b1c5f8a2d6e0b3c7f1a4d8e2</div>
+          </div>
+
+          <div class="page-footer-strip">
+            <span>GCM Limeira · Canil K9 · Relatório Mensal</span>
+            <span>Página 2 de 5</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <div class="lesson-box">
+    <strong>FILOSOFIA DOS 4 PDFs AUXILIARES:</strong> Diferentemente do PDF da Ocorrência (que documenta um evento pontual), esses 4 PDFs <strong>documentam séries históricas</strong>. São relatórios institucionais de prestação de contas: "como está o cão sob meus cuidados ao longo do tempo". Cada um responde uma pergunta institucional específica que pode ser feita ao condutor.
+  </div>
+
+  <h3 style="margin-top: 20px;">PADRÕES VISUAIS COMPARTILHADOS</h3>
+  <ul>
+    <li><strong>Light mode formal</strong>: fundo branco · texto preto · cor institucional como detalhe</li>
+    <li><strong>Cores próprias por PDF</strong> mantêm identidade visual da seção no app:
+      <ul style="padding-left: 24px;">
+        <li>Vacinação: <span style="color:#0a8e9d; font-weight:700;">ciano #0a8e9d</span> (saúde institucional)</li>
+        <li>Peso: <span style="color:#2c6e91; font-weight:700;">azul #2c6e91</span> (clínico)</li>
+        <li>Nutrição: <span style="color:#c25e1f; font-weight:700;">laranja #c25e1f</span> (alimentação)</li>
+        <li>Histórico: <span style="color:#5a4080; font-weight:700;">roxo #5a4080</span> (relatório institucional)</li>
+      </ul>
+    </li>
+    <li>Capa institucional padrão · brasão + título + meta + ID do documento</li>
+    <li>Header padrão em páginas internas (brasão mini + identificação + ID)</li>
+    <li>Footer com paginação</li>
+    <li><strong>Hash SHA-256</strong> ao final de cada página (integridade verificável)</li>
+    <li>Tipografia Inter sans-serif · monospace pra IDs e timestamps</li>
+    <li>Tabelas com zebra striping pra leitura</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PDF 1 — CARTEIRA DE VACINAÇÃO</h3>
+  <ul>
+    <li>Capa em ciano: "CARTEIRA DE VACINAÇÃO · Bono"</li>
+    <li>Subtítulo: "MALINOIS · 6 ANOS · CÃO OPERACIONAL"</li>
+    <li>Metadata na capa: período · vacinas registradas · status atual · próxima dose</li>
+    <li>ID: VAC: 2026/05/0042-K9</li>
+    <li><strong>Página interna:</strong>
+      <ul style="padding-left: 24px;">
+        <li>Card amarelo de aviso pra próxima dose vencendo</li>
+        <li>Tabela com 5 colunas: Vacina · Data · Lote · Veterinário · Status</li>
+        <li>Status badges: "EM DIA" (verde) · "15 DIAS" (amarelo) · "CUMPRIDA" (verde sutil)</li>
+        <li>CRMV do veterinário sempre visível</li>
+        <li>Bravecto: indicação "Aplicado pelo condutor" + "Trimestral"</li>
+        <li>Lista de anexos: comprovantes/NFs/atestados</li>
+      </ul>
+    </li>
+    <li>Hash SHA-256 ao final · prova integridade</li>
+    <li><strong>Quando usar:</strong> levar no veterinário · auditoria sanitária · viagem com o cão</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PDF 2 — HISTÓRICO DE PESO</h3>
+  <ul>
+    <li>Capa em azul clínico: "HISTÓRICO DE PESO · Bono"</li>
+    <li>Subtítulo: "42 PESAGENS · ÚLTIMOS 6 MESES"</li>
+    <li>Metadata: período · pesagens · peso atual · faixa ideal</li>
+    <li>ID: PESO: 2026/05/0142-K9</li>
+    <li><strong>Página interna:</strong>
+      <ul style="padding-left: 24px;">
+        <li>4 boxes de estatísticas: Atual · Mínimo · Média · Máximo</li>
+        <li>Gráfico SVG da evolução com faixa ideal sombreada</li>
+        <li>Tabela cronológica: Data · Peso · Variação · Registrado por</li>
+        <li><strong>Análise técnica em texto</strong>: parágrafo explicando padrão observado, referenciando o laudo nutricional</li>
+      </ul>
+    </li>
+    <li><strong>Quando usar:</strong> consulta veterinária · auditoria nutricional · acompanhamento de longo prazo</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PDF 3 — RELATÓRIO NUTRICIONAL</h3>
+  <ul>
+    <li>Capa em laranja: "RELATÓRIO NUTRICIONAL · Bono"</li>
+    <li>Subtítulo: "90 DIAS · CONFORMIDADE 95%"</li>
+    <li>Metadata: período · 180 refeições · conformidade · prescrição</li>
+    <li>ID: NUT: 2026/05/0089-K9</li>
+    <li><strong>Página interna:</strong>
+      <ul style="padding-left: 24px;">
+        <li>Prescrição vigente em box laranja · referência ao laudo da Dra. Ana Souza</li>
+        <li>Card grande de conformidade: 95% em destaque + explicação</li>
+        <li>Gráfico de barras com linha de prescrição (800g)</li>
+        <li>Tabela de divergências com 4 colunas: Data · Quantidade · Divergência · Justificativa</li>
+        <li>Divergências documentadas com motivo: pós-treino · recusa · treino intenso</li>
+      </ul>
+    </li>
+    <li><strong>RESOLVE O CASO DO LAUDO 800g vs 300g:</strong>
+      <ul style="padding-left: 24px;">
+        <li>Prescrição vigente visível e fundamentada</li>
+        <li>95% de aderência ao protocolo</li>
+        <li>Divergências documentadas com motivos institucionais</li>
+        <li>Histórico auditável e rastreável</li>
+      </ul>
+    </li>
+    <li><strong>Quando usar:</strong> defesa nutricional · auditoria · acompanhamento veterinário</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PDF 4 — HISTÓRICO MENSAL</h3>
+  <ul>
+    <li>Capa em roxo institucional: "RELATÓRIO MENSAL · Maio 2026"</li>
+    <li>Subtítulo: "BINÔMIO BONO · RAGONHA"</li>
+    <li>Metadata: período · total de registros · ocorrências · plantões</li>
+    <li>ID: HIST: 2026/05/0012-K9</li>
+    <li><strong>Página interna:</strong>
+      <ul style="padding-left: 24px;">
+        <li>4 summary boxes: Plantões · Ocorrências · Treinos · Eventos de Saúde</li>
+        <li>Distribuição por categoria com dots coloridos e percentuais</li>
+        <li>Timeline resumida agrupada por semana</li>
+        <li>Eventos importantes destacados em <strong>negrito</strong> (ocorrências · divergências)</li>
+      </ul>
+    </li>
+    <li>É a <strong>visão executiva</strong> do mês · o "card de visita" do trabalho do condutor</li>
+    <li><strong>Quando usar:</strong> prestação de contas mensal · gestor periódico · auditoria</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">QUANDO CADA PDF É GERADO</h3>
+  <ul>
+    <li><strong>Carteira de Vacinação</strong>: tap no botão "Exportar PDF" na tela Carteira (mockup 23)</li>
+    <li><strong>Histórico de Peso</strong>: tap no botão "Exportar PDF" na tela Peso (mockup 23)</li>
+    <li><strong>Relatório Nutricional</strong>: tap no botão "Exportar PDF" na tela Nutrição (mockup 23)</li>
+    <li><strong>Histórico Mensal</strong>: tap no botão "Exportar PDF" na tela Histórico (mockup 13) com filtro mensal aplicado</li>
+    <li>Todos geram instantaneamente · ficam disponíveis em "Documentos do Cão"</li>
+    <li>Compartilháveis via apps nativos (WhatsApp · email · drive)</li>
+    <li>Hash SHA-256 garante que o documento não foi adulterado</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PERGUNTA INSTITUCIONAL QUE CADA UM RESPONDE</h3>
+  <ul>
+    <li><strong>Vacinação:</strong> "O cão está com saúde sanitária em dia?"</li>
+    <li><strong>Peso:</strong> "O cão está bem-condicionado fisicamente?"</li>
+    <li><strong>Nutrição:</strong> "Como o cão tem sido alimentado? Conforme prescrição?"</li>
+    <li><strong>Histórico:</strong> "O que o binômio tem feito no período X?"</li>
+  </ul>
+
+  <div class="lesson-box" style="margin-top: 20px;">
+    <strong>COBERTURA TOTAL DA DEFESA PROFISSIONAL:</strong> Com os <strong>5 PDFs</strong> do app (Ocorrência + Carteira + Peso + Nutrição + Histórico Mensal), o condutor consegue responder <strong>qualquer pergunta institucional</strong> sobre seu trabalho com o cão. Auditor pediu prova de uma ocorrência? PDF da Ocorrência. Pediu acompanhamento de saúde? Carteira de Vacinação + Peso. Questionou alimentação? Relatório Nutricional. Pediu visão geral? Histórico Mensal. <strong>O app vira arquivo de defesa profissional completo.</strong>
+  </div>
+</div>
+
+</body>
+</html>

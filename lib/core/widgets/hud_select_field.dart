@@ -1,4 +1,4 @@
-﻿part of 'hud_controls.dart';
+part of 'hud_controls.dart';
 
 class HudSelectField<T> extends StatelessWidget {
   final String label;
@@ -18,7 +18,7 @@ class HudSelectField<T> extends StatelessWidget {
     required this.items,
     required this.labelBuilder,
     required this.onChanged,
-    this.accent = const Color(0xFF00E5FF),
+    this.accent = AppTheme.primary,
     this.placeholder = 'Selecione',
   });
 
@@ -62,7 +62,7 @@ class HudSelectField<T> extends StatelessWidget {
                     label.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.robotoMono(
+                    style: GoogleFonts.inter(
                       color: accent.withAlpha(190),
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
@@ -74,7 +74,7 @@ class HudSelectField<T> extends StatelessWidget {
                     selectedLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.oxanium(
+                    style: GoogleFonts.inter(
                       color: value == null
                           ? Colors.white.withAlpha(115)
                           : Colors.white,

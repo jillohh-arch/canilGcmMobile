@@ -47,7 +47,7 @@ class _EventSuggestionsTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       'EVENTOS SUGERIDOS',
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         color: category.color,
         fontSize: 10,
         fontWeight: FontWeight.w900,

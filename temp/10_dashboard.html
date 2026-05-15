@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER COMPACTO */
+  .dash-header {
+    padding: 8px 16px 14px 16px;
+    background: rgba(77, 208, 225, 0.04);
+    border-bottom: 1px solid rgba(77, 208, 225, 0.12);
+    flex-shrink: 0;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatars-stack {
+    display: flex;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .avatar-small {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .avatar-small.condutor {
+    border-color: rgba(77, 208, 225, 0.5);
+    margin-left: -10px;
+  }
+
+  .header-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-binomio {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    letter-spacing: 0.3px;
+  }
+
+  .header-turno {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #2ecc71;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .turno-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .header-time {
+    color: #b0c4cc;
+    font-weight: 500;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .header-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* SCROLL AREA */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* ALERTAS */
+  .alerts-section {
+    margin-bottom: 16px;
+  }
+
+  .alert-card {
+    background: rgba(231, 76, 60, 0.06);
+    border-left: 3px solid #e74c3c;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .alert-card.warn {
+    background: rgba(241, 196, 15, 0.06);
+    border-left-color: #f1c40f;
+  }
+
+  .alert-card.info {
+    background: rgba(77, 208, 225, 0.05);
+    border-left-color: #4dd0e1;
+  }
+
+  .alert-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .alert-card .alert-icon { color: #e74c3c; }
+  .alert-card.warn .alert-icon { color: #f1c40f; }
+  .alert-card.info .alert-icon { color: #4dd0e1; }
+
+  .alert-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .alert-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .alert-text {
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .alert-arrow {
+    color: #5a7280;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  /* SECTION LABEL */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-count {
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* ATIVIDADES DE HOJE */
+  .activities-section {
+    margin-bottom: 18px;
+  }
+
+  /* Card de atividade registrada */
+  .activity-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .activity-time {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 700;
+    width: 42px;
+    flex-shrink: 0;
+  }
+
+  .activity-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .icon-rotina { background: rgba(155, 89, 182, 0.12); color: #9b59b6; }
+  .icon-saude { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+  .icon-treino { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .icon-ocorrencia { background: rgba(77, 208, 225, 0.12); color: #4dd0e1; }
+
+  .activity-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .activity-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .activity-desc {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  /* Estado vazio */
+  .empty-state {
+    background: rgba(77, 208, 225, 0.03);
+    border: 1px dashed rgba(77, 208, 225, 0.25);
+    border-radius: 12px;
+    padding: 18px 14px;
+    text-align: center;
+  }
+
+  .empty-text {
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+
+  .empty-text strong {
+    color: #fff;
+  }
+
+  .empty-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .empty-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .empty-action:hover {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: rgba(77, 208, 225, 0.3);
+  }
+
+  .empty-action-icon {
+    font-size: 18px;
+  }
+
+  .empty-action-label {
+    color: #b0c4cc;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  /* ACESSO RÁPIDO */
+  .quick-access {
+    margin-bottom: 18px;
+  }
+
+  .quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .quick-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .quick-card:hover {
+    background: rgba(77, 208, 225, 0.05);
+    border-color: rgba(77, 208, 225, 0.25);
+  }
+
+  .quick-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .quick-card-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .quick-card-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .quick-card-meta {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  /* RESUMO DO CÃO */
+  .dog-summary {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .dog-summary-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .dog-summary-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    flex: 1;
+  }
+
+  .dog-summary-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  /* Specialty badges */
+  .specialty-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .specialty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.25);
+    border-radius: 10px;
+    color: #2ecc71;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .specialty-badge.formacao {
+    background: rgba(241, 196, 15, 0.08);
+    border-color: rgba(241, 196, 15, 0.25);
+    color: #f1c40f;
+  }
+
+  /* BOTTOM NAV + FAB */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #050d10;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 0 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #5a7280;
+  }
+
+  .nav-item.active {
+    color: #4dd0e1;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .fab-center {
+    width: 54px;
+    height: 54px;
+    background: #4dd0e1;
+    color: #050d10;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(77, 208, 225, 0.3);
+    cursor: pointer;
+    margin-top: -28px;
+    border: 4px solid #050d10;
+  }
+
+  .fab-spacer {
+    width: 54px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1200px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .compare {
+    display: flex;
+    gap: 30px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="compare">
+
+<!-- VERSÃO A: COM ALERTAS E ATIVIDADES -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    VERSÃO A — COM ALERTAS E ATIVIDADES
+    <small>Cenário real: pendências + 2 atividades registradas</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- HEADER -->
+    <div class="dash-header">
+      <div class="header-row">
+        <div class="avatars-stack">
+          <div class="avatar-small">BONO</div>
+          <div class="avatar-small condutor">RAG</div>
+        </div>
+        <div class="header-info">
+          <div class="header-binomio">Bono · GCM Ragonha</div>
+          <div class="header-turno">
+            <span class="turno-dot"></span>
+            <span>Turno ativo</span>
+            <span class="header-time">· há 5h</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="header-btn" title="Trocar cão">⇄</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- ALERTAS -->
+      <div class="alerts-section">
+        <div class="section-label">
+          <div class="section-label-text">
+            <span>⚠ ALERTAS</span>
+            <div class="section-label-line"></div>
+          </div>
+        </div>
+
+        <div class="alert-card">
+          <span class="alert-icon">💉</span>
+          <div class="alert-content">
+            <div class="alert-title">Vacina V10 do Bono vencida há 3 dias</div>
+            <div class="alert-text">Recomendado agendar revacinação imediata</div>
+          </div>
+          <span class="alert-arrow">›</span>
+        </div>
+
+        <div class="alert-card warn">
+          <span class="alert-icon">🐕</span>
+          <div class="alert-content">
+            <div class="alert-title">Apolo: sem registro há 8 dias</div>
+            <div class="alert-text">Considere registrar rotina ou treino</div>
+          </div>
+          <span class="alert-arrow">›</span>
+        </div>
+
+        <div class="alert-card info">
+          <span class="alert-icon">🌡</span>
+          <div class="alert-content">
+            <div class="alert-title">Calor extremo: 36°C</div>
+            <div class="alert-text">Reforçar hidratação · evitar treino externo nas próximas 3h</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ATIVIDADES DE HOJE -->
+      <div class="activities-section">
+        <div class="section-label">
+          <div class="section-label-text">
+            <span>📋 ATIVIDADES DE HOJE</span>
+            <div class="section-label-line"></div>
+          </div>
+          <span class="section-count">2 registros</span>
+        </div>
+
+        <div class="activity-card">
+          <div class="activity-time">07:15</div>
+          <div class="activity-icon icon-rotina">🍖</div>
+          <div class="activity-info">
+            <div class="activity-title">Alimentação · 800g (laudo)</div>
+            <div class="activity-desc">Manhã · Registrado por Ragonha</div>
+          </div>
+        </div>
+
+        <div class="activity-card">
+          <div class="activity-time">09:30</div>
+          <div class="activity-icon icon-treino">🎯</div>
+          <div class="activity-info">
+            <div class="activity-title">Treino · Obediência</div>
+            <div class="activity-desc">25 min · 4 comandos · Bom</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACESSO RÁPIDO -->
+      <div class="quick-access">
+        <div class="section-label">
+          <div class="section-label-text">
+            <span>⚡ REGISTRAR</span>
+            <div class="section-label-line"></div>
+          </div>
+        </div>
+
+        <div class="quick-grid">
+          <div class="quick-card">
+            <div class="quick-card-icon icon-rotina">🍖</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Rotina</div>
+              <div class="quick-card-meta">última há 7h</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-saude">⚕</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Saúde</div>
+              <div class="quick-card-meta">última há 12d</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-treino">🎯</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Treino</div>
+              <div class="quick-card-meta">última há 5h</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-ocorrencia">🛡</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Ocorrência</div>
+              <div class="quick-card-meta">última há 2d</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESUMO DO CÃO -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>🐕 BONO</span>
+          <div class="section-label-line"></div>
+        </div>
+      </div>
+
+      <div class="dog-summary">
+        <div class="dog-summary-row">
+          <div style="flex:1;">
+            <div class="dog-summary-name">Bono</div>
+            <div class="dog-summary-meta">Malinois · 6 anos · 28kg</div>
+          </div>
+        </div>
+        <div class="specialty-row">
+          <span class="specialty-badge">🛡 Guarda</span>
+          <span class="specialty-badge">🎯 Busca</span>
+          <span class="specialty-badge">👃 Detecção</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV + FAB -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Turno</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Histórico</span>
+      </div>
+      <div class="fab-center">+</div>
+      <div class="nav-item">
+        <span class="nav-icon">⚕</span>
+        <span class="nav-label">Saúde</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Perfil</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- VERSÃO B: DIA LIMPO, SEM ALERTAS, SEM ATIVIDADES -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    VERSÃO B — DIA LIMPO
+    <small>Sem alertas · estado vazio com chamada à ação</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>06:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- HEADER -->
+    <div class="dash-header">
+      <div class="header-row">
+        <div class="avatars-stack">
+          <div class="avatar-small">BONO</div>
+          <div class="avatar-small condutor">RAG</div>
+        </div>
+        <div class="header-info">
+          <div class="header-binomio">Bono · GCM Ragonha</div>
+          <div class="header-turno">
+            <span class="turno-dot"></span>
+            <span>Turno ativo</span>
+            <span class="header-time">· há 12min</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="header-btn" title="Trocar cão">⇄</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- ATIVIDADES DE HOJE (VAZIO) -->
+      <div class="activities-section">
+        <div class="section-label">
+          <div class="section-label-text">
+            <span>📋 ATIVIDADES DE HOJE</span>
+            <div class="section-label-line"></div>
+          </div>
+        </div>
+
+        <div class="empty-state">
+          <div class="empty-text">
+            <strong>Comece o dia</strong><br>
+            Registre alimentação, treino, saúde ou ocorrência
+          </div>
+          <div class="empty-actions">
+            <div class="empty-action">
+              <span class="empty-action-icon">🍖</span>
+              <span class="empty-action-label">Rotina</span>
+            </div>
+            <div class="empty-action">
+              <span class="empty-action-icon">⚕</span>
+              <span class="empty-action-label">Saúde</span>
+            </div>
+            <div class="empty-action">
+              <span class="empty-action-icon">🎯</span>
+              <span class="empty-action-label">Treino</span>
+            </div>
+            <div class="empty-action">
+              <span class="empty-action-icon">🛡</span>
+              <span class="empty-action-label">Ocorr.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACESSO RÁPIDO -->
+      <div class="quick-access">
+        <div class="section-label">
+          <div class="section-label-text">
+            <span>⚡ REGISTRAR</span>
+            <div class="section-label-line"></div>
+          </div>
+        </div>
+
+        <div class="quick-grid">
+          <div class="quick-card">
+            <div class="quick-card-icon icon-rotina">🍖</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Rotina</div>
+              <div class="quick-card-meta">última: ontem 19:30</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-saude">⚕</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Saúde</div>
+              <div class="quick-card-meta">última há 12d</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-treino">🎯</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Treino</div>
+              <div class="quick-card-meta">última: ontem 14h</div>
+            </div>
+          </div>
+          <div class="quick-card">
+            <div class="quick-card-icon icon-ocorrencia">🛡</div>
+            <div class="quick-card-info">
+              <div class="quick-card-name">Ocorrência</div>
+              <div class="quick-card-meta">última há 2d</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESUMO DO CÃO -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>🐕 BONO</span>
+          <div class="section-label-line"></div>
+        </div>
+      </div>
+
+      <div class="dog-summary">
+        <div class="dog-summary-row">
+          <div style="flex:1;">
+            <div class="dog-summary-name">Bono</div>
+            <div class="dog-summary-meta">Malinois · 6 anos · 28kg</div>
+          </div>
+        </div>
+        <div class="specialty-row">
+          <span class="specialty-badge">🛡 Guarda</span>
+          <span class="specialty-badge">🎯 Busca</span>
+          <span class="specialty-badge">👃 Detecção</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV + FAB -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Turno</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Histórico</span>
+      </div>
+      <div class="fab-center">+</div>
+      <div class="nav-item">
+        <span class="nav-icon">⚕</span>
+        <span class="nav-label">Saúde</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Perfil</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>Header compacto:</strong> binômio (avatares + nomes) + status turno ("há 5h", arredondado)</li>
+    <li>Botão "⇄" pra trocar cão sempre visível no header</li>
+    <li><strong>Alertas condicionais</strong> só aparecem se houver pendência real (médica, outro cão, clima crítico)</li>
+    <li>3 tipos de alerta: vermelho (crítico médico), amarelo (atenção), ciano (informativo/clima)</li>
+    <li>Tap no alerta → leva pra ação correspondente</li>
+    <li><strong>Atividades de hoje como protagonista</strong> — quando há registros, ocupa o espaço nobre</li>
+    <li>Cada atividade mostra: hora · ícone categórico · título · contexto curto</li>
+    <li>Cores semânticas por categoria (rotina=roxo, saúde=vermelho, treino=amarelo, ocorrência=ciano)</li>
+    <li><strong>Estado vazio educativo</strong> ("Comece o dia") + 4 atalhos visuais com ícone tappável</li>
+    <li><strong>Acesso rápido</strong> com 4 cards em grid 2x2, cada um mostrando última registrada</li>
+    <li><strong>Resumo do cão COMPACTO no fim</strong> — não no topo. "Malinois · 6 anos · 28kg" como meta-info</li>
+    <li>Badges de especialidades operacionais (Guarda + Busca + Detecção) — credencial visível</li>
+    <li><strong>FAB central no bottom nav</strong> com "+" — abre menu com 4 opções (Rotina/Saúde/Treino/Ocorrência)</li>
+    <li>Bottom nav: Turno · Histórico · [FAB] · Saúde · Perfil (5 itens)</li>
+    <li><strong>Sem badge "8"</strong> sem contexto · sem cronômetro em segundos · sem "MACHO 28KG" gigante</li>
+    <li>Sem aba "Rank" — gamificação removida conforme roadmap</li>
+  </ul>
+</div>
+
+</body>
+</html>

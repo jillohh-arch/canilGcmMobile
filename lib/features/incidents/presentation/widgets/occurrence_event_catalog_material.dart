@@ -22,7 +22,7 @@ OccurrenceEventCategory _materialEventCategory() {
         title: 'Arma localizada',
         description: 'Arma localizada durante a ocorrência.',
         icon: Icons.gps_fixed_rounded,
-        color: Color(0xFFFF3B5C),
+        color: AppTheme.error,
       ),
       OccurrenceQuickAction(
         title: 'Objeto apreendido',

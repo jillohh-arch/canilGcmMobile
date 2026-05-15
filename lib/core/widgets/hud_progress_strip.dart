@@ -89,7 +89,7 @@ class HudProgressStrip extends StatelessWidget {
                             step.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.robotoMono(
+                            style: GoogleFonts.inter(
                               color: isActive ? Colors.white : Colors.white70,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,

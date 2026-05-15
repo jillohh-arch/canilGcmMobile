@@ -4,7 +4,7 @@ OccurrenceEventCategory _forwardingEventCategory() {
   return const OccurrenceEventCategory(
     title: 'Encaminhamento',
     icon: Icons.local_hospital_rounded,
-    color: Color(0xFFFF3B5C),
+    color: AppTheme.error,
     actions: [
       OccurrenceQuickAction(
         title: 'Parte conduzida',
@@ -16,13 +16,13 @@ OccurrenceEventCategory _forwardingEventCategory() {
         title: 'Encaminhado à Santa Casa',
         description: 'Parte encaminhada à Santa Casa para atendimento.',
         icon: Icons.local_hospital_rounded,
-        color: Color(0xFFFF3B5C),
+        color: AppTheme.error,
       ),
       OccurrenceQuickAction(
         title: 'Encaminhado à UPA',
         description: 'Parte encaminhada à UPA para atendimento.',
         icon: Icons.medical_services_rounded,
-        color: Color(0xFFFF3B5C),
+        color: AppTheme.error,
       ),
       OccurrenceQuickAction(
         title: 'Apresentado no DP',

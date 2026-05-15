@@ -23,7 +23,7 @@ class _TimelineEventBody extends StatelessWidget {
                 update.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,

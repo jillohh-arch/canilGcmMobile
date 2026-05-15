@@ -36,7 +36,7 @@ class _EventActionTile extends StatelessWidget {
                   children: [
                     Text(
                       action.title,
-                      style: GoogleFonts.oxanium(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w900,

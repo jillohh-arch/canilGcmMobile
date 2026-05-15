@@ -35,7 +35,7 @@ extension _DailyTimelineEvolutionCompetencyCard on _DailyTimelineScreenState {
                     Expanded(
                       child: Text(
                         entry.key,
-                        style: GoogleFonts.oxanium(
+                        style: GoogleFonts.inter(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w800,

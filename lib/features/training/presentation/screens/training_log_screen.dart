@@ -20,9 +20,9 @@ part 'training_new_form_actions.dart';
 part 'training_new_form_fields.dart';
 part 'training_new_form_selectors.dart';
 
-const _hudBackground = Color(0xFF070B14);
-const _hudPanel = Color(0xFF0B1220);
-const _hudCyan = Color(0xFF00E5FF);
+final _hudBackground = AppTheme.background;
+const _hudPanel = const Color(0xFF0E1A1F);
+final _hudCyan = AppTheme.primary;
 
 class TrainingLogScreen extends StatefulWidget {
   final String dogId;
@@ -54,7 +54,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
         elevation: 0,
         title: Text(
           'EVOLUÇÃO',
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             fontSize: 18,
             color: Colors.white,
@@ -79,7 +79,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
           );
         },
         backgroundColor: _hudCyan,
-        child: const Icon(Icons.add_rounded, color: _hudBackground, size: 28),
+        child: Icon(Icons.add_rounded, color: _hudBackground, size: 28),
       ),
     );
   }

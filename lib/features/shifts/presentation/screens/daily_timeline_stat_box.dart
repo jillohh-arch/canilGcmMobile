@@ -31,7 +31,7 @@ class _StatBox extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               value,
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
                 fontSize: 18,
@@ -40,7 +40,7 @@ class _StatBox extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: Colors.white54,
                 fontSize: 9,
                 fontWeight: FontWeight.w800,

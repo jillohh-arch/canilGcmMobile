@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 part 'activity_save_button_content.dart';
@@ -81,7 +82,7 @@ class ActivityPrimarySaveButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: (isSaving || isCompressing) ? null : onSave,
       style: ElevatedButton.styleFrom(
-        backgroundColor: isSaving ? Colors.black45 : const Color(0xFF00E5FF),
+        backgroundColor: isSaving ? Colors.black45 : AppTheme.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         elevation: 0,
       ),

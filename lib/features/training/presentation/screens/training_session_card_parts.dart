@@ -58,7 +58,7 @@ class _SessionTypeIcon extends StatelessWidget {
       width: 38,
       height: 38,
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14),
+        color: AppTheme.background,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withAlpha(210), width: 1),
         boxShadow: [

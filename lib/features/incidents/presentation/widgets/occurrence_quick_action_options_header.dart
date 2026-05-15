@@ -30,7 +30,7 @@ class _QuickActionOptionsHeader extends StatelessWidget {
             children: [
               Text(
                 action.title.toUpperCase(),
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: action.color,
                   fontSize: 12,
                   fontWeight: FontWeight.w900,

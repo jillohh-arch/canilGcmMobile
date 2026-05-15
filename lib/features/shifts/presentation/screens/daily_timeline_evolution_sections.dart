@@ -35,7 +35,7 @@ extension _DailyTimelineEvolutionMessages on _DailyTimelineScreenState {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.oxanium(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w800,

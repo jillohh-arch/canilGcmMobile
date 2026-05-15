@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -11,4 +12,4 @@ part 'hud_select_field.dart';
 part 'hud_select_bottom_sheet.dart';
 
 const _hudPanelDeep = Color(0xFF08111D);
-const _hudPanel = Color(0xFF0B1220);
+const _hudPanel = const Color(0xFF0E1A1F);

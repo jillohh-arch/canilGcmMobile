@@ -30,7 +30,7 @@ class _InfoRow extends StatelessWidget {
             children: [
               Text(
                 label.toUpperCase(),
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: Colors.white54,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -40,7 +40,7 @@ class _InfoRow extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

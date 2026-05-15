@@ -9,13 +9,13 @@ class _ClosingRoadmapHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.flag_rounded, color: Color(0xFFFFB84D), size: 16),
+        const Icon(Icons.flag_rounded, color: AppTheme.warning, size: 16),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             'ROTEIRO DE ENCERRAMENTO',
-            style: GoogleFonts.robotoMono(
-              color: const Color(0xFFFFB84D),
+            style: GoogleFonts.inter(
+              color: AppTheme.warning,
               fontSize: 11,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.8,
@@ -24,7 +24,7 @@ class _ClosingRoadmapHeader extends StatelessWidget {
         ),
         Text(
           '${currentStep + 1} / 3',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: Colors.white54,
             fontSize: 11,
             fontWeight: FontWeight.w900,

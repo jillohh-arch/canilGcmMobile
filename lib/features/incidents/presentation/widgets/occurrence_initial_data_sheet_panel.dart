@@ -29,7 +29,7 @@ class OccurrenceInitialDataPanel extends StatelessWidget {
         children: [
           Text(
             'DADOS ESSENCIAIS',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: accentColor,
               fontSize: 11,
               fontWeight: FontWeight.w900,

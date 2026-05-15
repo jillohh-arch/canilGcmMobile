@@ -36,7 +36,7 @@ class HudInfoPill extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -83,7 +83,7 @@ class HudMetricCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             value,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: color,
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -95,7 +95,7 @@ class HudMetricCard extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white54,
               fontSize: 9,
               fontWeight: FontWeight.w900,
@@ -136,7 +136,7 @@ class HudActionButton extends StatelessWidget {
         icon: Icon(icon, color: color, size: 18),
         label: Text(
           label,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: Colors.white,
             fontSize: 11,
             fontWeight: FontWeight.w900,

@@ -83,7 +83,7 @@ class _MiniStat extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
@@ -92,7 +92,7 @@ class _MiniStat extends StatelessWidget {
             ),
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontSize: 8,
                 fontWeight: FontWeight.w600,
                 color: Colors.white38,

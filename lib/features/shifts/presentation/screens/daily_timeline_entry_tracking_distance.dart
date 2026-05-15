@@ -18,7 +18,7 @@ extension _DailyTimelineEntryTrackingDistance on _DailyTimelineScreenState {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF070B14).withAlpha(220),
+          color: AppTheme.background.withAlpha(220),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: color.withAlpha(140), width: 1),
         ),
@@ -28,7 +28,7 @@ extension _DailyTimelineEntryTrackingDistance on _DailyTimelineScreenState {
             const SizedBox(width: 8),
             Text(
               'DISTÂNCIA TOTAL PERCORRIDA: ',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: color.withAlpha(210),
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -36,7 +36,7 @@ extension _DailyTimelineEntryTrackingDistance on _DailyTimelineScreenState {
             ),
             Text(
               _formatTrackingDistance(rawDistance.toDouble()),
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w900,

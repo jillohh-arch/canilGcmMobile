@@ -25,7 +25,7 @@ class _InitialDataDoneButton extends StatelessWidget {
         ),
         child: Text(
           'CONCLUIR EDIÇÃO',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             letterSpacing: 1.1,
           ),

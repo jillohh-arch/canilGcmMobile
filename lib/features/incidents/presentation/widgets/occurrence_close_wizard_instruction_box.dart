@@ -14,7 +14,7 @@ class _InstructionBox extends StatelessWidget {
         color: const Color(0xFF082031),
         borderRadius: BorderRadius.circular(8),
         border: const Border(
-          left: BorderSide(color: Color(0xFF00E5FF), width: 3),
+          left: BorderSide(color: AppTheme.primary, width: 3),
         ),
       ),
       child: Text(

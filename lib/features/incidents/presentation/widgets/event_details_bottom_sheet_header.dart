@@ -23,7 +23,7 @@ class _Header extends StatelessWidget {
         Expanded(
           child: Text(
             'DETALHES DO EVENTO',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w900,

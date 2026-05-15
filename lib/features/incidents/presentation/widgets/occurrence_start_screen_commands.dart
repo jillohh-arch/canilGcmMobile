@@ -19,7 +19,7 @@ class _OccurrenceStartCommandGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const commandColor = Color(0xFF00E5FF);
+    final commandColor = AppTheme.primary;
 
     return Row(
       children: [
@@ -92,7 +92,7 @@ class _OccurrenceStartCommandCard extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.robotoMono(
+                    style: GoogleFonts.inter(
                       color: color,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,

@@ -23,7 +23,7 @@ extension _DailyTimelineProgressNodeCard on _DailyTimelineScreenState {
           colors: [
             progressStyle.borderColor.withAlpha(32),
             const Color(0xFF0B1020),
-            const Color(0xFF070B14),
+            AppTheme.background,
           ],
         ),
       ),

@@ -17,7 +17,7 @@ _OccurrenceEventVisual _visualForTimelineTitle(String title, Color fallback) {
 
   if (_matchesTimelineTitle(value, const ['inicio', 'registro inicial'])) {
     return const _OccurrenceEventVisual(
-      color: Color(0xFF00E5FF),
+      color: AppTheme.primary,
       icon: Icons.play_arrow_rounded,
     );
   }
@@ -85,7 +85,7 @@ _OccurrenceEventVisual _visualForTimelineTitle(String title, Color fallback) {
 
   if (value.contains('encerr')) {
     return const _OccurrenceEventVisual(
-      color: Color(0xFF00E5FF),
+      color: AppTheme.primary,
       icon: Icons.flag_rounded,
     );
   }

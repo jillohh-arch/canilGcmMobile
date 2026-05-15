@@ -39,7 +39,7 @@ class OccurrenceQuickActionCard extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             decoration: BoxDecoration(
-              color: const Color(0xFF0B1220),
+              color: const Color(0xFF0E1A1F),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: color.withAlpha(enabled ? 110 : 50),

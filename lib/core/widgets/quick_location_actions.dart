@@ -31,7 +31,7 @@ class QuickLocationActions extends StatelessWidget {
             ),
             label: Text(
               'CAPTURAR GPS',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 color: backgroundColor,
                 fontWeight: FontWeight.w900,
@@ -59,7 +59,7 @@ class QuickLocationActions extends StatelessWidget {
             ),
             label: Text(
               'HORA ATUAL',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 color: Colors.white,
                 fontWeight: FontWeight.w900,

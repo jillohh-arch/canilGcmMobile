@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class OccurrenceResultDetailSection extends StatelessWidget {
@@ -22,7 +23,7 @@ class OccurrenceResultDetailSection extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
         color: Colors.transparent,
-        border: Border(left: BorderSide(color: Color(0xFF00E5FF), width: 2)),
+        border: Border(left: BorderSide(color: AppTheme.primary, width: 2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +44,7 @@ class OccurrenceResultDetailSection extends StatelessWidget {
             icon: const Icon(
               Icons.add_outlined,
               size: 16,
-              color: Color(0xFF00E5FF),
+              color: AppTheme.primary,
             ),
             label: Text(
               actionLabel,

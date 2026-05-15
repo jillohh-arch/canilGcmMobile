@@ -19,7 +19,7 @@ extension _DailyTimelineAppShell on _DailyTimelineScreenState {
       appBar: AppBar(
         title: Text(
           'LINHA DO TEMPO',
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             fontSize: 18,
             color: Colors.white,

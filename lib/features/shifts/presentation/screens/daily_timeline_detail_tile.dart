@@ -22,7 +22,7 @@ extension _DailyTimelineDetailTile on _DailyTimelineScreenState {
           colors: [
             accent.withAlpha(20),
             const Color(0xFF0F1726),
-            const Color(0xFF070B14),
+            AppTheme.background,
           ],
         ),
       ),

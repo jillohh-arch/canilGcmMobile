@@ -47,7 +47,7 @@ class HudStagePanel extends StatelessWidget {
                 child: Text(
                   titles[currentIndex].toUpperCase(),
                   softWrap: true,
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                     color: accent,
@@ -57,7 +57,7 @@ class HudStagePanel extends StatelessWidget {
               ),
               Text(
                 'STEP ${currentIndex + 1}/${titles.length}',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   color: Colors.white54,

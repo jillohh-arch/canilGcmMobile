@@ -100,7 +100,7 @@ typedef _DailyTrainingSummary = ({
   Set<String> categories,
 });
 
-const _hudBackground = Color(0xFF070B14);
-const _hudPanel = Color(0xFF0B1220);
-const _hudCyan = Color(0xFF00E5FF);
+final _hudBackground = AppTheme.background;
+const _hudPanel = const Color(0xFF0E1A1F);
+final _hudCyan = AppTheme.primary;
 const _hudAmber = Color(0xFFFBBF24);

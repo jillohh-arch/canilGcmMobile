@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhes do Evento - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Background com timeline borrada (contexto) */
+  .background-blur {
+    position: absolute;
+    top: 44px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 16px;
+    opacity: 0.25;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  .bg-card {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    height: 80px;
+  }
+
+  /* Overlay escuro */
+  .overlay {
+    position: absolute;
+    top: 44px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 5;
+  }
+
+  /* Modal bottom sheet */
+  .modal {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 88%;
+    background: #050d10;
+    border-radius: 24px 24px 0 0;
+    overflow: hidden;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(77, 208, 225, 0.2);
+  }
+
+  .modal-handle {
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    margin: 10px auto;
+  }
+
+  /* Modal header */
+  .modal-header {
+    padding: 6px 20px 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .modal-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(77, 208, 225, 0.1);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 18px;
+  }
+
+  .modal-title {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 2px;
+  }
+
+  .modal-subtitle {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: #7a8a92;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  /* Scroll area */
+  .modal-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 20px 20px;
+  }
+
+  .modal-scroll::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Read-only info section */
+  .info-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 0;
+  }
+
+  .info-item:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+  }
+
+  .info-icon {
+    color: #4dd0e1;
+    font-size: 13px;
+    width: 18px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .info-content {
+    flex: 1;
+  }
+
+  .info-label {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+
+  .info-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .lock-icon {
+    color: #5a7280;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 18px;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .field-label-text {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .edited-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    resize: vertical;
+  }
+
+  .field-input:focus {
+    outline: none;
+    border-color: #4dd0e1;
+    background: rgba(77, 208, 225, 0.06);
+  }
+
+  .field-input::placeholder {
+    color: #5a7280;
+  }
+
+  textarea.field-input {
+    min-height: 80px;
+    line-height: 1.5;
+  }
+
+  .field-helper {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #5a7280;
+    line-height: 1.4;
+  }
+
+  .char-count {
+    text-align: right;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #5a7280;
+  }
+
+  /* Evidências - galeria de fotos */
+  .evidence-section {
+    margin-bottom: 18px;
+  }
+
+  .evidence-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .evidence-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .photo-item {
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5a7280;
+    font-size: 11px;
+  }
+
+  .photo-time {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    text-align: center;
+  }
+
+  .photo-add {
+    border: 1px dashed rgba(77, 208, 225, 0.3);
+    cursor: pointer;
+    color: #4dd0e1;
+    font-size: 22px;
+  }
+
+  .evidence-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .evidence-btn {
+    background: rgba(77, 208, 225, 0.06);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .evidence-btn:hover {
+    background: rgba(77, 208, 225, 0.1);
+  }
+
+  /* GPS atualizado warning */
+  .gps-update-warning {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #f1c40f;
+    line-height: 1.4;
+  }
+
+  /* Trilha de auditoria */
+  .audit-trail {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+
+  .audit-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .audit-icon {
+    color: #4dd0e1;
+    font-size: 12px;
+  }
+
+  .audit-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .audit-toggle {
+    margin-left: auto;
+    color: #5a7280;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .audit-entry {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 11px;
+  }
+
+  .audit-time {
+    color: #5a7280;
+    font-weight: 600;
+    min-width: 40px;
+    flex-shrink: 0;
+  }
+
+  .audit-text {
+    color: #b0c4cc;
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .audit-text strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Action buttons */
+  .modal-actions {
+    padding: 14px 20px 20px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: #050d10;
+  }
+
+  .btn {
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-delete {
+    background: transparent;
+    color: #e74c3c;
+    border: 1.5px solid rgba(231, 76, 60, 0.5);
+  }
+
+  .btn-delete:hover {
+    background: rgba(231, 76, 60, 0.08);
+    border-color: #e74c3c;
+  }
+
+  .btn-save {
+    background: #4dd0e1;
+    color: #050d10;
+  }
+
+  .btn-save:hover {
+    opacity: 0.9;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 30px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>12:10</span>
+      <div class="status-icons">
+        <span>4G</span>
+        <span>•••</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- Background simulando timeline borrada -->
+    <div class="background-blur">
+      <div class="bg-card"></div>
+      <div class="bg-card"></div>
+      <div class="bg-card"></div>
+      <div class="bg-card"></div>
+    </div>
+
+    <div class="overlay"></div>
+
+    <!-- Modal -->
+    <div class="modal">
+      <div class="modal-handle"></div>
+
+      <!-- Modal header -->
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-icon">📋</div>
+          <div>
+            <div class="modal-title">DETALHES DO EVENTO</div>
+            <div class="modal-subtitle">Abordagem feita</div>
+          </div>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+
+      <!-- Scroll content -->
+      <div class="modal-scroll">
+
+        <!-- Info read-only -->
+        <div class="info-section">
+          <div class="info-item">
+            <div class="info-icon">🕐</div>
+            <div class="info-content">
+              <div class="info-label">DATA E HORA <span class="lock-icon">🔒</span></div>
+              <div class="info-value">10/05/2026 às 12:01</div>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-icon">👤</div>
+            <div class="info-content">
+              <div class="info-label">OPERADOR <span class="lock-icon">🔒</span></div>
+              <div class="info-value">GCM Ragonha</div>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-icon">📍</div>
+            <div class="info-content">
+              <div class="info-label">LOCAL ORIGINAL</div>
+              <div class="info-value">Rua Jair de Barros Cotrin, Jardim Colina Verde</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Título do evento -->
+        <div class="field-group">
+          <div class="field-label">
+            <span class="field-label-text">TÍTULO DO EVENTO</span>
+          </div>
+          <input class="field-input" value="Abordagem feita" />
+        </div>
+
+        <!-- Observação -->
+        <div class="field-group">
+          <div class="field-label">
+            <span class="field-label-text">OBSERVAÇÃO</span>
+            <span class="edited-badge">✎ editado</span>
+          </div>
+          <textarea class="field-input" placeholder="Quem foi abordado? Veículo? Resultado?">Pessoa abordada em veículo VW Gol placa ABC1D23. Documento verificado, nada consta.</textarea>
+          <div class="char-count">94/500</div>
+          <div class="field-helper">Detalhe é proteção. Quanto mais específico o registro, mais sólido o arquivo de defesa.</div>
+        </div>
+
+        <!-- Evidências -->
+        <div class="evidence-section">
+          <div class="evidence-header">
+            <span class="evidence-title">📎 EVIDÊNCIAS DO EVENTO</span>
+          </div>
+
+          <div class="photo-grid">
+            <div class="photo-item">
+              <span>FOTO 1</span>
+              <div class="photo-time">12:05 · GPS</div>
+            </div>
+            <div class="photo-item">
+              <span>FOTO 2</span>
+              <div class="photo-time">12:07 · GPS</div>
+            </div>
+            <div class="photo-item photo-add">+</div>
+          </div>
+
+          <div class="evidence-actions">
+            <button class="evidence-btn">📷 + Foto</button>
+            <button class="evidence-btn">⊙ Atualizar GPS</button>
+          </div>
+
+          <div class="gps-update-warning">
+            ⚠ Localização atual difere do GPS original deste evento. Ao atualizar, escolha se deseja sobrescrever ou adicionar como segundo ponto.
+          </div>
+        </div>
+
+        <!-- Trilha de auditoria -->
+        <div class="audit-trail">
+          <div class="audit-header">
+            <span class="audit-icon">🔎</span>
+            <span class="audit-title">HISTÓRICO DE EDIÇÕES</span>
+            <span class="audit-toggle">3 alterações ⌄</span>
+          </div>
+
+          <div class="audit-entry">
+            <span class="audit-time">12:01</span>
+            <span class="audit-text">
+              <strong>Ragonha</strong> registrou o evento.
+            </span>
+          </div>
+          <div class="audit-entry">
+            <span class="audit-time">12:05</span>
+            <span class="audit-text">
+              <strong>Ragonha</strong> anexou foto (GPS preservado).
+            </span>
+          </div>
+          <div class="audit-entry">
+            <span class="audit-time">12:08</span>
+            <span class="audit-text">
+              <strong>Ragonha</strong> editou observação.
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action buttons -->
+      <div class="modal-actions">
+        <button class="btn btn-delete">🗑 Excluir</button>
+        <button class="btn btn-save">💾 Salvar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>Trilha de auditoria visível com toggle (3 alterações ⌄)</li>
+      <li>Cada edição registra: hora + autor + ação realizada</li>
+      <li>Badge "✎ editado" no campo Observação (sinaliza alteração)</li>
+      <li>Campos Data/Hora e Operador com ícone de cadeado (read-only)</li>
+      <li>Múltiplas fotos com timestamp próprio (12:05 · GPS no rodapé)</li>
+      <li>Botão "+ Foto" deixa claro que adiciona (não substitui)</li>
+      <li>Aviso de GPS atualizado (sobrescrever vs adicionar segundo ponto)</li>
+      <li>Placeholder da Observação como pergunta-guia (não texto default)</li>
+      <li>Helper text reforçando "detalhe é proteção"</li>
+      <li>Botão Excluir como outline vermelho (vai abrir modal de motivo)</li>
+      <li>Botão Salvar ciano fill (ação primária, padrão consistente)</li>
+      <li>Bottom sheet com handle visível (gesto de fechar)</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

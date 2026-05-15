@@ -102,7 +102,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
             _QuickActionButton(
               icon: Icons.report_rounded,
               label: 'Ocorrência',
-              color: const Color(0xFF4ECDE4),
+              color: AppTheme.primary,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(

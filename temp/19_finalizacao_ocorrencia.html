@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finalização de Ocorrência - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER WIZARD */
+  .wizard-header {
+    padding: 8px 16px 14px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.1);
+  }
+
+  .wh-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .close-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  .wh-text { flex: 1; text-align: center; }
+
+  .wh-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .wh-main {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .wh-spacer {
+    width: 36px;
+  }
+
+  /* PROGRESSO */
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  .progress-step {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-step.done {
+    background: #2ecc71;
+  }
+
+  .progress-step.current {
+    background: rgba(77, 208, 225, 0.2);
+  }
+
+  .progress-step.current::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 50%;
+    background: #4dd0e1;
+    border-radius: 2px;
+  }
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding: 0 4px;
+  }
+
+  .progress-label {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .progress-label.current {
+    color: #4dd0e1;
+  }
+
+  .progress-label.done {
+    color: #2ecc71;
+  }
+
+  /* OCORRÊNCIA CONTEXT (compacto no topo) */
+  .occ-context {
+    background: rgba(77, 208, 225, 0.05);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    margin: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .occ-context-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .occ-context-info { flex: 1; min-width: 0; }
+
+  .occ-context-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .occ-context-meta {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .occ-context-duration {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 4px 8px;
+    background: rgba(77, 208, 225, 0.1);
+    border-radius: 6px;
+  }
+
+  /* Scroll */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* Step title */
+  .step-title {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    line-height: 1.1;
+  }
+
+  .step-desc {
+    color: #b0c4cc;
+    font-size: 12px;
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+
+  /* TEXTAREA grande pro relato */
+  .relato-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 12px;
+    padding: 14px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    min-height: 180px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .relato-input::placeholder { color: #5a7280; }
+
+  .relato-counter {
+    color: #5a7280;
+    font-size: 10px;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .relato-counter strong {
+    color: #4dd0e1;
+  }
+
+  /* Audio recorder */
+  .audio-card {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    margin-top: 14px;
+  }
+
+  .audio-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .audio-info { flex: 1; }
+
+  .audio-title {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .audio-desc {
+    color: #7a8a92;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  /* RESULTADO CARDS (passo 2) */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .result-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    padding: 12px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    min-height: 90px;
+  }
+
+  .result-card.selected {
+    background: rgba(46, 204, 113, 0.08);
+    border-color: #2ecc71;
+  }
+
+  .result-card.selected.negative {
+    background: rgba(149, 165, 166, 0.08);
+    border-color: #95a5a6;
+  }
+
+  .result-card-check {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    background: #2ecc71;
+    color: #050d10;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .result-card.selected.negative .result-card-check {
+    background: #95a5a6;
+  }
+
+  .result-icon {
+    font-size: 24px;
+  }
+
+  .result-name {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .result-card:not(.selected) .result-name {
+    color: #b0c4cc;
+  }
+
+  /* Banner avisos */
+  .warning-banner {
+    background: rgba(241, 196, 15, 0.06);
+    border-left: 3px solid #f1c40f;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .warning-banner strong { color: #f1c40f; }
+
+  .warning-icon { 
+    color: #f1c40f; 
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  /* DETALHES (passo 3) - cards expansíveis */
+  .detail-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .detail-section-header {
+    padding: 12px;
+    background: rgba(46, 204, 113, 0.05);
+    border-bottom: 1px solid rgba(46, 204, 113, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .detail-section-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .detail-section-title {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    flex: 1;
+  }
+
+  .detail-section-body {
+    padding: 12px;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 12px;
+  }
+
+  .field-group:last-child { margin-bottom: 0; }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 9px;
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  .field-input::placeholder { color: #5a7280; }
+
+  /* Chips */
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 6px 11px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .chip.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Field row */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .field-input-wrap {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 9px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field-input-num {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    text-align: right;
+    outline: none;
+  }
+
+  .field-input-unit {
+    color: #7a8a92;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  /* Placa */
+  .placa-input {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: monospace;
+    font-size: 14px !important;
+  }
+
+  /* Photo button */
+  .photo-add {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1.5px dashed rgba(77, 208, 225, 0.3);
+    border-radius: 10px;
+    padding: 14px;
+    color: #4dd0e1;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ===== TELA 4: CONFIRMAÇÃO ===== */
+
+  .success-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border-radius: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    margin: 30px auto 16px auto;
+    border: 3px solid rgba(46, 204, 113, 0.4);
+  }
+
+  .success-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 6px;
+  }
+
+  .success-subtitle {
+    color: #2ecc71;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Resumo da ocorrência */
+  .summary-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .summary-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .summary-row:first-child { padding-top: 0; }
+  .summary-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .summary-icon {
+    color: #4dd0e1;
+    font-size: 13px;
+    width: 18px;
+    flex-shrink: 0;
+  }
+
+  .summary-key {
+    color: #7a8a92;
+    font-size: 11px;
+    flex: 1;
+  }
+
+  .summary-val {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  /* Resultados marcados */
+  .results-marked {
+    background: rgba(46, 204, 113, 0.05);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+
+  .results-marked-label {
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+  }
+
+  .results-marked-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .results-marked-item {
+    color: #fff;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .results-marked-item::before {
+    content: '✓';
+    color: #2ecc71;
+    font-weight: 700;
+  }
+
+  /* Botões de ação na confirmação */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .action-btn {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    border-radius: 12px;
+    padding: 14px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .action-btn-icon { font-size: 18px; }
+
+  /* Botões CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+  }
+
+  .cta-bar.single { grid-template-columns: 1fr; }
+
+  .btn-back {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-next {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-next.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: rgba(77, 208, 225, 0.2);
+    color: #5a7280;
+  }
+
+  .btn-next.success { background: #2ecc71; }
+
+  .btn-finish-only {
+    background: transparent;
+    color: #4dd0e1;
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1500px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong { color: #4dd0e1; }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA 1: PASSO 1 — RELATO FINAL ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    PASSO 1 — RELATO FINAL
+    <small>Texto obrigatório · áudio opcional</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>11:12</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header wizard -->
+    <div class="wizard-header">
+      <div class="wh-top">
+        <button class="close-btn">✕</button>
+        <div class="wh-text">
+          <div class="wh-subtitle">FINALIZAR OCORRÊNCIA</div>
+          <div class="wh-main">Passo 1 de 3</div>
+        </div>
+        <div class="wh-spacer"></div>
+      </div>
+
+      <div class="progress-row">
+        <div class="progress-step current"></div>
+        <div class="progress-step"></div>
+        <div class="progress-step"></div>
+      </div>
+      <div class="progress-info">
+        <span class="progress-label current">RELATO</span>
+        <span class="progress-label">RESULTADO</span>
+        <span class="progress-label">DETALHES</span>
+      </div>
+
+      <!-- Contexto da ocorrência -->
+      <div class="occ-context">
+        <div class="occ-context-icon">🛡</div>
+        <div class="occ-context-info">
+          <div class="occ-context-title">Faro em veículo</div>
+          <div class="occ-context-meta">12/05 · 09:42 · 8 eventos</div>
+        </div>
+        <span class="occ-context-duration">1h30</span>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="step-title">Relato final</div>
+      <div class="step-desc">Descreva o que aconteceu, ações tomadas e resultado da ocorrência</div>
+
+      <div class="section-label">
+        <span>NARRATIVA DA OCORRÊNCIA</span>
+        <span class="section-help">obrigatório</span>
+      </div>
+
+      <textarea class="relato-input" placeholder="Descreva o que aconteceu da chegada ao local até o encerramento da ocorrência...">Equipe foi acionada às 09:42 para abordagem de veículo Gol placa ABC1D23 em atitude suspeita na Av. Brasil. Realizada abordagem com cão K9 Bono. Durante a busca, Bono apresentou indicação positiva no banco do passageiro, levando à localização de 2 buchas de maconha (18g total). Condutor do veículo foi detido e encaminhado para a DP. BO elaborado sob nº 2026/05/8721.</textarea>
+
+      <div class="relato-counter">
+        <strong>438</strong> caracteres · texto suficiente
+      </div>
+
+      <!-- Audio recorder -->
+      <div class="section-label" style="margin-top: 16px;">
+        <span>ÁUDIO COMPLEMENTAR</span>
+        <span class="section-help">opcional</span>
+      </div>
+
+      <div class="audio-card">
+        <div class="audio-icon">🎙</div>
+        <div class="audio-info">
+          <div class="audio-title">Gravar relato em áudio</div>
+          <div class="audio-desc">Útil pra detalhes adicionais · vira anexo no PDF final</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="btn-back">Cancelar</button>
+      <button class="btn-next">PRÓXIMO ›</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA 2: PASSO 2 — RESULTADO (MULTI-SELECT) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    PASSO 2 — RESULTADO
+    <small>Multi-select · 3 resultados marcados (cenário real)</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>11:14</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="wizard-header">
+      <div class="wh-top">
+        <button class="close-btn">✕</button>
+        <div class="wh-text">
+          <div class="wh-subtitle">FINALIZAR OCORRÊNCIA</div>
+          <div class="wh-main">Passo 2 de 3</div>
+        </div>
+        <div class="wh-spacer"></div>
+      </div>
+
+      <div class="progress-row">
+        <div class="progress-step done"></div>
+        <div class="progress-step current"></div>
+        <div class="progress-step"></div>
+      </div>
+      <div class="progress-info">
+        <span class="progress-label done">RELATO ✓</span>
+        <span class="progress-label current">RESULTADO</span>
+        <span class="progress-label">DETALHES</span>
+      </div>
+
+      <div class="occ-context">
+        <div class="occ-context-icon">🛡</div>
+        <div class="occ-context-info">
+          <div class="occ-context-title">Faro em veículo</div>
+          <div class="occ-context-meta">12/05 · 09:42 · 8 eventos</div>
+        </div>
+        <span class="occ-context-duration">1h30</span>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="step-title">Resultado da ocorrência</div>
+      <div class="step-desc">Marque todos que se aplicam — pode selecionar mais de um</div>
+
+      <div class="section-label">
+        <span>RESULTADOS</span>
+        <span class="section-help">3 selecionados</span>
+      </div>
+
+      <div class="result-grid">
+        <!-- Droga apreendida - SELECIONADO -->
+        <div class="result-card selected">
+          <span class="result-card-check">✓</span>
+          <span class="result-icon">💊</span>
+          <span class="result-name">Droga apreendida</span>
+        </div>
+
+        <!-- Arma apreendida -->
+        <div class="result-card">
+          <span class="result-icon">🔫</span>
+          <span class="result-name">Arma apreendida</span>
+        </div>
+
+        <!-- Indivíduo detido - SELECIONADO -->
+        <div class="result-card selected">
+          <span class="result-card-check">✓</span>
+          <span class="result-icon">👤</span>
+          <span class="result-name">Indivíduo detido</span>
+        </div>
+
+        <!-- BO elaborado - SELECIONADO -->
+        <div class="result-card selected">
+          <span class="result-card-check">✓</span>
+          <span class="result-icon">📄</span>
+          <span class="result-name">BO elaborado</span>
+        </div>
+
+        <!-- Apoio prestado -->
+        <div class="result-card">
+          <span class="result-icon">🤝</span>
+          <span class="result-name">Apoio prestado</span>
+        </div>
+
+        <!-- Encaminhamento -->
+        <div class="result-card">
+          <span class="result-icon">🏥</span>
+          <span class="result-name">Encaminhamento</span>
+        </div>
+
+        <!-- Pessoa localizada -->
+        <div class="result-card">
+          <span class="result-icon">📍</span>
+          <span class="result-name">Pessoa localizada</span>
+        </div>
+
+        <!-- Sem ocorrência -->
+        <div class="result-card">
+          <span class="result-icon">⊘</span>
+          <span class="result-name">Sem ocorrência</span>
+        </div>
+      </div>
+
+      <div class="warning-banner" style="margin-top: 16px;">
+        <span class="warning-icon">ℹ</span>
+        <div>
+          <strong>Próximo passo:</strong> você vai preencher detalhes específicos pra cada resultado marcado (tipo de droga, dados do detido, número do BO, etc).
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-back">‹ Voltar</button>
+      <button class="btn-next">PRÓXIMO ›</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA 3: PASSO 3 — DETALHES ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    PASSO 3 — DETALHES POR RESULTADO
+    <small>Campos condicionais · 3 seções (1 por resultado marcado)</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>11:18</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="wizard-header">
+      <div class="wh-top">
+        <button class="close-btn">✕</button>
+        <div class="wh-text">
+          <div class="wh-subtitle">FINALIZAR OCORRÊNCIA</div>
+          <div class="wh-main">Passo 3 de 3</div>
+        </div>
+        <div class="wh-spacer"></div>
+      </div>
+
+      <div class="progress-row">
+        <div class="progress-step done"></div>
+        <div class="progress-step done"></div>
+        <div class="progress-step current"></div>
+      </div>
+      <div class="progress-info">
+        <span class="progress-label done">RELATO ✓</span>
+        <span class="progress-label done">RESULTADO ✓</span>
+        <span class="progress-label current">DETALHES</span>
+      </div>
+
+      <div class="occ-context">
+        <div class="occ-context-icon">🛡</div>
+        <div class="occ-context-info">
+          <div class="occ-context-title">Faro em veículo</div>
+          <div class="occ-context-meta">12/05 · 09:42 · 8 eventos</div>
+        </div>
+        <span class="occ-context-duration">1h30</span>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="step-title">Detalhes</div>
+      <div class="step-desc">Informações específicas pra cada resultado · vão pro PDF e BO</div>
+
+      <!-- Seção 1: Droga apreendida -->
+      <div class="detail-section">
+        <div class="detail-section-header">
+          <div class="detail-section-icon">💊</div>
+          <div class="detail-section-title">Droga apreendida</div>
+        </div>
+        <div class="detail-section-body">
+          <div class="field-group">
+            <div class="field-label">
+              <span>TIPO</span>
+            </div>
+            <div class="chips-row">
+              <span class="chip selected">Maconha</span>
+              <span class="chip">Cocaína</span>
+              <span class="chip">Crack</span>
+              <span class="chip">Ecstasy</span>
+              <span class="chip">Outros</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">
+              <span>QUANTIDADE E APRESENTAÇÃO</span>
+            </div>
+            <div class="field-row">
+              <div class="field-input-wrap">
+                <input class="field-input-num" type="number" value="18" />
+                <span class="field-input-unit">g</span>
+              </div>
+              <div class="field-input-wrap">
+                <input class="field-input-num" type="number" value="2" />
+                <span class="field-input-unit">buchas</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">
+              <span>FOTO DA APREENSÃO</span>
+              <span class="section-help">recomendado</span>
+            </div>
+            <button class="photo-add">📷 ADICIONAR FOTO</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 2: Indivíduo detido -->
+      <div class="detail-section">
+        <div class="detail-section-header">
+          <div class="detail-section-icon">👤</div>
+          <div class="detail-section-title">Indivíduo detido</div>
+        </div>
+        <div class="detail-section-body">
+          <div class="field-group">
+            <div class="field-label">
+              <span>QUANTIDADE DE DETIDOS</span>
+            </div>
+            <div class="field-input-wrap">
+              <input class="field-input-num" type="number" value="1" />
+              <span class="field-input-unit">pessoa</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">
+              <span>ENCAMINHAMENTO</span>
+            </div>
+            <div class="chips-row">
+              <span class="chip selected">DP</span>
+              <span class="chip">Custódia</span>
+              <span class="chip">Hospital</span>
+              <span class="chip">Outro</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">
+              <span>VEÍCULO ENVOLVIDO</span>
+              <span class="section-help">opcional</span>
+            </div>
+            <div class="field-row">
+              <div>
+                <input class="field-input placa-input" type="text" value="ABC1D23" placeholder="Placa" />
+              </div>
+              <div>
+                <input class="field-input" type="text" value="GOL" placeholder="Tipo" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 3: BO elaborado -->
+      <div class="detail-section">
+        <div class="detail-section-header">
+          <div class="detail-section-icon">📄</div>
+          <div class="detail-section-title">BO elaborado</div>
+        </div>
+        <div class="detail-section-body">
+          <div class="field-group">
+            <div class="field-label">
+              <span>NÚMERO DO BO</span>
+            </div>
+            <input class="field-input" type="text" value="2026/05/8721" placeholder="Ex: 2026/05/8721" />
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">
+              <span>DELEGACIA</span>
+            </div>
+            <input class="field-input" type="text" value="DP Centro - Limeira" placeholder="Nome da delegacia" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-back">‹ Voltar</button>
+      <button class="btn-next success">✓ CONCLUIR</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA 4: CONFIRMAÇÃO FINAL ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA 4 — CONFIRMAÇÃO FINAL
+    <small>Resumo do que foi registrado + opções de ação</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>11:22</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Sem header wizard, é tela de sucesso -->
+    <div class="scroll-area" style="padding-top: 20px;">
+
+      <div class="success-icon">✓</div>
+      <div class="success-title">Ocorrência finalizada</div>
+      <div class="success-subtitle">REGISTRO INSTITUCIONAL CRIADO</div>
+
+      <!-- Resumo principal -->
+      <div class="summary-card">
+        <div class="summary-row">
+          <span class="summary-icon">🛡</span>
+          <span class="summary-key">Natureza</span>
+          <span class="summary-val">Faro em veículo</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">📅</span>
+          <span class="summary-key">Data e duração</span>
+          <span class="summary-val">12/05 · 1h36min</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">📍</span>
+          <span class="summary-key">Local</span>
+          <span class="summary-val">Av. Brasil · Centro</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">🐕</span>
+          <span class="summary-key">Binômio</span>
+          <span class="summary-val">Bono · Ragonha</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-icon">📋</span>
+          <span class="summary-key">Eventos registrados</span>
+          <span class="summary-val">8 eventos</span>
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div class="results-marked">
+        <div class="results-marked-label">RESULTADOS DA OCORRÊNCIA</div>
+        <div class="results-marked-list">
+          <div class="results-marked-item">Droga apreendida · 18g de maconha</div>
+          <div class="results-marked-item">Indivíduo detido · 1 pessoa · encaminhada à DP</div>
+          <div class="results-marked-item">BO elaborado · nº 2026/05/8721</div>
+        </div>
+      </div>
+
+      <!-- Ações -->
+      <div class="action-row">
+        <button class="action-btn">
+          <span class="action-btn-icon">📄</span>
+          <span>Gerar PDF</span>
+        </button>
+        <button class="action-btn">
+          <span class="action-btn-icon">📤</span>
+          <span>Compartilhar</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar single">
+      <button class="btn-finish-only">VOLTAR AO TURNO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <div class="lesson-box">
+    <strong>FILOSOFIA DO WIZARD:</strong> A finalização é o momento que cristaliza o registro institucional. Wizard linear comunica seriedade — uma decisão por vez, sem pular. Mas com botão Voltar sempre disponível pra revisar. Rascunho automático ao cancelar garante que nada se perde se condutor precisar atender outra ocorrência urgente.
+  </div>
+
+  <h3 style="margin-top: 20px;">PADRÕES DOS 3 PASSOS</h3>
+  <ul>
+    <li><strong>Header wizard fixo</strong>: subtítulo "FINALIZAR OCORRÊNCIA" + título "Passo X de 3"</li>
+    <li><strong>Barra de progresso visual</strong>: 3 segmentos · feitos em verde · atual em ciano · pendentes em cinza</li>
+    <li><strong>Labels embaixo</strong>: RELATO · RESULTADO · DETALHES com ✓ nos concluídos</li>
+    <li><strong>Card de contexto fixo</strong>: ocorrência sendo finalizada (natureza + data + eventos + duração) — sempre visível pra lembrar o que tá fazendo</li>
+    <li>Botão X de fechar (canto superior esquerdo) abre confirmação "Salvar como rascunho?"</li>
+    <li>Botão Voltar/Próximo no rodapé · ciano fill no avançar</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PASSO 1 — RELATO FINAL</h3>
+  <ul>
+    <li>Título grande "Relato final" + descrição contextual</li>
+    <li><strong>Textarea grande</strong> (180px min) · placeholder educativo</li>
+    <li><strong>Contador de caracteres</strong> com feedback ("texto suficiente" quando passa de 100 chars)</li>
+    <li>Botão "Próximo" desabilitado se relato vazio (regra do roadmap)</li>
+    <li><strong>Áudio complementar opcional</strong>: card abaixo com microfone · "vira anexo no PDF final"</li>
+    <li>Áudio é evidência adicional · texto continua obrigatório</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PASSO 2 — RESULTADO (MULTI-SELECT)</h3>
+  <ul>
+    <li><strong>8 cards de resultado em grid 2x2</strong>: Droga · Arma · Detido · BO · Apoio · Encaminhamento · Pessoa localizada · Sem ocorrência</li>
+    <li>Cada card com ícone grande + nome</li>
+    <li><strong>Selecionados ganham borda verde + check no canto</strong></li>
+    <li>Contador "3 selecionados" no header da seção</li>
+    <li>"Sem ocorrência" é negativo · quando marcado fica cinza (não verde)</li>
+    <li><strong>Banner informativo</strong> avisa que próximo passo terá detalhes específicos</li>
+    <li>Cenário do mockup: Droga + Detido + BO (cenário real comum)</li>
+    <li>Botão "Próximo" desabilitado se nenhum marcado</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">PASSO 3 — DETALHES (CONDICIONAIS)</h3>
+  <ul>
+    <li><strong>Uma seção por resultado marcado</strong> — no caso 3 seções (Droga · Detido · BO)</li>
+    <li>Cada seção é um card expansível com header verde (resultado positivo) + ícone + título</li>
+    <li><strong>Droga apreendida:</strong> tipo (chips) · quantidade + apresentação (g/buchas) · foto recomendada</li>
+    <li><strong>Indivíduo detido:</strong> quantidade · encaminhamento (chips: DP/Custódia/Hospital) · veículo envolvido (placa uppercase + tipo)</li>
+    <li><strong>BO elaborado:</strong> número do BO · delegacia</li>
+    <li>Placa do veículo em fonte monospace + uppercase automático (regra do roadmap)</li>
+    <li>Foto recomendada (não obrigatória) na apreensão de drogas</li>
+    <li>Botão final "✓ CONCLUIR" em verde (não ciano) — sinaliza ação final positiva</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA 4 — CONFIRMAÇÃO FINAL</h3>
+  <ul>
+    <li>Ícone de sucesso grande verde no topo</li>
+    <li>"Ocorrência finalizada" + "REGISTRO INSTITUCIONAL CRIADO" — comunica seriedade</li>
+    <li><strong>Card de resumo</strong>: Natureza · Data e duração · Local · Binômio · Eventos</li>
+    <li><strong>Card de resultados</strong> em verde · lista com checks dos 3 resultados marcados</li>
+    <li>Cada resultado mostra dado-chave (18g de maconha · 1 pessoa à DP · nº do BO)</li>
+    <li>2 botões de ação em grid: <strong>Gerar PDF</strong> + <strong>Compartilhar</strong></li>
+    <li>Botão "VOLTAR AO TURNO" no rodapé — encerra fluxo e volta pro dashboard</li>
+    <li>PDF gera o documento institucional completo (conforme estrutura do roadmap)</li>
+    <li>Compartilhar abre opções nativas (WhatsApp, email, drive) com PDF pronto</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">REGRAS DE NEGÓCIO IMPLÍCITAS</h3>
+  <ul>
+    <li><strong>Rascunho automático ao cancelar:</strong> X no canto abre modal "Salvar como rascunho?" · ocorrência fica como "Em finalização" · pode retomar</li>
+    <li><strong>Aviso se 0 eventos:</strong> antes do Passo 1, modal "Ocorrência sem eventos registrados — tem certeza?"</li>
+    <li><strong>Validação placa:</strong> uppercase + formato (3 letras + 4 chars · suporta Mercosul)</li>
+    <li><strong>Texto obrigatório no relato:</strong> "Próximo" desabilitado se vazio</li>
+    <li><strong>Resultado obrigatório:</strong> "Próximo" desabilitado se nenhum marcado</li>
+    <li><strong>Detalhes condicionais:</strong> cada resultado tem campos próprios · todos validados antes do CONCLUIR</li>
+    <li><strong>Após CONCLUIR:</strong> ocorrência fica imutável (só anexar evidências adicionais é permitido)</li>
+    <li><strong>Trilha de auditoria:</strong> registra criação · finalização · cada edição posterior · com timestamps imutáveis</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">FLUXOS LATERAIS</h3>
+  <ul>
+    <li>X → "Salvar como rascunho ou descartar?" → opção rascunho salva e volta pro turno</li>
+    <li>Ocorrência em rascunho aparece no Histórico com badge "EM FINALIZAÇÃO" amarelo</li>
+    <li>Tap nela retoma exatamente no passo onde parou</li>
+    <li>Voltar (‹) preserva tudo · navega entre passos sem perder dados</li>
+    <li>Após CONCLUIR · PDF gerado fica disponível no Histórico permanentemente</li>
+  </ul>
+</div>
+
+</body>
+</html>

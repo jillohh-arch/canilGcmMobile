@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registrar Treino - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header fixo */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  /* Cabeçalho fixo: contexto compacto */
+  .context-bar {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.15);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctx-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .ctx-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ctx-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ctx-time {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .ctx-gps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 500;
+    background: rgba(46, 204, 113, 0.08);
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+
+  .ctx-gps-dot {
+    width: 5px;
+    height: 5px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  /* Chips de modalidade */
+  .chips-section {
+    padding: 14px 16px 4px 16px;
+    flex-shrink: 0;
+  }
+
+  .chips-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .chips-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chips-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .chip {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .chip:hover {
+    background: rgba(77, 208, 225, 0.06);
+    border-color: rgba(77, 208, 225, 0.3);
+    color: #fff;
+  }
+
+  .chip.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  .chip-icon {
+    font-size: 13px;
+  }
+
+  /* Scroll content */
+  .form-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  .form-scroll::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 18px;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .field-label-text {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .field-optional {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  .field-input:focus {
+    outline: none;
+    border-color: #4dd0e1;
+    background: rgba(77, 208, 225, 0.06);
+  }
+
+  .field-input::placeholder {
+    color: #5a7280;
+  }
+
+  textarea.field-input {
+    min-height: 70px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .field-helper {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #5a7280;
+    line-height: 1.4;
+  }
+
+  /* Sub-categorias (commands para Obediência, etc) */
+  .subcategory-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .subcategory-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.15s;
+  }
+
+  .subcategory-item:hover {
+    background: rgba(77, 208, 225, 0.06);
+    border-color: rgba(77, 208, 225, 0.3);
+  }
+
+  .subcategory-item.checked {
+    background: rgba(77, 208, 225, 0.1);
+    border-color: #4dd0e1;
+  }
+
+  .subcategory-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .check-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: transparent;
+    flex-shrink: 0;
+  }
+
+  .subcategory-item.checked .check-icon {
+    background: #4dd0e1;
+    border-color: #4dd0e1;
+    color: #050d10;
+  }
+
+  /* Slider de intensidade/desempenho */
+  .rating-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .rating-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .rating-btn:hover {
+    border-color: rgba(77, 208, 225, 0.3);
+    color: #b0c4cc;
+  }
+
+  .rating-btn.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Duração + Tipo grupo */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  /* Toggle de "sem guia / com guia" */
+  .toggle-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .toggle-option {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-option.active {
+    background: rgba(77, 208, 225, 0.12);
+    color: #4dd0e1;
+  }
+
+  /* Anexos */
+  .attachments {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .attachment-slot {
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(77, 208, 225, 0.25);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 22px;
+    cursor: pointer;
+    gap: 2px;
+  }
+
+  .attachment-slot small {
+    font-size: 9px;
+    color: #5a7280;
+  }
+
+  .attachment-slot:hover {
+    background: rgba(77, 208, 225, 0.06);
+    border-color: rgba(77, 208, 225, 0.5);
+  }
+
+  /* Rodapé com Salvar */
+  .save-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 16px 20px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-save:hover {
+    opacity: 0.9;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 30px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons">
+        <span>4G</span>
+        <span>•••</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- Header fixo -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR ATIVIDADE</div>
+          <div class="header-main">Treino</div>
+        </div>
+      </div>
+
+      <!-- Contexto compacto -->
+      <div class="context-bar">
+        <div class="ctx-avatar">BONO</div>
+        <div class="ctx-info">
+          <div class="ctx-binomio">Bono · GCM Ragonha</div>
+          <div class="ctx-time">10/05/2026 · 14:32</div>
+        </div>
+        <div class="ctx-gps">
+          <span class="ctx-gps-dot"></span>
+          GPS preciso
+        </div>
+      </div>
+    </div>
+
+    <!-- Chips de modalidade -->
+    <div class="chips-section">
+      <div class="chips-label">MODALIDADE</div>
+      <div class="chips-row">
+        <div class="chip active">
+          <span class="chip-icon">🎯</span>
+          Obediência
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🔍</span>
+          Busca
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🛡</span>
+          Proteção
+        </div>
+        <div class="chip">
+          <span class="chip-icon">👃</span>
+          Faro
+        </div>
+        <div class="chip">
+          <span class="chip-icon">💪</span>
+          Condicionamento
+        </div>
+      </div>
+    </div>
+
+    <!-- Form scroll -->
+    <div class="form-scroll">
+
+      <!-- Comandos treinados (sub-categoria de Obediência) -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">COMANDOS TREINADOS</span>
+          <span class="field-optional">selecione um ou mais</span>
+        </div>
+        <div class="subcategory-grid">
+          <div class="subcategory-item checked">
+            <span class="subcategory-name">Senta</span>
+            <span class="check-icon">✓</span>
+          </div>
+          <div class="subcategory-item checked">
+            <span class="subcategory-name">Deita</span>
+            <span class="check-icon">✓</span>
+          </div>
+          <div class="subcategory-item">
+            <span class="subcategory-name">Junto</span>
+            <span class="check-icon"></span>
+          </div>
+          <div class="subcategory-item checked">
+            <span class="subcategory-name">Fica</span>
+            <span class="check-icon">✓</span>
+          </div>
+          <div class="subcategory-item">
+            <span class="subcategory-name">Vem</span>
+            <span class="check-icon"></span>
+          </div>
+          <div class="subcategory-item">
+            <span class="subcategory-name">Solta</span>
+            <span class="check-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duração + tipo de guia -->
+      <div class="field-row">
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">DURAÇÃO</span>
+          </div>
+          <input class="field-input" placeholder="Ex: 25 min" value="25 min" />
+        </div>
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">CONDUÇÃO</span>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-option active">Com guia</div>
+            <div class="toggle-option">Sem guia</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desempenho -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">DESEMPENHO DO CÃO</span>
+        </div>
+        <div class="rating-row">
+          <div class="rating-btn">Ruim</div>
+          <div class="rating-btn">Regular</div>
+          <div class="rating-btn active">Bom</div>
+          <div class="rating-btn">Ótimo</div>
+        </div>
+        <div class="field-helper">Avaliação subjetiva do condutor sobre a sessão.</div>
+      </div>
+
+      <!-- Local -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">LOCAL DO TREINO</span>
+        </div>
+        <input class="field-input" value="Canil GCM Limeira - área de treino" />
+      </div>
+
+      <!-- Observação -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">OBSERVAÇÕES</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <textarea class="field-input" placeholder="Como foi a sessão? Avanços? Dificuldades?"></textarea>
+      </div>
+
+      <!-- Anexos -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">📎 EVIDÊNCIAS</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <div class="attachments">
+          <div class="attachment-slot">
+            📷
+            <small>Foto</small>
+          </div>
+          <div class="attachment-slot">
+            🎥
+            <small>Vídeo</small>
+          </div>
+          <div class="attachment-slot">
+            +
+            <small>Outro</small>
+          </div>
+        </div>
+        <div class="field-helper">Registros visuais ajudam a comprovar evolução do K9 ao longo do tempo.</div>
+      </div>
+
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar">
+      <button class="btn-cancel">Cancelar</button>
+      <button class="btn-save">💾 SALVAR TREINO</button>
+    </div>
+
+  </div>
+
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>Página dedicada (não modal) — espaço pra densidade</li>
+      <li>Chips horizontais de modalidade no topo (decisão arquitetural)</li>
+      <li>Estrutura: header fixo → chips → miolo dinâmico → rodapé fixo</li>
+      <li>Contexto compacto (binômio + hora + GPS) em barra única</li>
+      <li>GPS automático com indicador de precisão</li>
+      <li>Sub-categorias visuais (comandos treinados como checkboxes-card)</li>
+      <li>Toggle "Com guia / Sem guia" (não "off-leash")</li>
+      <li>Avaliação de desempenho com 4 níveis (Ruim/Regular/Bom/Ótimo)</li>
+      <li>Foto, vídeo e outros anexos em grid de 3 slots</li>
+      <li>Cor do botão Salvar SEMPRE ciano (consistente entre categorias)</li>
+      <li>"Cancelar" + "Salvar Treino" no rodapé fixo</li>
+      <li>Sem ilustração HUD, sem retículas, sem subtítulos pomposos</li>
+      <li>Helper text contextual ("Registros visuais ajudam a comprovar evolução")</li>
+      <li>Hierarquia clara: campos obrigatórios primeiro, opcionais depois</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

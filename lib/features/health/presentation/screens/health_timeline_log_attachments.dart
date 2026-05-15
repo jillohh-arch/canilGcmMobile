@@ -22,7 +22,7 @@ class _ExamAttachmentButton extends StatelessWidget {
       icon: const Icon(Icons.document_scanner_rounded, size: 18),
       label: Text(
         'ACESSAR LAUDO PDF',
-        style: GoogleFonts.oxanium(fontSize: 12, fontWeight: FontWeight.w800),
+        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800),
       ),
     );
   }

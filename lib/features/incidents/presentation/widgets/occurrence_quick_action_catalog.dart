@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 import 'occurrence_quick_action.dart';
 
@@ -49,19 +50,19 @@ class OccurrenceQuickActionCatalog {
             title: 'Arma localizada',
             description: 'Arma localizada durante a ocorrência.',
             icon: Icons.gps_fixed_rounded,
-            color: Color(0xFFFF3B5C),
+            color: AppTheme.error,
           ),
           OccurrenceQuickAction(
             title: 'Munição localizada',
             description: 'Munição localizada durante a ocorrência.',
             icon: Icons.adjust_rounded,
-            color: Color(0xFFFFB84D),
+            color: AppTheme.warning,
           ),
           OccurrenceQuickAction(
             title: 'Objeto ilícito localizado',
             description: 'Objeto ilícito localizado durante a averiguação.',
             icon: Icons.inventory_2_rounded,
-            color: Color(0xFF00E5FF),
+            color: AppTheme.primary,
           ),
         ],
       ),

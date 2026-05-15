@@ -40,7 +40,7 @@ class _OccurrenceFlowPrimaryControl extends StatelessWidget {
         ),
         child: Text(
           'CONTINUAR',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             letterSpacing: 1.8,
           ),

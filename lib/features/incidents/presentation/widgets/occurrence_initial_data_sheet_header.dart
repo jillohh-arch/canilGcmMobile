@@ -14,7 +14,7 @@ class _InitialDataSheetHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'EDITAR DADOS ESSENCIAIS',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: accentColor,
               fontSize: 12,
               fontWeight: FontWeight.w900,

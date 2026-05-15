@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hub de Treinos - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER UNIVERSAL */
+  .universal-header {
+    padding: 8px 16px 14px 16px;
+    background: rgba(77, 208, 225, 0.04);
+    border-bottom: 1px solid rgba(77, 208, 225, 0.12);
+    flex-shrink: 0;
+  }
+
+  .uh-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatars-stack {
+    display: flex;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .avatar-small.condutor {
+    border-color: rgba(77, 208, 225, 0.5);
+    margin-left: -10px;
+  }
+
+  .uh-info { flex: 1; min-width: 0; }
+
+  .uh-binomio {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .uh-turno {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .turno-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .uh-time {
+    color: #b0c4cc;
+    font-weight: 500;
+  }
+
+  .uh-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .uh-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* SCROLL AREA */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Page title */
+  .page-title-section {
+    margin-bottom: 18px;
+  }
+
+  .page-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .page-subtitle {
+    color: #7a8a92;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .page-subtitle strong {
+    color: #4dd0e1;
+    font-weight: 700;
+  }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-count {
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* SPECIALTY CARDS */
+  .specialty-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    transition: all 0.2s;
+  }
+
+  .specialty-card:hover {
+    background: rgba(77, 208, 225, 0.04);
+  }
+
+  .specialty-card.operational {
+    border-left: 3px solid #2ecc71;
+  }
+
+  .specialty-card.in-formation {
+    border-left: 3px solid #f1c40f;
+    background: rgba(241, 196, 15, 0.03);
+  }
+
+  .specialty-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .specialty-card.operational .specialty-icon {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .specialty-card.in-formation .specialty-icon {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .specialty-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .specialty-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .specialty-status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #b0c4cc;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .status-badge.operational {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .status-badge.in-formation {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .specialty-meta {
+    color: #7a8a92;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .specialty-arrow {
+    color: #5a7280;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Sub-info pra Detecção (linhas paralelas) */
+  .specialty-sub-info {
+    color: #b0c4cc;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .specialty-sub-info strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Add new specialty button */
+  .add-specialty-btn {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px dashed rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .add-specialty-btn-icon {
+    font-size: 16px;
+  }
+
+  /* General training chips */
+  .general-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .general-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+
+  .general-card:hover {
+    background: rgba(77, 208, 225, 0.04);
+  }
+
+  .general-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .general-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .general-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .general-meta {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #050d10;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 0 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #5a7280;
+  }
+
+  .nav-item.active {
+    color: #4dd0e1;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .fab-center {
+    width: 54px;
+    height: 54px;
+    background: #4dd0e1;
+    color: #050d10;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(77, 208, 225, 0.3);
+    cursor: pointer;
+    margin-top: -28px;
+    border: 4px solid #050d10;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1200px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong {
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+  <div class="phone-label">
+    HUB DE TREINOS — TELA APÓS TAP NO BOTTOM NAV
+    <small>Cão ativo: Bono · Operacional em B&C e Detecção · Em formação em Guarda & Proteção</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- HEADER UNIVERSAL -->
+    <div class="universal-header">
+      <div class="uh-row">
+        <div class="avatars-stack">
+          <div class="avatar-small">BONO</div>
+          <div class="avatar-small condutor">RAG</div>
+        </div>
+        <div class="uh-info">
+          <div class="uh-binomio">Bono · GCM Ragonha</div>
+          <div class="uh-turno">
+            <span class="turno-dot"></span>
+            <span>Turno ativo</span>
+            <span class="uh-time">· há 5h</span>
+          </div>
+        </div>
+        <div class="uh-actions">
+          <button class="uh-btn" title="Trocar cão">⇄</button>
+          <button class="uh-btn" title="Perfil">👤</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Título -->
+      <div class="page-title-section">
+        <div class="page-title">Treinos</div>
+        <div class="page-subtitle"><strong>5 sessões</strong> esta semana</div>
+      </div>
+
+      <!-- Especialidades -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>ESPECIALIDADES</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-count">3 ativas</span>
+      </div>
+
+      <!-- Busca & Captura - Operacional -->
+      <div class="specialty-card operational">
+        <div class="specialty-icon">🎯</div>
+        <div class="specialty-info">
+          <div class="specialty-name">Busca & Captura</div>
+          <div class="specialty-status-row">
+            <span class="status-badge operational">● OPERACIONAL</span>
+            <span>· última há 3 dias</span>
+          </div>
+          <div class="specialty-meta">Manutenção · 14 sessões neste mês</div>
+        </div>
+        <span class="specialty-arrow">›</span>
+      </div>
+
+      <!-- Detecção - Operacional com info de linha -->
+      <div class="specialty-card operational">
+        <div class="specialty-icon">👃</div>
+        <div class="specialty-info">
+          <div class="specialty-name">Detecção</div>
+          <div class="specialty-status-row">
+            <span class="status-badge operational">● OPERACIONAL</span>
+            <span>· última há 5 dias</span>
+          </div>
+          <div class="specialty-sub-info">
+            <strong>Drogas:</strong> operacional · 
+            <strong>Armas/Cadáver:</strong> não iniciadas
+          </div>
+        </div>
+        <span class="specialty-arrow">›</span>
+      </div>
+
+      <!-- Guarda & Proteção - Em formação -->
+      <div class="specialty-card in-formation">
+        <div class="specialty-icon">🛡</div>
+        <div class="specialty-info">
+          <div class="specialty-name">Guarda & Proteção</div>
+          <div class="specialty-status-row">
+            <span class="status-badge in-formation">◔ EM FORMAÇÃO</span>
+            <span>· última há 1 dia</span>
+          </div>
+          <div class="specialty-meta">Caça consolidada · Defesa em abertura</div>
+        </div>
+        <span class="specialty-arrow">›</span>
+      </div>
+
+      <!-- Adicionar nova especialidade -->
+      <button class="add-specialty-btn">
+        <span class="add-specialty-btn-icon">+</span>
+        <span>Iniciar nova especialidade</span>
+      </button>
+
+      <!-- Treinos gerais -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>TREINOS GERAIS</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="general-grid">
+        <div class="general-card">
+          <div class="general-icon">🐾</div>
+          <div class="general-info">
+            <div class="general-name">Obediência</div>
+            <div class="general-meta">há 2 dias</div>
+          </div>
+        </div>
+        <div class="general-card">
+          <div class="general-icon">💪</div>
+          <div class="general-info">
+            <div class="general-name">Condicionamento</div>
+            <div class="general-meta">há 6 dias</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Turno</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Histórico</span>
+      </div>
+      <div class="fab-center">🛡</div>
+      <div class="nav-item active">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Treino</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">🐕</span>
+        <span class="nav-label">Cão</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  
+  <div class="lesson-box">
+    <strong>HUB DE SELEÇÃO, NÃO PAINEL DE STATUS:</strong> A tela permite ao condutor decidir conscientemente o que treinar. O estado da especialidade no cão (operacional / em formação) já determina automaticamente se será sessão de manutenção ou formação — sem necessidade de perguntar isso explicitamente ao usuário.
+  </div>
+
+  <ul>
+    <li><strong>Header universal</strong> mantido (avatares + binômio + ⇄ + 👤)</li>
+    <li><strong>Cão ativo</strong> já determina o contexto — não precisa selecionar de novo</li>
+    <li>Trocar cão = botão ⇄ no header (consistente com outras telas)</li>
+    <li><strong>Título com contexto</strong>: "Treinos" + subtítulo "5 sessões esta semana"</li>
+    <li><strong>Cards de especialidades</strong>: cada uma como card único, mesmo Detecção (com linhas internas mostradas como sub-info)</li>
+    <li>Borda lateral colorida por estado: verde (operacional), amarelo (em formação)</li>
+    <li>Badge de estado + última sessão como info principal</li>
+    <li>Meta info adicional contextual: "Manutenção · 14 sessões neste mês" (B&C) · "Caça consolidada · Defesa em abertura" (G&P)</li>
+    <li><strong>Detecção mostra linhas inline</strong>: "Drogas: operacional · Armas/Cadáver: não iniciadas" — antecipa que tap abre tela de linhas</li>
+    <li><strong>Tap em card</strong>: app já sabe se vai pra manutenção ou formação baseado no estado — leva direto pra tela certa, sem perguntar</li>
+    <li><strong>"+ Iniciar nova especialidade"</strong> como botão dashed ciano abaixo dos cards — ação consciente, não default</li>
+    <li>Tap no botão abre seletor com especialidades não iniciadas</li>
+    <li><strong>Treinos gerais</strong> em grid 2x2 — Obediência + Condicionamento</li>
+    <li>Cards menores que especialidades — hierarquia visual clara</li>
+    <li>Bottom nav com Treino ativo (ciano)</li>
+    <li>FAB 🛡 continua exclusivo de Iniciar Ocorrência — não muda função na tela de Treino</li>
+  </ul>
+
+  <h3 style="margin-top: 24px;">FLUXO DE NAVEGAÇÃO</h3>
+
+  <ul>
+    <li>Tap em <strong>🎯 Busca & Captura</strong> (operacional) → tela de manutenção em B&C</li>
+    <li>Tap em <strong>👃 Detecção</strong> (operacional) → tela de linhas (Drogas/Armas/Cadáver)</li>
+    <li>Tap em <strong>🛡 Guarda & Proteção</strong> (em formação) → tela de formação com 4 abas</li>
+    <li>Tap em <strong>+ Iniciar nova especialidade</strong> → modal/sheet com opções (Cadáver em Detecção, especialidades não iniciadas)</li>
+    <li>Tap em <strong>🐾 Obediência</strong> → tela de biblioteca de comandos (sem formação/manutenção, é treino contínuo)</li>
+    <li>Tap em <strong>💪 Condicionamento</strong> → tela de condicionamento físico (treino contínuo)</li>
+  </ul>
+</div>
+
+</body>
+</html>

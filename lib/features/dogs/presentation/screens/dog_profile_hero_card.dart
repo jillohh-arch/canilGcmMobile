@@ -16,7 +16,7 @@ class _HeroCard extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _panelColor.withAlpha(220),
         borderRadius: BorderRadius.circular(12),
@@ -45,18 +45,18 @@ class _HeroCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       width: 90,
                       height: 90,
-                      placeholder: (context, url) => const Icon(
+                      placeholder: (context, url) => Icon(
                         Icons.pets_rounded,
                         color: _cyan,
                         size: 36,
                       ),
-                      errorWidget: (context, url, error) => const Icon(
+                      errorWidget: (context, url, error) => Icon(
                         Icons.pets_rounded,
                         color: _cyan,
                         size: 36,
                       ),
                     )
-                  : const Center(
+                  : Center(
                       child: Icon(Icons.pets_rounded, color: _cyan, size: 36),
                     ),
             ),
@@ -90,7 +90,7 @@ class _HeroCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.person_outline, color: Colors.white38, size: 14),
+                Icon(Icons.person_outline, color: Colors.white38, size: 14),
                 const SizedBox(width: 4),
                 Text(
                   handlerName!,
@@ -127,7 +127,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _statusColor(label);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
         borderRadius: BorderRadius.circular(6),
@@ -168,7 +168,7 @@ class _ModalityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _modalityColor(label);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
         borderRadius: BorderRadius.circular(4),

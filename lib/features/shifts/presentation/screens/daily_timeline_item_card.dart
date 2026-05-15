@@ -29,7 +29,7 @@ extension _DailyTimelineItemCard on _DailyTimelineScreenState {
                 colors: [
                   color.withAlpha(32),
                   const Color(0xFF0F1726),
-                  const Color(0xFF070B14),
+                  AppTheme.background,
                 ],
               ),
               boxShadow: [

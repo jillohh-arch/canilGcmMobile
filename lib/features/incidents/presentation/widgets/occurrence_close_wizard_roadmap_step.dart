@@ -33,7 +33,7 @@ class _RoadmapStep extends StatelessWidget {
               width: 34,
               height: 2,
               color: index < currentStep
-                  ? const Color(0xFF00F5A0)
+                  ? AppTheme.success
                   : Colors.white12,
             ),
         ],
@@ -62,15 +62,15 @@ class _RoadmapStepBadge extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: active
-            ? const Color(0xFF00E5FF).withAlpha(25)
+            ? AppTheme.primary.withAlpha(25)
             : Colors.transparent,
         border: Border.all(
-          color: active ? const Color(0xFF00E5FF) : Colors.white24,
+          color: active ? AppTheme.primary : Colors.white24,
         ),
         boxShadow: active
             ? [
                 BoxShadow(
-                  color: const Color(0xFF00E5FF).withAlpha(70),
+                  color: AppTheme.primary.withAlpha(70),
                   blurRadius: 12,
                 ),
               ]
@@ -80,13 +80,13 @@ class _RoadmapStepBadge extends StatelessWidget {
         child: done
             ? const Icon(
                 Icons.check_rounded,
-                color: Color(0xFF00F5A0),
+                color: AppTheme.success,
                 size: 20,
               )
             : Text(
                 '${index + 1}',
-                style: GoogleFonts.oxanium(
-                  color: active ? const Color(0xFF00E5FF) : Colors.white38,
+                style: GoogleFonts.inter(
+                  color: active ? AppTheme.primary : Colors.white38,
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
                 ),
@@ -107,8 +107,8 @@ class _RoadmapStepLabel extends StatelessWidget {
     return Text(
       label,
       maxLines: 1,
-      style: GoogleFonts.robotoMono(
-        color: active ? const Color(0xFF00E5FF) : Colors.white30,
+      style: GoogleFonts.inter(
+        color: active ? AppTheme.primary : Colors.white30,
         fontSize: 9,
         fontWeight: FontWeight.w900,
         letterSpacing: 1.1,

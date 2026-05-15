@@ -39,7 +39,7 @@ extension _HealthDashboardWeightSection on _HealthDashboardScreenState {
                   const SizedBox(width: 8),
                   Text(
                     'ANÁLISE BIOMÉTRICA: EVOLUÇÃO DE PESO',
-                    style: GoogleFonts.oxanium(
+                    style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: Colors.cyanAccent.withValues(alpha: 0.8),

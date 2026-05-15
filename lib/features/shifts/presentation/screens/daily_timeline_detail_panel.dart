@@ -19,7 +19,7 @@ extension _DailyTimelineDetailPanel on _DailyTimelineScreenState {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(225),
+        color: AppTheme.background.withAlpha(225),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: accent.withAlpha(85)),
       ),
@@ -32,7 +32,7 @@ extension _DailyTimelineDetailPanel on _DailyTimelineScreenState {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: accent.withAlpha(230),
                   fontSize: 10,
                   fontWeight: FontWeight.w900,

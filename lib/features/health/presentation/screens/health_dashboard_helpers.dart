@@ -40,7 +40,7 @@ extension _HealthDashboardScaffoldParts on _HealthDashboardScreenState {
       elevation: 0,
       title: Text(
         'SAÚDE DO K9',
-        style: GoogleFonts.oxanium(
+        style: GoogleFonts.inter(
           fontSize: 12,
           fontWeight: FontWeight.w900,
           letterSpacing: 3,

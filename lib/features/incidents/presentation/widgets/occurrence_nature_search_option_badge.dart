@@ -22,7 +22,7 @@ class _OccurrenceNatureCodeBadge extends StatelessWidget {
       child: Text(
         option.code.isEmpty ? 'MAN' : option.code,
         textAlign: TextAlign.center,
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           color: accent,
           fontSize: 10,
           fontWeight: FontWeight.w900,

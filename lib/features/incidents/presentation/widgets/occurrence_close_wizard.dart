@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -45,10 +46,10 @@ class OccurrenceCloseWizard extends StatefulWidget {
 }
 
 class _OccurrenceCloseWizardState extends State<OccurrenceCloseWizard> {
-  static const _bg = Color(0xFF070B14);
-  static const _panel = Color(0xFF0B1220);
-  static const _cyan = Color(0xFF00E5FF);
-  static const _red = Color(0xFFFF3B5C);
+  static final _bg = AppTheme.background;
+  static const _panel = const Color(0xFF0E1A1F);
+  static final _cyan = AppTheme.primary;
+  static final _red = AppTheme.error;
 
   int _currentStep = 0;
   late final stt.SpeechToText _speech;

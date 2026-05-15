@@ -16,7 +16,7 @@ class _IncidentInfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1220),
+        color: const Color(0xFF0E1A1F),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
@@ -25,14 +25,14 @@ class _IncidentInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: const Color(0xFF4ECDE4)),
+              Icon(icon, size: 14, color: AppTheme.primary),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF4ECDE4),
+                  color: AppTheme.primary,
                   letterSpacing: 1,
                 ),
               ),

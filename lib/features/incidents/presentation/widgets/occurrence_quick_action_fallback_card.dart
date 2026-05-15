@@ -41,7 +41,7 @@ class _QuickActionFallbackCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: enabled ? Colors.white : Colors.white54,
               fontSize: 11,
               fontWeight: FontWeight.w900,

@@ -65,7 +65,7 @@ class _OccurrenceMiniCommandButton extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: Colors.white,
             fontSize: 10,
             fontWeight: FontWeight.w900,

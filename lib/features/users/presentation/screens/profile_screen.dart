@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -23,13 +24,13 @@ part 'profile_identification_widgets.dart';
 part 'profile_shift_section.dart';
 part 'profile_info_row.dart';
 
-const _hudBackground = Color(0xFF070B14);
-const _hudPanel = Color(0xFF0B1220);
+final _hudBackground = AppTheme.background;
+const _hudPanel = const Color(0xFF0E1A1F);
 const _hudPanelAlt = Color(0xFF111827);
-const _hudCyan = Color(0xFF00E5FF);
+final _hudCyan = AppTheme.primary;
 const _hudAmber = Color(0xFFFBBF24);
 const _hudGreen = Color(0xFF00E58A);
-const _hudDanger = Color(0xFFFF3B6B);
+final _hudDanger = AppTheme.error;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

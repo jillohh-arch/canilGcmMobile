@@ -1,4 +1,4 @@
-﻿part of 'incident_form_screen.dart';
+part of 'incident_form_screen.dart';
 
 class _IncidentFeedCardTags extends StatelessWidget {
   final Incident incident;
@@ -14,7 +14,7 @@ class _IncidentFeedCardTags extends StatelessWidget {
         _IncidentFeedTag(
           icon: Icons.location_on_rounded,
           text: incident.location,
-          iconColor: const Color(0xFF4ECDE4),
+          iconColor: AppTheme.primary,
           textColor: cs.onSurface,
         ),
         const SizedBox(width: 8),
@@ -72,7 +72,7 @@ class _IncidentFeedDescription extends StatelessWidget {
               Icon(
                 Icons.description_rounded,
                 size: 12,
-                color: const Color(0xFF4ECDE4),
+                color: AppTheme.primary,
               ),
               const SizedBox(width: 6),
               Text(
@@ -80,7 +80,7 @@ class _IncidentFeedDescription extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 8,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF4ECDE4),
+                  color: AppTheme.primary,
                   letterSpacing: 0.8,
                 ),
               ),

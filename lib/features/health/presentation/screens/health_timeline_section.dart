@@ -10,7 +10,7 @@ extension _HealthDashboardTimelineSection on _HealthDashboardScreenState {
           const SizedBox(width: 8),
           Text(
             'PRONTUÁRIO DE COMBATE / HISTÓRICO',
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w800,
               color: Colors.white54,

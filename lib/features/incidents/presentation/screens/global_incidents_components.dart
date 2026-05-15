@@ -1,4 +1,4 @@
-﻿part of 'global_incidents_screen.dart';
+part of 'global_incidents_screen.dart';
 
 Color _globalIncidentResultColor(String result) {
   final normalized = result.toLowerCase();
@@ -15,7 +15,7 @@ Color _globalIncidentResultColor(String result) {
   if (normalized.contains('cancel')) {
     return AppTheme.statusAlert;
   }
-  return const Color(0xFF4ECDE4);
+  return AppTheme.primary;
 }
 
 IconData _globalIncidentTypeIcon(String? type) {

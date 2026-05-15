@@ -5,7 +5,7 @@ const _healthAccent = Color(0xFFEF5350);
 const _weightAccent = Color(0xFF66BB6A);
 const _maleAccent = Color(0xFF82B1FF);
 const _femaleAccent = Color(0xFFFF80AB);
-const _ageAccent = Color(0xFF4ECDE4);
+final _ageAccent = AppTheme.primary;
 
 class _CockpitBento extends StatelessWidget {
   final Dog dog;

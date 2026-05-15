@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -25,7 +26,7 @@ part 'history_timeline_item.dart';
 part 'history_data_loader.dart';
 
 /// Cores do tema (consistentes com o mockup)
-const _bgColor = Color(0xFF070B14);
+final _bgColor = AppTheme.background;
 const _cyanAccent = Color(0xFF4DD0E1);
 const _purpleAccent = Color(0xFF9B59B6);
 const _redAccent = Color(0xFFE74C3C);

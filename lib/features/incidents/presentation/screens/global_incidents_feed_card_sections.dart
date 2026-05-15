@@ -1,4 +1,4 @@
-﻿part of 'global_incidents_screen.dart';
+part of 'global_incidents_screen.dart';
 
 class _GlobalIncidentCardTags extends StatelessWidget {
   final Incident incident;
@@ -14,7 +14,7 @@ class _GlobalIncidentCardTags extends StatelessWidget {
         _GlobalIncidentTag(
           icon: Icons.location_on_rounded,
           text: incident.location,
-          color: const Color(0xFF4ECDE4),
+          color: AppTheme.primary,
         ),
         const SizedBox(width: 8),
         _GlobalIncidentTag(
@@ -70,7 +70,7 @@ class _GlobalIncidentDescription extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 8,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF4ECDE4),
+              color: AppTheme.primary,
               letterSpacing: 0.8,
             ),
           ),

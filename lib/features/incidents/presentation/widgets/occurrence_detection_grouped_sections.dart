@@ -37,7 +37,7 @@ class OccurrenceDetectionGroupedSections extends StatelessWidget {
         HudExpansionSection(
           title: 'Contexto & Local',
           icon: Icons.location_on_rounded,
-          iconColor: const Color(0xFF4ECDE4),
+          iconColor: AppTheme.primary,
           children: [topActionRow, const SizedBox(height: 16), locationTimeRow],
         ),
         const SizedBox(height: 12),

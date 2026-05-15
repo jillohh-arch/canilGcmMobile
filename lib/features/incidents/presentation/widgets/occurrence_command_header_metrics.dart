@@ -18,7 +18,7 @@ class _WideMetric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(150),
+        color: AppTheme.background.withAlpha(150),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: accent.withAlpha(95)),
       ),
@@ -28,7 +28,7 @@ class _WideMetric extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             title.toUpperCase(),
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white.withAlpha(115),
               fontSize: 8.5,
               fontWeight: FontWeight.w900,
@@ -40,7 +40,7 @@ class _WideMetric extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w900,
@@ -78,7 +78,7 @@ class _HeaderChip extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             label,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: color,
               fontSize: 9,
               fontWeight: FontWeight.w900,

@@ -22,7 +22,7 @@ extension _DailyTimelineIncidentUpdateNote on _DailyTimelineScreenState {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: Color(0xFF4ECDE4), width: 1.5),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
         ),
       ),
     );

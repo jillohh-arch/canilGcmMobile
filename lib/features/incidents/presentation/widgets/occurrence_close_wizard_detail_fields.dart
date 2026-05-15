@@ -17,7 +17,7 @@ extension _OccurrenceCloseWizardDetailFields on _OccurrenceCloseWizardState {
         children: [
           Text(
             result.toUpperCase(),
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: _OccurrenceCloseWizardState._cyan,
               fontSize: 11,
               fontWeight: FontWeight.w900,

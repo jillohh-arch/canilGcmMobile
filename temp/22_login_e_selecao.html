@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluxo de Entrada - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-bar.light {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* ===== TELA A: SPLASH ===== */
+
+  .splash-bg {
+    flex: 1;
+    background: 
+      radial-gradient(circle at 50% 30%, rgba(77, 208, 225, 0.08), transparent 60%),
+      #050d10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    position: relative;
+  }
+
+  .splash-brasao {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.15), rgba(77, 208, 225, 0.05));
+    border: 2px solid rgba(77, 208, 225, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .splash-brasao-inner {
+    color: #4dd0e1;
+    font-size: 56px;
+    line-height: 1;
+  }
+
+  .splash-title {
+    color: #fff;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .splash-subtitle {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  /* Loading dots */
+  .loading-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .loading-dot {
+    width: 6px;
+    height: 6px;
+    background: #4dd0e1;
+    border-radius: 50%;
+    opacity: 0.3;
+  }
+
+  .loading-dot:nth-child(1) { animation: pulse-dot 1.4s infinite 0s; }
+  .loading-dot:nth-child(2) { animation: pulse-dot 1.4s infinite 0.2s; }
+  .loading-dot:nth-child(3) { animation: pulse-dot 1.4s infinite 0.4s; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  .splash-footer {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: #5a7280;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .splash-footer strong {
+    color: #b0c4cc;
+    font-weight: 600;
+  }
+
+  /* ===== TELA B: LOGIN ===== */
+
+  .login-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    background: 
+      radial-gradient(circle at 50% 0%, rgba(77, 208, 225, 0.05), transparent 50%),
+      #050d10;
+  }
+
+  .login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0 30px 0;
+  }
+
+  .login-brasao {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.15), rgba(77, 208, 225, 0.05));
+    border: 2px solid rgba(77, 208, 225, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .login-brasao-inner {
+    color: #4dd0e1;
+    font-size: 32px;
+  }
+
+  .login-brand-title {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+  }
+
+  .login-brand-sub {
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+  }
+
+  .login-welcome {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .login-welcome-title {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .login-welcome-sub {
+    color: #7a8a92;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* Form */
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .input-group {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .input-group:focus-within {
+    border-color: #4dd0e1;
+    background: rgba(77, 208, 225, 0.06);
+  }
+
+  .input-icon {
+    color: #4dd0e1;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .input-field::placeholder { color: #5a7280; }
+
+  .input-toggle {
+    color: #7a8a92;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* Forgot password link */
+  .forgot-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: -4px;
+    margin-bottom: 16px;
+  }
+
+  .forgot-link {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Primary button (biometria) */
+  .btn-biometric {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .btn-biometric-icon {
+    font-size: 20px;
+  }
+
+  /* Or divider */
+  .or-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0;
+  }
+
+  .or-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .or-text {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  /* Secondary button (senha) */
+  .btn-password {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.08);
+    color: #4dd0e1;
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Footer */
+  .login-footer {
+    text-align: center;
+    color: #5a7280;
+    font-size: 9px;
+    line-height: 1.5;
+    margin-top: auto;
+    padding-top: 20px;
+  }
+
+  .login-footer strong { color: #b0c4cc; }
+
+  /* ===== TELA C: SELEÇÃO DE CÃO ===== */
+
+  .selection-header {
+    padding: 12px 16px 14px 16px;
+    flex-shrink: 0;
+  }
+
+  .selection-greeting {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+  }
+
+  .selection-name {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+
+  .selection-info {
+    color: #7a8a92;
+    font-size: 11px;
+  }
+
+  .selection-info strong {
+    color: #b0c4cc;
+    font-weight: 600;
+  }
+
+  /* Title da lista */
+  .list-header {
+    padding: 12px 16px 8px 16px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .list-title {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .list-count {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Lista de cães */
+  .dogs-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 100px 16px;
+  }
+
+  .dogs-list::-webkit-scrollbar { width: 0; }
+
+  .dog-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .dog-item.titular {
+    background: rgba(77, 208, 225, 0.04);
+    border-color: rgba(77, 208, 225, 0.3);
+    border-left-width: 3px;
+  }
+
+  .dog-item.unfit {
+    opacity: 0.85;
+  }
+
+  .dog-item-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .dog-photo {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .dog-photo.apt { border-color: #2ecc71; color: #2ecc71; }
+  .dog-photo.formation { border-color: #f1c40f; color: #f1c40f; }
+  .dog-photo.unfit { border-color: #e74c3c; color: #e74c3c; }
+
+  .dog-info { flex: 1; min-width: 0; }
+
+  .dog-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
+  .dog-name {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .titular-badge {
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .dog-breed {
+    color: #b0c4cc;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .dog-status-line {
+    color: #7a8a92;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .status-icon-sm {
+    font-size: 10px;
+  }
+
+  /* Status badge grande */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .status-badge.apt {
+    background: rgba(46, 204, 113, 0.1);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.3);
+  }
+
+  .status-badge.warn {
+    background: rgba(241, 196, 15, 0.08);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.3);
+  }
+
+  .status-badge.unfit {
+    background: rgba(231, 76, 60, 0.08);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+  }
+
+  .status-icon {
+    font-size: 12px;
+  }
+
+  /* Pendências */
+  .pendencias {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .pendencia-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .pendencia-icon { font-size: 11px; }
+  .pendencia-icon.warn { color: #f1c40f; }
+  .pendencia-icon.danger { color: #e74c3c; }
+
+  /* Última atividade */
+  .last-activity {
+    color: #5a7280;
+    font-size: 9px;
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  /* Card sticky com botão assumir */
+  .assume-cta {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 22px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .assume-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .assume-btn.unfit {
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.5);
+  }
+
+  .assume-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* SELECTED state */
+  .dog-item.selected {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: #4dd0e1;
+    border-width: 2px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  .lesson-box {
+    background: rgba(77, 208, 225, 0.04);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0;
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .lesson-box strong { color: #4dd0e1; }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: SPLASH ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — SPLASH
+    <small>1-2 segundos enquanto verifica auth e turno</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar light">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="splash-bg">
+      <div class="splash-brasao">
+        <span class="splash-brasao-inner">🛡</span>
+      </div>
+      <div class="splash-title">CANIL K9</div>
+      <div class="splash-subtitle">GCM LIMEIRA-SP</div>
+
+      <div class="loading-dots">
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+      </div>
+
+      <div class="splash-footer">
+        <strong>Sistema Institucional</strong><br>
+        v1.3.0
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA B: LOGIN ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — LOGIN
+    <small>RA + senha · biometria como ação primária</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="login-content">
+      <!-- Brasão menor -->
+      <div class="login-brand">
+        <div class="login-brasao">
+          <span class="login-brasao-inner">🛡</span>
+        </div>
+        <div class="login-brand-title">CANIL K9</div>
+        <div class="login-brand-sub">GCM LIMEIRA-SP</div>
+      </div>
+
+      <!-- Welcome -->
+      <div class="login-welcome">
+        <div class="login-welcome-title">Bem-vindo de volta</div>
+        <div class="login-welcome-sub">Acesse com sua matrícula e senha institucional</div>
+      </div>
+
+      <!-- Form -->
+      <div class="login-form">
+        <!-- RA -->
+        <div class="input-group">
+          <span class="input-icon">🪪</span>
+          <input class="input-field" type="text" placeholder="Matrícula (RA)" value="691755" />
+        </div>
+
+        <!-- Senha -->
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input class="input-field" type="password" placeholder="Senha" value="••••••••" />
+          <span class="input-toggle">👁</span>
+        </div>
+
+        <!-- Esqueci a senha -->
+        <div class="forgot-row">
+          <span class="forgot-link">Esqueci minha senha</span>
+        </div>
+
+        <!-- Botão biometria (primário) -->
+        <button class="btn-biometric">
+          <span class="btn-biometric-icon">👆</span>
+          ENTRAR COM BIOMETRIA
+        </button>
+
+        <!-- Divisor "OU" -->
+        <div class="or-divider">
+          <div class="or-line"></div>
+          <span class="or-text">OU</span>
+          <div class="or-line"></div>
+        </div>
+
+        <!-- Botão entrar com senha -->
+        <button class="btn-password">
+          ENTRAR COM SENHA
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <div class="login-footer">
+        <strong>Acesso restrito a guardas da GCM Limeira</strong><br>
+        Cadastros são feitos pela administração do canil
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA C: SELEÇÃO DE CÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA C — SELEÇÃO DE CÃO / ASSUMIR PLANTÃO
+    <small>Lista vertical · 3 cenários (titular apto, outro condutor, com pendência)</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Saudação -->
+    <div class="selection-header">
+      <div class="selection-greeting">BOA TARDE</div>
+      <div class="selection-name">GCM Ragonha</div>
+      <div class="selection-info">
+        RA 691755 · <strong>14/05/2026 · quarta</strong>
+      </div>
+    </div>
+
+    <!-- Title da lista -->
+    <div class="list-header">
+      <span class="list-title">Selecione o cão</span>
+      <span class="list-count">3 cães no canil</span>
+    </div>
+
+    <!-- Lista -->
+    <div class="dogs-list">
+
+      <!-- Bono (titular, selecionado) -->
+      <div class="dog-item titular selected">
+        <div class="dog-item-top">
+          <div class="dog-photo apt">BONO</div>
+          <div class="dog-info">
+            <div class="dog-name-row">
+              <span class="dog-name">Bono</span>
+              <span class="titular-badge">SEU CÃO</span>
+            </div>
+            <div class="dog-breed">Malinois · 6 anos · 28kg</div>
+            <div class="dog-status-line">
+              <span class="status-icon-sm" style="color:#2ecc71;">●</span>
+              <span>Operacional · 3 especialidades</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-badge apt">
+          <span class="status-icon">✓</span>
+          APTO PARA PLANTÃO
+        </div>
+
+        <div class="last-activity">
+          Última atividade: ontem às 19:30 · GCM Silva (cobrindo)
+        </div>
+      </div>
+
+      <!-- Apolo (titular do GCM Silva, em formação) -->
+      <div class="dog-item">
+        <div class="dog-item-top">
+          <div class="dog-photo formation">APOLO</div>
+          <div class="dog-info">
+            <div class="dog-name-row">
+              <span class="dog-name">Apolo</span>
+            </div>
+            <div class="dog-breed">Malinois · 2 anos · 36kg</div>
+            <div class="dog-status-line">
+              <span class="status-icon-sm" style="color:#f1c40f;">◔</span>
+              <span>Em formação · 1 especialidade</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-badge warn">
+          <span class="status-icon">!</span>
+          APTO COM PENDÊNCIA
+        </div>
+
+        <div class="pendencias">
+          <div class="pendencia-item">
+            <span class="pendencia-icon warn">●</span>
+            <span>Antipulgas vence em 3 dias</span>
+          </div>
+        </div>
+
+        <div class="last-activity">
+          Titular: GCM Silva · Última atividade: hoje 07:00
+        </div>
+      </div>
+
+      <!-- Tor (com pendência crítica) -->
+      <div class="dog-item unfit">
+        <div class="dog-item-top">
+          <div class="dog-photo unfit">TOR</div>
+          <div class="dog-info">
+            <div class="dog-name-row">
+              <span class="dog-name">Tor</span>
+            </div>
+            <div class="dog-breed">Pastor Alemão · 7 anos · 32kg</div>
+            <div class="dog-status-line">
+              <span class="status-icon-sm" style="color:#e74c3c;">⚠</span>
+              <span>Em recuperação</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-badge unfit">
+          <span class="status-icon">⊘</span>
+          NÃO APTO PARA PLANTÃO
+        </div>
+
+        <div class="pendencias">
+          <div class="pendencia-item">
+            <span class="pendencia-icon danger">●</span>
+            <span>Em recuperação de cirurgia (até 25/05)</span>
+          </div>
+          <div class="pendencia-item">
+            <span class="pendencia-icon warn">●</span>
+            <span>Vacina V10 vencida há 12 dias</span>
+          </div>
+        </div>
+
+        <div class="last-activity">
+          Titular: GCM Pereira · Última atividade: há 8 dias
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="assume-cta">
+      <button class="assume-btn">
+        ASSUMIR PLANTÃO COM BONO →
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <div class="lesson-box">
+    <strong>FLUXO DE ENTRADA INSTITUCIONAL:</strong> 3 telas conectadas comunicam seriedade desde o primeiro segundo. Splash neutra (logo + nome), Login simples (RA + senha + biometria), Seleção de cão com transparência sobre status. Sem distrações, sem motivação cafona, sem competição.
+  </div>
+
+  <h3 style="margin-top: 20px;">TELA A — SPLASH</h3>
+  <ul>
+    <li>Fundo escuro com gradient sutil ciano radial</li>
+    <li>Brasão 🛡 grande em círculo centralizado · borda ciano discreta</li>
+    <li><strong>"CANIL K9"</strong> em destaque + <strong>"GCM LIMEIRA-SP"</strong> como subtítulo</li>
+    <li>3 dots animados como loading (suave, não chamativo)</li>
+    <li>Footer: "Sistema Institucional · v1.3.0" — discreto e institucional</li>
+    <li>Dura 1-2 segundos enquanto verifica auth state e turno ativo</li>
+    <li>Decide pra onde ir: login se sem auth · seleção se sem turno · dashboard se com turno</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA B — LOGIN</h3>
+  <ul>
+    <li>Brasão menor no topo · mantém identidade visual da splash</li>
+    <li><strong>"Bem-vindo de volta"</strong> + subtítulo "Acesse com sua matrícula e senha institucional"</li>
+    <li>2 campos: <strong>Matrícula (RA)</strong> + <strong>Senha</strong></li>
+    <li>Ícone à esquerda em cada campo: 🪪 RA + 🔒 senha</li>
+    <li>Toggle 👁 pra mostrar/ocultar senha</li>
+    <li>Link "Esqueci minha senha" alinhado à direita · acima dos botões</li>
+    <li><strong>Botão "ENTRAR COM BIOMETRIA"</strong> em ciano fill grande · ação primária</li>
+    <li>Ícone 👆 (digital) — biometria mais comum em GCM</li>
+    <li>Divisor "OU" entre os dois botões</li>
+    <li><strong>"ENTRAR COM SENHA"</strong> em ciano outline · ação secundária</li>
+    <li>Hierarquia clara: biometria é o caminho rápido · senha é fallback</li>
+    <li>Footer institucional: "Acesso restrito a guardas da GCM Limeira · Cadastros são feitos pela administração do canil"</li>
+    <li>Sem opção de "Criar conta" — coerente com cadastro institucional centralizado</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA C — SELEÇÃO DE CÃO</h3>
+  <ul>
+    <li><strong>Saudação contextual</strong>: "BOA TARDE · GCM Ragonha · RA 691755 · 14/05/2026 · quarta"</li>
+    <li>Saudação muda conforme horário (Bom dia / Boa tarde / Boa noite)</li>
+    <li>Comunica logo de cara: "o app sabe quem você é"</li>
+    <li><strong>Lista vertical de cães</strong> (não carrossel) · suporta crescimento do canil</li>
+    <li>Contador "3 cães no canil" pra contexto rápido</li>
+    <li>3 cenários no mockup demonstram comportamento completo:</li>
+  </ul>
+
+  <h3 style="margin-top: 16px;">CENÁRIO 1 — BONO (TITULAR APTO · SELECIONADO)</h3>
+  <ul>
+    <li>Card em destaque: borda ciano + fundo levemente ciano + selected state</li>
+    <li>Borda lateral mais grossa (3px) marca "TITULAR"</li>
+    <li>Badge "SEU CÃO" em ciano · marca relação especial</li>
+    <li>Foto com borda verde (apto)</li>
+    <li>Status: "● Operacional · 3 especialidades"</li>
+    <li>Badge grande verde: "✓ APTO PARA PLANTÃO"</li>
+    <li>"Última atividade: ontem às 19:30 · GCM Silva (cobrindo)" — informa que outro condutor cobriu</li>
+  </ul>
+
+  <h3 style="margin-top: 16px;">CENÁRIO 2 — APOLO (DE OUTRO CONDUTOR · COM PENDÊNCIA LEVE)</h3>
+  <ul>
+    <li>Card normal · sem destaque de titular</li>
+    <li>Foto com borda amarela (em formação)</li>
+    <li>Status: "◔ Em formação · 1 especialidade"</li>
+    <li>Badge amarelo: "! APTO COM PENDÊNCIA"</li>
+    <li>Lista de pendências em card escuro: "● Antipulgas vence em 3 dias" (amarelo)</li>
+    <li>"Titular: GCM Silva · Última atividade: hoje 07:00" — quem é o titular original + atividade recente</li>
+    <li>Pode assumir normalmente (não bloqueia)</li>
+  </ul>
+
+  <h3 style="margin-top: 16px;">CENÁRIO 3 — TOR (NÃO APTO · RECUPERAÇÃO + VACINA VENCIDA)</h3>
+  <ul>
+    <li>Card com opacidade reduzida (85%) · comunica restrição visualmente</li>
+    <li>Foto com borda vermelha (não apto)</li>
+    <li>Status: "⚠ Em recuperação"</li>
+    <li>Badge vermelho: "⊘ NÃO APTO PARA PLANTÃO"</li>
+    <li>Lista de pendências com 2 itens:
+      <ul style="padding-left: 24px;">
+        <li>"● Em recuperação de cirurgia (até 25/05)" (vermelho)</li>
+        <li>"● Vacina V10 vencida há 12 dias" (amarelo)</li>
+      </ul>
+    </li>
+    <li>"Titular: GCM Pereira · Última atividade: há 8 dias"</li>
+    <li><strong>Permite assumir mesmo assim</strong> · botão muda pra amarelo "ASSUMIR COM PENDÊNCIA" (conforme decisão)</li>
+    <li>Quando assume cão não apto, registro guarda "Assumido com pendências: X, Y, Z" pra trilha de auditoria</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">CTA ASSUMIR PLANTÃO</h3>
+  <ul>
+    <li>Botão sticky no rodapé · sempre visível independente do scroll</li>
+    <li>Texto dinâmico: "ASSUMIR PLANTÃO COM BONO →" · muda conforme cão selecionado</li>
+    <li>Fundo ciano fill quando cão apto</li>
+    <li>Muda pra amarelo "ASSUMIR COM PENDÊNCIA" se cão tem alerta</li>
+    <li>Tap leva direto pro Dashboard (sem confirmação extra, decisão sua)</li>
+    <li>Mas se for cão NÃO APTO, mostra confirmação rápida: "Assumir Tor com pendências críticas?" · sim/cancelar</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">REGRAS TRANSVERSAIS</h3>
+  <ul>
+    <li>Tap em qualquer cão da lista o seleciona · CTA atualiza o nome</li>
+    <li>Lista atualiza automaticamente quando outro condutor encerra um plantão</li>
+    <li>Lista mostra apenas cães <strong>ativos</strong> (não aposentados/doados)</li>
+    <li>Cães em recuperação aparecem mas com status visível</li>
+    <li>Gestor no painel web pode marcar cão como inativo (some da lista) ou marcar pendências</li>
+    <li>Pendências calculadas automaticamente (datas de vacina, antipulgas, exames)</li>
+    <li>Sem opção "Adicionar novo cão" pelo app — cadastro institucional via painel web</li>
+    <li>Histórico de quem assumiu cada plantão é registrado · "cobertura" também é auditável</li>
+  </ul>
+</div>
+
+</body>
+</html>

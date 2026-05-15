@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Treino - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  /* Contexto */
+  .context-bar {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.15);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctx-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .ctx-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ctx-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ctx-time {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .ctx-gps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 500;
+    background: rgba(46, 204, 113, 0.08);
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+
+  .ctx-gps-dot {
+    width: 5px;
+    height: 5px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  /* Scroll content */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 30px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Section label */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  /* Cards de especialidade */
+  .specialty-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .specialty-card:hover {
+    background: rgba(77, 208, 225, 0.04);
+    border-color: rgba(77, 208, 225, 0.25);
+  }
+
+  /* Variantes de estado */
+  .specialty-card.operacional {
+    border-left: 3px solid #2ecc71;
+  }
+
+  .specialty-card.formacao {
+    border-left: 3px solid #f1c40f;
+  }
+
+  .specialty-card.nao-iniciada {
+    border-left: 3px solid rgba(149, 165, 166, 0.3);
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .specialty-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+
+  .specialty-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .specialty-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .specialty-card.operacional .specialty-icon {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .specialty-card.formacao .specialty-icon {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .specialty-card.nao-iniciada .specialty-icon {
+    background: rgba(149, 165, 166, 0.08);
+    color: #95a5a6;
+  }
+
+  .specialty-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .specialty-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .specialty-status {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .specialty-card.operacional .specialty-status {
+    color: #2ecc71;
+  }
+
+  .specialty-card.formacao .specialty-status {
+    color: #f1c40f;
+  }
+
+  .specialty-card.nao-iniciada .specialty-status {
+    color: #95a5a6;
+  }
+
+  /* Status badge */
+  .status-badge {
+    padding: 4px 8px;
+    border-radius: 16px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .status-badge .badge-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+
+  .status-badge.operacional {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.25);
+  }
+
+  .status-badge.operacional .badge-dot {
+    background: #2ecc71;
+  }
+
+  .status-badge.formacao {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.25);
+  }
+
+  .status-badge.formacao .badge-dot {
+    background: #f1c40f;
+  }
+
+  /* Progress info (pra cards em formação) */
+  .progress-info {
+    margin-top: 6px;
+    margin-bottom: 10px;
+  }
+
+  .progress-label {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-label strong {
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f1c40f, #f39c12);
+    border-radius: 2px;
+  }
+
+  /* Meta info do card */
+  .specialty-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .last-session {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .last-session-icon {
+    color: #4dd0e1;
+    font-size: 11px;
+  }
+
+  .specialty-cta {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Card "Não iniciada" - botão Iniciar */
+  .specialty-card.nao-iniciada .specialty-meta {
+    border-top-color: rgba(149, 165, 166, 0.1);
+  }
+
+  .specialty-card.nao-iniciada .last-session {
+    color: #5a7280;
+    font-style: italic;
+  }
+
+  .start-btn {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Alerta de manutenção atrasada */
+  .alert-overdue {
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px solid rgba(231, 76, 60, 0.2);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 10px;
+    font-size: 10px;
+    color: #e74c3c;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Treinos gerais */
+  .general-section {
+    margin-top: 24px;
+  }
+
+  .chips-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .general-chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.15s;
+  }
+
+  .general-chip:hover {
+    background: rgba(77, 208, 225, 0.05);
+    border-color: rgba(77, 208, 225, 0.25);
+  }
+
+  .general-chip-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .general-chip-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .general-chip-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .general-chip-meta {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 30px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+
+  /* Legenda de estados */
+  .legend {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 20px;
+    width: 390px;
+  }
+
+  .legend h4 {
+    color: #4dd0e1;
+    font-size: 11px;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 11px;
+    color: #b0c4cc;
+  }
+
+  .legend-row .status-badge {
+    cursor: default;
+    flex-shrink: 0;
+    width: 110px;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons">
+        <span>4G</span>
+        <span>•••</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR ATIVIDADE</div>
+          <div class="header-main">Treino</div>
+        </div>
+      </div>
+      <div class="context-bar">
+        <div class="ctx-avatar">BONO</div>
+        <div class="ctx-info">
+          <div class="ctx-binomio">Bono · GCM Ragonha</div>
+          <div class="ctx-time">10/05/2026 · 14:32</div>
+        </div>
+        <div class="ctx-gps">
+          <span class="ctx-gps-dot"></span>
+          GPS preciso
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll content -->
+    <div class="scroll-area">
+
+      <!-- ESPECIALIDADES -->
+      <div class="section-label">
+        <span>ESPECIALIDADES</span>
+        <span class="section-label-line"></span>
+      </div>
+
+      <!-- Card: Guarda & Proteção (Operacional) -->
+      <div class="specialty-card operacional">
+        <div class="specialty-header">
+          <div class="specialty-title-row">
+            <div class="specialty-icon">🛡</div>
+            <div class="specialty-info">
+              <div class="specialty-name">Guarda & Proteção</div>
+              <div class="specialty-status">Operacional</div>
+            </div>
+          </div>
+          <div class="status-badge operacional">
+            <span class="badge-dot"></span>
+            ATIVO
+          </div>
+        </div>
+        <div class="specialty-meta">
+          <div class="last-session">
+            <span class="last-session-icon">⏱</span>
+            Última manutenção: há 7 dias
+          </div>
+          <div class="specialty-cta">Registrar manutenção →</div>
+        </div>
+      </div>
+
+      <!-- Card: Busca & Captura (Em formação) -->
+      <div class="specialty-card formacao">
+        <div class="specialty-header">
+          <div class="specialty-title-row">
+            <div class="specialty-icon">🎯</div>
+            <div class="specialty-info">
+              <div class="specialty-name">Busca & Captura</div>
+              <div class="specialty-status">Em formação</div>
+            </div>
+          </div>
+          <div class="status-badge formacao">
+            <span class="badge-dot"></span>
+            FORMAÇÃO
+          </div>
+        </div>
+        <div class="progress-info">
+          <div class="progress-label">
+            <span>Módulo 2 — Indicações estruturais</span>
+            <strong>6/12 marcos</strong>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 50%;"></div>
+          </div>
+        </div>
+        <div class="specialty-meta">
+          <div class="last-session">
+            <span class="last-session-icon">⏱</span>
+            Última sessão: há 3 dias
+          </div>
+          <div class="specialty-cta">Continuar formação →</div>
+        </div>
+      </div>
+
+      <!-- Card: Detecção (Não iniciada) -->
+      <div class="specialty-card nao-iniciada">
+        <div class="specialty-header">
+          <div class="specialty-title-row">
+            <div class="specialty-icon">👃</div>
+            <div class="specialty-info">
+              <div class="specialty-name">Detecção</div>
+              <div class="specialty-status">Não iniciada</div>
+            </div>
+          </div>
+        </div>
+        <div class="specialty-meta">
+          <div class="last-session">
+            Especialidade não iniciada com Bono
+          </div>
+          <button class="start-btn">+ Iniciar formação</button>
+        </div>
+      </div>
+
+      <!-- TREINOS GERAIS -->
+      <div class="general-section">
+        <div class="section-label">
+          <span>TREINOS GERAIS</span>
+          <span class="section-label-line"></span>
+        </div>
+
+        <div class="chips-grid">
+          <div class="general-chip">
+            <div class="general-chip-icon">🎯</div>
+            <div class="general-chip-info">
+              <div class="general-chip-name">Obediência</div>
+              <div class="general-chip-meta">15 comandos · há 2 dias</div>
+            </div>
+          </div>
+          <div class="general-chip">
+            <div class="general-chip-icon">💪</div>
+            <div class="general-chip-info">
+              <div class="general-chip-name">Condicionamento</div>
+              <div class="general-chip-meta">há 5 dias</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Legenda -->
+  <div class="legend">
+    <h4>ESTADOS DAS ESPECIALIDADES</h4>
+    <div class="legend-row">
+      <span class="status-badge operacional"><span class="badge-dot"></span> ATIVO</span>
+      <span>Cão formado · treino de manutenção (registro leve)</span>
+    </div>
+    <div class="legend-row">
+      <span class="status-badge formacao"><span class="badge-dot"></span> FORMAÇÃO</span>
+      <span>Cão em aprendizagem · treino estruturado (registro denso)</span>
+    </div>
+    <div class="legend-row">
+      <span class="status-badge" style="background: rgba(149,165,166,0.1); color:#95a5a6; border:1px solid rgba(149,165,166,0.25);"><span class="badge-dot" style="background:#95a5a6;"></span> NÃO INICIADA</span>
+      <span>Especialidade ainda não trabalhada com este cão</span>
+    </div>
+  </div>
+
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>Especialidades em destaque no topo (cards grandes)</li>
+      <li>3 estados visuais: Operacional (verde) / Formação (amarelo) / Não iniciada (cinza)</li>
+      <li>Barra lateral colorida à esquerda comunica estado de relance</li>
+      <li>Card em formação mostra módulo atual + barra de progresso (6/12 marcos)</li>
+      <li>Card operacional mostra "Última manutenção" (pressão saudável)</li>
+      <li>Card não iniciado tem botão "+ Iniciar formação" claro</li>
+      <li>Apolo veria os 3 cards de especialidade todos no estado "Não iniciada"</li>
+      <li>Treinos gerais (Obediência + Condicionamento) embaixo, em chips compactos</li>
+      <li>Obediência mostra contador de comandos da biblioteca (15)</li>
+      <li>Hierarquia visual reflete a importância: especialidade > treino geral</li>
+      <li>CTA contextual em cada card: Continuar formação / Registrar manutenção / Iniciar</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

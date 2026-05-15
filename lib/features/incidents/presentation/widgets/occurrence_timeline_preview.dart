@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
@@ -51,7 +52,7 @@ class OccurrenceTimelinePreview extends StatelessWidget {
             Expanded(
               child: Text(
                 'REGISTRO OPERACIONAL',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
@@ -68,7 +69,7 @@ class OccurrenceTimelinePreview extends StatelessWidget {
               ),
               child: Text(
                 '${updates.length} evento${updates.length == 1 ? '' : 's'}',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: accent,
                   fontSize: 9,
                   fontWeight: FontWeight.w900,
@@ -95,7 +96,7 @@ class OccurrenceTimelinePreview extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1220).withAlpha(190),
+            color: const Color(0xFF0E1A1F).withAlpha(190),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: accent.withAlpha(70)),
           ),

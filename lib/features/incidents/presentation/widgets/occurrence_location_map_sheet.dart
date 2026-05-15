@@ -55,7 +55,7 @@ class OccurrenceLocationMapSheet extends StatelessWidget {
               Expanded(
                 child: Text(
                   'AJUSTE DO LOCAL',
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: accentColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -90,7 +90,7 @@ class OccurrenceLocationMapSheet extends StatelessWidget {
               ),
               child: Text(
                 'CONFIRMAR LOCAL',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.2,

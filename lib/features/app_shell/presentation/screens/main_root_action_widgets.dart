@@ -15,7 +15,7 @@ class _ActionSheetContent extends StatelessWidget {
           children: [
             Text(
               'CENTRAL DE REGISTRO',
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 color: Colors.cyanAccent.withValues(alpha: 0.8),

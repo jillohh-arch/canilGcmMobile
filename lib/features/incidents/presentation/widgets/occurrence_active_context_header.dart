@@ -18,7 +18,7 @@ class _OccurrenceActiveContextHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'CONTEXTO DA OCORRÊNCIA',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: accentColor,
               fontSize: 10,
               fontWeight: FontWeight.w900,
@@ -31,7 +31,7 @@ class _OccurrenceActiveContextHeader extends StatelessWidget {
           icon: const Icon(Icons.edit_rounded, size: 15),
           label: Text(
             'EDITAR',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.8,

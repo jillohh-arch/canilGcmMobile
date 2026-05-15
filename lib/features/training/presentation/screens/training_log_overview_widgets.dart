@@ -14,7 +14,7 @@ class _TrainingHudHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _hudPanel.withAlpha(235),
         borderRadius: BorderRadius.circular(6),
@@ -31,7 +31,7 @@ class _TrainingHudHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: _hudCyan.withAlpha(90)),
             ),
-            child: const Icon(Icons.timeline_rounded, color: _hudCyan),
+            child: Icon(Icons.timeline_rounded, color: _hudCyan),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -40,7 +40,7 @@ class _TrainingHudHeader extends StatelessWidget {
               children: [
                 Text(
                   'PAINEL DE EVOLUÇÃO',
-                  style: GoogleFonts.oxanium(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -50,7 +50,7 @@ class _TrainingHudHeader extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   lastLabel,
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: Colors.white60,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -60,7 +60,7 @@ class _TrainingHudHeader extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: _hudCyan.withAlpha(16),
               borderRadius: BorderRadius.circular(6),
@@ -68,7 +68,7 @@ class _TrainingHudHeader extends StatelessWidget {
             ),
             child: Text(
               '${sessions.length}',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: _hudCyan,
                 fontWeight: FontWeight.w900,
                 fontSize: 12,
@@ -95,7 +95,7 @@ class _TrainingEvolutionTab extends StatelessWidget {
     final tVM = Provider.of<TrainingViewModel>(context);
 
     if (tVM.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _hudCyan));
+      return Center(child: CircularProgressIndicator(color: _hudCyan));
     }
 
     final sessions = tVM.trainings..sort((a, b) => a.date.compareTo(b.date));
@@ -104,7 +104,7 @@ class _TrainingEvolutionTab extends StatelessWidget {
         .toList();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

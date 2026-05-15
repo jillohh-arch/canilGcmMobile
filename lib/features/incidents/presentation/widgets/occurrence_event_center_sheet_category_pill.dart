@@ -34,7 +34,7 @@ class _EventCategoryPill extends StatelessWidget {
             const SizedBox(width: 7),
             Text(
               category.title.toUpperCase(),
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: selected ? category.color : Colors.white70,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 part 'app_theme_components.dart';
@@ -57,7 +57,7 @@ class AppTheme {
       ).copyWith(
         primary: primary,
         onPrimary: Colors.black,
-        secondary: const Color(0xFF4ECDE4),
+        secondary: AppTheme.primary,
         onSecondary: const Color(0xFF00363F),
         secondaryContainer: const Color(0xFF004E5B),
         onSecondaryContainer: const Color(0xFFB3EEFF),

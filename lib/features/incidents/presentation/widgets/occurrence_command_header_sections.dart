@@ -60,7 +60,7 @@ class _HeaderTitleBlock extends StatelessWidget {
                 _safeNature(nature).toUpperCase(),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -114,7 +114,7 @@ class _OperationalMetricsRow extends StatelessWidget {
             icon: Icons.bolt_rounded,
             title: 'Ações',
             label: '${eventCount ?? 0}',
-            accent: const Color(0xFFFFB84D),
+            accent: AppTheme.warning,
           ),
         ),
       ],

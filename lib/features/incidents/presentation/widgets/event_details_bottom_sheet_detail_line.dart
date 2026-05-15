@@ -28,7 +28,7 @@ class _EventDetailLine extends StatelessWidget {
               children: [
                 Text(
                   label.toUpperCase(),
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: color,
                     fontSize: 9,
                     fontWeight: FontWeight.w900,

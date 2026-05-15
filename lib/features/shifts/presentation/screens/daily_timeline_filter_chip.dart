@@ -20,17 +20,17 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFF00E5FF).withAlpha(30)
+              ? AppTheme.primary.withAlpha(30)
               : _hudPanel.withAlpha(180),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: selected ? const Color(0xFF00E5FF) : const Color(0xFF2A2A2A),
+            color: selected ? AppTheme.primary : const Color(0xFF2A2A2A),
             width: 1,
           ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withAlpha(28),
+                    color: AppTheme.primary.withAlpha(28),
                     blurRadius: 12,
                   ),
                 ]
@@ -38,8 +38,8 @@ class _FilterChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.robotoMono(
-            color: selected ? const Color(0xFF00E5FF) : Colors.white70,
+          style: GoogleFonts.inter(
+            color: selected ? AppTheme.primary : Colors.white70,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             fontSize: 11,
           ),

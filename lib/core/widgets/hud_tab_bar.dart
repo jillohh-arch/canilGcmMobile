@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const _hudBackground = Color(0xFF070B14);
-const _hudCyan = Color(0xFF00E5FF);
+final _hudBackground = AppTheme.background;
+final _hudCyan = AppTheme.primary;
 
 class HudTabBar extends StatelessWidget {
   final TabController? controller;
@@ -33,12 +34,12 @@ class HudTabBar extends StatelessWidget {
         ),
         labelColor: _hudCyan,
         unselectedLabelColor: Colors.white54,
-        labelStyle: GoogleFonts.oxanium(
+        labelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w900,
           fontSize: 11,
           letterSpacing: 0.8,
         ),
-        unselectedLabelStyle: GoogleFonts.oxanium(
+        unselectedLabelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w800,
           fontSize: 11,
           letterSpacing: 0.5,

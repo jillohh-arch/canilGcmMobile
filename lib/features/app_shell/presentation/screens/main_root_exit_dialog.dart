@@ -46,7 +46,7 @@ extension _MainRootExitDialog on _MainRootScreenState {
             child: const Text(
               'Cancelar',
               style: TextStyle(
-                color: Color(0xFF00E5FF),
+                color: AppTheme.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),

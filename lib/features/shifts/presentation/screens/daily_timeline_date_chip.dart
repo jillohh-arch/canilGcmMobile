@@ -21,13 +21,13 @@ class _TimelineDateChip extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF00E5FF).withAlpha(34)
+              ? AppTheme.primary.withAlpha(34)
               : const Color(0xFF0B1020),
           borderRadius: BorderRadius.circular(6),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withAlpha(80),
+                    color: AppTheme.primary.withAlpha(80),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),
@@ -35,7 +35,7 @@ class _TimelineDateChip extends StatelessWidget {
               : [],
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF00E5FF)
+                ? AppTheme.primary
                 : const Color(0x3300E5FF),
           ),
         ),
@@ -44,17 +44,17 @@ class _TimelineDateChip extends StatelessWidget {
           children: [
             Text(
               _timelineWeekdayLabel(date.weekday),
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
-                color: isSelected ? const Color(0xFF00E5FF) : Colors.white38,
+                color: isSelected ? AppTheme.primary : Colors.white38,
                 letterSpacing: 0.8,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '${date.day}',
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: isSelected ? Colors.white : Colors.white70,
@@ -65,7 +65,7 @@ class _TimelineDateChip extends StatelessWidget {
             Container(
               width: 18,
               height: 2,
-              color: isSelected ? const Color(0xFF00E5FF) : Colors.white12,
+              color: isSelected ? AppTheme.primary : Colors.white12,
             ),
           ],
         ),

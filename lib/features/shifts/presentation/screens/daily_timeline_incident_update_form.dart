@@ -28,10 +28,10 @@ extension _DailyTimelineIncidentUpdateForm on _DailyTimelineScreenState {
         decoration: BoxDecoration(
           color: const Color(0xFF0F1923),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF4ECDE4).withAlpha(60)),
+          border: Border.all(color: AppTheme.primary.withAlpha(60)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4ECDE4).withAlpha(15),
+              color: AppTheme.primary.withAlpha(15),
               blurRadius: 24,
               spreadRadius: 2,
             ),

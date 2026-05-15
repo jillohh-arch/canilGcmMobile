@@ -1,4 +1,4 @@
-﻿part of 'hud_controls.dart';
+part of 'hud_controls.dart';
 
 class _HudSelectBottomSheet<T> extends StatelessWidget {
   final String label;
@@ -27,7 +27,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
       margin: const EdgeInsets.all(14),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14),
+        color: AppTheme.background,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: accent.withAlpha(155)),
         boxShadow: [BoxShadow(color: accent.withAlpha(45), blurRadius: 26)],
@@ -52,7 +52,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
               Expanded(
                 child: Text(
                   label.toUpperCase(),
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: accent,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -121,7 +121,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
                         Expanded(
                           child: Text(
                             labelBuilder(item),
-                            style: GoogleFonts.oxanium(
+                            style: GoogleFonts.inter(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w800,

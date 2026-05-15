@@ -16,7 +16,7 @@ extension _DailyTimelineEvolutionScopeCard on _DailyTimelineScreenState {
         children: [
           Text(
             'RECORTE ATUAL',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: _hudCyan.withAlpha(210),
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -26,7 +26,7 @@ extension _DailyTimelineEvolutionScopeCard on _DailyTimelineScreenState {
           const SizedBox(height: 2),
           Text(
             _buildEvolutionScopeHeadline(),
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w900,

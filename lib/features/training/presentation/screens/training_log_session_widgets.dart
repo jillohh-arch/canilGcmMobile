@@ -1,4 +1,4 @@
-﻿part of 'training_log_screen.dart';
+part of 'training_log_screen.dart';
 
 class _SectionHeader extends StatelessWidget {
   final String label;
@@ -11,7 +11,7 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w800,
             color: _hudCyan.withAlpha(210),
@@ -98,7 +98,7 @@ class _SessionCardState extends State<_SessionCard> {
             colors: [
               color.withAlpha(_expanded ? 36 : 22),
               const Color(0xFF0B1020),
-              const Color(0xFF070B14),
+              AppTheme.background,
             ],
           ),
         ),
@@ -142,7 +142,7 @@ class _EmptyTraining extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'Nenhum treino registrado',
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   fontSize: 15,
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -152,7 +152,7 @@ class _EmptyTraining extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Toque em + para adicionar uma sessÃ£o.',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   fontSize: 11,
                   color: Colors.white54,
                   fontWeight: FontWeight.w700,

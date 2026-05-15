@@ -7,13 +7,13 @@ extension _DailyTimelineIncidentUpdateHeader on _DailyTimelineScreenState {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF4ECDE4).withAlpha(25),
+            color: AppTheme.primary.withAlpha(25),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFF4ECDE4).withAlpha(80)),
+            border: Border.all(color: AppTheme.primary.withAlpha(80)),
           ),
           child: const Icon(
             Icons.edit_rounded,
-            color: Color(0xFF4ECDE4),
+            color: AppTheme.primary,
             size: 18,
           ),
         ),
@@ -24,7 +24,7 @@ extension _DailyTimelineIncidentUpdateHeader on _DailyTimelineScreenState {
             children: [
               Text(
                 'ATUALIZAR OCORRÊNCIA',
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,

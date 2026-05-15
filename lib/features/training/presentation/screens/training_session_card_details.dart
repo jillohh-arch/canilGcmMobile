@@ -22,13 +22,13 @@ class _SessionTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = fontFamily == _SessionTagFont.oxanium
-        ? GoogleFonts.oxanium(
+        ? GoogleFonts.inter(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
             color: labelColor,
             letterSpacing: letterSpacing,
           )
-        : GoogleFonts.robotoMono(
+        : GoogleFonts.inter(
             fontSize: fontSize,
             fontWeight: FontWeight.w700,
             color: labelColor,
@@ -69,7 +69,7 @@ class _SessionDateBlock extends StatelessWidget {
       children: [
         Text(
           dateText,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontSize: 10,
             color: Colors.white54,
             fontWeight: FontWeight.w700,
@@ -79,7 +79,7 @@ class _SessionDateBlock extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${session.searchDuration}s',
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               fontSize: 16,
               color: color,
               fontWeight: FontWeight.w900,
@@ -112,7 +112,7 @@ class _SessionStateLine extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             expanded ? 'REGISTRO ABERTO' : 'TOQUE PARA DETALHES',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               fontSize: 9,
               color: expanded ? color : Colors.white38,
               fontWeight: FontWeight.w800,

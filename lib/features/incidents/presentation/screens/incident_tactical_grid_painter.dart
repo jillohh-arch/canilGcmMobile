@@ -4,7 +4,7 @@ class _TacticalGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF4ECDE4).withValues(alpha: 0.025)
+      ..color = AppTheme.primary.withValues(alpha: 0.025)
       ..strokeWidth = 0.5;
     const step = 28.0;
     for (double x = 0; x < size.width; x += step) {

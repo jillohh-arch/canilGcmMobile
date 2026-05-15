@@ -54,12 +54,12 @@ extension _DailyTimelineIncidentUpdateShortcutSection
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF4ECDE4).withAlpha(25)
+              ? AppTheme.primary.withAlpha(25)
               : Colors.white.withAlpha(6),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF4ECDE4).withAlpha(100)
+                ? AppTheme.primary.withAlpha(100)
                 : Colors.white10,
             width: isSelected ? 1.5 : 1,
           ),
@@ -69,7 +69,7 @@ extension _DailyTimelineIncidentUpdateShortcutSection
           style: GoogleFonts.inter(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-            color: isSelected ? const Color(0xFF4ECDE4) : Colors.white54,
+            color: isSelected ? AppTheme.primary : Colors.white54,
           ),
         ),
       ),

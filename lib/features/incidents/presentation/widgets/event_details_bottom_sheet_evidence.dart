@@ -36,7 +36,7 @@ class _EvidencePanel extends StatelessWidget {
         children: [
           Text(
             'EVIDÊNCIAS DO EVENTO',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: accentColor,
               fontSize: 10,
               fontWeight: FontWeight.w900,

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -25,7 +26,7 @@ part 'dog_prontuario_documentos.dart';
 part 'dog_prontuario_eventos.dart';
 
 /// Cores do tema
-const _bgColor = Color(0xFF070B14);
+final _bgColor = AppTheme.background;
 const _cyanAccent = Color(0xFF4DD0E1);
 const _greenAccent = Color(0xFF2ECC71);
 const _yellowAccent = Color(0xFFF1C40F);

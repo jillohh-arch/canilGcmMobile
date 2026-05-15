@@ -62,7 +62,7 @@ class _OccurrenceBackButton extends StatelessWidget {
       ),
       child: Text(
         'VOLTAR',
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           fontWeight: FontWeight.w800,
           letterSpacing: 1.2,
         ),
@@ -93,7 +93,7 @@ class _OccurrenceSaveProgressButton extends StatelessWidget {
       ),
       child: Text(
         'SALVAR ANDAMENTO',
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           fontWeight: FontWeight.w800,
           letterSpacing: 0.8,
         ),

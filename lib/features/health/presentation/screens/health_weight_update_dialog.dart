@@ -9,14 +9,14 @@ class _WeightUpdateDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: const Color(0xFF070B14),
+      backgroundColor: AppTheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
         side: const BorderSide(color: Color(0x9900E5FF)),
       ),
       title: Text(
         'ATUALIZAR PESO',
-        style: GoogleFonts.oxanium(
+        style: GoogleFonts.inter(
           color: Colors.cyanAccent,
           fontSize: 16,
           fontWeight: FontWeight.w900,
@@ -47,7 +47,7 @@ class _WeightUpdateDialog extends StatelessWidget {
             ),
             decoration: InputDecoration(
               suffixText: 'kg',
-              suffixStyle: GoogleFonts.robotoMono(
+              suffixStyle: GoogleFonts.inter(
                 color: Colors.cyanAccent.withValues(alpha: 0.75),
                 fontWeight: FontWeight.w900,
               ),
@@ -73,7 +73,7 @@ class _WeightUpdateDialog extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
           child: Text(
             'CANCELAR',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white54,
               fontWeight: FontWeight.w800,
             ),
@@ -82,7 +82,7 @@ class _WeightUpdateDialog extends StatelessWidget {
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Colors.cyanAccent,
-            foregroundColor: const Color(0xFF070B14),
+            foregroundColor: AppTheme.background,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
             ),
@@ -104,7 +104,7 @@ class _WeightUpdateDialog extends StatelessWidget {
           },
           child: Text(
             'SALVAR',
-            style: GoogleFonts.robotoMono(fontWeight: FontWeight.w900),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w900),
           ),
         ),
       ],

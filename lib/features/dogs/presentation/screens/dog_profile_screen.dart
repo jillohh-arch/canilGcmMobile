@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -15,12 +16,12 @@ part 'dog_profile_aptitude_section.dart';
 part 'dog_profile_recent_records.dart';
 part 'dog_profile_observations.dart';
 
-const _bgColor = Color(0xFF070B14);
-const _panelColor = Color(0xFF0B1220);
-const _cyan = Color(0xFF00E5FF);
+final _bgColor = AppTheme.background;
+const _panelColor = const Color(0xFF0E1A1F);
+final _cyan = AppTheme.primary;
 const _green = Color(0xFF00E58A);
 const _amber = Color(0xFFFBBF24);
-const _danger = Color(0xFFFF3B6B);
+final _danger = AppTheme.error;
 const _purple = Color(0xFFAB47BC);
 
 class DogProfileScreen extends StatefulWidget {
@@ -117,7 +118,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
           backgroundColor: _bgColor,
           pinned: true,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: _cyan, size: 20),
+            icon: Icon(Icons.arrow_back_ios_new, color: _cyan, size: 20),
             onPressed: () => Navigator.of(context).pop(),
           ),
           centerTitle: true,
@@ -131,7 +132,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.edit_outlined, color: _cyan, size: 20),
+              icon: Icon(Icons.edit_outlined, color: _cyan, size: 20),
               onPressed: () {
                 // TODO: abrir tela de edição
               },
@@ -141,7 +142,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         // Hero card
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: _loading
                 ? _buildShimmer()
                 : _HeroCard(
@@ -153,14 +154,14 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         // Dados gerais
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _GeneralDataSection(dog: widget.dog),
           ),
         ),
         // Saúde
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _HealthSection(
               dog: widget.dog,
               vaccines: _vaccines,
@@ -171,7 +172,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         // Aptidão operacional
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _AptitudeSection(
               aptitudes: _aptitudes,
               specialties: widget.dog.specialties,
@@ -182,7 +183,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         // Últimos registros
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _RecentRecordsSection(
               records: _recentRecords,
               loading: _loading,
@@ -192,7 +193,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         // Observações
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 100),
             child: _ObservationsSection(
               observacoes: widget.dog.observacoes,
             ),
@@ -210,7 +211,7 @@ class _DogProfileScreenState extends State<DogProfileScreen> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _cyan.withAlpha(30)),
       ),
-      child: const Center(
+      child: Center(
         child: SizedBox(
           width: 24,
           height: 24,

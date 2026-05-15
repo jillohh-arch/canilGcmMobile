@@ -63,13 +63,13 @@ class _IncidentFormScreenState extends State<IncidentFormScreen>
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(
-          'OcorrÃªncias',
+          'Ocorrências',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: const Color(0xFF4ECDE4),
-          labelColor: const Color(0xFF4ECDE4),
+          indicatorColor: AppTheme.primary,
+          labelColor: AppTheme.primary,
           unselectedLabelColor: cs.onSurfaceVariant,
           labelStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w700,

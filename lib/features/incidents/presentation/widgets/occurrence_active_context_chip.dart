@@ -38,7 +38,7 @@ class _OccurrenceContextChip extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '$label: ',
-                    style: GoogleFonts.robotoMono(
+                    style: GoogleFonts.inter(
                       color: Colors.white54,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,

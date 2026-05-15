@@ -17,15 +17,15 @@ class _NarrationButton extends StatelessWidget {
       label: Text(listening ? 'PARAR NARRAÇÃO' : 'NARRAÇÃO'),
       style: OutlinedButton.styleFrom(
         foregroundColor: listening
-            ? const Color(0xFFFF3B5C)
-            : const Color(0xFF00E5FF),
+            ? AppTheme.error
+            : AppTheme.primary,
         side: BorderSide(
           color: listening
-              ? const Color(0xFFFF3B5C).withAlpha(145)
-              : const Color(0xFF00E5FF).withAlpha(145),
+              ? AppTheme.error.withAlpha(145)
+              : AppTheme.primary.withAlpha(145),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        textStyle: GoogleFonts.robotoMono(
+        textStyle: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.2,

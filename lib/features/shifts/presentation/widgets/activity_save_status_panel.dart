@@ -29,7 +29,7 @@ class ActivitySaveStatusPanel extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withAlpha(235),
+        color: AppTheme.background.withAlpha(235),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: statusColor.withAlpha(150)),
         boxShadow: [

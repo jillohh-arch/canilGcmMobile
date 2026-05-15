@@ -20,7 +20,7 @@ class _IncidentNatureField extends StatelessWidget {
       children: [
         Text(
           'NATUREZA DA OCORRÊNCIA',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w800,
             color: Colors.white54,
@@ -32,8 +32,8 @@ class _IncidentNatureField extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           natures: OccurrenceNatureSeed.items,
-          panelColor: const Color(0xFF0B1220),
-          accent: const Color(0xFF00E5FF),
+          panelColor: const Color(0xFF0E1A1F),
+          accent: AppTheme.primary,
           onSelected: onSelected,
           onChanged: onChanged,
           fieldBuilder: (context, controller, focusNode, onChanged) {
@@ -72,18 +72,18 @@ class _IncidentNatureTextField extends StatelessWidget {
         hintStyle: GoogleFonts.inter(color: Colors.white24, fontSize: 14),
         prefixIcon: const Icon(
           Icons.radar_rounded,
-          color: Color(0xFF00E5FF),
+          color: AppTheme.primary,
           size: 20,
         ),
         filled: true,
-        fillColor: const Color(0xFF0B1220),
+        fillColor: const Color(0xFF0E1A1F),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF00E5FF)),
+          borderSide: const BorderSide(color: AppTheme.primary),
         ),
       ),
     );

@@ -42,7 +42,7 @@ class _IdleButtonLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.robotoMono(
+      style: GoogleFonts.inter(
         fontWeight: FontWeight.w900,
         color: color,
         fontSize: 15,

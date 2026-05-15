@@ -10,10 +10,10 @@ class _SavingNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF082031),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF00E5FF).withAlpha(110)),
+        border: Border.all(color: AppTheme.primary.withAlpha(110)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00E5FF).withAlpha(24),
+            color: AppTheme.primary.withAlpha(24),
             blurRadius: 16,
           ),
         ],
@@ -25,7 +25,7 @@ class _SavingNotice extends StatelessWidget {
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Color(0xFF00E5FF),
+              color: AppTheme.primary,
             ),
           ),
           const SizedBox(width: 12),
@@ -52,7 +52,7 @@ class _EvidenceNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1220),
+        color: const Color(0xFF0E1A1F),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white12),
       ),

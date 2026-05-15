@@ -44,7 +44,7 @@ class _OccurrenceTopBar extends StatelessWidget {
                 Text(
                   'K9 - COMANDO',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: accentColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -104,7 +104,7 @@ class _OccurrenceTopBarStatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           color: accentColor,
           fontSize: 12,
           fontWeight: FontWeight.w900,

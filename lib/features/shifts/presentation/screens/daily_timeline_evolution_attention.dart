@@ -15,7 +15,7 @@ extension _DailyTimelineEvolutionAttention on _DailyTimelineScreenState {
               _selectedTrainingFilter == null
                   ? 'ATENÇÃO DO PERÍODO'
                   : 'ATENÇÃO EM ${_selectedTrainingFilter!.toUpperCase()}',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: _hudCyan.withAlpha(210),
                 fontSize: 10,
                 fontWeight: FontWeight.w800,

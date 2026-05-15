@@ -70,7 +70,7 @@ class _NameLabel extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             color: Colors.white,
             fontSize: 17,
             fontWeight: FontWeight.w900,
@@ -81,7 +81,7 @@ class _NameLabel extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: accent,
             fontSize: 9,
             fontWeight: FontWeight.w900,
@@ -120,7 +120,7 @@ class _Avatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: Container(
-          color: const Color(0xFF0B1220),
+          color: const Color(0xFF0E1A1F),
           child: imageUrl != null && imageUrl!.trim().isNotEmpty
               ? Image.network(
                   imageUrl!,

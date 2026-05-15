@@ -1,4 +1,4 @@
-﻿part of 'training_log_screen.dart';
+part of 'training_log_screen.dart';
 
 class _ChartSection extends StatelessWidget {
   final String title;
@@ -25,7 +25,7 @@ class _ChartSection extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w800,
               color: _hudCyan,

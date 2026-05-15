@@ -35,7 +35,7 @@ extension _DailyTimelineEvolutionChartLegend on _DailyTimelineScreenState {
           const SizedBox(width: 6),
           Text(
             label,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white70,
               fontSize: 11,
               fontWeight: FontWeight.w700,

@@ -16,10 +16,10 @@ class _NewIncidentHero extends StatelessWidget {
           height: 140,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF00E5FF), width: 3),
+            border: Border.all(color: AppTheme.primary, width: 3),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                color: AppTheme.primary.withValues(alpha: 0.2),
                 blurRadius: 16,
                 spreadRadius: 2,
               ),
@@ -39,7 +39,7 @@ class _NewIncidentHero extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           (dog?.name?.toString() ?? 'K9').toUpperCase(),
-          style: GoogleFonts.oxanium(
+          style: GoogleFonts.inter(
             fontSize: 28,
             fontWeight: FontWeight.w900,
             color: Colors.white,
@@ -65,18 +65,18 @@ class _IncidentActiveShiftBadge extends StatelessWidget {
           width: 8,
           height: 8,
           decoration: const BoxDecoration(
-            color: Color(0xFF00F5A0),
+            color: AppTheme.success,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Color(0xFF00F5A0), blurRadius: 8)],
+            boxShadow: [BoxShadow(color: AppTheme.success, blurRadius: 8)],
           ),
         ),
         const SizedBox(width: 8),
         Text(
           'TURNO ATIVO',
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF00F5A0),
+            color: AppTheme.success,
             letterSpacing: 1.5,
           ),
         ),

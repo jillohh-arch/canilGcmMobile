@@ -25,7 +25,7 @@ class _OccurrenceNatureOptionTexts extends StatelessWidget {
           option.group,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.robotoMono(
+          style: GoogleFonts.inter(
             color: Colors.white.withAlpha(115),
             fontSize: 9,
             fontWeight: FontWeight.w700,

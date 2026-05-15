@@ -33,11 +33,11 @@ extension _DailyTimelineIncidentUpdateActions on _DailyTimelineScreenState {
             onPressed: onSave,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF004E5B),
-              foregroundColor: const Color(0xFF4ECDE4),
+              foregroundColor: AppTheme.primary,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
-                side: const BorderSide(color: Color(0xFF4ECDE4), width: 1),
+                side: const BorderSide(color: AppTheme.primary, width: 1),
               ),
             ),
             child: Text(

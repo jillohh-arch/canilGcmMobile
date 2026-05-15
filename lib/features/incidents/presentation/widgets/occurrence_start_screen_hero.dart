@@ -27,7 +27,7 @@ class _OccurrenceStartHero extends StatelessWidget {
           Text(
             dogName.toUpperCase(),
             textAlign: TextAlign.center,
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 30,
               fontWeight: FontWeight.w900,
@@ -38,7 +38,7 @@ class _OccurrenceStartHero extends StatelessWidget {
           const _OccurrenceStatusPill(
             icon: Icons.circle,
             label: 'TURNO ATIVO',
-            color: Color(0xFF00F5A0),
+            color: AppTheme.success,
           ),
         ],
       ),
@@ -113,7 +113,7 @@ class _OccurrenceStatusPill extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             label,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: color,
               fontSize: 10,
               fontWeight: FontWeight.w900,

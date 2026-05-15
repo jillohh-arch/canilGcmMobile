@@ -43,7 +43,7 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
                   scopeLabel == null
                       ? 'COMPARATIVO SEMANAL'
                       : 'COMPARATIVO DE ${scopeLabel.toUpperCase()}',
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.inter(
                     color: accent.withAlpha(220),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -58,7 +58,7 @@ extension _DailyTimelineEvolutionWeekComparison on _DailyTimelineScreenState {
                     isDown: style.isDown,
                     scopeText: scopeText,
                   ),
-                  style: GoogleFonts.oxanium(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w800,

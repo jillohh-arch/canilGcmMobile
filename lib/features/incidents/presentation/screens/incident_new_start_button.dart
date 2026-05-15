@@ -15,8 +15,8 @@ class _IncidentStartButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: vm.isLoading ? null : onPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E5FF),
-              foregroundColor: const Color(0xFF070B14),
+              backgroundColor: AppTheme.primary,
+              foregroundColor: AppTheme.background,
               elevation: 0,
               shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(
@@ -28,7 +28,7 @@ class _IncidentStartButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                    color: AppTheme.primary.withValues(alpha: 0.5),
                     blurRadius: 20,
                     offset: const Offset(0, 4),
                   ),
@@ -36,7 +36,7 @@ class _IncidentStartButton extends StatelessWidget {
               ),
               child: Center(
                 child: vm.isLoading
-                    ? const CircularProgressIndicator(color: Color(0xFF070B14))
+                    ? const CircularProgressIndicator(color: AppTheme.background)
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -44,7 +44,7 @@ class _IncidentStartButton extends StatelessWidget {
                           const SizedBox(width: 12),
                           Text(
                             'INICIAR OCORRÊNCIA',
-                            style: GoogleFonts.oxanium(
+                            style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.5,

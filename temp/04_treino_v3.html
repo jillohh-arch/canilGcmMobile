@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registrar Treino - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  /* Contexto compacto */
+  .context-bar {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.15);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctx-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .ctx-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ctx-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ctx-time {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .ctx-gps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 500;
+    background: rgba(46, 204, 113, 0.08);
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+
+  .ctx-gps-dot {
+    width: 5px;
+    height: 5px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  /* Chips de modalidade */
+  .chips-section {
+    padding: 14px 16px 4px 16px;
+    flex-shrink: 0;
+  }
+
+  .chips-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .chips-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chips-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .chip {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .chip.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  .chip-icon {
+    font-size: 13px;
+  }
+
+  /* Form scroll */
+  .form-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  .form-scroll::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* Section header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .section-action {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* Sub-chips de categoria de comando */
+  .subchips-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin: 0 -16px 14px -16px;
+    padding: 0 16px 6px 16px;
+  }
+
+  .subchips-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .subchip {
+    flex-shrink: 0;
+    padding: 6px 11px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  .subchip.active {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: rgba(77, 208, 225, 0.4);
+    color: #4dd0e1;
+  }
+
+  .subchip-count {
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  /* Lista de comandos */
+  .commands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .command-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .command-item.checked {
+    background: rgba(77, 208, 225, 0.1);
+    border-color: #4dd0e1;
+  }
+
+  .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: transparent;
+    flex-shrink: 0;
+  }
+
+  .command-item.checked .check-circle {
+    background: #4dd0e1;
+    border-color: #4dd0e1;
+    color: #050d10;
+  }
+
+  .command-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .command-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .command-desc {
+    color: #5a7280;
+    font-size: 11px;
+  }
+
+  .stage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .stage-icon {
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .stage-1 { background: rgba(149, 165, 166, 0.1); color: #95a5a6; border: 1px solid rgba(149, 165, 166, 0.25); }
+  .stage-2 { background: rgba(241, 196, 15, 0.1); color: #f1c40f; border: 1px solid rgba(241, 196, 15, 0.25); }
+  .stage-3 { background: rgba(230, 126, 34, 0.1); color: #e67e22; border: 1px solid rgba(230, 126, 34, 0.25); }
+  .stage-4 { background: rgba(52, 152, 219, 0.1); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.25); }
+  .stage-5 { background: rgba(46, 204, 113, 0.1); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.25); }
+
+  /* Botão adicionar comando */
+  .add-command-btn {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px dashed rgba(77, 208, 225, 0.4);
+    border-radius: 10px;
+    padding: 12px;
+    color: #4dd0e1;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+
+  /* Banner info */
+  .info-banner {
+    background: rgba(77, 208, 225, 0.05);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #b0c4cc;
+    line-height: 1.5;
+  }
+
+  .info-banner strong {
+    color: #4dd0e1;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 18px;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .field-label-text {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .field-optional {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  textarea.field-input {
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  /* Toggle */
+  .toggle-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .toggle-option {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .toggle-option.active {
+    background: rgba(77, 208, 225, 0.12);
+    color: #4dd0e1;
+  }
+
+  /* Rating */
+  .rating-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .rating-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .rating-btn.active {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* GALERIA DE FOTOS */
+  .photos-section {
+    margin-bottom: 18px;
+  }
+
+  .photos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .photo-slot {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .photo-existing {
+    background: #1a2a30;
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .photo-time-overlay {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .photo-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    background: rgba(231, 76, 60, 0.9);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .photo-add {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(77, 208, 225, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    gap: 4px;
+  }
+
+  .photo-add:hover {
+    background: rgba(77, 208, 225, 0.06);
+    border-color: rgba(77, 208, 225, 0.5);
+  }
+
+  .photo-add-icon {
+    font-size: 22px;
+  }
+
+  .photo-add-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #5a7280;
+    letter-spacing: 0.5px;
+  }
+
+  .photos-helper {
+    font-size: 11px;
+    color: #5a7280;
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .photos-helper-icon {
+    color: #4dd0e1;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* Save bar */
+  .save-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 16px 20px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 30px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons">
+        <span>4G</span>
+        <span>•••</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">REGISTRAR ATIVIDADE</div>
+          <div class="header-main">Treino</div>
+        </div>
+      </div>
+      <div class="context-bar">
+        <div class="ctx-avatar">BONO</div>
+        <div class="ctx-info">
+          <div class="ctx-binomio">Bono · GCM Ragonha</div>
+          <div class="ctx-time">10/05/2026 · 14:32</div>
+        </div>
+        <div class="ctx-gps">
+          <span class="ctx-gps-dot"></span>
+          GPS preciso
+        </div>
+      </div>
+    </div>
+
+    <!-- Modalidade chips -->
+    <div class="chips-section">
+      <div class="chips-label">MODALIDADE</div>
+      <div class="chips-row">
+        <div class="chip active">
+          <span class="chip-icon">🎯</span>
+          Obediência
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🔍</span>
+          Busca
+        </div>
+        <div class="chip">
+          <span class="chip-icon">🛡</span>
+          Proteção
+        </div>
+        <div class="chip">
+          <span class="chip-icon">👃</span>
+          Faro
+        </div>
+        <div class="chip">
+          <span class="chip-icon">💪</span>
+          Condicionamento
+        </div>
+      </div>
+    </div>
+
+    <!-- Form scroll -->
+    <div class="form-scroll">
+
+      <div class="info-banner">
+        <strong>Biblioteca do Bono.</strong> Toque no comando pra marcar como treinado nesta sessão. Toque no estágio pra atualizar progresso.
+      </div>
+
+      <div class="section-header">
+        <span class="section-label">COMANDOS TREINADOS HOJE</span>
+        <span class="section-action">⚙ Gerenciar</span>
+      </div>
+
+      <div class="subchips-row">
+        <div class="subchip active">Todos <span class="subchip-count">15</span></div>
+        <div class="subchip">Operacionais <span class="subchip-count">7</span></div>
+        <div class="subchip">Posicionais <span class="subchip-count">2</span></div>
+        <div class="subchip">Posturais <span class="subchip-count">3</span></div>
+        <div class="subchip">Habilidades <span class="subchip-count">3</span></div>
+      </div>
+
+      <!-- Lista resumida pra dar mais espaço pra galeria -->
+      <div class="commands-list">
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Senta</div>
+            <div class="command-desc">Operacional</div>
+          </div>
+          <span class="stage-badge stage-5"><span class="stage-icon">●</span> Operacional</span>
+        </div>
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Hop</div>
+            <div class="command-desc">Sobe em mesa/cadeira</div>
+          </div>
+          <span class="stage-badge stage-3"><span class="stage-icon">◑</span> Em desenvolvimento</span>
+        </div>
+        <div class="command-item checked">
+          <span class="check-circle">✓</span>
+          <div class="command-info">
+            <div class="command-name">Parkour</div>
+            <div class="command-desc">Anda de lado na parede</div>
+          </div>
+          <span class="stage-badge stage-2"><span class="stage-icon">◔</span> Introduzido</span>
+        </div>
+      </div>
+
+      <button class="add-command-btn">+ Adicionar comando à biblioteca</button>
+
+      <!-- Duração + Condução -->
+      <div class="field-row">
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">DURAÇÃO</span>
+          </div>
+          <input class="field-input" placeholder="Ex: 25 min" value="25 min" />
+        </div>
+        <div>
+          <div class="field-label">
+            <span class="field-label-text">CONDUÇÃO</span>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-option active">Com guia</div>
+            <div class="toggle-option">Sem guia</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desempenho -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">DESEMPENHO GERAL DA SESSÃO</span>
+        </div>
+        <div class="rating-row">
+          <div class="rating-btn">Ruim</div>
+          <div class="rating-btn">Regular</div>
+          <div class="rating-btn active">Bom</div>
+          <div class="rating-btn">Ótimo</div>
+        </div>
+      </div>
+
+      <!-- ===== GALERIA DE FOTOS ===== -->
+      <div class="photos-section">
+        <div class="field-label">
+          <span class="field-label-text">📷 FOTOS DA SESSÃO</span>
+          <span class="field-optional">opcional · até 6 fotos</span>
+        </div>
+
+        <div class="photos-grid">
+          <div class="photo-slot photo-existing">
+            <span>FOTO 1</span>
+            <span class="photo-remove">✕</span>
+            <div class="photo-time-overlay">14:35 · GPS</div>
+          </div>
+          <div class="photo-slot photo-existing">
+            <span>FOTO 2</span>
+            <span class="photo-remove">✕</span>
+            <div class="photo-time-overlay">14:42 · GPS</div>
+          </div>
+          <div class="photo-slot photo-add">
+            <span class="photo-add-icon">📷</span>
+            <span class="photo-add-label">+ FOTO</span>
+          </div>
+        </div>
+
+        <div class="photos-helper">
+          <span class="photos-helper-icon">💡</span>
+          <span>Fotos preservam timestamp e GPS originais. Úteis pra documentar evolução do K9 ao longo do tempo.</span>
+        </div>
+      </div>
+
+      <!-- Observação -->
+      <div class="field-group">
+        <div class="field-label">
+          <span class="field-label-text">OBSERVAÇÕES</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <textarea class="field-input" placeholder="Avanços, dificuldades, pontos pra próxima sessão..."></textarea>
+      </div>
+
+    </div>
+
+    <!-- Save -->
+    <div class="save-bar">
+      <button class="btn-cancel">Cancelar</button>
+      <button class="btn-save">💾 SALVAR TREINO</button>
+    </div>
+
+  </div>
+
+  <div class="design-notes">
+    <h3>SEÇÃO DE FOTOS</h3>
+    <ul>
+      <li>Grid de 3 colunas (combina com layout dos sub-cards)</li>
+      <li>Fotos existentes com timestamp + GPS embutidos no rodapé</li>
+      <li>Botão ✕ vermelho discreto no canto pra remover foto</li>
+      <li>Slot "+ FOTO" sempre visível pra adicionar</li>
+      <li>Limite de 6 fotos por sessão (controla custo de storage)</li>
+      <li>Helper text reforça função institucional ("documentar evolução")</li>
+      <li>Sem suporte a vídeo no MVP (decisão consciente sobre custo)</li>
+      <li>EXIF preservado pra integridade forense</li>
+      <li>Vídeo fica como evolução futura (compressão agressiva ou link YouTube)</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

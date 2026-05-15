@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 import 'package:canil_gcm/core/widgets/activity_weather_button.dart';
 import 'package:canil_gcm/core/widgets/hud_chip_group.dart';

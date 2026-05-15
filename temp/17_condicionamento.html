@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Condicionamento Físico - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.12);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text { flex: 1; }
+
+  .header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(77, 208, 225, 0.12);
+    color: #4dd0e1;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Status do cão */
+  .dog-status {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ds-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .ds-info { flex: 1; }
+
+  .ds-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ds-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  /* Scroll */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label:first-of-type { margin-top: 4px; }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* Resumo semanal */
+  .week-summary {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.06), rgba(46, 204, 113, 0.03));
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 4px;
+  }
+
+  .ws-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .ws-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .ws-stat {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+
+  .ws-stat-value {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .ws-stat-unit {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 2px;
+  }
+
+  .ws-stat-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Cards de exercícios */
+  .exercises-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .exercise-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    padding: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: all 0.15s;
+    min-height: 76px;
+  }
+
+  .exercise-card:hover {
+    background: rgba(77, 208, 225, 0.04);
+    border-color: rgba(77, 208, 225, 0.3);
+  }
+
+  .exercise-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .exercise-icon {
+    font-size: 18px;
+    width: 28px;
+    height: 28px;
+    background: rgba(77, 208, 225, 0.08);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .exercise-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    flex: 1;
+    line-height: 1.2;
+  }
+
+  .exercise-meta {
+    color: #7a8a92;
+    font-size: 9px;
+    margin-top: auto;
+  }
+
+  /* Categorias */
+  .cat-header {
+    color: #7a8a92;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-top: 14px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .cat-header:first-of-type { margin-top: 0; }
+
+  /* Sessões recentes */
+  .recent-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .recent-date {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 700;
+    width: 42px;
+    flex-shrink: 0;
+  }
+
+  .recent-icon {
+    width: 30px;
+    height: 30px;
+    background: rgba(77, 208, 225, 0.1);
+    color: #4dd0e1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .recent-info { flex: 1; min-width: 0; }
+
+  .recent-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .recent-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .recent-tag {
+    color: #2ecc71;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 3px 6px;
+    background: rgba(46, 204, 113, 0.1);
+    border-radius: 6px;
+  }
+
+  .recent-tag.gps {
+    color: #4dd0e1;
+    background: rgba(77, 208, 225, 0.1);
+  }
+
+  /* ===== TELA B: NOVA SESSÃO ===== */
+
+  /* Exercise selector compacto no topo */
+  .exercise-selected {
+    background: rgba(77, 208, 225, 0.06);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .exercise-selected-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .exercise-selected-info { flex: 1; }
+
+  .exercise-selected-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+  }
+
+  .exercise-selected-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .exercise-selected-change {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Field groups */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Inputs duplos (duração + distância) */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .field-input-wrap {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field-input-num {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: inherit;
+    text-align: right;
+    outline: none;
+    width: 100%;
+  }
+
+  .field-input-unit {
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .field-input-key {
+    color: #7a8a92;
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  /* Toggle GPS */
+  .tracker-toggle {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tracker-toggle.active {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: rgba(77, 208, 225, 0.4);
+  }
+
+  .tracker-icon-big {
+    width: 36px;
+    height: 36px;
+    background: rgba(77, 208, 225, 0.15);
+    color: #4dd0e1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .tracker-info { flex: 1; }
+
+  .tracker-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .tracker-desc {
+    color: #7a8a92;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .switch {
+    width: 42px;
+    height: 24px;
+    background: #4dd0e1;
+    border-radius: 12px;
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .switch.off {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .switch-handle {
+    width: 18px;
+    height: 18px;
+    background: #050d10;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    transition: all 0.2s;
+  }
+
+  .switch.off .switch-handle {
+    right: 21px;
+  }
+
+  /* Intensidade chips */
+  .intensity-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .intensity-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 4px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .intensity-btn.selected.leve {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  .intensity-btn.selected.moderada {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .intensity-btn.selected.intensa {
+    background: rgba(231, 76, 60, 0.12);
+    border-color: #e74c3c;
+    color: #e74c3c;
+  }
+
+  /* Condição pós-treino */
+  .condition-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .condition-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 4px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .condition-btn.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Observações */
+  .obs-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .obs-input::placeholder { color: #5a7280; }
+
+  /* Card de aviso (lesão = saúde) */
+  .health-link-card {
+    background: rgba(231, 76, 60, 0.04);
+    border-left: 3px solid rgba(231, 76, 60, 0.5);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .health-link-icon {
+    color: #e74c3c;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .health-link-content { flex: 1; }
+
+  .health-link-title {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .health-link-text {
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .health-link-arrow {
+    color: #5a7280;
+    font-size: 12px;
+  }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .cta-btn.tracker {
+    background: #2ecc71;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: VISÃO GERAL DE CONDICIONAMENTO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — VISÃO GERAL DE CONDICIONAMENTO
+    <small>Resumo semanal + catálogo de exercícios + sessões recentes</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">TREINO CONTÍNUO</div>
+          <div class="header-main">Condicionamento Físico</div>
+        </div>
+        <div class="header-icon">💪</div>
+      </div>
+
+      <div class="dog-status">
+        <div class="ds-avatar">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">Última sessão há 2 dias · 142 sessões totais</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll -->
+    <div class="scroll-area">
+
+      <!-- Resumo semanal -->
+      <div class="week-summary">
+        <div class="ws-title">📊 ESTA SEMANA</div>
+        <div class="ws-grid">
+          <div class="ws-stat">
+            <div class="ws-stat-value">8</div>
+            <div class="ws-stat-label">SESSÕES</div>
+          </div>
+          <div class="ws-stat">
+            <div class="ws-stat-value">3<span class="ws-stat-unit">h</span></div>
+            <div class="ws-stat-label">TEMPO</div>
+          </div>
+          <div class="ws-stat">
+            <div class="ws-stat-value">12<span class="ws-stat-unit">km</span></div>
+            <div class="ws-stat-label">DISTÂNCIA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercícios disponíveis -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>EXERCÍCIOS</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-help">tap pra registrar</span>
+      </div>
+
+      <!-- CARDIOVASCULAR -->
+      <div class="cat-header">CARDIOVASCULAR</div>
+      <div class="exercises-grid">
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🚶</span>
+            <span class="exercise-name">Passeio</span>
+          </div>
+          <div class="exercise-meta">Última: hoje 07:00</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🏃</span>
+            <span class="exercise-name">Esteira</span>
+          </div>
+          <div class="exercise-meta">Última: há 3 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🪂</span>
+            <span class="exercise-name">Paraquedas</span>
+          </div>
+          <div class="exercise-meta">Última: há 5 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🏊</span>
+            <span class="exercise-name">Natação</span>
+          </div>
+          <div class="exercise-meta">Última: há 12 dias</div>
+        </div>
+      </div>
+
+      <!-- FORÇA -->
+      <div class="cat-header">FORÇA</div>
+      <div class="exercises-grid">
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🏋</span>
+            <span class="exercise-name">Tração c/ peso</span>
+          </div>
+          <div class="exercise-meta">Última: há 4 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🪢</span>
+            <span class="exercise-name">Tração elástica</span>
+          </div>
+          <div class="exercise-meta">Última: há 2 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🧗</span>
+            <span class="exercise-name">Escalada</span>
+          </div>
+          <div class="exercise-meta">Última: há 8 dias</div>
+        </div>
+      </div>
+
+      <!-- AGILIDADE / PLIOMETRIA -->
+      <div class="cat-header">AGILIDADE E PLIOMETRIA</div>
+      <div class="exercises-grid">
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">⚽</span>
+            <span class="exercise-name">Bolinha em campo</span>
+          </div>
+          <div class="exercise-meta">Última: há 1 dia</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">📐</span>
+            <span class="exercise-name">A-Frame</span>
+          </div>
+          <div class="exercise-meta">Última: há 6 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">⬆</span>
+            <span class="exercise-name">Salto altura</span>
+          </div>
+          <div class="exercise-meta">Última: há 3 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">↔</span>
+            <span class="exercise-name">Salto distância</span>
+          </div>
+          <div class="exercise-meta">Última: há 7 dias</div>
+        </div>
+        <div class="exercise-card">
+          <div class="exercise-card-top">
+            <span class="exercise-icon">🔢</span>
+            <span class="exercise-name">Cavaletes</span>
+          </div>
+          <div class="exercise-meta">Última: há 4 dias</div>
+        </div>
+        <div class="exercise-card" style="border-style: dashed; border-color: rgba(77,208,225,0.3); background: rgba(77,208,225,0.02);">
+          <div class="exercise-card-top">
+            <span class="exercise-icon" style="background:rgba(77,208,225,0.05);">+</span>
+            <span class="exercise-name" style="color:#4dd0e1;">Outro</span>
+          </div>
+          <div class="exercise-meta">Personalizado</div>
+        </div>
+      </div>
+
+      <!-- Sessões recentes -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>SESSÕES RECENTES</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">12/05</div>
+        <div class="recent-icon">⚽</div>
+        <div class="recent-info">
+          <div class="recent-title">Bolinha em campo · 10 reps</div>
+          <div class="recent-meta">Diagonais 50m · 18min · intensa</div>
+        </div>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">12/05</div>
+        <div class="recent-icon">🚶</div>
+        <div class="recent-info">
+          <div class="recent-title">Passeio matinal</div>
+          <div class="recent-meta">2.3km · 25min</div>
+        </div>
+        <span class="recent-tag gps">GPS</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">11/05</div>
+        <div class="recent-icon">🪢</div>
+        <div class="recent-info">
+          <div class="recent-title">Tração elástica</div>
+          <div class="recent-meta">15 min · moderada</div>
+        </div>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">11/05</div>
+        <div class="recent-icon">🚶</div>
+        <div class="recent-info">
+          <div class="recent-title">Passeio noturno</div>
+          <div class="recent-meta">1.8km · 22min</div>
+        </div>
+        <span class="recent-tag gps">GPS</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">09/05</div>
+        <div class="recent-icon">🏃</div>
+        <div class="recent-info">
+          <div class="recent-title">Esteira</div>
+          <div class="recent-meta">2 séries de 2min · velocidade máx</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA B: NOVA SESSÃO (BOLINHA EM CAMPO) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — NOVA SESSÃO (BOLINHA EM CAMPO)
+    <small>Formulário inteligente · adapta campos ao exercício escolhido</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">NOVA SESSÃO · CONDICIONAMENTO</div>
+          <div class="header-main">Registrar treino</div>
+        </div>
+        <div class="header-icon">💪</div>
+      </div>
+
+      <div class="dog-status">
+        <div class="ds-avatar">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">14:48 · Campo do Bairro Centro</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Exercício selecionado -->
+      <div class="exercise-selected">
+        <div class="exercise-selected-icon">⚽</div>
+        <div class="exercise-selected-info">
+          <div class="exercise-selected-label">EXERCÍCIO</div>
+          <div class="exercise-selected-name">Bolinha em campo</div>
+        </div>
+        <span class="exercise-selected-change">Trocar</span>
+      </div>
+
+      <!-- Aviso de lesão (clicável vai pra Saúde) -->
+      <div class="health-link-card">
+        <span class="health-link-icon">⚕</span>
+        <div class="health-link-content">
+          <div class="health-link-title">Cão se lesionou ou sentiu algo?</div>
+          <div class="health-link-text">Registre como evento de saúde · só veterinário confirma lesão oficialmente</div>
+        </div>
+        <span class="health-link-arrow">›</span>
+      </div>
+
+      <!-- Campos específicos pra Bolinha em campo: repetições + distância da diagonal -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>REPETIÇÕES E DIAGONAL</span>
+        </div>
+        <div class="field-row">
+          <div>
+            <div class="field-input-key">REPETIÇÕES</div>
+            <div class="field-input-wrap">
+              <input class="field-input-num" type="number" value="10" />
+              <span class="field-input-unit">vezes</span>
+            </div>
+          </div>
+          <div>
+            <div class="field-input-key">DIAGONAL</div>
+            <div class="field-input-wrap">
+              <input class="field-input-num" type="number" value="50" />
+              <span class="field-input-unit">m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duração total -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>DURAÇÃO TOTAL</span>
+        </div>
+        <div class="field-input-wrap">
+          <input class="field-input-num" type="number" value="18" />
+          <span class="field-input-unit">minutos</span>
+        </div>
+      </div>
+
+      <!-- Intensidade -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>INTENSIDADE</span>
+        </div>
+        <div class="intensity-row">
+          <div class="intensity-btn">Leve</div>
+          <div class="intensity-btn">Moderada</div>
+          <div class="intensity-btn selected intensa">Intensa</div>
+        </div>
+      </div>
+
+      <!-- GPS toggle (desligado por padrão pra bolinha em campo) -->
+      <div class="tracker-toggle">
+        <div class="tracker-icon-big">📡</div>
+        <div class="tracker-info">
+          <div class="tracker-name">Rastreador GPS</div>
+          <div class="tracker-desc">Não recomendado pra área pequena · ative se quiser</div>
+        </div>
+        <div class="switch off">
+          <div class="switch-handle"></div>
+        </div>
+      </div>
+
+      <!-- Condição pós-treino -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>CONDIÇÃO PÓS-TREINO</span>
+        </div>
+        <div class="condition-row">
+          <div class="condition-btn">Normal</div>
+          <div class="condition-btn selected">Ofegante</div>
+          <div class="condition-btn">Exausto</div>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="section-help">opcional</span>
+        </div>
+        <textarea class="obs-input" placeholder="Notas sobre a sessão · pegada · recuperação..."></textarea>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="cta-btn">💾 SALVAR SESSÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <h3 style="margin-top: 20px;">TELA A — VISÃO GERAL</h3>
+  <ul>
+    <li>Header ciano "TREINO CONTÍNUO" coerente com Obediência (não tem manutenção/formação)</li>
+    <li>Status do cão com "Última sessão há 2 dias · 142 sessões totais" — credencial visível</li>
+    <li><strong>Resumo semanal</strong> com gradiente sutil destacado: 8 sessões · 3h · 12km</li>
+    <li>Métricas agregadas calculam dinamicamente (sessões da semana atual)</li>
+    <li><strong>Catálogo de exercícios em 3 categorias</strong>: Cardiovascular · Força · Agilidade e Pliometria</li>
+    <li>Cards 2x2 compactos com ícone semântico · nome do exercício · última sessão</li>
+    <li>Tap em qualquer card → tela B com aquele exercício pré-selecionado</li>
+    <li><strong>Card "Outro"</strong> no fim da grid de Agilidade · borda dashed ciano · pra exercícios personalizados</li>
+    <li>Sessões recentes embaixo · cada uma com data + ícone do exercício + métricas curtas + badge GPS se aplicável</li>
+    <li>"2 séries de 2min · velocidade máx" na sessão de esteira reflete o uso real do Bono (você disse)</li>
+    <li>"Diagonais 50m · 18min · intensa" na bolinha reflete seu treino real</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA B — NOVA SESSÃO (FORMULÁRIO INTELIGENTE)</h3>
+  <ul>
+    <li>Cenário escolhido: Bolinha em campo · mostra como o formulário se adapta</li>
+    <li><strong>Exercício selecionado em destaque no topo</strong> · botão "Trocar" pra voltar e escolher outro</li>
+    <li><strong>Card de aviso "Cão se lesionou?"</strong> sempre presente · vermelho discreto · tap leva pra registro de saúde</li>
+    <li>Microcopy: "só veterinário confirma lesão oficialmente" — respeita o que você falou</li>
+    <li><strong>Campos específicos pra Bolinha em campo:</strong> Repetições (10 padrão) + Diagonal (metragem em metros) — como você descreveu</li>
+    <li>Inputs numéricos grandes com unidade ao lado · fáceis de preencher rápido</li>
+    <li>Duração total · campo único pra tempo total da sessão</li>
+    <li><strong>Intensidade colorida</strong>: Leve (verde) · Moderada (amarelo) · Intensa (vermelho) — escala visual</li>
+    <li><strong>GPS toggle</strong> com microcopy contextual: "Não recomendado pra área pequena · ative se quiser"</li>
+    <li>Para corridas externas, GPS estaria ligado por padrão</li>
+    <li>Condição pós-treino: Normal · Ofegante · Exausto — 3 níveis simples</li>
+    <li>Observações opcional · pra notas qualitativas</li>
+    <li>CTA único "Salvar sessão" — sem GPS ativo, não muda cor</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">FORMULÁRIO INTELIGENTE — CAMPOS POR EXERCÍCIO</h3>
+  <ul>
+    <li><strong>Passeio:</strong> duração + distância + GPS (ligado por padrão)</li>
+    <li><strong>Esteira:</strong> séries + duração por série + velocidade km/h</li>
+    <li><strong>Paraquedas:</strong> duração + distância + GPS (ligado por padrão)</li>
+    <li><strong>Natação:</strong> duração</li>
+    <li><strong>Tração c/ peso:</strong> carga (kg) + duração ou repetições</li>
+    <li><strong>Tração elástica:</strong> duração</li>
+    <li><strong>Escalada:</strong> repetições + altura</li>
+    <li><strong>Bolinha em campo:</strong> repetições + diagonal (m) + duração total</li>
+    <li><strong>A-Frame:</strong> repetições</li>
+    <li><strong>Salto em altura:</strong> altura máxima (cm) + repetições</li>
+    <li><strong>Salto em distância:</strong> distância máxima (m) + repetições</li>
+    <li><strong>Cavaletes:</strong> repetições + altura</li>
+    <li>Campos comuns a todos: intensidade · condição pós-treino · observações</li>
+    <li>GPS toggle aparece em todos · padrão ligado nos externos · padrão desligado nos de canil</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">DIFERENÇAS DAS OUTRAS TELAS DE TREINO</h3>
+  <ul>
+    <li>Sem fases · sem estágios · sem orientador · sem figurante</li>
+    <li>Sem "formação" e "manutenção" — Condicionamento é sempre Condicionamento</li>
+    <li>Métricas <strong>numéricas predominam</strong> (tempo, distância, repetições) em vez de avaliação subjetiva</li>
+    <li>Lesão sai dessa tela · vai pra Saúde · só veterinário confirma</li>
+    <li>GPS opcional em quase todos os exercícios</li>
+    <li>Cenário escolhido (Bolinha em campo) reflete uso real do Bono — métrica de diagonal é específica do seu método</li>
+  </ul>
+</div>
+
+</body>
+</html>

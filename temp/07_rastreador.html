@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreador - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* ===== ESTADO 1: PRÉ-TRILHA ===== */
+  .pre-header {
+    padding: 8px 16px 16px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(77, 208, 225, 0.08);
+  }
+
+  .pre-header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .pre-header-text {
+    flex: 1;
+  }
+
+  .pre-header-subtitle {
+    color: #4dd0e1;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .pre-header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .pre-header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(77, 208, 225, 0.12);
+    color: #4dd0e1;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .pre-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  /* Status do sistema (GPS, bateria) */
+  .system-status {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .system-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+  }
+
+  .system-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .system-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .icon-ok {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .icon-warn {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .icon-bad {
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+  }
+
+  .system-info {
+    flex: 1;
+  }
+
+  .system-label {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .system-value {
+    color: #b0c4cc;
+    font-size: 11px;
+  }
+
+  .system-tag {
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .tag-ok {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .tag-warn {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  /* Configuração da sessão */
+  .config-section {
+    margin-bottom: 16px;
+  }
+
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .config-field {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .config-icon {
+    color: #4dd0e1;
+    font-size: 16px;
+    width: 24px;
+    flex-shrink: 0;
+  }
+
+  .config-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .config-label-row {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+  }
+
+  .config-value-row {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .config-chevron {
+    color: #5a7280;
+    font-size: 14px;
+  }
+
+  /* Aviso de bateria */
+  .battery-warning {
+    background: rgba(241, 196, 15, 0.06);
+    border-left: 3px solid #f1c40f;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #b0c4cc;
+    line-height: 1.5;
+  }
+
+  .battery-warning strong {
+    color: #f1c40f;
+  }
+
+  /* Botão grande iniciar */
+  .start-trail-btn {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 16px 22px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .btn-start-trail {
+    width: 100%;
+    background: #2ecc71;
+    color: #050d10;
+    border: none;
+    border-radius: 14px;
+    padding: 18px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 20px rgba(46, 204, 113, 0.2);
+  }
+
+  /* ===== ESTADO 2: DURANTE A TRILHA ===== */
+  .live-screen {
+    background: #0a1418;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Status bar mínima */
+  .live-topbar {
+    background: rgba(46, 204, 113, 0.08);
+    border-bottom: 1px solid rgba(46, 204, 113, 0.2);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .live-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #2ecc71;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2ecc71;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .live-binomio {
+    color: #b0c4cc;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  /* Mapa */
+  .live-map {
+    flex: 1;
+    background: linear-gradient(135deg, #0d2030 0%, #1a2a30 50%, #0d2030 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Simular grid de mapa */
+  .map-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(77, 208, 225, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77, 208, 225, 0.04) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  /* Trail desenhada */
+  .trail-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Marcadores no mapa */
+  .map-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+  }
+
+  .marker-start {
+    width: 22px;
+    height: 22px;
+    background: #f1c40f;
+    border-radius: 50%;
+    border: 3px solid #050d10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #050d10;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .marker-event {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 3px solid #050d10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .marker-indicacao { background: #4dd0e1; }
+  .marker-checagem { background: #f1c40f; }
+  .marker-perda { background: #e67e22; }
+
+  .marker-current {
+    width: 18px;
+    height: 18px;
+    background: #2ecc71;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 8px rgba(46, 204, 113, 0.25);
+    animation: pulse-current 2s infinite;
+  }
+
+  @keyframes pulse-current {
+    0%, 100% { box-shadow: 0 0 0 8px rgba(46, 204, 113, 0.25); }
+    50% { box-shadow: 0 0 0 14px rgba(46, 204, 113, 0.1); }
+  }
+
+  /* Métricas grandes */
+  .live-metrics {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    background: rgba(5, 13, 16, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 14px;
+    padding: 12px;
+    z-index: 10;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .metric-cell {
+    text-align: center;
+  }
+
+  .metric-label-live {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+
+  .metric-value-live {
+    color: #fff;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .metric-unit-live {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* Mini stats */
+  .mini-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(77, 208, 225, 0.1);
+  }
+
+  .mini-stat {
+    text-align: center;
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .mini-stat strong {
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /* Botões de marcação */
+  .live-actions {
+    background: rgba(5, 13, 16, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px 16px;
+    flex-shrink: 0;
+  }
+
+  .actions-label {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+  }
+
+  .action-btn:hover {
+    background: rgba(77, 208, 225, 0.08);
+    border-color: rgba(77, 208, 225, 0.4);
+  }
+
+  .action-icon-big {
+    font-size: 22px;
+  }
+
+  .action-icon-big.icon-cyan { color: #4dd0e1; }
+  .action-icon-big.icon-yellow { color: #f1c40f; }
+  .action-icon-big.icon-orange { color: #e67e22; }
+
+  .action-label {
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* Botão alvo encontrado / encerrar */
+  .end-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-target {
+    background: #2ecc71;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-stop {
+    background: transparent;
+    color: #e74c3c;
+    border: 1.5px solid #e74c3c;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ===== ESTADO 3: PÓS-TRILHA / RESUMO ===== */
+  .summary-header {
+    padding: 16px;
+    background: rgba(46, 204, 113, 0.06);
+    border-bottom: 1px solid rgba(46, 204, 113, 0.2);
+    flex-shrink: 0;
+  }
+
+  .summary-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .summary-check {
+    width: 40px;
+    height: 40px;
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .summary-title-text {
+    flex: 1;
+  }
+
+  .summary-title-label {
+    color: #2ecc71;
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .summary-title-main {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .summary-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 90px 16px;
+  }
+
+  /* Mapa estático no resumo */
+  .summary-map {
+    background: linear-gradient(135deg, #0d2030, #1a2a30);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    height: 180px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Grandes métricas finais */
+  .summary-bignums {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .bignum-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .bignum-label {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+  }
+
+  .bignum-val {
+    color: #4dd0e1;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  /* Eventos registrados */
+  .events-section {
+    margin-bottom: 16px;
+  }
+
+  .events-section h4 {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .event-row {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .event-time {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 40px;
+  }
+
+  .event-icon-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .event-text {
+    flex: 1;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .event-dist {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  /* Resultado da sessão */
+  .result-section {
+    margin-bottom: 16px;
+  }
+
+  .result-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .result-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 4px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #7a8a92;
+  }
+
+  .result-btn.selected.completa {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  /* CTA final */
+  .final-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 8px;
+  }
+
+  .btn-discard {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save-summary {
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1200px;
+    margin: 20px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA 1: PRÉ-TRILHA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">1. ANTES DE INICIAR</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>09:14</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="pre-header">
+      <div class="pre-header-top">
+        <button class="back-btn">‹</button>
+        <div class="pre-header-text">
+          <div class="pre-header-subtitle">RASTREADOR · BUSCA & CAPTURA</div>
+          <div class="pre-header-main">Nova trilha</div>
+        </div>
+        <div class="pre-header-icon">📡</div>
+      </div>
+    </div>
+
+    <div class="pre-content">
+
+      <!-- Status do sistema -->
+      <div class="section-label">VERIFICAÇÃO DO SISTEMA</div>
+      <div class="system-status">
+        <div class="system-row">
+          <div class="system-icon icon-ok">📍</div>
+          <div class="system-info">
+            <div class="system-label">GPS</div>
+            <div class="system-value">Sinal preciso · ±3m</div>
+          </div>
+          <span class="system-tag tag-ok">PRONTO</span>
+        </div>
+        <div class="system-row">
+          <div class="system-icon icon-ok">🔋</div>
+          <div class="system-info">
+            <div class="system-label">Bateria</div>
+            <div class="system-value">82% · suficiente pra trilha longa</div>
+          </div>
+          <span class="system-tag tag-ok">OK</span>
+        </div>
+        <div class="system-row">
+          <div class="system-icon icon-warn">📶</div>
+          <div class="system-info">
+            <div class="system-label">Conexão</div>
+            <div class="system-value">4G fraco · trilha salva localmente</div>
+          </div>
+          <span class="system-tag tag-warn">OFFLINE</span>
+        </div>
+      </div>
+
+      <!-- Configuração -->
+      <div class="section-label">CONFIGURAÇÃO DA TRILHA</div>
+      <div class="config-section">
+        <div class="config-field">
+          <span class="config-icon">🎯</span>
+          <div class="config-content">
+            <div class="config-label-row">MARCO TRABALHADO</div>
+            <div class="config-value-row">M2 · Indicação em telhado</div>
+          </div>
+          <span class="config-chevron">›</span>
+        </div>
+        <div class="config-field">
+          <span class="config-icon">👤</span>
+          <div class="config-content">
+            <div class="config-label-row">FIGURANTE</div>
+            <div class="config-value-row">Fig. Souza (3ª vez com este cão)</div>
+          </div>
+          <span class="config-chevron">›</span>
+        </div>
+        <div class="config-field">
+          <span class="config-icon">🧥</span>
+          <div class="config-content">
+            <div class="config-label-row">OBJETO DE ODOR</div>
+            <div class="config-value-row">Camiseta usada</div>
+          </div>
+          <span class="config-chevron">›</span>
+        </div>
+        <div class="config-field">
+          <span class="config-icon">🌳</span>
+          <div class="config-content">
+            <div class="config-label-row">AMBIENTE</div>
+            <div class="config-value-row">Vegetação rasteira</div>
+          </div>
+          <span class="config-chevron">›</span>
+        </div>
+        <div class="config-field">
+          <span class="config-icon">👁</span>
+          <div class="config-content">
+            <div class="config-label-row">ORIENTADOR</div>
+            <div class="config-value-row">GCM Ragonha</div>
+          </div>
+          <span class="config-chevron">›</span>
+        </div>
+      </div>
+
+      <!-- Aviso bateria -->
+      <div class="battery-warning">
+        <strong>⚠ Aviso:</strong> GPS contínuo consome cerca de 15-25% de bateria em trilhas longas (30-60min). Tenha um carregador disponível em campo se necessário.
+      </div>
+
+    </div>
+
+    <div class="start-trail-btn">
+      <button class="btn-start-trail">▶ INICIAR TRILHA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA 2: DURANTE A TRILHA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">2. AO VIVO · RASTREANDO</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>09:23</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋 67%</span></div>
+    </div>
+
+    <div class="live-screen">
+      <!-- Top bar com status ao vivo -->
+      <div class="live-topbar">
+        <div class="live-status">
+          <span class="live-dot"></span>
+          GRAVANDO TRILHA
+        </div>
+        <div class="live-binomio">Thor · Silva</div>
+      </div>
+
+      <!-- Mapa -->
+      <div class="live-map">
+        <div class="map-grid"></div>
+
+        <!-- Trail SVG -->
+        <svg class="trail-svg" viewBox="0 0 390 600" preserveAspectRatio="none">
+          <path d="M 80 480 Q 100 420, 130 380 T 180 280 Q 200 240, 220 220 T 260 180 Q 280 160, 290 140"
+                stroke="#4dd0e1"
+                stroke-width="3"
+                fill="none"
+                stroke-linecap="round"
+                stroke-dasharray="0"
+                opacity="0.9"/>
+          <path d="M 80 480 Q 100 420, 130 380 T 180 280 Q 200 240, 220 220 T 260 180 Q 280 160, 290 140"
+                stroke="rgba(77, 208, 225, 0.3)"
+                stroke-width="10"
+                fill="none"
+                stroke-linecap="round"
+                opacity="0.5"/>
+        </svg>
+
+        <!-- Métricas grandes -->
+        <div class="live-metrics">
+          <div class="metrics-grid">
+            <div class="metric-cell">
+              <div class="metric-label-live">DISTÂNCIA</div>
+              <div class="metric-value-live">187<span class="metric-unit-live">m</span></div>
+            </div>
+            <div class="metric-cell">
+              <div class="metric-label-live">TEMPO</div>
+              <div class="metric-value-live">09<span class="metric-unit-live">:42</span></div>
+            </div>
+          </div>
+          <div class="mini-stats">
+            <div class="mini-stat">📏 Vel: <strong>1.9 km/h</strong></div>
+            <div class="mini-stat">📍 ±3m</div>
+            <div class="mini-stat">🎯 2 eventos</div>
+          </div>
+        </div>
+
+        <!-- Marcadores no mapa -->
+        <div class="map-marker" style="bottom: 60px; left: 22%;">
+          <div class="marker-start">S</div>
+        </div>
+        <div class="map-marker" style="top: 38%; left: 40%;">
+          <div class="marker-event marker-checagem">?</div>
+        </div>
+        <div class="map-marker" style="top: 24%; left: 55%;">
+          <div class="marker-event marker-indicacao">🐕</div>
+        </div>
+        <div class="map-marker" style="top: 18%; left: 74%;">
+          <div class="marker-current"></div>
+        </div>
+      </div>
+
+      <!-- Botões de ação grandes -->
+      <div class="live-actions">
+        <div class="actions-label">MARCAR EVENTO NA TRILHA</div>
+        <div class="actions-grid">
+          <div class="action-btn">
+            <span class="action-icon-big icon-cyan">🐕</span>
+            <span class="action-label">Cão indicou</span>
+          </div>
+          <div class="action-btn">
+            <span class="action-icon-big icon-yellow">❓</span>
+            <span class="action-label">Checagem</span>
+          </div>
+          <div class="action-btn">
+            <span class="action-icon-big icon-orange">⚠</span>
+            <span class="action-label">Perdeu rastro</span>
+          </div>
+        </div>
+        <div class="end-buttons">
+          <button class="btn-target">🎯 ALVO ENCONTRADO</button>
+          <button class="btn-stop">⏹ ENCERRAR</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA 3: RESUMO PÓS-TRILHA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">3. RESUMO DA TRILHA</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>09:38</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋 61%</span></div>
+    </div>
+
+    <!-- Header de sucesso -->
+    <div class="summary-header">
+      <div class="summary-title-row">
+        <div class="summary-check">✓</div>
+        <div class="summary-title-text">
+          <div class="summary-title-label">TRILHA CONCLUÍDA</div>
+          <div class="summary-title-main">Confirme e salve a sessão</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-content">
+
+      <!-- Mapa final -->
+      <div class="summary-map">
+        <div class="map-grid"></div>
+        <svg class="trail-svg" viewBox="0 0 360 180" preserveAspectRatio="none">
+          <path d="M 30 150 Q 60 130, 90 110 T 140 80 Q 170 65, 200 55 T 250 45 Q 290 38, 320 35"
+                stroke="#4dd0e1"
+                stroke-width="2.5"
+                fill="none"
+                stroke-linecap="round"/>
+          <path d="M 30 150 Q 60 130, 90 110 T 140 80 Q 170 65, 200 55 T 250 45 Q 290 38, 320 35"
+                stroke="rgba(77, 208, 225, 0.3)"
+                stroke-width="8"
+                fill="none"
+                stroke-linecap="round"
+                opacity="0.5"/>
+        </svg>
+        <!-- Marcadores no mapa final -->
+        <div class="map-marker" style="bottom: 18px; left: 9%;">
+          <div class="marker-start">S</div>
+        </div>
+        <div class="map-marker" style="top: 50%; left: 40%;">
+          <div class="marker-event marker-checagem" style="width:22px; height:22px; font-size:10px;">?</div>
+        </div>
+        <div class="map-marker" style="top: 30%; left: 60%;">
+          <div class="marker-event marker-indicacao" style="width:22px; height:22px; font-size:10px;">🐕</div>
+        </div>
+        <div class="map-marker" style="top: 18%; right: 9%;">
+          <div class="marker-event" style="width: 24px; height: 24px; background: #2ecc71; border: 3px solid #050d10; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #050d10; font-size: 11px;">🎯</div>
+        </div>
+      </div>
+
+      <!-- Big numbers -->
+      <div class="summary-bignums">
+        <div class="bignum-card">
+          <div class="bignum-label">DISTÂNCIA</div>
+          <div class="bignum-val">312m</div>
+        </div>
+        <div class="bignum-card">
+          <div class="bignum-label">TEMPO</div>
+          <div class="bignum-val">14:28</div>
+        </div>
+        <div class="bignum-card">
+          <div class="bignum-label">VEL. MÉDIA</div>
+          <div class="bignum-val">1.3 <span style="font-size:13px; color:#5a7280;">km/h</span></div>
+        </div>
+        <div class="bignum-card">
+          <div class="bignum-label">EVENTOS</div>
+          <div class="bignum-val">3</div>
+        </div>
+      </div>
+
+      <!-- Eventos registrados -->
+      <div class="events-section">
+        <h4>EVENTOS REGISTRADOS NA TRILHA</h4>
+        <div class="event-row">
+          <span class="event-time">09:23</span>
+          <span class="event-icon-mini marker-start" style="background:#f1c40f; color:#050d10; font-size:9px;">S</span>
+          <span class="event-text">Início da trilha</span>
+          <span class="event-dist">0m</span>
+        </div>
+        <div class="event-row">
+          <span class="event-time">09:28</span>
+          <span class="event-icon-mini marker-checagem">?</span>
+          <span class="event-text">Checagem · 65m fora</span>
+          <span class="event-dist">128m</span>
+        </div>
+        <div class="event-row">
+          <span class="event-time">09:33</span>
+          <span class="event-icon-mini marker-indicacao">🐕</span>
+          <span class="event-text">Indicação em telhado</span>
+          <span class="event-dist">241m</span>
+        </div>
+        <div class="event-row">
+          <span class="event-time">09:38</span>
+          <span class="event-icon-mini" style="background:#2ecc71;">🎯</span>
+          <span class="event-text">Alvo encontrado</span>
+          <span class="event-dist">312m</span>
+        </div>
+      </div>
+
+      <!-- Resultado -->
+      <div class="result-section">
+        <h4 style="color:#4dd0e1; font-size:10px; font-weight:600; letter-spacing:1.2px; margin-bottom:10px;">RESULTADO DA SESSÃO</h4>
+        <div class="result-buttons">
+          <div class="result-btn selected completa">COMPLETA</div>
+          <div class="result-btn">CHECAGEM</div>
+          <div class="result-btn">PERDA</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="final-bar">
+      <button class="btn-discard">Descartar</button>
+      <button class="btn-save-summary">💾 SALVAR SESSÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notas de design -->
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>3 estados:</strong> pré-trilha (config) → ao vivo (rastreio) → resumo (confirmação)</li>
+    <li>Pré-trilha verifica: GPS, bateria, conexão (offline-first)</li>
+    <li>Configuração completa antes de iniciar: marco, figurante, objeto, ambiente, orientador</li>
+    <li>Indicador de "3ª vez com este cão" no figurante (controle de variação)</li>
+    <li>Aviso explícito sobre consumo de bateria em trilha longa</li>
+    <li>Botão "Iniciar" verde grande, fácil de tocar em campo</li>
+    <li><strong>Tela ao vivo:</strong> mapa em tela cheia com trajeto sendo desenhado</li>
+    <li>Ponto verde pulsante = posição atual</li>
+    <li>Marcadores coloridos no mapa: Start (S), Indicação (🐕), Checagem (?), Perda (⚠)</li>
+    <li>Métricas grandes flutuantes no topo (legíveis sem foco)</li>
+    <li>3 botões grandes pra marcar eventos: Cão indicou / Checagem / Perdeu rastro</li>
+    <li>2 botões finais: Alvo encontrado (verde) / Encerrar (vermelho outline)</li>
+    <li>Status "GRAVANDO TRILHA" com dot pulsante (claro que tá ativo)</li>
+    <li>Distância em metros automática, sem digitação</li>
+    <li><strong>Resumo:</strong> mapa final estático + 4 big numbers + lista cronológica de eventos</li>
+    <li>Resultado da sessão sugerido pelo sistema (baseado nos eventos) mas editável</li>
+    <li>Cada evento mostra a distância em que ocorreu (forensicamente útil)</li>
+    <li>Botão Salvar primário ciano · Descartar secundário cinza</li>
+    <li>Funciona offline (salva local, sincroniza quando voltar ao 4G)</li>
+  </ul>
+</div>
+
+</body>
+</html>

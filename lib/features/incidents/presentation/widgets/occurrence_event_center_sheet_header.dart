@@ -15,7 +15,7 @@ class _EventCenterHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'ADICIONAR EVENTO',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w900,

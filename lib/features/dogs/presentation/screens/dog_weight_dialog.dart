@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 void _showDogWeightDialog(
   BuildContext context,
@@ -38,7 +38,7 @@ void _showDogWeightDialog(
           TextField(
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: Colors.white,

@@ -20,14 +20,14 @@ class _AptitudeSection extends StatelessWidget {
         _SectionTitle(title: 'APTIDÃO OPERACIONAL'),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _panelColor.withAlpha(200),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: _cyan.withAlpha(30)),
           ),
           child: loading
-              ? const Center(
+              ? Center(
                   child: SizedBox(
                     width: 16,
                     height: 16,
@@ -87,7 +87,7 @@ class _AptitudeRow extends StatelessWidget {
     final icon = _resolveIcon(aptitude.icone);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
@@ -112,7 +112,7 @@ class _AptitudeRow extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: color.withAlpha(20),
               borderRadius: BorderRadius.circular(4),
@@ -179,7 +179,7 @@ class _FallbackAptitudeRow extends StatelessWidget {
     final icon = _iconForName(name);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
@@ -204,7 +204,7 @@ class _FallbackAptitudeRow extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: _green.withAlpha(20),
               borderRadius: BorderRadius.circular(4),

@@ -14,7 +14,7 @@ extension _HealthBioHeader on _HealthDashboardScreenState {
           const SizedBox(height: 16),
           Text(
             dog.name.toUpperCase(),
-            style: GoogleFonts.oxanium(
+            style: GoogleFonts.inter(
               fontSize: 26,
               fontWeight: FontWeight.bold,
               color: Colors.white,

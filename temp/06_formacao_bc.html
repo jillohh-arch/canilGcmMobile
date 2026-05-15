@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formação Busca & Captura - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* Header fixo */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    color: #f1c40f;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Status global */
+  .formation-status {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .status-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .status-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .status-time strong {
+    color: #f1c40f;
+  }
+
+  /* Abas */
+  .tabs-row {
+    display: flex;
+    gap: 4px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .tabs-row::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .tab {
+    padding: 12px 14px;
+    color: #5a7280;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab.active {
+    color: #4dd0e1;
+    border-bottom-color: #4dd0e1;
+  }
+
+  /* Scroll content */
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 90px 16px;
+  }
+
+  .tab-content::-webkit-scrollbar {
+    width: 0;
+  }
+
+  /* ====== ABA ROADMAP ====== */
+  .roadmap-section {
+    margin-bottom: 20px;
+  }
+
+  .module-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .module-card.concluido {
+    border-left: 3px solid #2ecc71;
+  }
+
+  .module-card.em-treino {
+    border-left: 3px solid #f1c40f;
+    background: rgba(241, 196, 15, 0.04);
+  }
+
+  .module-card.bloqueado {
+    border-left: 3px solid rgba(149, 165, 166, 0.3);
+    opacity: 0.7;
+  }
+
+  .module-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .module-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .module-card.concluido .module-num {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 2px solid #2ecc71;
+  }
+
+  .module-card.em-treino .module-num {
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border: 2px solid #f1c40f;
+  }
+
+  .module-card.bloqueado .module-num {
+    background: rgba(149, 165, 166, 0.08);
+    color: #95a5a6;
+    border: 2px solid rgba(149, 165, 166, 0.3);
+  }
+
+  .module-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .module-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .module-subtitle {
+    color: #5a7280;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .module-status-badge {
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    flex-shrink: 0;
+  }
+
+  .module-card.concluido .module-status-badge {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .module-card.em-treino .module-status-badge {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .module-card.bloqueado .module-status-badge {
+    background: rgba(149, 165, 166, 0.08);
+    color: #95a5a6;
+  }
+
+  .module-progress-info {
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .module-progress-info strong {
+    color: #fff;
+  }
+
+  .module-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .module-progress-fill {
+    height: 100%;
+    background: #f1c40f;
+    border-radius: 2px;
+  }
+
+  .module-card.concluido .module-progress-fill {
+    background: #2ecc71;
+    width: 100% !important;
+  }
+
+  /* Avaliação final */
+  .final-eval {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  .final-eval-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+    color: #5a7280;
+  }
+
+  .final-eval-title {
+    color: #b0c4cc;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .final-eval-desc {
+    color: #5a7280;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  /* ====== ABA MÓDULO ATUAL ====== */
+  .module-detail-header {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .detail-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .detail-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border: 2px solid #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .detail-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .detail-meta {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(241, 196, 15, 0.15);
+  }
+
+  .detail-meta-item {
+    font-size: 10px;
+  }
+
+  .detail-meta-item-label {
+    color: #7a8a92;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .detail-meta-item-value {
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  /* Lista de marcos */
+  .marcos-list {
+    margin-bottom: 16px;
+  }
+
+  .marcos-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .marcos-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+  }
+
+  .marcos-add {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .marco-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .marco-item.atingido {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.25);
+  }
+
+  .marco-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: transparent;
+    flex-shrink: 0;
+  }
+
+  .marco-item.atingido .marco-check {
+    background: #2ecc71;
+    border-color: #2ecc71;
+    color: #050d10;
+  }
+
+  .marco-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .marco-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .marco-meta {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .marco-sessions-count {
+    background: rgba(77, 208, 225, 0.08);
+    color: #4dd0e1;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Info banner sobre objeto de odor */
+  .info-banner {
+    background: rgba(77, 208, 225, 0.05);
+    border-left: 3px solid #4dd0e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: #b0c4cc;
+    line-height: 1.5;
+  }
+
+  .info-banner strong {
+    color: #4dd0e1;
+  }
+
+  /* ====== ABA HISTÓRICO ====== */
+  .session-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .session-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .session-date {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .session-marco {
+    color: #5a7280;
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .session-result {
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .result-completa {
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+  }
+
+  .result-checagem {
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+  }
+
+  .result-perda {
+    background: rgba(230, 126, 34, 0.12);
+    color: #e67e22;
+  }
+
+  .session-stats {
+    display: flex;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 10px;
+  }
+
+  .session-stat {
+    color: #b0c4cc;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .session-stat-icon {
+    color: #4dd0e1;
+  }
+
+  /* ====== ABA ESTATÍSTICAS ====== */
+  .stat-block {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .stat-header {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+  }
+
+  /* Big numbers */
+  .big-numbers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .big-num-card {
+    text-align: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+  }
+
+  .big-num-value {
+    color: #4dd0e1;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .big-num-label {
+    color: #7a8a92;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+  }
+
+  /* Gráfico simulado */
+  .chart-area {
+    height: 140px;
+    margin-top: 8px;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 10px 0;
+  }
+
+  .chart-bar {
+    flex: 1;
+    background: linear-gradient(180deg, #4dd0e1, rgba(77, 208, 225, 0.3));
+    border-radius: 3px 3px 0 0;
+    min-height: 4px;
+    position: relative;
+  }
+
+  .chart-bar.highlight {
+    background: linear-gradient(180deg, #f1c40f, rgba(241, 196, 15, 0.3));
+  }
+
+  .chart-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding: 0 4px;
+  }
+
+  .chart-label {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  .chart-y-axis {
+    color: #5a7280;
+    font-size: 9px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Distribuição de resultados */
+  .result-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .result-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .result-label {
+    color: #b0c4cc;
+    font-size: 11px;
+    width: 90px;
+    flex-shrink: 0;
+  }
+
+  .result-bar-container {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .result-bar {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  .result-bar.completa-bar { background: #2ecc71; }
+  .result-bar.checagem-bar { background: #f1c40f; }
+  .result-bar.perda-bar { background: #e67e22; }
+
+  .result-percent {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    width: 36px;
+    text-align: right;
+  }
+
+  /* CTA fixo */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 390px;
+    margin-top: 20px;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- TELA 1: ABA ROADMAP -->
+<div class="phone-wrap">
+  <div class="phone-label">ABA: ROADMAP</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">FORMAÇÃO · EM ANDAMENTO</div>
+          <div class="header-main">Busca & Captura</div>
+        </div>
+        <div class="header-icon">🎯</div>
+      </div>
+      <div class="formation-status">
+        <div class="status-avatar">THOR</div>
+        <div class="status-info">
+          <div class="status-binomio">Thor · GCM Silva</div>
+          <div class="status-time">Iniciada em <strong>12/03/2026</strong> · 2 meses em formação</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab active">Roadmap</div>
+      <div class="tab">Módulo atual</div>
+      <div class="tab">Histórico</div>
+      <div class="tab">Estatísticas</div>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- Módulo 1: Concluído -->
+      <div class="module-card concluido">
+        <div class="module-header">
+          <div class="module-num">✓</div>
+          <div class="module-info">
+            <div class="module-name">Módulo 1 — Pareamento e Indicação</div>
+            <div class="module-subtitle">Mata fechada · objetos com odor forte · distância progressiva</div>
+          </div>
+          <span class="module-status-badge">CONCLUÍDO</span>
+        </div>
+        <div class="module-progress-info">
+          Concluído em <strong>15/04/2026</strong> · 8 marcos atingidos · 24 sessões
+        </div>
+        <div class="module-progress-bar">
+          <div class="module-progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Módulo 2: Em treino -->
+      <div class="module-card em-treino">
+        <div class="module-header">
+          <div class="module-num">2</div>
+          <div class="module-info">
+            <div class="module-name">Módulo 2 — Indicações estruturais</div>
+            <div class="module-subtitle">Vegetação rasteira · objetos médios · obstáculos urbanos</div>
+          </div>
+          <span class="module-status-badge">EM TREINO</span>
+        </div>
+        <div class="module-progress-info">
+          <strong>6 de 12 marcos atingidos</strong> · 18 sessões · última há 3 dias
+        </div>
+        <div class="module-progress-bar">
+          <div class="module-progress-fill" style="width: 50%;"></div>
+        </div>
+      </div>
+
+      <!-- Módulo 3: Bloqueado mas visível -->
+      <div class="module-card bloqueado">
+        <div class="module-header">
+          <div class="module-num">3</div>
+          <div class="module-info">
+            <div class="module-name">Módulo 3 — Operacional urbano</div>
+            <div class="module-subtitle">Cenário real · vestígios mínimos · todas as variáveis ambientais</div>
+          </div>
+          <span class="module-status-badge">A INICIAR</span>
+        </div>
+        <div class="module-progress-info">
+          Disponível após conclusão do Módulo 2
+        </div>
+      </div>
+
+      <!-- Avaliação final -->
+      <div class="final-eval">
+        <div class="final-eval-icon">🏅</div>
+        <div class="final-eval-title">Avaliação Final</div>
+        <div class="final-eval-desc">Prova de certificação · opcional após Módulo 3</div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">+ NOVA SESSÃO DE FORMAÇÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA 2: ABA MÓDULO ATUAL -->
+<div class="phone-wrap">
+  <div class="phone-label">ABA: MÓDULO ATUAL</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">FORMAÇÃO · EM ANDAMENTO</div>
+          <div class="header-main">Busca & Captura</div>
+        </div>
+        <div class="header-icon">🎯</div>
+      </div>
+      <div class="formation-status">
+        <div class="status-avatar">THOR</div>
+        <div class="status-info">
+          <div class="status-binomio">Thor · GCM Silva</div>
+          <div class="status-time">Iniciada em <strong>12/03/2026</strong> · 2 meses em formação</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab">Roadmap</div>
+      <div class="tab active">Módulo atual</div>
+      <div class="tab">Histórico</div>
+      <div class="tab">Estatísticas</div>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- Header do módulo -->
+      <div class="module-detail-header">
+        <div class="detail-title-row">
+          <div class="detail-num">2</div>
+          <div class="detail-name">Indicações estruturais</div>
+        </div>
+        <div class="module-subtitle" style="color:#b0c4cc;">Vegetação rasteira · objetos médios · obstáculos urbanos</div>
+        <div class="detail-meta">
+          <div class="detail-meta-item">
+            <div class="detail-meta-item-label">PROGRESSO</div>
+            <div class="detail-meta-item-value">6/12 marcos</div>
+          </div>
+          <div class="detail-meta-item">
+            <div class="detail-meta-item-label">SESSÕES</div>
+            <div class="detail-meta-item-value">18 nesta fase</div>
+          </div>
+          <div class="detail-meta-item">
+            <div class="detail-meta-item-label">ÚLTIMA</div>
+            <div class="detail-meta-item-value">há 3 dias</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Banner objeto de odor -->
+      <div class="info-banner">
+        <strong>Objetos de odor sugeridos:</strong> itens médios como aliança, brinco, anel, isqueiro, chave.
+      </div>
+
+      <!-- Lista de marcos -->
+      <div class="marcos-list">
+        <div class="marcos-header">
+          <span class="marcos-title">MARCOS DO MÓDULO</span>
+          <span class="marcos-add">+ Adicionar marco</span>
+        </div>
+
+        <div class="marco-item atingido">
+          <span class="marco-check">✓</span>
+          <div class="marco-info">
+            <div class="marco-name">Indicação de muro pulado</div>
+            <div class="marco-meta">Atingido em 22/04/2026</div>
+          </div>
+          <span class="marco-sessions-count">8 sessões</span>
+        </div>
+
+        <div class="marco-item atingido">
+          <span class="marco-check">✓</span>
+          <div class="marco-info">
+            <div class="marco-name">Indicação de porta atravessada</div>
+            <div class="marco-meta">Atingido em 29/04/2026</div>
+          </div>
+          <span class="marco-sessions-count">5 sessões</span>
+        </div>
+
+        <div class="marco-item atingido">
+          <span class="marco-check">✓</span>
+          <div class="marco-info">
+            <div class="marco-name">Indicação de carro (porta-malas)</div>
+            <div class="marco-meta">Atingido em 03/05/2026</div>
+          </div>
+          <span class="marco-sessions-count">4 sessões</span>
+        </div>
+
+        <div class="marco-item">
+          <span class="marco-check"></span>
+          <div class="marco-info">
+            <div class="marco-name">Indicação em telhado</div>
+            <div class="marco-meta">Em treino · 3 sessões realizadas</div>
+          </div>
+          <span class="marco-sessions-count">3 sessões</span>
+        </div>
+
+        <div class="marco-item">
+          <span class="marco-check"></span>
+          <div class="marco-info">
+            <div class="marco-name">Mudança calçada/grama</div>
+            <div class="marco-meta">Não treinado</div>
+          </div>
+          <span class="marco-sessions-count">0 sessões</span>
+        </div>
+
+        <div class="marco-item">
+          <span class="marco-check"></span>
+          <div class="marco-info">
+            <div class="marco-name">Indicação de subida em árvore</div>
+            <div class="marco-meta">Não treinado</div>
+          </div>
+          <span class="marco-sessions-count">0 sessões</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">+ NOVA SESSÃO DE FORMAÇÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA 3: ABA HISTÓRICO -->
+<div class="phone-wrap">
+  <div class="phone-label">ABA: HISTÓRICO</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">FORMAÇÃO · EM ANDAMENTO</div>
+          <div class="header-main">Busca & Captura</div>
+        </div>
+        <div class="header-icon">🎯</div>
+      </div>
+      <div class="formation-status">
+        <div class="status-avatar">THOR</div>
+        <div class="status-info">
+          <div class="status-binomio">Thor · GCM Silva</div>
+          <div class="status-time">Iniciada em <strong>12/03/2026</strong> · 2 meses em formação</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab">Roadmap</div>
+      <div class="tab">Módulo atual</div>
+      <div class="tab active">Histórico</div>
+      <div class="tab">Estatísticas</div>
+    </div>
+
+    <div class="tab-content">
+
+      <div class="session-card">
+        <div class="session-header">
+          <div>
+            <div class="session-date">07/05/2026 · 09:15</div>
+            <div class="session-marco">M2 · Indicação em telhado</div>
+          </div>
+          <span class="session-result result-completa">COMPLETA</span>
+        </div>
+        <div class="session-stats">
+          <span class="session-stat"><span class="session-stat-icon">📏</span> 147m</span>
+          <span class="session-stat"><span class="session-stat-icon">⏱</span> 12min</span>
+          <span class="session-stat"><span class="session-stat-icon">👤</span> Fig. anônimo</span>
+        </div>
+      </div>
+
+      <div class="session-card">
+        <div class="session-header">
+          <div>
+            <div class="session-date">03/05/2026 · 14:40</div>
+            <div class="session-marco">M2 · Indicação de carro</div>
+          </div>
+          <span class="session-result result-checagem">CHECAGEM</span>
+        </div>
+        <div class="session-stats">
+          <span class="session-stat"><span class="session-stat-icon">📏</span> 198m</span>
+          <span class="session-stat"><span class="session-stat-icon">⏱</span> 18min</span>
+          <span class="session-stat"><span class="session-stat-icon">👤</span> Fig. Souza</span>
+        </div>
+      </div>
+
+      <div class="session-card">
+        <div class="session-header">
+          <div>
+            <div class="session-date">30/04/2026 · 10:20</div>
+            <div class="session-marco">M2 · Indicação em telhado</div>
+          </div>
+          <span class="session-result result-perda">PERDA DE RASTRO</span>
+        </div>
+        <div class="session-stats">
+          <span class="session-stat"><span class="session-stat-icon">📏</span> 89m</span>
+          <span class="session-stat"><span class="session-stat-icon">⏱</span> 8min</span>
+          <span class="session-stat"><span class="session-stat-icon">👤</span> Fig. anônimo</span>
+        </div>
+      </div>
+
+      <div class="session-card">
+        <div class="session-header">
+          <div>
+            <div class="session-date">28/04/2026 · 16:00</div>
+            <div class="session-marco">M2 · Indicação de carro</div>
+          </div>
+          <span class="session-result result-completa">COMPLETA</span>
+        </div>
+        <div class="session-stats">
+          <span class="session-stat"><span class="session-stat-icon">📏</span> 156m</span>
+          <span class="session-stat"><span class="session-stat-icon">⏱</span> 13min</span>
+          <span class="session-stat"><span class="session-stat-icon">👤</span> Fig. Pereira</span>
+        </div>
+      </div>
+
+      <div class="session-card">
+        <div class="session-header">
+          <div>
+            <div class="session-date">25/04/2026 · 11:30</div>
+            <div class="session-marco">M2 · Indicação de porta</div>
+          </div>
+          <span class="session-result result-completa">COMPLETA</span>
+        </div>
+        <div class="session-stats">
+          <span class="session-stat"><span class="session-stat-icon">📏</span> 134m</span>
+          <span class="session-stat"><span class="session-stat-icon">⏱</span> 11min</span>
+          <span class="session-stat"><span class="session-stat-icon">👤</span> Fig. anônimo</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">+ NOVA SESSÃO DE FORMAÇÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA 4: ABA ESTATÍSTICAS -->
+<div class="phone-wrap">
+  <div class="phone-label">ABA: ESTATÍSTICAS</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">FORMAÇÃO · EM ANDAMENTO</div>
+          <div class="header-main">Busca & Captura</div>
+        </div>
+        <div class="header-icon">🎯</div>
+      </div>
+      <div class="formation-status">
+        <div class="status-avatar">THOR</div>
+        <div class="status-info">
+          <div class="status-binomio">Thor · GCM Silva</div>
+          <div class="status-time">Iniciada em <strong>12/03/2026</strong> · 2 meses em formação</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab">Roadmap</div>
+      <div class="tab">Módulo atual</div>
+      <div class="tab">Histórico</div>
+      <div class="tab active">Estatísticas</div>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- Big numbers -->
+      <div class="stat-block">
+        <div class="stat-header">VISÃO GERAL</div>
+        <div class="big-numbers">
+          <div class="big-num-card">
+            <div class="big-num-value">42</div>
+            <div class="big-num-label">SESSÕES TOTAIS</div>
+          </div>
+          <div class="big-num-card">
+            <div class="big-num-value">5.8km</div>
+            <div class="big-num-label">DISTÂNCIA TOTAL</div>
+          </div>
+          <div class="big-num-card">
+            <div class="big-num-value">147m</div>
+            <div class="big-num-label">MÉDIA POR SESSÃO</div>
+          </div>
+          <div class="big-num-card">
+            <div class="big-num-value">412m</div>
+            <div class="big-num-label">MAIOR TRILHA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evolução da distância -->
+      <div class="stat-block">
+        <div class="stat-header">📏 EVOLUÇÃO DA DISTÂNCIA · ÚLTIMAS 10 SESSÕES</div>
+        <div class="chart-y-axis">
+          <span>400m</span>
+          <span>0m</span>
+        </div>
+        <div class="chart-area">
+          <div class="chart-bar" style="height: 28%;"></div>
+          <div class="chart-bar" style="height: 35%;"></div>
+          <div class="chart-bar" style="height: 22%;"></div>
+          <div class="chart-bar" style="height: 38%;"></div>
+          <div class="chart-bar" style="height: 33%;"></div>
+          <div class="chart-bar" style="height: 50%;"></div>
+          <div class="chart-bar" style="height: 39%;"></div>
+          <div class="chart-bar" style="height: 22%;"></div>
+          <div class="chart-bar" style="height: 49%;"></div>
+          <div class="chart-bar highlight" style="height: 37%;"></div>
+        </div>
+        <div class="chart-labels">
+          <span class="chart-label">10 sessões atrás</span>
+          <span class="chart-label">hoje</span>
+        </div>
+      </div>
+
+      <!-- Distribuição de resultados -->
+      <div class="stat-block">
+        <div class="stat-header">🎯 DISTRIBUIÇÃO DE RESULTADOS</div>
+        <div class="result-distribution">
+          <div class="result-row">
+            <span class="result-label">Completa</span>
+            <div class="result-bar-container">
+              <div class="result-bar completa-bar" style="width: 71%;"></div>
+            </div>
+            <span class="result-percent">71%</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Checagem</span>
+            <div class="result-bar-container">
+              <div class="result-bar checagem-bar" style="width: 21%;"></div>
+            </div>
+            <span class="result-percent">21%</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Perda</span>
+            <div class="result-bar-container">
+              <div class="result-bar perda-bar" style="width: 8%;"></div>
+            </div>
+            <span class="result-percent">8%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Figurantes -->
+      <div class="stat-block">
+        <div class="stat-header">👤 FIGURANTES UTILIZADOS</div>
+        <div class="big-numbers">
+          <div class="big-num-card">
+            <div class="big-num-value">12</div>
+            <div class="big-num-label">FIGURANTES ÚNICOS</div>
+          </div>
+          <div class="big-num-card">
+            <div class="big-num-value">3.5x</div>
+            <div class="big-num-label">REPETIÇÃO MÉDIA</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">+ NOVA SESSÃO DE FORMAÇÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notas de design -->
+<div style="width: 100%; display: flex; justify-content: center; margin-top: 20px;">
+  <div class="design-notes">
+    <h3>DECISÕES APLICADAS</h3>
+    <ul>
+      <li>4 abas: Roadmap / Módulo atual / Histórico / Estatísticas</li>
+      <li>Header de status sempre visível (binômio + tempo em formação)</li>
+      <li>Cores: amarelo (formação), verde (concluído), cinza (bloqueado)</li>
+      <li>Aba Roadmap: visão macro dos 3 módulos + avaliação final opcional</li>
+      <li>Módulo bloqueado é VISÍVEL (você definiu isso), só com badge "A INICIAR"</li>
+      <li>Aba Módulo atual: marcos com contador de sessões e data de atingimento</li>
+      <li>Banner sugerindo objetos de odor por módulo</li>
+      <li>Botão "+ Adicionar marco" pra criar marcos novos não previstos</li>
+      <li>Aba Histórico: sessões com distância do Rastreador, tempo e figurante</li>
+      <li>3 resultados possíveis: COMPLETA / CHECAGEM / PERDA DE RASTRO</li>
+      <li>Aba Estatísticas: big numbers + gráfico de evolução + distribuição</li>
+      <li>Variação de figurantes monitorada (3.5x repetição média)</li>
+      <li>Maior trilha em destaque (412m — prova de progresso)</li>
+      <li>CTA "+ Nova sessão de formação" fixo no rodapé em todas as abas</li>
+      <li>Marcos atingidos têm fundo levemente verde (feedback visual)</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

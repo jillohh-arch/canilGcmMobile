@@ -16,7 +16,7 @@ extension _DailyTimelineEntryIncidentProgressSection
       const SizedBox(height: 14),
       Text(
         'LINHA DO TEMPO',
-        style: GoogleFonts.oxanium(
+        style: GoogleFonts.inter(
           color: color.withAlpha(230),
           fontSize: 10,
           fontWeight: FontWeight.w900,

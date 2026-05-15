@@ -94,7 +94,7 @@ class _SensorCard extends StatelessWidget {
                   Text(
                     'TOQUE PARA ALTERAR',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.robotoMono(
+                    style: GoogleFonts.inter(
                       fontSize: 7,
                       fontWeight: FontWeight.w900,
                       color: Colors.cyanAccent.withValues(alpha: 0.68),

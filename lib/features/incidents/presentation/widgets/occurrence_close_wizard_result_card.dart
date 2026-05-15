@@ -27,7 +27,7 @@ class _ResultCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? option.color.withAlpha(28)
-                : const Color(0xFF0B1220),
+                : const Color(0xFF0E1A1F),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: selected ? option.color : Colors.white12,
@@ -55,7 +55,7 @@ class _ResultCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: selected ? Colors.white : Colors.white60,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w900,

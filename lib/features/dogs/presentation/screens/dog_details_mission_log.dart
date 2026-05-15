@@ -81,7 +81,7 @@ class _MissionLog extends StatelessWidget {
       title: incident.type ?? 'Ocorrência',
       subtitle: '${incident.result} · ${incident.location}',
       icon: Icons.report_rounded,
-      color: const Color(0xFF4ECDE4),
+      color: AppTheme.primary,
       tag: 'OCORRÊNCIA',
     );
   }

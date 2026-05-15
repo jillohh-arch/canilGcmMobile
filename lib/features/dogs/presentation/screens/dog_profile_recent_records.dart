@@ -18,14 +18,14 @@ class _RecentRecordsSection extends StatelessWidget {
         _SectionTitle(title: 'ÚLTIMOS REGISTROS'),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _panelColor.withAlpha(200),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: _cyan.withAlpha(30)),
           ),
           child: loading
-              ? const Center(
+              ? Center(
                   child: SizedBox(
                     width: 16,
                     height: 16,
@@ -72,7 +72,7 @@ class _RecordRow extends StatelessWidget {
     final timeLabel = _formatRelativeTime(record.dataHora);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
@@ -108,7 +108,7 @@ class _RecordRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          const Icon(
+          Icon(
             Icons.chevron_right_rounded,
             color: Colors.white24,
             size: 18,

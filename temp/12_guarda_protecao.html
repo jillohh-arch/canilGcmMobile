@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guarda & Proteção - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* ===== HEADER ===== */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text { flex: 1; }
+
+  .header-subtitle {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Status do cão */
+  .dog-status {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dog-status.operational {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.2);
+  }
+
+  .ds-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .dog-status.operational .ds-avatar {
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  .ds-info { flex: 1; }
+
+  .ds-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .ds-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  /* Abas */
+  .tabs-row {
+    display: flex;
+    gap: 2px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .tabs-row::-webkit-scrollbar { height: 0; }
+
+  .tab {
+    padding: 12px 10px;
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab.active {
+    color: #4dd0e1;
+    border-bottom-color: #4dd0e1;
+  }
+
+  .tab-content, .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 110px 16px;
+  }
+
+  .tab-content::-webkit-scrollbar, .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* ===== TRILHAS DE IMPULSOS ===== */
+  .impulse-trail {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .impulse-trail.consolidated { border-left: 3px solid #2ecc71; }
+  .impulse-trail.opening { border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.03); }
+  .impulse-trail.developing { border-left: 3px solid #e67e22; }
+  .impulse-trail.not-started { border-left: 3px solid rgba(149, 165, 166, 0.3); opacity: 0.8; }
+
+  .impulse-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .impulse-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .impulse-trail.consolidated .impulse-icon { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .impulse-trail.opening .impulse-icon { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .impulse-trail.developing .impulse-icon { background: rgba(230, 126, 34, 0.12); color: #e67e22; }
+  .impulse-trail.not-started .impulse-icon { background: rgba(149, 165, 166, 0.08); color: #95a5a6; }
+
+  .impulse-info { flex: 1; min-width: 0; }
+
+  .impulse-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .impulse-state {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .impulse-trail.consolidated .impulse-state { color: #2ecc71; }
+  .impulse-trail.opening .impulse-state { color: #f1c40f; }
+  .impulse-trail.developing .impulse-state { color: #e67e22; }
+  .impulse-trail.not-started .impulse-state { color: #95a5a6; }
+
+  .impulse-badge {
+    padding: 3px 7px;
+    border-radius: 8px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .impulse-trail.consolidated .impulse-badge { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .impulse-trail.opening .impulse-badge { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .impulse-trail.developing .impulse-badge { background: rgba(230, 126, 34, 0.12); color: #e67e22; }
+  .impulse-trail.not-started .impulse-badge { background: rgba(149, 165, 166, 0.08); color: #95a5a6; }
+
+  /* Trilha visual */
+  .impulse-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .impulse-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .impulse-trail.consolidated .impulse-bar-fill { background: #2ecc71; width: 100%; }
+  .impulse-trail.opening .impulse-bar-fill { background: #f1c40f; width: 35%; }
+  .impulse-trail.developing .impulse-bar-fill { background: #e67e22; width: 65%; }
+  .impulse-trail.not-started .impulse-bar-fill { background: transparent; width: 0; }
+
+  .impulse-context {
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.4;
+    font-style: italic;
+  }
+
+  .impulse-context.not-started-text {
+    color: #7a8a92;
+  }
+
+  /* ===== CAPACIDADES TÉCNICAS ===== */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .tech-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 9px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tech-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .tech-check.done {
+    background: #2ecc71;
+    border-color: #2ecc71;
+    color: #050d10;
+  }
+
+  .tech-check.in-progress {
+    background: rgba(241, 196, 15, 0.15);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .tech-name {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .tech-item:not(:has(.done)):not(:has(.in-progress)) .tech-name { color: #7a8a92; }
+
+  /* ===== COMANDOS DA ESPECIALIDADE ===== */
+  .specialty-cmd {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .cmd-stage {
+    font-size: 18px;
+    width: 24px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .cmd-stage.full { color: #2ecc71; }
+  .cmd-stage.partial { color: #e67e22; }
+  .cmd-stage.empty { color: #5a7280; }
+
+  .cmd-info { flex: 1; min-width: 0; }
+
+  .cmd-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .cmd-desc {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .cmd-status {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .cmd-status.op { color: #2ecc71; }
+  .cmd-status.dev { color: #e67e22; }
+  .cmd-status.none { color: #5a7280; }
+
+  /* ===== HISTÓRICO RECENTE NA FORMAÇÃO ===== */
+  .recent-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .recent-date {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 700;
+    width: 42px;
+    flex-shrink: 0;
+  }
+
+  .recent-info { flex: 1; min-width: 0; }
+
+  .recent-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .recent-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .recent-payment {
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 3px 7px;
+    border-radius: 6px;
+  }
+
+  .recent-payment.caca { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .recent-payment.defesa { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .recent-payment.agressao { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+  .recent-payment.nenhum { background: rgba(149, 165, 166, 0.1); color: #95a5a6; }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* ===== TELA C: NOVA SESSÃO ===== */
+  /* Chip groups */
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 7px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .chip.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  .chip.selected-caca {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  .chip.selected-defesa {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .chip.selected-agressao {
+    background: rgba(231, 76, 60, 0.12);
+    border-color: #e74c3c;
+    color: #e74c3c;
+  }
+
+  /* Form fields */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-input-row {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .fi-icon {
+    color: #4dd0e1;
+    font-size: 14px;
+  }
+
+  .fi-content { flex: 1; }
+
+  .fi-key {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 1px;
+  }
+
+  .fi-val {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .fi-chev {
+    color: #5a7280;
+    font-size: 13px;
+  }
+
+  /* Comportamento - radio */
+  .behavior-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .behavior-opt {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .behavior-opt.selected {
+    background: rgba(46, 204, 113, 0.1);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  /* Pagamento - destaque especial */
+  .payment-section {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+
+  .payment-title {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .payment-sub {
+    color: #7a8a92;
+    font-size: 10px;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+
+  .payment-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .payment-opt {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 4px;
+    color: #7a8a92;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .payment-opt-icon {
+    font-size: 16px;
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .payment-opt-text {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .payment-opt.selected-caca {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  .payment-opt.selected-defesa {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .payment-opt.selected-agressao {
+    background: rgba(231, 76, 60, 0.12);
+    border-color: #e74c3c;
+    color: #e74c3c;
+  }
+
+  .payment-opt.selected-nenhum {
+    background: rgba(149, 165, 166, 0.1);
+    border-color: #95a5a6;
+    color: #95a5a6;
+  }
+
+  /* Avaliação - 4 critérios */
+  .eval-grid {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .eval-row {
+    margin-bottom: 12px;
+  }
+
+  .eval-row:last-child { margin-bottom: 0; }
+
+  .eval-name {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .eval-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+  }
+
+  .eval-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    padding: 6px 4px;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .eval-btn.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Cenário simulado expansível */
+  .scenario-toggle {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+
+  .scenario-toggle.active {
+    background: rgba(231, 76, 60, 0.06);
+    border-color: rgba(231, 76, 60, 0.3);
+  }
+
+  .scenario-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .scenario-icon {
+    color: #5a7280;
+    font-size: 16px;
+  }
+
+  .scenario-toggle.active .scenario-icon { color: #e74c3c; }
+
+  .scenario-text {
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .scenario-toggle.active .scenario-text { color: #e74c3c; }
+
+  .scenario-switch {
+    width: 38px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .scenario-toggle.active .scenario-switch { background: #e74c3c; }
+
+  .scenario-switch-handle {
+    width: 16px;
+    height: 16px;
+    background: #050d10;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: all 0.2s;
+  }
+
+  .scenario-toggle.active .scenario-switch-handle { left: 19px; }
+
+  /* Textarea */
+  .obs-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .obs-input::placeholder { color: #5a7280; }
+
+  /* ===== MANUTENÇÃO ===== */
+  .focus-card {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.08), rgba(46, 204, 113, 0.04));
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .focus-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+  }
+
+  .focus-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+
+  .focus-input::placeholder { color: #5a7280; }
+
+  .focus-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .focus-suggestion {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    color: #4dd0e1;
+    padding: 5px 10px;
+    border-radius: 14px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: FORMAÇÃO (APOLO) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — FORMAÇÃO (APOLO)
+    <small>Trilhas dos 3 impulsos + capacidades técnicas + comandos</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#f1c40f;">FORMAÇÃO · EM ANDAMENTO</div>
+          <div class="header-main">Guarda & Proteção</div>
+        </div>
+        <div class="header-icon" style="background:rgba(241,196,15,0.12); color:#f1c40f;">🛡</div>
+      </div>
+      <div class="dog-status">
+        <div class="ds-avatar">APOLO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Apolo · GCM Silva · 2 anos</div>
+          <div class="ds-time">Iniciado em 02/2026 · 18 sessões</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab active">Trilhas</div>
+      <div class="tab">Impulso atual</div>
+      <div class="tab">Sessões</div>
+      <div class="tab">Estats</div>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- TRILHAS DOS 3 IMPULSOS -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>JORNADA DOS IMPULSOS</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="impulse-trail consolidated">
+        <div class="impulse-top">
+          <div class="impulse-icon">🦌</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Caça</div>
+            <div class="impulse-state">Consolidada</div>
+          </div>
+          <span class="impulse-badge">●</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+        <div class="impulse-context">Equipamento se move e ativa o impulso · base emocional do trabalho</div>
+      </div>
+
+      <div class="impulse-trail opening">
+        <div class="impulse-top">
+          <div class="impulse-icon">🛡</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Defesa</div>
+            <div class="impulse-state">Em abertura</div>
+          </div>
+          <span class="impulse-badge">◔</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+        <div class="impulse-context">Confronto direto com o cão · pagamento volta em caça pra equilibrar</div>
+      </div>
+
+      <div class="impulse-trail not-started">
+        <div class="impulse-top">
+          <div class="impulse-icon">⚔</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Agressão</div>
+            <div class="impulse-state">Não iniciada</div>
+          </div>
+          <span class="impulse-badge">○</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+        <div class="impulse-context not-started-text">Cão como parceiro de luta · trabalha após defesa consolidada</div>
+      </div>
+
+      <!-- CAPACIDADES TÉCNICAS -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>CAPACIDADES TÉCNICAS</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-help">na caça</span>
+      </div>
+
+      <div class="tech-grid">
+        <div class="tech-item">
+          <div class="tech-check done">✓</div>
+          <div class="tech-name">Material inicial</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-check done">✓</div>
+          <div class="tech-name">Mordida firme</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-check done">✓</div>
+          <div class="tech-name">Boca cheia</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-check in-progress">◔</div>
+          <div class="tech-name">Estabilização</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-check done">✓</div>
+          <div class="tech-name">Manga jovem</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-check in-progress">◔</div>
+          <div class="tech-name">Manga adulta</div>
+        </div>
+      </div>
+
+      <!-- COMANDOS DA ESPECIALIDADE -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>COMANDOS DA ESPECIALIDADE</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="specialty-cmd">
+        <span class="cmd-stage partial">◑</span>
+        <div class="cmd-info">
+          <div class="cmd-name">Larga</div>
+          <div class="cmd-desc">Solta o equipamento sob comando</div>
+        </div>
+        <span class="cmd-status dev">EM DESENVOLVIMENTO</span>
+      </div>
+
+      <div class="specialty-cmd">
+        <span class="cmd-stage empty">○</span>
+        <div class="cmd-info">
+          <div class="cmd-name">Atenção</div>
+          <div class="cmd-desc">Latir para o figurante</div>
+        </div>
+        <span class="cmd-status none">NÃO INICIADO</span>
+      </div>
+
+      <!-- SESSÕES RECENTES -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>SESSÕES RECENTES</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">10/05</div>
+        <div class="recent-info">
+          <div class="recent-title">Defesa · Fig. Souza</div>
+          <div class="recent-meta">Manga adulta · Boca cheia</div>
+        </div>
+        <span class="recent-payment caca">🦌 Caça</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">07/05</div>
+        <div class="recent-info">
+          <div class="recent-title">Caça · Fig. Lima</div>
+          <div class="recent-meta">Manga jovem · Larga</div>
+        </div>
+        <span class="recent-payment caca">🦌 Caça</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">03/05</div>
+        <div class="recent-info">
+          <div class="recent-title">Defesa · Fig. Souza</div>
+          <div class="recent-meta">Cenário simulado · abordagem</div>
+        </div>
+        <span class="recent-payment defesa">🛡 Defesa</span>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">▶ NOVA SESSÃO DE FORMAÇÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA B: MANUTENÇÃO (BONO) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — MANUTENÇÃO (BONO)
+    <small>Cão operacional · foco em aprimoramento por sessão</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#2ecc71;">MANUTENÇÃO OPERACIONAL</div>
+          <div class="header-main">Guarda & Proteção</div>
+        </div>
+        <div class="header-icon" style="background:rgba(46,204,113,0.12); color:#2ecc71;">🛡</div>
+      </div>
+      <div class="dog-status operational">
+        <div class="ds-avatar">BONO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Bono · GCM Ragonha</div>
+          <div class="ds-time">Operacional há 4 anos · 64 sessões · última há 5d</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Foco de aprimoramento -->
+      <div class="focus-card">
+        <div class="focus-label">🎯 FOCO DESTA SESSÃO</div>
+        <input class="focus-input" type="text" placeholder="O que você quer aprimorar?" value="Larga mais imediata" />
+        <div class="focus-suggestions">
+          <span class="focus-suggestion">Mordida calma</span>
+          <span class="focus-suggestion">Larga melhor</span>
+          <span class="focus-suggestion">Atenção firme</span>
+          <span class="focus-suggestion">Rotina</span>
+        </div>
+      </div>
+
+      <!-- 3 impulsos do Bono - todos operacionais -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>IMPULSOS · BONO</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="impulse-trail consolidated">
+        <div class="impulse-top">
+          <div class="impulse-icon">🦌</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Caça</div>
+            <div class="impulse-state">Operacional</div>
+          </div>
+          <span class="impulse-badge">●</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+      </div>
+
+      <div class="impulse-trail consolidated">
+        <div class="impulse-top">
+          <div class="impulse-icon">🛡</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Defesa</div>
+            <div class="impulse-state">Operacional</div>
+          </div>
+          <span class="impulse-badge">●</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+      </div>
+
+      <div class="impulse-trail consolidated">
+        <div class="impulse-top">
+          <div class="impulse-icon">⚔</div>
+          <div class="impulse-info">
+            <div class="impulse-name">Agressão</div>
+            <div class="impulse-state">Operacional</div>
+          </div>
+          <span class="impulse-badge">●</span>
+        </div>
+        <div class="impulse-bar"><div class="impulse-bar-fill"></div></div>
+      </div>
+
+      <!-- Sessões recentes -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>MANUTENÇÕES RECENTES</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">05/05</div>
+        <div class="recent-info">
+          <div class="recent-title">Mordida calma · Fig. Souza</div>
+          <div class="recent-meta">Defesa · manga adulta</div>
+        </div>
+        <span class="recent-payment caca">🦌 Caça</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">28/04</div>
+        <div class="recent-info">
+          <div class="recent-title">Rotina · Fig. Lima</div>
+          <div class="recent-meta">Caça · manga adulta</div>
+        </div>
+        <span class="recent-payment caca">🦌 Caça</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">21/04</div>
+        <div class="recent-info">
+          <div class="recent-title">Atenção firme · Fig. Souza</div>
+          <div class="recent-meta">Cenário · abordagem em viatura</div>
+        </div>
+        <span class="recent-payment agressao">⚔ Agressão</span>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">▶ INICIAR MANUTENÇÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA C: NOVA SESSÃO (FORMULÁRIO) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA C — NOVA SESSÃO DE FORMAÇÃO (APOLO)
+    <small>Formulário completo · Pagamento + Cenário simulado + Avaliação</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#f1c40f;">NOVA SESSÃO · GUARDA & PROTEÇÃO</div>
+          <div class="header-main">Registrar treino</div>
+        </div>
+        <div class="header-icon" style="background:rgba(241,196,15,0.12); color:#f1c40f;">🛡</div>
+      </div>
+      <div class="dog-status">
+        <div class="ds-avatar">APOLO</div>
+        <div class="ds-info">
+          <div class="ds-binomio">Apolo · GCM Silva</div>
+          <div class="ds-time">14:48 · Canil GCM Limeira</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- IMPULSO TRABALHADO -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>IMPULSO TRABALHADO</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip">🦌 Caça</span>
+          <span class="chip selected-defesa">🛡 Defesa</span>
+          <span class="chip">⚔ Agressão</span>
+          <span class="chip">Mista</span>
+        </div>
+      </div>
+
+      <!-- FIGURANTE -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>FIGURANTE</span>
+        </div>
+        <div class="field-input-row">
+          <span class="fi-icon">👤</span>
+          <div class="fi-content">
+            <div class="fi-key">QUEM FIGUROU</div>
+            <div class="fi-val">Fig. Souza</div>
+          </div>
+          <span class="fi-chev">›</span>
+        </div>
+      </div>
+
+      <!-- EQUIPAMENTO -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>EQUIPAMENTO</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip">Material filhote</span>
+          <span class="chip">Manga jovem</span>
+          <span class="chip selected">Manga adulta</span>
+          <span class="chip">Traje</span>
+          <span class="chip">Vara</span>
+        </div>
+      </div>
+
+      <!-- CAPACIDADES TRABALHADAS -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>CAPACIDADES TRABALHADAS</span>
+          <span class="section-help">multi-select</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip selected">Mordida firme</span>
+          <span class="chip selected">Boca cheia</span>
+          <span class="chip selected">Estabilização</span>
+          <span class="chip">Mordida calma</span>
+          <span class="chip">Pressão sustentada</span>
+        </div>
+      </div>
+
+      <!-- COMANDOS -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>COMANDOS TRABALHADOS</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip selected">Larga</span>
+          <span class="chip">Atenção</span>
+          <span class="chip">Nenhum</span>
+        </div>
+      </div>
+
+      <!-- CENÁRIO SIMULADO -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>CENÁRIO</span>
+        </div>
+        <div class="scenario-toggle active">
+          <div class="scenario-left">
+            <span class="scenario-icon">🎬</span>
+            <span class="scenario-text">Cenário simulado</span>
+          </div>
+          <div class="scenario-switch"><div class="scenario-switch-handle"></div></div>
+        </div>
+        <textarea class="obs-input" placeholder="Descreva o cenário simulado..." style="margin-top:8px;">Abordagem de suspeito em via pública. Figurante simula reação evasiva e parte pra defesa frontal após latido de atenção.</textarea>
+      </div>
+
+      <!-- COMPORTAMENTO DO CÃO -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>COMPORTAMENTO DO CÃO</span>
+        </div>
+        <div class="behavior-options">
+          <div class="behavior-opt">Hesitante</div>
+          <div class="behavior-opt selected">Equilibrado</div>
+          <div class="behavior-opt">Firme</div>
+          <div class="behavior-opt">Exagerado</div>
+        </div>
+      </div>
+
+      <!-- AVALIAÇÃO MULTI-CRITÉRIO -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>AVALIAÇÃO DA SESSÃO</span>
+          <span class="section-help">pelo figurante</span>
+        </div>
+        <div class="eval-grid">
+          <div class="eval-row">
+            <div class="eval-name">Drive (intensidade)</div>
+            <div class="eval-buttons">
+              <div class="eval-btn">Ruim</div>
+              <div class="eval-btn">Regular</div>
+              <div class="eval-btn selected">Bom</div>
+              <div class="eval-btn">Ótimo</div>
+            </div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-name">Mordida (qualidade técnica)</div>
+            <div class="eval-buttons">
+              <div class="eval-btn">Ruim</div>
+              <div class="eval-btn">Regular</div>
+              <div class="eval-btn">Bom</div>
+              <div class="eval-btn selected">Ótimo</div>
+            </div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-name">Controle (resposta a comandos)</div>
+            <div class="eval-buttons">
+              <div class="eval-btn">Ruim</div>
+              <div class="eval-btn selected">Regular</div>
+              <div class="eval-btn">Bom</div>
+              <div class="eval-btn">Ótimo</div>
+            </div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-name">Equilíbrio emocional</div>
+            <div class="eval-buttons">
+              <div class="eval-btn">Ruim</div>
+              <div class="eval-btn">Regular</div>
+              <div class="eval-btn selected">Bom</div>
+              <div class="eval-btn">Ótimo</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGAMENTO DA SESSÃO -->
+      <div class="payment-section">
+        <div class="payment-title">PAGAMENTO DA SESSÃO</div>
+        <div class="payment-sub">Onde a sessão terminou emocionalmente · imensa maioria das vezes em caça</div>
+        <div class="payment-options">
+          <div class="payment-opt selected-caca">
+            <span class="payment-opt-icon">🦌</span>
+            <span class="payment-opt-text">CAÇA</span>
+          </div>
+          <div class="payment-opt">
+            <span class="payment-opt-icon">🛡</span>
+            <span class="payment-opt-text">DEFESA</span>
+          </div>
+          <div class="payment-opt">
+            <span class="payment-opt-icon">⚔</span>
+            <span class="payment-opt-text">AGRESSÃO</span>
+          </div>
+          <div class="payment-opt">
+            <span class="payment-opt-icon">⊘</span>
+            <span class="payment-opt-text">SEM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- OBSERVAÇÕES -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES DO FIGURANTE</span>
+          <span class="section-help">opcional</span>
+        </div>
+        <textarea class="obs-input" placeholder="Notas técnicas do figurante sobre a sessão..."></textarea>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">💾 SALVAR SESSÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>Estrutura única entre as especialidades</strong> — Guarda & Proteção não usa módulos numerados (B&C) nem fases estatísticas (Detecção). Usa <strong>trilhas paralelas dos 3 impulsos</strong>.</li>
+    <li><strong>Trilhas dos 3 impulsos visíveis simultaneamente</strong> · cada uma com estado próprio (consolidada/em abertura/em desenvolvimento/não iniciada)</li>
+    <li>Barra de progresso visual + texto descritivo do papel do figurante em cada impulso (citação direta da sua explicação)</li>
+    <li><strong>Capacidades técnicas em grid</strong> com estado individual (✓ feito · ◔ em progresso · ○ não iniciado)</li>
+    <li><strong>Comandos da especialidade separados</strong> da biblioteca de Obediência (Larga · Atenção)</li>
+    <li>5 estágios discretos nos comandos (mesmo padrão da Obediência)</li>
+    <li><strong>Sessões recentes mostram tipo de pagamento</strong> como badge colorido (verde caça · amarelo defesa · vermelho agressão · cinza sem)</li>
+    <li><strong>Manutenção do Bono</strong>: foco de aprimoramento como campo livre em destaque com sugestões rápidas (Mordida calma · Larga melhor · Atenção firme · Rotina)</li>
+    <li>3 impulsos do Bono operacionais (todos verdes) — visão de cão completo</li>
+    <li><strong>Nova sessão</strong> tem todos os campos discutidos: impulso · figurante · equipamento · capacidades · comandos · cenário · comportamento · avaliação · pagamento · observações</li>
+    <li>Avaliação multi-critério (Drive · Mordida · Controle · Equilíbrio) com 4 níveis cada (Ruim/Regular/Bom/Ótimo) — pelo figurante</li>
+    <li><strong>Pagamento da sessão em destaque institucional</strong> — 4 opções (Caça padrão, Defesa, Agressão, Sem)</li>
+    <li>Microcopy explicativa: "imensa maioria das vezes em caça"</li>
+    <li>"Sem pagamento" como opção registrável (não escondida) — vira flag de revisão posterior</li>
+    <li>Cenário simulado como toggle expansível com campo descritivo · ícone 🎬</li>
+    <li>"Nenhum" como opção válida em comandos trabalhados (sua observação)</li>
+    <li><strong>Sem GPS</strong> · sem certificação externa · treinos estáticos no local</li>
+  </ul>
+</div>
+
+</body>
+</html>

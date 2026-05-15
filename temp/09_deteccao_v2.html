@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detecção - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* ===== HEADER ===== */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* ===== TELA A: VISÃO GERAL ===== */
+  .a-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 16px 100px 16px;
+  }
+
+  .a-content::-webkit-scrollbar { width: 0; }
+
+  .dog-card {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .dog-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .dog-info { flex: 1; }
+
+  .dog-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .dog-binomio {
+    color: #4dd0e1;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  /* Card de linha de detecção */
+  .line-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .line-card.operacional { border-left: 3px solid #2ecc71; }
+  .line-card.formacao { border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.02); }
+  .line-card.nao-iniciada {
+    border-left: 3px solid rgba(149, 165, 166, 0.3);
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .line-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+
+  .line-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .line-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .line-card.operacional .line-icon { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .line-card.formacao .line-icon { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .line-card.nao-iniciada .line-icon { background: rgba(149, 165, 166, 0.08); color: #95a5a6; }
+
+  .line-info { flex: 1; min-width: 0; }
+
+  .line-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .line-status {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .line-card.operacional .line-status { color: #2ecc71; }
+  .line-card.formacao .line-status { color: #f1c40f; }
+  .line-card.nao-iniciada .line-status { color: #95a5a6; }
+
+  .coverage-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0;
+  }
+
+  .coverage-tag {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 3px 8px;
+    color: #b0c4cc;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .progress-section { margin: 8px 0; }
+
+  .progress-label {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-label strong { color: #fff; font-weight: 700; }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .progress-segment {
+    height: 100%;
+    border-right: 1px solid #050d10;
+  }
+
+  .progress-segment:last-child { border-right: none; }
+  .progress-segment.done { background: #f1c40f; }
+  .progress-segment.partial { background: linear-gradient(90deg, #f1c40f 50%, rgba(255,255,255,0.06) 50%); }
+
+  .line-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .line-meta-text {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .line-cta {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .start-btn {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Card de sessão multi-linha (atalho) */
+  .multi-session-card {
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.08), rgba(231, 76, 60, 0.04));
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .multi-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .multi-info { flex: 1; }
+
+  .multi-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .multi-sub {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .multi-cta {
+    color: #f1c40f;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Selo de certificação */
+  .cert-badge-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+    padding: 3px 7px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  /* ===== TELA C: SESSÃO MULTI-LINHA ===== */
+  .live-screen {
+    background: #0a1418;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .live-topbar {
+    background: rgba(241, 196, 15, 0.08);
+    border-bottom: 1px solid rgba(241, 196, 15, 0.2);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .live-status-yellow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #f1c40f;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+  }
+
+  .live-dot-yellow {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f1c40f;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .live-info {
+    color: #b0c4cc;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  /* Banner multi-linha */
+  .multi-line-banner {
+    background: rgba(241, 196, 15, 0.06);
+    border-bottom: 1px solid rgba(241, 196, 15, 0.15);
+    padding: 10px 16px;
+    flex-shrink: 0;
+  }
+
+  .multi-line-banner-label {
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .multi-line-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .ml-chip {
+    background: rgba(241, 196, 15, 0.12);
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    color: #f1c40f;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .live-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+  }
+
+  .live-content::-webkit-scrollbar { width: 0; }
+
+  /* Card da tentativa atual */
+  .attempt-card {
+    background: rgba(77, 208, 225, 0.05);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .attempt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .attempt-num {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .attempt-total {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .attempt-title {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .position-selector { margin-bottom: 14px; }
+
+  .position-label {
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .position-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pos-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 12px 8px;
+    color: #7a8a92;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .pos-btn.active {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .pos-icon {
+    font-size: 18px;
+    margin-bottom: 2px;
+    display: block;
+  }
+
+  .result-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .result-btn-big {
+    border-radius: 12px;
+    padding: 16px 8px;
+    cursor: pointer;
+    border: none;
+    text-align: center;
+  }
+
+  .result-btn-hit {
+    background: #2ecc71;
+    color: #050d10;
+  }
+
+  .result-btn-miss {
+    background: rgba(231, 76, 60, 0.15);
+    border: 1.5px solid #e74c3c;
+    color: #e74c3c;
+  }
+
+  .result-btn-icon {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 3px;
+    display: block;
+  }
+
+  .result-btn-text {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* Contadores duplicados por linha */
+  .line-counters-section {
+    margin-bottom: 14px;
+  }
+
+  .lcs-label {
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .line-counter {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .line-counter.critical {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.3);
+    animation: glow 2s infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); }
+    50% { box-shadow: 0 0 12px rgba(46, 204, 113, 0.2); }
+  }
+
+  .lc-line-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(241, 196, 15, 0.12);
+    color: #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .lc-line-info { flex: 1; min-width: 0; }
+
+  .lc-line-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .lc-line-phase {
+    color: #7a8a92;
+    font-size: 9px;
+  }
+
+  .lc-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+
+  .lc-progress-val {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .lc-progress-val strong { color: #f1c40f; }
+
+  .line-counter.critical .lc-progress-val strong { color: #2ecc71; }
+
+  .lc-progress-sub {
+    color: #5a7280;
+    font-size: 9px;
+    margin-top: 2px;
+  }
+
+  .lc-alert {
+    color: #2ecc71;
+    font-size: 9px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  /* Histórico desta sessão */
+  .session-history {
+    margin-bottom: 14px;
+  }
+
+  .sh-label {
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .sh-grid {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .sh-item {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .sh-item.hit {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: rgba(46, 204, 113, 0.3);
+    color: #2ecc71;
+  }
+
+  .sh-item.miss {
+    background: rgba(231, 76, 60, 0.12);
+    border-color: rgba(231, 76, 60, 0.3);
+    color: #e74c3c;
+  }
+
+  .sh-num {
+    font-size: 8px;
+    opacity: 0.6;
+    margin-bottom: 1px;
+  }
+
+  .end-session {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+  }
+
+  .btn-pause {
+    background: rgba(241, 196, 15, 0.08);
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    color: #f1c40f;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-end-session {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1.5px solid #e74c3c;
+    color: #e74c3c;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+
+  /* ===== TELA D: CERTIFICAÇÃO EXTERNA ===== */
+  .cert-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 100px 16px;
+  }
+
+  .cert-content::-webkit-scrollbar { width: 0; }
+
+  /* Banner explicativo */
+  .cert-banner {
+    background: rgba(46, 204, 113, 0.06);
+    border: 1px solid rgba(46, 204, 113, 0.25);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 12px;
+  }
+
+  .cert-banner-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .cert-banner-info { flex: 1; }
+
+  .cert-banner-title {
+    color: #2ecc71;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .cert-banner-text {
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* Form fields */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-optional {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .field-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+
+  .field-input::placeholder { color: #5a7280; }
+
+  textarea.field-input {
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  /* Resultado da prova */
+  .result-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .result-opt {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .result-opt.selected-aprovado {
+    background: rgba(46, 204, 113, 0.1);
+    border-color: #2ecc71;
+  }
+
+  .result-opt.selected-reprovado {
+    background: rgba(231, 76, 60, 0.1);
+    border-color: #e74c3c;
+  }
+
+  .result-opt-icon {
+    font-size: 20px;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .result-opt.selected-aprovado .result-opt-icon { color: #2ecc71; }
+  .result-opt.selected-reprovado .result-opt-icon { color: #e74c3c; }
+
+  .result-opt-text {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .result-opt:not(.selected-aprovado):not(.selected-reprovado) .result-opt-text { color: #7a8a92; }
+
+  /* Anexo */
+  .attachment-area {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(77, 208, 225, 0.4);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .attachment-icon {
+    font-size: 24px;
+    color: #4dd0e1;
+  }
+
+  .attachment-text {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .attachment-sub {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  /* CTA bar */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #7a8a92;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-save-cert {
+    background: #2ecc71;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: VISÃO GERAL (MULTI-LINHA) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — VISÃO GERAL DE DETECÇÃO
+    <small>Múltiplas linhas em formação paralela</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#4dd0e1;">ESPECIALIDADE</div>
+          <div class="header-main">Detecção</div>
+        </div>
+        <div class="header-icon" style="background:rgba(77,208,225,0.12); color:#4dd0e1;">👃</div>
+      </div>
+    </div>
+
+    <div class="a-content">
+
+      <div class="dog-card">
+        <div class="dog-avatar">THOR</div>
+        <div class="dog-info">
+          <div class="dog-name">Thor</div>
+          <div class="dog-binomio">Conduzido por GCM Silva</div>
+        </div>
+      </div>
+
+      <!-- Card de atalho pra sessão multi-linha -->
+      <div class="multi-session-card">
+        <div class="multi-icon">⚡</div>
+        <div class="multi-info">
+          <div class="multi-title">Sessão multi-linha disponível</div>
+          <div class="multi-sub">Drogas + Armas em formação ativa — pode treinar junto</div>
+        </div>
+        <div class="multi-cta">▶</div>
+      </div>
+
+      <div class="section-label">
+        <span>LINHAS DE DETECÇÃO</span>
+        <span class="section-label-line"></span>
+      </div>
+
+      <!-- Linha Drogas - Em formação -->
+      <div class="line-card formacao">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">💊</div>
+            <div class="line-info">
+              <div class="line-name">Drogas</div>
+              <div class="line-status">Em formação · Fase 3</div>
+            </div>
+          </div>
+        </div>
+        <div class="coverage-tags">
+          <span class="coverage-tag">maconha</span>
+          <span class="coverage-tag">cocaína</span>
+          <span class="coverage-tag">crack</span>
+          <span class="coverage-tag">LSD</span>
+          <span class="coverage-tag">ecstasy</span>
+          <span class="coverage-tag">+ outros</span>
+        </div>
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Protocolo Ragonha · Fase 3 de 5</span>
+            <strong>7 / 10</strong>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-segment done" style="flex: 1;"></div>
+            <div class="progress-segment done" style="flex: 1;"></div>
+            <div class="progress-segment partial" style="flex: 1;"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">42 sessões · última: hoje</span>
+          <span class="line-cta">Continuar →</span>
+        </div>
+      </div>
+
+      <!-- Linha Armas - Em formação (paralela) -->
+      <div class="line-card formacao">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">🔫</div>
+            <div class="line-info">
+              <div class="line-name">Armas</div>
+              <div class="line-status">Em formação · Fase 2</div>
+            </div>
+          </div>
+        </div>
+        <div class="coverage-tags">
+          <span class="coverage-tag">pólvora</span>
+          <span class="coverage-tag">munição</span>
+          <span class="coverage-tag">+ derivados</span>
+        </div>
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Protocolo Ragonha · Fase 2 de 5</span>
+            <strong>2 / 3 var</strong>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-segment done" style="flex: 1;"></div>
+            <div class="progress-segment partial" style="flex: 1;"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">28 sessões · última: hoje</span>
+          <span class="line-cta">Continuar →</span>
+        </div>
+      </div>
+
+      <!-- Linha Cadáver - Não iniciada -->
+      <div class="line-card nao-iniciada">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">🕯</div>
+            <div class="line-info">
+              <div class="line-name">Cadáver</div>
+              <div class="line-status">Não iniciada</div>
+            </div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">Especialidade não iniciada com Thor</span>
+          <button class="start-btn">+ Iniciar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA C: SESSÃO MULTI-LINHA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA C — SESSÃO MULTI-LINHA AO VIVO
+    <small>Drogas + Armas treinadas simultaneamente</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="live-screen">
+      <div class="live-topbar">
+        <div class="live-status-yellow">
+          <span class="live-dot-yellow"></span>
+          SESSÃO EM ANDAMENTO
+        </div>
+        <div class="live-info">Thor · GCM Silva</div>
+      </div>
+
+      <!-- Banner multi-linha -->
+      <div class="multi-line-banner">
+        <div class="multi-line-banner-label">LINHAS SENDO TRABALHADAS NESTA SESSÃO</div>
+        <div class="multi-line-chips">
+          <span class="ml-chip">💊 Drogas · F3</span>
+          <span class="ml-chip">🔫 Armas · F2</span>
+        </div>
+      </div>
+
+      <div class="live-content">
+
+        <!-- Card da tentativa atual -->
+        <div class="attempt-card">
+          <div class="attempt-header">
+            <span class="attempt-num">TENTATIVA 5</span>
+            <span class="attempt-total">de até 15 nesta sessão</span>
+          </div>
+          <div class="attempt-title">Posicionar caixa de odor</div>
+
+          <div class="position-selector">
+            <div class="position-label">ONDE A CAIXA COM ODOR ESTÁ?</div>
+            <div class="position-buttons">
+              <div class="pos-btn">
+                <span class="pos-icon">◧</span>
+                ESQ
+              </div>
+              <div class="pos-btn active">
+                <span class="pos-icon">◨</span>
+                MEIO
+              </div>
+              <div class="pos-btn">
+                <span class="pos-icon">▣</span>
+                DIR
+              </div>
+            </div>
+          </div>
+
+          <div class="result-buttons">
+            <button class="result-btn-big result-btn-hit">
+              <span class="result-btn-icon">✓</span>
+              <span class="result-btn-text">ACERTO</span>
+            </button>
+            <button class="result-btn-big result-btn-miss">
+              <span class="result-btn-icon">✗</span>
+              <span class="result-btn-text">ERRO</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Contadores por linha -->
+        <div class="line-counters-section">
+          <div class="lcs-label">PROGRESSO POR LINHA · CONSECUTIVOS HISTÓRICOS</div>
+
+          <div class="line-counter critical">
+            <div class="lc-line-icon">💊</div>
+            <div class="lc-line-info">
+              <div class="lc-line-name">Drogas</div>
+              <div class="lc-line-phase">Fase 3 · critério 10/10</div>
+            </div>
+            <div class="lc-progress">
+              <div class="lc-progress-val"><strong>9</strong> / 10</div>
+              <div class="lc-alert">⚠ 1 PRA AVANÇAR!</div>
+            </div>
+          </div>
+
+          <div class="line-counter">
+            <div class="lc-line-icon">🔫</div>
+            <div class="lc-line-info">
+              <div class="lc-line-name">Armas</div>
+              <div class="lc-line-phase">Fase 2 · critério 3/3</div>
+            </div>
+            <div class="lc-progress">
+              <div class="lc-progress-val"><strong>2</strong> / 3</div>
+              <div class="lc-progress-sub">variação meio</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Histórico desta sessão -->
+        <div class="session-history">
+          <div class="sh-label">TENTATIVAS DESTA SESSÃO · 4/4</div>
+          <div class="sh-grid">
+            <div class="sh-item hit"><span class="sh-num">1</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">2</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">3</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">4</span>✓</div>
+          </div>
+        </div>
+
+        <div class="end-session">
+          <button class="btn-pause">⏸ Pausar</button>
+          <button class="btn-end-session">⏹ ENCERRAR SESSÃO</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA D: CERTIFICAÇÃO EXTERNA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA D — REGISTRAR CERTIFICAÇÃO EXTERNA
+    <small>Avaliador independente · documento institucional</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#2ecc71;">DETECÇÃO · DROGAS</div>
+          <div class="header-main">Certificação externa</div>
+        </div>
+        <div class="header-icon" style="background:rgba(46,204,113,0.12); color:#2ecc71;">🏅</div>
+      </div>
+    </div>
+
+    <div class="cert-content">
+
+      <!-- Banner explicativo -->
+      <div class="cert-banner">
+        <div class="cert-banner-icon">🏅</div>
+        <div class="cert-banner-info">
+          <div class="cert-banner-title">Por que registrar certificação externa?</div>
+          <div class="cert-banner-text">
+            Diferente da formação interna, a certificação é feita por avaliador independente. Tem peso institucional superior em auditoria, processos e operações.
+          </div>
+        </div>
+      </div>
+
+      <!-- Data -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>DATA DA PROVA</span>
+        </div>
+        <input class="field-input" type="text" placeholder="dd/mm/aaaa" value="15/08/2026" />
+      </div>
+
+      <!-- Avaliador -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>NOME DO AVALIADOR</span>
+        </div>
+        <input class="field-input" type="text" placeholder="Ex: João da Silva" value="Ricardo Almeida" />
+      </div>
+
+      <!-- Instituição -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>INSTITUIÇÃO / ÓRGÃO</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <input class="field-input" type="text" placeholder="Ex: Polícia Federal, Canil X" value="Canil K9 Centro - MG" />
+      </div>
+
+      <!-- Local -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>LOCAL DA PROVA</span>
+        </div>
+        <input class="field-input" type="text" placeholder="Cidade, estado" value="Belo Horizonte / MG" />
+      </div>
+
+      <!-- Resultado -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>RESULTADO</span>
+        </div>
+        <div class="result-options">
+          <div class="result-opt selected-aprovado">
+            <span class="result-opt-icon">✓</span>
+            <span class="result-opt-text">APROVADO</span>
+          </div>
+          <div class="result-opt">
+            <span class="result-opt-icon">✗</span>
+            <span class="result-opt-text">REPROVADO</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="field-optional">opcional</span>
+        </div>
+        <textarea class="field-input" placeholder="Detalhes da prova, pontos avaliados, comentários do avaliador..."></textarea>
+      </div>
+
+      <!-- Anexo -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>📎 ANEXAR CERTIFICADO</span>
+        </div>
+        <div class="attachment-area">
+          <div class="attachment-icon">📄</div>
+          <div class="attachment-text">Toque para anexar PDF ou foto</div>
+          <div class="attachment-sub">Certificado, ata da prova, foto do documento</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-cancel">Cancelar</button>
+      <button class="btn-save-cert">🏅 REGISTRAR CERTIFICAÇÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Notas -->
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>Banner Nose-MP removido</strong> — material de imprinting fica no plano de formação, sem evangelizar marca</li>
+    <li><strong>Linhas paralelas:</strong> Drogas (Fase 3) e Armas (Fase 2) em formação simultânea</li>
+    <li>Card de atalho "Sessão multi-linha disponível" no topo da Tela A — sinaliza que pode treinar junto</li>
+    <li>Cada linha tem barra de progresso própria, sessões próprias, fase própria — total independência de ritmo</li>
+    <li>Coverage tags personalizadas por linha (drogas tem maconha/cocaína/etc, armas tem pólvora/munição)</li>
+    <li><strong>Sessão multi-linha</strong> mostra chips das linhas trabalhadas no topo: "💊 Drogas · F3" + "🔫 Armas · F2"</li>
+    <li><strong>Contadores duplicados:</strong> cada linha tem seu contador próprio com fase e critério próprios</li>
+    <li>Drogas em 9/10 ganha destaque visual (animação glow + alerta "⚠ 1 PRA AVANÇAR")</li>
+    <li>Armas em 2/3 fica normal (longe do critério ainda)</li>
+    <li>Acerto único alimenta AMBAS as linhas; erro reseta AMBOS os contadores</li>
+    <li><strong>Tela D — Certificação externa:</strong> evento institucional separado da formação</li>
+    <li>Banner explica diferença entre formação interna e certificação externa</li>
+    <li>Campos: data, avaliador, instituição, local, resultado (Aprovado/Reprovado), observações, anexo</li>
+    <li>Resultado APROVADO destacado em verde (cor de operacional/certificado)</li>
+    <li>Anexo obrigatório do certificado (PDF ou foto) — prova institucional</li>
+    <li>Após registrar, cão ganha selo "🏅 CERTIFICADO" no card daquela linha (Tela A)</li>
+    <li>Reprovação também registrável — útil pra histórico (cão fez a prova, não passou, tentar de novo)</li>
+  </ul>
+</div>
+
+</body>
+</html>

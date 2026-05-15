@@ -21,7 +21,7 @@ extension _DailyTimelineEntryActions on _DailyTimelineScreenState {
             icon: const Icon(Icons.edit_rounded, size: 14),
             label: Text(
               'EDITAR REGISTRO',
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.8,

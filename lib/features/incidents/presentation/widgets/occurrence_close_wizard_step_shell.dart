@@ -21,7 +21,7 @@ class _StepShell extends StatelessWidget {
           children: [
             Text(
               title,
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: accent,
                 fontSize: 11,
                 fontWeight: FontWeight.w900,

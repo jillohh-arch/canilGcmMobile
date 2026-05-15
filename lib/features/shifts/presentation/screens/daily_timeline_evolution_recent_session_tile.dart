@@ -42,7 +42,7 @@ extension _DailyTimelineEvolutionRecentSessionTile
               children: [
                 Text(
                   training.trainingType,
-                  style: GoogleFonts.oxanium(
+                  style: GoogleFonts.inter(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
@@ -63,7 +63,7 @@ extension _DailyTimelineEvolutionRecentSessionTile
           ),
           Text(
             minutes > 0 ? '$minutes min' : '--',
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: visual.color,
               fontWeight: FontWeight.w900,
               fontSize: 14,

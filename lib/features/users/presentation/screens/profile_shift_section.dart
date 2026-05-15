@@ -13,7 +13,7 @@ extension _ProfileShiftSection on _ProfileScreenState {
           children: [
             Text(
               'TURNO',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 color: _hudCyan.withAlpha(210),
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -98,7 +98,7 @@ extension _ProfileShiftSection on _ProfileScreenState {
                                 child: const Text(
                                   'Cancelar',
                                   style: TextStyle(
-                                    color: Color(0xFF00E5FF),
+                                    color: AppTheme.primary,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),

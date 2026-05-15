@@ -34,7 +34,7 @@ class _EventDetailsActions extends StatelessWidget {
             icon: const Icon(Icons.save_rounded),
             label: Text(
               'SALVAR',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,
               ),
@@ -73,7 +73,7 @@ class _EventOutlineActionButton extends StatelessWidget {
       icon: Icon(icon),
       label: Text(
         label,
-        style: GoogleFonts.robotoMono(
+        style: GoogleFonts.inter(
           fontWeight: FontWeight.w900,
           letterSpacing: 1.0,
         ),

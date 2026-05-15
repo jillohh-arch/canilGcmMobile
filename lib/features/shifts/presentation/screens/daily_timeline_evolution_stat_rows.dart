@@ -11,7 +11,7 @@ extension _DailyTimelineEvolutionStatRows on _DailyTimelineScreenState {
           label: 'SESSÕES',
           value: '$totalSessions',
           icon: Icons.format_list_numbered_rounded,
-          color: const Color(0xFF00E5FF),
+          color: AppTheme.primary,
         ),
         const SizedBox(width: 10),
         _StatBox(
@@ -20,7 +20,7 @@ extension _DailyTimelineEvolutionStatRows on _DailyTimelineScreenState {
               ? '${totalMinutes.toStringAsFixed(0)} min'
               : '--',
           icon: Icons.timer_rounded,
-          color: const Color(0xFF00E5FF),
+          color: AppTheme.primary,
         ),
       ],
     );
@@ -39,7 +39,7 @@ extension _DailyTimelineEvolutionStatRows on _DailyTimelineScreenState {
               ? '${averageMinutes.toStringAsFixed(1)} min'
               : '--',
           icon: Icons.bar_chart_rounded,
-          color: const Color(0xFF00E5FF),
+          color: AppTheme.primary,
         ),
         const SizedBox(width: 10),
         _StatBox(

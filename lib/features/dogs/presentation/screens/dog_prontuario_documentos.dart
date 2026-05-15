@@ -213,7 +213,7 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF0B1220),
+          backgroundColor: const Color(0xFF0E1A1F),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             doc.nome,
@@ -256,7 +256,7 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1220),
+      backgroundColor: const Color(0xFF0E1A1F),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -376,12 +376,12 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.upload_file, color: Color(0xFF070B14), size: 18),
+                          const Icon(Icons.upload_file, color: AppTheme.background, size: 18),
                           const SizedBox(width: 8),
                           Text(
                             'SELECIONAR ARQUIVO',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF070B14),
+                              color: AppTheme.background,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),

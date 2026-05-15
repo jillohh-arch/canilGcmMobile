@@ -12,7 +12,7 @@ extension _DailyTimelineItemIndicator on _DailyTimelineScreenState {
       drawGap: true,
       indicator: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF070B14),
+          color: AppTheme.background,
           shape: BoxShape.circle,
           border: Border.all(color: color, width: 1.4),
           boxShadow: [

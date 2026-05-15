@@ -35,7 +35,7 @@ class _SearchOperationTheaterSection extends StatelessWidget {
         ActivityWeatherButton(
           label: 'PUXAR CLIMA ATUAL (GPS)',
           onPressed: onPullWeather,
-          backgroundColor: const Color(0xFF4ECDE4).withAlpha(50),
+          backgroundColor: AppTheme.primary.withAlpha(50),
         ),
         const SizedBox(height: 16),
         trackingAction,

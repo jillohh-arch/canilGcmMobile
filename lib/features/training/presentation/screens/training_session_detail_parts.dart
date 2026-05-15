@@ -68,7 +68,7 @@ class _SessionNotesBox extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF070B14).withAlpha(210),
+          color: AppTheme.background.withAlpha(210),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: color.withAlpha(90)),
         ),
@@ -122,7 +122,7 @@ class _DetailChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               fontSize: 10,
               color: Colors.white70,
               fontWeight: FontWeight.w700,

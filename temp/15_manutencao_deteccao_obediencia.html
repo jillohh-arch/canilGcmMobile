@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manutenção Detecção e Obediência - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(46, 204, 113, 0.15);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text { flex: 1; }
+
+  .header-subtitle {
+    color: #2ecc71;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Status do cão operacional */
+  .op-status {
+    background: rgba(46, 204, 113, 0.06);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .op-status-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .op-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #2ecc71;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .op-info { flex: 1; min-width: 0; }
+
+  .op-binomio {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .op-status-label {
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .op-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .op-badge {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .op-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(46, 204, 113, 0.15);
+  }
+
+  .op-stat { text-align: center; }
+
+  .op-stat-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .op-stat-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* Scroll */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* Section labels */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-help {
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* Foco card */
+  .focus-card {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.08), rgba(46, 204, 113, 0.04));
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .focus-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+  }
+
+  .focus-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+
+  .focus-input::placeholder { color: #5a7280; }
+
+  .focus-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .focus-suggestion {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.25);
+    color: #4dd0e1;
+    padding: 5px 10px;
+    border-radius: 14px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Chips */
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 7px 12px;
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .chip.selected {
+    background: rgba(77, 208, 225, 0.12);
+    border-color: #4dd0e1;
+    color: #4dd0e1;
+  }
+
+  /* Line selector pra Detecção */
+  .line-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .line-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .line-card.selected {
+    background: rgba(46, 204, 113, 0.08);
+    border-color: #2ecc71;
+  }
+
+  .line-card.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .line-icon-sm {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .line-name-sm {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .line-status-sm {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .line-card.selected .line-status-sm { color: #2ecc71; }
+  .line-card:not(.selected):not(.disabled) .line-status-sm { color: #95a5a6; }
+  .line-card.disabled .line-status-sm { color: #5a7280; }
+
+  /* Avaliação */
+  .rating-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .rating-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 4px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .rating-btn.active {
+    background: rgba(46, 204, 113, 0.1);
+    border-color: #2ecc71;
+    color: #2ecc71;
+  }
+
+  .rating-btn.bad.active {
+    background: rgba(231, 76, 60, 0.1);
+    border-color: #e74c3c;
+    color: #e74c3c;
+  }
+
+  /* Textarea */
+  .obs-input {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 60px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .obs-input::placeholder { color: #5a7280; }
+
+  /* Sessões recentes */
+  .recent-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .recent-date {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 700;
+    width: 42px;
+    flex-shrink: 0;
+  }
+
+  .recent-info { flex: 1; min-width: 0; }
+
+  .recent-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .recent-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .recent-rating {
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 3px 7px;
+    background: rgba(46, 204, 113, 0.1);
+    border-radius: 6px;
+  }
+
+  /* Field group */
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* COMMAND CHIPS (Obediência) */
+  .command-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .command-chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #b0c4cc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .command-chip.selected {
+    background: rgba(77, 208, 225, 0.1);
+    border-color: rgba(77, 208, 225, 0.4);
+    color: #4dd0e1;
+  }
+
+  .command-stage {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .command-stage.full { color: #2ecc71; }
+  .command-stage.partial { color: #4dd0e1; }
+  .command-stage.dev { color: #e67e22; }
+  .command-stage.intro { color: #f1c40f; }
+  .command-stage.none { color: #5a7280; }
+
+  .command-name {
+    flex: 1;
+  }
+
+  /* Categoria header pra Obediência */
+  .cat-header {
+    color: #7a8a92;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-top: 14px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .cat-header:first-of-type { margin-top: 0; }
+
+  /* CTA */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: MANUTENÇÃO EM DETECÇÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — MANUTENÇÃO EM DETECÇÃO (BONO)
+    <small>Cão operacional · seleciona linha + tipo de cenário + foco</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle">MANUTENÇÃO OPERACIONAL</div>
+          <div class="header-main">Detecção</div>
+        </div>
+        <div class="header-icon">👃</div>
+      </div>
+
+      <div class="op-status">
+        <div class="op-status-top">
+          <div class="op-avatar">BONO</div>
+          <div class="op-info">
+            <div class="op-binomio">Bono · GCM Ragonha</div>
+            <div class="op-status-label">
+              <span class="op-dot"></span>
+              OPERACIONAL EM DROGAS HÁ 18 MESES
+            </div>
+          </div>
+          <span class="op-badge">FORMADO</span>
+        </div>
+        <div class="op-stats">
+          <div class="op-stat">
+            <div class="op-stat-label">SESSÕES</div>
+            <div class="op-stat-value">94</div>
+          </div>
+          <div class="op-stat">
+            <div class="op-stat-label">ÚLTIMA</div>
+            <div class="op-stat-value">5d</div>
+          </div>
+          <div class="op-stat">
+            <div class="op-stat-label">CERTIFICADO</div>
+            <div class="op-stat-value">🏅</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll -->
+    <div class="scroll-area">
+
+      <!-- Linha a treinar -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>LINHA A TREINAR</span>
+        </div>
+        <div class="line-selector">
+          <div class="line-card selected">
+            <div class="line-icon-sm">💊</div>
+            <div class="line-name-sm">Drogas</div>
+            <div class="line-status-sm">● OPERACIONAL</div>
+          </div>
+          <div class="line-card disabled">
+            <div class="line-icon-sm">🔫</div>
+            <div class="line-name-sm">Armas</div>
+            <div class="line-status-sm">NÃO INICIADA</div>
+          </div>
+          <div class="line-card disabled">
+            <div class="line-icon-sm">🕯</div>
+            <div class="line-name-sm">Cadáver</div>
+            <div class="line-status-sm">NÃO INICIADA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Foco da sessão -->
+      <div class="focus-card">
+        <div class="focus-label">🎯 FOCO DESTA SESSÃO</div>
+        <input class="focus-input" type="text" placeholder="O que quer aprimorar?" value="Indicação em altura" />
+        <div class="focus-suggestions">
+          <span class="focus-suggestion">Discriminação</span>
+          <span class="focus-suggestion">Indicação passiva</span>
+          <span class="focus-suggestion">Veículo</span>
+          <span class="focus-suggestion">Rotina</span>
+        </div>
+      </div>
+
+      <!-- Tipo de cenário -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>TIPO DE CENÁRIO</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip">Caixas (reforço)</span>
+          <span class="chip selected">Veículo</span>
+          <span class="chip">Ambiente fechado</span>
+          <span class="chip">Área aberta</span>
+          <span class="chip">Bagagem</span>
+        </div>
+      </div>
+
+      <!-- Material de odor -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>MATERIAL DE ODOR</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip selected">Nose-MP Drogas</span>
+          <span class="chip">Droga real</span>
+          <span class="chip">Scentlogix</span>
+        </div>
+      </div>
+
+      <!-- Avaliação geral -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>RESULTADO DA SESSÃO</span>
+          <span class="section-help">avaliação geral</span>
+        </div>
+        <div class="rating-row">
+          <div class="rating-btn bad">Falhou</div>
+          <div class="rating-btn">Regular</div>
+          <div class="rating-btn active">Bom</div>
+          <div class="rating-btn">Ótimo</div>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="section-help">opcional</span>
+        </div>
+        <textarea class="obs-input" placeholder="Notas sobre a sessão, comportamento, ajustes..."></textarea>
+      </div>
+
+      <!-- Sessões recentes -->
+      <div class="section-label">
+        <span>MANUTENÇÕES RECENTES</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">07/05</div>
+        <div class="recent-info">
+          <div class="recent-title">Discriminação · caixas</div>
+          <div class="recent-meta">Drogas · 12 tentativas</div>
+        </div>
+        <span class="recent-rating">ÓTIMO</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">30/04</div>
+        <div class="recent-info">
+          <div class="recent-title">Busca em veículo</div>
+          <div class="recent-meta">Drogas · cenário operacional</div>
+        </div>
+        <span class="recent-rating">BOM</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">23/04</div>
+        <div class="recent-info">
+          <div class="recent-title">Ambiente fechado</div>
+          <div class="recent-meta">Drogas · escritório/casa</div>
+        </div>
+        <span class="recent-rating">BOM</span>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="cta-btn">💾 SALVAR SESSÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TELA B: MANUTENÇÃO EM OBEDIÊNCIA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — TREINO DE OBEDIÊNCIA (BONO)
+    <small>Não tem formação/manutenção · treino contínuo da biblioteca</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#4dd0e1;">TREINO CONTÍNUO</div>
+          <div class="header-main">Obediência</div>
+        </div>
+        <div class="header-icon" style="background:rgba(77,208,225,0.12); color:#4dd0e1;">🐾</div>
+      </div>
+
+      <div class="op-status" style="background:rgba(77,208,225,0.04); border-color:rgba(77,208,225,0.2);">
+        <div class="op-status-top">
+          <div class="op-avatar" style="border-color:#4dd0e1; color:#4dd0e1;">BONO</div>
+          <div class="op-info">
+            <div class="op-binomio">Bono · GCM Ragonha</div>
+            <div class="op-status-label" style="color:#4dd0e1;">
+              <span class="op-dot" style="background:#4dd0e1;"></span>
+              15 COMANDOS NA BIBLIOTECA
+            </div>
+          </div>
+          <span class="op-badge" style="background:rgba(77,208,225,0.15); color:#4dd0e1;">ATIVO</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll -->
+    <div class="scroll-area">
+
+      <!-- Foco da sessão -->
+      <div class="focus-card">
+        <div class="focus-label">🎯 FOCO DESTA SESSÃO</div>
+        <input class="focus-input" type="text" placeholder="O que quer trabalhar?" value="Reforço de comandos novos" />
+        <div class="focus-suggestions">
+          <span class="focus-suggestion">Comandos consolidados</span>
+          <span class="focus-suggestion">Novos comandos</span>
+          <span class="focus-suggestion">Com distrações</span>
+          <span class="focus-suggestion">Rotina</span>
+        </div>
+      </div>
+
+      <!-- Comandos trabalhados -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>COMANDOS TRABALHADOS</span>
+          <span class="section-help">tap pra selecionar</span>
+        </div>
+
+        <div class="cat-header">OPERACIONAIS</div>
+        <div class="command-grid">
+          <div class="command-chip selected">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Senta</span>
+          </div>
+          <div class="command-chip selected">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Deita</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Fica</span>
+          </div>
+          <div class="command-chip selected">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Junto</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Junto à direita</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Vem</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Solta</span>
+          </div>
+        </div>
+
+        <div class="cat-header">POSTURAIS</div>
+        <div class="command-grid">
+          <div class="command-chip">
+            <span class="command-stage full">●</span>
+            <span class="command-name">Levanta</span>
+          </div>
+          <div class="command-chip selected">
+            <span class="command-stage dev">◑</span>
+            <span class="command-name">Cumprimenta</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage intro">◔</span>
+            <span class="command-name">Abraço</span>
+          </div>
+        </div>
+
+        <div class="cat-header">HABILIDADES</div>
+        <div class="command-grid">
+          <div class="command-chip">
+            <span class="command-stage partial">◕</span>
+            <span class="command-name">Jump</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage dev">◑</span>
+            <span class="command-name">Hop</span>
+          </div>
+          <div class="command-chip">
+            <span class="command-stage intro">◔</span>
+            <span class="command-name">Parkour</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ambiente / contexto -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>AMBIENTE</span>
+        </div>
+        <div class="chips-row">
+          <span class="chip selected">Canil</span>
+          <span class="chip">Praça</span>
+          <span class="chip">Rua</span>
+          <span class="chip">Local com distração</span>
+        </div>
+      </div>
+
+      <!-- Avaliação -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>DESEMPENHO GERAL</span>
+        </div>
+        <div class="rating-row">
+          <div class="rating-btn bad">Ruim</div>
+          <div class="rating-btn">Regular</div>
+          <div class="rating-btn active">Bom</div>
+          <div class="rating-btn">Ótimo</div>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="field-group">
+        <div class="field-label">
+          <span>OBSERVAÇÕES</span>
+          <span class="section-help">opcional · ajustes de estágio?</span>
+        </div>
+        <textarea class="obs-input" placeholder="Algum comando precisa subir/baixar de estágio? Notas da sessão..."></textarea>
+      </div>
+
+      <!-- Sessões recentes -->
+      <div class="section-label">
+        <span>SESSÕES RECENTES</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">10/05</div>
+        <div class="recent-info">
+          <div class="recent-title">5 comandos · canil</div>
+          <div class="recent-meta">Operacionais · sem distração</div>
+        </div>
+        <span class="recent-rating">ÓTIMO</span>
+      </div>
+
+      <div class="recent-card">
+        <div class="recent-date">03/05</div>
+        <div class="recent-info">
+          <div class="recent-title">3 comandos · praça</div>
+          <div class="recent-meta">Habilidades · com distração</div>
+        </div>
+        <span class="recent-rating">BOM</span>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="cta-btn">💾 SALVAR SESSÃO</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+
+  <h3 style="margin-top: 20px;">TELA A — MANUTENÇÃO EM DETECÇÃO</h3>
+  <ul>
+    <li>Header verde institucional (manutenção operacional) coerente com B&C</li>
+    <li>Status do cão com 3 métricas: sessões, última, certificação 🏅 (do mockup 9)</li>
+    <li>Badge "OPERACIONAL EM DROGAS HÁ 18 MESES" valoriza credencial específica</li>
+    <li><strong>Linha a treinar</strong> em 3 cards: Drogas selecionada (operacional), Armas e Cadáver desabilitadas (não iniciadas) — coerente com mockup 9</li>
+    <li>Quando outra linha do cão fica operacional, ela vira selecionável</li>
+    <li><strong>Foco da sessão</strong> com campo livre + sugestões (Discriminação · Indicação passiva · Veículo · Rotina) — mesmo padrão de B&C e G&P</li>
+    <li><strong>Tipo de cenário</strong> em chips: Caixas (reforço) · Veículo · Ambiente fechado · Área aberta · Bagagem — sessão de manutenção pode ser caixas (reforço da discriminação) ou cenário operacional real</li>
+    <li><strong>Material de odor</strong> em chips: Nose-MP / Droga real / Scentlogix — não engessa o método</li>
+    <li>Avaliação simples (Falhou/Regular/Bom/Ótimo) sem contadores rígidos de acertos consecutivos (cão já é operacional)</li>
+    <li>Sem GPS por padrão (cenário urbano local), mas pode ter toggle futuro pra cenários grandes</li>
+    <li>Sessões recentes mostram tipo de cenário + avaliação</li>
+    <li>CTA "Salvar sessão" simples — não tem "iniciar com rastreador" porque GPS não é padrão aqui</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">TELA B — OBEDIÊNCIA (TREINO CONTÍNUO)</h3>
+  <ul>
+    <li>Header ciano (não verde) porque Obediência <strong>não tem formação encerrada</strong> — é treino contínuo</li>
+    <li>Subtítulo "TREINO CONTÍNUO" em vez de "MANUTENÇÃO OPERACIONAL" — sinaliza essa diferença</li>
+    <li>Status do cão com "15 COMANDOS NA BIBLIOTECA" — credencial visível</li>
+    <li><strong>Foco da sessão</strong> com sugestões específicas: Comandos consolidados · Novos comandos · Com distrações · Rotina</li>
+    <li><strong>Comandos trabalhados</strong>: biblioteca completa do Bono organizada em 3 categorias (Operacionais · Posturais · Habilidades)</li>
+    <li>Cada comando mostra <strong>estágio atual</strong> com ícone semântico: ● (operacional) · ◕ (consolidado) · ◑ (em desenvolvimento) · ◔ (introduzido) · ○ (não treinado)</li>
+    <li>Tap em comando = marca como trabalhado nesta sessão</li>
+    <li>Categoria header sutil pra separar grupos sem virar abas (mantém densidade)</li>
+    <li><strong>Ambiente</strong> como chip único: Canil · Praça · Rua · Local com distração — comunica progressão de dificuldade</li>
+    <li>Avaliação simples (Ruim/Regular/Bom/Ótimo)</li>
+    <li>Microcopy nas observações: "ajustes de estágio?" — lembra ao condutor que comando que vai bem repetidamente pode subir de estágio</li>
+    <li><strong>Posicionais ocultos</strong> propositalmente (Meio · Atravessa) pra mostrar como ficaria se tivessem categoria com poucos itens — caso real é mostrar todos</li>
+    <li>Não tem campo de cenário simulado nem orientador (não se aplica a obediência)</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">DIFERENÇAS ENTRE AS DUAS TELAS</h3>
+  <ul>
+    <li><strong>Detecção (Manutenção):</strong> verde, foco em cenário/linha/material, avaliação geral simples</li>
+    <li><strong>Obediência (Treino contínuo):</strong> ciano, foco em comandos da biblioteca, registro por comando trabalhado</li>
+    <li>As duas têm <strong>"Foco da sessão"</strong> como campo destacado — padrão do app pra cão operacional</li>
+    <li>As duas têm avaliação simples no fim, sem multi-critério complexo</li>
+    <li>As duas mostram sessões recentes embaixo</li>
+    <li>CTA único: "Salvar sessão" ciano fill</li>
+  </ul>
+</div>
+
+</body>
+</html>

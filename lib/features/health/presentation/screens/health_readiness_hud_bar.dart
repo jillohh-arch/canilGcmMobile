@@ -32,7 +32,7 @@ class _ReadinessHudBar extends StatelessWidget {
           children: [
             Text(
               'PRONTIDÃO',
-              style: GoogleFonts.oxanium(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 color: Colors.white54,

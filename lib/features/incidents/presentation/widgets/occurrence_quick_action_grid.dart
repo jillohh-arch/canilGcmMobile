@@ -32,7 +32,7 @@ class OccurrenceQuickActionGrid extends StatelessWidget {
             Expanded(
               child: Text(
                 'REGISTROS RÁPIDOS',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
@@ -89,7 +89,7 @@ class OccurrenceQuickActionGrid extends StatelessWidget {
             icon: Icon(Icons.add_rounded, color: accentColor),
             label: Text(
               'OUTRO EVENTO / CENTRAL',
-              style: GoogleFonts.robotoMono(
+              style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,

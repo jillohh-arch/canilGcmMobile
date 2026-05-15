@@ -23,14 +23,14 @@ class _HealthSection extends StatelessWidget {
         _SectionTitle(title: 'SAÚDE'),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _panelColor.withAlpha(200),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: _cyan.withAlpha(30)),
           ),
           child: loading
-              ? const Center(
+              ? Center(
                   child: SizedBox(
                     width: 16,
                     height: 16,

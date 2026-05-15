@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detecção - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* ===== HEADER GENÉRICO ===== */
+  .page-header {
+    padding: 8px 16px 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .header-text {
+    flex: 1;
+  }
+
+  .header-subtitle {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .header-main {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* ===== TELA A: VISÃO GERAL ===== */
+  .a-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 16px 100px 16px;
+  }
+
+  .a-content::-webkit-scrollbar { width: 0; }
+
+  /* Card de identificação do cão */
+  .dog-card {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .dog-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .dog-info {
+    flex: 1;
+  }
+
+  .dog-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .dog-binomio {
+    color: #4dd0e1;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  /* Section label */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  /* Card de linha de detecção */
+  .line-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .line-card.operacional { border-left: 3px solid #2ecc71; }
+  .line-card.formacao { border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.02); }
+  .line-card.nao-iniciada {
+    border-left: 3px solid rgba(149, 165, 166, 0.3);
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .line-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+
+  .line-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .line-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .line-card.operacional .line-icon { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .line-card.formacao .line-icon { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .line-card.nao-iniciada .line-icon { background: rgba(149, 165, 166, 0.08); color: #95a5a6; }
+
+  .line-info { flex: 1; min-width: 0; }
+
+  .line-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .line-status {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .line-card.operacional .line-status { color: #2ecc71; }
+  .line-card.formacao .line-status { color: #f1c40f; }
+  .line-card.nao-iniciada .line-status { color: #95a5a6; }
+
+  /* Coverage badges */
+  .coverage-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0;
+  }
+
+  .coverage-tag {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 3px 8px;
+    color: #b0c4cc;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .line-card.operacional .coverage-tag {
+    border-color: rgba(46, 204, 113, 0.2);
+    color: #b3e6c5;
+  }
+
+  /* Progress info */
+  .progress-section {
+    margin: 8px 0;
+  }
+
+  .progress-label {
+    color: #b0c4cc;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-label strong { color: #fff; font-weight: 700; }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .progress-segment {
+    height: 100%;
+    border-right: 1px solid #050d10;
+  }
+
+  .progress-segment:last-child { border-right: none; }
+  .progress-segment.done { background: #f1c40f; }
+  .progress-segment.partial { background: linear-gradient(90deg, #f1c40f 50%, rgba(255,255,255,0.06) 50%); }
+
+  /* Meta info */
+  .line-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .line-meta-text {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .line-cta {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .start-btn {
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    color: #4dd0e1;
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Banner sobre Nose-MP */
+  .nose-mp-banner {
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px solid rgba(77, 208, 225, 0.15);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 8px 0 16px 0;
+    font-size: 10px;
+    color: #b0c4cc;
+    line-height: 1.4;
+  }
+
+  .nose-mp-banner strong { color: #4dd0e1; }
+
+  /* ===== TELA B: FORMAÇÃO DETALHADA ===== */
+  .formation-status-b {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.2);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .b-status-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 1.5px solid #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .b-status-info { flex: 1; }
+
+  .b-status-binomio {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .b-status-time {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  /* Abas */
+  .tabs-row {
+    display: flex;
+    gap: 2px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .tabs-row::-webkit-scrollbar { height: 0; }
+
+  .tab {
+    padding: 12px 10px;
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab.active {
+    color: #4dd0e1;
+    border-bottom-color: #4dd0e1;
+  }
+
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 100px 16px;
+  }
+
+  .tab-content::-webkit-scrollbar { width: 0; }
+
+  /* ===== ABA FASE ATUAL ===== */
+
+  /* Fase header */
+  .phase-header {
+    background: rgba(241, 196, 15, 0.06);
+    border: 1px solid rgba(241, 196, 15, 0.25);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .phase-header.turning-point {
+    border-color: rgba(241, 196, 15, 0.5);
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.08), rgba(230, 126, 34, 0.06));
+  }
+
+  .turning-point-badge {
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    background: linear-gradient(90deg, #f1c40f, #e67e22);
+    color: #050d10;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+  }
+
+  .phase-num-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .phase-num-big {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(241, 196, 15, 0.15);
+    border: 2px solid #f1c40f;
+    color: #f1c40f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .phase-name {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .phase-desc {
+    color: #b0c4cc;
+    font-size: 11px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+
+  /* Contador grande de acertos consecutivos */
+  .counter-big {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+
+  .counter-label {
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .counter-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .counter-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .counter-dot.hit {
+    background: #2ecc71;
+    border-color: #2ecc71;
+    color: #050d10;
+  }
+
+  .counter-dot.miss {
+    background: rgba(231, 76, 60, 0.2);
+    border-color: #e74c3c;
+    color: #e74c3c;
+  }
+
+  .counter-dot.pending {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.2);
+  }
+
+  .counter-progress {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .counter-progress strong { color: #f1c40f; }
+
+  .counter-criterion {
+    color: #95a5a6;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  /* Stats da fase */
+  .phase-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .phase-stat {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .phase-stat-label {
+    color: #7a8a92;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+  }
+
+  .phase-stat-value {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* Critério explicado */
+  .criterion-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+
+  .criterion-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .criterion-text {
+    color: #b0c4cc;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .criterion-stat {
+    color: #2ecc71;
+    font-weight: 700;
+  }
+
+  /* Botão troubleshooting */
+  .help-btn {
+    width: 100%;
+    background: rgba(77, 208, 225, 0.04);
+    border: 1px dashed rgba(77, 208, 225, 0.3);
+    border-radius: 10px;
+    padding: 10px;
+    color: #4dd0e1;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* CTA fixo */
+  .cta-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 18px 16px;
+    background: linear-gradient(to top, #050d10 80%, transparent);
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* ===== TELA C: SESSÃO AO VIVO ===== */
+  .live-screen {
+    background: #0a1418;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .live-topbar {
+    background: rgba(241, 196, 15, 0.08);
+    border-bottom: 1px solid rgba(241, 196, 15, 0.2);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .live-status-yellow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #f1c40f;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+  }
+
+  .live-dot-yellow {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f1c40f;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .live-info {
+    color: #b0c4cc;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .live-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .live-content::-webkit-scrollbar { width: 0; }
+
+  /* Card da tentativa atual */
+  .attempt-card {
+    background: rgba(77, 208, 225, 0.05);
+    border: 1px solid rgba(77, 208, 225, 0.3);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .attempt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .attempt-num {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .attempt-total {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .attempt-title {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+
+  /* Seletor de posição da caixa */
+  .position-selector {
+    margin-bottom: 16px;
+  }
+
+  .position-label {
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .position-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pos-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 14px 8px;
+    color: #7a8a92;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .pos-btn.active {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: #f1c40f;
+    color: #f1c40f;
+  }
+
+  .pos-icon {
+    font-size: 20px;
+    margin-bottom: 2px;
+    display: block;
+  }
+
+  /* Botões grandes de resultado */
+  .result-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .result-btn-big {
+    border-radius: 12px;
+    padding: 18px 8px;
+    cursor: pointer;
+    border: none;
+    text-align: center;
+  }
+
+  .result-btn-hit {
+    background: #2ecc71;
+    color: #050d10;
+  }
+
+  .result-btn-miss {
+    background: rgba(231, 76, 60, 0.15);
+    border: 1.5px solid #e74c3c;
+    color: #e74c3c;
+  }
+
+  .result-btn-icon {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .result-btn-text {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .result-hint {
+    color: #5a7280;
+    font-size: 10px;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Contadores ao vivo */
+  .live-counters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .live-counter-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .lc-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+
+  .lc-value-big {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .lc-value-big strong { color: #4dd0e1; }
+
+  .lc-sub {
+    color: #5a7280;
+    font-size: 9px;
+  }
+
+  .live-counter-card.critical {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.3);
+  }
+
+  .live-counter-card.critical .lc-value-big strong { color: #2ecc71; }
+
+  .live-counter-card.warning {
+    background: rgba(241, 196, 15, 0.06);
+    border-color: rgba(241, 196, 15, 0.3);
+  }
+
+  /* Histórico da sessão (tentativas anteriores) */
+  .session-history {
+    margin-bottom: 14px;
+  }
+
+  .sh-label {
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .sh-grid {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .sh-item {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .sh-item.hit {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: rgba(46, 204, 113, 0.3);
+    color: #2ecc71;
+  }
+
+  .sh-item.miss {
+    background: rgba(231, 76, 60, 0.12);
+    border-color: rgba(231, 76, 60, 0.3);
+    color: #e74c3c;
+  }
+
+  .sh-num {
+    font-size: 8px;
+    opacity: 0.6;
+    margin-bottom: 1px;
+  }
+
+  /* End buttons */
+  .end-session {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+  }
+
+  .btn-pause {
+    background: rgba(241, 196, 15, 0.08);
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    color: #f1c40f;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-end-session {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1.5px solid #e74c3c;
+    color: #e74c3c;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+
+  /* ===== ABA ROADMAP ===== */
+  .module-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+
+  .module-card.done { border-left: 3px solid #2ecc71; }
+  .module-card.active { border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.04); }
+  .module-card.pending { border-left: 3px solid rgba(149, 165, 166, 0.3); opacity: 0.75; }
+
+  .module-card.turning {
+    border: 1px solid rgba(241, 196, 15, 0.4);
+    border-left: 3px solid #f1c40f;
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.06), rgba(230, 126, 34, 0.03));
+  }
+
+  .module-row-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .module-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .module-card.done .module-circle {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 2px solid #2ecc71;
+  }
+  .module-card.active .module-circle {
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border: 2px solid #f1c40f;
+  }
+  .module-card.pending .module-circle {
+    background: rgba(149, 165, 166, 0.08);
+    color: #95a5a6;
+    border: 2px solid rgba(149, 165, 166, 0.3);
+  }
+
+  .module-text { flex: 1; min-width: 0; }
+  .module-text-name {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+  .module-text-sub {
+    color: #5a7280;
+    font-size: 10px;
+  }
+
+  .module-badge {
+    padding: 3px 7px;
+    border-radius: 8px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .module-card.done .module-badge { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .module-card.active .module-badge { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .module-card.pending .module-badge { background: rgba(149, 165, 166, 0.08); color: #95a5a6; }
+
+  .module-extra {
+    color: #b0c4cc;
+    font-size: 10px;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  .turning-mark {
+    background: linear-gradient(90deg, rgba(241, 196, 15, 0.1), rgba(230, 126, 34, 0.05));
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-top: 6px;
+    color: #f1c40f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* Divider entre Caixas e Real */
+  .phase-divider {
+    text-align: center;
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin: 12px 0 10px 0;
+    position: relative;
+  }
+
+  .phase-divider::before, .phase-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 30%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .phase-divider::before { left: 0; }
+  .phase-divider::after { right: 0; }
+
+  /* Notas */
+  .design-notes {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TELA A: VISÃO GERAL DE DETECÇÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA A — VISÃO GERAL DE DETECÇÃO
+    <small>Mostra todas as linhas (Drogas / Armas / Cadáver)</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#4dd0e1;">ESPECIALIDADE</div>
+          <div class="header-main">Detecção</div>
+        </div>
+        <div class="header-icon" style="background:rgba(77,208,225,0.12); color:#4dd0e1;">👃</div>
+      </div>
+    </div>
+
+    <div class="a-content">
+
+      <!-- Identificação do cão -->
+      <div class="dog-card">
+        <div class="dog-avatar">THOR</div>
+        <div class="dog-info">
+          <div class="dog-name">Thor</div>
+          <div class="dog-binomio">Conduzido por GCM Silva</div>
+        </div>
+      </div>
+
+      <!-- Linhas de detecção -->
+      <div class="section-label">
+        <span>LINHAS DE DETECÇÃO</span>
+        <span class="section-label-line"></span>
+      </div>
+
+      <div class="nose-mp-banner">
+        <strong>Sobre o Nose-MP:</strong> tecnologia brasileira que combina odores reais em equilíbrio. Uma linha cobre múltiplas substâncias sem mascaramento entre elas.
+      </div>
+
+      <!-- Linha Drogas - Em formação -->
+      <div class="line-card formacao">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">💊</div>
+            <div class="line-info">
+              <div class="line-name">Drogas</div>
+              <div class="line-status">Em formação · Fase 3</div>
+            </div>
+          </div>
+        </div>
+        <div class="coverage-tags">
+          <span class="coverage-tag">maconha</span>
+          <span class="coverage-tag">cocaína</span>
+          <span class="coverage-tag">crack</span>
+          <span class="coverage-tag">LSD</span>
+          <span class="coverage-tag">ecstasy</span>
+          <span class="coverage-tag">ópio</span>
+          <span class="coverage-tag">heroína</span>
+          <span class="coverage-tag">+ outros</span>
+        </div>
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Protocolo Ragonha · Fase 3 de 5</span>
+            <strong>7 / 10 acertos</strong>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-segment done" style="flex: 1;"></div>
+            <div class="progress-segment done" style="flex: 1;"></div>
+            <div class="progress-segment partial" style="flex: 1;"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+            <div class="progress-segment" style="flex: 1; background: rgba(255,255,255,0.04);"></div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">42 sessões · iniciada em 12/03</span>
+          <span class="line-cta">Continuar →</span>
+        </div>
+      </div>
+
+      <!-- Linha Armas - Não iniciada -->
+      <div class="line-card nao-iniciada">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">🔫</div>
+            <div class="line-info">
+              <div class="line-name">Armas</div>
+              <div class="line-status">Não iniciada</div>
+            </div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">Especialidade não iniciada com Thor</span>
+          <button class="start-btn">+ Iniciar</button>
+        </div>
+      </div>
+
+      <!-- Linha Cadáver - Não iniciada -->
+      <div class="line-card nao-iniciada">
+        <div class="line-header">
+          <div class="line-title-row">
+            <div class="line-icon">🕯</div>
+            <div class="line-info">
+              <div class="line-name">Cadáver</div>
+              <div class="line-status">Não iniciada</div>
+            </div>
+          </div>
+        </div>
+        <div class="line-meta">
+          <span class="line-meta-text">Especialidade não iniciada com Thor</span>
+          <button class="start-btn">+ Iniciar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA B: FORMAÇÃO DETALHADA (FASE 3 ATIVA) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA B — FORMAÇÃO EM LINHA DROGAS · ABA "FASE ATUAL"
+    <small>5 abas: Roadmap, Fase atual, Sessões, Estatísticas, Documentos</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="page-header">
+      <div class="header-top">
+        <button class="back-btn">‹</button>
+        <div class="header-text">
+          <div class="header-subtitle" style="color:#f1c40f;">DETECÇÃO · DROGAS</div>
+          <div class="header-main">Protocolo Ragonha</div>
+        </div>
+        <div class="header-icon" style="background:rgba(241,196,15,0.12); color:#f1c40f;">💊</div>
+      </div>
+      <div class="formation-status-b">
+        <div class="b-status-avatar">THOR</div>
+        <div class="b-status-info">
+          <div class="b-status-binomio">Thor · GCM Silva · Fase 3 ativa</div>
+          <div class="b-status-time">Iniciada em 12/03/2026 · 42 sessões</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-row">
+      <div class="tab">Roadmap</div>
+      <div class="tab active">Fase atual</div>
+      <div class="tab">Sessões</div>
+      <div class="tab">Estats</div>
+      <div class="tab">Docs</div>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- Fase header com ponto de virada -->
+      <div class="phase-header turning-point">
+        <div class="turning-point-badge">⭐ PONTO DE VIRADA</div>
+        <div class="phase-num-row">
+          <div class="phase-num-big">3</div>
+          <div class="phase-name">Independência sem bola</div>
+        </div>
+        <div class="phase-desc">
+          3 caixas · cão trabalha apenas pelo odor · recompensa NÃO é a bola
+        </div>
+
+        <!-- Contador grande -->
+        <div class="counter-big">
+          <div class="counter-label">ACERTOS CONSECUTIVOS · ATUAL</div>
+          <div class="counter-display">
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot hit">✓</div>
+            <div class="counter-dot pending">?</div>
+            <div class="counter-dot pending">?</div>
+            <div class="counter-dot pending">?</div>
+          </div>
+          <div class="counter-progress"><strong>7</strong> / 10</div>
+          <div class="counter-criterion">faltam 3 acertos consecutivos pra avançar</div>
+        </div>
+      </div>
+
+      <!-- Stats da fase -->
+      <div class="phase-stats">
+        <div class="phase-stat">
+          <div class="phase-stat-label">SESSÕES</div>
+          <div class="phase-stat-value">18</div>
+        </div>
+        <div class="phase-stat">
+          <div class="phase-stat-label">MELHOR SEQUÊNCIA</div>
+          <div class="phase-stat-value">8</div>
+        </div>
+        <div class="phase-stat">
+          <div class="phase-stat-label">ÚLTIMA</div>
+          <div class="phase-stat-value">há 1d</div>
+        </div>
+      </div>
+
+      <!-- Critério explicado -->
+      <div class="criterion-card" style="margin-top: 14px;">
+        <div class="criterion-title">📊 CRITÉRIO DE PROGRESSÃO</div>
+        <div class="criterion-text">
+          <strong style="color:#fff;">10 acertos consecutivos sem erro</strong>, com a caixa de odor em posições variadas.<br>
+          <span style="font-size:11px;">Confiança estatística: <span class="criterion-stat">99,99983%</span> · qualquer erro reinicia a contagem.</span>
+        </div>
+      </div>
+
+      <!-- Botão troubleshooting -->
+      <button class="help-btn">📖 Ver troubleshooting da Fase 3</button>
+
+    </div>
+
+    <div class="cta-bar">
+      <button class="cta-btn">▶ INICIAR NOVA SESSÃO</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA C: SESSÃO AO VIVO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA C — SESSÃO AO VIVO · REGISTRADOR DE TENTATIVAS
+    <small>Contador de acertos/erros tentativa por tentativa</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:48</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <div class="live-screen">
+      <div class="live-topbar">
+        <div class="live-status-yellow">
+          <span class="live-dot-yellow"></span>
+          SESSÃO EM ANDAMENTO
+        </div>
+        <div class="live-info">Fase 3 · Thor</div>
+      </div>
+
+      <div class="live-content">
+
+        <!-- Card da tentativa atual -->
+        <div class="attempt-card">
+          <div class="attempt-header">
+            <span class="attempt-num">TENTATIVA 5</span>
+            <span class="attempt-total">de até 15 nesta sessão</span>
+          </div>
+          <div class="attempt-title">Posicionar caixa de odor</div>
+
+          <!-- Seletor de posição -->
+          <div class="position-selector">
+            <div class="position-label">ONDE A CAIXA COM ODOR ESTÁ?</div>
+            <div class="position-buttons">
+              <div class="pos-btn">
+                <span class="pos-icon">◧</span>
+                ESQUERDA
+              </div>
+              <div class="pos-btn active">
+                <span class="pos-icon">◨</span>
+                MEIO
+              </div>
+              <div class="pos-btn">
+                <span class="pos-icon">▣</span>
+                DIREITA
+              </div>
+            </div>
+          </div>
+
+          <!-- Botões de resultado -->
+          <div class="result-buttons">
+            <button class="result-btn-big result-btn-hit">
+              <span class="result-btn-icon">✓</span>
+              <span class="result-btn-text">ACERTO</span>
+            </button>
+            <button class="result-btn-big result-btn-miss">
+              <span class="result-btn-icon">✗</span>
+              <span class="result-btn-text">ERRO</span>
+            </button>
+          </div>
+          <div class="result-hint">Erro abrirá opções: foi pra vazia / não sentou / hesitou</div>
+        </div>
+
+        <!-- Contadores ao vivo -->
+        <div class="live-counters">
+          <div class="live-counter-card">
+            <div class="lc-label">NESTA SESSÃO</div>
+            <div class="lc-value-big"><strong>4</strong> / 4</div>
+            <div class="lc-sub">100% até agora</div>
+          </div>
+          <div class="live-counter-card critical">
+            <div class="lc-label">CONSECUTIVOS HISTÓRICO</div>
+            <div class="lc-value-big"><strong>9</strong> / 10</div>
+            <div class="lc-sub">⚠ 1 acerto pra avançar fase!</div>
+          </div>
+        </div>
+
+        <!-- Histórico desta sessão -->
+        <div class="session-history">
+          <div class="sh-label">TENTATIVAS DESTA SESSÃO</div>
+          <div class="sh-grid">
+            <div class="sh-item hit"><span class="sh-num">1</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">2</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">3</span>✓</div>
+            <div class="sh-item hit"><span class="sh-num">4</span>✓</div>
+          </div>
+        </div>
+
+        <!-- Fim de sessão -->
+        <div class="end-session">
+          <button class="btn-pause">⏸ Pausar</button>
+          <button class="btn-end-session">⏹ ENCERRAR SESSÃO</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Notas -->
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>3 telas conectadas:</strong> Visão geral → Formação detalhada → Sessão ao vivo</li>
+    <li><strong>Linhas de detecção</strong> como agrupamento principal (Drogas / Armas / Cadáver) — Nose-MP define cobertura</li>
+    <li>Tags de cobertura mostram TODAS as substâncias cobertas pela linha (sem mascaramento por equilíbrio do Nose-MP)</li>
+    <li>Banner educativo sobre Nose-MP no topo da visão geral</li>
+    <li><strong>"Protocolo Ragonha"</strong> aparece como o método de formação adotado — você é autor publicado</li>
+    <li>Estado visual idêntico ao padrão das outras especialidades (verde/amarelo/cinza)</li>
+    <li>Barra de progresso por FASE (5 segmentos), não por marcos</li>
+    <li><strong>Aba "Fase atual" é o coração da tela:</strong> contador grande de acertos consecutivos com bolinhas individuais</li>
+    <li><strong>Badge "PONTO DE VIRADA"</strong> destacando Fase 3 (remoção da bola)</li>
+    <li>Critério de progressão explicado com confiança estatística (99,99983%)</li>
+    <li>Botão "Ver troubleshooting" sempre acessível na fase atual</li>
+    <li>Estatísticas da fase: sessões, melhor sequência, última</li>
+    <li><strong>Sessão ao vivo é estruturada:</strong> a cada tentativa, condutor marca posição da caixa + acerto/erro</li>
+    <li>Dois contadores ao vivo: "nesta sessão" + "consecutivos histórico" (este último é o que importa pra fase)</li>
+    <li><strong>Alerta crítico</strong> quando faltam poucos acertos pra atingir critério ("⚠ 1 acerto pra avançar fase!")</li>
+    <li>Histórico visual de tentativas da sessão em grid (✓✗)</li>
+    <li>Botão "Erro" expande opções: foi pra vazia / não sentou / hesitou (registro forense)</li>
+    <li><strong>SEM cálculo de tempo de formação</strong> — Bono fez em 30d, outros podem levar 6 meses, ambos válidos</li>
+    <li>Pausar permite interromper sessão sem perder progresso (cão cansado, interrupção)</li>
+    <li>Reset de contagem é DURO mas honesto: 1 erro zera o contador histórico</li>
+  </ul>
+</div>
+
+</body>
+</html>

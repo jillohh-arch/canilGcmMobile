@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 part 'occurrence_command_header_avatar.dart';
@@ -61,7 +62,7 @@ class OccurrenceCommandHeader extends StatelessWidget {
             dogAccent: accent,
             operatorName: operatorName,
             operatorImageUrl: operatorImageUrl,
-            operatorAccent: const Color(0xFF00F5A0),
+            operatorAccent: AppTheme.success,
           ),
           if (showOperationalMetrics) ...[
             const SizedBox(height: 12),

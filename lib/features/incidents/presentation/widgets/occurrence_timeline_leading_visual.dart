@@ -44,7 +44,7 @@ class _TimelineLeadingVisual extends StatelessWidget {
           Text(
             _formatHour(update.timestamp),
             textAlign: TextAlign.center,
-            style: GoogleFonts.robotoMono(
+            style: GoogleFonts.inter(
               color: Colors.white70,
               fontSize: 10,
               fontWeight: FontWeight.w900,

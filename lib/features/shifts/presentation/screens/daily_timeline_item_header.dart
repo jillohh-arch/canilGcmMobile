@@ -12,7 +12,7 @@ extension _DailyTimelineItemHeader on _DailyTimelineScreenState {
           height: 34,
           margin: const EdgeInsets.only(right: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF070B14),
+            color: AppTheme.background,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: color.withAlpha(170)),
             boxShadow: [BoxShadow(color: color.withAlpha(60), blurRadius: 12)],
@@ -26,7 +26,7 @@ extension _DailyTimelineItemHeader on _DailyTimelineScreenState {
             children: [
               Text(
                 presentation.title.toUpperCase(),
-                style: GoogleFonts.oxanium(
+                style: GoogleFonts.inter(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
@@ -37,7 +37,7 @@ extension _DailyTimelineItemHeader on _DailyTimelineScreenState {
               const SizedBox(height: 5),
               Text(
                 presentation.subtitle,
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: Colors.white60,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -60,7 +60,7 @@ extension _DailyTimelineItemHeader on _DailyTimelineScreenState {
                     ),
                     child: Text(
                       presentation.mainMetric,
-                      style: GoogleFonts.oxanium(
+                      style: GoogleFonts.inter(
                         color: color,
                         fontWeight: FontWeight.w900,
                         fontSize: 11,
