@@ -9,6 +9,7 @@ import 'package:canil_gcm/features/training/presentation/screens/training_log_sc
 import 'package:canil_gcm/features/training/presentation/screens/detection_maintenance_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/guard_protection_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -119,7 +120,16 @@ class TrainingHubScreen extends StatelessWidget {
       return;
     }
 
-    // Fallback: Guarda & Proteção, Faro/Rastro, or generic "Treino"
+    if (lowerCat.contains('guarda') || lowerCat.contains('proteção') || lowerCat.contains('protecao')) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GuardProtectionScreen(dog: dog),
+        ),
+      );
+      return;
+    }
+
+    // Fallback: Faro/Rastro, or generic "Treino"
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
