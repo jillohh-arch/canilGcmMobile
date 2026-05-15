@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "nutrition_prescriptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vigent_from", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "feedings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fed_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -255,6 +255,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Documentos / Laudos (coleção raiz legada) ────────────────────
+    match /documentos/{docId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
     // ─── Catch-all: nega tudo não coberto ─────────────────────────────
     match /{document=**} {
       allow read, write: if false;

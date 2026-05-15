@@ -66,21 +66,33 @@ class NutritionViewModel extends ChangeNotifier {
 
   /// Inicializa o ViewModel para um cão específico.
   Future<void> loadForDog(String dogId) async {
-    if (_activeDogId == dogId && _prescription != null) return;
+    if (_activeDogId == dogId && !_loading) return;
     _activeDogId = dogId;
     _loading = true;
     notifyListeners();
 
-    // Carrega prescrição vigente
-    _prescription = await _service.getActivePrescription(dogId);
+    try {
+      // Carrega prescrição vigente
+      _prescription = await _service.getActivePrescription(dogId);
+    } catch (e) {
+      _prescription = null;
+      debugPrint('[NutritionVM] Erro ao carregar prescrição: $e');
+    }
 
     // Inicia stream de refeições do dia
     _feedingsSub?.cancel();
-    _feedingsSub = _service.watchTodayFeedings(dogId).listen((feedings) {
-      _todayFeedings = feedings;
-      _calculateConformity();
-      notifyListeners();
-    });
+    _feedingsSub = _service.watchTodayFeedings(dogId).listen(
+      (feedings) {
+        _todayFeedings = feedings;
+        _calculateConformity();
+        notifyListeners();
+      },
+      onError: (e) {
+        debugPrint('[NutritionVM] Erro no stream de refeições: $e');
+        _todayFeedings = [];
+        notifyListeners();
+      },
+    );
 
     _loading = false;
     notifyListeners();
@@ -91,28 +103,35 @@ class NutritionViewModel extends ChangeNotifier {
     _historyLoading = true;
     notifyListeners();
 
-    final now = DateTime.now();
-    final from90d = now.subtract(const Duration(days: 90));
+    try {
+      final now = DateTime.now();
+      final from90d = now.subtract(const Duration(days: 90));
 
-    // Carrega em paralelo
-    final results = await Future.wait([
-      _service.getFeedings(dogId, from: from90d),
-      _service.getPrescriptionHistory(dogId),
-    ]);
+      // Carrega em paralelo
+      final results = await Future.wait([
+        _service.getFeedings(dogId, from: from90d),
+        _service.getPrescriptionHistory(dogId),
+      ]);
 
-    _historyFeedings = results[0] as List<Feeding>;
-    _prescriptionHistory = results[1] as List<NutritionPrescription>;
+      _historyFeedings = results[0] as List<Feeding>;
+      _prescriptionHistory = results[1] as List<NutritionPrescription>;
 
-    // Calcula conformidade 90 dias
-    _totalFeedings90d = _historyFeedings.length;
-    _conformFeedings90d =
-        _historyFeedings.where((f) => f.divergencePercent.abs() <= 10.0).length;
-    _divergentFeedings90d = _totalFeedings90d - _conformFeedings90d;
-    _conformity90d =
-        _totalFeedings90d > 0 ? (_conformFeedings90d / _totalFeedings90d) * 100 : 0.0;
+      // Calcula conformidade 90 dias
+      _totalFeedings90d = _historyFeedings.length;
+      _conformFeedings90d =
+          _historyFeedings.where((f) => f.divergencePercent.abs() <= 10.0).length;
+      _divergentFeedings90d = _totalFeedings90d - _conformFeedings90d;
+      _conformity90d =
+          _totalFeedings90d > 0 ? (_conformFeedings90d / _totalFeedings90d) * 100 : 0.0;
 
-    // Aplica filtros
-    _applyFilters();
+      // Aplica filtros
+      _applyFilters();
+    } catch (e) {
+      debugPrint('[NutritionVM] Erro ao carregar histórico: $e');
+      _historyFeedings = [];
+      _prescriptionHistory = [];
+      _filteredFeedings = [];
+    }
 
     _historyLoading = false;
     notifyListeners();
@@ -128,9 +147,14 @@ class NutritionViewModel extends ChangeNotifier {
   Future<void> addFeedingWithPhoto(String dogId, Feeding feeding, File? photo) async {
     final feedingId = await _service.addFeeding(dogId, feeding);
     if (photo != null) {
-      final url = await _service.uploadFeedingPhoto(dogId, photo);
-      if (url != null) {
-        await _service.updateFeedingPhoto(dogId, feedingId, url);
+      try {
+        final url = await _service.uploadFeedingPhoto(dogId, photo);
+        if (url != null) {
+          await _service.updateFeedingPhoto(dogId, feedingId, url);
+        }
+      } catch (e) {
+        debugPrint('[NutritionVM] Erro upload foto (feeding salvo): $e');
+        // Feeding já foi salvo, foto falhou — não propaga erro
       }
     }
   }

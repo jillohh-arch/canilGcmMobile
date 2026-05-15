@@ -62,7 +62,7 @@ class Feeding {
     return ((amount - prescription) / prescription) * 100;
   }
 
-  bool get isConform => divergencePercent == 0.0;
+  bool get isConform => divergencePercent.abs() <= 10.0;
 
   static DateTime? _toDateTime(dynamic value) {
     if (value == null) return null;
