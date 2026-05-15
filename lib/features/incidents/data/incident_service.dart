@@ -18,17 +18,71 @@ class IncidentService {
   }
 
   Future<List<dynamic>> getIncidents({String? dogId}) async {
-    Query query = _db.collection('incidents').orderBy('date', descending: true);
-    if (dogId != null) {
-      query = query.where('dogId', isEqualTo: dogId);
-    }
+    try {
+      // Tenta query com filtro e ordenação (requer índice composto)
+      Query query = _db.collection('incidents');
+      if (dogId != null) {
+        query = query.where('dogId', isEqualTo: dogId);
+      }
+      query = query.orderBy('date', descending: true);
 
-    final snapshot = await query.get();
-    return snapshot.docs.map((doc) {
-      final data = Map<String, dynamic>.from(doc.data() as Map);
-      data['id'] = doc.id;
-      return data;
-    }).toList();
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) {
+        final data = Map<String, dynamic>.from(doc.data() as Map);
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      // Fallback: busca sem orderBy (índice composto pode não existir)
+      try {
+        Query query = _db.collection('incidents');
+        if (dogId != null) {
+          query = query.where('dogId', isEqualTo: dogId);
+        }
+
+        final snapshot = await query.get();
+        final results = snapshot.docs.map((doc) {
+          final data = Map<String, dynamic>.from(doc.data() as Map);
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+
+        // Ordena localmente por date desc
+        results.sort((a, b) {
+          final dateA = a['date'];
+          final dateB = b['date'];
+          if (dateA is Timestamp && dateB is Timestamp) {
+            return dateB.compareTo(dateA);
+          }
+          return 0;
+        });
+        return results;
+      } catch (e2) {
+        // Último fallback: busca TODOS e filtra localmente
+        final snapshot = await _db.collection('incidents').get();
+        final results = snapshot.docs.map((doc) {
+          final data = Map<String, dynamic>.from(doc.data() as Map);
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+
+        // Filtra por dogId localmente
+        final filtered = dogId != null
+            ? results.where((d) => d['dogId'] == dogId).toList()
+            : results;
+
+        // Ordena localmente
+        filtered.sort((a, b) {
+          final dateA = a['date'];
+          final dateB = b['date'];
+          if (dateA is Timestamp && dateB is Timestamp) {
+            return dateB.compareTo(dateA);
+          }
+          return 0;
+        });
+        return filtered;
+      }
+    }
   }
 
   Future<List<dynamic>> getOpenIncidents({String? dogId}) async {

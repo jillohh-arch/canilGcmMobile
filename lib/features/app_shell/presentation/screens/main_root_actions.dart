@@ -11,16 +11,17 @@ extension _MainRootActions on _MainRootScreenState {
         children: [
           Icon(
             icon,
-            color: isSelected ? Colors.cyanAccent : Colors.white54,
-            size: 24,
+            color: isSelected ? const Color(0xFF4DD0E1) : const Color(0xFF5A7280),
+            size: 22,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
-              color: isSelected ? Colors.cyanAccent : Colors.white54,
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            style: GoogleFonts.inter(
+              color: isSelected ? const Color(0xFF4DD0E1) : const Color(0xFF5A7280),
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
           ),
         ],

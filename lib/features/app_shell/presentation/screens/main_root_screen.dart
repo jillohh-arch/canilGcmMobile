@@ -6,9 +6,9 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
-import 'package:canil_gcm/features/shifts/presentation/screens/daily_timeline_screen.dart';
+import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_dashboard_screen.dart';
-import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
+import 'package:canil_gcm/features/dogs/presentation/screens/dog_prontuario_tab_screen.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,9 +42,9 @@ class _MainRootScreenState extends State<MainRootScreen> {
 
   final List<Widget> _screens = [
     const ActiveShiftDashboardScreen(),
-    const DailyTimelineScreen(),
+    const HistoryScreen(),
     const HealthDashboardScreen(),
-    const ProfileScreen(),
+    const DogProntuarioTabScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -109,8 +109,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.cyanAccent.withValues(alpha: 0.3),
-                blurRadius: 15,
+                color: const Color(0xFF4DD0E1).withValues(alpha: 0.3),
+                blurRadius: 16,
                 spreadRadius: 2,
               ),
             ],
@@ -127,10 +127,12 @@ class _MainRootScreenState extends State<MainRootScreen> {
                 );
               }
             },
-            backgroundColor: const Color(0xFF020617),
+            backgroundColor: const Color(0xFF4DD0E1),
             elevation: 0,
-            shape: const CircleBorder(),
-            child: const Icon(Icons.add, color: Colors.cyanAccent, size: 32),
+            shape: const CircleBorder(
+              side: BorderSide(color: Color(0xFF050D10), width: 4),
+            ),
+            child: const Icon(Icons.shield, color: Color(0xFF050D10), size: 26),
           ),
         ),
 
@@ -139,29 +141,28 @@ class _MainRootScreenState extends State<MainRootScreen> {
 
         // BARRA DE NAVEGAÇÃO CÔNCAVA
         bottomNavigationBar: BottomAppBar(
-          color: const Color(0xFF0F172A),
-          shape:
-              const CircularNotchedRectangle(), // Cria a curva/berço para o FAB
-          notchMargin: 8.0, // Espaço entre o botão e a curva
+          color: const Color(0xFF050D10),
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
           child: SizedBox(
             height: 60,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Lado Esquerdo: Turno e Timeline
+                // Lado Esquerdo: Turno e Histórico
                 Row(
                   children: [
-                    _buildNavItem(0, Icons.shield_outlined, 'Turno'),
-                    _buildNavItem(1, Icons.history_toggle_off, 'Hist.'),
+                    _buildNavItem(0, Icons.home_outlined, 'Turno'),
+                    _buildNavItem(1, Icons.history, 'Histórico'),
                   ],
                 ),
-                // Espaço central reservado para o FAB (Não mexer aqui)
+                // Espaço central reservado para o FAB
                 const SizedBox(width: 32),
-                // Lado Direito: Saúde e Perfil
+                // Lado Direito: Saúde e Cão/Perfil
                 Row(
                   children: [
                     _buildNavItem(2, Icons.medical_services_outlined, 'Saúde'),
-                    _buildNavItem(3, Icons.person_outline, 'Perfil'),
+                    _buildNavItem(3, Icons.pets, 'Cão'),
                   ],
                 ),
               ],

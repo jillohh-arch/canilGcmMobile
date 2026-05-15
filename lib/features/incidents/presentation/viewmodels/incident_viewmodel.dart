@@ -66,12 +66,17 @@ class IncidentViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final raw = await _db.getIncidents(dogId: dogId);
-      final fetched = raw
-          .map((json) => Incident.fromJson(json as Map<String, dynamic>))
-          .toList();
+      final fetched = <Incident>[];
+      for (final json in raw) {
+        try {
+          fetched.add(Incident.fromJson(json as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('[IncidentViewModel] Erro ao parsear incident: $e');
+        }
+      }
       _replaceWithFetchedIncidents(fetched, dogId: dogId);
     } catch (e) {
-      debugPrint('Error fetching incidents: $e');
+      debugPrint('[IncidentViewModel] Error fetching incidents for dog $dogId: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
