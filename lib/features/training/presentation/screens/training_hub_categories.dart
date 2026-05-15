@@ -287,7 +287,7 @@ class _SpecialtyCard extends StatelessWidget {
                     Text(
                       data.name,
                       style: GoogleFonts.inter(
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary,
                       ),
@@ -295,28 +295,18 @@ class _SpecialtyCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: data.statusColor.withAlpha(20),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: data.statusColor.withAlpha(60)),
-                          ),
-                          child: Text(
-                            data.statusLabel,
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: data.statusColor,
-                              letterSpacing: 0.5,
-                            ),
+                        Text(
+                          data.statusLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: data.statusColor,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Text(
-                          '· ${data.lastLabel}',
+                          ' · ${data.lastLabel}',
                           style: GoogleFonts.inter(
-                            fontSize: 11,
+                            fontSize: 10,
                             color: AppTheme.textTertiary,
                           ),
                         ),
@@ -369,41 +359,47 @@ class _GeneralTrainingCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withAlpha(20)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: color.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
+                color: AppTheme.primary.withAlpha(25),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: Center(
                 child: Text(emoji, style: const TextStyle(fontSize: 16)),
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              lastStr,
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                color: AppTheme.textTertiary,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    lastStr,
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      color: AppTheme.textTertiary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

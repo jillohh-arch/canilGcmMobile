@@ -73,6 +73,7 @@ const _exerciseCatalog = <_ExerciseType>[
   _ExerciseType(name: 'Esteira', icon: '🏃', category: 'CARDIOVASCULAR', fields: [
     _FieldDef(key: 'sets', label: 'SÉRIES', unit: 'x'),
     _FieldDef(key: 'duration', label: 'DURAÇÃO/SÉRIE', unit: 'min'),
+    _FieldDef(key: 'speed', label: 'VELOCIDADE', unit: 'km/h'),
   ]),
   _ExerciseType(name: 'Paraquedas', icon: '🪂', category: 'CARDIOVASCULAR', gpsDefault: true, fields: [
     _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
@@ -84,6 +85,7 @@ const _exerciseCatalog = <_ExerciseType>[
   // Força
   _ExerciseType(name: 'Tração c/ peso', icon: '🏋', category: 'FORÇA', fields: [
     _FieldDef(key: 'load', label: 'CARGA', unit: 'kg'),
+    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
     _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
   ]),
   _ExerciseType(name: 'Tração elástica', icon: '🪢', category: 'FORÇA', fields: [
@@ -438,6 +440,7 @@ class _ConditioningOverview extends StatelessWidget {
           ],
         ),
         ...categories.entries.map((entry) {
+          final isLastCategory = entry.key == categories.keys.last;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -460,7 +463,10 @@ class _ConditioningOverview extends StatelessWidget {
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
                 childAspectRatio: 2.2,
-                children: entry.value.map((ex) => _exerciseCard(ex)).toList(),
+                children: [
+                  ...entry.value.map((ex) => _exerciseCard(ex)),
+                  if (isLastCategory) _otherExerciseCard(),
+                ],
               ),
             ],
           );
@@ -533,6 +539,81 @@ class _ConditioningOverview extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _otherExerciseCard() {
+    final otherExercise = _ExerciseType(
+      name: 'Outro',
+      icon: '+',
+      category: 'AGILIDADE E PLIOMETRIA',
+      fields: [
+        _FieldDef(key: 'custom_name', label: 'EXERCÍCIO', unit: ''),
+        _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
+        _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+      ],
+    );
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onExerciseTap(otherExercise);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(5),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: AppTheme.primary.withAlpha(80),
+            style: BorderStyle.none,
+          ),
+        ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: AppTheme.primary.withAlpha(80),
+            width: 1.5,
+            strokeAlign: BorderSide.strokeAlignInside,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withAlpha(12),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Center(
+                    child: Text('+', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.primary, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Outro',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Personalizado',
+              style: GoogleFonts.inter(
+                color: AppTheme.textTertiary,
+                fontSize: 9,
+              ),
             ),
           ],
         ),

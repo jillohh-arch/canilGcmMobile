@@ -131,6 +131,14 @@ class _TrainingHubHeader extends StatelessWidget {
                   ],
                 ),
               ),
+              // Action buttons
+              Row(
+                children: [
+                  _headerActionBtn(context, '⇄'),
+                  const SizedBox(width: 6),
+                  _headerActionBtn(context, '👤'),
+                ],
+              ),
             ],
           ),
         ),
@@ -178,5 +186,23 @@ class _TrainingHubHeader extends StatelessWidget {
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
     return vm.trainings.where((t) => t.date.isAfter(start)).length;
+  }
+
+  Widget _headerActionBtn(BuildContext context, String label) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(20),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withAlpha(50)),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: AppTheme.primary),
+        ),
+      ),
+    );
   }
 }
