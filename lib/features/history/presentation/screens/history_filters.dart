@@ -16,9 +16,33 @@ extension _HistoryFilters on _HistoryScreenState {
             final period = periods[index];
             final isActive = _periodFilter == period;
             return GestureDetector(
-              onTap: () {
+              onTap: () async {
                 HapticFeedback.selectionClick();
-                setState(() => _periodFilter = period);
+                if (period == 'Personalizado') {
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2024),
+                    lastDate: DateTime.now(),
+                    initialDateRange: _customRange,
+                    builder: (ctx, child) => Theme(
+                      data: Theme.of(ctx).copyWith(
+                        colorScheme: ColorScheme.dark(
+                          primary: _cyanAccent,
+                          surface: AppTheme.background,
+                        ),
+                      ),
+                      child: child!,
+                    ),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _customRange = picked;
+                      _periodFilter = 'Personalizado';
+                    });
+                  }
+                } else {
+                  setState(() => _periodFilter = period);
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
@@ -33,13 +57,26 @@ extension _HistoryFilters on _HistoryScreenState {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  period,
-                  style: GoogleFonts.inter(
-                    color: isActive ? _cyanAccent : _textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (period == 'Personalizado')
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Icon(Icons.calendar_today, size: 12,
+                            color: isActive ? _cyanAccent : _textSecondary),
+                      ),
+                    Text(
+                      period == 'Personalizado' && _periodFilter == 'Personalizado' && _customRange != null
+                          ? '${_customRange!.start.day}/${_customRange!.start.month} — ${_customRange!.end.day}/${_customRange!.end.month}'
+                          : period,
+                      style: GoogleFonts.inter(
+                        color: isActive ? _cyanAccent : _textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -52,10 +89,11 @@ extension _HistoryFilters on _HistoryScreenState {
   Widget _buildTypeFilters() {
     final types = [
       ('Tudo', null),
-      ('🍖 Rotina', 'Rotina'),
-      ('⚕ Saúde', 'Saude'),
-      ('🎯 Treino', 'Treino'),
       ('🛡 Ocorrência', 'Ocorrência'),
+      ('🎯 Treino', 'Treino'),
+      ('🥩 Nutrição', 'Nutricao'),
+      ('⚕ Saúde', 'Saude'),
+      ('🍖 Rotina', 'Rotina'),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -120,8 +158,18 @@ extension _HistoryFilters on _HistoryScreenState {
       case 'Este mês':
         final monthStart = DateTime(now.year, now.month, 1);
         return (start: monthStart, end: today.add(const Duration(days: 1)));
+      case 'Personalizado':
+        if (_customRange != null) {
+          return (
+            start: _customRange!.start,
+            end: _customRange!.end.add(const Duration(days: 1)),
+          );
+        }
+        return (
+          start: today.subtract(const Duration(days: 30)),
+          end: today.add(const Duration(days: 1)),
+        );
       default:
-        // Personalizado - mostra últimos 30 dias por padrão
         return (
           start: today.subtract(const Duration(days: 30)),
           end: today.add(const Duration(days: 1)),

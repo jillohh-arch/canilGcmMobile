@@ -72,6 +72,33 @@ extension _HistoryDataLoader on _HistoryScreenState {
       }
     }
 
+    // Nutrição
+    if (_typeFilter == 'Tudo' || _typeFilter == 'Nutricao') {
+      final nVM = Provider.of<NutritionViewModel>(context);
+      for (final f in nVM.todayFeedings) {
+        if (_isInRange(f.fedAt, range)) {
+          entries.add(HistoryEntry(
+            id: f.id ?? f.fedAt.millisecondsSinceEpoch.toString(),
+            category: 'Nutricao',
+            originalModel: f,
+            time: f.fedAt,
+            title: 'Alimentação · ${f.amountGrams}g',
+            subtitle: '${f.period} · ${f.fedBy}',
+            location: '',
+            authorId: f.fedBy,
+            authorName: _resolveAuthorName(f.fedBy),
+            details: {
+              'Período': f.period,
+              'Quantidade': '${f.amountGrams}g',
+              'Prescrição': '${f.prescriptionAtTime}g',
+              'Divergência': '${f.divergencePercent.toStringAsFixed(1)}%',
+              if (f.observations != null) 'Observações': f.observations,
+            },
+          ));
+        }
+      }
+    }
+
     // Ordena por hora (mais recente primeiro)
     entries.sort((a, b) => b.time.compareTo(a.time));
     return entries;

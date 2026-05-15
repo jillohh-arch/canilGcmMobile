@@ -41,6 +41,8 @@ class HistoryEntry {
         return _yellowAccent;
       case 'Ocorrência':
         return _cyanAccent;
+      case 'Nutricao':
+        return const Color(0xFFF59E0B);
       default:
         return _textMuted;
     }
@@ -57,6 +59,8 @@ class HistoryEntry {
         return '🎯';
       case 'Ocorrência':
         return '🛡';
+      case 'Nutricao':
+        return '🥩';
       default:
         return '📋';
     }
@@ -73,6 +77,8 @@ class HistoryEntry {
         return Icons.track_changes_rounded;
       case 'Ocorrência':
         return Icons.shield_rounded;
+      case 'Nutricao':
+        return Icons.restaurant_outlined;
       default:
         return Icons.info_outline;
     }

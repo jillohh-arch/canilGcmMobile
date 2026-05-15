@@ -10,6 +10,7 @@ import 'package:canil_gcm/features/training/presentation/viewmodels/training_vie
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
+import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -50,6 +51,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// Filtro de tipo selecionado
   String _typeFilter = 'Tudo';
+
+  /// Range customizado para "Personalizado"
+  DateTimeRange? _customRange;
 
   String? _lastLoadedDogId;
 
@@ -129,7 +133,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
-              // TODO: export PDF
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Exportação PDF do histórico em desenvolvimento',
+                    style: GoogleFonts.inter(fontSize: 12),
+                  ),
+                  backgroundColor: _cyanAccent,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
