@@ -22,6 +22,8 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
+import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
+import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 
 import 'dynamic_activity_sheet.dart';
 

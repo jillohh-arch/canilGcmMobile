@@ -11,9 +11,10 @@ class _TodayActivitiesSection extends StatelessWidget {
     final healthVM = Provider.of<HealthViewModel>(context);
     final incidentVM = Provider.of<IncidentViewModel>(context);
     final routineVM = Provider.of<RoutineViewModel>(context);
+    final nutritionVM = Provider.of<NutritionViewModel>(context);
 
     final todayEntries = _buildTodayEntries(
-      trainingVM, healthVM, incidentVM, routineVM,
+      trainingVM, healthVM, incidentVM, routineVM, nutritionVM,
     );
 
     final displayEntries = todayEntries.take(5).toList();
@@ -100,6 +101,7 @@ class _TodayActivitiesSection extends StatelessWidget {
     HealthViewModel healthVM,
     IncidentViewModel incidentVM,
     RoutineViewModel routineVM,
+    NutritionViewModel nutritionVM,
   ) {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
@@ -151,6 +153,17 @@ class _TodayActivitiesSection extends StatelessWidget {
           color: AppTheme.attention,
         ));
       }
+    }
+
+    // Refeições do dia
+    for (final f in nutritionVM.todayFeedings) {
+      entries.add(_ActivityEntry(
+        type: 'nutricao',
+        title: 'Alimentação • ${f.amountGrams}g',
+        time: f.fedAt,
+        icon: Icons.restaurant_outlined,
+        color: AppTheme.attention,
+      ));
     }
 
     entries.sort((a, b) => b.time.compareTo(a.time));

@@ -61,8 +61,11 @@ class _QuickActionsSection extends StatelessWidget {
     final lastIncident = _lastAgo(incidentVM.incidents.isNotEmpty
         ? incidentVM.incidents.first.date
         : null);
-    final lastRoutine = _lastAgo(routineVM.routines.isNotEmpty
-        ? routineVM.routines.first.timestamp
+
+    // Nutrição: última refeição do dia
+    final nutritionVM = Provider.of<NutritionViewModel>(context);
+    final lastNutrition = _lastAgo(nutritionVM.todayFeedings.isNotEmpty
+        ? nutritionVM.todayFeedings.first.fedAt
         : null);
 
     if (actions.isNotEmpty) {
@@ -78,21 +81,14 @@ class _QuickActionsSection extends StatelessWidget {
       return _buildGridLayout(items);
     }
 
-    // Fallback: 4 ações padrão
+    // Fallback: 4 ações padrão conforme spec (Nutrição, Saúde, Treino, Ocorrência)
     return _buildGridLayout([
       _QuickActionCard(
-        label: 'Ocorrência',
-        icon: Icons.local_police_outlined,
-        color: AppTheme.error,
-        lastAgo: lastIncident,
-        onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
-      ),
-      _QuickActionCard(
-        label: 'Treino',
-        icon: Icons.fitness_center_rounded,
-        color: AppTheme.primary,
-        lastAgo: lastTraining,
-        onTap: () => _openSheet(context, 'treino', 'Treino'),
+        label: 'Nutrição',
+        icon: Icons.restaurant_outlined,
+        color: AppTheme.attention,
+        lastAgo: lastNutrition,
+        onTap: () => _openNutrition(context),
       ),
       _QuickActionCard(
         label: 'Saúde',
@@ -102,11 +98,18 @@ class _QuickActionsSection extends StatelessWidget {
         onTap: () => _openSheet(context, 'saude', 'Saúde'),
       ),
       _QuickActionCard(
-        label: 'Rotina',
-        icon: Icons.schedule_rounded,
-        color: AppTheme.attention,
-        lastAgo: lastRoutine,
-        onTap: () => _openSheet(context, 'rotina', 'Rotina'),
+        label: 'Treino',
+        icon: Icons.fitness_center_rounded,
+        color: AppTheme.primary,
+        lastAgo: lastTraining,
+        onTap: () => _openSheet(context, 'treino', 'Treino'),
+      ),
+      _QuickActionCard(
+        label: 'Ocorrência',
+        icon: Icons.local_police_outlined,
+        color: AppTheme.error,
+        lastAgo: lastIncident,
+        onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
       ),
     ]);
   }
@@ -133,6 +136,18 @@ class _QuickActionsSection extends StatelessWidget {
     if (diff.inHours < 24) return 'há ${diff.inHours}h';
     if (diff.inDays == 1) return 'há 1 dia';
     return 'há ${diff.inDays}d';
+  }
+
+  void _openNutrition(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FeedingRegistrationScreen(
+          dogId: dog.id,
+          dogName: dog.name,
+        ),
+      ),
+    );
   }
 
   void _openSheet(BuildContext context, String tipo, String nome) {

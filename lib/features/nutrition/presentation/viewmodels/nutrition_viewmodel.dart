@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_service.dart';
@@ -121,6 +122,17 @@ class NutritionViewModel extends ChangeNotifier {
   Future<void> addFeeding(String dogId, Feeding feeding) async {
     await _service.addFeeding(dogId, feeding);
     // O stream atualiza automaticamente
+  }
+
+  /// Registra refeição com upload de foto da balança.
+  Future<void> addFeedingWithPhoto(String dogId, Feeding feeding, File? photo) async {
+    final feedingId = await _service.addFeeding(dogId, feeding);
+    if (photo != null) {
+      final url = await _service.uploadFeedingPhoto(dogId, photo);
+      if (url != null) {
+        await _service.updateFeedingPhoto(dogId, feedingId, url);
+      }
+    }
   }
 
   // ─── Filtros ───────────────────────────────────────────────────────

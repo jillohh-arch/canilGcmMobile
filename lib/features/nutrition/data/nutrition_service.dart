@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 
 /// Service para gerenciar alimentação e prescrições nutricionais.
 class NutritionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final StorageService _storage = StorageService();
 
   // ─── Feedings ─────────────────────────────────────────────────────
 
@@ -58,6 +62,18 @@ class NutritionService {
   Future<String> addFeeding(String dogId, Feeding feeding) async {
     final docRef = await _feedingsCol(dogId).add(feeding.toJson());
     return docRef.id;
+  }
+
+  /// Faz upload da foto da balança e retorna a URL.
+  Future<String?> uploadFeedingPhoto(String dogId, File photo) async {
+    return _storage.uploadImage(photo, 'dogs/$dogId/feeding_photos');
+  }
+
+  /// Atualiza a URL da foto em um feeding existente.
+  Future<void> updateFeedingPhoto(String dogId, String feedingId, String photoUrl) async {
+    await _feedingsCol(dogId).doc(feedingId).update({
+      'photo_balance_url': photoUrl,
+    });
   }
 
   // ─── Prescriptions ────────────────────────────────────────────────

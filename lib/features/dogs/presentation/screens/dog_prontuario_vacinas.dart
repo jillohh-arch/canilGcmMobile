@@ -7,7 +7,7 @@ extension _DogProntuarioVacinas on _DogProntuarioTabScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('CARTEIRA DE VACINAÇÃO', action: 'Ver completa →'),
+        _buildVacinasSectionHeader(),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Container(
@@ -110,6 +110,50 @@ extension _DogProntuarioVacinas on _DogProntuarioTabScreenState {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Header da seção vacinação com "Ver completa →" navegável.
+  Widget _buildVacinasSectionHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+      child: Row(
+        children: [
+          Text(
+            'CARTEIRA DE VACINAÇÃO',
+            style: GoogleFonts.inter(
+              color: _cyanAccent,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(height: 1, color: _cyanAccent.withAlpha(38)),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              final dog = _getActiveDog();
+              if (dog == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => VaccinationHistoryScreen(dog: dog),
+                ),
+              );
+            },
+            child: Text(
+              'Ver completa →',
+              style: GoogleFonts.inter(
+                color: _cyanAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

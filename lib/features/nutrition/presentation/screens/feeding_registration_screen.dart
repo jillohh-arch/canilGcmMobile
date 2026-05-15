@@ -769,9 +769,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         fedBy: fedBy,
       );
 
-      await vm.addFeeding(widget.dogId, feeding);
-
-      // TODO: upload _photoFile to Storage if not null
+      await vm.addFeedingWithPhoto(widget.dogId, feeding, _photoFile);
 
       if (!mounted) return;
       HapticFeedback.mediumImpact();

@@ -10,7 +10,7 @@ extension _DogProntuarioPeso on _DogProntuarioTabScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('EVOLUÇÃO DO PESO', action: 'Ver tudo →'),
+        _buildPesoSectionHeader(dog),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Container(
@@ -100,6 +100,48 @@ extension _DogProntuarioPeso on _DogProntuarioTabScreenState {
           ),
         ),
       ],
+    );
+  }
+
+  /// Header da seção peso com "Ver tudo →" navegável.
+  Widget _buildPesoSectionHeader(Dog dog) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+      child: Row(
+        children: [
+          Text(
+            'EVOLUÇÃO DO PESO',
+            style: GoogleFonts.inter(
+              color: _cyanAccent,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(height: 1, color: _cyanAccent.withAlpha(38)),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => WeightHistoryScreen(dog: dog),
+                ),
+              );
+            },
+            child: Text(
+              'Ver tudo →',
+              style: GoogleFonts.inter(
+                color: _cyanAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
