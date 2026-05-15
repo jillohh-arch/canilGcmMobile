@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
-import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/core/widgets/binomio_header.dart';
 
 /// Condicionamento Físico — Visão geral + Nova sessão
 /// Tela A: resumo semanal, catálogo de exercícios, sessões recentes
@@ -215,95 +214,24 @@ class _ConditioningOverview extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // Dog status
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withAlpha(10),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.primary.withAlpha(50)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1A2A30),
-                    border: Border.all(color: AppTheme.primary, width: 1.5),
-                  ),
-                  child: ClipOval(
-                    child: dog.profileImageUrl != null && dog.profileImageUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: dog.profileImageUrl!,
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Center(
-                              child: Text(
-                                dog.name.isNotEmpty ? dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Text(
-                                dog.name.isNotEmpty ? dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Text(
-                              dog.name.isNotEmpty ? dog.name[0] : 'K',
-                              style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (ctx) {
-                          final userVM = Provider.of<UserViewModel>(ctx);
-                          final handler = userVM.displayNameFor(ra: dog.conductorRa);
-                          return Text(
-                            '${dog.name} · $handler',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        },
-                      ),
-                      Consumer<TrainingViewModel>(
-                        builder: (_, vm, __) {
-                          final condSessions = vm.trainings
-                              .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
-                              .toList();
-                          int? lastDays;
-                          if (condSessions.isNotEmpty) {
-                            condSessions.sort((a, b) => b.date.compareTo(a.date));
-                            lastDays = DateTime.now().difference(condSessions.first.date).inDays;
-                          }
-                          final lastStr = lastDays != null ? 'Última sessão há $lastDays dias' : 'Sem sessões';
-                          return Text(
-                            '$lastStr · ${condSessions.length} sessões totais',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textSecondary,
-                              fontSize: 10,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          Consumer<TrainingViewModel>(
+            builder: (_, vm, __) {
+              final condSessions = vm.trainings
+                  .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
+                  .toList();
+              int? lastDays;
+              if (condSessions.isNotEmpty) {
+                condSessions.sort((a, b) => b.date.compareTo(a.date));
+                lastDays = DateTime.now().difference(condSessions.first.date).inDays;
+              }
+              final lastStr = lastDays != null ? 'Última sessão há $lastDays dias' : 'Sem sessões';
+              return BinomioHeader(
+                dog: dog,
+                subtitle: '$lastStr · ${condSessions.length} sessões totais',
+                subtitleColor: AppTheme.textSecondary,
+                avatarSize: 44,
+              );
+            },
           ),
         ],
       ),
@@ -959,82 +887,12 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withAlpha(10),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.primary.withAlpha(50)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1A2A30),
-                    border: Border.all(color: AppTheme.primary, width: 1.5),
-                  ),
-                  child: ClipOval(
-                    child: widget.dog.profileImageUrl != null && widget.dog.profileImageUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: widget.dog.profileImageUrl!,
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Center(
-                              child: Text(
-                                widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Text(
-                                widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Text(
-                              widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                              style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (ctx) {
-                          final userVM = Provider.of<UserViewModel>(ctx);
-                          final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
-                          return Text(
-                            '${widget.dog.name} · $handler',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        },
-                      ),
-                      Text(
-                        TimeOfDay.now().format(context),
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          BinomioHeader(
+            dog: widget.dog,
+            subtitle: widget.exercise.name,
+            subtitleColor: AppTheme.primary,
+            avatarSize: 40,
+            withBackground: false,
           ),
         ],
       ),

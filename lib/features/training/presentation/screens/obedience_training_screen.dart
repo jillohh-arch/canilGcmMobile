@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
-import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/core/widgets/binomio_header.dart';
 
 /// Tela B — Treino de Obediência (Treino Contínuo)
 /// Biblioteca de comandos com estágios, foco, ambiente, avaliação
@@ -234,112 +233,28 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
           ),
           const SizedBox(height: 12),
           // Dog status card (cyan theme)
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withAlpha(10),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.primary.withAlpha(50)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1A2A30),
-                    border: Border.all(color: AppTheme.primary, width: 1.5),
-                  ),
-                  child: ClipOval(
-                    child: widget.dog.profileImageUrl != null && widget.dog.profileImageUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: widget.dog.profileImageUrl!,
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Center(
-                              child: Text(
-                                widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Text(
-                                widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                                style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Text(
-                              widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
-                              style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                  ),
+          BinomioHeader(
+            dog: widget.dog,
+            subtitle: '$_totalCommands COMANDOS NA BIBLIOTECA',
+            subtitleColor: AppTheme.primary,
+            showStatusDot: true,
+            statusDotColor: AppTheme.primary,
+            avatarSize: 44,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(40),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'ATIVO',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (ctx) {
-                          final userVM = Provider.of<UserViewModel>(ctx);
-                          final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
-                          return Text(
-                            '${widget.dog.name} · $handler',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        },
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '$_totalCommands COMANDOS NA BIBLIOTECA',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.primary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withAlpha(40),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'ATIVO',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
