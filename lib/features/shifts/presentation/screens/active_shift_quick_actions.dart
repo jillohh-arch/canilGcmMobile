@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "REGISTROS RÁPIDOS" com botões carregados do Firestore.
+/// Seção "Registros rápidos" com botões carregados do Firestore.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -12,20 +12,14 @@ class _QuickActionsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Icon(Icons.bolt_rounded, color: _hudCyan, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              'REGISTROS RÁPIDOS',
-              style: GoogleFonts.robotoMono(
-                color: _hudCyan,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
-              ),
-            ),
-          ],
+        Text(
+          'REGISTROS RÁPIDOS',
+          style: GoogleFonts.inter(
+            color: AppTheme.textTertiary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
         ),
         const SizedBox(height: 12),
         if (actions.isEmpty)
@@ -39,7 +33,7 @@ class _QuickActionsSection extends StatelessWidget {
                   child: _QuickActionButton(
                     label: actions[i].nome,
                     icon: _resolveIcon(actions[i].icone),
-                    borderColor: _resolveColor(actions[i].cor),
+                    color: _resolveColor(actions[i].cor),
                     onTap: () => _openSheet(
                       context,
                       actions[i].tipo,
@@ -54,101 +48,95 @@ class _QuickActionsSection extends StatelessWidget {
     );
   }
 
-  /// Fallback caso a coleção atalhos_registro esteja vazia.
   Widget _buildFallbackActions(BuildContext context) {
     return Row(
       children: [
         Expanded(
           child: _QuickActionButton(
-            label: 'Passeio',
-            icon: Icons.directions_walk_rounded,
-            borderColor: _hudGreen,
-            onTap: () => _openSheet(context, 'Rotina', 'Passeio'),
+            label: 'Ocorrência',
+            icon: Icons.assignment_outlined,
+            color: AppTheme.error,
+            onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _QuickActionButton(
-            label: 'Limpeza',
-            icon: Icons.cleaning_services_rounded,
-            borderColor: const Color(0xFFAB47BC),
-            onTap: () => _openSheet(context, 'Rotina', 'Limpeza'),
+            label: 'Treino',
+            icon: Icons.fitness_center_rounded,
+            color: AppTheme.primary,
+            onTap: () => _openSheet(context, 'treino', 'Treino'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _QuickActionButton(
-            label: 'Alimentação',
-            icon: Icons.restaurant_rounded,
-            borderColor: _hudCyan,
-            onTap: () => _openSheet(context, 'Rotina', 'Alimentação'),
+            label: 'Saúde',
+            icon: Icons.medical_services_outlined,
+            color: AppTheme.success,
+            onTap: () => _openSheet(context, 'saude', 'Saúde'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _QuickActionButton(
-            label: 'Detecção',
-            icon: Icons.track_changes_rounded,
-            borderColor: _hudAmber,
-            onTap: () => _openSheet(context, 'Treino', null),
+            label: 'Rotina',
+            icon: Icons.schedule_rounded,
+            color: AppTheme.attention,
+            onTap: () => _openSheet(context, 'rotina', 'Rotina'),
           ),
         ),
       ],
     );
   }
 
-  void _openSheet(BuildContext context, String category, String? subtype) {
+  void _openSheet(BuildContext context, String tipo, String nome) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
-      useRootNavigator: true,
       isScrollControlled: true,
-      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DynamicActivitySheet(
-        category: category,
+        category: nome,
         dogId: dog.id,
         dogName: dog.name,
       ),
     );
   }
 
-  IconData _resolveIcon(String icone) {
-    switch (icone) {
-      case 'dog_walk':
-      case 'passeio':
-        return Icons.directions_walk_rounded;
-      case 'cleaning':
-      case 'limpeza':
-        return Icons.cleaning_services_rounded;
-      case 'food':
-      case 'alimentacao':
-        return Icons.restaurant_rounded;
-      case 'detection':
-      case 'deteccao':
-        return Icons.track_changes_rounded;
-      case 'training':
-      case 'treino':
+  IconData _resolveIcon(String? iconName) {
+    switch (iconName) {
+      case 'assignment':
+        return Icons.assignment_outlined;
+      case 'fitness_center':
         return Icons.fitness_center_rounded;
+      case 'medical_services':
+        return Icons.medical_services_outlined;
+      case 'schedule':
+        return Icons.schedule_rounded;
+      case 'pets':
+        return Icons.pets_rounded;
       default:
-        return Icons.bolt_rounded;
+        return Icons.radio_button_checked;
     }
   }
 
-  Color _resolveColor(String cor) {
-    switch (cor) {
-      case 'verde':
-        return _hudGreen;
-      case 'vermelho':
-        return _hudDanger;
-      case 'laranja':
+  Color _resolveColor(String? colorName) {
+    switch (colorName) {
+      case 'red':
+      case 'danger':
+        return AppTheme.error;
+      case 'green':
+      case 'success':
+        return AppTheme.success;
       case 'amber':
-        return _hudAmber;
-      case 'roxo':
-        return const Color(0xFFAB47BC);
-      case 'ciano':
+      case 'warning':
+        return AppTheme.warning;
+      case 'orange':
+      case 'attention':
+        return AppTheme.attention;
       default:
-        return _hudCyan;
+        return AppTheme.primary;
     }
   }
 }
@@ -156,41 +144,38 @@ class _QuickActionsSection extends StatelessWidget {
 class _QuickActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final Color borderColor;
+  final Color color;
   final VoidCallback onTap;
 
   const _QuickActionButton({
     required this.label,
     required this.icon,
-    required this.borderColor,
+    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: _hudPanel.withAlpha(200),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor.withAlpha(100)),
-          boxShadow: [
-            BoxShadow(color: borderColor.withAlpha(20), blurRadius: 12),
-          ],
+          color: color.withAlpha(10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(50)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: borderColor, size: 26),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
             Text(
               label,
               style: GoogleFonts.inter(
-                color: Colors.white70,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,

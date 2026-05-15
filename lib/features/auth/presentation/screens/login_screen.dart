@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 
 part 'login_screen_widgets.dart';
@@ -17,11 +18,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _hudBackground = Color(0xFF070B14);
-  static const _hudPanel = Color(0xFF0B1220);
-  static const _hudCyan = Color(0xFF00E5FF);
-  static const _hudDanger = Color(0xFFFF3B6B);
-
   final _raController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -75,16 +71,17 @@ class _LoginScreenState extends State<LoginScreen> {
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
-          side: BorderSide(color: _hudDanger.withAlpha(140)),
+          side: BorderSide(color: AppTheme.error.withAlpha(140)),
         ),
         content: Text(
           message,
           style: GoogleFonts.inter(
             color: Colors.white,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
           ),
         ),
-        backgroundColor: const Color(0xFF1A0A12),
+        backgroundColor: AppTheme.error.withAlpha(30),
       ),
     );
   }
@@ -100,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Autentique-se para acessar o CANIL GCM',
+        localizedReason: 'Autentique-se para acessar o Canil K9',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
@@ -124,12 +121,12 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         } else {
           _showSnack(
-            'Nenhum acesso salvo. Faça login com R.A. e Senha primeiro.',
+            'Nenhum acesso salvo. Faça login com R.A. e senha primeiro.',
           );
         }
       }
     } catch (e) {
-      _showSnack('Erro ao acessar biometria ou operação cancelada.');
+      _showSnack('Erro ao acessar biometria.');
     }
   }
 
@@ -138,130 +135,141 @@ class _LoginScreenState extends State<LoginScreen> {
     final authVM = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
-      backgroundColor: _hudBackground,
-      body: Stack(
-        children: [
-          // ── Background sólido com gradiente sutil ─────────────────────────
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    _hudPanel,
-                    _hudBackground,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Login Content ──────────────────────────────────────────────────
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 24,
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _LoginBrand(),
-                      const SizedBox(height: 56),
-
-                      // ── Error Message ──────────────────────────────────────
-                      if (authVM.errorMessage != null) ...[
-                        _LoginErrorBanner(message: authVM.errorMessage!),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // ── Biometria (primária) ──────────────────────────────
-                      if (_biometricAvailable) ...[
-                        _BiometricPrimaryAction(
-                          onPressed: () => _handleBiometricLogin(authVM),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-
-                      // ── Divisor ───────────────────────────────────────────
-                      Row(
-                        children: [
-                          Expanded(child: Divider(color: Colors.white12)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              'ou entre com senha',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: Colors.white38,
-                              ),
-                            ),
-                          ),
-                          Expanded(child: Divider(color: Colors.white12)),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ── Inputs ─────────────────────────────────────────────
-                      _PremiumTextField(
-                        controller: _raController,
-                        label: 'IDENTIFICAÇÃO R.A.',
-                        icon: Icons.badge_rounded,
-                        keyboardType: TextInputType.number,
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Informe o R.A.' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      _PremiumTextField(
-                        controller: _passwordController,
-                        label: 'SENHA',
-                        icon: Icons.key_rounded,
-                        obscureText: _obscurePassword,
-                        isPassword: true,
-                        onTogglePassword: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Senha obrigatória' : null,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // ── Botão Entrar (secundário) ─────────────────────────
-                      _LoginPrimaryAction(
-                        isLoading: authVM.isLoading,
-                        onPressed: () async {
-                          HapticFeedback.mediumImpact();
-                          if (_formKey.currentState!.validate()) {
-                            final ra = _raController.text.trim();
-                            final pass = _passwordController.text.trim();
-                            final success = await authVM
-                                .signInWithRaAndPassword(ra, pass);
-                            if (success) {
-                              await _secureStorage.write(
-                                key: 'cached_ra',
-                                value: ra,
-                              );
-                              await _secureStorage.write(
-                                key: 'cached_password',
-                                value: pass,
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 32),
-                    ],
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Brasão + Título ─────────────────────────────────
+                  const _LoginBrand(),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Bem-vindo de volta',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Identifique-se para acessar o sistema',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // ── Erro ───────────────────────────────────────────
+                  if (authVM.errorMessage != null) ...[
+                    _LoginErrorBanner(message: authVM.errorMessage!),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ── Biometria (primária) ───────────────────────────
+                  if (_biometricAvailable) ...[
+                    _BiometricButton(
+                      onPressed: () => _handleBiometricLogin(authVM),
+                    ),
+                    const SizedBox(height: 24),
+                    _Divider(),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ── Campos ─────────────────────────────────────────
+                  _LoginTextField(
+                    controller: _raController,
+                    label: 'Matrícula (RA)',
+                    icon: Icons.badge_outlined,
+                    keyboardType: TextInputType.number,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Informe o R.A.' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _LoginTextField(
+                    controller: _passwordController,
+                    label: 'Senha',
+                    icon: Icons.lock_outline_rounded,
+                    obscureText: _obscurePassword,
+                    isPassword: true,
+                    onTogglePassword: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Senha obrigatória' : null,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Esqueci senha ──────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        // TODO: implementar recuperação de senha
+                      },
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 32),
+                      ),
+                      child: Text(
+                        'Esqueci minha senha',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Botão Entrar ───────────────────────────────────
+                  _PasswordLoginButton(
+                    isLoading: authVM.isLoading,
+                    onPressed: () async {
+                      HapticFeedback.mediumImpact();
+                      if (_formKey.currentState!.validate()) {
+                        final ra = _raController.text.trim();
+                        final pass = _passwordController.text.trim();
+                        final success =
+                            await authVM.signInWithRaAndPassword(ra, pass);
+                        if (success) {
+                          await _secureStorage.write(
+                            key: 'cached_ra',
+                            value: ra,
+                          );
+                          await _secureStorage.write(
+                            key: 'cached_password',
+                            value: pass,
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 48),
+
+                  // ── Footer institucional ───────────────────────────
+                  Text(
+                    'Guarda Civil Municipal de Limeira',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppTheme.textTertiary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -9,47 +9,48 @@ class _LoginBrand extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            width: 100,
+            height: 100,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _LoginScreenState._hudCyan.withAlpha(18),
+              color: AppTheme.primary.withAlpha(12),
               border: Border.all(
-                color: _LoginScreenState._hudCyan.withAlpha(190),
-                width: 2,
+                color: AppTheme.primary.withAlpha(60),
+                width: 1.5,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: _LoginScreenState._hudCyan.withAlpha(60),
-                  blurRadius: 16,
-                  spreadRadius: 1,
-                ),
-              ],
             ),
-            child: Image.asset(
-              'assets/images/logo-canil.png',
-              width: 80,
-              height: 80,
-              fit: BoxFit.contain,
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/logo-canil.png',
+                width: 64,
+                height: 64,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.shield_rounded,
+                  size: 48,
+                  color: AppTheme.primary.withAlpha(180),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Text(
-            'CANIL GCM',
-            style: GoogleFonts.oxanium(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 4,
+            'CANIL K9',
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+              letterSpacing: 2.5,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'SISTEMA OPERACIONAL K9 — CANIL GCM',
-            style: GoogleFonts.robotoMono(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: _LoginScreenState._hudCyan.withAlpha(210),
-              letterSpacing: 2,
+            'GCM LIMEIRA-SP',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textTertiary,
+              letterSpacing: 1.5,
             ),
           ),
         ],
@@ -66,33 +67,27 @@ class _LoginErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _LoginScreenState._hudDanger.withAlpha(18),
+        color: AppTheme.error.withAlpha(15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _LoginScreenState._hudDanger.withAlpha(130)),
-        boxShadow: [
-          BoxShadow(
-            color: _LoginScreenState._hudDanger.withAlpha(35),
-            blurRadius: 18,
-          ),
-        ],
+        border: Border.all(color: AppTheme.error.withAlpha(80)),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.warning_amber_rounded,
-            color: _LoginScreenState._hudDanger,
+            color: AppTheme.error,
             size: 20,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: GoogleFonts.robotoMono(
-                color: Colors.white,
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -102,37 +97,24 @@ class _LoginErrorBanner extends StatelessWidget {
   }
 }
 
-class _LoginPrimaryAction extends StatelessWidget {
-  final bool isLoading;
-  final Future<void> Function() onPressed;
+class _BiometricButton extends StatelessWidget {
+  final VoidCallback onPressed;
 
-  const _LoginPrimaryAction({required this.isLoading, required this.onPressed});
+  const _BiometricButton({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: _LoginScreenState._hudCyan),
-      );
-    }
-
     return SizedBox(
-      height: 58,
-      child: ElevatedButton(
+      height: 56,
+      child: FilledButton.icon(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _LoginScreenState._hudCyan,
-          foregroundColor: _LoginScreenState._hudBackground,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          elevation: 10,
-          shadowColor: _LoginScreenState._hudCyan.withAlpha(120),
-        ),
-        child: Text(
-          'ACESSAR SISTEMA',
-          style: GoogleFonts.oxanium(
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
-            letterSpacing: 1.2,
+        icon: const Icon(Icons.fingerprint_rounded, size: 24),
+        label: Text(
+          'ENTRAR COM BIOMETRIA',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            letterSpacing: 0.5,
           ),
         ),
       ),
@@ -140,34 +122,64 @@ class _LoginPrimaryAction extends StatelessWidget {
   }
 }
 
-class _BiometricPrimaryAction extends StatelessWidget {
-  final VoidCallback onPressed;
+class _PasswordLoginButton extends StatelessWidget {
+  final bool isLoading;
+  final Future<void> Function() onPressed;
 
-  const _BiometricPrimaryAction({required this.onPressed});
+  const _PasswordLoginButton({
+    required this.isLoading,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primary),
+      );
+    }
+
     return SizedBox(
-      height: 64,
-      child: ElevatedButton.icon(
+      height: 56,
+      child: OutlinedButton(
         onPressed: onPressed,
-        icon: const Icon(Icons.fingerprint_rounded, size: 30),
-        label: Text(
-          'ENTRAR COM BIOMETRIA',
-          style: GoogleFonts.oxanium(
-            fontWeight: FontWeight.w900,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppTheme.primary.withAlpha(180)),
+        ),
+        child: Text(
+          'ENTRAR COM SENHA',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
             fontSize: 14,
-            letterSpacing: 1.0,
+            color: AppTheme.primary,
+            letterSpacing: 0.5,
           ),
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _LoginScreenState._hudCyan,
-          foregroundColor: _LoginScreenState._hudBackground,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          elevation: 6,
-          shadowColor: _LoginScreenState._hudCyan.withAlpha(80),
-        ),
       ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: Color(0xFF1D2C33))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'OU',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textTertiary,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        const Expanded(child: Divider(color: Color(0xFF1D2C33))),
+      ],
     );
   }
 }

@@ -7,46 +7,34 @@ class _EmptyDogState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: _hudPanel.withAlpha(230),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _hudCyan.withAlpha(80)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FaIcon(
-                FontAwesomeIcons.dog,
-                size: 44,
-                color: _hudCyan.withAlpha(160),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.pets_rounded,
+              size: 64,
+              color: AppTheme.textTertiary.withAlpha(100),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Nenhum cão cadastrado',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'NENHUM CÃO DISPONÍVEL',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.oxanium(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Cadastre um cão no painel administrativo para iniciar o plantão.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppTheme.textTertiary,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Cadastre ou libere um K9 para iniciar o plantão.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  color: Colors.white60,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

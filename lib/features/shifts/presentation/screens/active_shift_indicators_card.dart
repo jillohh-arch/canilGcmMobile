@@ -23,11 +23,7 @@ class _ShiftIndicatorsCard extends StatelessWidget {
     final startOfDay = DateTime(now.year, now.month, now.day);
 
     final todayRecords = _countTodayRecords(
-      trainingVM,
-      healthVM,
-      incidentVM,
-      routineVM,
-      startOfDay,
+      trainingVM, healthVM, incidentVM, routineVM, startOfDay,
     );
 
     final tempLabel = weatherData != null
@@ -35,48 +31,50 @@ class _ShiftIndicatorsCard extends StatelessWidget {
         : '--°C';
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
-        color: _hudPanel.withAlpha(200),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _hudCyan.withAlpha(40)),
+        color: const Color(0xFF0E1A1F),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _IndicatorChip(
-                icon: Icons.description_outlined,
-                color: _hudCyan,
-                label: '$todayRecords registro${todayRecords != 1 ? 's' : ''}',
-              ),
-              _IndicatorChip(
-                icon: Icons.notifications_active_outlined,
-                color: totalAlerts > 0 ? _hudDanger : Colors.white38,
-                label: '$totalAlerts alerta${totalAlerts != 1 ? 's' : ''}',
-              ),
-              _IndicatorChip(
-                icon: Icons.thermostat_rounded,
-                color: _hudAmber,
-                label: tempLabel,
-              ),
-              _IndicatorChip(
-                icon: Icons.shield_outlined,
-                color: _hudGreen,
-                label: dog.operationalStatus,
-              ),
-            ],
+          _IndicatorChip(
+            icon: Icons.description_outlined,
+            label: '$todayRecords',
+            subtitle: 'Registros',
+            color: AppTheme.primary,
           ),
-          const SizedBox(height: 10),
-          _LastRecordLabel(
-            trainingVM: trainingVM,
-            healthVM: healthVM,
-            routineVM: routineVM,
+          _IndicatorChip(
+            icon: Icons.notifications_active_outlined,
+            label: '$totalAlerts',
+            subtitle: 'Alertas',
+            color: totalAlerts > 0 ? AppTheme.warning : AppTheme.textTertiary,
+          ),
+          _IndicatorChip(
+            icon: Icons.thermostat_outlined,
+            label: tempLabel,
+            subtitle: 'Temp.',
+            color: _tempColor(),
+          ),
+          _IndicatorChip(
+            icon: Icons.favorite_outline_rounded,
+            label: dog.operationalStatus,
+            subtitle: 'Status',
+            color: AppTheme.success,
           ),
         ],
       ),
     );
+  }
+
+  Color _tempColor() {
+    if (weatherData == null) return AppTheme.textTertiary;
+    final temp = weatherData!.temperatura;
+    if (temp >= 35) return AppTheme.error;
+    if (temp >= 30) return AppTheme.warning;
+    return AppTheme.success;
   }
 
   int _countTodayRecords(
@@ -87,105 +85,59 @@ class _ShiftIndicatorsCard extends StatelessWidget {
     DateTime startOfDay,
   ) {
     int count = 0;
-    for (final s in trainingVM.trainings) {
-      if (!s.date.isBefore(startOfDay)) count++;
-    }
-    for (final h in healthVM.healthLogs) {
-      if (!h.date.isBefore(startOfDay)) count++;
-    }
-    for (final i in incidentVM.incidents) {
-      if (!i.date.isBefore(startOfDay)) count++;
-    }
-    for (final r in routineVM.routines) {
-      if (!r.timestamp.isBefore(startOfDay)) count++;
-    }
+    count += trainingVM.trainings
+        .where((t) => t.date.isAfter(startOfDay))
+        .length;
+    count += healthVM.healthLogs
+        .where((h) => h.date.isAfter(startOfDay))
+        .length;
+    count += incidentVM.incidents
+        .where((i) => i.date.isAfter(startOfDay))
+        .length;
+    count += routineVM.routines
+        .where((r) => r.timestamp.isAfter(startOfDay))
+        .length;
     return count;
   }
 }
 
 class _IndicatorChip extends StatelessWidget {
   final IconData icon;
-  final Color color;
   final String label;
+  final String subtitle;
+  final Color color;
 
   const _IndicatorChip({
     required this.icon,
-    required this.color,
     required this.label,
+    required this.subtitle,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 20),
+        Icon(icon, color: color, size: 18),
         const SizedBox(height: 4),
         Text(
           label,
           style: GoogleFonts.inter(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
           ),
-          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: AppTheme.textTertiary,
+          ),
         ),
       ],
     );
-  }
-}
-
-class _LastRecordLabel extends StatelessWidget {
-  final TrainingViewModel trainingVM;
-  final HealthViewModel healthVM;
-  final RoutineViewModel routineVM;
-
-  const _LastRecordLabel({
-    required this.trainingVM,
-    required this.healthVM,
-    required this.routineVM,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final lastText = _resolveLastRecord();
-    return Text(
-      lastText,
-      style: GoogleFonts.inter(
-        color: Colors.white38,
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
-      ),
-    );
-  }
-
-  String _resolveLastRecord() {
-    DateTime? lastDate;
-    String lastType = '';
-
-    if (trainingVM.trainings.isNotEmpty) {
-      final s = trainingVM.trainings.first;
-      lastDate = s.date;
-      lastType = 'Treino';
-    }
-    if (healthVM.healthLogs.isNotEmpty) {
-      final h = healthVM.healthLogs.first;
-      if (lastDate == null || h.date.isAfter(lastDate)) {
-        lastDate = h.date;
-        lastType = h.logType;
-      }
-    }
-    if (routineVM.routines.isNotEmpty) {
-      final r = routineVM.routines.first;
-      if (lastDate == null || r.timestamp.isAfter(lastDate)) {
-        lastDate = r.timestamp;
-        lastType = r.activityType;
-      }
-    }
-
-    if (lastDate == null) return 'Nenhum registro hoje';
-
-    final hour =
-        '${lastDate.hour.toString().padLeft(2, '0')}:${lastDate.minute.toString().padLeft(2, '0')}';
-    return 'Último registro: $lastType às $hour';
   }
 }

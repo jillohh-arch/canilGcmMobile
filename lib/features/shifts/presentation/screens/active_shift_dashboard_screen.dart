@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/weather_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
@@ -34,13 +35,6 @@ part 'active_shift_conditions_card.dart';
 part 'active_shift_cockpit.dart';
 part 'active_shift_readiness.dart';
 part 'active_shift_dog_switcher.dart';
-
-const _hudBackground = Color(0xFF070B14);
-const _hudPanel = Color(0xFF0B1220);
-const _hudCyan = Color(0xFF00E5FF);
-const _hudGreen = Color(0xFF00E58A);
-const _hudAmber = Color(0xFFFBBF24);
-const _hudDanger = Color(0xFFFF3B6B);
 
 class ActiveShiftDashboardScreen extends StatefulWidget {
   const ActiveShiftDashboardScreen({super.key});
@@ -72,22 +66,14 @@ class _ActiveShiftDashboardScreenState
       _lastFetchedDogId = dogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadDashboardData(dogId);
-        Provider.of<TrainingViewModel>(
-          context,
-          listen: false,
-        ).fetchTrainingsForDog(dogId);
-        Provider.of<HealthViewModel>(
-          context,
-          listen: false,
-        ).fetchHealthLogsForDog(dogId);
-        Provider.of<IncidentViewModel>(
-          context,
-          listen: false,
-        ).fetchIncidentsForDog(dogId);
-        Provider.of<RoutineViewModel>(
-          context,
-          listen: false,
-        ).fetchRoutinesForDog(dogId);
+        Provider.of<TrainingViewModel>(context, listen: false)
+            .fetchTrainingsForDog(dogId);
+        Provider.of<HealthViewModel>(context, listen: false)
+            .fetchHealthLogsForDog(dogId);
+        Provider.of<IncidentViewModel>(context, listen: false)
+            .fetchIncidentsForDog(dogId);
+        Provider.of<RoutineViewModel>(context, listen: false)
+            .fetchRoutinesForDog(dogId);
 
         final dogVM = Provider.of<DogViewModel>(context, listen: false);
         final userVM = Provider.of<UserViewModel>(context, listen: false);
@@ -104,39 +90,24 @@ class _ActiveShiftDashboardScreenState
   }
 
   Future<void> _loadDashboardData(String dogId) async {
-    // Carrega dados em paralelo, tolerando falhas individuais
     List<QuickAction> quickActions = [];
     List<DashboardAlert> alerts = [];
     int totalAlerts = 0;
     WeatherData? weather;
 
-    try {
-      quickActions = await _dashboardService.getQuickActions();
-    } catch (_) {}
-
-    try {
-      alerts = await _dashboardService.getActiveAlerts(dogId);
-    } catch (_) {}
-
-    try {
-      totalAlerts = await _dashboardService.countActiveAlerts(dogId);
-    } catch (_) {}
-
-    try {
-      weather = await _dashboardService.getWeatherData('default');
-    } catch (_) {}
+    try { quickActions = await _dashboardService.getQuickActions(); } catch (_) {}
+    try { alerts = await _dashboardService.getActiveAlerts(dogId); } catch (_) {}
+    try { totalAlerts = await _dashboardService.countActiveAlerts(dogId); } catch (_) {}
+    try { weather = await _dashboardService.getWeatherData('default'); } catch (_) {}
 
     // Fallback: busca clima via API se Firestore não retornou
     if (weather == null) {
       try {
         final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-          ),
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
         );
         final result = await WeatherService().getCurrentWeather(
-          position.latitude,
-          position.longitude,
+          position.latitude, position.longitude,
         );
         if (result != null) {
           final temp = (result['temperature'] as num?)?.toDouble() ?? 0;
@@ -144,11 +115,7 @@ class _ActiveShiftDashboardScreenState
           weather = WeatherData(
             temperatura: temp,
             umidade: hum,
-            riscoTermico: temp >= 35
-                ? 'ALTO'
-                : temp >= 30
-                    ? 'MODERADO'
-                    : 'BAIXO',
+            riscoTermico: temp >= 35 ? 'ALTO' : temp >= 30 ? 'MODERADO' : 'BAIXO',
             atualizadoEm: DateTime.now(),
           );
         }
@@ -166,16 +133,15 @@ class _ActiveShiftDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<ShiftViewModel, DogViewModel, AuthViewModel,
-        UserViewModel>(
+    return Consumer4<ShiftViewModel, DogViewModel, AuthViewModel, UserViewModel>(
       builder: (context, shiftVM, dogVM, authVM, userVM, _) {
         if (!shiftVM.hasActiveShift) {
-          return const Scaffold(
-            backgroundColor: _hudBackground,
+          return Scaffold(
+            backgroundColor: AppTheme.background,
             body: Center(
               child: Text(
                 'Nenhum turno ativo.\nInicie um turno para acessar o dashboard.',
-                style: TextStyle(color: Colors.white54, fontSize: 14),
+                style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -184,10 +150,7 @@ class _ActiveShiftDashboardScreenState
 
         final fbUser = authVM.user;
         final currentRa = HandlerIdentityService.raFromUser(fbUser);
-        final callsign = userVM.displayNameFor(
-          ra: currentRa,
-          firebaseUser: fbUser,
-        );
+        final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
         final dogId = shiftVM.activeDogId!;
 
         return StreamBuilder<Dog?>(
@@ -195,19 +158,18 @@ class _ActiveShiftDashboardScreenState
           builder: (context, snapshot) {
             final dog = snapshot.data ?? _localDogFallback(dogVM, dogId);
             if (dog == null) {
-              return const Scaffold(
-                backgroundColor: _hudBackground,
+              return Scaffold(
+                backgroundColor: AppTheme.background,
                 body: Center(
                   child: Text(
                     'K9 do turno não encontrado.',
-                    style: TextStyle(color: Colors.white),
+                    style: GoogleFonts.inter(color: AppTheme.textSecondary),
                   ),
                 ),
               );
             }
-
             return Scaffold(
-              backgroundColor: _hudBackground,
+              backgroundColor: AppTheme.background,
               body: _buildCockpit(context, dog, callsign),
             );
           },

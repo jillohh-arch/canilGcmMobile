@@ -19,7 +19,7 @@ class _ShiftHeader extends StatelessWidget {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final elapsed = _formatElapsed(shiftVM.shiftStartTime);
     final status = shiftVM.hasActiveShift ? 'Turno ativo' : 'Sem turno';
-    final statusColor = shiftVM.hasActiveShift ? _hudGreen : Colors.white38;
+    final statusColor = shiftVM.hasActiveShift ? AppTheme.success : AppTheme.textTertiary;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -36,7 +36,7 @@ class _ShiftHeader extends StatelessWidget {
                   child: _CircleAvatar(
                     imageUrl: dog.profileImageUrl,
                     fallbackIcon: Icons.pets_rounded,
-                    borderColor: _hudCyan,
+                    borderColor: AppTheme.primary,
                     size: 46,
                   ),
                 ),
@@ -45,7 +45,7 @@ class _ShiftHeader extends StatelessWidget {
                   child: _CircleAvatar(
                     imageUrl: conductorPhotoUrl,
                     fallbackIcon: Icons.person,
-                    borderColor: Colors.white38,
+                    borderColor: AppTheme.textTertiary,
                     size: 46,
                   ),
                 ),
@@ -53,47 +53,38 @@ class _ShiftHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Texto dinâmico
+
+          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${dog.name} • $callsign',
+                  '${dog.name} + $callsign',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
                   ),
-                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Row(
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
-                        color: statusColor,
                         shape: BoxShape.circle,
+                        color: statusColor,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      status,
+                      '$status · $elapsed',
                       style: GoogleFonts.inter(
-                        color: statusColor,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      ' • $elapsed',
-                      style: GoogleFonts.inter(
-                        color: Colors.white54,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],
@@ -101,22 +92,17 @@ class _ShiftHeader extends StatelessWidget {
               ],
             ),
           ),
-          // Botão troca de cão
-          InkWell(
-            onTap: onSwitchDog,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
+
+          // Botão trocar cão
+          IconButton(
+            onPressed: onSwitchDog,
+            icon: const Icon(Icons.swap_horiz_rounded, size: 22),
+            color: AppTheme.primary,
+            tooltip: 'Trocar cão',
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primary.withAlpha(15),
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _hudCyan.withAlpha(120)),
-                color: _hudPanel.withAlpha(200),
-              ),
-              child: const Icon(
-                Icons.swap_horiz_rounded,
-                color: _hudCyan,
-                size: 22,
               ),
             ),
           ),
@@ -126,12 +112,11 @@ class _ShiftHeader extends StatelessWidget {
   }
 
   String _formatElapsed(DateTime? startTime) {
-    if (startTime == null) return '';
+    if (startTime == null) return '--:--';
     final diff = DateTime.now().difference(startTime);
-    if (diff.inHours > 0) {
-      return 'há ${diff.inHours}h${diff.inMinutes.remainder(60)}min';
-    }
-    return 'há ${diff.inMinutes}min';
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes.remainder(60);
+    return '${hours}h${minutes.toString().padLeft(2, '0')}';
   }
 }
 
@@ -142,7 +127,7 @@ class _CircleAvatar extends StatelessWidget {
   final double size;
 
   const _CircleAvatar({
-    required this.imageUrl,
+    this.imageUrl,
     required this.fallbackIcon,
     required this.borderColor,
     required this.size,
@@ -155,34 +140,27 @@ class _CircleAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 1.5),
-        color: _hudPanel,
+        color: AppTheme.background,
+        border: Border.all(color: borderColor.withAlpha(150), width: 2),
       ),
       child: ClipOval(
-        child: imageUrl != null
+        child: imageUrl != null && imageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
-                width: size,
-                height: size,
-                placeholder: (context, url) => Icon(
-                  fallbackIcon,
-                  color: borderColor,
-                  size: size * 0.45,
-                ),
-                errorWidget: (context, url, error) => Icon(
-                  fallbackIcon,
-                  color: borderColor,
-                  size: size * 0.45,
-                ),
+                placeholder: (_, __) => _fallback(),
+                errorWidget: (_, __, ___) => _fallback(),
               )
-            : Center(
-                child: Icon(
-                  fallbackIcon,
-                  color: borderColor,
-                  size: size * 0.45,
-                ),
-              ),
+            : _fallback(),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      color: const Color(0xFF1A2328),
+      child: Center(
+        child: Icon(fallbackIcon, color: AppTheme.textTertiary, size: size * 0.4),
       ),
     );
   }

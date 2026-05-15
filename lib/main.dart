@@ -15,6 +15,7 @@ import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/app_shell/presentation/screens/main_root_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/login_screen.dart';
+import 'package:canil_gcm/features/auth/presentation/screens/splash_screen.dart';
 
 final GlobalKey<NavigatorState> globalNavigatorKey =
     GlobalKey<NavigatorState>();
@@ -50,7 +51,7 @@ class GcmK9App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GCM K9',
+      title: 'Canil K9',
       theme: AppTheme.darkTheme,
       navigatorKey: globalNavigatorKey,
       builder: (context, child) {
@@ -68,22 +69,26 @@ class GcmK9App extends StatelessWidget {
           return Navigator(
             onDidRemovePage: (_) {},
             pages: [
+              // Sem auth → Login
               if (authVM.user == null)
-                const MaterialPage(key: ValueKey('Login'), child: LoginScreen())
+                const MaterialPage(
+                  key: ValueKey('Login'),
+                  child: LoginScreen(),
+                )
               else ...[
+                // Carregando dados do usuário/turno → Splash
                 if (isLoadingCurrentUser || shiftVM.isLoading)
                   const MaterialPage(
-                    key: ValueKey('LoadingSession'),
-                    child: Scaffold(
-                      backgroundColor: Colors.black,
-                      body: Center(child: CircularProgressIndicator()),
-                    ),
+                    key: ValueKey('Splash'),
+                    child: SplashScreen(),
                   )
+                // Sem turno ativo → Seleção de cão
                 else if (!shiftVM.hasActiveShift)
                   const MaterialPage(
                     key: ValueKey('Assumption'),
                     child: ShiftAssumptionScreen(),
                   ),
+                // Turno ativo → Dashboard
                 if (!isLoadingCurrentUser &&
                     !shiftVM.isLoading &&
                     shiftVM.hasActiveShift)

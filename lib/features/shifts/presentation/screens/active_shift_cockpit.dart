@@ -1,98 +1,98 @@
 part of 'active_shift_dashboard_screen.dart';
 
-extension _ActiveShiftCockpit on _ActiveShiftDashboardScreenState {
-  Widget _buildCockpit(
-    BuildContext context,
-    Dog dog,
-    String callsign,
-  ) {
-    // Foto do condutor logado (Firebase Auth ou UserModel)
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final userVM = Provider.of<UserViewModel>(context, listen: false);
-    final conductorPhoto = _resolveConductorPhoto(authVM, userVM);
+/// Monta o layout principal do dashboard via CustomScrollView.
+Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
+  final state = context.findAncestorStateOfType<_ActiveShiftDashboardScreenState>()!;
+  final userVM = Provider.of<UserViewModel>(context);
+  final authVM = Provider.of<AuthViewModel>(context);
+  final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+  final userModel = userVM.users.cast<dynamic>().firstWhere(
+    (u) => u?.ra == currentRa,
+    orElse: () => null,
+  );
+  final conductorPhoto = userModel?.photoUrl as String?;
 
-    return CustomScrollView(
+  return SafeArea(
+    child: CustomScrollView(
       slivers: [
-        // 1. Cabeçalho do turno
+        // Header
         SliverToBoxAdapter(
-          child: SafeArea(
-            bottom: false,
-            child: _ShiftHeader(
-              dog: dog,
-              callsign: callsign,
-              conductorPhotoUrl: conductorPhoto,
-              onSwitchDog: () => _showDogSwitcher(context, dog),
-            ),
+          child: _ShiftHeader(
+            dog: dog,
+            callsign: callsign,
+            conductorPhotoUrl: conductorPhoto,
+            onSwitchDog: () => _showDogSwitcher(context),
           ),
         ),
-        // 2. Card de resumo superior (indicadores)
+
+        // Indicadores
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: _ShiftIndicatorsCard(
               dog: dog,
-              totalAlerts: _totalAlerts,
-              weatherData: _weatherData,
+              totalAlerts: state._totalAlerts,
+              weatherData: state._weatherData,
             ),
           ),
         ),
-        // 3. Registros Rápidos
+
+        // Ações rápidas
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _QuickActionsSection(
               dog: dog,
-              actions: _quickActions,
+              actions: state._quickActions,
             ),
           ),
         ),
-        // 4. Alertas
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: _AlertsSection(
-              alerts: _alerts,
-              totalAlerts: _totalAlerts,
+
+        // Alertas
+        if (state._alerts.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: _AlertsSection(
+                alerts: state._alerts,
+                totalAlerts: state._totalAlerts,
+              ),
             ),
           ),
-        ),
-        // 5. Atividades de Hoje
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: _TodayActivitiesSection(dogId: dog.id),
+
+        // Condições ambientais
+        if (state._weatherData != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: _ConditionsCard(weatherData: state._weatherData!),
+            ),
           ),
-        ),
-        // 6. Card do Cão
+
+        // Perfil do cão (card clicável)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
             child: _DogProfileCard(dog: dog),
           ),
         ),
-        // 7. Condições climáticas
+
+        // Atividades de hoje
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-            child: _ConditionsCard(weatherData: _weatherData),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+            child: _TodayActivitiesSection(dogId: dog.id),
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
-  String? _resolveConductorPhoto(AuthViewModel authVM, UserViewModel userVM) {
-    // Tenta foto do Firebase Auth
-    final fbPhoto = authVM.user?.photoURL;
-    if (fbPhoto != null && fbPhoto.isNotEmpty) return fbPhoto;
-
-    // Tenta foto do UserModel pelo RA
-    final ra = HandlerIdentityService.raFromUser(authVM.user);
-    if (ra != null) {
-      final userModel = userVM.findByRa(ra);
-      if (userModel?.photoUrl != null) return userModel!.photoUrl;
-    }
-
+Dog? _localDogFallback(DogViewModel dogVM, String dogId) {
+  try {
+    return dogVM.dogs.firstWhere((d) => d.id == dogId);
+  } catch (_) {
     return null;
   }
 }
