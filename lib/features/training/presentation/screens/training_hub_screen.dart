@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_maintenance_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -85,6 +88,37 @@ class TrainingHubScreen extends StatelessWidget {
   }
 
   void _openTrainingSheet(BuildContext context, String category, Dog dog) {
+    // Route to dedicated screens based on category
+    final lowerCat = category.toLowerCase();
+
+    if (lowerCat.contains('detecção') || lowerCat.contains('deteccao')) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetectionMaintenanceScreen(dog: dog),
+        ),
+      );
+      return;
+    }
+
+    if (lowerCat.contains('obediência') || lowerCat.contains('obediencia')) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ObedienceTrainingScreen(dog: dog),
+        ),
+      );
+      return;
+    }
+
+    if (lowerCat.contains('condicionamento')) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ConditioningScreen(dog: dog),
+        ),
+      );
+      return;
+    }
+
+    // Fallback: Guarda & Proteção, Faro/Rastro, or generic "Treino"
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

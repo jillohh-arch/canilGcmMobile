@@ -11,10 +11,12 @@ class _TrainingHubCategories extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trainingVM = Provider.of<TrainingViewModel>(context);
+
     // Especialidades do cão (com status real)
-    final specialties = _buildSpecialtyCards();
+    final specialties = _buildSpecialtyCards(trainingVM);
     // Treinos gerais (sem status de especialidade)
-    final generalTrainings = _buildGeneralCards();
+    final generalTrainings = _buildGeneralCards(trainingVM);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,34 +85,40 @@ class _TrainingHubCategories extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildSpecialtyCards() {
+  List<Widget> _buildSpecialtyCards(TrainingViewModel trainingVM) {
     final specs = <_SpecialtyData>[];
 
     // Detecção
+    final detLast = _lastSessionDaysAgo(trainingVM, 'Detecção');
     specs.add(_SpecialtyData(
       name: 'Detecção',
       icon: Icons.search_rounded,
       color: AppTheme.primary,
       status: _getSpecialtyStatus('deteccao'),
       subtitle: 'Protocolo Ragonha',
+      lastDaysAgo: detLast,
     ));
 
     // Guarda & Proteção
+    final gpLast = _lastSessionDaysAgo(trainingVM, 'Guarda');
     specs.add(_SpecialtyData(
       name: 'Guarda & Proteção',
       icon: Icons.shield_rounded,
       color: AppTheme.error,
       status: _getSpecialtyStatus('guarda_protecao'),
       subtitle: 'Defesa e contenção',
+      lastDaysAgo: gpLast,
     ));
 
     // Faro / Rastro
+    final faroLast = _lastSessionDaysAgo(trainingVM, 'Faro');
     specs.add(_SpecialtyData(
       name: 'Faro / Rastro',
       icon: Icons.air_rounded,
       color: const Color(0xFF9C27B0),
       status: _getSpecialtyStatus('faro_rastro'),
       subtitle: 'Busca e captura',
+      lastDaysAgo: faroLast,
     ));
 
     // Filtra apenas as que têm status (ativas ou em formação)
@@ -132,21 +140,40 @@ class _TrainingHubCategories extends StatelessWidget {
     return 'inativa';
   }
 
-  List<Widget> _buildGeneralCards() {
+  List<Widget> _buildGeneralCards(TrainingViewModel trainingVM) {
+    final obedLast = _lastSessionDaysAgo(trainingVM, 'Obediência');
+    final condLast = _lastSessionDaysAgo(trainingVM, 'Condicionamento');
+
     return [
       _GeneralTrainingCard(
         icon: Icons.psychology_rounded,
         label: 'Obediência',
         color: AppTheme.success,
+        lastDaysAgo: obedLast,
         onTap: () => onCategoryTap('Obediência'),
       ),
       _GeneralTrainingCard(
         icon: Icons.directions_run_rounded,
         label: 'Condicionamento',
         color: AppTheme.attention,
+        lastDaysAgo: condLast,
         onTap: () => onCategoryTap('Condicionamento'),
       ),
     ];
+  }
+
+  int? _lastSessionDaysAgo(TrainingViewModel vm, String typePrefix) {
+    final now = DateTime.now();
+    DateTime? last;
+    for (final t in vm.trainings) {
+      if (t.trainingType.toLowerCase().contains(typePrefix.toLowerCase())) {
+        if (last == null || t.date.isAfter(last)) {
+          last = t.date;
+        }
+      }
+    }
+    if (last == null) return null;
+    return now.difference(last).inDays;
   }
 
   Widget _buildAddSpecialtyButton() {
@@ -182,6 +209,7 @@ class _SpecialtyData {
   final Color color;
   final String status;
   final String subtitle;
+  final int? lastDaysAgo;
 
   _SpecialtyData({
     required this.name,
@@ -189,11 +217,19 @@ class _SpecialtyData {
     required this.color,
     required this.status,
     required this.subtitle,
+    this.lastDaysAgo,
   });
 
   bool get isOperational => status == 'operacional';
   String get statusLabel => isOperational ? 'OPERACIONAL' : 'EM FORMAÇÃO';
   Color get statusColor => isOperational ? AppTheme.success : AppTheme.warning;
+
+  String get lastLabel {
+    if (lastDaysAgo == null) return 'sem sessões';
+    if (lastDaysAgo == 0) return 'última hoje';
+    if (lastDaysAgo == 1) return 'última há 1 dia';
+    return 'última há $lastDaysAgo dias';
+  }
 }
 
 class _SpecialtyCard extends StatelessWidget {
@@ -276,13 +312,21 @@ class _SpecialtyCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          data.subtitle,
+                          '· ${data.lastLabel}',
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             color: AppTheme.textTertiary,
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: AppTheme.textTertiary,
+                      ),
                     ),
                   ],
                 ),
@@ -301,17 +345,25 @@ class _GeneralTrainingCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final int? lastDaysAgo;
   final VoidCallback onTap;
 
   const _GeneralTrainingCard({
     required this.icon,
     required this.label,
     required this.color,
+    this.lastDaysAgo,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final lastStr = lastDaysAgo == null
+        ? 'sem sessões'
+        : lastDaysAgo == 0
+            ? 'hoje'
+            : 'há $lastDaysAgo dias';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -340,6 +392,14 @@ class _GeneralTrainingCard extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              lastStr,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                color: AppTheme.textTertiary,
               ),
             ),
           ],
