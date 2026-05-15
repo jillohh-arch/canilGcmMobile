@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 /// Tela B — Treino de Obediência (Treino Contínuo)
 /// Biblioteca de comandos com estágios, foco, ambiente, avaliação
@@ -283,13 +284,19 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.dog.name,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Builder(
+                        builder: (ctx) {
+                          final userVM = Provider.of<UserViewModel>(ctx);
+                          final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                          return Text(
+                            '${widget.dog.name} · $handler',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
                       ),
                       Row(
                         children: [

@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 /// Tela A — Manutenção em Detecção
 /// Cão operacional: seleciona linha + tipo de cenário + foco
@@ -293,13 +294,19 @@ class _DetectionMaintenanceScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.dog.name,
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Builder(
+                            builder: (ctx) {
+                              final userVM = Provider.of<UserViewModel>(ctx);
+                              final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                              return Text(
+                                '${widget.dog.name} · $handler',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              );
+                            },
                           ),
                           Row(
                             children: [

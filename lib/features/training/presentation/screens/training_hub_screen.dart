@@ -14,6 +14,7 @@ import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 part 'training_hub_header.dart';
 part 'training_hub_categories.dart';

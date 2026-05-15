@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -295,25 +296,19 @@ class _FormationViewState extends State<_FormationView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      widget.dog.name,
+                Builder(
+                  builder: (ctx) {
+                    final userVM = Provider.of<UserViewModel>(ctx);
+                    final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                    return Text(
+                      '${widget.dog.name} · $handler',
                       style: GoogleFonts.inter(
                         color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      widget.dog.breed,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textTertiary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
                 Consumer<TrainingViewModel>(
                   builder: (_, vm, __) {
@@ -988,13 +983,19 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.dog.name,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Builder(
+                      builder: (ctx) {
+                        final userVM = Provider.of<UserViewModel>(ctx);
+                        final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                        return Text(
+                          '${widget.dog.name} · $handler',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        );
+                      },
                     ),
                     Text(
                       'Operacional há ${widget.dog.age > 2 ? widget.dog.age - 2 : 1} anos · $count sessões${lastDays != null ? ' · última há ${lastDays}d' : ''}',
@@ -1648,13 +1649,19 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  widget.dog.name,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Builder(
+                  builder: (ctx) {
+                    final userVM = Provider.of<UserViewModel>(ctx);
+                    final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                    return Text(
+                      '${widget.dog.name} · $handler',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 8),
                 Text(

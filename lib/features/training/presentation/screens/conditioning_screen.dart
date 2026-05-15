@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 /// Condicionamento Físico — Visão geral + Nova sessão
 /// Tela A: resumo semanal, catálogo de exercícios, sessões recentes
@@ -264,13 +265,19 @@ class _ConditioningOverview extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        dog.name,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Builder(
+                        builder: (ctx) {
+                          final userVM = Provider.of<UserViewModel>(ctx);
+                          final handler = userVM.displayNameFor(ra: dog.conductorRa);
+                          return Text(
+                            '${dog.name} · $handler',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
                       ),
                       Consumer<TrainingViewModel>(
                         builder: (_, vm, __) {
@@ -1002,13 +1009,19 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.dog.name,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Builder(
+                        builder: (ctx) {
+                          final userVM = Provider.of<UserViewModel>(ctx);
+                          final handler = userVM.displayNameFor(ra: widget.dog.conductorRa);
+                          return Text(
+                            '${widget.dog.name} · $handler',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
                       ),
                       Text(
                         TimeOfDay.now().format(context),

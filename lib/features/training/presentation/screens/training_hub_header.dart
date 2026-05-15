@@ -8,8 +8,10 @@ class _TrainingHubHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final shiftVM = Provider.of<ShiftViewModel>(context);
+    final userVM = Provider.of<UserViewModel>(context);
     final weekCount = _countThisWeek(trainingVM);
     final isShiftActive = shiftVM.hasActiveShift;
+    final handlerName = userVM.displayNameFor(ra: dog.conductorRa);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,7 +91,7 @@ class _TrainingHubHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${dog.name} · ${dog.breed}',
+                      '${dog.name} · $handlerName',
                       style: GoogleFonts.inter(
                         color: AppTheme.textPrimary,
                         fontSize: 13,
