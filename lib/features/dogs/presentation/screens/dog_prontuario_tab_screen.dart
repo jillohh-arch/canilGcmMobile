@@ -20,6 +20,7 @@ import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
+import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
 part 'dog_prontuario_ficha.dart';
 part 'dog_prontuario_nutricao.dart';

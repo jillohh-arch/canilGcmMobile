@@ -35,7 +35,7 @@ extension _DogProntuarioNutricao on _DogProntuarioTabScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('NUTRIÇÃO', action: 'Ver tudo →'),
+        _buildNutritionSectionHeader(dog),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -55,6 +55,51 @@ extension _DogProntuarioNutricao on _DogProntuarioTabScreenState {
           ),
         ),
       ],
+    );
+  }
+
+  /// Header da seção nutrição com "Ver tudo →" navegável.
+  Widget _buildNutritionSectionHeader(Dog dog) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+      child: Row(
+        children: [
+          Text(
+            'NUTRIÇÃO',
+            style: GoogleFonts.inter(
+              color: _cyanAccent,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(height: 1, color: _cyanAccent.withAlpha(38)),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => NutritionFullScreen(
+                    dogId: dog.id,
+                    dogName: dog.name,
+                  ),
+                ),
+              );
+            },
+            child: Text(
+              'Ver tudo →',
+              style: GoogleFonts.inter(
+                color: _cyanAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
