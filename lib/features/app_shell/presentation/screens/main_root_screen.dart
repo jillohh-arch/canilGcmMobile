@@ -12,6 +12,7 @@ import 'package:canil_gcm/features/health/presentation/screens/health_dashboard_
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_prontuario_tab_screen.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
+import 'package:canil_gcm/features/training/presentation/screens/training_hub_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 
@@ -81,7 +82,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
         await _handleBackNavigation(context);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF030712),
+        backgroundColor: AppTheme.background,
         // O corpo do app muda conforme a aba selecionada
         body: Stack(
           children: [

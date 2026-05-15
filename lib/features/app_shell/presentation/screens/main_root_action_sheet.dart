@@ -117,6 +117,22 @@ extension _MainRootActionSheet on _MainRootScreenState {
           return;
         }
 
+        // Treino → navega para o Hub de Treinos
+        if (category == 'Treino') {
+          if (Navigator.of(menuContext).canPop()) {
+            Navigator.of(menuContext).pop();
+          }
+          Future.microtask(() {
+            if (!mounted) return;
+            rootNavigator.push(
+              MaterialPageRoute(
+                builder: (_) => const TrainingHubScreen(),
+              ),
+            );
+          });
+          return;
+        }
+
         if (Navigator.of(menuContext).canPop()) {
           Navigator.of(menuContext).pop();
         }

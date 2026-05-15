@@ -21,7 +21,7 @@ part 'training_new_form_fields.dart';
 part 'training_new_form_selectors.dart';
 
 final _hudBackground = AppTheme.background;
-const _hudPanel = const Color(0xFF0E1A1F);
+const _hudPanel = Color(0xFF0E1A1F);
 final _hudCyan = AppTheme.primary;
 
 class TrainingLogScreen extends StatefulWidget {
