@@ -33,7 +33,7 @@ class _SaveHealthLogButton extends StatelessWidget {
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              foregroundColor: const Color(0xFF030712),
+              foregroundColor: AppTheme.background,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

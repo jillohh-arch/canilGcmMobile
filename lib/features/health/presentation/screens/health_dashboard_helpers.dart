@@ -36,7 +36,7 @@ extension _HealthDashboardScaffoldParts on _HealthDashboardScreenState {
     return SliverAppBar(
       expandedHeight: 0,
       pinned: true,
-      backgroundColor: const Color(0xFF030712),
+      backgroundColor: AppTheme.background,
       elevation: 0,
       title: Text(
         'SAÚDE DO K9',

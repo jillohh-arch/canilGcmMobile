@@ -58,7 +58,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
     final shiftVM = Provider.of<ShiftViewModel>(context);
     if (!shiftVM.hasActiveShift) {
       return Scaffold(
-        backgroundColor: const Color(0xFF030712),
+        backgroundColor: AppTheme.background,
         body: Center(
           child: Text(
             'Nenhum turno ativo.',
@@ -84,7 +84,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
     } catch (_) {}
 
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
+      backgroundColor: AppTheme.background,
       floatingActionButton: null,
       body: CustomScrollView(
         slivers: [

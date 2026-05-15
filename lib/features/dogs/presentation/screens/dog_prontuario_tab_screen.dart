@@ -16,6 +16,7 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 
 part 'dog_prontuario_ficha.dart';
 part 'dog_prontuario_status_medico.dart';
@@ -25,12 +26,12 @@ part 'dog_prontuario_vacinas.dart';
 part 'dog_prontuario_documentos.dart';
 part 'dog_prontuario_eventos.dart';
 
-/// Cores do tema
+/// Cores do tema — mapeadas para AppTheme tokens
 final _bgColor = AppTheme.background;
-const _cyanAccent = Color(0xFF4DD0E1);
-const _greenAccent = Color(0xFF2ECC71);
-const _yellowAccent = Color(0xFFF1C40F);
-const _redAccent = Color(0xFFE74C3C);
+final _cyanAccent = AppTheme.primary;
+final _greenAccent = AppTheme.success;
+final _yellowAccent = AppTheme.warning;
+final _redAccent = AppTheme.error;
 const _textPrimary = Colors.white;
 const _textSecondary = Color(0xFFB0C4CC);
 const _textMuted = Color(0xFF7A8A92);
@@ -148,7 +149,7 @@ class _DogProntuarioTabScreenState extends State<DogProntuarioTabScreen> {
       backgroundColor: _bgColor,
       body: SafeArea(
         child: _loading
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: _cyanAccent, strokeWidth: 2),
               )
             : Stack(
@@ -203,6 +204,15 @@ class _DogProntuarioTabScreenState extends State<DogProntuarioTabScreen> {
     );
   }
 
+  /// Abre o sheet de registro de saúde
+  Widget _buildHealthSheet(Dog dog) {
+    return DynamicActivitySheet(
+      category: 'Saude',
+      dogId: dog.id,
+      dogName: dog.name,
+    );
+  }
+
   /// Botão CTA fixo no fundo
   Widget _buildCtaButton() {
     return Container(
@@ -222,7 +232,15 @@ class _DogProntuarioTabScreenState extends State<DogProntuarioTabScreen> {
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          // TODO: navegar para tela de registro de evento de saúde
+          final dog = _getActiveDog();
+          if (dog == null) return;
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => _buildHealthSheet(dog),
+          );
         },
         child: Container(
           width: double.infinity,

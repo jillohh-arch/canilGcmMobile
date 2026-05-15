@@ -46,7 +46,7 @@ class _TacticalHealthThumbnail extends StatelessWidget {
       height: 75,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFF030712),
+        color: AppTheme.background,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: accentColor.withValues(alpha: 0.8),

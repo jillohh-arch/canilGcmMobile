@@ -68,7 +68,7 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.add, color: _cyanAccent, size: 16),
+                      Icon(Icons.add, color: _cyanAccent, size: 16),
                       const SizedBox(width: 6),
                       Text(
                         'Anexar laudo ou documento',
@@ -305,7 +305,7 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: _cyanAccent),
+                        borderSide: BorderSide(color: _cyanAccent),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -324,7 +324,7 @@ extension _DogProntuarioDocumentos on _DogProntuarioTabScreenState {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: _cyanAccent),
+                        borderSide: BorderSide(color: _cyanAccent),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),

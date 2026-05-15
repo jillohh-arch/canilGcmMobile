@@ -143,7 +143,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
 
         // BARRA DE NAVEGAÇÃO CÔNCAVA
         bottomNavigationBar: BottomAppBar(
-          color: const Color(0xFF050D10),
+          color: AppTheme.background,
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
           child: SizedBox(

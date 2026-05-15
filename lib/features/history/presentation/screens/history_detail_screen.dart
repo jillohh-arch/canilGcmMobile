@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/incidents/domain/incident_progress_update.dart';
 
@@ -15,7 +16,7 @@ class HistoryDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(
           children: [

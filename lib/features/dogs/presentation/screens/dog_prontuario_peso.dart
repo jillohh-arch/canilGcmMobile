@@ -162,7 +162,7 @@ class _WeightChartPainter extends CustomPainter {
     final range = maxVal - minVal;
 
     final linePaint = Paint()
-      ..color = const Color(0xFF4DD0E1)
+      ..color = _cyanAccent
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
@@ -177,7 +177,7 @@ class _WeightChartPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final dotPaint = Paint()
-      ..color = const Color(0xFF4DD0E1)
+      ..color = _cyanAccent
       ..style = PaintingStyle.fill;
 
     final path = Path();
