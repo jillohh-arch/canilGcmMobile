@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Registros rápidos" com botões carregados do Firestore.
+/// Seção "Registrar" com grid 2x2 conforme mockup.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -9,85 +9,130 @@ class _QuickActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trainingVM = Provider.of<TrainingViewModel>(context);
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final routineVM = Provider.of<RoutineViewModel>(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildSectionLabel('REGISTRAR'),
+        const SizedBox(height: 12),
+        _buildGrid(context, trainingVM, healthVM, incidentVM, routineVM),
+      ],
+    );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Row(
+      children: [
         Text(
-          'REGISTROS RÁPIDOS',
+          text,
           style: GoogleFonts.inter(
-            color: AppTheme.textTertiary,
+            color: AppTheme.primary,
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 12),
-        if (actions.isEmpty)
-          _buildFallbackActions(context)
-        else
-          Row(
-            children: [
-              for (int i = 0; i < actions.length; i++) ...[
-                if (i > 0) const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    label: actions[i].nome,
-                    icon: _resolveIcon(actions[i].icone),
-                    color: _resolveColor(actions[i].cor),
-                    onTap: () => _openSheet(
-                      context,
-                      actions[i].tipo,
-                      actions[i].nome,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(height: 1, color: AppTheme.primary.withAlpha(30)),
+        ),
       ],
     );
   }
 
-  Widget _buildFallbackActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickActionButton(
-            label: 'Ocorrência',
-            icon: Icons.assignment_outlined,
-            color: AppTheme.error,
-            onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _QuickActionButton(
-            label: 'Treino',
-            icon: Icons.fitness_center_rounded,
-            color: AppTheme.primary,
-            onTap: () => _openSheet(context, 'treino', 'Treino'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _QuickActionButton(
-            label: 'Saúde',
-            icon: Icons.medical_services_outlined,
-            color: AppTheme.success,
-            onTap: () => _openSheet(context, 'saude', 'Saúde'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _QuickActionButton(
-            label: 'Rotina',
-            icon: Icons.schedule_rounded,
-            color: AppTheme.attention,
-            onTap: () => _openSheet(context, 'rotina', 'Rotina'),
-          ),
-        ),
-      ],
-    );
+  Widget _buildGrid(
+    BuildContext context,
+    TrainingViewModel trainingVM,
+    HealthViewModel healthVM,
+    IncidentViewModel incidentVM,
+    RoutineViewModel routineVM,
+  ) {
+    // Calcula "última há Xh" para cada categoria
+    final lastTraining = _lastAgo(trainingVM.trainings.isNotEmpty
+        ? trainingVM.trainings.first.date
+        : null);
+    final lastHealth = _lastAgo(healthVM.healthLogs.isNotEmpty
+        ? healthVM.healthLogs.first.date
+        : null);
+    final lastIncident = _lastAgo(incidentVM.incidents.isNotEmpty
+        ? incidentVM.incidents.first.date
+        : null);
+    final lastRoutine = _lastAgo(routineVM.routines.isNotEmpty
+        ? routineVM.routines.first.timestamp
+        : null);
+
+    if (actions.isNotEmpty) {
+      // Usa ações do Firestore
+      final items = actions.map((a) => _QuickActionCard(
+        label: a.nome,
+        icon: _resolveIcon(a.icone),
+        color: _resolveColor(a.cor),
+        lastAgo: '',
+        onTap: () => _openSheet(context, a.tipo, a.nome),
+      )).toList();
+
+      return _buildGridLayout(items);
+    }
+
+    // Fallback: 4 ações padrão
+    return _buildGridLayout([
+      _QuickActionCard(
+        label: 'Ocorrência',
+        icon: Icons.local_police_outlined,
+        color: AppTheme.error,
+        lastAgo: lastIncident,
+        onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
+      ),
+      _QuickActionCard(
+        label: 'Treino',
+        icon: Icons.fitness_center_rounded,
+        color: AppTheme.primary,
+        lastAgo: lastTraining,
+        onTap: () => _openSheet(context, 'treino', 'Treino'),
+      ),
+      _QuickActionCard(
+        label: 'Saúde',
+        icon: Icons.medical_services_outlined,
+        color: AppTheme.success,
+        lastAgo: lastHealth,
+        onTap: () => _openSheet(context, 'saude', 'Saúde'),
+      ),
+      _QuickActionCard(
+        label: 'Rotina',
+        icon: Icons.schedule_rounded,
+        color: AppTheme.attention,
+        lastAgo: lastRoutine,
+        onTap: () => _openSheet(context, 'rotina', 'Rotina'),
+      ),
+    ]);
+  }
+
+  Widget _buildGridLayout(List<Widget> items) {
+    final rows = <Widget>[];
+    for (int i = 0; i < items.length; i += 2) {
+      rows.add(Row(
+        children: [
+          Expanded(child: items[i]),
+          const SizedBox(width: 10),
+          Expanded(child: i + 1 < items.length ? items[i + 1] : const SizedBox()),
+        ],
+      ));
+      if (i + 2 < items.length) rows.add(const SizedBox(height: 10));
+    }
+    return Column(children: rows);
+  }
+
+  String _lastAgo(DateTime? date) {
+    if (date == null) return '';
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    if (diff.inDays == 1) return 'há 1 dia';
+    return 'há ${diff.inDays}d';
   }
 
   void _openSheet(BuildContext context, String tipo, String nome) {
@@ -116,6 +161,8 @@ class _QuickActionsSection extends StatelessWidget {
         return Icons.schedule_rounded;
       case 'pets':
         return Icons.pets_rounded;
+      case 'local_police':
+        return Icons.local_police_outlined;
       default:
         return Icons.radio_button_checked;
     }
@@ -141,16 +188,18 @@ class _QuickActionsSection extends StatelessWidget {
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
+class _QuickActionCard extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
+  final String lastAgo;
   final VoidCallback onTap;
 
-  const _QuickActionButton({
+  const _QuickActionCard({
     required this.label,
     required this.icon,
     required this.color,
+    required this.lastAgo,
     required this.onTap,
   });
 
@@ -159,28 +208,49 @@ class _QuickActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withAlpha(10),
+          color: color.withAlpha(8),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withAlpha(50)),
+          border: Border.all(color: color.withAlpha(40)),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 6),
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(20),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const Spacer(),
+                Icon(Icons.add_rounded, color: color.withAlpha(120), size: 16),
+              ],
+            ),
+            const SizedBox(height: 10),
             Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
+            if (lastAgo.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'última $lastAgo',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: AppTheme.textTertiary,
+                ),
+              ),
+            ],
           ],
         ),
       ),

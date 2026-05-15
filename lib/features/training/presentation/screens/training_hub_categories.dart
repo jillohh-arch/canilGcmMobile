@@ -11,95 +11,301 @@ class _TrainingHubCategories extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Especialidades do cão (com status real)
+    final specialties = _buildSpecialtyCards();
+    // Treinos gerais (sem status de especialidade)
+    final generalTrainings = _buildGeneralCards();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Especialidades
+        if (specialties.isNotEmpty) ...[
+          _sectionLabel('ESPECIALIDADES', count: specialties.length),
+          const SizedBox(height: 10),
+          ...specialties,
+          const SizedBox(height: 12),
+          // Botão iniciar nova especialidade
+          _buildAddSpecialtyButton(),
+          const SizedBox(height: 24),
+        ],
+
+        // Treinos gerais
+        _sectionLabel('TREINOS GERAIS'),
+        const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.search_rounded,
-                label: 'Detecção',
-                subtitle: 'Protocolo Ragonha',
-                color: AppTheme.primary,
-                onTap: () => onCategoryTap('Detecção'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.shield_rounded,
-                label: 'Guarda & Proteção',
-                subtitle: 'Defesa e contenção',
-                color: AppTheme.error,
-                onTap: () => onCategoryTap('Guarda & Proteção'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.psychology_rounded,
-                label: 'Obediência',
-                subtitle: 'Comandos e disciplina',
-                color: AppTheme.success,
-                onTap: () => onCategoryTap('Obediência'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.school_rounded,
-                label: 'Formação BC',
-                subtitle: 'Base curricular',
-                color: AppTheme.warning,
-                onTap: () => onCategoryTap('Formação BC'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.directions_run_rounded,
-                label: 'Condicionamento',
-                subtitle: 'Físico e resistência',
-                color: AppTheme.attention,
-                onTap: () => onCategoryTap('Condicionamento'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CategoryCard(
-                icon: Icons.air_rounded,
-                label: 'Faro / Rastro',
-                subtitle: 'Busca e captura',
-                color: const Color(0xFF9C27B0),
-                onTap: () => onCategoryTap('Faro / Rastro'),
-              ),
-            ),
+            for (int i = 0; i < generalTrainings.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(child: generalTrainings[i]),
+            ],
           ],
         ),
       ],
     );
   }
+
+  Widget _sectionLabel(String text, {int? count}) {
+    return Row(
+      children: [
+        Text(
+          text,
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(height: 1, color: AppTheme.primary.withAlpha(30)),
+        ),
+        if (count != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count ativas',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildSpecialtyCards() {
+    final specs = <_SpecialtyData>[];
+
+    // Detecção
+    specs.add(_SpecialtyData(
+      name: 'Detecção',
+      icon: Icons.search_rounded,
+      color: AppTheme.primary,
+      status: _getSpecialtyStatus('deteccao'),
+      subtitle: 'Protocolo Ragonha',
+    ));
+
+    // Guarda & Proteção
+    specs.add(_SpecialtyData(
+      name: 'Guarda & Proteção',
+      icon: Icons.shield_rounded,
+      color: AppTheme.error,
+      status: _getSpecialtyStatus('guarda_protecao'),
+      subtitle: 'Defesa e contenção',
+    ));
+
+    // Faro / Rastro
+    specs.add(_SpecialtyData(
+      name: 'Faro / Rastro',
+      icon: Icons.air_rounded,
+      color: const Color(0xFF9C27B0),
+      status: _getSpecialtyStatus('faro_rastro'),
+      subtitle: 'Busca e captura',
+    ));
+
+    // Filtra apenas as que têm status (ativas ou em formação)
+    final active = specs.where((s) => s.status != 'inativa').toList();
+    if (active.isEmpty) return specs.take(2).toList().map((s) => _SpecialtyCard(data: s, onTap: () => onCategoryTap(s.name))).toList();
+    return active.map((s) => _SpecialtyCard(data: s, onTap: () => onCategoryTap(s.name))).toList();
+  }
+
+  String _getSpecialtyStatus(String key) {
+    // Verifica nas especialidades do cão (List<String>)
+    final specialties = dog.specialties;
+    if (specialties == null || specialties.isEmpty) return 'inativa';
+    for (final s in specialties) {
+      final name = s.toLowerCase();
+      if (name.contains(key) || key.contains(name)) {
+        return 'operacional';
+      }
+    }
+    return 'inativa';
+  }
+
+  List<Widget> _buildGeneralCards() {
+    return [
+      _GeneralTrainingCard(
+        icon: Icons.psychology_rounded,
+        label: 'Obediência',
+        color: AppTheme.success,
+        onTap: () => onCategoryTap('Obediência'),
+      ),
+      _GeneralTrainingCard(
+        icon: Icons.directions_run_rounded,
+        label: 'Condicionamento',
+        color: AppTheme.attention,
+        onTap: () => onCategoryTap('Condicionamento'),
+      ),
+    ];
+  }
+
+  Widget _buildAddSpecialtyButton() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withAlpha(50)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add_rounded, color: AppTheme.primary, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            'Iniciar nova especialidade',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _CategoryCard extends StatelessWidget {
+class _SpecialtyData {
+  final String name;
+  final IconData icon;
+  final Color color;
+  final String status;
+  final String subtitle;
+
+  _SpecialtyData({
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.status,
+    required this.subtitle,
+  });
+
+  bool get isOperational => status == 'operacional';
+  String get statusLabel => isOperational ? 'OPERACIONAL' : 'EM FORMAÇÃO';
+  Color get statusColor => isOperational ? AppTheme.success : AppTheme.warning;
+}
+
+class _SpecialtyCard extends StatelessWidget {
+  final _SpecialtyData data;
+  final VoidCallback onTap;
+
+  const _SpecialtyCard({required this.data, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: data.color.withAlpha(6),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: data.color.withAlpha(30)),
+        ),
+        child: Row(
+          children: [
+            // Borda lateral colorida
+            Container(
+              width: 3,
+              height: 72,
+              decoration: BoxDecoration(
+                color: data.statusColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  bottomLeft: Radius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Ícone
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: data.color.withAlpha(15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(data.icon, color: data.color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: data.statusColor.withAlpha(20),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: data.statusColor.withAlpha(60)),
+                          ),
+                          child: Text(
+                            data.statusLabel,
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: data.statusColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          data.subtitle,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 18),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GeneralTrainingCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _CategoryCard({
+  const _GeneralTrainingCard({
     required this.icon,
     required this.label,
-    required this.subtitle,
     required this.color,
     required this.onTap,
   });
@@ -119,13 +325,13 @@ class _CategoryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: color.withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(height: 10),
             Text(
@@ -134,14 +340,6 @@ class _CategoryCard extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: AppTheme.textTertiary,
               ),
             ),
           ],

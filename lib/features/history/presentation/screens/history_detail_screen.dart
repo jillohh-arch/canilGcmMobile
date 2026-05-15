@@ -50,7 +50,7 @@ class HistoryDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF4DD0E1).withAlpha(10),
+        color: AppTheme.primary.withAlpha(10),
       ),
       child: Column(
         children: [
@@ -68,7 +68,7 @@ class HistoryDetailScreen extends StatelessWidget {
                     Text(
                       'DETALHE DO REGISTRO',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.5,
@@ -108,11 +108,11 @@ class HistoryDetailScreen extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4DD0E1).withAlpha(20),
-                  border: Border.all(color: const Color(0xFF4DD0E1).withAlpha(51)),
+                  color: AppTheme.primary.withAlpha(20),
+                  border: Border.all(color: AppTheme.primary.withAlpha(51)),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.more_horiz, color: Color(0xFF4DD0E1), size: 16),
+                child: const Icon(Icons.more_horiz, color: AppTheme.primary, size: 16),
               ),
             ],
           ),
@@ -128,8 +128,8 @@ class HistoryDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF4DD0E1).withAlpha(15),
-        border: Border.all(color: const Color(0xFF4DD0E1).withAlpha(51)),
+        color: AppTheme.primary.withAlpha(15),
+        border: Border.all(color: AppTheme.primary.withAlpha(51)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -207,8 +207,8 @@ class HistoryDetailScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF2ECC71).withAlpha(15),
-            border: Border.all(color: const Color(0xFF2ECC71).withAlpha(51)),
+            color: AppTheme.success.withAlpha(15),
+            border: Border.all(color: AppTheme.success.withAlpha(51)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -217,13 +217,13 @@ class HistoryDetailScreen extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withAlpha(38),
+                  color: AppTheme.success.withAlpha(38),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 alignment: Alignment.center,
                 child: Icon(
                   isSuccess ? Icons.check : Icons.info_outline,
-                  color: const Color(0xFF2ECC71),
+                  color: AppTheme.success,
                   size: 16,
                 ),
               ),
@@ -235,7 +235,7 @@ class HistoryDetailScreen extends StatelessWidget {
                     Text(
                       isSuccess ? 'RESULTADO POSITIVO' : 'RESULTADO',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF2ECC71),
+                        color: AppTheme.success,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
@@ -303,7 +303,7 @@ class HistoryDetailScreen extends StatelessWidget {
                   children: [
                     Icon(
                       _iconForKey(kv.key),
-                      color: const Color(0xFF4DD0E1),
+                      color: AppTheme.primary,
                       size: 13,
                     ),
                     const SizedBox(width: 10),
@@ -407,13 +407,13 @@ class HistoryDetailScreen extends StatelessWidget {
                       width: 26,
                       height: 26,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4DD0E1).withAlpha(26),
+                        color: AppTheme.primary.withAlpha(26),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.circle,
-                        color: Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         size: 8,
                       ),
                     ),
@@ -516,7 +516,7 @@ class HistoryDetailScreen extends StatelessWidget {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Color(0xFF4DD0E1),
+                                color: AppTheme.primary,
                               ),
                             ),
                           ),
@@ -543,7 +543,7 @@ class HistoryDetailScreen extends StatelessWidget {
                       type.contains('video')
                           ? Icons.videocam_outlined
                           : Icons.insert_drive_file_outlined,
-                      color: const Color(0xFF4DD0E1),
+                      color: AppTheme.primary,
                       size: 28,
                     ),
                     const SizedBox(height: 4),
@@ -650,7 +650,7 @@ class HistoryDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF4DD0E1), size: 14),
+          Icon(icon, color: AppTheme.primary, size: 14),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -675,8 +675,8 @@ class HistoryDetailScreen extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF050D10).withAlpha(0),
-            const Color(0xFF050D10),
+            AppTheme.background.withAlpha(0),
+            AppTheme.background,
           ],
         ),
       ),
@@ -691,20 +691,20 @@ class HistoryDetailScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4DD0E1).withAlpha(26),
-                  border: Border.all(color: const Color(0xFF4DD0E1).withAlpha(77)),
+                  color: AppTheme.primary.withAlpha(26),
+                  border: Border.all(color: AppTheme.primary.withAlpha(77)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.picture_as_pdf, color: Color(0xFF4DD0E1), size: 16),
+                    const Icon(Icons.picture_as_pdf, color: AppTheme.primary, size: 16),
                     const SizedBox(width: 6),
                     Text(
                       'Gerar PDF',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -724,19 +724,19 @@ class HistoryDetailScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.share, color: Color(0xFF050D10), size: 16),
+                    const Icon(Icons.share, color: AppTheme.background, size: 16),
                     const SizedBox(width: 6),
                     Text(
                       'COMPARTILHAR',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF050D10),
+                        color: AppTheme.background,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
@@ -761,7 +761,7 @@ class HistoryDetailScreen extends StatelessWidget {
           Text(
             text,
             style: GoogleFonts.inter(
-              color: const Color(0xFF4DD0E1),
+              color: AppTheme.primary,
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.2,
@@ -771,7 +771,7 @@ class HistoryDetailScreen extends StatelessWidget {
           Expanded(
             child: Container(
               height: 1,
-              color: const Color(0xFF4DD0E1).withAlpha(38),
+              color: AppTheme.primary.withAlpha(38),
             ),
           ),
         ],

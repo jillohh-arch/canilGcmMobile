@@ -15,7 +15,7 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
   return SafeArea(
     child: CustomScrollView(
       slivers: [
-        // Header
+        // Header (binômio)
         SliverToBoxAdapter(
           child: _ShiftHeader(
             dog: dog,
@@ -25,19 +25,27 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
           ),
         ),
 
-        // Indicadores
+        // Alertas (prioridade visual — aparece primeiro)
+        if (state._alerts.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _AlertsSection(
+                alerts: state._alerts,
+                totalAlerts: state._totalAlerts,
+              ),
+            ),
+          ),
+
+        // Atividades de hoje
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: _ShiftIndicatorsCard(
-              dog: dog,
-              totalAlerts: state._totalAlerts,
-              weatherData: state._weatherData,
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _TodayActivitiesSection(dogId: dog.id),
           ),
         ),
 
-        // Ações rápidas
+        // Registros rápidos (grid 2x2)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -48,40 +56,23 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
           ),
         ),
 
-        // Alertas
-        if (state._alerts.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: _AlertsSection(
-                alerts: state._alerts,
-                totalAlerts: state._totalAlerts,
-              ),
-            ),
-          ),
-
-        // Condições ambientais
-        if (state._weatherData != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: _ConditionsCard(weatherData: state._weatherData!),
-            ),
-          ),
-
-        // Perfil do cão (card clicável)
+        // Indicadores compactos
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: _DogProfileCard(dog: dog),
+            child: _ShiftIndicatorsCard(
+              dog: dog,
+              totalAlerts: state._totalAlerts,
+              weatherData: state._weatherData,
+            ),
           ),
         ),
 
-        // Atividades de hoje
+        // Perfil do cão (card compacto)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-            child: _TodayActivitiesSection(dogId: dog.id),
+            child: _DogProfileCard(dog: dog),
           ),
         ),
       ],

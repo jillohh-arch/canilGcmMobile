@@ -55,43 +55,60 @@ class _AlertTile extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withAlpha(8),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withAlpha(40)),
+        border: Border.all(color: color.withAlpha(30)),
       ),
       child: Row(
         children: [
+          // Borda lateral colorida (3px)
+          Container(
+            width: 3,
+            height: 56,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(6),
+                bottomLeft: Radius.circular(6),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           Icon(_alertIcon(alert.tipo), color: color, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  alert.titulo,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                if (alert.descricao.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    alert.descricao,
+                    alert.titulo,
                     style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (alert.descricao.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      alert.descricao,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
+          Icon(Icons.chevron_right_rounded, color: color.withAlpha(120), size: 18),
+          const SizedBox(width: 10),
         ],
       ),
     );

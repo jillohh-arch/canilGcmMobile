@@ -16,46 +16,82 @@ class _TodayActivitiesSection extends StatelessWidget {
       trainingVM, healthVM, incidentVM, routineVM,
     );
 
-    final displayEntries = todayEntries.take(3).toList();
+    final displayEntries = todayEntries.take(5).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ATIVIDADES DE HOJE',
-          style: GoogleFonts.inter(
-            color: AppTheme.textTertiary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-          ),
+        // Section label com linha
+        Row(
+          children: [
+            Text(
+              'ATIVIDADES DE HOJE',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(height: 1, color: AppTheme.primary.withAlpha(30)),
+            ),
+            if (todayEntries.length > 5) ...[
+              const SizedBox(width: 8),
+              Text(
+                '${todayEntries.length}',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 12),
         if (displayEntries.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0E1A1F),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle_outline, color: AppTheme.textTertiary, size: 18),
-                const SizedBox(width: 10),
-                Text(
-                  'Nenhum registro hoje. Comece pelo botão acima.',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          )
+          _buildEmptyState(context)
         else
           ...displayEntries.map((entry) => _ActivityTile(entry: entry)),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppTheme.primary.withAlpha(40),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.wb_sunny_outlined, color: AppTheme.primary.withAlpha(100), size: 28),
+          const SizedBox(height: 10),
+          Text(
+            'Comece o dia',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Registre a primeira atividade do turno',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textTertiary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -159,16 +195,32 @@ class _ActivityTile extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // Tempo à esquerda
+            SizedBox(
+              width: 40,
+              child: Text(
+                timeStr,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textTertiary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Ícone circular colorido
             Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
                 color: entry.color.withAlpha(15),
-                borderRadius: BorderRadius.circular(6),
+                shape: BoxShape.circle,
+                border: Border.all(color: entry.color.withAlpha(60), width: 1.5),
               ),
-              child: Icon(entry.icon, color: entry.color, size: 16),
+              child: Icon(entry.icon, color: entry.color, size: 15),
             ),
             const SizedBox(width: 10),
+            // Título
             Expanded(
               child: Text(
                 entry.title,
@@ -177,13 +229,6 @@ class _ActivityTile extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                 ),
-              ),
-            ),
-            Text(
-              timeStr,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: AppTheme.textTertiary,
               ),
             ),
           ],

@@ -111,7 +111,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF4DD0E1).withValues(alpha: 0.3),
+                color: AppTheme.primary.withValues(alpha: 0.3),
                 blurRadius: 16,
                 spreadRadius: 2,
               ),
@@ -129,7 +129,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
                 );
               }
             },
-            backgroundColor: const Color(0xFF4DD0E1),
+            backgroundColor: AppTheme.primary,
             elevation: 0,
             shape: const CircleBorder(
               side: BorderSide(color: Color(0xFF050D10), width: 4),
@@ -147,7 +147,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
           child: SizedBox(
-            height: 60,
+            height: 72,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

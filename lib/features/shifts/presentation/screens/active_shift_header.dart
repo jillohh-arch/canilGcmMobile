@@ -60,7 +60,7 @@ class _ShiftHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${dog.name} + $callsign',
+                  '${dog.name} · $callsign',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

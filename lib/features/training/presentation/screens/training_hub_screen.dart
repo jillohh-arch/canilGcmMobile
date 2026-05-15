@@ -11,7 +11,6 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 part 'training_hub_header.dart';
-part 'training_hub_stats.dart';
 part 'training_hub_categories.dart';
 
 class TrainingHubScreen extends StatelessWidget {
@@ -21,7 +20,6 @@ class TrainingHubScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
-    final trainingVM = Provider.of<TrainingViewModel>(context);
 
     final dogId = shiftVM.activeDogId;
     Dog? dog;
@@ -51,32 +49,10 @@ class TrainingHubScreen extends StatelessWidget {
               child: _TrainingHubHeader(dog: dog),
             ),
 
-            // Stats rápidas
+            // Especialidades + Treinos gerais
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _TrainingHubStats(trainingVM: trainingVM),
-              ),
-            ),
-
-            // Categorias
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                child: Text(
-                  'CATEGORIAS DE TREINO',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textTertiary,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 child: _TrainingHubCategories(
                   dog: dog,
                   onCategoryTap: (category) {
@@ -90,16 +66,8 @@ class TrainingHubScreen extends StatelessWidget {
             // Evolução (link)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: _EvolutionLink(dog: dog),
-              ),
-            ),
-
-            // Último treino
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: _LastTrainingCard(trainingVM: trainingVM),
               ),
             ),
           ],
@@ -183,83 +151,6 @@ class _EvolutionLink extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _LastTrainingCard extends StatelessWidget {
-  final TrainingViewModel trainingVM;
-  const _LastTrainingCard({required this.trainingVM});
-
-  @override
-  Widget build(BuildContext context) {
-    if (trainingVM.trainings.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0E1A1F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: AppTheme.textTertiary, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              'Nenhum treino registrado ainda.',
-              style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final last = trainingVM.trainings.first;
-    final timeStr =
-        '${last.date.day.toString().padLeft(2, '0')}/${last.date.month.toString().padLeft(2, '0')} às ${last.date.hour.toString().padLeft(2, '0')}:${last.date.minute.toString().padLeft(2, '0')}';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1A1F),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ÚLTIMO TREINO',
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textTertiary,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.fitness_center_rounded, color: AppTheme.primary, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  last.trainingType,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-              Text(
-                timeStr,
-                style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textTertiary),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

@@ -25,12 +25,12 @@ part 'history_timeline_list.dart';
 part 'history_timeline_item.dart';
 part 'history_data_loader.dart';
 
-/// Cores do tema (consistentes com o mockup)
+/// Cores do tema — mapeadas para AppTheme tokens
 final _bgColor = AppTheme.background;
-const _cyanAccent = Color(0xFF4DD0E1);
+final _cyanAccent = AppTheme.primary;
 const _purpleAccent = Color(0xFF9B59B6);
-const _redAccent = Color(0xFFE74C3C);
-const _yellowAccent = Color(0xFFF1C40F);
+final _redAccent = AppTheme.error;
+final _yellowAccent = AppTheme.warning;
 const _textPrimary = Colors.white;
 const _textSecondary = Color(0xFFB0C4CC);
 const _textTertiary = Color(0xFF7A8A92);
@@ -141,7 +141,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.picture_as_pdf, color: _cyanAccent, size: 15),
+                  Icon(Icons.picture_as_pdf, color: _cyanAccent, size: 15),
                   const SizedBox(width: 5),
                   Text(
                     'Exportar PDF',

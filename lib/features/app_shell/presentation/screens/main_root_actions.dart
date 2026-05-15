@@ -4,22 +4,22 @@ extension _MainRootActions on _MainRootScreenState {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return MaterialButton(
-      minWidth: 40,
+      minWidth: 56,
       onPressed: () => _onTabTapped(index),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
-            color: isSelected ? const Color(0xFF4DD0E1) : const Color(0xFF5A7280),
-            size: 22,
+            color: isSelected ? AppTheme.primary : const Color(0xFF5A7280),
+            size: 26,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             label,
             style: GoogleFonts.inter(
-              color: isSelected ? const Color(0xFF4DD0E1) : const Color(0xFF5A7280),
-              fontSize: 9,
+              color: isSelected ? AppTheme.primary : const Color(0xFF5A7280),
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3,
             ),
