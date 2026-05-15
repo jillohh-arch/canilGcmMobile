@@ -1,4 +1,4 @@
-part of 'training_log_screen.dart';
+﻿part of 'training_log_screen.dart';
 
 class _ChartSection extends StatelessWidget {
   final String title;
@@ -34,7 +34,7 @@ class _ChartSection extends StatelessWidget {
           ),
           Text(
             subtitle,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 11,
               color: Colors.white30,
               fontWeight: FontWeight.w500,
@@ -86,7 +86,7 @@ class _SearchDurationChart extends StatelessWidget {
                 reservedSize: 36,
                 getTitlesWidget: (val, meta) => Text(
                   '${val.round()}s',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 9,
                     color: Colors.white38,
                   ),
@@ -105,7 +105,7 @@ class _SearchDurationChart extends StatelessWidget {
                   final d = sessions[idx].date;
                   return Text(
                     '${d.day}/${d.month}',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.inter(
                       fontSize: 9,
                       color: Colors.white38,
                     ),
@@ -125,7 +125,7 @@ class _SearchDurationChart extends StatelessWidget {
               getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
                 return LineTooltipItem(
                   '${s.y.round()}s',
-                  GoogleFonts.poppins(
+                  GoogleFonts.inter(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,

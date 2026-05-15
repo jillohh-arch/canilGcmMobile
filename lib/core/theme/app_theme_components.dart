@@ -1,4 +1,4 @@
-part of 'app_theme.dart';
+﻿part of 'app_theme.dart';
 
 AppBarTheme _buildAppBarTheme(ColorScheme cs) {
   return AppBarTheme(
@@ -8,7 +8,7 @@ AppBarTheme _buildAppBarTheme(ColorScheme cs) {
     scrolledUnderElevation: 2,
     centerTitle: true,
     surfaceTintColor: cs.secondary,
-    titleTextStyle: GoogleFonts.poppins(
+    titleTextStyle: GoogleFonts.inter(
       fontSize: 18,
       fontWeight: FontWeight.w700,
       color: cs.onSurface,
@@ -28,7 +28,7 @@ NavigationBarThemeData _buildNavigationBarTheme(ColorScheme cs) {
       return IconThemeData(color: cs.onSurfaceVariant, size: 24);
     }),
     labelTextStyle: WidgetStateProperty.resolveWith((states) {
-      final base = GoogleFonts.poppins(fontSize: 12, letterSpacing: 0.5);
+      final base = GoogleFonts.inter(fontSize: 12, letterSpacing: 0.5);
       if (states.contains(WidgetState.selected)) {
         return base.copyWith(
           fontWeight: FontWeight.w700,
@@ -64,7 +64,7 @@ ElevatedButtonThemeData _buildElevatedButtonTheme(ColorScheme cs) {
       foregroundColor: cs.onSecondaryContainer,
       minimumSize: const Size.fromHeight(56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      textStyle: GoogleFonts.poppins(
+      textStyle: GoogleFonts.inter(
         fontSize: 15,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.1,
@@ -77,11 +77,11 @@ ElevatedButtonThemeData _buildElevatedButtonTheme(ColorScheme cs) {
 FilledButtonThemeData _buildFilledButtonTheme() {
   return FilledButtonThemeData(
     style: FilledButton.styleFrom(
-      backgroundColor: const Color(0xFF00E5FF),
+      backgroundColor: AppTheme.primary,
       foregroundColor: Colors.black,
       minimumSize: const Size.fromHeight(56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      textStyle: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700),
+      textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
     ),
   );
 }
@@ -93,15 +93,15 @@ OutlinedButtonThemeData _buildOutlinedButtonTheme(ColorScheme cs) {
       side: BorderSide(color: cs.outline, width: 1),
       minimumSize: const Size.fromHeight(56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      textStyle: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+      textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
     ),
   );
 }
 
 FloatingActionButtonThemeData _buildFloatingActionButtonTheme(ColorScheme cs) {
   return FloatingActionButtonThemeData(
-    backgroundColor: cs.secondaryContainer,
-    foregroundColor: cs.onSecondaryContainer,
+    backgroundColor: AppTheme.primary,
+    foregroundColor: Colors.black,
     elevation: 3,
     shape: const CircleBorder(),
   );
@@ -111,18 +111,18 @@ InputDecorationTheme _buildInputDecorationTheme(ColorScheme cs) {
   return InputDecorationTheme(
     filled: false,
     labelStyle: TextStyle(
-      color: cs.onSurfaceVariant,
+      color: AppTheme.textTertiary,
       fontSize: 12,
       letterSpacing: 1.0,
     ),
-    hintStyle: TextStyle(color: cs.onSurfaceVariant.withAlpha(153)),
+    hintStyle: TextStyle(color: AppTheme.textTertiary.withAlpha(153)),
     prefixIconColor: cs.secondary,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     border: _inputBorder(cs.outline),
     enabledBorder: _inputBorder(const Color(0xFF2A2A2A)),
-    focusedBorder: _inputBorder(const Color(0xFF00E5FF)),
-    errorBorder: _inputBorder(cs.error),
-    focusedErrorBorder: _inputBorder(cs.error),
+    focusedBorder: _inputBorder(AppTheme.primary),
+    errorBorder: _inputBorder(AppTheme.error),
+    focusedErrorBorder: _inputBorder(AppTheme.error),
   );
 }
 
@@ -138,7 +138,7 @@ ChipThemeData _buildChipTheme(ColorScheme cs) {
     backgroundColor: cs.surfaceContainerHighest,
     selectedColor: cs.secondaryContainer,
     checkmarkColor: cs.onSecondaryContainer,
-    labelStyle: GoogleFonts.poppins(fontSize: 13, color: cs.onSurface),
+    labelStyle: GoogleFonts.inter(fontSize: 13, color: cs.onSurface),
     side: BorderSide(color: cs.outlineVariant),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -154,9 +154,9 @@ ListTileThemeData _buildListTileTheme(ColorScheme cs) {
     tileColor: Colors.transparent,
     iconColor: cs.secondary,
     textColor: cs.onSurface,
-    subtitleTextStyle: GoogleFonts.poppins(
+    subtitleTextStyle: GoogleFonts.inter(
       fontSize: 13,
-      color: cs.onSurfaceVariant,
+      color: AppTheme.textSecondary,
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),

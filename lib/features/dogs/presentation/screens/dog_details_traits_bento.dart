@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _DogTraitsBentoRow extends StatelessWidget {
   final Dog dog;
@@ -15,7 +15,7 @@ class _DogTraitsBentoRow extends StatelessWidget {
           child: _DogTraitBentoBlock(
             icon: dog.sex == 'F' ? Icons.female_rounded : Icons.male_rounded,
             accent: sexAccent,
-            value: dog.sex == 'F' ? 'Fêmea' : 'Macho',
+            value: dog.sex == 'F' ? 'FÃªmea' : 'Macho',
             label: 'SEXO',
           ),
         ),
@@ -66,7 +66,7 @@ class _DogTraitBentoBlock extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -75,7 +75,7 @@ class _DogTraitBentoBlock extends StatelessWidget {
                 ),
                 Text(
                   label,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 8,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1,
@@ -109,7 +109,7 @@ class _ConductorBentoBlock extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'RA $conductorRa',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -118,7 +118,7 @@ class _ConductorBentoBlock extends StatelessWidget {
           ),
           Text(
             'CONDUTOR',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 7,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,

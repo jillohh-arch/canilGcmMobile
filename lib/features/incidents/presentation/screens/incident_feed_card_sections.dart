@@ -1,4 +1,4 @@
-part of 'incident_form_screen.dart';
+﻿part of 'incident_form_screen.dart';
 
 class _IncidentFeedCardTags extends StatelessWidget {
   final Incident incident;
@@ -38,7 +38,7 @@ class _IncidentFeedTimestamp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.inter(
         fontSize: 10,
         color: Colors.white30,
         fontWeight: FontWeight.w500,
@@ -76,8 +76,8 @@ class _IncidentFeedDescription extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'RELATÓRIO',
-                style: GoogleFonts.poppins(
+                'RELATÃ“RIO',
+                style: GoogleFonts.inter(
                   fontSize: 8,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF4ECDE4),
@@ -89,7 +89,7 @@ class _IncidentFeedDescription extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             description,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 12,
               color: Colors.white70,
               fontWeight: FontWeight.w400,

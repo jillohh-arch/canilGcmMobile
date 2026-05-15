@@ -1,4 +1,4 @@
-part of 'incident_form_screen.dart';
+﻿part of 'incident_form_screen.dart';
 
 class _IncidentFeedCardHeader extends StatelessWidget {
   final Incident incident;
@@ -39,7 +39,7 @@ class _IncidentFeedCardHeader extends StatelessWidget {
               if (incident.type != null)
                 Text(
                   incident.type!.toUpperCase(),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     color: resultColor,
@@ -48,7 +48,7 @@ class _IncidentFeedCardHeader extends StatelessWidget {
                 ),
               Text(
                 incident.displayResult,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface,

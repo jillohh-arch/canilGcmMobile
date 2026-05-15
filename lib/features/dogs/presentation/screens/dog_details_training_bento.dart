@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _TrainingSummaryBento extends StatelessWidget {
   final TrainingSessionModel? lastTraining;
@@ -52,9 +52,9 @@ class _TrainingSummaryText extends StatelessWidget {
       children: [
         Text(
           lastTraining != null
-              ? 'ÚLTIMO TREINO DE ${lastTraining!.trainingType.toUpperCase()}'
-              : 'ÚLTIMO TREINO DE FARO',
-          style: GoogleFonts.poppins(
+              ? 'ÃšLTIMO TREINO DE ${lastTraining!.trainingType.toUpperCase()}'
+              : 'ÃšLTIMO TREINO DE FARO',
+          style: GoogleFonts.inter(
             fontSize: 9,
             fontWeight: FontWeight.w800,
             color: _trainingAccent,
@@ -64,8 +64,8 @@ class _TrainingSummaryText extends StatelessWidget {
         const SizedBox(height: 4),
         if (lastTraining != null) ...[
           Text(
-            '${lastTraining!.trainingType}${lastTraining!.substanceUsed != null ? " · ${lastTraining!.substanceUsed}" : ""}',
-            style: GoogleFonts.poppins(
+            '${lastTraining!.trainingType}${lastTraining!.substanceUsed != null ? " Â· ${lastTraining!.substanceUsed}" : ""}',
+            style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -73,7 +73,7 @@ class _TrainingSummaryText extends StatelessWidget {
           ),
           Text(
             lastTraining!.location,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 11,
               color: Colors.white54,
               fontWeight: FontWeight.w500,
@@ -82,7 +82,7 @@ class _TrainingSummaryText extends StatelessWidget {
         ] else
           Text(
             'Nenhum treino registrado',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white38),
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.white38),
           ),
       ],
     );
@@ -101,15 +101,15 @@ class _SessionCounter extends StatelessWidget {
       children: [
         Text(
           '$count',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 28,
             fontWeight: FontWeight.w900,
             color: _trainingAccent,
           ),
         ),
         Text(
-          'SESSÕES',
-          style: GoogleFonts.poppins(
+          'SESSÃ•ES',
+          style: GoogleFonts.inter(
             fontSize: 8,
             fontWeight: FontWeight.w700,
             color: Colors.white38,

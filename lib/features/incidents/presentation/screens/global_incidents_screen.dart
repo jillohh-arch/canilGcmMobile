@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -41,8 +41,8 @@ class _GlobalIncidentsScreenState extends State<GlobalIncidentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Feed de Ocorrências',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18),
+          'Feed de OcorrÃªncias',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         actions: [
           IconButton(

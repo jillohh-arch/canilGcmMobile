@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _HealthSummaryBento extends StatelessWidget {
   final HealthLogModel? lastHealth;
@@ -27,8 +27,8 @@ class _HealthSummaryBento extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'SAÚDE',
-                style: GoogleFonts.poppins(
+                'SAÃšDE',
+                style: GoogleFonts.inter(
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   color: _healthAccent,
@@ -43,7 +43,7 @@ class _HealthSummaryBento extends StatelessWidget {
               children: [
                 Text(
                   lastHealth!.logType,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -51,7 +51,7 @@ class _HealthSummaryBento extends StatelessWidget {
                 ),
                 Text(
                   _formatDogDetailsDate(lastHealth!.date),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 10,
                     color: Colors.white38,
                   ),
@@ -61,7 +61,7 @@ class _HealthSummaryBento extends StatelessWidget {
           else
             Text(
               'Sem registros',
-              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white38),
+              style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
             ),
           if (lastVaccineDate != null)
             Row(
@@ -74,7 +74,7 @@ class _HealthSummaryBento extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   'Vacina: ${_formatDogDetailsDate(lastVaccineDate!)}',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 9,
                     color: Colors.white38,
                   ),
@@ -124,7 +124,7 @@ class _WeightSummaryBento extends StatelessWidget {
               children: [
                 Text(
                   weight != null ? weight!.toStringAsFixed(1) : '--',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
@@ -132,7 +132,7 @@ class _WeightSummaryBento extends StatelessWidget {
                 ),
                 Text(
                   'KG',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: Colors.white38,
@@ -143,7 +143,7 @@ class _WeightSummaryBento extends StatelessWidget {
             ),
             Text(
               'PESO',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.inter(
                 fontSize: 8,
                 fontWeight: FontWeight.w700,
                 color: _weightAccent,

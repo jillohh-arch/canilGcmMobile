@@ -1,4 +1,4 @@
-part of 'training_log_screen.dart';
+﻿part of 'training_log_screen.dart';
 
 class _TrainingTypeSelector extends StatelessWidget {
   final List<String> trainingTypes;
@@ -47,7 +47,7 @@ class _TrainingTypeSelector extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   type,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: isSelected ? color : Colors.white60,
@@ -80,7 +80,7 @@ class _SubstanceSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _TrainingSectionLabel('Substância Procurada'),
+        const _TrainingSectionLabel('SubstÃ¢ncia Procurada'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -88,7 +88,7 @@ class _SubstanceSelector extends StatelessWidget {
             final isSelected = selectedSubstance == substance;
             return FilterChip(
               label: Text(substance),
-              labelStyle: GoogleFonts.poppins(
+              labelStyle: GoogleFonts.inter(
                 fontSize: 13,
                 color: isSelected ? Colors.black : Colors.white70,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _BentoBlock extends StatelessWidget {
   final Widget child;
@@ -53,7 +53,7 @@ class _AgentStatusPill extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             AppTheme.statusLabel(status),
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 9,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -97,7 +97,7 @@ class _QuickActionButton extends StatelessWidget {
               const SizedBox(height: 5),
               Text(
                 label,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: color,

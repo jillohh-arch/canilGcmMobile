@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _EmptyHealth extends StatelessWidget {
   final String filter;
@@ -19,14 +19,14 @@ class _EmptyHealth extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             filter == 'Todos'
-                ? 'Nenhum registro médico'
+                ? 'Nenhum registro mÃ©dico'
                 : 'Sem registros de $filter',
-            style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70),
+            style: GoogleFonts.inter(fontSize: 14, color: Colors.white70),
           ),
           const SizedBox(height: 4),
           Text(
             'Toque em "Novo Registro" para adicionar',
-            style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
+            style: GoogleFonts.inter(fontSize: 12, color: Colors.white70),
           ),
         ],
       ),

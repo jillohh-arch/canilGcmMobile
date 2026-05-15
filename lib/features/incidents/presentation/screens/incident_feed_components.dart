@@ -1,9 +1,9 @@
-part of 'incident_form_screen.dart';
+﻿part of 'incident_form_screen.dart';
 
 Color _incidentFeedResultColor(String result) {
   final normalized = result.toLowerCase();
 
-  if (normalized.contains('êxito') ||
+  if (normalized.contains('Ãªxito') ||
       normalized.contains('exito') ||
       normalized.contains('sucesso') ||
       normalized.contains('localiz')) {
@@ -22,7 +22,7 @@ IconData _incidentFeedTypeIcon(String? type) {
   switch (type) {
     case 'Busca de Entorpecentes':
       return Icons.track_changes_rounded;
-    case 'Apoio à Viatura':
+    case 'Apoio Ã  Viatura':
       return Icons.local_police_rounded;
     case 'Varredura de Local':
       return Icons.radar_rounded;
@@ -66,7 +66,7 @@ class _IncidentFeedTag extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: textColor,

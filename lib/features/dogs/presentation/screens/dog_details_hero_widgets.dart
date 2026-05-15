@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _DogHeroAvatar extends StatelessWidget {
   final Dog dog;
@@ -49,7 +49,7 @@ class _DogHeroIdentity extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           dog.name.toUpperCase(),
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 26,
             fontWeight: FontWeight.w900,
             color: Colors.white,
@@ -61,7 +61,7 @@ class _DogHeroIdentity extends StatelessWidget {
           children: [
             Text(
               dog.breed,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 color: Colors.white70,
                 fontWeight: FontWeight.w500,
@@ -79,8 +79,8 @@ class _DogHeroIdentity extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${dog.age} anos · ID: ${dog.id.substring(0, 8).toUpperCase()}',
-          style: GoogleFonts.poppins(
+          '${dog.age} anos Â· ID: ${dog.id.substring(0, 8).toUpperCase()}',
+          style: GoogleFonts.inter(
             fontSize: 10,
             color: Colors.white38,
             fontWeight: FontWeight.w600,

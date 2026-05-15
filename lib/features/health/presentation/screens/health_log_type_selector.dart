@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _HealthLogTypeSelector extends StatelessWidget {
   final List<String> logTypes;
@@ -55,7 +55,7 @@ class _HealthLogTypeSelector extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       type,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: isSelected
                             ? FontWeight.w700

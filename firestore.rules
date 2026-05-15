@@ -69,16 +69,14 @@ service cloud.firestore {
         ]);
     }
 
-    // Current operational state: one document per RA.
-    // Mobile writes only its own RA. Web dashboards can read all active shifts.
+    // ─── Active Shifts ────────────────────────────────────────────────
     match /active_shifts/{ra} {
       allow read: if signedIn();
       allow create, update: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
       allow delete: if false;
     }
 
-    // Historical/audit log for shifts. Created by the mobile app when a shift
-    // starts, then updated when the handler switches K9 or ends the shift.
+    // ─── Shift Logs ───────────────────────────────────────────────────
     match /shift_logs/{shiftId} {
       allow read: if signedIn();
       allow create: if isValidShiftLogCreate();
@@ -88,20 +86,122 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Existing mobile collections are kept in compatibility mode for now:
-    // authenticated users can keep using the current admin/profile/activity
-    // screens without a custom-claims migration. Hardening these collections
-    // should be the next rules pass once admin claims are configured.
+    // ─── Users ────────────────────────────────────────────────────────
     match /users/{ra} {
       allow read: if signedIn();
       allow create, update, delete: if signedIn();
     }
 
+    // ─── Dogs + Subcoleções ───────────────────────────────────────────
     match /dogs/{dogId} {
       allow read: if signedIn();
       allow create, update, delete: if signedIn();
+
+      // Histórico de peso
+      match /weight_history/{recordId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Especialidades
+      match /specialties/{specialtyId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Linhas de detecção
+      match /detection_lines/{lineId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Estado de Guarda & Proteção
+      match /guard_protection_state/{stateId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Biblioteca de comandos
+      match /commands/{commandId} {
+        allow read: if signedIn();
+        allow create, update, delete: if signedIn();
+      }
+
+      // Eventos de saúde
+      match /health_events/{eventId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Documentos e laudos
+      match /documents/{docId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Certificações externas
+      match /external_certifications/{certId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Sessões de treino
+      match /training_sessions/{sessionId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Tentativas de treino (detecção granular)
+      match /training_attempts/{attemptId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if false;
+      }
+
+      // Sessões de condicionamento
+      match /conditioning_sessions/{sessionId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Alimentação
+      match /feedings/{feedingId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      // Prescrições nutricionais
+      match /nutrition_prescriptions/{prescriptionId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
     }
 
+    // ─── Ocorrências + Eventos ────────────────────────────────────────
+    match /occurrences/{occurrenceId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+
+      match /events/{eventId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+    }
+
+    // ─── Coleções legadas (compatibilidade) ───────────────────────────
     match /trainings/{trainingId} {
       allow read: if signedIn();
       allow create, update, delete: if signedIn();
@@ -127,6 +227,35 @@ service cloud.firestore {
       allow create, update, delete: if signedIn();
     }
 
+    // ─── Audit Logs ───────────────────────────────────────────────────
+    match /auditLogs/{logId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // ─── GPS Tracks ───────────────────────────────────────────────────
+    match /gps_tracks/{trackId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    // ─── PDFs Gerados ─────────────────────────────────────────────────
+    match /generated_pdfs/{pdfId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // ─── Estado de Selos ──────────────────────────────────────────────
+    match /badges_state/{userId}/{badgeId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    // ─── Catch-all: nega tudo não coberto ─────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

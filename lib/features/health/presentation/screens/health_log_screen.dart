@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
@@ -55,24 +55,24 @@ class _HealthLogScreenState extends State<HealthLogScreen>
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(
-          'Prontuário Médico',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18),
+          'ProntuÃ¡rio MÃ©dico',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppTheme.amber,
           labelColor: AppTheme.amber,
           unselectedLabelColor: cs.onSurfaceVariant,
-          labelStyle: GoogleFonts.poppins(
+          labelStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
-          unselectedLabelStyle: GoogleFonts.poppins(
+          unselectedLabelStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w500,
             fontSize: 13,
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.timeline_rounded), text: 'Histórico'),
+            Tab(icon: Icon(Icons.timeline_rounded), text: 'HistÃ³rico'),
             Tab(
               icon: Icon(Icons.add_circle_outline_rounded),
               text: 'Novo Registro',
@@ -94,4 +94,4 @@ class _HealthLogScreenState extends State<HealthLogScreen>
   }
 }
 
-// ── Health Timeline (Apple Health style) ──────────────────────────────────────
+// â”€â”€ Health Timeline (Apple Health style) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

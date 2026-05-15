@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -63,19 +63,19 @@ class _IncidentFormScreenState extends State<IncidentFormScreen>
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(
-          'Ocorrências',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18),
+          'OcorrÃªncias',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFF4ECDE4),
           labelColor: const Color(0xFF4ECDE4),
           unselectedLabelColor: cs.onSurfaceVariant,
-          labelStyle: GoogleFonts.poppins(
+          labelStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
-          unselectedLabelStyle: GoogleFonts.poppins(
+          unselectedLabelStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w500,
             fontSize: 13,
           ),
@@ -99,4 +99,4 @@ class _IncidentFormScreenState extends State<IncidentFormScreen>
   }
 }
 
-// Incident Feed (estilo feed/logística) --------------------------------------
+// Incident Feed (estilo feed/logÃ­stica) --------------------------------------

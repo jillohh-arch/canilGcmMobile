@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _SectionLabel extends StatelessWidget {
   final String label;
@@ -8,7 +8,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label.toUpperCase(),
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.inter(
         fontSize: 10,
         fontWeight: FontWeight.w800,
         color: Colors.white70,
@@ -18,7 +18,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── Shared helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 (IconData, Color) _iconAndColor(String logType) {
   switch (logType) {
     case 'Vacina':
@@ -27,7 +27,7 @@ class _SectionLabel extends StatelessWidget {
       return (Icons.local_hospital_rounded, const Color(0xFF66BB6A));
     case 'Exame':
       return (Icons.biotech_rounded, const Color(0xFF7E57C2));
-    case 'Medicação':
+    case 'MedicaÃ§Ã£o':
       return (Icons.medication_rounded, const Color(0xFFFF7043));
     case 'Banho':
       return (Icons.water_drop_rounded, const Color(0xFF29B6F6));

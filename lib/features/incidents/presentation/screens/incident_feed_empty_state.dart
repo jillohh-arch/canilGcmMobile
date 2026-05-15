@@ -1,4 +1,4 @@
-part of 'incident_form_screen.dart';
+﻿part of 'incident_form_screen.dart';
 
 class _IncidentFeedEmptyState extends StatelessWidget {
   const _IncidentFeedEmptyState();
@@ -16,8 +16,8 @@ class _IncidentFeedEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Nenhuma ocorrência registrada',
-            style: GoogleFonts.poppins(
+            'Nenhuma ocorrÃªncia registrada',
+            style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.white.withAlpha(60),
             ),
@@ -25,7 +25,7 @@ class _IncidentFeedEmptyState extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Toque em "Nova" para registrar',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 12,
               color: Colors.white.withAlpha(40),
             ),

@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _MissionTimelineRail extends StatelessWidget {
   final _MissionTimelineItem item;
@@ -53,7 +53,7 @@ class _MissionTimelineContent extends StatelessWidget {
             _MissionTagChip(item: item),
             Text(
               dateStr,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 color: Colors.white30,
@@ -64,7 +64,7 @@ class _MissionTimelineContent extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           item.title,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Colors.white,
@@ -74,7 +74,7 @@ class _MissionTimelineContent extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             item.subtitle,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 11,
               color: Colors.white38,
               fontWeight: FontWeight.w500,
@@ -103,7 +103,7 @@ class _MissionTagChip extends StatelessWidget {
       ),
       child: Text(
         item.tag,
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.inter(
           fontSize: 8,
           fontWeight: FontWeight.w800,
           color: item.color,

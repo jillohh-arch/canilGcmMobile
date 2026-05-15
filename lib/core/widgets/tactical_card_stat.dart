@@ -1,4 +1,4 @@
-part of 'tactical_card.dart';
+﻿part of 'tactical_card.dart';
 
 class TacticalCardStat extends StatelessWidget {
   final String label;
@@ -23,7 +23,7 @@ class TacticalCardStat extends StatelessWidget {
         ],
         Text(
           value,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Colors.white,
@@ -32,7 +32,7 @@ class TacticalCardStat extends StatelessWidget {
         ),
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 8,
             fontWeight: FontWeight.w600,
             color: Colors.white54,

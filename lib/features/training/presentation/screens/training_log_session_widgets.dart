@@ -1,4 +1,4 @@
-part of 'training_log_screen.dart';
+﻿part of 'training_log_screen.dart';
 
 class _SectionHeader extends StatelessWidget {
   final String label;
@@ -27,7 +27,7 @@ class _SectionHeader extends StatelessWidget {
           ),
           child: Text(
             '$count',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: _hudCyan,
@@ -56,9 +56,9 @@ class _SessionCardState extends State<_SessionCard> {
     switch (type) {
       case 'Faro':
         return (Icons.track_changes_rounded, const Color(0xFFFFB300));
-      case 'Proteção':
+      case 'ProteÃ§Ã£o':
         return (Icons.shield_rounded, const Color(0xFFEF5350));
-      case 'Obediência':
+      case 'ObediÃªncia':
         return (Icons.school_rounded, const Color(0xFF42A5F5));
       default:
         return (Icons.fitness_center_rounded, AppTheme.amber);
@@ -151,7 +151,7 @@ class _EmptyTraining extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Toque em + para adicionar uma sessão.',
+                'Toque em + para adicionar uma sessÃ£o.',
                 style: GoogleFonts.robotoMono(
                   fontSize: 11,
                   color: Colors.white54,

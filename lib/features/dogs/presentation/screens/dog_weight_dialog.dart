@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 void _showDogWeightDialog(
   BuildContext context,
@@ -19,7 +19,7 @@ void _showDogWeightDialog(
       ),
       title: Text(
         'ATUALIZAR PESO',
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.inter(
           fontSize: 16,
           fontWeight: FontWeight.w800,
           color: Colors.white,
@@ -31,8 +31,8 @@ void _showDogWeightDialog(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Insira o novo peso do cão em quilogramas (kg).',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
+            'Insira o novo peso do cÃ£o em quilogramas (kg).',
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -45,7 +45,7 @@ void _showDogWeightDialog(
             ),
             decoration: InputDecoration(
               suffixText: 'kg',
-              suffixStyle: GoogleFonts.poppins(color: Colors.white38),
+              suffixStyle: GoogleFonts.inter(color: Colors.white38),
               enabledBorder: const OutlineInputBorder(
                 borderSide: BorderSide(color: Color(0xFF2A2A2A)),
               ),
@@ -63,7 +63,7 @@ void _showDogWeightDialog(
           onPressed: () => Navigator.pop(ctx),
           child: Text(
             'CANCELAR',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
               color: Colors.white38,
             ),
@@ -83,7 +83,7 @@ void _showDogWeightDialog(
             if (weight == null || weight <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Informe um peso válido.'),
+                  content: Text('Informe um peso vÃ¡lido.'),
                   backgroundColor: Color(0xFFE53935),
                 ),
               );
@@ -118,7 +118,7 @@ void _showDogWeightDialog(
                 dogName: dog.name,
                 date: DateTime.now(),
                 logType: 'Rotina',
-                healthObservations: 'Pesagem de rotina registrada no dossiê.',
+                healthObservations: 'Pesagem de rotina registrada no dossiÃª.',
                 weight: weight,
               );
               await healthVM.addHealthLog(hLog);
@@ -126,7 +126,7 @@ void _showDogWeightDialog(
               if (!context.mounted) return;
               messenger.showSnackBar(
                 const SnackBar(
-                  content: Text('Peso atualizado e histórico registrado.'),
+                  content: Text('Peso atualizado e histÃ³rico registrado.'),
                   backgroundColor: _weightAccent,
                 ),
               );
@@ -135,7 +135,7 @@ void _showDogWeightDialog(
               messenger.showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
+                    'Peso atualizado. HistÃ³rico mÃ©dico pendente: ${_cleanHealthError(e)}',
                   ),
                   backgroundColor: const Color(0xFFFBBF24),
                 ),
@@ -144,7 +144,7 @@ void _showDogWeightDialog(
           },
           child: Text(
             'SALVAR',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontWeight: FontWeight.w800,
               color: Colors.black,
             ),
@@ -159,6 +159,6 @@ String _cleanHealthError(Object error) {
   return error
       .toString()
       .replaceFirst('Exception: ', '')
-      .replaceFirst('Falha ao salvar registro médico: ', '')
+      .replaceFirst('Falha ao salvar registro mÃ©dico: ', '')
       .trim();
 }

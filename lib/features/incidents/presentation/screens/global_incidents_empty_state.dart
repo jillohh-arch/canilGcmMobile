@@ -1,4 +1,4 @@
-part of 'global_incidents_screen.dart';
+﻿part of 'global_incidents_screen.dart';
 
 class _GlobalIncidentsEmptyState extends StatelessWidget {
   const _GlobalIncidentsEmptyState();
@@ -16,8 +16,8 @@ class _GlobalIncidentsEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Nenhuma ocorrência registrada',
-            style: GoogleFonts.poppins(
+            'Nenhuma ocorrÃªncia registrada',
+            style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.white.withAlpha(60),
             ),

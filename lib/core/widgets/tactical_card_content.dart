@@ -1,4 +1,4 @@
-part of 'tactical_card.dart';
+﻿part of 'tactical_card.dart';
 
 class _TacticalCardContent extends StatelessWidget {
   final Widget? avatar;
@@ -66,7 +66,7 @@ class _TacticalCardHeader extends StatelessWidget {
             children: [
               Text(
                 title.toUpperCase(),
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
@@ -79,7 +79,7 @@ class _TacticalCardHeader extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: Colors.white60,

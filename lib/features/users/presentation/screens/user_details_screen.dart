@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -71,7 +71,7 @@ class UserDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   user.callsign.toUpperCase(),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
@@ -80,7 +80,7 @@ class UserDetailsScreen extends StatelessWidget {
                 if (user.name.isNotEmpty)
                   Text(
                     user.name,
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
                       color: Colors.grey[500],
                       fontWeight: FontWeight.w500,
@@ -88,7 +88,7 @@ class UserDetailsScreen extends StatelessWidget {
                   ),
                 Text(
                   isAdmin ? 'ADMINISTRADOR' : 'CONDUTOR',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     fontSize: 13,
                     color: cs.primary,
                     fontWeight: FontWeight.w700,
@@ -137,11 +137,11 @@ class _CompactStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800),
+          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800),
         ),
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 10,
             fontWeight: FontWeight.w500,
             color: Colors.grey[500],
@@ -170,7 +170,7 @@ class _LinkedDogsSection extends StatelessWidget {
         children: [
           Text(
             'K9s VINCULADOS',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.2,

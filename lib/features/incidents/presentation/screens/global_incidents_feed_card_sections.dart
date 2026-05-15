@@ -1,4 +1,4 @@
-part of 'global_incidents_screen.dart';
+﻿part of 'global_incidents_screen.dart';
 
 class _GlobalIncidentCardTags extends StatelessWidget {
   final Incident incident;
@@ -36,7 +36,7 @@ class _GlobalIncidentTimestamp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.inter(
         fontSize: 10,
         color: Colors.white30,
         fontWeight: FontWeight.w500,
@@ -66,8 +66,8 @@ class _GlobalIncidentDescription extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'RELATÓRIO',
-            style: GoogleFonts.poppins(
+            'RELATÃ“RIO',
+            style: GoogleFonts.inter(
               fontSize: 8,
               fontWeight: FontWeight.w800,
               color: const Color(0xFF4ECDE4),
@@ -77,7 +77,7 @@ class _GlobalIncidentDescription extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             description,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 12,
               color: Colors.white70,
               fontWeight: FontWeight.w400,

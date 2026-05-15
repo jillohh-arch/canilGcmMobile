@@ -1,7 +1,7 @@
-part of 'app_theme.dart';
+﻿part of 'app_theme.dart';
 
 TextTheme _buildAppTextTheme(ColorScheme cs) {
-  return GoogleFonts.poppinsTextTheme(
+  return GoogleFonts.interTextTheme(
     TextTheme(
       displayLarge: TextStyle(
         fontSize: 57,
@@ -53,12 +53,12 @@ TextTheme _buildAppTextTheme(ColorScheme cs) {
       bodyMedium: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: cs.onSurfaceVariant,
+        color: AppTheme.textSecondary,
       ),
       bodySmall: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        color: cs.onSurfaceVariant,
+        color: AppTheme.textSecondary,
       ),
       labelLarge: TextStyle(
         fontSize: 14,
@@ -75,8 +75,8 @@ TextTheme _buildAppTextTheme(ColorScheme cs) {
       labelSmall: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w500,
-        color: cs.onSurface,
-        letterSpacing: 0.5,
+        color: AppTheme.textTertiary,
+        letterSpacing: 1.2,
       ),
     ),
   );

@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _HealthTimelineItemBody extends StatelessWidget {
   final HealthLogModel log;
@@ -24,7 +24,7 @@ class _HealthTimelineItemBody extends StatelessWidget {
             const Spacer(),
             Text(
               dateStr,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: Colors.white70,
@@ -41,8 +41,8 @@ class _HealthTimelineItemBody extends StatelessWidget {
         if (log.vaccines.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
-            log.vaccines.join(' · '),
-            style: GoogleFonts.poppins(
+            log.vaccines.join(' Â· '),
+            style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -71,7 +71,7 @@ class _HealthLogTypeBadge extends StatelessWidget {
       ),
       child: Text(
         logType.toUpperCase(),
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.inter(
           fontSize: 9,
           fontWeight: FontWeight.w800,
           color: color,

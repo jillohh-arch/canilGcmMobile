@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _HealthExpandedDetails extends StatelessWidget {
   final HealthLogModel log;
@@ -24,7 +24,7 @@ class _HealthExpandedDetails extends StatelessWidget {
           const SizedBox(height: 6),
           _DetailRow(
             icon: Icons.notes_rounded,
-            label: 'Observações',
+            label: 'ObservaÃ§Ãµes',
             value: log.healthObservations,
             color: color,
           ),
@@ -60,7 +60,7 @@ class _DetailRow extends StatelessWidget {
             children: [
               Text(
                 label.toUpperCase(),
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
                   color: Colors.white70,
@@ -69,7 +69,7 @@ class _DetailRow extends StatelessWidget {
               ),
               Text(
                 value,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Colors.white70,

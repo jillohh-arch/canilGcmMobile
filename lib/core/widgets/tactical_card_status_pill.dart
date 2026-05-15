@@ -1,4 +1,4 @@
-part of 'tactical_card.dart';
+﻿part of 'tactical_card.dart';
 
 class StatusPill extends StatelessWidget {
   final String status;
@@ -28,7 +28,7 @@ class StatusPill extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             status,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 9,
               fontWeight: FontWeight.w800,
               color: Colors.white,

@@ -1,9 +1,9 @@
-part of 'global_incidents_screen.dart';
+﻿part of 'global_incidents_screen.dart';
 
 Color _globalIncidentResultColor(String result) {
   final normalized = result.toLowerCase();
 
-  if (normalized.contains('êxito') ||
+  if (normalized.contains('Ãªxito') ||
       normalized.contains('exito') ||
       normalized.contains('sucesso') ||
       normalized.contains('localiz')) {
@@ -22,7 +22,7 @@ IconData _globalIncidentTypeIcon(String? type) {
   switch (type) {
     case 'Busca de Entorpecentes':
       return Icons.track_changes_rounded;
-    case 'Apoio à Viatura':
+    case 'Apoio Ã  Viatura':
       return Icons.local_police_rounded;
     case 'Varredura de Local':
       return Icons.radar_rounded;
@@ -62,7 +62,7 @@ class _GlobalIncidentTag extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: color,

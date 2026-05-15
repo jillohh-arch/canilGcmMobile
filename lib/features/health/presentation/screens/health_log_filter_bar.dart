@@ -1,4 +1,4 @@
-part of 'health_log_screen.dart';
+﻿part of 'health_log_screen.dart';
 
 class _HealthFilterBar extends StatelessWidget {
   final List<String> filters;
@@ -41,7 +41,7 @@ class _HealthFilterBar extends StatelessWidget {
                   Text(filter),
                 ],
               ),
-              labelStyle: GoogleFonts.poppins(
+              labelStyle: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected ? color : Colors.white70,

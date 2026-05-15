@@ -1,4 +1,4 @@
-part of 'dog_details_screen.dart';
+﻿part of 'dog_details_screen.dart';
 
 class _MissionTimelineItem {
   final DateTime date;
@@ -26,8 +26,8 @@ class _MissionLogHeader extends StatelessWidget {
     return Row(
       children: [
         Text(
-          'LOG DE MISSÕES',
-          style: GoogleFonts.poppins(
+          'LOG DE MISSÃ•ES',
+          style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.4,
@@ -55,7 +55,7 @@ class _MissionLogEmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Nenhuma atividade registrada',
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white24),
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.white24),
             ),
           ],
         ),
