@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
@@ -259,15 +260,32 @@ class _DetectionMaintenanceScreenState
                         color: const Color(0xFF1A2A30),
                         border: Border.all(color: AppTheme.success, width: 2),
                       ),
-                      child: Center(
-                        child: Text(
-                          widget.dog.name.substring(0, widget.dog.name.length.clamp(0, 4)).toUpperCase(),
-                          style: GoogleFonts.inter(
-                            color: AppTheme.success,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      child: ClipOval(
+                        child: widget.dog.profileImageUrl != null && widget.dog.profileImageUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: widget.dog.profileImageUrl!,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Center(
+                                  child: Text(
+                                    widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
+                                    style: GoogleFonts.inter(color: AppTheme.success, fontSize: 14, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Text(
+                                    widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
+                                    style: GoogleFonts.inter(color: AppTheme.success, fontSize: 14, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
+                                  style: GoogleFonts.inter(color: AppTheme.success, fontSize: 14, fontWeight: FontWeight.w700),
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 10),

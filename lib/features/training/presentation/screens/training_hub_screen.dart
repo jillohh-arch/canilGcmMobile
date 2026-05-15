@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';

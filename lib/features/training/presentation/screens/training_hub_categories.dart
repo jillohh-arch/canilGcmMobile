@@ -92,10 +92,10 @@ class _TrainingHubCategories extends StatelessWidget {
     final detLast = _lastSessionDaysAgo(trainingVM, 'Detecção');
     specs.add(_SpecialtyData(
       name: 'Detecção',
-      icon: Icons.search_rounded,
+      emoji: '👃',
       color: AppTheme.primary,
       status: _getSpecialtyStatus('deteccao'),
-      subtitle: 'Protocolo Ragonha',
+      subtitle: 'Drogas: operacional',
       lastDaysAgo: detLast,
     ));
 
@@ -103,8 +103,8 @@ class _TrainingHubCategories extends StatelessWidget {
     final gpLast = _lastSessionDaysAgo(trainingVM, 'Guarda');
     specs.add(_SpecialtyData(
       name: 'Guarda & Proteção',
-      icon: Icons.shield_rounded,
-      color: AppTheme.error,
+      emoji: '🛡',
+      color: AppTheme.warning,
       status: _getSpecialtyStatus('guarda_protecao'),
       subtitle: 'Defesa e contenção',
       lastDaysAgo: gpLast,
@@ -114,8 +114,8 @@ class _TrainingHubCategories extends StatelessWidget {
     final faroLast = _lastSessionDaysAgo(trainingVM, 'Faro');
     specs.add(_SpecialtyData(
       name: 'Faro / Rastro',
-      icon: Icons.air_rounded,
-      color: const Color(0xFF9C27B0),
+      emoji: '🎯',
+      color: AppTheme.success,
       status: _getSpecialtyStatus('faro_rastro'),
       subtitle: 'Busca e captura',
       lastDaysAgo: faroLast,
@@ -146,16 +146,16 @@ class _TrainingHubCategories extends StatelessWidget {
 
     return [
       _GeneralTrainingCard(
-        icon: Icons.psychology_rounded,
+        emoji: '🐾',
         label: 'Obediência',
-        color: AppTheme.success,
+        color: AppTheme.primary,
         lastDaysAgo: obedLast,
         onTap: () => onCategoryTap('Obediência'),
       ),
       _GeneralTrainingCard(
-        icon: Icons.directions_run_rounded,
+        emoji: '💪',
         label: 'Condicionamento',
-        color: AppTheme.attention,
+        color: AppTheme.primary,
         lastDaysAgo: condLast,
         onTap: () => onCategoryTap('Condicionamento'),
       ),
@@ -205,7 +205,7 @@ class _TrainingHubCategories extends StatelessWidget {
 
 class _SpecialtyData {
   final String name;
-  final IconData icon;
+  final String emoji;
   final Color color;
   final String status;
   final String subtitle;
@@ -213,7 +213,7 @@ class _SpecialtyData {
 
   _SpecialtyData({
     required this.name,
-    required this.icon,
+    required this.emoji,
     required this.color,
     required this.status,
     required this.subtitle,
@@ -221,7 +221,7 @@ class _SpecialtyData {
   });
 
   bool get isOperational => status == 'operacional';
-  String get statusLabel => isOperational ? 'OPERACIONAL' : 'EM FORMAÇÃO';
+  String get statusLabel => isOperational ? '● OPERACIONAL' : '◔ EM FORMAÇÃO';
   Color get statusColor => isOperational ? AppTheme.success : AppTheme.warning;
 
   String get lastLabel {
@@ -245,9 +245,9 @@ class _SpecialtyCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: data.color.withAlpha(6),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: data.color.withAlpha(30)),
+          color: Colors.white.withAlpha(8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withAlpha(20)),
         ),
         child: Row(
           children: [
@@ -264,15 +264,17 @@ class _SpecialtyCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Ícone
+            // Ícone emoji
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: data.color.withAlpha(15),
-                borderRadius: BorderRadius.circular(8),
+                color: data.statusColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(data.icon, color: data.color, size: 20),
+              child: Center(
+                child: Text(data.emoji, style: const TextStyle(fontSize: 22)),
+              ),
             ),
             const SizedBox(width: 12),
             // Info
@@ -342,14 +344,14 @@ class _SpecialtyCard extends StatelessWidget {
 }
 
 class _GeneralTrainingCard extends StatelessWidget {
-  final IconData icon;
+  final String emoji;
   final String label;
   final Color color;
   final int? lastDaysAgo;
   final VoidCallback onTap;
 
   const _GeneralTrainingCard({
-    required this.icon,
+    required this.emoji,
     required this.label,
     required this.color,
     this.lastDaysAgo,
@@ -369,9 +371,9 @@ class _GeneralTrainingCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withAlpha(8),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withAlpha(40)),
+          color: Colors.white.withAlpha(8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withAlpha(20)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +385,9 @@ class _GeneralTrainingCard extends StatelessWidget {
                 color: color.withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: color, size: 18),
+              child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 16)),
+              ),
             ),
             const SizedBox(height: 10),
             Text(

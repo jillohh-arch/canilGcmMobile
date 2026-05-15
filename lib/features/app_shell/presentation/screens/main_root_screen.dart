@@ -8,7 +8,6 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
-import 'package:canil_gcm/features/health/presentation/screens/health_dashboard_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_prontuario_tab_screen.dart';
 import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
@@ -45,7 +44,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
   final List<Widget> _screens = [
     const ActiveShiftDashboardScreen(),
     const HistoryScreen(),
-    const HealthDashboardScreen(),
+    const TrainingHubScreen(),
     const DogProntuarioTabScreen(),
   ];
 
@@ -160,10 +159,10 @@ class _MainRootScreenState extends State<MainRootScreen> {
                 ),
                 // Espaço central reservado para o FAB
                 const SizedBox(width: 32),
-                // Lado Direito: Saúde e Cão/Perfil
+                // Lado Direito: Treino e Cão/Perfil
                 Row(
                   children: [
-                    _buildNavItem(2, Icons.medical_services_outlined, 'Saúde'),
+                    _buildNavItem(2, Icons.track_changes_rounded, 'Treino'),
                     _buildNavItem(3, Icons.pets, 'Cão'),
                   ],
                 ),
