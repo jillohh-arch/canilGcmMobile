@@ -17,8 +17,12 @@ import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmod
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
+import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
+import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
+import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 
 part 'dog_prontuario_ficha.dart';
+part 'dog_prontuario_nutricao.dart';
 part 'dog_prontuario_status_medico.dart';
 part 'dog_prontuario_especialidades.dart';
 part 'dog_prontuario_peso.dart';
@@ -180,6 +184,8 @@ class _DogProntuarioTabScreenState extends State<DogProntuarioTabScreen> {
                         _buildEspecialidades(dog),
                         // Evolução do peso
                         _buildPesoSection(dog),
+                        // Nutrição
+                        _buildNutricaoSection(dog),
                         // Carteira de vacinação
                         _buildVacinasSection(),
                         // Laudos e documentos
