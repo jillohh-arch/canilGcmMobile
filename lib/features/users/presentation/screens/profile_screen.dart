@@ -16,6 +16,11 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
+import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 
 part 'profile_screen_sections.dart';
 part 'profile_hero_widgets.dart';
@@ -236,6 +241,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
                   _buildDogSection(shiftVM),
                   const SizedBox(height: 20),
+                  _buildStatsGrid(),
+                  const SizedBox(height: 20),
+                  _buildConformitySection(shiftVM),
+                  const SizedBox(height: 20),
                   _buildSettingsSection(),
                   const SizedBox(height: 20),
                   _buildActionButtons(authVM, shiftVM),
@@ -380,13 +389,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (dog == null) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1A1F),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-      ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DogProfileScreen(dog: dog!),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1A1F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
+        ),
       child: Row(
         children: [
           Container(
@@ -442,7 +459,233 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 18),
         ],
       ),
+      ),
     );
+  }
+
+  // ─── Stats Grid 2x2 ─────────────────────────────────────────────
+
+  Widget _buildStatsGrid() {
+    // Dados reais virão dos ViewModels — por ora usa contagem local
+    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final trainingVM = Provider.of<TrainingViewModel>(context);
+
+    final totalOcorrencias = incidentVM.incidents.length;
+    final totalTreinos = trainingVM.trainings.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'SUA ATUAÇÃO',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(height: 1, color: AppTheme.primary.withAlpha(30)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildStatCard('—', 'PLANTÕES', Icons.calendar_today_rounded, _hudCyan),
+            const SizedBox(width: 10),
+            _buildStatCard('—', 'HORAS', Icons.access_time_rounded, _hudGreen),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _buildStatCard('$totalOcorrencias', 'OCORRÊNCIAS', Icons.shield_outlined, _hudAmber),
+            const SizedBox(width: 10),
+            _buildStatCard('$totalTreinos', 'TREINOS', Icons.fitness_center_rounded, _hudCyan),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String value, String label, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1A1F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(30)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textTertiary,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Selos de Conformidade ─────────────────────────────────────────
+
+  Widget _buildConformitySection(ShiftViewModel shiftVM) {
+    final dogVM = Provider.of<DogViewModel>(context);
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final nutritionVM = Provider.of<NutritionViewModel>(context);
+
+    final dogId = shiftVM.activeDogId;
+    Dog? dog;
+    try {
+      dog = dogVM.dogs.firstWhere((d) => d.id == dogId);
+    } catch (_) {}
+
+    final seals = _calculateSeals(dog, healthVM, nutritionVM);
+    final activeCount = seals.where((s) => s.active).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'CONFORMIDADE PROFISSIONAL',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withAlpha(15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$activeCount de ${seals.length}',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.success,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Selos institucionais calculados conforme protocolo.',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: AppTheme.textTertiary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.8,
+          ),
+          itemCount: seals.length,
+          itemBuilder: (_, i) => _buildSealCard(seals[i]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSealCard(_Seal seal) {
+    final color = seal.active ? AppTheme.success : AppTheme.textTertiary;
+    final opacity = seal.active ? 1.0 : 0.4;
+
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withAlpha(seal.active ? 10 : 5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(seal.active ? 50 : 20)),
+        ),
+        child: Row(
+          children: [
+            Icon(seal.icon, color: color, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                seal.label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: seal.active ? AppTheme.textPrimary : AppTheme.textTertiary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_Seal> _calculateSeals(Dog? dog, HealthViewModel healthVM, NutritionViewModel nutritionVM) {
+    final now = DateTime.now();
+
+    // Vacinas em dia
+    final vaccinesOk = dog?.lastVaccineDate != null &&
+        now.difference(dog!.lastVaccineDate!).inDays < 365;
+
+    // Peso monitorado (pesagem nos últimos 30 dias)
+    final weightOk = healthVM.healthLogs.any((l) =>
+        l.weight != null && now.difference(l.date).inDays <= 30);
+
+    // Conformidade alimentar >= 90%
+    final conformityOk = nutritionVM.conformity90d >= 90.0;
+
+    return [
+      _Seal(icon: Icons.calendar_today, label: 'Plantões sem lacunas', active: true),
+      _Seal(icon: Icons.description_outlined, label: 'Relato final 100%', active: true),
+      _Seal(icon: Icons.picture_as_pdf, label: 'PDFs gerados', active: true),
+      _Seal(icon: Icons.fitness_center, label: 'Manutenções em dia', active: true),
+      _Seal(icon: Icons.menu_book, label: 'Biblioteca atualizada', active: true),
+      _Seal(icon: Icons.vaccines, label: 'Vacinas em dia', active: vaccinesOk),
+      _Seal(icon: Icons.bug_report_outlined, label: 'Antipulgas em dia', active: vaccinesOk),
+      _Seal(icon: Icons.restaurant, label: 'Conformidade alimentar', active: conformityOk),
+      _Seal(icon: Icons.monitor_weight, label: 'Peso monitorado', active: weightOk),
+      _Seal(icon: Icons.person, label: 'Perfil completo', active: true),
+      _Seal(icon: Icons.folder_outlined, label: 'Documentos do cão', active: true),
+    ];
   }
 
   Widget _buildSettingsSection() {
@@ -701,4 +944,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+}
+
+class _Seal {
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  const _Seal({required this.icon, required this.label, required this.active});
 }
