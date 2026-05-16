@@ -229,6 +229,7 @@ class _TrainingHubBody extends StatelessWidget {
         ),
       ),
       child: SafeArea(
+        top: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
           child: Column(

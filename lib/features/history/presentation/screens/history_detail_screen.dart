@@ -85,6 +85,7 @@ class RegistroDetalhePage extends StatelessWidget {
                 ),
               ),
               child: SafeArea(
+                top: true,
                 bottom: false,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 188),

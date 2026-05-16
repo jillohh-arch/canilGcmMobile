@@ -146,7 +146,7 @@ class _TrainingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _TrainingPanel(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       borderColor: AppTheme.primary.withAlpha(48),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -155,8 +155,8 @@ class _TrainingHeader extends StatelessWidget {
           return Row(
             children: [
               SizedBox(
-                width: compact ? 90 : 102,
-                height: compact ? 72 : 78,
+                width: compact ? 84 : 94,
+                height: compact ? 66 : 72,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -167,7 +167,7 @@ class _TrainingHeader extends StatelessWidget {
                         imageUrl: handlerPhotoUrl,
                         fallbackIcon: Icons.person_rounded,
                         borderColor: _trainingTextSecondary,
-                        size: compact ? 60 : 68,
+                        size: compact ? 56 : 62,
                       ),
                     ),
                     Positioned(
@@ -177,11 +177,11 @@ class _TrainingHeader extends StatelessWidget {
                         imageUrl: dog.profileImageUrl,
                         fallbackText: dog.name.isNotEmpty ? dog.name[0] : 'K',
                         borderColor: _trainingTextPrimary,
-                        size: compact ? 68 : 76,
+                        size: compact ? 64 : 70,
                       ),
                     ),
                     Positioned(
-                      left: compact ? 56 : 64,
+                      left: compact ? 52 : 58,
                       bottom: 3,
                       child: Container(
                         width: 20,
@@ -222,13 +222,13 @@ class _TrainingHeader extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       textAlign: TextAlign.left,
                       style: GoogleFonts.inter(
-                        fontSize: compact ? 21 : 24,
+                        fontSize: compact ? 20 : 22,
                         fontWeight: FontWeight.w900,
                         color: _trainingTextPrimary,
                         letterSpacing: 0,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     Row(
                       children: [
                         Container(

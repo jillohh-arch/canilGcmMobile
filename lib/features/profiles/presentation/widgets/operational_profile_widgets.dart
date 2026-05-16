@@ -53,7 +53,7 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 8),
       child: Row(
         children: [
           IconButton(
@@ -68,7 +68,7 @@ class ProfileHeader extends StatelessWidget {
             icon: const Icon(
               Icons.arrow_back_rounded,
               color: profileTextPrimary,
-              size: 34,
+              size: 30,
             ),
           ),
           const SizedBox(width: 4),
@@ -82,7 +82,7 @@ class ProfileHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     color: profilePrimary,
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: .5,
                   ),
@@ -94,7 +94,7 @@ class ProfileHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     color: profileTextPrimary,
-                    fontSize: 24,
+                    fontSize: 23,
                     height: 1,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
@@ -108,7 +108,7 @@ class ProfileHeader extends StatelessWidget {
             icon: const Icon(
               Icons.more_vert_rounded,
               color: profileTextSecondary,
-              size: 30,
+              size: 28,
             ),
           ),
         ],
@@ -138,11 +138,11 @@ class ProfileMainCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ProfilePanel(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 365;
-          final avatarSize = compact ? 104.0 : 126.0;
+          final avatarSize = compact ? 86.0 : 96.0;
 
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +152,7 @@ class ProfileMainCard extends StatelessWidget {
                 size: avatarSize,
                 fallbackIcon: fallbackIcon,
               ),
-              SizedBox(width: compact ? 14 : 22),
+              SizedBox(width: compact ? 12 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,29 +163,32 @@ class ProfileMainCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
                         color: profileTextPrimary,
-                        fontSize: compact ? 20 : 23,
+                        fontSize: compact ? 18 : 20,
                         height: 1,
                         fontWeight: FontWeight.w900,
                         letterSpacing: .3,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     for (final row in rows) _InfoRow(row: row),
-                    const SizedBox(height: 10),
-                    OperationalBadge(label: badge, color: profileSuccess),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 7,
-                      children: chips
-                          .map(
-                            (chip) => OperationalBadge(
-                              label: chip,
-                              color: profileSuccess,
-                              compact: true,
-                            ),
-                          )
-                          .toList(),
+                      spacing: 7,
+                      runSpacing: 6,
+                      children: [
+                        OperationalBadge(
+                          label: badge,
+                          color: profileSuccess,
+                          compact: true,
+                        ),
+                        ...chips.map(
+                          (chip) => OperationalBadge(
+                            label: chip,
+                            color: profileSuccess,
+                            compact: true,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -248,10 +251,13 @@ class OperationalBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(maxWidth: compact ? 150 : 190),
+      constraints: BoxConstraints(
+        maxWidth: compact ? 140 : 180,
+        minHeight: compact ? 28 : 30,
+      ),
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 16,
-        vertical: compact ? 5 : 7,
+        horizontal: compact ? 9 : 13,
+        vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
         color: color.withAlpha(9),
@@ -262,7 +268,7 @@ class OperationalBadge extends StatelessWidget {
         label,
         style: GoogleFonts.inter(
           color: color,
-          fontSize: compact ? 11 : 12,
+          fontSize: compact ? 10.5 : 11.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0,
         ),
@@ -573,6 +579,7 @@ class OperationalAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dotSize = size <= 60 ? 14.0 : 18.0;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -595,11 +602,11 @@ class OperationalAvatar extends StatelessWidget {
           ),
         ),
         Positioned(
-          right: 5,
-          bottom: 7,
+          right: size <= 60 ? 2 : 4,
+          bottom: size <= 60 ? 3 : 5,
           child: Container(
-            width: 20,
-            height: 20,
+            width: dotSize,
+            height: dotSize,
             decoration: BoxDecoration(
               color: profileSuccess,
               shape: BoxShape.circle,

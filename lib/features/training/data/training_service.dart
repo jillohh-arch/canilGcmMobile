@@ -132,7 +132,9 @@ class TrainingService {
       final isSpecialty = specialties.any(
         (specialty) => _matchesSpecialty(session, specialty),
       );
-      if (isSpecialty) continue;
+      if (isSpecialty || _isSpecialtyTrainingType(session.trainingType)) {
+        continue;
+      }
 
       final key = normalizeTrainingKey(session.trainingType);
       grouped.putIfAbsent(key, () => []).add(session);
@@ -173,6 +175,18 @@ class TrainingService {
         sessionType == specialtyKey ||
         sessionSpecialty.contains(specialtyKey) ||
         specialtyKey.contains(sessionSpecialty) && sessionSpecialty.isNotEmpty;
+  }
+
+  bool _isSpecialtyTrainingType(String value) {
+    final key = normalizeTrainingKey(value);
+    return key.contains('detec') ||
+        key.contains('faro') ||
+        key.contains('scent') ||
+        key.contains('guarda') ||
+        key.contains('protec') ||
+        key.contains('busca') ||
+        key.contains('captura') ||
+        key.contains('rastro');
   }
 
   int _progressFromSpecialty(TrainingSpecialtyModel specialty) {

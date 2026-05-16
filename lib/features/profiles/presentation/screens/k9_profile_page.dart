@@ -46,13 +46,14 @@ class K9ProfilePage extends StatelessWidget {
                 ),
               ),
               child: SafeArea(
+                top: true,
                 bottom: false,
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    8,
+                    12,
                     16,
-                    showBottomNav ? 106 : 26,
+                    showBottomNav ? 126 : 30,
                   ),
                   child: Column(
                     children: [
@@ -83,7 +84,7 @@ class K9ProfilePage extends StatelessWidget {
                         metrics: data.metrics,
                       ),
                       const SizedBox(height: 10),
-                      _K9ResponsiveGrid(data: data),
+                      _K9ProfileSections(data: data),
                     ],
                   ),
                 ),
@@ -342,10 +343,10 @@ class K9ProfilePage extends StatelessWidget {
   }
 }
 
-class _K9ResponsiveGrid extends StatelessWidget {
+class _K9ProfileSections extends StatelessWidget {
   final K9ProfileData data;
 
-  const _K9ResponsiveGrid({required this.data});
+  const _K9ProfileSections({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -384,34 +385,14 @@ class _K9ResponsiveGrid extends StatelessWidget {
       entries: data.recentActivities,
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 390) {
-          return Column(
-            children: [
-              health,
-              const SizedBox(height: 10),
-              documents,
-              const SizedBox(height: 10),
-              timeline,
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 11, child: health),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 8,
-              child: Column(
-                children: [documents, const SizedBox(height: 10), timeline],
-              ),
-            ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        health,
+        const SizedBox(height: 10),
+        documents,
+        const SizedBox(height: 10),
+        timeline,
+      ],
     );
   }
 }

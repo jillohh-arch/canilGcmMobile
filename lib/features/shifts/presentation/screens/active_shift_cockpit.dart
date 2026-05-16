@@ -22,6 +22,7 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
       ),
     ),
     child: SafeArea(
+      top: true,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
         child: Column(

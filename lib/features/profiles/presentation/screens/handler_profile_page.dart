@@ -47,13 +47,14 @@ class HandlerProfilePage extends StatelessWidget {
                 ),
               ),
               child: SafeArea(
+                top: true,
                 bottom: false,
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    8,
+                    12,
                     16,
-                    showBottomNav ? 106 : 26,
+                    showBottomNav ? 126 : 30,
                   ),
                   child: Column(
                     children: [

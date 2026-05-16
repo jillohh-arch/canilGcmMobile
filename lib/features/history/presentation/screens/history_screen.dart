@@ -120,8 +120,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
           child: SafeArea(
+            top: true,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 102),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 126),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
