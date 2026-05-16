@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
 /// Widget universal de cabeçalho binômio (cão + condutor).
 /// Mostra fotos sobrepostas, nomes, e status/subtítulo opcional.
@@ -55,6 +56,9 @@ class BinomioHeader extends StatelessWidget {
   /// Callback ao tocar no header (ex: abrir perfil do cão)
   final VoidCallback? onTap;
 
+  /// Se true, mostra botão 👤 que navega para ProfileScreen (default: true)
+  final bool showProfileButton;
+
   const BinomioHeader({
     super.key,
     required this.dog,
@@ -69,6 +73,7 @@ class BinomioHeader extends StatelessWidget {
     this.avatarSize = 50,
     this.withBackground = true,
     this.onTap,
+    this.showProfileButton = true,
   });
 
   @override
@@ -168,10 +173,33 @@ class BinomioHeader extends StatelessWidget {
           ),
         ),
 
-        // Trailing widget
-        if (trailing != null) ...[
+        // Trailing widget + profile button
+        if (trailing != null || showProfileButton) ...[
           const SizedBox(width: 8),
-          trailing!,
+          if (trailing != null) trailing!,
+          if (showProfileButton) ...[
+            if (trailing != null) const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primary.withAlpha(50)),
+                ),
+                child: const Center(
+                  child: Text('👤', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+            ),
+          ],
         ],
       ],
     );

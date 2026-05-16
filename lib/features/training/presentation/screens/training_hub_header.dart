@@ -28,12 +28,6 @@ class _TrainingHubHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _headerActionBtn(context, '⇄', null),
-                const SizedBox(width: 6),
-                _headerActionBtn(context, '👤', () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  );
-                }),
               ],
             ),
           ),
