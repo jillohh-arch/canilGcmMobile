@@ -267,42 +267,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Painel glassmorfismo tático universal
-  Widget _glassPanel({
-    required Widget child,
-    EdgeInsets padding = const EdgeInsets.all(16),
-    EdgeInsets margin = EdgeInsets.zero,
-    Color borderColor = const Color(0xFF1D2C33),
-    double borderRadius = 12,
-    double sigmaBlur = 12,
-  }) {
-    return Container(
-      margin: margin,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: sigmaBlur, sigmaY: sigmaBlur),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1216).withAlpha(200),
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: borderColor.withAlpha(60), width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(40),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildIdentityCard(
     String? photoStr,
     String callsign,
@@ -310,9 +274,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String raStr,
     String unit,
   ) {
-    return _glassPanel(
+    return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
-      borderColor: AppTheme.primary,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1A1F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(30)),
+      ),
       child: Column(
         children: [
           // Avatar
@@ -421,8 +390,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
-      child: _glassPanel(
-        borderColor: AppTheme.success,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1A1F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
+        ),
       child: Row(
         children: [
           Container(
@@ -534,50 +508,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStatCard(String value, String label, IconData icon, Color color) {
     return Expanded(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1216).withAlpha(200),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: color.withAlpha(40), width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(30),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1A1F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(30)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 16),
-                const SizedBox(height: 8),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textTertiary,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textTertiary,
+                letterSpacing: 0.8,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -662,36 +623,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Opacity(
       opacity: opacity,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1216).withAlpha(180),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withAlpha(seal.active ? 60 : 25), width: 0.8),
-            ),
-            child: Row(
-              children: [
-                Icon(seal.icon, color: color, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    seal.label,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: seal.active ? Colors.white : AppTheme.textTertiary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withAlpha(seal.active ? 10 : 5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(seal.active ? 50 : 20)),
+        ),
+        child: Row(
+          children: [
+            Icon(seal.icon, color: color, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                seal.label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: seal.active ? AppTheme.textPrimary : AppTheme.textTertiary,
                 ),
-              ],
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -759,48 +714,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSettingItem(IconData icon, String title, String subtitle) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1216).withAlpha(180),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1D2C33).withAlpha(60), width: 0.8),
-            ),
-            child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1A1F),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF1D2C33), width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.textSecondary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: AppTheme.textSecondary, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppTheme.textTertiary,
-                        ),
-                      ),
-                    ],
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 18),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppTheme.textTertiary,
+                  ),
+                ),
               ],
             ),
           ),
-        ),
+          Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 18),
+        ],
       ),
     );
   }
