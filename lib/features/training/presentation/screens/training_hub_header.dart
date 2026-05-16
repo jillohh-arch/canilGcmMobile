@@ -27,9 +27,13 @@ class _TrainingHubHeader extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _headerActionBtn(context, '⇄'),
+                _headerActionBtn(context, '⇄', null),
                 const SizedBox(width: 6),
-                _headerActionBtn(context, '👤'),
+                _headerActionBtn(context, '👤', () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                }),
               ],
             ),
           ),
@@ -80,19 +84,25 @@ class _TrainingHubHeader extends StatelessWidget {
     return vm.trainings.where((t) => t.date.isAfter(start)).length;
   }
 
-  Widget _headerActionBtn(BuildContext context, String label) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withAlpha(20),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.primary.withAlpha(50)),
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 13, color: AppTheme.primary),
+  Widget _headerActionBtn(BuildContext context, String label, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(20),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.primary.withAlpha(50)),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: AppTheme.primary),
+          ),
         ),
       ),
     );

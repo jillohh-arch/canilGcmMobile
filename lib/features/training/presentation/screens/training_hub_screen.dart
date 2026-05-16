@@ -19,6 +19,7 @@ import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/core/services/report_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 import 'package:printing/printing.dart';
 
 part 'training_hub_header.dart';
