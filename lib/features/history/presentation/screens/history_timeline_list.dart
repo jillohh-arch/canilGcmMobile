@@ -73,7 +73,7 @@ class HistoryDaySection extends StatelessWidget {
         Stack(
           children: [
             Positioned(
-              left: 23,
+              left: 16,
               top: 22,
               bottom: 22,
               child: Container(width: 1.2, color: _historyTextSecondary),
@@ -86,7 +86,7 @@ class HistoryDaySection extends StatelessWidget {
                     railColor: _railColorForIndex(i),
                   ),
                   if (i < group.entries.length - 1)
-                    Divider(height: 1, color: _historyBorder, indent: 80),
+                    Divider(height: 1, color: _historyBorder, indent: 74),
                 ],
               ],
             ),

@@ -70,24 +70,15 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _periodFilter = 'Este mês';
+  String _periodFilter = 'Hoje';
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
-  String _query = '';
   String? _lastLoadedDogId;
-
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllData());
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -154,9 +145,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         .length,
                   ),
                   const SizedBox(height: 14),
-                  HistorySearchBar(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value),
+                  HistoryTypeFilterBadges(
+                    selected: _typeFilter,
+                    onSelected: (value) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _typeFilter = value);
+                    },
                   ),
                   const SizedBox(height: 14),
                   HistoryTimelineCard(groups: groupedEntries),
@@ -171,20 +165,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   List<HistoryEntry> _filterEntries(List<HistoryEntry> entries) {
     final range = _periodDateRange();
-    final query = _normalize(_query);
 
     return entries.where((entry) {
       final inRange =
           !entry.time.isBefore(range.start) && entry.time.isBefore(range.end);
       final typeMatches =
           _typeFilter == 'Tudo' || entry.category == _typeFilter;
-      final queryMatches =
-          query.isEmpty ||
-          _normalize(
-            '${entry.title} ${entry.subtitle} ${entry.author} ${entry.tag} ${entry.location}',
-          ).contains(query);
 
-      return inRange && typeMatches && queryMatches;
+      return inRange && typeMatches;
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
   }
 
@@ -196,23 +184,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               entry.time.year == now.year && entry.time.month == now.month,
         )
         .toList();
-  }
-
-  String _normalize(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll('á', 'a')
-        .replaceAll('à', 'a')
-        .replaceAll('ã', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('é', 'e')
-        .replaceAll('ê', 'e')
-        .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
-        .replaceAll('ô', 'o')
-        .replaceAll('õ', 'o')
-        .replaceAll('ú', 'u')
-        .replaceAll('ç', 'c');
   }
 }
 
@@ -342,53 +313,74 @@ class HistorySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final formattedMonth = '${_monthName(now.month)}/${now.year}';
+    final metrics = [
+      _SummaryMetricData(
+        icon: Icons.assignment_outlined,
+        value: '$total',
+        label: 'Total registros',
+        meta: 'Todos os tipos',
+        color: AppTheme.primary,
+      ),
+      _SummaryMetricData(
+        icon: Icons.schedule_rounded,
+        value: '$month',
+        label: 'Este mês',
+        meta: formattedMonth,
+        color: AppTheme.primary,
+      ),
+      _SummaryMetricData(
+        icon: Icons.assignment_outlined,
+        value: '$incidents',
+        label: 'Ocorrências',
+        meta: 'Este mês',
+        color: _historyYellow,
+      ),
+      _SummaryMetricData(
+        icon: Icons.fitness_center_rounded,
+        value: '$trainings',
+        label: 'Treinos',
+        meta: 'Este mês',
+        color: _historyGreen,
+      ),
+    ];
 
     return _HistoryPanel(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: _SummaryMetric(
-                icon: Icons.assignment_outlined,
-                value: '$total',
-                label: 'Total de registros',
-                meta: 'Todos os tipos',
-                color: AppTheme.primary,
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 390) {
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _SummaryMetric(data: metrics[0])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _SummaryMetric(data: metrics[1])),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _SummaryMetric(data: metrics[2])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _SummaryMetric(data: metrics[3])),
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return IntrinsicHeight(
+            child: Row(
+              children: [
+                for (int i = 0; i < metrics.length; i++) ...[
+                  Expanded(child: _SummaryMetric(data: metrics[i])),
+                  if (i < metrics.length - 1) const _SummaryDivider(),
+                ],
+              ],
             ),
-            const _SummaryDivider(),
-            Expanded(
-              child: _SummaryMetric(
-                icon: Icons.schedule_rounded,
-                value: '$month',
-                label: 'Este mês',
-                meta: formattedMonth,
-                color: AppTheme.primary,
-              ),
-            ),
-            const _SummaryDivider(),
-            Expanded(
-              child: _SummaryMetric(
-                icon: Icons.assignment_outlined,
-                value: '$incidents',
-                label: 'Ocorrências',
-                meta: 'Este mês',
-                color: _historyYellow,
-              ),
-            ),
-            const _SummaryDivider(),
-            Expanded(
-              child: _SummaryMetric(
-                icon: Icons.fitness_center_rounded,
-                value: '$trainings',
-                label: 'Treinos',
-                meta: 'Este mês',
-                color: _historyGreen,
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -413,68 +405,78 @@ class HistorySummaryCard extends StatelessWidget {
   }
 }
 
-class _SummaryMetric extends StatelessWidget {
+class _SummaryMetricData {
   final IconData icon;
   final String value;
   final String label;
   final String meta;
   final Color color;
 
-  const _SummaryMetric({
+  const _SummaryMetricData({
     required this.icon,
     required this.value,
     required this.label,
     required this.meta,
     required this.color,
   });
+}
+
+class _SummaryMetric extends StatelessWidget {
+  final _SummaryMetricData data;
+
+  const _SummaryMetric({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 25),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _HistoryAutoFitText(
-                value,
-                alignment: Alignment.centerLeft,
-                textAlign: TextAlign.left,
-                style: GoogleFonts.inter(
-                  color: _historyTextPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
+    return Container(
+      constraints: const BoxConstraints(minHeight: 74),
+      padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
+      child: Row(
+        children: [
+          Icon(data.icon, color: data.color, size: 24),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _HistoryAutoFitText(
+                  data.value,
+                  alignment: Alignment.centerLeft,
+                  textAlign: TextAlign.left,
+                  style: GoogleFonts.inter(
+                    color: _historyTextPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              _HistoryAutoFitText(
-                label,
-                alignment: Alignment.centerLeft,
-                textAlign: TextAlign.left,
-                style: GoogleFonts.inter(
-                  color: _historyTextSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 3),
+                Text(
+                  data.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _historyTextSecondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              _HistoryAutoFitText(
-                meta,
-                alignment: Alignment.centerLeft,
-                textAlign: TextAlign.left,
-                style: GoogleFonts.inter(
-                  color: _historyTextSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  data.meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _historyTextMuted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -492,44 +494,142 @@ class _SummaryDivider extends StatelessWidget {
   }
 }
 
-class HistorySearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
+class HistoryTypeFilterBadges extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelected;
 
-  const HistorySearchBar({
+  const HistoryTypeFilterBadges({
     super.key,
-    required this.controller,
-    required this.onChanged,
+    required this.selected,
+    required this.onSelected,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      decoration: _historyPanelDecoration(),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: GoogleFonts.inter(
-          color: _historyTextPrimary,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
+    const filters = [
+      _HistoryTypeBadgeData(
+        label: 'Tudo',
+        value: 'Tudo',
+        icon: Icons.all_inclusive_rounded,
+        color: AppTheme.primary,
+      ),
+      _HistoryTypeBadgeData(
+        label: 'Ocorrências',
+        value: 'Ocorrência',
+        icon: Icons.assignment_outlined,
+        color: _historyYellow,
+      ),
+      _HistoryTypeBadgeData(
+        label: 'Treinos',
+        value: 'Treino',
+        icon: Icons.fitness_center_rounded,
+        color: _historyGreen,
+      ),
+      _HistoryTypeBadgeData(
+        label: 'Rotinas',
+        value: 'Rotina',
+        icon: Icons.format_list_bulleted_rounded,
+        color: AppTheme.primary,
+      ),
+      _HistoryTypeBadgeData(
+        label: 'Saúde',
+        value: 'Saúde',
+        icon: Icons.monitor_heart_outlined,
+        color: _historyGreen,
+      ),
+      _HistoryTypeBadgeData(
+        label: 'Nutrição',
+        value: 'Nutrição',
+        icon: Icons.rice_bowl_rounded,
+        color: _historyYellow,
+      ),
+    ];
+
+    return _HistoryPanel(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      child: SizedBox(
+        height: 38,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: filters.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final filter = filters[index];
+            final active = selected == filter.value;
+            return _HistoryTypeBadge(
+              data: filter,
+              active: active,
+              onTap: () => onSelected(filter.value),
+            );
+          },
         ),
-        cursorColor: AppTheme.primary,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: _historyTextSecondary,
-            size: 26,
+      ),
+    );
+  }
+}
+
+class _HistoryTypeBadgeData {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _HistoryTypeBadgeData({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+}
+
+class _HistoryTypeBadge extends StatelessWidget {
+  final _HistoryTypeBadgeData data;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _HistoryTypeBadge({
+    required this.data,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? data.color : _historyTextSecondary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 72, maxWidth: 126),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          decoration: BoxDecoration(
+            color: active
+                ? data.color.withAlpha(18)
+                : Colors.white.withAlpha(7),
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(
+              color: active ? data.color.withAlpha(170) : _historyBorder,
+            ),
           ),
-          hintText: 'Buscar no histórico...',
-          hintStyle: GoogleFonts.inter(
-            color: _historyTextSecondary,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(data.icon, color: color, size: 17),
+              const SizedBox(width: 7),
+              Flexible(
+                child: _HistoryAutoFitText(
+                  data.label,
+                  style: GoogleFonts.inter(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 13),
         ),
       ),
     );

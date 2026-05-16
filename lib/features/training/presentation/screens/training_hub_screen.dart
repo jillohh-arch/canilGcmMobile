@@ -1,141 +1,186 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
-import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
-import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/detection_maintenance_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/guard_protection_screen.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/data/dog_service.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/dynamic_activity_sheet.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
-import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/training/data/training_service.dart';
+import 'package:canil_gcm/features/training/domain/training_model.dart';
+import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_maintenance_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/guard_protection_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/core/widgets/binomio_header.dart';
-import 'package:canil_gcm/core/services/report_service.dart';
-import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
-import 'package:printing/printing.dart';
 
 part 'training_hub_header.dart';
 part 'training_hub_categories.dart';
 
-class TrainingHubScreen extends StatelessWidget {
+class TrainingHubScreen extends StatefulWidget {
   const TrainingHubScreen({super.key});
+
+  @override
+  State<TrainingHubScreen> createState() => _TrainingHubScreenState();
+}
+
+class _TrainingHubScreenState extends State<TrainingHubScreen> {
+  final DogService _dogService = DogService();
+  final TrainingService _trainingService = TrainingService();
+
+  String? _boundDogId;
+  Stream<Dog?>? _dogStream;
+  Stream<List<TrainingSpecialtyModel>>? _specialtiesStream;
+  Stream<List<TrainingHubSession>>? _sessionsStream;
+
+  void _bindDogStreams(String dogId) {
+    if (_boundDogId == dogId) return;
+    _boundDogId = dogId;
+    _dogStream = _dogService.watchDog(dogId);
+    _specialtiesStream = _trainingService.watchSpecialtiesForDog(dogId);
+    _sessionsStream = _trainingService.watchSessionsForDog(dogId);
+  }
 
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
+    final userVM = Provider.of<UserViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context);
 
-    final dogId = shiftVM.activeDogId;
-    Dog? dog;
-    try {
-      dog = dogVM.dogs.firstWhere((d) => d.id == dogId);
-    } catch (_) {}
-
-    if (dog == null) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: Center(
-          child: Text(
-            'Nenhum cão ativo no turno.',
-            style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 14),
-          ),
-        ),
-      );
+    if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) {
+      return const _TrainingNoShift();
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Header
-            SliverToBoxAdapter(
-              child: _TrainingHubHeader(dog: dog),
-            ),
+    final dogId = shiftVM.activeDogId!;
+    _bindDogStreams(dogId);
 
-            // Especialidades + Treinos gerais
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: _TrainingHubCategories(
-                  dog: dog,
-                  onCategoryTap: (category) {
-                    HapticFeedback.mediumImpact();
-                    _openTrainingSheet(context, category, dog!);
-                  },
-                ),
-              ),
-            ),
+    final currentRa =
+        shiftVM.handlerId ?? HandlerIdentityService.raFromUser(authVM.user);
+    final handler = userVM.findByRa(currentRa);
+    final handlerName = userVM.displayNameFor(
+      ra: currentRa,
+      firebaseUser: authVM.user,
+      fallback: 'Condutor',
+    );
 
-            // Evolução (link)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                child: _EvolutionLink(dog: dog),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          _openTrainingSheet(context, 'Treino', dog!);
-        },
-        backgroundColor: AppTheme.primary,
-        child: Icon(Icons.add_rounded, color: AppTheme.background, size: 28),
+    return StreamBuilder<Dog?>(
+      stream: _dogStream,
+      builder: (context, dogSnapshot) {
+        final dog = dogSnapshot.data ?? _localDogFallback(dogVM, dogId);
+        if (dog == null) {
+          return const _TrainingMissingDog();
+        }
+
+        return StreamBuilder<List<TrainingSpecialtyModel>>(
+          stream: _specialtiesStream,
+          builder: (context, specialtiesSnapshot) {
+            final specialties =
+                specialtiesSnapshot.data ?? const <TrainingSpecialtyModel>[];
+
+            return StreamBuilder<List<TrainingHubSession>>(
+              stream: _sessionsStream,
+              builder: (context, sessionsSnapshot) {
+                final sessions =
+                    sessionsSnapshot.data ?? const <TrainingHubSession>[];
+                final data = _trainingService.buildHubData(
+                  specialties: specialties,
+                  sessions: sessions,
+                );
+
+                return Scaffold(
+                  backgroundColor: _trainingBackground,
+                  body: AnnotatedRegion<SystemUiOverlayStyle>(
+                    value: SystemUiOverlayStyle.light.copyWith(
+                      statusBarColor: Colors.transparent,
+                      systemNavigationBarColor: const Color(0xFF07141B),
+                      systemNavigationBarIconBrightness: Brightness.light,
+                    ),
+                    child: _TrainingHubBody(
+                      dog: dog,
+                      handlerName: handlerName,
+                      handlerPhotoUrl: handler?.photoUrl,
+                      shiftStartTime: shiftVM.shiftStartTime,
+                      data: data,
+                      loading:
+                          specialtiesSnapshot.connectionState ==
+                              ConnectionState.waiting ||
+                          sessionsSnapshot.connectionState ==
+                              ConnectionState.waiting,
+                      onOpenLog: () => _openTrainingLog(context, dog),
+                      onNewSession: () => _openTrainingSheet(
+                        context,
+                        category: 'Treino',
+                        dog: dog,
+                      ),
+                      onTrainingTap: (category) => _openTrainingSheet(
+                        context,
+                        category: category,
+                        dog: dog,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openTrainingLog(BuildContext context, Dog dog) {
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TrainingLogScreen(dogId: dog.id, dogName: dog.name),
       ),
     );
   }
 
-  void _openTrainingSheet(BuildContext context, String category, Dog dog) {
-    // Route to dedicated screens based on category
-    final lowerCat = category.toLowerCase();
+  void _openTrainingSheet(
+    BuildContext context, {
+    required String category,
+    required Dog dog,
+  }) {
+    HapticFeedback.mediumImpact();
+    final lowerCat = normalizeTrainingKey(category);
 
-    if (lowerCat.contains('detecção') || lowerCat.contains('deteccao')) {
+    if (lowerCat.contains('detec') || lowerCat.contains('faro')) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DetectionMaintenanceScreen(dog: dog),
-        ),
+        MaterialPageRoute(builder: (_) => DetectionMaintenanceScreen(dog: dog)),
       );
       return;
     }
 
-    if (lowerCat.contains('obediência') || lowerCat.contains('obediencia')) {
+    if (lowerCat.contains('obediencia')) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ObedienceTrainingScreen(dog: dog),
-        ),
+        MaterialPageRoute(builder: (_) => ObedienceTrainingScreen(dog: dog)),
       );
       return;
     }
 
     if (lowerCat.contains('condicionamento')) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => ConditioningScreen(dog: dog)));
+      return;
+    }
+
+    if (lowerCat.contains('guarda') || lowerCat.contains('protec')) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ConditioningScreen(dog: dog),
-        ),
+        MaterialPageRoute(builder: (_) => GuardProtectionScreen(dog: dog)),
       );
       return;
     }
 
-    if (lowerCat.contains('guarda') || lowerCat.contains('proteção') || lowerCat.contains('protecao')) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => GuardProtectionScreen(dog: dog),
-        ),
-      );
-      return;
-    }
-
-    // Fallback: Faro/Rastro, or generic "Treino"
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -150,173 +195,118 @@ class TrainingHubScreen extends StatelessWidget {
   }
 }
 
-class _EvolutionLink extends StatelessWidget {
+class _TrainingHubBody extends StatelessWidget {
   final Dog dog;
-  const _EvolutionLink({required this.dog});
+  final String handlerName;
+  final String? handlerPhotoUrl;
+  final DateTime? shiftStartTime;
+  final TrainingHubData data;
+  final bool loading;
+  final VoidCallback onOpenLog;
+  final VoidCallback onNewSession;
+  final ValueChanged<String> onTrainingTap;
+
+  const _TrainingHubBody({
+    required this.dog,
+    required this.handlerName,
+    required this.handlerPhotoUrl,
+    required this.shiftStartTime,
+    required this.data,
+    required this.loading,
+    required this.onOpenLog,
+    required this.onNewSession,
+    required this.onTrainingTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Evolução & Histórico
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => TrainingLogScreen(dogId: dog.id, dogName: dog.name),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF061017), Color(0xFF050D10), Color(0xFF050D10)],
+        ),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TrainingHeader(
+                dog: dog,
+                handlerName: handlerName,
+                handlerPhotoUrl: handlerPhotoUrl,
+                shiftStartTime: shiftStartTime,
               ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0E1A1F),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.show_chart_rounded, color: AppTheme.primary, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Evolução & Histórico',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Gráficos, sessões anteriores e progresso',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
-              ],
-            ),
+              const SizedBox(height: 14),
+              _TrainingWeekSummary(data: data),
+              const SizedBox(height: 14),
+              _TrainingSpecialtiesSection(
+                specialties: data.specialties,
+                loading: loading,
+                onTap: onTrainingTap,
+              ),
+              const SizedBox(height: 14),
+              _TrainingGeneralSection(
+                trainings: data.generalTrainings,
+                onTap: onTrainingTap,
+              ),
+              const SizedBox(height: 14),
+              _TrainingRecentSessionsSection(
+                sessions: data.recentSessions,
+                onOpenLog: onOpenLog,
+              ),
+              const SizedBox(height: 16),
+              _NewTrainingSessionButton(onTap: onNewSession),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
-        // Exportar Relatório PDF
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            _exportTrainingReport(context, dog);
-          },
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0E1A1F),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.warning.withAlpha(40), width: 0.8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.picture_as_pdf_rounded, color: AppTheme.warning, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Relatório de Treinos',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Exportar PDF com todas as sessões do K9',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.share_rounded, color: AppTheme.warning.withAlpha(150), size: 18),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
 
-  Future<void> _exportTrainingReport(BuildContext context, Dog dog) async {
-    final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final userVM = Provider.of<UserViewModel>(context, listen: false);
-
-    final fbUser = authVM.user;
-    final currentRa = HandlerIdentityService.raFromUser(fbUser);
-    final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
-
-    final trainings = trainingVM.trainings
-        .where((t) => t.dogId == dog.id)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
-
-    if (trainings.isEmpty) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Nenhuma sessão de treino registrada para ${dog.name}.',
-            style: GoogleFonts.inter(fontSize: 13),
-          ),
-          backgroundColor: AppTheme.warning,
-        ),
-      );
-      return;
-    }
-
-    final entries = trainings.map((t) => ReportEntry(
-      date: t.date,
-      type: t.trainingType,
-      location: t.location.isNotEmpty ? t.location : 'Canil GCM',
-      observations: t.handlerNotes,
-    )).toList();
-
-    try {
-      final pdfBytes = await ReportService.generateActivityReport(
-        dog: dog,
-        conductorCallsign: callsign,
-        entries: entries,
-        period: 'Treinos — ${_formatPeriod(trainings.first.date, trainings.last.date)}',
-      );
-
-      await Printing.sharePdf(
-        bytes: pdfBytes,
-        filename: 'relatorio_treinos_${dog.name.toLowerCase()}.pdf',
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao gerar PDF: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
+Dog? _localDogFallback(DogViewModel dogVM, String dogId) {
+  try {
+    return dogVM.dogs.firstWhere((dog) => dog.id == dogId);
+  } catch (_) {
+    return null;
   }
+}
 
-  String _formatPeriod(DateTime start, DateTime end) {
-    String fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    return '${fmt(start)} a ${fmt(end)}';
+class _TrainingNoShift extends StatelessWidget {
+  const _TrainingNoShift();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: _trainingBackground,
+      body: Center(
+        child: Text(
+          'Nenhum turno ativo.\nInicie um turno para acessar o hub de treinos.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _trainingTextSecondary),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrainingMissingDog extends StatelessWidget {
+  const _TrainingMissingDog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: _trainingBackground,
+      body: Center(
+        child: Text(
+          'K9 do turno não encontrado.',
+          style: TextStyle(color: _trainingTextSecondary),
+        ),
+      ),
+    );
   }
 }
