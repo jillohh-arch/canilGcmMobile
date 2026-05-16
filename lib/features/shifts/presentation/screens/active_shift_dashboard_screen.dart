@@ -3,13 +3,11 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/core/services/weather_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -57,7 +55,6 @@ class _ActiveShiftDashboardScreenState
   List<QuickAction> _quickActions = [];
   List<DashboardAlert> _alerts = [];
   int _totalAlerts = 0;
-  WeatherData? _weatherData;
 
   @override
   void didChangeDependencies() {
@@ -69,20 +66,31 @@ class _ActiveShiftDashboardScreenState
       _lastFetchedDogId = dogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadDashboardData(dogId);
-        Provider.of<TrainingViewModel>(context, listen: false)
-            .fetchTrainingsForDog(dogId);
-        Provider.of<HealthViewModel>(context, listen: false)
-            .fetchHealthLogsForDog(dogId);
-        Provider.of<IncidentViewModel>(context, listen: false)
-            .fetchIncidentsForDog(dogId);
-        Provider.of<RoutineViewModel>(context, listen: false)
-            .fetchRoutinesForDog(dogId);
+        Provider.of<TrainingViewModel>(
+          context,
+          listen: false,
+        ).fetchTrainingsForDog(dogId);
+        Provider.of<HealthViewModel>(
+          context,
+          listen: false,
+        ).fetchHealthLogsForDog(dogId);
+        Provider.of<IncidentViewModel>(
+          context,
+          listen: false,
+        ).fetchIncidentsForDog(dogId);
+        Provider.of<RoutineViewModel>(
+          context,
+          listen: false,
+        ).fetchRoutinesForDog(dogId);
+        Provider.of<NutritionViewModel>(
+          context,
+          listen: false,
+        ).loadForDog(dogId);
 
         final dogVM = Provider.of<DogViewModel>(context, listen: false);
         final userVM = Provider.of<UserViewModel>(context, listen: false);
         final authVM = Provider.of<AuthViewModel>(context, listen: false);
-        final currentRa =
-            HandlerIdentityService.raFromUser(authVM.user) ?? '';
+        final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
 
         try {
           final dog = dogVM.dogs.firstWhere((d) => d.id == dogId);
@@ -96,47 +104,33 @@ class _ActiveShiftDashboardScreenState
     List<QuickAction> quickActions = [];
     List<DashboardAlert> alerts = [];
     int totalAlerts = 0;
-    WeatherData? weather;
 
-    try { quickActions = await _dashboardService.getQuickActions(); } catch (_) {}
-    try { alerts = await _dashboardService.getActiveAlerts(dogId); } catch (_) {}
-    try { totalAlerts = await _dashboardService.countActiveAlerts(dogId); } catch (_) {}
-    try { weather = await _dashboardService.getWeatherData('default'); } catch (_) {}
-
-    // Fallback: busca clima via API se Firestore não retornou
-    if (weather == null) {
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
-        );
-        final result = await WeatherService().getCurrentWeather(
-          position.latitude, position.longitude,
-        );
-        if (result != null) {
-          final temp = (result['temperature'] as num?)?.toDouble() ?? 0;
-          final hum = (result['humidity'] as num?)?.toInt() ?? 0;
-          weather = WeatherData(
-            temperatura: temp,
-            umidade: hum,
-            riscoTermico: temp >= 35 ? 'ALTO' : temp >= 30 ? 'MODERADO' : 'BAIXO',
-            atualizadoEm: DateTime.now(),
-          );
-        }
-      } catch (_) {}
-    }
+    try {
+      quickActions = await _dashboardService.getQuickActions();
+    } catch (_) {}
+    try {
+      alerts = await _dashboardService.getActiveAlerts(dogId);
+    } catch (_) {}
+    try {
+      totalAlerts = await _dashboardService.countActiveAlerts(dogId);
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {
       _quickActions = quickActions;
       _alerts = alerts;
       _totalAlerts = totalAlerts;
-      _weatherData = weather;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<ShiftViewModel, DogViewModel, AuthViewModel, UserViewModel>(
+    return Consumer4<
+      ShiftViewModel,
+      DogViewModel,
+      AuthViewModel,
+      UserViewModel
+    >(
       builder: (context, shiftVM, dogVM, authVM, userVM, _) {
         if (!shiftVM.hasActiveShift) {
           return Scaffold(
@@ -144,7 +138,10 @@ class _ActiveShiftDashboardScreenState
             body: Center(
               child: Text(
                 'Nenhum turno ativo.\nInicie um turno para acessar o dashboard.',
-                style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 14),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  fontSize: 14,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -153,7 +150,10 @@ class _ActiveShiftDashboardScreenState
 
         final fbUser = authVM.user;
         final currentRa = HandlerIdentityService.raFromUser(fbUser);
-        final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
+        final callsign = userVM.displayNameFor(
+          ra: currentRa,
+          firebaseUser: fbUser,
+        );
         final dogId = shiftVM.activeDogId!;
 
         return StreamBuilder<Dog?>(
@@ -173,7 +173,14 @@ class _ActiveShiftDashboardScreenState
             }
             return Scaffold(
               backgroundColor: AppTheme.background,
-              body: _buildCockpit(context, dog, callsign),
+              body: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: SystemUiOverlayStyle.light.copyWith(
+                  statusBarColor: Colors.transparent,
+                  systemNavigationBarColor: const Color(0xFF07141B),
+                  systemNavigationBarIconBrightness: Brightness.light,
+                ),
+                child: _buildCockpit(context, dog, callsign),
+              ),
             );
           },
         );

@@ -1,93 +1,90 @@
 part of 'history_screen.dart';
 
-/// Widget de cada item da timeline com linha conectora e Hero
-extension _HistoryTimelineItem on _HistoryScreenState {
-  Widget _buildTimelineItem(
-    HistoryEntry entry, {
-    required bool isLast,
-    required String dogId,
-  }) {
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final currentUserId = authVM.user?.uid ?? '';
-    final isYou = entry.authorId == currentUserId ||
-        entry.authorId == (authVM.user?.email?.split('@').first ?? '');
+class HistoryTimelineItem extends StatelessWidget {
+  final HistoryEntry entry;
+  final Color railColor;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                PageRouteBuilder<void>(
-                  transitionDuration: const Duration(milliseconds: 400),
-                  reverseTransitionDuration: const Duration(milliseconds: 350),
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    return HistoryDetailScreen(entry: entry);
+  const HistoryTimelineItem({
+    super.key,
+    required this.entry,
+    required this.railColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final time = DateFormat('HH:mm').format(entry.time);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.of(context).push(
+            PageRouteBuilder<void>(
+              transitionDuration: const Duration(milliseconds: 260),
+              reverseTransitionDuration: const Duration(milliseconds: 220),
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return RegistroDetalhePage(entry: entry);
+              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
                   },
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: child,
-                    );
-                  },
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 46,
+                child: Center(
+                  child: Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: railColor,
+                      border: Border.all(color: _historyBackground, width: 1.5),
+                    ),
+                  ),
                 ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(8),
-                border: Border.all(color: Colors.white.withAlpha(18)),
-                borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hora
-                  SizedBox(
-                    width: 38,
-                    child: Text(
-                      _formatTime(entry.time),
-                      textAlign: TextAlign.right,
-                      style: GoogleFonts.inter(
-                        color: _textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+              SizedBox(
+                width: 52,
+                child: Text(
+                  time,
+                  style: GoogleFonts.inter(
+                    color: _historyTextPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: 10),
-                  // Ícone
-                  Hero(
-                    tag: '${entry.heroTag}_icon',
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: entry.categoryColor.withAlpha(46),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        entry.categoryIcon,
-                        color: entry.categoryColor,
-                        size: 14,
-                      ),
-                    ),
+                ),
+              ),
+              Hero(
+                tag: '${entry.heroTag}_icon',
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: entry.color.withAlpha(13),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _historyBorder),
                   ),
-                  const SizedBox(width: 12),
-                  // Conteúdo
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Título com Hero
-                        Hero(
-                          tag: entry.heroTag,
-                          flightShuttleBuilder: (
+                  child: Icon(entry.icon, color: entry.color, size: 24),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Hero(
+                      tag: entry.heroTag,
+                      flightShuttleBuilder:
+                          (
                             flightContext,
                             animation,
                             flightDirection,
@@ -99,176 +96,99 @@ extension _HistoryTimelineItem on _HistoryScreenState {
                               child: toHeroContext.widget,
                             );
                           },
-                          child: Material(
-                            color: Colors.transparent,
-                            child: Text(
-                              entry.title,
-                              style: GoogleFonts.inter(
-                                color: _textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Text(
+                          entry.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: _historyTextPrimary,
+                            fontSize: 14,
+                            height: 1.08,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (entry.subtitle.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        entry.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: _historyTextSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person_rounded,
+                          color: _historyTextMuted,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            entry.author.isEmpty ? 'Ragonha' : entry.author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: _historyTextSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        // Meta row
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            if (entry.subtitle.isNotEmpty)
-                              Text(
-                                entry.subtitle,
-                                style: GoogleFonts.inter(
-                                  color: _textTertiary,
-                                  fontSize: 11,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            // Badge de autoria
-                            _buildAuthorBadge(isYou, entry.authorName),
-                            // Status em andamento
-                            if (entry.isInProgress)
-                              _buildInProgressBadge(),
-                            // Editado
-                            if (entry.editedAt != null)
-                              Text(
-                                'editado ${_formatTime(entry.editedAt!)}',
-                                style: GoogleFonts.inter(
-                                  color: _textTertiary,
-                                  fontSize: 9,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                          ],
-                        ),
                       ],
                     ),
-                  ),
-                  // Chevron
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Icon(
-                      Icons.chevron_right,
-                      color: _textMuted,
-                      size: 16,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              _HistoryCategoryTag(entry: entry),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: _historyTextSecondary,
+                size: 24,
+              ),
+            ],
           ),
-          // Linha conectora entre cards
-          if (!isLast)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                width: 1,
-                height: 8,
-                margin: const EdgeInsets.only(left: 76),
-                color: const Color(0xFF1A3A4A),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAuthorBadge(bool isYou, String authorName) {
-    if (authorName.isEmpty && !isYou) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: isYou
-            ? _cyanAccent.withAlpha(26)
-            : const Color(0xFF95A5A6).withAlpha(26),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        isYou ? 'VOCÊ' : authorName.toUpperCase(),
-        style: GoogleFonts.inter(
-          color: isYou ? _cyanAccent : const Color(0xFF95A5A6),
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
         ),
       ),
     );
   }
-
-  Widget _buildInProgressBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: _yellowAccent.withAlpha(31),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PulsingDot(color: _yellowAccent),
-          const SizedBox(width: 4),
-          Text(
-            'EM ANDAMENTO',
-            style: GoogleFonts.inter(
-              color: _yellowAccent,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTime(DateTime dt) {
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
 }
 
-/// Dot pulsante para status "em andamento"
-class _PulsingDot extends StatefulWidget {
-  final Color color;
-  const _PulsingDot({required this.color});
+class _HistoryCategoryTag extends StatelessWidget {
+  final HistoryEntry entry;
 
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  const _HistoryCategoryTag({required this.entry});
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller.drive(Tween(begin: 0.4, end: 1.0)),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 92),
       child: Container(
-        width: 5,
-        height: 5,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color,
+          color: entry.color.withAlpha(8),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: entry.color.withAlpha(170)),
+        ),
+        child: _HistoryAutoFitText(
+          entry.tag,
+          style: GoogleFonts.inter(
+            color: entry.color,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );

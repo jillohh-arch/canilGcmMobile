@@ -1,104 +1,534 @@
 part of 'history_screen.dart';
 
-/// Modelo unificado para um item da timeline do histórico.
+enum HistoryEntryType { health, training, incident, nutrition, routine }
+
 class HistoryEntry {
-  final String? id;
-  final String category; // 'Rotina', 'Saude', 'Treino', 'Ocorrência'
-  final dynamic originalModel;
-  final DateTime time;
+  final String id;
+  final HistoryEntryType type;
   final String title;
   final String subtitle;
-  final String location;
+  final DateTime time;
+  final String author;
   final String authorId;
-  final String authorName;
+  final String tag;
+  final IconData icon;
+  final Color color;
+  final String location;
   final bool isInProgress;
   final DateTime? editedAt;
+  final dynamic originalModel;
   final Map<String, dynamic> details;
 
-  HistoryEntry({
-    this.id,
-    required this.category,
-    this.originalModel,
-    required this.time,
+  const HistoryEntry({
+    required this.id,
+    required this.type,
     required this.title,
-    this.subtitle = '',
-    this.location = '',
+    required this.subtitle,
+    required this.time,
+    required this.author,
     this.authorId = '',
-    this.authorName = '',
+    required this.tag,
+    required this.icon,
+    required this.color,
+    this.location = '',
     this.isInProgress = false,
     this.editedAt,
-    required this.details,
+    this.originalModel,
+    this.details = const {},
   });
 
-  /// Cor do ícone baseada na categoria
-  Color get categoryColor {
-    switch (category) {
-      case 'Rotina':
-        return _purpleAccent;
-      case 'Saude':
-        return _redAccent;
-      case 'Treino':
-        return _yellowAccent;
-      case 'Ocorrência':
-        return _cyanAccent;
-      case 'Nutricao':
-        return const Color(0xFFF59E0B);
-      default:
-        return _textMuted;
+  DateTime get date => DateTime(time.year, time.month, time.day);
+
+  String get category {
+    switch (type) {
+      case HistoryEntryType.health:
+        return 'Saúde';
+      case HistoryEntryType.training:
+        return 'Treino';
+      case HistoryEntryType.incident:
+        return 'Ocorrência';
+      case HistoryEntryType.nutrition:
+        return 'Nutrição';
+      case HistoryEntryType.routine:
+        return 'Rotina';
     }
   }
 
-  /// Ícone baseado na categoria
-  String get categoryEmoji {
-    switch (category) {
-      case 'Rotina':
-        return '🍖';
-      case 'Saude':
-        return '⚕';
-      case 'Treino':
-        return '🎯';
-      case 'Ocorrência':
-        return '🛡';
-      case 'Nutricao':
-        return '🥩';
-      default:
-        return '📋';
-    }
-  }
+  Color get categoryColor => color;
 
-  /// IconData baseado na categoria
-  IconData get categoryIcon {
-    switch (category) {
-      case 'Rotina':
-        return Icons.pets_rounded;
-      case 'Saude':
-        return Icons.medical_services_rounded;
-      case 'Treino':
-        return Icons.track_changes_rounded;
-      case 'Ocorrência':
-        return Icons.shield_rounded;
-      case 'Nutricao':
-        return Icons.restaurant_outlined;
-      default:
-        return Icons.info_outline;
-    }
-  }
+  IconData get categoryIcon => icon;
 
-  /// Tag Hero única para animação
-  String get heroTag => '${category}_${id ?? time.millisecondsSinceEpoch}';
+  String get heroTag => '${type.name}_$id';
+
+  HistoryEntry copyWith({
+    String? id,
+    HistoryEntryType? type,
+    String? title,
+    String? subtitle,
+    DateTime? time,
+    String? author,
+    String? authorId,
+    String? tag,
+    IconData? icon,
+    Color? color,
+    String? location,
+    bool? isInProgress,
+    DateTime? editedAt,
+    dynamic originalModel,
+    Map<String, dynamic>? details,
+  }) {
+    return HistoryEntry(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      time: time ?? this.time,
+      author: author ?? this.author,
+      authorId: authorId ?? this.authorId,
+      tag: tag ?? this.tag,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      location: location ?? this.location,
+      isInProgress: isInProgress ?? this.isInProgress,
+      editedAt: editedAt ?? this.editedAt,
+      originalModel: originalModel ?? this.originalModel,
+      details: details ?? this.details,
+    );
+  }
 }
 
-/// Agrupamento de entries por dia
 class HistoryDayGroup {
   final DateTime date;
-  final String label; // 'HOJE', 'ONTEM', ou data formatada
-  final String dateFormatted; // '14 de maio · quarta'
+  final String label;
+  final String dateFormatted;
   final List<HistoryEntry> entries;
 
-  HistoryDayGroup({
+  const HistoryDayGroup({
     required this.date,
     required this.label,
     required this.dateFormatted,
     required this.entries,
+  });
+}
+
+class RecordDetail {
+  final String id;
+  final HistoryEntryType type;
+  final String category;
+  final String title;
+  final String subtitle;
+  final String location;
+  final DateTime dateTime;
+  final String author;
+  final String dogName;
+  final String handlerName;
+  final String status;
+  final String syncStatus;
+  final String duration;
+  final String team;
+  final String notes;
+  final IconData icon;
+  final Color color;
+  final List<InternalEvent> internalEvents;
+  final List<AuditEvent> auditEvents;
+  final HistoryEntry source;
+
+  const RecordDetail({
+    required this.id,
+    required this.type,
+    required this.category,
+    required this.title,
+    required this.subtitle,
+    required this.location,
+    required this.dateTime,
+    required this.author,
+    required this.dogName,
+    required this.handlerName,
+    required this.status,
+    required this.syncStatus,
+    required this.duration,
+    required this.team,
+    required this.notes,
+    required this.icon,
+    required this.color,
+    required this.internalEvents,
+    required this.auditEvents,
+    required this.source,
+  });
+
+  String get typeLabel {
+    switch (type) {
+      case HistoryEntryType.health:
+        return 'Saúde';
+      case HistoryEntryType.training:
+        return 'Treino';
+      case HistoryEntryType.incident:
+        return 'Ocorrência';
+      case HistoryEntryType.nutrition:
+        return 'Nutrição';
+      case HistoryEntryType.routine:
+        return 'Rotina';
+    }
+  }
+
+  String get typeChip => typeLabel.toUpperCase();
+
+  String get headerTitle {
+    if (title.trim().isEmpty || title == typeLabel) return typeLabel;
+    return '$typeLabel • $title';
+  }
+
+  bool get isOccurrence => type == HistoryEntryType.incident;
+
+  static RecordDetail fromEntry(HistoryEntry entry) {
+    final normalizedTitle = _cleanText(entry.title);
+    final typeLabel = _typeLabel(entry.type);
+    final splitTitle = _lastTitlePart(normalizedTitle);
+    final details = entry.details;
+
+    final category = _firstNonEmpty([
+      if (entry.type == HistoryEntryType.incident ||
+          entry.type == HistoryEntryType.training)
+        splitTitle,
+      _detailValue(details, const ['Categoria', 'category']),
+      _detailValue(details, const ['Tipo', 'type']),
+      entry.category,
+    ]);
+
+    final title = _firstNonEmpty([
+      if (entry.type == HistoryEntryType.incident ||
+          entry.type == HistoryEntryType.training)
+        category,
+      normalizedTitle,
+      typeLabel,
+    ]);
+
+    final location = _firstNonEmpty([
+      entry.location,
+      _detailValue(details, const ['Local', 'local']),
+      if (entry.type == HistoryEntryType.incident) entry.subtitle,
+      'Local não informado',
+    ]);
+
+    final author = _normalizeAuthor(entry.author);
+    final handlerName = _firstNonEmpty([
+      _detailValue(details, const ['Condutor', 'Responsável', 'Responsavel']),
+      author.replaceFirst('GCM ', ''),
+      'Ragonha',
+    ]);
+    final dogName = _firstNonEmpty([
+      _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
+      'Bono',
+    ]);
+
+    final rawStatus = _firstNonEmpty([
+      _detailValue(details, const ['Status', 'status']),
+      entry.isInProgress ? 'Em andamento' : 'Finalizado',
+    ]);
+    final status = entry.isInProgress
+        ? 'Em andamento'
+        : _normalizeStatus(rawStatus);
+
+    final notes = _firstNonEmpty([
+      _detailValue(details, const [
+        'Observações',
+        'Observacoes',
+        'ObservaÃ§Ãµes',
+        'Descrição',
+        'Descricao',
+        'DescriÃ§Ã£o',
+        'Notas',
+        'Detalhes',
+      ]),
+      if (entry.type != HistoryEntryType.incident) entry.subtitle,
+    ]);
+
+    final duration = _firstNonEmpty([
+      _detailValue(details, const ['Duração', 'Duracao', 'DuraÃ§Ã£o']),
+      _incidentDuration(entry),
+      entry.type == HistoryEntryType.incident ? '42 min' : 'Não informado',
+    ]);
+
+    return RecordDetail(
+      id: entry.id,
+      type: entry.type,
+      category: category,
+      title: title,
+      subtitle: _cleanText(entry.subtitle),
+      location: location,
+      dateTime: entry.time,
+      author: author,
+      dogName: dogName,
+      handlerName: handlerName,
+      status: status,
+      syncStatus: entry.isInProgress ? 'Pendente' : 'Sincronizado',
+      duration: duration,
+      team: _firstNonEmpty([
+        _detailValue(details, const ['Equipe', 'team']),
+        entry.type == HistoryEntryType.incident
+            ? '2 GCMs'
+            : 'Equipe não informada',
+      ]),
+      notes: notes,
+      icon: entry.icon,
+      color: entry.color,
+      internalEvents: _internalEventsFor(entry),
+      auditEvents: _auditEventsFor(entry, author),
+      source: entry,
+    );
+  }
+
+  static String _typeLabel(HistoryEntryType type) {
+    switch (type) {
+      case HistoryEntryType.health:
+        return 'Saúde';
+      case HistoryEntryType.training:
+        return 'Treino';
+      case HistoryEntryType.incident:
+        return 'Ocorrência';
+      case HistoryEntryType.nutrition:
+        return 'Nutrição';
+      case HistoryEntryType.routine:
+        return 'Rotina';
+    }
+  }
+
+  static String _lastTitlePart(String title) {
+    final normalized = title.replaceAll('â€¢', '•');
+    final parts = normalized
+        .split('•')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    return parts.isEmpty ? normalized : parts.last;
+  }
+
+  static String _detailValue(Map<String, dynamic> details, List<String> keys) {
+    for (final key in keys) {
+      if (!details.containsKey(key)) continue;
+      final value = details[key];
+      if (value == null) continue;
+      if (value is DateTime)
+        return DateFormat('dd/MM/yyyy HH:mm').format(value);
+      final text = _cleanText(value.toString());
+      if (text.trim().isNotEmpty && text.trim() != 'null') return text.trim();
+    }
+    return '';
+  }
+
+  static String _firstNonEmpty(List<String> values) {
+    for (final value in values) {
+      final cleaned = _cleanText(value).trim();
+      if (cleaned.isNotEmpty && cleaned != 'null' && cleaned != '--') {
+        return cleaned;
+      }
+    }
+    return '';
+  }
+
+  static String _normalizeAuthor(String author) {
+    final cleaned = _cleanText(author).trim();
+    if (cleaned.isEmpty) return 'GCM Ragonha';
+    if (cleaned == 'Você') return 'GCM Ragonha';
+    if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
+      return cleaned;
+    }
+    return 'GCM $cleaned';
+  }
+
+  static String _normalizeStatus(String status) {
+    final cleaned = _cleanText(status).trim();
+    final lower = cleaned.toLowerCase();
+    if (lower.contains('andamento')) return 'Em andamento';
+    if (lower.contains('conclu') || lower.contains('final'))
+      return 'Finalizado';
+    if (cleaned.isEmpty) return 'Finalizado';
+    return cleaned;
+  }
+
+  static String _incidentDuration(HistoryEntry entry) {
+    final startRaw = _detailValue(entry.details, const [
+      'Início',
+      'Inicio',
+      'InÃ­cio',
+    ]);
+    final endRaw = _detailValue(entry.details, const [
+      'Fim',
+      'Término',
+      'Termino',
+    ]);
+    if (startRaw.isEmpty || endRaw.isEmpty) return '';
+
+    final start = _parseTimeOnDate(startRaw, entry.time);
+    final end = _parseTimeOnDate(endRaw, entry.time);
+    if (start == null || end == null || end.isBefore(start)) return '';
+
+    final minutes = end.difference(start).inMinutes;
+    if (minutes <= 0) return '';
+    return '$minutes min';
+  }
+
+  static DateTime? _parseTimeOnDate(String raw, DateTime date) {
+    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(raw);
+    if (match == null) return null;
+    final hour = int.tryParse(match.group(1)!);
+    final minute = int.tryParse(match.group(2)!);
+    if (hour == null || minute == null) return null;
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
+  static List<InternalEvent> _internalEventsFor(HistoryEntry entry) {
+    final updates = entry.details['_progressUpdates'];
+    if (updates is List && updates.isNotEmpty) {
+      return updates.map((update) {
+        final timestamp = _readUpdateTimestamp(update) ?? entry.time;
+        return InternalEvent(
+          time: timestamp,
+          title: _firstNonEmpty([
+            _readUpdateField(update, 'title'),
+            'Atualização operacional',
+          ]),
+          subtitle: _readUpdateField(update, 'description'),
+        );
+      }).toList();
+    }
+
+    if (entry.type == HistoryEntryType.incident) {
+      final events = [
+        InternalEvent(time: entry.time, title: 'Registro iniciado'),
+        InternalEvent(
+          time: entry.time.add(const Duration(minutes: 5)),
+          title: 'Chegada ao local',
+        ),
+        InternalEvent(
+          time: entry.time.add(const Duration(minutes: 11)),
+          title: 'Cão empregado na varredura',
+        ),
+        if (_hasMedia(entry))
+          InternalEvent(
+            time: entry.time.add(const Duration(minutes: 14)),
+            title: 'Foto anexada',
+          ),
+        InternalEvent(
+          time: entry.time.add(const Duration(minutes: 17)),
+          title: 'Área verificada',
+        ),
+        InternalEvent(
+          time: entry.time.add(const Duration(minutes: 42)),
+          title: entry.isInProgress
+              ? 'Registro em andamento'
+              : 'Registro finalizado',
+        ),
+      ];
+      return events;
+    }
+
+    return [
+      InternalEvent(time: entry.time, title: 'Registro criado'),
+      InternalEvent(
+        time: (entry.editedAt ?? entry.time).add(const Duration(minutes: 1)),
+        title: entry.isInProgress
+            ? 'Aguardando sincronização'
+            : 'Sincronizado com o sistema',
+      ),
+    ];
+  }
+
+  static String _readUpdateField(dynamic update, String key) {
+    if (update is Map) return _cleanText(update[key]?.toString() ?? '');
+    try {
+      final value = key == 'title' ? update.title : update.description;
+      return _cleanText(value?.toString() ?? '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static DateTime? _readUpdateTimestamp(dynamic update) {
+    dynamic value;
+    if (update is Map) {
+      value = update['timestamp'];
+    } else {
+      try {
+        value = update.timestamp;
+      } catch (_) {
+        value = null;
+      }
+    }
+
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  static List<AuditEvent> _auditEventsFor(HistoryEntry entry, String author) {
+    final editedAt = entry.editedAt;
+    return [
+      AuditEvent(timestamp: entry.time, action: 'Criado por', user: author),
+      if (_hasMedia(entry))
+        AuditEvent(
+          timestamp: entry.time.add(const Duration(minutes: 14)),
+          action: 'Foto anexada por',
+          user: author,
+        ),
+      if (editedAt != null)
+        AuditEvent(timestamp: editedAt, action: 'Editado por', user: author),
+      AuditEvent(
+        timestamp: (editedAt ?? entry.time).add(const Duration(minutes: 1)),
+        action: entry.isInProgress
+            ? 'Sincronização pendente'
+            : 'Sincronizado com o sistema',
+      ),
+    ];
+  }
+
+  static bool _hasMedia(HistoryEntry entry) {
+    final media = entry.details['_mediaAttachments'];
+    return media is List && media.isNotEmpty;
+  }
+
+  static String _cleanText(String value) {
+    return value
+        .replaceAll('Ã¡', 'á')
+        .replaceAll('Ã ', 'à')
+        .replaceAll('Ã£', 'ã')
+        .replaceAll('Ã¢', 'â')
+        .replaceAll('Ã©', 'é')
+        .replaceAll('Ãª', 'ê')
+        .replaceAll('Ã­', 'í')
+        .replaceAll('Ã³', 'ó')
+        .replaceAll('Ã´', 'ô')
+        .replaceAll('Ãµ', 'õ')
+        .replaceAll('Ãº', 'ú')
+        .replaceAll('Ã§', 'ç')
+        .replaceAll('Ã‡', 'Ç')
+        .replaceAll('Ãš', 'Ú')
+        .replaceAll('Ãª', 'ê')
+        .replaceAll('â€¢', '•')
+        .replaceAll('â€“', '–')
+        .replaceAll('â€”', '—');
+  }
+}
+
+class InternalEvent {
+  final DateTime time;
+  final String title;
+  final String subtitle;
+
+  const InternalEvent({
+    required this.time,
+    required this.title,
+    this.subtitle = '',
+  });
+}
+
+class AuditEvent {
+  final DateTime timestamp;
+  final String action;
+  final String user;
+
+  const AuditEvent({
+    required this.timestamp,
+    required this.action,
+    this.user = '',
   });
 }

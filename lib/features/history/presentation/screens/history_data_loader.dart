@@ -1,6 +1,5 @@
 part of 'history_screen.dart';
 
-/// Carrega dados do Firebase e constrói as entries filtradas
 extension _HistoryDataLoader on _HistoryScreenState {
   void _loadAllData() {
     if (!mounted) return;
@@ -8,104 +7,223 @@ extension _HistoryDataLoader on _HistoryScreenState {
     if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) return;
 
     final dogId = shiftVM.activeDogId!;
-    final iVM = Provider.of<IncidentViewModel>(context, listen: false);
-    final tVM = Provider.of<TrainingViewModel>(context, listen: false);
-    final rVM = Provider.of<RoutineViewModel>(context, listen: false);
-    final hVM = Provider.of<HealthViewModel>(context, listen: false);
-
-    // Carrega todos os dados em paralelo
-    iVM.fetchIncidentsForDog(dogId);
-    tVM.fetchTrainingsForDog(dogId);
-    rVM.fetchRoutinesForDog(dogId);
-    hVM.fetchHealthLogsForDog(dogId);
+    Provider.of<IncidentViewModel>(
+      context,
+      listen: false,
+    ).fetchIncidentsForDog(dogId);
+    Provider.of<TrainingViewModel>(
+      context,
+      listen: false,
+    ).fetchTrainingsForDog(dogId);
+    Provider.of<RoutineViewModel>(
+      context,
+      listen: false,
+    ).fetchRoutinesForDog(dogId);
+    Provider.of<HealthViewModel>(
+      context,
+      listen: false,
+    ).fetchHealthLogsForDog(dogId);
+    Provider.of<NutritionViewModel>(context, listen: false).loadForDog(dogId);
   }
 
-  /// Constrói todas as entries filtradas por período e tipo
-  List<HistoryEntry> _buildFilteredEntries(String dogId) {
-    final tVM = Provider.of<TrainingViewModel>(context);
-    final iVM = Provider.of<IncidentViewModel>(context);
-    final hVM = Provider.of<HealthViewModel>(context);
-    final rVM = Provider.of<RoutineViewModel>(context);
+  List<HistoryEntry> _buildAllEntries(String dogId) {
+    final trainingVM = Provider.of<TrainingViewModel>(context);
+    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final routineVM = Provider.of<RoutineViewModel>(context);
+    final nutritionVM = Provider.of<NutritionViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
 
     final dogName = _resolveDogName(dogId, dogVM);
-    final range = _periodDateRange();
+    final entries = <HistoryEntry>[];
 
-    List<HistoryEntry> entries = [];
-
-    // Rotinas
-    if (_typeFilter == 'Tudo' || _typeFilter == 'Rotina') {
-      for (final r in rVM.routines) {
-        if (r.dogId == dogId && _isInRange(r.timestamp, range)) {
-          entries.add(_buildRoutineEntry(r, dogName));
-        }
-      }
+    for (final log in healthVM.healthLogs) {
+      if (log.dogId == dogId) entries.add(_buildHealthEntry(log, dogName));
     }
 
-    // Saúde
-    if (_typeFilter == 'Tudo' || _typeFilter == 'Saude') {
-      for (final h in hVM.healthLogs) {
-        if (h.dogId == dogId && _isInRange(h.date, range)) {
-          entries.add(_buildHealthEntry(h, dogName));
-        }
-      }
+    for (final incident in incidentVM.incidents) {
+      if (incident.dogId == dogId) entries.add(_buildIncidentEntry(incident));
     }
 
-    // Treinos
-    if (_typeFilter == 'Tudo' || _typeFilter == 'Treino') {
-      for (final t in tVM.trainings) {
-        if (t.dogId == dogId && _isInRange(t.date, range)) {
-          entries.add(_buildTrainingEntry(t));
-        }
-      }
+    for (final training in trainingVM.trainings) {
+      if (training.dogId == dogId) entries.add(_buildTrainingEntry(training));
     }
 
-    // Ocorrências
-    if (_typeFilter == 'Tudo' || _typeFilter == 'Ocorrência') {
-      for (final i in iVM.incidents) {
-        if (i.dogId == dogId) {
-          // Ocorrências em andamento sempre aparecem, independente do filtro de data
-          if (i.isInProgress || _isInRange(i.date, range)) {
-            entries.add(_buildIncidentEntry(i));
-          }
-        }
-      }
+    for (final routine in routineVM.routines) {
+      if (routine.dogId == dogId) entries.add(_buildRoutineEntry(routine));
     }
 
-    // Nutrição
-    if (_typeFilter == 'Tudo' || _typeFilter == 'Nutricao') {
-      final nVM = Provider.of<NutritionViewModel>(context);
-      for (final f in nVM.todayFeedings) {
-        if (_isInRange(f.fedAt, range)) {
-          entries.add(HistoryEntry(
-            id: f.id ?? f.fedAt.millisecondsSinceEpoch.toString(),
-            category: 'Nutricao',
-            originalModel: f,
-            time: f.fedAt,
-            title: 'Alimentação · ${f.amountGrams}g',
-            subtitle: '${f.period} · ${f.fedBy}',
-            location: '',
-            authorId: f.fedBy,
-            authorName: _resolveAuthorName(f.fedBy),
-            details: {
-              'Período': f.period,
-              'Quantidade': '${f.amountGrams}g',
-              'Prescrição': '${f.prescriptionAtTime}g',
-              'Divergência': '${f.divergencePercent.toStringAsFixed(1)}%',
-              if (f.observations != null) 'Observações': f.observations,
-            },
-          ));
-        }
-      }
+    for (final feeding in nutritionVM.todayFeedings) {
+      entries.add(
+        HistoryEntry(
+          id: feeding.id ?? 'nutrition_${feeding.fedAt.millisecondsSinceEpoch}',
+          type: HistoryEntryType.nutrition,
+          title: 'Alimentação registrada',
+          subtitle: 'Ração: ${feeding.amountGrams}g',
+          time: feeding.fedAt,
+          author: _resolveAuthorName(feeding.fedBy),
+          authorId: feeding.fedBy,
+          tag: 'NUTRIÇÃO',
+          icon: Icons.rice_bowl_rounded,
+          color: _historyYellow,
+          details: {
+            'Período': _periodLabel(feeding.period),
+            'Quantidade': '${feeding.amountGrams}g',
+            'Prescrição': '${feeding.prescriptionAtTime}g',
+            'Divergência': '${feeding.divergencePercent.toStringAsFixed(1)}%',
+            if (feeding.observations?.trim().isNotEmpty == true)
+              'Observações': feeding.observations,
+          },
+        ),
+      );
     }
 
-    // Ordena por hora (mais recente primeiro)
+    if (entries.isEmpty) return _mockEntries();
+
     entries.sort((a, b) => b.time.compareTo(a.time));
     return entries;
   }
 
-  bool _isInRange(DateTime date, ({DateTime start, DateTime end}) range) {
-    return !date.isBefore(range.start) && date.isBefore(range.end);
+  HistoryEntry _buildHealthEntry(HealthLogModel log, String dogName) {
+    final isWeight = log.weight != null;
+    final title = isWeight
+        ? 'Pesagem operacional registrada'
+        : _healthTitle(log);
+    final subtitle = isWeight
+        ? 'Peso atual: ${log.weight!.toStringAsFixed(1)} kg'
+        : _healthSubtitle(log);
+    final author = log.vetName?.trim().isNotEmpty == true
+        ? log.vetName!.trim()
+        : 'Ragonha';
+
+    return HistoryEntry(
+      id: log.id ?? 'health_${log.date.millisecondsSinceEpoch}',
+      type: HistoryEntryType.health,
+      title: title,
+      subtitle: subtitle,
+      time: log.date,
+      author: author,
+      tag: 'SAÚDE',
+      icon: isWeight ? Icons.monitor_weight_outlined : Icons.vaccines_outlined,
+      color: _historyGreen,
+      originalModel: log,
+      details: {
+        'Cão': dogName,
+        'Tipo': log.logType,
+        if (log.weight != null) 'Peso': '${log.weight!.toStringAsFixed(1)} kg',
+        if (log.vaccines.isNotEmpty) 'Vacinas': log.vaccines.join(', '),
+        if (log.healthObservations.trim().isNotEmpty)
+          'Observações': log.healthObservations,
+        if (log.vetName?.trim().isNotEmpty == true) 'Responsável': log.vetName,
+        if (log.mediaAttachments?.isNotEmpty == true)
+          '_mediaAttachments': log.mediaAttachments,
+      },
+    );
+  }
+
+  HistoryEntry _buildIncidentEntry(Incident incident) {
+    final type = (incident.type ?? 'Registro').trim();
+    final isYou = _isCurrentUser(incident.handlerId);
+
+    return HistoryEntry(
+      id: incident.id,
+      type: HistoryEntryType.incident,
+      title: 'Ocorrência • $type',
+      subtitle: incident.location.trim().isEmpty
+          ? 'Local não informado'
+          : incident.location.trim(),
+      time: incident.date,
+      author: isYou ? 'Você' : _resolveAuthorName(incident.handlerId),
+      authorId: incident.handlerId,
+      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
+      icon: Icons.assignment_outlined,
+      color: isYou ? _historyYellow : AppTheme.error,
+      location: incident.location,
+      isInProgress: incident.isInProgress,
+      editedAt: !incident.updatedAt.isAtSameMomentAs(incident.date)
+          ? incident.updatedAt
+          : null,
+      originalModel: incident,
+      details: {
+        'Resultado': incident.displayResult,
+        'Status': incident.status,
+        'Descrição': incident.description,
+        'Local': incident.location,
+        'Condutor': _resolveAuthorName(incident.handlerId),
+        if (incident.startedAt != incident.date)
+          'Início': DateFormat('HH:mm').format(incident.startedAt),
+        if (incident.endedAt != null)
+          'Fim': DateFormat('HH:mm').format(incident.endedAt!),
+        if (incident.outcomes.isNotEmpty) '_outcomes': incident.outcomes,
+        if (incident.progressUpdates.isNotEmpty)
+          '_progressUpdates': incident.progressUpdates,
+        if (incident.extraFields != null) ...incident.extraFields!,
+        if (incident.mediaAttachments?.isNotEmpty == true)
+          '_mediaAttachments': incident.mediaAttachments,
+      },
+    );
+  }
+
+  HistoryEntry _buildTrainingEntry(TrainingSessionModel training) {
+    final subtitle = training.location.trim().isEmpty
+        ? 'Sessão registrada'
+        : training.location.trim();
+    final duration = training.searchDuration != null
+        ? '${(training.searchDuration! / 60).round()} min'
+        : '';
+
+    return HistoryEntry(
+      id: training.id ?? 'training_${training.date.millisecondsSinceEpoch}',
+      type: HistoryEntryType.training,
+      title: 'Treino • ${training.trainingType}',
+      subtitle: subtitle,
+      time: training.date,
+      author: _resolveAuthorName(training.handlerId),
+      authorId: training.handlerId,
+      tag: 'TREINO',
+      icon: Icons.fitness_center_rounded,
+      color: _historyGreen,
+      location: training.location,
+      originalModel: training,
+      details: {
+        'Tipo': training.trainingType,
+        if (duration.isNotEmpty) 'Duração': duration,
+        if (training.location.trim().isNotEmpty) 'Local': training.location,
+        if (training.weather.trim().isNotEmpty) 'Clima': training.weather,
+        if (training.handlerNotes.trim().isNotEmpty)
+          'Notas': training.handlerNotes,
+        if (training.substanceUsed?.trim().isNotEmpty == true)
+          'Substância': training.substanceUsed,
+        if (training.metadata != null) ...training.metadata!,
+        if (training.mediaAttachments?.isNotEmpty == true)
+          '_mediaAttachments': training.mediaAttachments,
+      },
+    );
+  }
+
+  HistoryEntry _buildRoutineEntry(RoutineModel routine) {
+    return HistoryEntry(
+      id: routine.id ?? 'routine_${routine.timestamp.millisecondsSinceEpoch}',
+      type: HistoryEntryType.routine,
+      title: routine.activityType,
+      subtitle: routine.notes?.trim().isNotEmpty == true
+          ? routine.notes!.trim()
+          : routine.status,
+      time: routine.timestamp,
+      author: _resolveAuthorName(routine.handlerId),
+      authorId: routine.handlerId,
+      tag: 'ROTINA',
+      icon: Icons.format_list_bulleted_rounded,
+      color: AppTheme.primary,
+      originalModel: routine,
+      details: {
+        'Status': routine.status,
+        if (routine.notes?.trim().isNotEmpty == true) 'Notas': routine.notes,
+        if (routine.metadata != null) ...routine.metadata!,
+        if (routine.mediaAttachments?.isNotEmpty == true)
+          '_mediaAttachments': routine.mediaAttachments,
+      },
+    );
   }
 
   String _resolveDogName(String dogId, DogViewModel dogVM) {
@@ -115,158 +233,154 @@ extension _HistoryDataLoader on _HistoryScreenState {
     return 'K9';
   }
 
-  HistoryEntry _buildRoutineEntry(RoutineModel routine, String dogName) {
-    final subtitle = routine.notes?.isNotEmpty == true
-        ? routine.notes!
-        : routine.status;
-
-    return HistoryEntry(
-      id: routine.id,
-      category: 'Rotina',
-      originalModel: routine,
-      time: routine.timestamp,
-      title: '${routine.activityType}${routine.metadata?['quantidade'] != null ? ' · ${routine.metadata!['quantidade']}' : ''}',
-      subtitle: subtitle,
-      location: '',
-      authorId: routine.handlerId,
-      authorName: _resolveAuthorName(routine.handlerId),
-      details: {
-        'Status': routine.status,
-        'Notas': routine.notes ?? '',
-        if (routine.metadata != null) ...routine.metadata!,
-        if (routine.mediaAttachments != null)
-          '_mediaAttachments': routine.mediaAttachments,
-      },
-    );
-  }
-
-  HistoryEntry _buildHealthEntry(HealthLogModel healthLog, String dogName) {
-    final title = _resolveHealthTitle(healthLog);
-    final subtitle = healthLog.healthObservations.isNotEmpty
-        ? healthLog.healthObservations
-        : (healthLog.vaccines.isNotEmpty
-            ? healthLog.vaccines.join(', ')
-            : '');
-
-    return HistoryEntry(
-      id: healthLog.id,
-      category: 'Saude',
-      originalModel: healthLog,
-      time: healthLog.date,
-      title: title,
-      subtitle: subtitle,
-      location: '',
-      authorId: '', // HealthLogModel não tem handlerId
-      authorName: '',
-      details: {
-        if (healthLog.weight != null) 'Peso': '${healthLog.weight} kg',
-        if (healthLog.vaccines.isNotEmpty)
-          'Vacinas': healthLog.vaccines.join(', '),
-        'Observações': healthLog.healthObservations,
-        if (healthLog.vetName != null && healthLog.vetName!.isNotEmpty)
-          'Veterinário': healthLog.vetName,
-        if (healthLog.mediaAttachments != null)
-          '_mediaAttachments': healthLog.mediaAttachments,
-      },
-    );
-  }
-
-  HistoryEntry _buildTrainingEntry(TrainingSessionModel training) {
-    final duration = training.searchDuration != null
-        ? '${(training.searchDuration! / 60).round()} min'
-        : '';
-    final subtitle = [
-      if (duration.isNotEmpty) duration,
-      if (training.location.isNotEmpty) training.location,
-    ].join(' · ');
-
-    return HistoryEntry(
-      id: training.id,
-      category: 'Treino',
-      originalModel: training,
-      time: training.date,
-      title: 'Treino · ${training.trainingType}',
-      subtitle: subtitle,
-      location: training.location,
-      authorId: training.handlerId,
-      authorName: _resolveAuthorName(training.handlerId),
-      details: {
-        'Tipo': training.trainingType,
-        if (duration.isNotEmpty) 'Duração': duration,
-        'Local': training.location,
-        'Clima': training.weather,
-        'Notas': training.handlerNotes,
-        if (training.substanceUsed != null)
-          'Substância': training.substanceUsed,
-        if (training.metadata != null) ...training.metadata!,
-        if (training.mediaAttachments != null)
-          '_mediaAttachments': training.mediaAttachments,
-      },
-    );
-  }
-
-  HistoryEntry _buildIncidentEntry(Incident incident) {
-    final type = (incident.type ?? 'Ocorrência').trim();
-    final isActive = incident.isInProgress;
-
-    return HistoryEntry(
-      id: incident.id,
-      category: 'Ocorrência',
-      originalModel: incident,
-      time: incident.date,
-      title: 'Ocorrência · $type',
-      subtitle: incident.location,
-      location: incident.location,
-      authorId: incident.handlerId,
-      authorName: _resolveAuthorName(incident.handlerId),
-      isInProgress: isActive,
-      editedAt: !incident.updatedAt.isAtSameMomentAs(incident.date) ? incident.updatedAt : null,
-      details: {
-        'Resultado': incident.displayResult,
-        'Status': incident.status,
-        'Descrição': incident.description,
-        'Local': incident.location,
-        if (incident.startedAt != incident.date)
-          'Início': DateFormat('HH:mm').format(incident.startedAt),
-        if (incident.endedAt != null)
-          'Fim': DateFormat('HH:mm').format(incident.endedAt!),
-        if (incident.outcomes.isNotEmpty)
-          '_outcomes': incident.outcomes,
-        if (incident.progressUpdates.isNotEmpty)
-          '_progressUpdates': incident.progressUpdates,
-        if (incident.extraFields != null) ...incident.extraFields!,
-        if (incident.mediaAttachments != null)
-          '_mediaAttachments': incident.mediaAttachments,
-      },
-    );
-  }
-
-  String _resolveHealthTitle(HealthLogModel healthLog) {
-    final logType = healthLog.logType.trim();
-    if (logType.isNotEmpty && logType.toLowerCase() != 'rotina') {
-      return logType;
-    }
-    if (healthLog.vaccines.isNotEmpty) {
-      return healthLog.vaccines.first;
-    }
-    final obs = healthLog.healthObservations.trim();
-    if (obs.isNotEmpty) {
-      final first = obs.split(RegExp(r'[.!?\n]')).first.trim();
-      if (first.isNotEmpty) return first;
-    }
-    return 'Registro de saúde';
-  }
-
   String _resolveAuthorName(String handlerId) {
-    if (handlerId.isEmpty) return '';
+    if (handlerId.trim().isEmpty) return 'Ragonha';
+    if (_isCurrentUser(handlerId)) return 'Você';
+
     final userVM = Provider.of<UserViewModel>(context, listen: false);
-    // Tenta encontrar o nome do usuário pelo handlerId (que é o RA)
     for (final user in userVM.users) {
       if (user.ra == handlerId) {
         return user.callsign.isNotEmpty ? user.callsign : user.name;
       }
     }
-    // Fallback: usa o próprio handlerId como nome
     return 'GCM $handlerId';
+  }
+
+  bool _isCurrentUser(String handlerId) {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final emailRa = authVM.user?.email?.split('@').first;
+    return handlerId == authVM.user?.uid || handlerId == emailRa;
+  }
+
+  String _healthTitle(HealthLogModel log) {
+    final logType = log.logType.trim();
+    if (logType.toLowerCase().contains('vacin')) return 'Vacinação aplicada';
+    if (logType.isNotEmpty && logType.toLowerCase() != 'rotina') {
+      return '$logType registrado';
+    }
+    if (log.vaccines.isNotEmpty) return 'Vacinação aplicada';
+    return 'Registro de saúde';
+  }
+
+  String _healthSubtitle(HealthLogModel log) {
+    if (log.vaccines.isNotEmpty) return log.vaccines.join(' • ');
+    if (log.healthObservations.trim().isNotEmpty) return log.healthObservations;
+    return 'Registro clínico operacional';
+  }
+
+  String _periodLabel(String period) {
+    switch (period) {
+      case 'manha':
+        return 'Manhã';
+      case 'almoco':
+        return 'Almoço';
+      case 'noite':
+        return 'Noite';
+      default:
+        return period;
+    }
+  }
+
+  List<HistoryEntry> _mockEntries() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final previous = today.subtract(const Duration(days: 3));
+
+    return [
+      HistoryEntry(
+        id: 'mock_weight',
+        type: HistoryEntryType.health,
+        title: 'Pesagem operacional registrada',
+        subtitle: 'Peso atual: 27.0 kg',
+        time: today.add(const Duration(hours: 14, minutes: 23)),
+        author: 'Ragonha',
+        tag: 'SAÚDE',
+        icon: Icons.monitor_weight_outlined,
+        color: _historyGreen,
+        details: const {'Peso': '27.0 kg', 'Responsável': 'Ragonha'},
+      ),
+      HistoryEntry(
+        id: 'mock_incident_1',
+        type: HistoryEntryType.incident,
+        title: 'Ocorrência • Averiguação',
+        subtitle: 'Rua Guido Orsi, Jardim Ouro Verde',
+        time: today.add(const Duration(hours: 13, minutes: 17)),
+        author: 'Você',
+        tag: 'VOCÊ',
+        icon: Icons.assignment_outlined,
+        color: _historyYellow,
+        location: 'Rua Guido Orsi, Jardim Ouro Verde',
+        details: const {
+          'Status': 'Concluída',
+          'Local': 'Rua Guido Orsi, Jardim Ouro Verde',
+          'Resultado': 'Sem alteração',
+        },
+      ),
+      HistoryEntry(
+        id: 'mock_training_1',
+        type: HistoryEntryType.training,
+        title: 'Treino • Obediência',
+        subtitle: 'Sessão registrada',
+        time: today.add(const Duration(hours: 12, minutes: 37)),
+        author: 'Ragonha',
+        tag: 'TREINO',
+        icon: Icons.fitness_center_rounded,
+        color: _historyGreen,
+        details: const {'Tipo': 'Obediência', 'Condutor': 'Ragonha'},
+      ),
+      HistoryEntry(
+        id: 'mock_nutrition',
+        type: HistoryEntryType.nutrition,
+        title: 'Alimentação registrada',
+        subtitle: 'Ração: 450g',
+        time: yesterday.add(const Duration(hours: 17, minutes: 48)),
+        author: 'Ragonha',
+        tag: 'NUTRIÇÃO',
+        icon: Icons.rice_bowl_rounded,
+        color: _historyYellow,
+        details: const {'Quantidade': '450g', 'Responsável': 'Ragonha'},
+      ),
+      HistoryEntry(
+        id: 'mock_incident_2',
+        type: HistoryEntryType.incident,
+        title: 'Ocorrência • Apoio em abordagem',
+        subtitle: 'Av. das Américas, 1200',
+        time: yesterday.add(const Duration(hours: 9, minutes: 12)),
+        author: 'Ragonha',
+        tag: 'OCORRÊNCIA',
+        icon: Icons.emergency_share_rounded,
+        color: AppTheme.error,
+        location: 'Av. das Américas, 1200',
+        details: const {
+          'Status': 'Concluída',
+          'Local': 'Av. das Américas, 1200',
+        },
+      ),
+      HistoryEntry(
+        id: 'mock_vaccine',
+        type: HistoryEntryType.health,
+        title: 'Vacinação aplicada',
+        subtitle: 'V8 • Lote 24521',
+        time: previous.add(const Duration(hours: 16, minutes: 2)),
+        author: 'Veterinário João',
+        tag: 'SAÚDE',
+        icon: Icons.vaccines_outlined,
+        color: _historyGreen,
+        details: const {'Vacina': 'V8', 'Lote': '24521', 'Veterinário': 'João'},
+      ),
+      HistoryEntry(
+        id: 'mock_training_2',
+        type: HistoryEntryType.training,
+        title: 'Treino • Detecção',
+        subtitle: 'Odor: Cocaína',
+        time: previous.add(const Duration(hours: 10, minutes: 31)),
+        author: 'Ragonha',
+        tag: 'TREINO',
+        icon: Icons.fitness_center_rounded,
+        color: _historyGreen,
+        details: const {'Tipo': 'Detecção', 'Substância': 'Cocaína'},
+      ),
+    ]..sort((a, b) => b.time.compareTo(a.time));
   }
 }

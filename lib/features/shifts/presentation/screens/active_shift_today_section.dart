@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Card compacto "ATIVIDADE DO TURNO" — mostra estado vazio ou resumo.
+/// Card compacto "Atividade do turno".
 class _ShiftActivityCard extends StatelessWidget {
   final String dogId;
   const _ShiftActivityCard({required this.dogId});
@@ -15,122 +15,108 @@ class _ShiftActivityCard extends StatelessWidget {
 
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
-
     final totalToday = _countToday(
-      trainingVM, healthVM, incidentVM, routineVM, nutritionVM, startOfDay,
+      trainingVM,
+      healthVM,
+      incidentVM,
+      routineVM,
+      nutritionVM,
+      startOfDay,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel(text: 'ATIVIDADE DO TURNO'),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _kSurface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _kBorder),
-          ),
-          child: totalToday == 0
-              ? _buildEmpty(context)
-              : _buildSummary(context, totalToday),
-        ),
-      ],
-    );
-  }
+    final message = totalToday == 0
+        ? 'Nenhuma atividade registrada hoje.'
+        : '$totalToday atividade${totalToday > 1 ? 's' : ''} registrada${totalToday > 1 ? 's' : ''} hoje.';
 
-  Widget _buildEmpty(BuildContext context) {
-    return Column(
-      children: [
-        Icon(
-          Icons.event_note_outlined,
-          color: _kTextMuted,
-          size: 28,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Nenhuma atividade registrada hoje.',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: _kTextSecondary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 14),
-        _OutlineButton(
-          label: 'Registrar atividade',
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-            final activeDogId = shiftVM.activeDogId;
-            if (activeDogId != null) {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => DynamicActivitySheet(
-                  category: 'Treino',
-                  dogId: activeDogId,
-                  dogName: '',
+    return _DashboardPanel(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 390;
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _PanelTitle(
+                  icon: Icons.format_list_bulleted_rounded,
+                  label: 'ATIVIDADE DO TURNO',
                 ),
-              );
-            }
-          },
-        ),
-      ],
-    );
-  }
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _kTextSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _OutlineButton(
+                  label: 'Registrar atividade',
+                  fullWidth: true,
+                  onTap: () => _openActivitySheet(context),
+                ),
+              ],
+            );
+          }
 
-  Widget _buildSummary(BuildContext context, int total) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppTheme.success.withAlpha(15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(
-            child: Text(
-              '$total',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.success,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return Row(
             children: [
-              Text(
-                '$total atividade${total > 1 ? 's' : ''} registrada${total > 1 ? 's' : ''} hoje',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _kTextPrimary,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const _PanelTitle(
+                      icon: Icons.format_list_bulleted_rounded,
+                      label: 'ATIVIDADE DO TURNO',
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: _kTextSecondary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Veja o histórico abaixo',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: _kTextMuted,
-                ),
+              const SizedBox(width: 14),
+              _OutlineButton(
+                label: 'Registrar atividade',
+                onTap: () => _openActivitySheet(context),
               ),
             ],
-          ),
-        ),
-        Icon(Icons.chevron_right_rounded, color: _kTextMuted, size: 20),
-      ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _openActivitySheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    final activeDogId = shiftVM.activeDogId;
+    if (activeDogId == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DynamicActivitySheet(
+        category: 'Treino',
+        dogId: activeDogId,
+        dogName: '',
+      ),
     );
   }
 
@@ -142,39 +128,59 @@ class _ShiftActivityCard extends StatelessWidget {
     NutritionViewModel nutritionVM,
     DateTime startOfDay,
   ) {
-    int count = 0;
-    count += trainingVM.trainings.where((t) => t.date.isAfter(startOfDay)).length;
-    count += healthVM.healthLogs.where((h) => h.date.isAfter(startOfDay)).length;
-    count += incidentVM.incidents.where((i) => i.date.isAfter(startOfDay)).length;
-    count += routineVM.routines.where((r) => r.timestamp.isAfter(startOfDay)).length;
+    var count = 0;
+    count += trainingVM.trainings
+        .where((t) => t.date.isAfter(startOfDay))
+        .length;
+    count += healthVM.healthLogs
+        .where((h) => h.date.isAfter(startOfDay))
+        .length;
+    count += incidentVM.incidents
+        .where((i) => i.date.isAfter(startOfDay))
+        .length;
+    count += routineVM.routines
+        .where((r) => r.timestamp.isAfter(startOfDay))
+        .length;
     count += nutritionVM.todayFeedings.length;
     return count;
   }
 }
 
-/// Botão outline institucional.
 class _OutlineButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
+  final bool fullWidth;
 
-  const _OutlineButton({required this.label, required this.onTap});
+  const _OutlineButton({
+    required this.label,
+    required this.onTap,
+    this.fullWidth = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primary.withAlpha(80)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.primary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Container(
+          height: 42,
+          width: fullWidth ? double.infinity : 142,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withAlpha(10),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.primary.withAlpha(170)),
+          ),
+          child: _AutoFitText(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primary,
+            ),
           ),
         ),
       ),
@@ -182,7 +188,7 @@ class _OutlineButton extends StatelessWidget {
   }
 }
 
-/// Timeline de atividades recentes com "Ver todas".
+/// Timeline de atividades recentes com o mesmo ritmo visual do mockup.
 class _RecentActivityTimeline extends StatelessWidget {
   final String dogId;
   const _RecentActivityTimeline({required this.dogId});
@@ -196,56 +202,100 @@ class _RecentActivityTimeline extends StatelessWidget {
     final nutritionVM = Provider.of<NutritionViewModel>(context);
 
     final entries = _buildEntries(
-      trainingVM, healthVM, incidentVM, routineVM, nutritionVM,
-    );
+      trainingVM,
+      healthVM,
+      incidentVM,
+      routineVM,
+      nutritionVM,
+    ).take(3).toList();
 
-    if (entries.isEmpty) return const SizedBox.shrink();
-
-    final displayEntries = entries.take(3).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel(
-          text: 'ATIVIDADES RECENTES',
-          trailing: GestureDetector(
-            onTap: () {
-              // TODO: navegar para histórico completo
-            },
-            child: Text(
-              'Ver todas',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
+    return _DashboardPanel(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      child: Column(
+        children: [
+          _PanelTitle(
+            icon: Icons.history_rounded,
+            label: 'ATIVIDADES RECENTES',
+            trailing: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () {},
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Ver todas',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.primary,
+                      size: 20,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: _kSurface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _kBorder),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < displayEntries.length; i++) ...[
-                _TimelineItem(entry: displayEntries[i]),
-                if (i < displayEntries.length - 1)
-                  Divider(
-                    height: 1,
-                    color: _kBorder,
-                    indent: 16,
-                    endIndent: 16,
+          const SizedBox(height: 14),
+          if (entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 10, 4, 14),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Nenhum registro recente para este turno.',
+                  style: GoogleFonts.inter(
+                    color: _kTextSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+              ),
+            )
+          else
+            Stack(
+              children: [
+                Positioned(
+                  left: 17,
+                  top: 18,
+                  bottom: 18,
+                  child: Container(width: 1.2, color: _kTextSecondary),
+                ),
+                Column(
+                  children: [
+                    for (int i = 0; i < entries.length; i++) ...[
+                      _TimelineItem(
+                        entry: entries[i],
+                        railColor: _railColorForIndex(i),
+                      ),
+                      if (i < entries.length - 1)
+                        Divider(height: 1, color: _kBorder, indent: 58),
+                    ],
+                  ],
+                ),
               ],
-            ],
-          ),
-        ),
-      ],
+            ),
+        ],
+      ),
     );
+  }
+
+  Color _railColorForIndex(int index) {
+    switch (index) {
+      case 0:
+        return _kTextSecondary;
+      case 1:
+        return AppTheme.warning;
+      default:
+        return const Color(0xFF74DB69);
+    }
   }
 
   List<_ActivityEntry> _buildEntries(
@@ -259,68 +309,84 @@ class _RecentActivityTimeline extends StatelessWidget {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final entries = <_ActivityEntry>[];
 
-    for (final t in trainingVM.trainings) {
-      if (t.date.isAfter(startOfDay)) {
-        entries.add(_ActivityEntry(
-          type: 'treino',
-          title: 'Treino · ${t.trainingType}',
-          subtitle: 'Sessão registrada',
-          time: t.date,
-          icon: Icons.fitness_center_rounded,
-          color: AppTheme.primary,
-        ));
-      }
-    }
-
     for (final h in healthVM.healthLogs) {
-      if (h.date.isAfter(startOfDay)) {
-        entries.add(_ActivityEntry(
-          type: 'saude',
-          title: '${h.logType} registrada',
-          subtitle: h.healthObservations,
-          time: h.date,
-          icon: Icons.medical_services_outlined,
-          color: AppTheme.success,
-        ));
+      if (h.date.isAfter(startOfDay) && h.weight != null) {
+        entries.add(
+          _ActivityEntry(
+            title: 'Pesagem operacional registrada',
+            subtitle: '',
+            trailing: '${h.weight!.toStringAsFixed(1)} kg',
+            time: h.date,
+            icon: Icons.monitor_weight_outlined,
+            color: AppTheme.primary,
+          ),
+        );
+      } else if (h.date.isAfter(startOfDay)) {
+        entries.add(
+          _ActivityEntry(
+            title: '${h.logType} registrado',
+            subtitle: h.healthObservations,
+            time: h.date,
+            icon: Icons.local_hospital_rounded,
+            color: const Color(0xFF8BE36D),
+          ),
+        );
       }
     }
 
     for (final i in incidentVM.incidents) {
       if (i.date.isAfter(startOfDay)) {
-        entries.add(_ActivityEntry(
-          type: 'ocorrencia',
-          title: 'Ocorrência · ${i.type ?? 'Registro'}',
-          subtitle: i.location.isNotEmpty ? i.location : '',
-          time: i.date,
-          icon: Icons.local_police_outlined,
-          color: AppTheme.error,
-          badge: 'VOCÊ',
-        ));
+        entries.add(
+          _ActivityEntry(
+            title: 'Ocorrência • ${i.type ?? 'Registro'}',
+            subtitle: i.location,
+            badge: 'VOCÊ',
+            time: i.date,
+            icon: Icons.assignment_outlined,
+            color: AppTheme.warning,
+          ),
+        );
+      }
+    }
+
+    for (final t in trainingVM.trainings) {
+      if (t.date.isAfter(startOfDay)) {
+        entries.add(
+          _ActivityEntry(
+            title: 'Treino • ${t.trainingType}',
+            subtitle: 'Sessão registrada',
+            time: t.date,
+            icon: Icons.fitness_center_rounded,
+            color: const Color(0xFF74DB69),
+          ),
+        );
       }
     }
 
     for (final r in routineVM.routines) {
       if (r.timestamp.isAfter(startOfDay)) {
-        entries.add(_ActivityEntry(
-          type: 'rotina',
-          title: r.activityType,
-          subtitle: '',
-          time: r.timestamp,
-          icon: Icons.schedule_rounded,
-          color: AppTheme.attention,
-        ));
+        entries.add(
+          _ActivityEntry(
+            title: r.activityType,
+            subtitle: r.notes ?? '',
+            time: r.timestamp,
+            icon: Icons.format_list_bulleted_rounded,
+            color: AppTheme.primary,
+          ),
+        );
       }
     }
 
     for (final f in nutritionVM.todayFeedings) {
-      entries.add(_ActivityEntry(
-        type: 'nutricao',
-        title: 'Alimentação · ${f.amountGrams}g',
-        subtitle: '',
-        time: f.fedAt,
-        icon: Icons.restaurant_outlined,
-        color: AppTheme.attention,
-      ));
+      entries.add(
+        _ActivityEntry(
+          title: 'Nutrição • ${f.amountGrams}g',
+          subtitle: '',
+          time: f.fedAt,
+          icon: Icons.rice_bowl_rounded,
+          color: AppTheme.warning,
+        ),
+      );
     }
 
     entries.sort((a, b) => b.time.compareTo(a.time));
@@ -328,11 +394,11 @@ class _RecentActivityTimeline extends StatelessWidget {
   }
 }
 
-/// Item individual da timeline.
 class _TimelineItem extends StatelessWidget {
   final _ActivityEntry entry;
+  final Color railColor;
 
-  const _TimelineItem({required this.entry});
+  const _TimelineItem({required this.entry, required this.railColor});
 
   @override
   Widget build(BuildContext context) {
@@ -340,115 +406,126 @@ class _TimelineItem extends StatelessWidget {
         '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          // Ícone
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: entry.color.withAlpha(12),
-              shape: BoxShape.circle,
-              border: Border.all(color: entry.color.withAlpha(50)),
+          SizedBox(
+            width: 34,
+            child: Center(
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: railColor,
+                  border: Border.all(color: _kDashboardBackground, width: 1.5),
+                ),
+              ),
             ),
-            child: Icon(entry.icon, color: entry.color, size: 14),
           ),
-          const SizedBox(width: 12),
-
-          // Conteúdo
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: entry.color.withAlpha(14),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: _kBorder),
+            ),
+            child: Icon(entry.icon, color: entry.color, size: 21),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 45,
+            child: Text(
+              timeStr,
+              style: GoogleFonts.inter(
+                color: _kTextSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      timeStr,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _kTextMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        entry.title,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _kTextPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  entry.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _kTextPrimary,
+                    fontSize: 13,
+                    height: 1.08,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          entry.subtitle!,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: _kTextMuted,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (entry.badge != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withAlpha(20),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            entry.badge!,
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                if (entry.subtitle.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    entry.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: _kTextSecondary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-
-          // Chevron
-          Icon(Icons.chevron_right_rounded, color: _kTextMuted, size: 18),
+          if (entry.trailing != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              entry.trailing!,
+              style: GoogleFonts.inter(
+                color: _kTextPrimary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (entry.badge != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: AppTheme.warning.withAlpha(170)),
+              ),
+              child: Text(
+                entry.badge!,
+                style: GoogleFonts.inter(
+                  color: AppTheme.warning,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(width: 5),
+          Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 21),
         ],
       ),
     );
   }
 }
 
-/// Modelo de entrada de atividade.
 class _ActivityEntry {
-  final String type;
   final String title;
-  final String? subtitle;
+  final String subtitle;
+  final String? trailing;
   final DateTime time;
   final IconData icon;
   final Color color;
   final String? badge;
 
   _ActivityEntry({
-    required this.type,
     required this.title,
-    this.subtitle,
+    required this.subtitle,
+    this.trailing,
     required this.time,
     required this.icon,
     required this.color,
