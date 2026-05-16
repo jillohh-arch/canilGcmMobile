@@ -16,6 +16,10 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
+import 'package:canil_gcm/core/services/report_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:printing/printing.dart';
 
 part 'training_hub_header.dart';
 part 'training_hub_categories.dart';
@@ -152,53 +156,167 @@ class _EvolutionLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TrainingLogScreen(dogId: dog.id, dogName: dog.name),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0E1A1F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.show_chart_rounded, color: AppTheme.primary, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Evolução & Histórico',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Gráficos, sessões anteriores e progresso',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
+    return Column(
+      children: [
+        // Evolução & Histórico
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => TrainingLogScreen(dogId: dog.id, dogName: dog.name),
               ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E1A1F),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
-          ],
+            child: Row(
+              children: [
+                Icon(Icons.show_chart_rounded, color: AppTheme.primary, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Evolução & Histórico',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Gráficos, sessões anteriores e progresso',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
+              ],
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 10),
+        // Exportar Relatório PDF
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _exportTrainingReport(context, dog);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E1A1F),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.warning.withAlpha(40), width: 0.8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.picture_as_pdf_rounded, color: AppTheme.warning, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Relatório de Treinos',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Exportar PDF com todas as sessões do K9',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.share_rounded, color: AppTheme.warning.withAlpha(150), size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _exportTrainingReport(BuildContext context, Dog dog) async {
+    final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+
+    final fbUser = authVM.user;
+    final currentRa = HandlerIdentityService.raFromUser(fbUser);
+    final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
+
+    final trainings = trainingVM.trainings
+        .where((t) => t.dogId == dog.id)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    if (trainings.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Nenhuma sessão de treino registrada para ${dog.name}.',
+            style: GoogleFonts.inter(fontSize: 13),
+          ),
+          backgroundColor: AppTheme.warning,
+        ),
+      );
+      return;
+    }
+
+    final entries = trainings.map((t) => ReportEntry(
+      date: t.date,
+      type: t.trainingType,
+      location: t.location.isNotEmpty ? t.location : 'Canil GCM',
+      observations: t.handlerNotes,
+    )).toList();
+
+    try {
+      final pdfBytes = await ReportService.generateActivityReport(
+        dog: dog,
+        conductorCallsign: callsign,
+        entries: entries,
+        period: 'Treinos — ${_formatPeriod(trainings.first.date, trainings.last.date)}',
+      );
+
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'relatorio_treinos_${dog.name.toLowerCase()}.pdf',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao gerar PDF: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
+
+  String _formatPeriod(DateTime start, DateTime end) {
+    String fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    return '${fmt(start)} a ${fmt(end)}';
   }
 }
