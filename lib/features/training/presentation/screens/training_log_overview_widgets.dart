@@ -112,7 +112,39 @@ class _TrainingEvolutionTab extends StatelessWidget {
           _TrainingHudHeader(sessions: sessions),
           const SizedBox(height: 14),
           if (sessions.isNotEmpty) _SummaryCards(sessions: sessions),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          // Streak card
+          if (sessions.isNotEmpty) ...[
+            _StreakCard(sessions: sessions),
+            const SizedBox(height: 20),
+          ],
+
+          // Weekly bar chart (últimas 8 semanas)
+          if (sessions.length >= 2) ...[
+            _ChartSection(
+              title: 'SESSÕES POR SEMANA',
+              subtitle: 'Frequência de treino nas últimas 8 semanas',
+              child: _WeeklyBarChart(sessions: sessions),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // Distribuição por especialidade (donut)
+          if (sessions.length >= 3) ...[
+            _ChartSection(
+              title: 'DISTRIBUIÇÃO POR TIPO',
+              subtitle: 'Proporção de cada especialidade treinada',
+              child: _SpecialtyDonutChart(sessions: sessions),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // Progresso por especialidade (barras horizontais)
+          if (sessions.isNotEmpty) ...[
+            _SpecialtyProgressBars(sessions: sessions),
+            const SizedBox(height: 20),
+          ],
 
           // Scent search duration chart
           if (scentSessions.length >= 2) ...[
@@ -130,7 +162,7 @@ class _TrainingEvolutionTab extends StatelessWidget {
           if (sessions.isEmpty)
             _EmptyTraining()
           else
-            ...sessions.reversed.map((s) => _SessionCard(session: s)),
+            ...sessions.reversed.take(10).map((s) => _SessionCard(session: s)),
         ],
       ),
     );
