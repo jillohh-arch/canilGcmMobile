@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Registrar" com grid 2x2 conforme mockup.
+/// Seção "REGISTRAR" com grid 2x2 compacto institucional.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -12,34 +12,14 @@ class _QuickActionsSection extends StatelessWidget {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
     final incidentVM = Provider.of<IncidentViewModel>(context);
-    final routineVM = Provider.of<RoutineViewModel>(context);
+    final nutritionVM = Provider.of<NutritionViewModel>(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('REGISTRAR'),
+        _SectionLabel(text: 'REGISTRAR'),
         const SizedBox(height: 12),
-        _buildGrid(context, trainingVM, healthVM, incidentVM, routineVM),
-      ],
-    );
-  }
-
-  Widget _buildSectionLabel(String text) {
-    return Row(
-      children: [
-        Text(
-          text,
-          style: GoogleFonts.inter(
-            color: AppTheme.primary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(height: 1, color: AppTheme.primary.withAlpha(30)),
-        ),
+        _buildGrid(context, trainingVM, healthVM, incidentVM, nutritionVM),
       ],
     );
   }
@@ -49,9 +29,8 @@ class _QuickActionsSection extends StatelessWidget {
     TrainingViewModel trainingVM,
     HealthViewModel healthVM,
     IncidentViewModel incidentVM,
-    RoutineViewModel routineVM,
+    NutritionViewModel nutritionVM,
   ) {
-    // Calcula "última há Xh" para cada categoria
     final lastTraining = _lastAgo(trainingVM.trainings.isNotEmpty
         ? trainingVM.trainings.first.date
         : null);
@@ -61,54 +40,53 @@ class _QuickActionsSection extends StatelessWidget {
     final lastIncident = _lastAgo(incidentVM.incidents.isNotEmpty
         ? incidentVM.incidents.first.date
         : null);
-
-    // Nutrição: última refeição do dia
-    final nutritionVM = Provider.of<NutritionViewModel>(context);
     final lastNutrition = _lastAgo(nutritionVM.todayFeedings.isNotEmpty
         ? nutritionVM.todayFeedings.first.fedAt
         : null);
 
     if (actions.isNotEmpty) {
-      // Usa ações do Firestore
       final items = actions.map((a) => _QuickActionCard(
         label: a.nome,
+        sublabel: 'Último registro',
+        lastAgo: '',
         icon: _resolveIcon(a.icone),
         color: _resolveColor(a.cor),
-        lastAgo: '',
         onTap: () => _openSheet(context, a.tipo, a.nome),
       )).toList();
-
       return _buildGridLayout(items);
     }
 
-    // Fallback: 4 ações padrão conforme spec (Nutrição, Saúde, Treino, Ocorrência)
     return _buildGridLayout([
       _QuickActionCard(
         label: 'Nutrição',
+        sublabel: 'Última refeição',
+        lastAgo: lastNutrition.isNotEmpty ? lastNutrition : '—',
         icon: Icons.restaurant_outlined,
         color: AppTheme.attention,
-        lastAgo: lastNutrition,
         onTap: () => _openNutrition(context),
       ),
       _QuickActionCard(
         label: 'Saúde',
+        sublabel: 'Último registro',
+        lastAgo: lastHealth.isNotEmpty ? lastHealth : '—',
         icon: Icons.medical_services_outlined,
         color: AppTheme.success,
-        lastAgo: lastHealth,
         onTap: () => _openSheet(context, 'saude', 'Saúde'),
       ),
       _QuickActionCard(
         label: 'Treino',
+        sublabel: 'Último treino',
+        lastAgo: lastTraining.isNotEmpty ? lastTraining : '—',
         icon: Icons.fitness_center_rounded,
         color: AppTheme.primary,
-        lastAgo: lastTraining,
         onTap: () => _openSheet(context, 'treino', 'Treino'),
       ),
       _QuickActionCard(
         label: 'Ocorrência',
+        sublabel: 'Última ocorrência',
+        lastAgo: lastIncident.isNotEmpty ? lastIncident : '—',
         icon: Icons.local_police_outlined,
         color: AppTheme.error,
-        lastAgo: lastIncident,
         onTap: () => _openSheet(context, 'ocorrencia', 'Ocorrência'),
       ),
     ]);
@@ -203,18 +181,21 @@ class _QuickActionsSection extends StatelessWidget {
   }
 }
 
+/// Card individual do grid "Registrar".
 class _QuickActionCard extends StatelessWidget {
   final String label;
+  final String sublabel;
+  final String lastAgo;
   final IconData icon;
   final Color color;
-  final String lastAgo;
   final VoidCallback onTap;
 
   const _QuickActionCard({
     required this.label,
+    required this.sublabel,
+    required this.lastAgo,
     required this.icon,
     required this.color,
-    required this.lastAgo,
     required this.onTap,
   });
 
@@ -225,9 +206,9 @@ class _QuickActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withAlpha(8),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withAlpha(40)),
+          color: _kSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _kBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,16 +216,16 @@ class _QuickActionCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
-                    color: color.withAlpha(20),
+                    color: color.withAlpha(15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: color, size: 18),
+                  child: Icon(icon, color: color, size: 16),
                 ),
                 const Spacer(),
-                Icon(Icons.add_rounded, color: color.withAlpha(120), size: 16),
+                Icon(Icons.add_rounded, color: color.withAlpha(100), size: 16),
               ],
             ),
             const SizedBox(height: 10),
@@ -253,19 +234,26 @@ class _QuickActionCard extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: _kTextPrimary,
               ),
             ),
-            if (lastAgo.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                'última $lastAgo',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: AppTheme.textTertiary,
-                ),
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                color: _kTextMuted,
               ),
-            ],
+            ),
+            const SizedBox(height: 1),
+            Text(
+              lastAgo,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _kTextSecondary,
+              ),
+            ),
           ],
         ),
       ),

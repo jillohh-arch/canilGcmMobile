@@ -104,15 +104,17 @@ class _MainRootScreenState extends State<MainRootScreen> {
           ],
         ),
 
-        // BOTÃO CENTRAL: O Gatilho de Operações
+        // BOTÃO CENTRAL: FAB compacto institucional
         floatingActionButton: Container(
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.3),
-                blurRadius: 16,
-                spreadRadius: 2,
+                color: AppTheme.primary.withAlpha(40),
+                blurRadius: 12,
+                spreadRadius: 1,
               ),
             ],
           ),
@@ -131,22 +133,23 @@ class _MainRootScreenState extends State<MainRootScreen> {
             backgroundColor: AppTheme.primary,
             elevation: 0,
             shape: const CircleBorder(
-              side: BorderSide(color: Color(0xFF050D10), width: 4),
+              side: BorderSide(color: Color(0xFF050D10), width: 3),
             ),
-            child: const Icon(Icons.shield, color: Color(0xFF050D10), size: 26),
+            child: const Icon(Icons.shield, color: Color(0xFF050D10), size: 22),
           ),
         ),
 
         // POSIÇÃO ANCORADA: Faz o botão "encaixar" na barra
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-        // BARRA DE NAVEGAÇÃO CÔNCAVA
+        // BARRA DE NAVEGAÇÃO INSTITUCIONAL
         bottomNavigationBar: BottomAppBar(
-          color: AppTheme.background,
+          color: const Color(0xFF0B171C),
           shape: const CircularNotchedRectangle(),
-          notchMargin: 8.0,
+          notchMargin: 6.0,
+          elevation: 0,
           child: SizedBox(
-            height: 72,
+            height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -158,8 +161,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
                   ],
                 ),
                 // Espaço central reservado para o FAB
-                const SizedBox(width: 32),
-                // Lado Direito: Treino e Cão/Perfil
+                const SizedBox(width: 28),
+                // Lado Direito: Treino e Cão
                 Row(
                   children: [
                     _buildNavItem(2, Icons.track_changes_rounded, 'Treino'),

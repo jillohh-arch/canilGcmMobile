@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Card de condições ambientais: temperatura, umidade, risco térmico.
+/// Card de condições ambientais (mantido para uso futuro).
 class _ConditionsCard extends StatelessWidget {
   final WeatherData weatherData;
 
@@ -11,11 +11,11 @@ class _ConditionsCard extends StatelessWidget {
     final riskColor = _riskColor(weatherData.riscoTermico);
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0E1A1F),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -23,7 +23,7 @@ class _ConditionsCard extends StatelessWidget {
           Text(
             'CONDIÇÕES AMBIENTAIS',
             style: GoogleFonts.inter(
-              color: AppTheme.textTertiary,
+              color: _kTextMuted,
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -90,14 +90,14 @@ class _ConditionItem extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: AppTheme.textTertiary),
+            Icon(icon, size: 14, color: _kTextMuted),
             const SizedBox(width: 4),
             Text(
               value,
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: valueColor ?? AppTheme.textPrimary,
+                color: valueColor ?? _kTextPrimary,
               ),
             ),
           ],
@@ -107,7 +107,7 @@ class _ConditionItem extends StatelessWidget {
           label,
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: AppTheme.textTertiary,
+            color: _kTextMuted,
           ),
         ),
       ],

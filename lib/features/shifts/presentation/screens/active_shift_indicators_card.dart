@@ -1,117 +1,123 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Card horizontal com indicadores dinâmicos: registros, alertas, temperatura, status.
-class _ShiftIndicatorsCard extends StatelessWidget {
+/// Card "RESUMO DO TURNO" com 4 colunas: Tempo, Ocorrências, Treinos, Saúde.
+class _ShiftSummaryCard extends StatelessWidget {
   final Dog dog;
-  final int totalAlerts;
-  final WeatherData? weatherData;
 
-  const _ShiftIndicatorsCard({
-    required this.dog,
-    required this.totalAlerts,
-    this.weatherData,
-  });
+  const _ShiftSummaryCard({required this.dog});
 
   @override
   Widget build(BuildContext context) {
+    final shiftVM = Provider.of<ShiftViewModel>(context);
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
     final incidentVM = Provider.of<IncidentViewModel>(context);
-    final routineVM = Provider.of<RoutineViewModel>(context);
 
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
-    final todayRecords = _countTodayRecords(
-      trainingVM, healthVM, incidentVM, routineVM, startOfDay,
-    );
+    final elapsed = _formatElapsed(shiftVM.shiftStartTime);
+    final startTime = _formatStartTime(shiftVM.shiftStartTime);
 
-    final tempLabel = weatherData != null
-        ? '${weatherData!.temperatura.round()}°C'
-        : '--°C';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1A1F),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1D2C33), width: 0.8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _IndicatorChip(
-            icon: Icons.description_outlined,
-            label: '$todayRecords',
-            subtitle: 'Registros',
-            color: AppTheme.primary,
-          ),
-          _IndicatorChip(
-            icon: Icons.notifications_active_outlined,
-            label: '$totalAlerts',
-            subtitle: 'Alertas',
-            color: totalAlerts > 0 ? AppTheme.warning : AppTheme.textTertiary,
-          ),
-          _IndicatorChip(
-            icon: Icons.thermostat_outlined,
-            label: tempLabel,
-            subtitle: 'Temp.',
-            color: _tempColor(),
-          ),
-          _IndicatorChip(
-            icon: Icons.favorite_outline_rounded,
-            label: dog.operationalStatus,
-            subtitle: 'Status',
-            color: AppTheme.success,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _tempColor() {
-    if (weatherData == null) return AppTheme.textTertiary;
-    final temp = weatherData!.temperatura;
-    if (temp >= 35) return AppTheme.error;
-    if (temp >= 30) return AppTheme.warning;
-    return AppTheme.success;
-  }
-
-  int _countTodayRecords(
-    TrainingViewModel trainingVM,
-    HealthViewModel healthVM,
-    IncidentViewModel incidentVM,
-    RoutineViewModel routineVM,
-    DateTime startOfDay,
-  ) {
-    int count = 0;
-    count += trainingVM.trainings
-        .where((t) => t.date.isAfter(startOfDay))
-        .length;
-    count += healthVM.healthLogs
-        .where((h) => h.date.isAfter(startOfDay))
-        .length;
-    count += incidentVM.incidents
+    final todayIncidents = incidentVM.incidents
         .where((i) => i.date.isAfter(startOfDay))
         .length;
-    count += routineVM.routines
-        .where((r) => r.timestamp.isAfter(startOfDay))
+    final todayTrainings = trainingVM.trainings
+        .where((t) => t.date.isAfter(startOfDay))
         .length;
-    return count;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel(text: 'RESUMO DO TURNO'),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: _kSurface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _kBorder),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SummaryColumn(
+                    icon: Icons.schedule_rounded,
+                    iconColor: AppTheme.primary,
+                    value: elapsed,
+                    label: 'Início $startTime',
+                  ),
+                ),
+                _verticalDivider(),
+                Expanded(
+                  child: _SummaryColumn(
+                    icon: Icons.local_police_outlined,
+                    iconColor: AppTheme.error,
+                    value: '$todayIncidents',
+                    label: 'Hoje',
+                  ),
+                ),
+                _verticalDivider(),
+                Expanded(
+                  child: _SummaryColumn(
+                    icon: Icons.fitness_center_rounded,
+                    iconColor: AppTheme.primary,
+                    value: '$todayTrainings',
+                    label: 'Hoje',
+                  ),
+                ),
+                _verticalDivider(),
+                Expanded(
+                  child: _SummaryColumn(
+                    icon: Icons.favorite_outline_rounded,
+                    iconColor: AppTheme.success,
+                    value: 'OK',
+                    label: 'Status do cão',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _verticalDivider() {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      color: _kBorder,
+    );
+  }
+
+  String _formatElapsed(DateTime? startTime) {
+    if (startTime == null) return '0h 00m';
+    final diff = DateTime.now().difference(startTime);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes.remainder(60);
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
+  }
+
+  String _formatStartTime(DateTime? start) {
+    if (start == null) return '--:--';
+    return '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
   }
 }
 
-class _IndicatorChip extends StatelessWidget {
+/// Coluna individual do resumo.
+class _SummaryColumn extends StatelessWidget {
   final IconData icon;
+  final Color iconColor;
+  final String value;
   final String label;
-  final String subtitle;
-  final Color color;
 
-  const _IndicatorChip({
+  const _SummaryColumn({
     required this.icon,
+    required this.iconColor,
+    required this.value,
     required this.label,
-    required this.subtitle,
-    required this.color,
   });
 
   @override
@@ -119,24 +125,62 @@ class _IndicatorChip extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(height: 4),
+        Icon(icon, color: iconColor, size: 16),
+        const SizedBox(height: 6),
         Text(
-          label,
+          value,
           style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: _kTextPrimary,
           ),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 2),
         Text(
-          subtitle,
+          label,
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: AppTheme.textTertiary,
+            fontWeight: FontWeight.w500,
+            color: _kTextMuted,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+/// Label de seção reutilizável.
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+
+  const _SectionLabel({required this.text, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          text,
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
           ),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(height: 1, color: AppTheme.primary.withAlpha(25)),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 10),
+          trailing!,
+        ],
       ],
     );
   }

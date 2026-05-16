@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Alertas" com dados vindos do Firestore.
+/// Seção "Alertas" com dados vindos do Firestore — design institucional.
 class _AlertsSection extends StatelessWidget {
   final List<DashboardAlert> alerts;
   final int totalAlerts;
@@ -14,30 +14,20 @@ class _AlertsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'ALERTAS',
-              style: GoogleFonts.inter(
-                color: AppTheme.textTertiary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const Spacer(),
-            if (totalAlerts > alerts.length)
-              Text(
-                'ver todos ($totalAlerts)',
-                style: GoogleFonts.inter(
-                  color: AppTheme.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
+        _SectionLabel(
+          text: 'ALERTAS',
+          trailing: totalAlerts > alerts.length
+              ? Text(
+                  'ver todos ($totalAlerts)',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : null,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         ...alerts.map((alert) => _AlertTile(alert: alert)),
       ],
     );
@@ -56,26 +46,26 @@ class _AlertTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: color.withAlpha(8),
-        borderRadius: BorderRadius.circular(6),
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withAlpha(30)),
       ),
       child: Row(
         children: [
-          // Borda lateral colorida (3px)
+          // Borda lateral colorida
           Container(
             width: 3,
-            height: 56,
+            height: 52,
             decoration: BoxDecoration(
               color: color,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(6),
-                bottomLeft: Radius.circular(6),
+                topLeft: Radius.circular(14),
+                bottomLeft: Radius.circular(14),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Icon(_alertIcon(alert.tipo), color: color, size: 18),
+          Icon(_alertIcon(alert.tipo), color: color, size: 16),
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
@@ -86,9 +76,9 @@ class _AlertTile extends StatelessWidget {
                   Text(
                     alert.titulo,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
+                      color: _kTextPrimary,
                     ),
                   ),
                   if (alert.descricao.isNotEmpty) ...[
@@ -96,8 +86,8 @@ class _AlertTile extends StatelessWidget {
                     Text(
                       alert.descricao,
                       style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                        color: _kTextMuted,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -107,8 +97,8 @@ class _AlertTile extends StatelessWidget {
               ),
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: color.withAlpha(120), size: 18),
-          const SizedBox(width: 10),
+          Icon(Icons.chevron_right_rounded, color: _kTextMuted, size: 16),
+          const SizedBox(width: 12),
         ],
       ),
     );
