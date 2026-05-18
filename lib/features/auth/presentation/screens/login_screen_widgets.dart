@@ -9,47 +9,47 @@ class _LoginBrand extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 100,
-            height: 100,
+            width: 70,
+            height: 70,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppTheme.primary.withAlpha(12),
               border: Border.all(
                 color: AppTheme.primary.withAlpha(60),
-                width: 1.5,
+                width: 2,
               ),
             ),
             child: ClipOval(
               child: Image.asset(
                 'assets/images/logo-canil.png',
-                width: 64,
-                height: 64,
+                width: 44,
+                height: 44,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Icon(
                   Icons.shield_rounded,
-                  size: 48,
+                  size: 32,
                   color: AppTheme.primary.withAlpha(180),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           Text(
             'CANIL K9',
             style: GoogleFonts.inter(
-              fontSize: 24,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
               color: AppTheme.textPrimary,
-              letterSpacing: 2.5,
+              letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             'GCM LIMEIRA-SP',
             style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textTertiary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primary,
               letterSpacing: 1.5,
             ),
           ),
@@ -108,11 +108,14 @@ class _BiometricButton extends StatelessWidget {
       height: 56,
       child: FilledButton.icon(
         onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
         icon: const Icon(Icons.fingerprint_rounded, size: 24),
         label: Text(
           'ENTRAR COM BIOMETRIA',
           style: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             fontSize: 14,
             letterSpacing: 0.5,
           ),
@@ -145,12 +148,13 @@ class _PasswordLoginButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppTheme.primary.withAlpha(180)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: Text(
           'ENTRAR COM SENHA',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
-            fontSize: 14,
+            fontSize: 13,
             color: AppTheme.primary,
             letterSpacing: 0.5,
           ),

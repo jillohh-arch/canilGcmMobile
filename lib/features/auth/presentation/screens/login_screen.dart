@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Identifique-se para acessar o sistema',
+                    'Identifique-se com sua matrícula e senha institucional',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 13,
@@ -257,12 +257,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // ── Footer institucional ───────────────────────────
                   Text(
-                    'Guarda Civil Municipal de Limeira',
+                    'Acesso restrito a guardas da GCM Limeira',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Cadastros são feitos pela administração do canil',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
                       color: AppTheme.textTertiary,
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ],

@@ -3,8 +3,13 @@ part of 'shift_assumption_screen.dart';
 class _AssumptionHeader extends StatelessWidget {
   final String displayName;
   final String ra;
+  final int dogCount;
 
-  const _AssumptionHeader({required this.displayName, required this.ra});
+  const _AssumptionHeader({
+    required this.displayName,
+    required this.ra,
+    this.dogCount = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +36,7 @@ class _AssumptionHeader extends StatelessWidget {
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -41,33 +46,50 @@ class _AssumptionHeader extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: AppTheme.primary,
-              letterSpacing: 1.2,
+              letterSpacing: 0.8,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             displayName,
             style: GoogleFonts.inter(
               fontSize: 20,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: AppTheme.textPrimary,
+              height: 1.1,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'RA $ra · $dateStr · $weekday',
             style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
+              fontSize: 11,
+              color: AppTheme.textTertiary,
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Selecione o cão para assumir o plantão',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
-            ),
+          const SizedBox(height: 12),
+          // ── Title da lista ──────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Selecione o cão',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              if (dogCount > 0)
+                Text(
+                  '$dogCount ${dogCount == 1 ? 'cão' : 'cães'} no canil',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textTertiary,
+                  ),
+                ),
+            ],
           ),
         ],
       ),

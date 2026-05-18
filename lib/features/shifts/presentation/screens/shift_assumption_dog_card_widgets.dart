@@ -4,105 +4,136 @@ class _DogSelectionCard extends StatelessWidget {
   final Dog dog;
   final bool isSelected;
   final bool isTitular;
+  final String? titularName;
+  final DogFitnessResult fitness;
   final VoidCallback onTap;
 
   const _DogSelectionCard({
     required this.dog,
     required this.isSelected,
     required this.isTitular,
+    this.titularName,
+    required this.fitness,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isUnfit = fitness.status == DogFitnessStatus.unfit;
     final borderColor = isSelected
         ? AppTheme.primary
-        : const Color(0xFF1D2C33);
+        : isTitular
+            ? AppTheme.primary.withAlpha(80)
+            : const Color(0xFF1D2C33);
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppTheme.primary.withAlpha(8)
-              : const Color(0xFF0E1A1F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: isSelected ? 1.5 : 0.8),
+              ? AppTheme.primary.withAlpha(10)
+              : isTitular
+                  ? AppTheme.primary.withAlpha(5)
+                  : const Color(0xFF0E1A1F),
+          borderRadius: BorderRadius.circular(14),
+          border: Border(
+            left: BorderSide(
+              color: isTitular ? AppTheme.primary : borderColor,
+              width: isTitular ? 3 : (isSelected ? 2 : 1),
+            ),
+            top: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
+            right: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
+            bottom: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
+          ),
         ),
-        child: Row(
-          children: [
-            // ── Avatar ─────────────────────────────────────────────
-            _DogAvatar(dog: dog, isSelected: isSelected),
-            const SizedBox(width: 14),
-
-            // ── Info ───────────────────────────────────────────────
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Opacity(
+          opacity: isUnfit ? 0.85 : 1.0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top row: avatar + info ─────────────────────────────
+              Row(
                 children: [
-                  // Nome + badge titular
-                  Row(
-                    children: [
-                      Text(
-                        dog.name,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      if (isTitular) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withAlpha(20),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'SEU CÃO',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                              letterSpacing: 0.5,
+                  _DogAvatar(dog: dog, fitness: fitness),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nome + badge titular
+                        Row(
+                          children: [
+                            Text(
+                              dog.name,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textPrimary,
+                              ),
                             ),
+                            if (isTitular) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'SEU CÃO',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        // Raça + idade + peso
+                        Text(
+                          _buildSubtitle(),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        // Status operacional
+                        _OperationalStatusLine(dog: dog),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Raça + idade + peso
-                  Text(
-                    _buildSubtitle(),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  // Status badge
-                  _StatusBadge(dog: dog),
                 ],
               ),
-            ),
+              const SizedBox(height: 10),
 
-            // ── Check indicator ────────────────────────────────────
-            if (isSelected)
-              Icon(
-                Icons.check_circle_rounded,
-                color: AppTheme.primary,
-                size: 24,
+              // ── Status badge ───────────────────────────────────────
+              _FitnessBadge(fitness: fitness),
+
+              // ── Pendências ─────────────────────────────────────────
+              if (fitness.pendencies.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _PendenciesList(pendencies: fitness.pendencies),
+              ],
+
+              // ── Footer: titular + última atividade ─────────────────
+              const SizedBox(height: 6),
+              _CardFooter(
+                isTitular: isTitular,
+                titularName: titularName,
+                lastTrainingDate: dog.lastTrainingDate,
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -112,135 +143,315 @@ class _DogSelectionCard extends StatelessWidget {
     final parts = <String>[];
     if (dog.breed.isNotEmpty) parts.add(dog.breed);
     parts.add('${dog.age} anos');
-    if (dog.weight != null) parts.add('${dog.weight!.toStringAsFixed(1)} kg');
+    if (dog.weight != null) parts.add('${dog.weight!.toStringAsFixed(0)}kg');
     return parts.join(' · ');
   }
 }
 
 class _DogAvatar extends StatelessWidget {
   final Dog dog;
-  final bool isSelected;
+  final DogFitnessResult fitness;
 
-  const _DogAvatar({required this.dog, required this.isSelected});
+  const _DogAvatar({required this.dog, required this.fitness});
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = isSelected ? AppTheme.primary : AppTheme.success;
+    final borderColor = switch (fitness.status) {
+      DogFitnessStatus.apt => AppTheme.success,
+      DogFitnessStatus.warning => AppTheme.warning,
+      DogFitnessStatus.unfit => AppTheme.error,
+    };
 
     return Container(
-      width: 56,
-      height: 56,
+      width: 50,
+      height: 50,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor.withAlpha(150), width: 2),
+        border: Border.all(color: borderColor, width: 2),
       ),
       child: ClipOval(
         child: dog.profileImageUrl != null && dog.profileImageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: dog.profileImageUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: const Color(0xFF1A2328),
-                  child: Icon(Icons.pets, color: AppTheme.textTertiary, size: 24),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  color: const Color(0xFF1A2328),
-                  child: Icon(Icons.pets, color: AppTheme.textTertiary, size: 24),
-                ),
+                placeholder: (_, __) => _AvatarPlaceholder(name: dog.name),
+                errorWidget: (_, __, ___) => _AvatarPlaceholder(name: dog.name),
               )
-            : Container(
-                color: const Color(0xFF1A2328),
-                child: Center(
-                  child: Text(
-                    dog.name.isNotEmpty ? dog.name[0] : 'K',
-                    style: GoogleFonts.inter(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
+            : _AvatarPlaceholder(name: dog.name),
       ),
     );
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final Dog dog;
+class _AvatarPlaceholder extends StatelessWidget {
+  final String name;
 
-  const _StatusBadge({required this.dog});
+  const _AvatarPlaceholder({required this.name});
 
   @override
   Widget build(BuildContext context) {
-    final status = dog.status;
-    final isActive = status == 'Ativo';
-
-    final color = isActive ? AppTheme.success : AppTheme.warning;
-    final label = isActive ? 'APTO PARA PLANTÃO' : status.toUpperCase();
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withAlpha(15),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withAlpha(60)),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-          letterSpacing: 0.5,
+      color: const Color(0xFF1A2A30),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name.substring(0, name.length.clamp(0, 4)).toUpperCase() : 'K9',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textSecondary,
+          ),
         ),
       ),
     );
   }
 }
 
+class _OperationalStatusLine extends StatelessWidget {
+  final Dog dog;
+
+  const _OperationalStatusLine({required this.dog});
+
+  @override
+  Widget build(BuildContext context) {
+    final specialtyCount = dog.specialties?.length ?? 0;
+    final statusText = dog.status == 'Ativo'
+        ? 'Operacional${specialtyCount > 0 ? ' · $specialtyCount especialidade${specialtyCount > 1 ? 's' : ''}' : ''}'
+        : dog.status;
+    final statusColor = dog.status == 'Ativo'
+        ? AppTheme.success
+        : AppTheme.warning;
+    final statusIcon = dog.status == 'Ativo' ? '●' : '◔';
+
+    return Row(
+      children: [
+        Text(
+          statusIcon,
+          style: TextStyle(fontSize: 10, color: statusColor),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          statusText,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: AppTheme.textTertiary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FitnessBadge extends StatelessWidget {
+  final DogFitnessResult fitness;
+
+  const _FitnessBadge({required this.fitness});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (fitness.status) {
+      DogFitnessStatus.apt => AppTheme.success,
+      DogFitnessStatus.warning => AppTheme.warning,
+      DogFitnessStatus.unfit => AppTheme.error,
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(80)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            fitness.statusIcon,
+            style: TextStyle(fontSize: 12, color: color),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            fitness.statusLabel,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendenciesList extends StatelessWidget {
+  final List<DogPendency> pendencies;
+
+  const _PendenciesList({required this.pendencies});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(50),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: pendencies.map((p) {
+          final color = p.severity == DogPendencySeverity.critical
+              ? AppTheme.error
+              : AppTheme.warning;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Text('●', style: TextStyle(fontSize: 11, color: color)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    p.label,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _CardFooter extends StatelessWidget {
+  final bool isTitular;
+  final String? titularName;
+  final DateTime? lastTrainingDate;
+
+  const _CardFooter({
+    required this.isTitular,
+    this.titularName,
+    this.lastTrainingDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = <String>[];
+
+    if (!isTitular && titularName != null && titularName!.isNotEmpty) {
+      parts.add('Titular: $titularName');
+    }
+
+    if (lastTrainingDate != null) {
+      parts.add('Última: ${_formatRelativeDate(lastTrainingDate!)}');
+    }
+
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    return Text(
+      parts.join(' · '),
+      style: GoogleFonts.inter(
+        fontSize: 9,
+        fontStyle: FontStyle.italic,
+        color: AppTheme.textTertiary,
+      ),
+    );
+  }
+
+  String _formatRelativeDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inHours < 1) return 'agora';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    if (diff.inDays == 1) return 'ontem';
+    if (diff.inDays < 7) return 'há ${diff.inDays} dias';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+  }
+}
+
 class _AssumptionCta extends StatelessWidget {
   final Dog dog;
+  final DogFitnessResult fitness;
   final bool isLoading;
   final VoidCallback onPressed;
 
   const _AssumptionCta({
     required this.dog,
+    required this.fitness,
     required this.isLoading,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isUnfit = fitness.status == DogFitnessStatus.unfit;
+
+    final bgColor = isUnfit
+        ? AppTheme.warning.withAlpha(20)
+        : AppTheme.primary;
+    final fgColor = isUnfit
+        ? AppTheme.warning
+        : Colors.black;
+    final borderSide = isUnfit
+        ? BorderSide(color: AppTheme.warning.withAlpha(130))
+        : BorderSide.none;
+    final label = isUnfit
+        ? 'ASSUMIR ${dog.name.toUpperCase()} COM PENDÊNCIA'
+        : 'ASSUMIR PLANTÃO COM ${dog.name.toUpperCase()} →';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: AppTheme.background,
-        border: Border(
-          top: BorderSide(color: const Color(0xFF1D2C33), width: 0.5),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppTheme.background.withAlpha(0),
+            AppTheme.background,
+          ],
+          stops: const [0.0, 0.2],
         ),
       ),
       child: SizedBox(
         height: 56,
-        child: FilledButton(
-          onPressed: isLoading ? null : onPressed,
-          child: isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.black,
-                  ),
-                )
-              : Text(
-                  'ASSUMIR PLANTÃO COM ${dog.name.toUpperCase()}',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+        child: Material(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: isLoading ? null : onPressed,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.fromBorderSide(borderSide),
+              ),
+              child: Center(
+                child: isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: fgColor,
+                        ),
+                      )
+                    : Text(
+                        label,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: fgColor,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+              ),
+            ),
+          ),
         ),
       ),
     );
