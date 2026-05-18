@@ -173,7 +173,10 @@ class _DogAvatar extends StatelessWidget {
         child: dog.profileImageUrl != null && dog.profileImageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: dog.profileImageUrl!,
+                width: 60,
+                height: 60,
                 fit: BoxFit.cover,
+                alignment: Alignment.center,
                 placeholder: (_, __) => _AvatarPlaceholder(name: dog.name),
                 errorWidget: (_, __, ___) => _AvatarPlaceholder(name: dog.name),
               )
