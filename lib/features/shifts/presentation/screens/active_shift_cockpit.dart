@@ -22,6 +22,11 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
           callsign: callsign,
           conductorPhotoUrl: conductorPhoto,
           onSwitchDog: () => _showDogSwitcher(context),
+          onProfile: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const HandlerProfilePage(showBottomNav: false),
+            ),
+          ),
         ),
         // Scroll area
         Expanded(

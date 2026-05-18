@@ -59,12 +59,14 @@ class _ShiftHeader extends StatelessWidget {
   final String callsign;
   final String? conductorPhotoUrl;
   final VoidCallback onSwitchDog;
+  final VoidCallback? onProfile;
 
   const _ShiftHeader({
     required this.dog,
     required this.callsign,
     this.conductorPhotoUrl,
     required this.onSwitchDog,
+    this.onProfile,
   });
 
   @override
@@ -178,6 +180,30 @@ class _ShiftHeader extends StatelessWidget {
               child: const Center(
                 child: Icon(
                   Icons.compare_arrows_rounded,
+                  color: AppTheme.primary,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Botão perfil do condutor
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              if (onProfile != null) onProfile!();
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primary.withAlpha(51)),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.person_outline_rounded,
                   color: AppTheme.primary,
                   size: 16,
                 ),
