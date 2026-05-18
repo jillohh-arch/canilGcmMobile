@@ -154,35 +154,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Identifique-se com sua matrícula e senha institucional',
+                    'Acesse com sua matrícula e senha institucional',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12,
                       color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
 
                   // ── Erro ───────────────────────────────────────────
                   if (authVM.errorMessage != null) ...[
                     _LoginErrorBanner(message: authVM.errorMessage!),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // ── Biometria (primária) ───────────────────────────
-                  if (_biometricAvailable) ...[
-                    _BiometricButton(
-                      onPressed: () => _handleBiometricLogin(authVM),
-                    ),
-                    const SizedBox(height: 24),
-                    _Divider(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                   ],
 
                   // ── Campos ─────────────────────────────────────────
@@ -194,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (v) =>
                         v == null || v.isEmpty ? 'Informe o R.A.' : null,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   _LoginTextField(
                     controller: _passwordController,
                     label: 'Senha',
@@ -206,7 +196,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (v) =>
                         v == null || v.isEmpty ? 'Senha obrigatória' : null,
                   ),
-                  const SizedBox(height: 12),
 
                   // ── Esqueci senha ──────────────────────────────────
                   Align(
@@ -222,15 +211,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         'Esqueci minha senha',
                         style: GoogleFonts.inter(
-                          fontSize: 12,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                           color: AppTheme.primary,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // ── Botão Entrar ───────────────────────────────────
+                  // ── Biometria (primária) ───────────────────────────
+                  if (_biometricAvailable) ...[
+                    _BiometricButton(
+                      onPressed: () => _handleBiometricLogin(authVM),
+                    ),
+                    const SizedBox(height: 12),
+                    _Divider(),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ── Botão Entrar com Senha ────────────────────────
                   _PasswordLoginButton(
                     isLoading: authVM.isLoading,
                     onPressed: () async {
