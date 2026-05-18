@@ -225,8 +225,10 @@ class _ShiftHeader extends StatelessWidget {
   String _formatElapsed(DateTime? start) {
     if (start == null) return '--';
     final diff = DateTime.now().difference(start);
+    if (diff.inMinutes < 1) return 'Turno iniciado agora';
     if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
-    return 'há ${diff.inHours}h';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    return 'há ${diff.inDays}d';
   }
 }
 
