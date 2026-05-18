@@ -16,6 +16,9 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/core/widgets/seal_detail_sheet.dart';
+import 'package:canil_gcm/features/profiles/domain/seal_data.dart';
+import 'package:canil_gcm/features/profiles/domain/seal_definitions.dart';
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const Color _kBg = Color(0xFF050D10);
@@ -520,13 +523,13 @@ class _StatsSection extends StatelessWidget {
             ),
             _StatCard(
               icon: Icons.shield_rounded,
-              color: AppTheme.warning,
+              color: AppTheme.primary,
               value: '${incidentVM.incidents.length}',
               label: 'OCORRÊNCIAS',
             ),
             _StatCard(
               icon: Icons.fitness_center_rounded,
-              color: const Color(0xFF9B59B6),
+              color: AppTheme.success,
               value: '${trainingVM.trainings.length}',
               label: 'TREINOS',
             ),
@@ -609,8 +612,9 @@ class _StatCard extends StatelessWidget {
 class _ProfileSectionLabel extends StatelessWidget {
   final String text;
   final String? trailing;
+  final String? aptoLabel;
 
-  const _ProfileSectionLabel({required this.text, this.trailing});
+  const _ProfileSectionLabel({required this.text, this.trailing, this.aptoLabel});
 
   @override
   Widget build(BuildContext context) {
@@ -642,6 +646,18 @@ class _ProfileSectionLabel extends StatelessWidget {
               ),
             ),
           ],
+          if (aptoLabel != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              aptoLabel!,
+              style: GoogleFonts.inter(
+                color: AppTheme.success,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -657,17 +673,52 @@ class _SelosSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final specialtyCount = dog?.specialties?.length ?? 0;
+    final allSeals = buildSealDefinitions(specialtyCount: specialtyCount);
+    final activeCount = allSeals.where((s) => s.isActive).length;
+    final total = allSeals.length;
+
+    // Selos por categoria
+    final operacional = allSeals.where((s) =>
+        s.id == 'plantoes_sem_lacunas' ||
+        s.id == 'relato_final_100' ||
+        s.id == 'pdfs_gerados_100').toList();
+    final treino = allSeals.where((s) =>
+        s.id == 'manutencoes_em_dia' ||
+        s.id == 'sessoes_registradas' ||
+        s.id == 'biblioteca_atualizada').toList();
+    final saude = allSeals.where((s) =>
+        s.id == 'vacinas_em_dia' ||
+        s.id == 'antipulgas_em_dia' ||
+        s.id == 'conformidade_alimentar' ||
+        s.id == 'peso_monitorado').toList();
+    final admin = allSeals.where((s) =>
+        s.id == 'perfil_completo' ||
+        s.id == 'documentos_do_cao').toList();
+
+    // Label APTO
+    String? aptoLabel;
+    if (activeCount >= total) {
+      aptoLabel = '✓ APTO TOTAL';
+    } else if (activeCount >= 8) {
+      aptoLabel = '✓ APTO';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ProfileSectionLabel(text: 'CONFORMIDADE PROFISSIONAL', trailing: '9 de 11'),
+        _ProfileSectionLabel(
+          text: 'CONFORMIDADE PROFISSIONAL',
+          trailing: '$activeCount de $total',
+          aptoLabel: aptoLabel,
+        ),
         // Intro
         Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: AppTheme.primary.withAlpha(10),
-            border: Border(left: BorderSide(color: AppTheme.primary, width: 3)),
+            border: const Border(left: BorderSide(color: AppTheme.primary, width: 3)),
             borderRadius: BorderRadius.circular(6),
           ),
           child: RichText(
@@ -686,40 +737,20 @@ class _SelosSection extends StatelessWidget {
           ),
         ),
         // Operacional
-        _SeloCategoryLabel(text: 'OPERACIONAL'),
-        _SelosGrid(selos: const [
-          _SeloData(icon: Icons.calendar_month_rounded, name: 'Plantões sem lacunas', meta: 'há 142 dias', active: true),
-          _SeloData(icon: Icons.edit_note_rounded, name: 'Relato final 100%', meta: 'últimas 30 ocorrências', active: true),
-          _SeloData(icon: Icons.picture_as_pdf_rounded, name: 'PDFs gerados 100%', meta: 'últimas 30 ocorrências', active: true),
-        ]),
+        const _SeloCategoryLabel(text: 'OPERACIONAL'),
+        _SelosGrid(selos: operacional),
         const SizedBox(height: 14),
         // Treino
-        _SeloCategoryLabel(text: 'TREINO'),
-        _SelosGrid(selos: [
-          _SeloData(
-            icon: Icons.fitness_center_rounded,
-            name: 'Manutenções em dia',
-            meta: '${dog?.specialties?.length ?? 0} especialidades',
-            active: true,
-          ),
-          const _SeloData(icon: Icons.pets_rounded, name: 'Biblioteca atualizada', meta: 'comandos · estágios', active: true),
-        ]),
+        const _SeloCategoryLabel(text: 'TREINO'),
+        _SelosGrid(selos: treino),
         const SizedBox(height: 14),
         // Saúde do cão
-        _SeloCategoryLabel(text: 'SAÚDE DO CÃO'),
-        const _SelosGrid(selos: [
-          _SeloData(icon: Icons.vaccines_rounded, name: 'Vacinas em dia', meta: 'cronograma cumprido', active: true),
-          _SeloData(icon: Icons.shield_rounded, name: 'Antipulgas em dia', meta: 'vence em 15 dias', active: false),
-          _SeloData(icon: Icons.restaurant_rounded, name: 'Conformidade alimentar', meta: '100% conforme laudo', active: true),
-          _SeloData(icon: Icons.monitor_weight_rounded, name: 'Peso monitorado', meta: 'registros recentes', active: true),
-        ]),
+        const _SeloCategoryLabel(text: 'SAÚDE DO CÃO'),
+        _SelosGrid(selos: saude),
         const SizedBox(height: 14),
         // Administrativo
-        _SeloCategoryLabel(text: 'ADMINISTRATIVO'),
-        const _SelosGrid(selos: [
-          _SeloData(icon: Icons.person_rounded, name: 'Perfil completo', meta: 'dados atualizados', active: true),
-          _SeloData(icon: Icons.assignment_rounded, name: 'Documentos do cão', meta: '2 pendentes', active: false),
-        ]),
+        const _SeloCategoryLabel(text: 'ADMINISTRATIVO'),
+        _SelosGrid(selos: admin),
       ],
     );
   }
@@ -747,22 +778,8 @@ class _SeloCategoryLabel extends StatelessWidget {
   }
 }
 
-class _SeloData {
-  final IconData icon;
-  final String name;
-  final String meta;
-  final bool active;
-
-  const _SeloData({
-    required this.icon,
-    required this.name,
-    required this.meta,
-    required this.active,
-  });
-}
-
 class _SelosGrid extends StatelessWidget {
-  final List<_SeloData> selos;
+  final List<SealData> selos;
 
   const _SelosGrid({required this.selos});
 
@@ -775,79 +792,82 @@ class _SelosGrid extends StatelessWidget {
       childAspectRatio: 3.0,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      children: selos.map((s) => _SeloCard(selo: s)).toList(),
+      children: selos.map((s) => _SeloCard(seal: s)).toList(),
     );
   }
 }
 
 class _SeloCard extends StatelessWidget {
-  final _SeloData selo;
+  final SealData seal;
 
-  const _SeloCard({required this.selo});
+  const _SeloCard({required this.seal});
 
   @override
   Widget build(BuildContext context) {
-    final color = selo.active ? AppTheme.success : const Color(0xFF95A5A6);
-    final opacity = selo.active ? 1.0 : 0.4;
+    final color = seal.isActive ? AppTheme.success : const Color(0xFF95A5A6);
+    final opacity = seal.isActive ? 1.0 : 0.4;
 
-    return Opacity(
-      opacity: opacity,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: selo.active
-              ? AppTheme.success.withAlpha(10)
-              : Colors.white.withAlpha(8),
-          border: Border.all(
-            color: selo.active
-                ? AppTheme.success.withAlpha(51)
-                : _kBorderSubtle,
+    return GestureDetector(
+      onTap: () => SealDetailSheet.show(context, seal),
+      child: Opacity(
+        opacity: opacity,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: seal.isActive
+                ? AppTheme.success.withAlpha(10)
+                : Colors.white.withAlpha(8),
+            border: Border.all(
+              color: seal.isActive
+                  ? AppTheme.success.withAlpha(51)
+                  : _kBorderSubtle,
+            ),
+            borderRadius: BorderRadius.circular(10),
           ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color.withAlpha(30),
-                borderRadius: BorderRadius.circular(7),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withAlpha(30),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(seal.icon, color: color, size: 13),
               ),
-              child: Icon(selo.icon, color: color, size: 13),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    selo.name,
-                    style: GoogleFonts.inter(
-                      color: selo.active ? _kTextPrimary : const Color(0xFF95A5A6),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      seal.name,
+                      style: GoogleFonts.inter(
+                        color: seal.isActive ? _kTextPrimary : const Color(0xFF95A5A6),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    selo.meta,
-                    style: GoogleFonts.inter(
-                      color: _kTextMuted,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500,
+                    const SizedBox(height: 1),
+                    Text(
+                      seal.subtitle,
+                      style: GoogleFonts.inter(
+                        color: _kTextMuted,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
