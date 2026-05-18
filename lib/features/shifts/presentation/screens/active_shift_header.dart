@@ -87,8 +87,8 @@ class _ShiftHeader extends StatelessWidget {
         children: [
           // Avatares sobrepostos
           SizedBox(
-            width: 60,
-            height: 38,
+            width: 70,
+            height: 44,
             child: Stack(
               children: [
                 _SmallAvatar(
@@ -99,7 +99,7 @@ class _ShiftHeader extends StatelessWidget {
                   borderColor: AppTheme.primary,
                 ),
                 Positioned(
-                  left: 28,
+                  left: 30,
                   child: _SmallAvatar(
                     imageUrl: conductorPhotoUrl,
                     fallbackText: conductorName.length >= 3
@@ -111,7 +111,7 @@ class _ShiftHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           // Info
           Expanded(
             child: Column(
@@ -230,7 +230,7 @@ class _ShiftHeader extends StatelessWidget {
   }
 }
 
-/// Avatar circular 38px para o header compacto.
+/// Avatar circular 44px para o header compacto.
 class _SmallAvatar extends StatelessWidget {
   final String? imageUrl;
   final String fallbackText;
@@ -245,8 +245,8 @@ class _SmallAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 38,
-      height: 38,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFF1A2A30),
@@ -256,8 +256,8 @@ class _SmallAvatar extends StatelessWidget {
         child: imageUrl != null && imageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
-                width: 38,
-                height: 38,
+                width: 44,
+                height: 44,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => _fallbackWidget(),
                 errorWidget: (_, __, ___) => _fallbackWidget(),
@@ -275,7 +275,7 @@ class _SmallAvatar extends StatelessWidget {
         fallbackText,
         style: GoogleFonts.inter(
           color: AppTheme.primary,
-          fontSize: 9,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
       ),

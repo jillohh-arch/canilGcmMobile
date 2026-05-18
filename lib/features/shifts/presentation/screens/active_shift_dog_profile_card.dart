@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Resumo do Cão" fiel ao mockup — card compacto com specialty badges.
+/// Seção "Resumo do Cão" — card com avatar, info, badges e seta de navegação.
 class _DogSummarySection extends StatelessWidget {
   final Dog dog;
 
@@ -29,18 +29,45 @@ class _DogSummarySection extends StatelessWidget {
             );
           },
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(5),
+              color: Colors.white.withAlpha(8),
               border: Border.all(color: _kBorderSubtle),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Nome + meta
+                // Avatar + Nome + meta + seta
                 Row(
                   children: [
+                    // Avatar do cão
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF1A2A30),
+                        border: Border.all(
+                          color: AppTheme.primary.withAlpha(51),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: dog.profileImageUrl != null &&
+                                dog.profileImageUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: dog.profileImageUrl!,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => _dogFallback(),
+                                errorWidget: (_, __, ___) => _dogFallback(),
+                              )
+                            : _dogFallback(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,29 +76,58 @@ class _DogSummarySection extends StatelessWidget {
                             dog.name,
                             style: GoogleFonts.inter(
                               color: _kTextPrimary,
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Text(
                             metaParts.join(' · '),
                             style: GoogleFonts.inter(
-                              color: _kTextMuted,
-                              fontSize: 10,
+                              color: _kTextSecondary,
+                              fontSize: 11,
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Status operacional
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppTheme.success,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Operacional',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.success,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+                    // Seta de navegação
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: _kTextMuted,
+                      size: 20,
                     ),
                   ],
                 ),
                 // Specialty badges
                 if (dog.specialties != null && dog.specialties!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: dog.specialties!.map((s) {
                       return _SpecialtyBadge(label: s);
                     }).toList(),
@@ -84,6 +140,18 @@ class _DogSummarySection extends StatelessWidget {
       ],
     );
   }
+
+  Widget _dogFallback() {
+    return Container(
+      color: const Color(0xFF1A2A30),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.pets_rounded,
+        color: AppTheme.primary.withAlpha(128),
+        size: 22,
+      ),
+    );
+  }
 }
 
 class _SpecialtyBadge extends StatelessWidget {
@@ -93,7 +161,6 @@ class _SpecialtyBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cor baseada no tipo de especialidade
     final isFormacao = label.toLowerCase().contains('form');
     final color = isFormacao ? AppTheme.warning : AppTheme.success;
 

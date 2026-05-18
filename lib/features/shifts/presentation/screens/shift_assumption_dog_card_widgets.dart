@@ -163,11 +163,11 @@ class _DogAvatar extends StatelessWidget {
     };
 
     return Container(
-      width: 50,
-      height: 50,
+      width: 60,
+      height: 60,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 2),
+        border: Border.all(color: borderColor, width: 2.5),
       ),
       child: ClipOval(
         child: dog.profileImageUrl != null && dog.profileImageUrl!.isNotEmpty

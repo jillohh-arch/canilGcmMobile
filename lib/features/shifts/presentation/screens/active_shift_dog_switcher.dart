@@ -75,57 +75,115 @@ class _DogSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    return GestureDetector(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: Container(
-        width: 40,
-        height: 40,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppTheme.primary.withAlpha(80)),
+          color: Colors.white.withAlpha(8),
+          border: Border.all(color: AppTheme.primary.withAlpha(40)),
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: ClipOval(
-          child: dog.profileImageUrl != null && dog.profileImageUrl!.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: dog.profileImageUrl!,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Icon(
-                    Icons.pets,
-                    color: AppTheme.textTertiary,
-                    size: 18,
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    dog.name.isNotEmpty ? dog.name[0] : 'K',
+        child: Row(
+          children: [
+            // Foto maior
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withAlpha(80)),
+                color: const Color(0xFF1A2A30),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: dog.profileImageUrl != null &&
+                        dog.profileImageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: dog.profileImageUrl!,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Icon(
+                          Icons.pets_rounded,
+                          color: AppTheme.primary.withAlpha(128),
+                          size: 24,
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          dog.name.isNotEmpty
+                              ? dog.name.substring(0, dog.name.length.clamp(0, 3)).toUpperCase()
+                              : 'K9',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dog.name,
                     style: GoogleFonts.inter(
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    dog.breed,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
                       color: AppTheme.textSecondary,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: dog.status == 'Ativo'
+                              ? AppTheme.success
+                              : AppTheme.warning,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        dog.status,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: dog.status == 'Ativo'
+                              ? AppTheme.success
+                              : AppTheme.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Seta
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppTheme.textTertiary,
+            ),
+          ],
         ),
-      ),
-      title: Text(
-        dog.name,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
-        ),
-      ),
-      subtitle: Text(
-        '${dog.breed} · ${dog.status}',
-        style: GoogleFonts.inter(
-          fontSize: 12,
-          color: AppTheme.textSecondary,
-        ),
-      ),
-      trailing: Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: 14,
-        color: AppTheme.textTertiary,
       ),
     );
   }
