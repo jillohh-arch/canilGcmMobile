@@ -57,9 +57,9 @@ class _QuickActionsSection extends StatelessWidget {
 
     return [
       _QuickCard(
-        icon: Icons.rice_bowl_rounded,
-        color: const Color(0xFF9B59B6),
-        label: 'Rotina',
+        icon: Icons.restaurant_rounded,
+        color: const Color(0xFFE67E22),
+        label: 'Nutrição',
         meta: lastNutrition.isNotEmpty ? 'última $lastNutrition' : 'sem registro',
         onTap: () => _openNutrition(context),
       ),

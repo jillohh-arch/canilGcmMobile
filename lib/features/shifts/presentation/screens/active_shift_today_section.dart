@@ -63,8 +63,8 @@ class _TodayActivitiesSection extends StatelessWidget {
         title: 'Alimentação · ${f.amountGrams}g',
         subtitle: 'Registrado',
         time: f.fedAt,
-        icon: Icons.rice_bowl_rounded,
-        color: const Color(0xFF9B59B6),
+        icon: Icons.restaurant_rounded,
+        color: const Color(0xFFE67E22),
       ));
     }
 
@@ -239,8 +239,8 @@ class _EmptyActivitiesState extends StatelessWidget {
           Row(
             children: [
               _EmptyActionChip(
-                icon: Icons.rice_bowl_rounded,
-                label: 'Rotina',
+                icon: Icons.restaurant_rounded,
+                label: 'Nutrição',
                 onTap: () => _openSheet(context, 'Nutrição'),
               ),
               const SizedBox(width: 8),
