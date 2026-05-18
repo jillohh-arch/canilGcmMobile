@@ -16,10 +16,6 @@ extension _DailyTimelineDataLoader on _DailyTimelineScreenState {
       context,
       listen: false,
     ).fetchTrainingsForDog(dogId);
-    Provider.of<RoutineViewModel>(
-      context,
-      listen: false,
-    ).fetchRoutinesForDog(dogId);
     Provider.of<HealthViewModel>(
       context,
       listen: false,

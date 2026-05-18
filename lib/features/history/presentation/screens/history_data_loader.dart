@@ -15,10 +15,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
       context,
       listen: false,
     ).fetchTrainingsForDog(dogId);
-    Provider.of<RoutineViewModel>(
-      context,
-      listen: false,
-    ).fetchRoutinesForDog(dogId);
     Provider.of<HealthViewModel>(
       context,
       listen: false,
@@ -30,7 +26,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final incidentVM = Provider.of<IncidentViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
-    final routineVM = Provider.of<RoutineViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
 
@@ -47,10 +42,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
     for (final training in trainingVM.trainings) {
       if (training.dogId == dogId) entries.add(_buildTrainingEntry(training));
-    }
-
-    for (final routine in routineVM.routines) {
-      if (routine.dogId == dogId) entries.add(_buildRoutineEntry(routine));
     }
 
     for (final feeding in nutritionVM.todayFeedings) {
@@ -197,31 +188,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
         if (training.metadata != null) ...training.metadata!,
         if (training.mediaAttachments?.isNotEmpty == true)
           '_mediaAttachments': training.mediaAttachments,
-      },
-    );
-  }
-
-  HistoryEntry _buildRoutineEntry(RoutineModel routine) {
-    return HistoryEntry(
-      id: routine.id ?? 'routine_${routine.timestamp.millisecondsSinceEpoch}',
-      type: HistoryEntryType.routine,
-      title: routine.activityType,
-      subtitle: routine.notes?.trim().isNotEmpty == true
-          ? routine.notes!.trim()
-          : routine.status,
-      time: routine.timestamp,
-      author: _resolveAuthorName(routine.handlerId),
-      authorId: routine.handlerId,
-      tag: 'ROTINA',
-      icon: Icons.format_list_bulleted_rounded,
-      color: AppTheme.primary,
-      originalModel: routine,
-      details: {
-        'Status': routine.status,
-        if (routine.notes?.trim().isNotEmpty == true) 'Notas': routine.notes,
-        if (routine.metadata != null) ...routine.metadata!,
-        if (routine.mediaAttachments?.isNotEmpty == true)
-          '_mediaAttachments': routine.mediaAttachments,
       },
     );
   }

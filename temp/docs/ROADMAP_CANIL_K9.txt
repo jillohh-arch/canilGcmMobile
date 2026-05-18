@@ -1,0 +1,806 @@
+================================================================================
+ROADMAP COMPLETO — APP CANIL K9 GCM LIMEIRA
+================================================================================
+
+Documento de planejamento técnico e de design do aplicativo de gestão do
+canil K9 da Guarda Civil Municipal de Limeira.
+
+Autor do app: Jilles Ragonha (GCM, RA 691755)
+Cães cadastrados: Bono (Malinois, 6 anos) e Apolo (Malinois, 2 anos)
+
+
+================================================================================
+PROPÓSITO INSTITUCIONAL DO APP
+================================================================================
+
+O app existe primariamente porque "existe muita discussão entre os GCMs que
+quem trabalha no canil não faz nada". Suas funções reais são:
+
+  1. PRESTAÇÃO DE CONTAS - registro estruturado da rotina do canil
+  2. PROTEÇÃO DO CONDUTOR - contra questionamento de gestores
+  3. PRONTUÁRIO INSTITUCIONAL - histórico do cão e do trabalho
+  4. EVIDÊNCIA DEFENSIVA - em auditoria ou processo administrativo
+
+Caso real ilustrativo: condutor foi questionado por dar 800g/dia ao Bono
+(veterinário institucional dizia 300g). Pagou do próprio bolso especialista
+para fazer laudo nutricional. Discussão ainda existe. O app precisa ser
+o arquivo que defende decisões técnicas como essa.
+
+
+================================================================================
+PRINCÍPIOS NORTEADORES (CONSULTAR ANTES DE CADA DECISÃO)
+================================================================================
+
+  1. FORMA SEGUE FUNÇÃO — toda decoração que não serve à prestação de
+     contas, corta.
+
+  2. DEFESA PROFISSIONAL — todo campo, foto, GPS, timestamp serve pra
+     defender o condutor em auditoria.
+
+  3. TOM INSTITUCIONAL SÉRIO — sem RPG, sem militar gamer, sem inglês
+     decorativo.
+
+  4. SUBTRAÇÃO NO MVP — quando em dúvida, tira.
+
+  5. AUDITOR É O USUÁRIO INVISÍVEL — toda tela vai virar PDF que alguém
+     vai ler frio.
+
+
+================================================================================
+FASE 0 — DECISÕES TRANSVERSAIS (antes de mexer em tela)
+================================================================================
+
+Aplicar em TODO o app. Não é tela, é diretriz.
+
+--------------------------------------------------------------------------------
+0.1 PADRONIZAÇÃO DE LINGUAGEM
+--------------------------------------------------------------------------------
+
+  - Cortar inglês decorativo: "K9 DUTY SELECTION", "BIO-SURVEILLANCE",
+    "TACTICAL", etc.
+  - Cortar tom RPG/militar: "Prontuário de Combate", "Faro de Elite",
+    "Binômio de Ferro", "Galeria de Troféus".
+  - Cortar subtítulos motivacionais: "AÇÃO • CONTROLE • SEGURANÇA",
+    "FOCO • PRECISÃO • RESULTADO" — todos.
+  - Reduzir caixa alta excessiva — manter só em headers principais.
+  - Padronizar nomenclatura: "senha" (não "Chave de Acesso"), "binômio",
+    "natureza da ocorrência".
+
+--------------------------------------------------------------------------------
+0.2 PADRONIZAÇÃO VISUAL
+--------------------------------------------------------------------------------
+
+  - Cor do botão Salvar/Primário sempre ciano (não muda por categoria).
+  - Glow/neon comportado — borda com leve glow, sem halo exagerado.
+  - Cortar retículas HUD militares dos cards de ação.
+  - Cortar cantos chanfrados decorativos — usar bordas arredondadas
+    simples.
+  - Padronizar padding inferior em todas as telas pra não cobrir conteúdo
+    com FAB.
+
+--------------------------------------------------------------------------------
+0.3 TRILHA DE AUDITORIA (CRÍTICO — afeta arquitetura de dados)
+--------------------------------------------------------------------------------
+
+  - Toda edição registra: quem editou, quando, qual campo,
+    valor antes/depois.
+  - Toda exclusão é soft delete com motivo obrigatório.
+  - Timestamps imutáveis em criação de eventos.
+  - EXIF preservado em fotos anexadas.
+  - Aparece no PDF final como "Histórico de edições".
+
+--------------------------------------------------------------------------------
+0.4 VALIDAÇÃO DE CAMPOS
+--------------------------------------------------------------------------------
+
+  - Placas: uppercase forçado + validação de formato (antigo + Mercosul).
+  - Tipo de veículo: dropdown fixo, não texto livre.
+  - Quantidades: validação numérica com unidade.
+  - Texto livre: limite de caracteres + bloquear caracteres aleatórios
+    sem contexto.
+
+--------------------------------------------------------------------------------
+0.5 SUBSTITUIR ILUSTRAÇÕES COM CARA DE IA
+--------------------------------------------------------------------------------
+
+  - Cards de Registros Rápidos, fotos de cães em mockup,
+    sparkle watermark.
+  - Substituir por: fotos reais do canil de Limeira + ícones limpos
+    (Material Symbols, Lucide).
+
+--------------------------------------------------------------------------------
+0.6 DECISÕES PENDENTES QUE AFETAM VÁRIAS TELAS
+--------------------------------------------------------------------------------
+
+  - Banho vai pra Rotina ou Saúde? (decidir e remover duplicação)
+  - Carteira de vacinação mora em Saúde do Cão (não em Histórico).
+  - Gamificação será removida (XP, ranking, troféus, missões).
+
+
+================================================================================
+FASE 1 — TELAS DE ENTRADA (LOGIN E SELEÇÃO)
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 1.1 — TELA DE LOGIN
+--------------------------------------------------------------------------------
+
+Mudanças:
+  - Padronizar caixa alta (só em "ENTRAR" se for botão).
+  - Trocar "Chave de Acesso" -> "senha".
+  - Promover biometria como primária (botão grande), senha como
+    secundária.
+  - Remover background com silhuetas humanas borradas.
+  - Validação de erros como banner único no topo (não múltiplos campos
+    vermelhos).
+  - Manter brasão da GCM e identidade ciano (acerto).
+
+Critério de pronto: login limpo, biometria 1-tap, senha como
+alternativa.
+
+--------------------------------------------------------------------------------
+SPRINT 1.2 — SELEÇÃO DE CÃO (CARROSSEL)
+--------------------------------------------------------------------------------
+
+Mudanças:
+  - Cortar "K9 DUTY SELECTION" (inglês).
+  - Cortar card "Selecione seu cão" redundante.
+  - Cortar cantos de mira / retículas HUD.
+  - Cortar "Prontidão Operacional 75%" (métrica opaca).
+  - Inverter hierarquia: nome do cão grande, peso/idade pequeno.
+  - Adicionar info que decide plantão: apto/não-apto, restrições
+    médicas, último condutor.
+  - Adicionar alerta visual se cão tem pendência (vacina vencida,
+    exame pendente, restrição).
+  - Foto do cão em destaque, mas sem glow neon.
+
+Critério de pronto: condutor olha 2 segundos e sabe se o cão está
+apto pro plantão.
+
+
+================================================================================
+FASE 2 — DASHBOARD E NAVEGAÇÃO
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 2.1 — DASHBOARD ATIVO (APÓS SELECIONAR CÃO)
+--------------------------------------------------------------------------------
+
+Mudanças críticas:
+  - Reduzir foto gigante do cão (mover pra header pequeno).
+  - Cortar "Prontidão Operacional 75%" repetida.
+  - Unificar label "Turno Ativo / Em Patrulha" em uma só.
+  - Remover cronômetro em segundos (mostrar em minutos/horas).
+  - Clima como info condicional (só aparece se tiver alerta:
+    chuva, calor extremo).
+  - Atividades de hoje deve ser protagonista — onde o condutor
+    olha primeiro.
+  - Remover aba "Rank" da navegação principal (será descontinuada).
+
+Hierarquia nova proposta:
+  1. Binômio + status do turno (compacto)
+  2. Atividades de hoje (próximas, pendentes, registradas)
+  3. Pendências do cão (vacina, exame, peso atrasado)
+  4. Acesso rápido: Rotina / Saúde / Treino / Ocorrência
+
+--------------------------------------------------------------------------------
+SPRINT 2.2 — CENTRAL DE REGISTRO (FAB)
+--------------------------------------------------------------------------------
+
+Decisão arquitetural já validada:
+  - Trocar fluxo "carrossel de seleção -> formulário" por página única
+    com chips horizontais no topo.
+  - Estrutura padronizada:
+    * Cabeçalho fixo: GPS (com indicador de precisão) + Hora + Local
+    * Miolo dinâmico: muda por chip selecionado
+    * Rodapé fixo: Duração + Descrição + Anexos + Salvar (sempre ciano)
+
+Aplicar em: Rotina, Saúde, Treino, Ocorrência (mesma estrutura).
+
+
+================================================================================
+FASE 3 — DOMÍNIOS DE REGISTRO
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 3.1 — ROTINA
+--------------------------------------------------------------------------------
+
+Categorias (revisadas):
+  - Manter: Passeios, Alimentação, Brincadeiras, Limpeza, Escovação,
+    Banho (se decidir que mora aqui).
+  - Cortar: Descanso (estado padrão, não evento), Outros (perigoso
+    pra relatórios).
+  - Adicionar conforme uso real: rever após 30 dias.
+
+Ajustes:
+  - Cores semanticamente corretas (Descanso vermelho era erro — saiu).
+  - Reduzir fricção de registro (multi-tap pra repetições).
+  - Foto opcional, não obrigatória.
+
+--------------------------------------------------------------------------------
+SPRINT 3.2 — ALIMENTAÇÃO (ATENÇÃO ESPECIAL)
+--------------------------------------------------------------------------------
+
+PRINCÍPIO INVERTIDO após contexto 800g vs 300g:
+NÃO simplificar — REFORÇAR como arquivo de defesa.
+
+Adicionar:
+  - Laudo nutricional como referência fixa visível na tela
+    (PDF anexo, especialista, CRMV).
+  - Foto da balança como evidência forense (com timestamp + GPS
+    embutidos automaticamente).
+  - Registro de quem ajustou quantidade (data + condutor + motivo).
+  - Visualização agregada por período (gramas/dia, semana, mês).
+  - Alerta se quantidade diverge do laudo (com motivo obrigatório).
+
+Sobre IA na alimentação (futuro):
+  - IA SUGERE, não prescreve.
+  - Prescrição vigente sempre vence IA.
+  - Toda sugestão da IA registrada com disclaimer e aceitação
+    consciente.
+  - IA auditável: mostrar fórmula.
+  - Idealmente: fórmula validada pela própria especialista do laudo.
+  - Cuidado com fronteira do exercício da medicina veterinária (CRMV).
+
+--------------------------------------------------------------------------------
+SPRINT 3.3 — SAÚDE / MÉDICO
+--------------------------------------------------------------------------------
+
+Mudanças:
+  - Decidir e remover duplicação: Banho fica em Rotina (exceto banho
+    terapêutico -> Saúde).
+  - Adicionar categoria "Medicação" para tratamentos contínuos.
+  - "Próxima dose" e "Data retorno" precisam gerar notificação real
+    (senão são ruído).
+  - PDF anexo deve estar disponível em todos os tipos de evento médico.
+  - Validação básica de campos (não aceitar "jxnsn" como produto).
+
+Adicionar tela: Carteira de Vacinação Ativa (consolidada,
+sempre acessível):
+  - Status por vacina (em dia / vencida / próxima)
+  - Datas de aplicação
+  - Lote, fabricante, veterinário
+  - PDF da carteira completa exportável
+
+--------------------------------------------------------------------------------
+SPRINT 3.4 — TREINO
+--------------------------------------------------------------------------------
+
+Categorias: Obediência, Busca, Proteção, Faro, Condicionamento
+(já existem, revisar nomenclatura).
+
+Ajustes:
+  - "Off-leash" -> "Sem guia".
+  - Padronizar cor do botão Salvar (ciano, não muda por categoria).
+  - Substituir fotos com cara de IA por fotos reais.
+  - Watermark sparkle precisa sair.
+
+
+================================================================================
+FASE 4 — OCORRÊNCIAS (BLOCO MAIS CRÍTICO)
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 4.1 — INICIAR OCORRÊNCIA (TELA LIMPA, JÁ É BOA)
+--------------------------------------------------------------------------------
+
+Ajustes pequenos:
+  - Esclarecer "K9 - COMANDO" (se é unidade real, manter; senão
+    simplificar para "Canil GCM").
+  - Resolver botão "NOVA" no canto superior (função opaca, risco
+    de toque acidental).
+  - Adicionar indicador de precisão do GPS (alta / baixa / sem sinal).
+  - Mostrar binômio completo (condutor + cão), não só cão.
+  - Tratar caso de ocorrência em andamento (banner de aviso).
+  - "Ajustar natureza" -> considerar "Ajustar tipo de ocorrência".
+
+--------------------------------------------------------------------------------
+SPRINT 4.2 — NATUREZA DA OCORRÊNCIA (DROPDOWN SEARCH)
+--------------------------------------------------------------------------------
+
+Ajustes:
+  - Adicionar bloco "Mais usadas / Recentes" no topo (Apoio,
+    Averiguação, Maus tratos, Patrulhamento).
+  - Adicionar categorias K9-específicas:
+    * Faro em veículo
+    * Faro em entorpecente
+    * Busca em mata
+    * Localização de pessoa
+    * Contenção / captura de animal
+    * Apoio em mandado
+    * Demonstração / treinamento operacional
+  - Destacar "Maus tratos contra animais" (Lei 14.064/2020).
+  - Trocar ícone das 3 formas geométricas (sem semântica).
+  - Verificar comportamento do dropdown com teclado aberto.
+
+--------------------------------------------------------------------------------
+SPRINT 4.3 — OCORRÊNCIA EM ANDAMENTO (REGISTROS RÁPIDOS + TIMELINE)
+--------------------------------------------------------------------------------
+
+Mudanças nos cards de Registros Rápidos:
+  - Cortar ilustrações HUD militares.
+  - Cortar retículas e cantos de mira.
+  - Cortar subtítulos pomposos ("AÇÃO • CONTROLE • SEGURANÇA").
+  - Substituir por cards compactos com ícone semântico + nome do
+    evento.
+  - Mais cards visíveis sem rolar.
+
+Mudanças no card de contexto:
+  - Estados claros para "Equipe": Sozinho / Preenchido / Pendente.
+  - Adicionar contador de eventos visível ("5 eventos").
+  - Microcopy sem jargão técnico: "Sincronizado · em andamento"
+    (não "Firebase").
+
+Mudanças no modal "Adicionar Evento":
+  - Categorias OK (Geral, Abordagem, Busca/Cão, Material,
+    Encaminhamento).
+  - Considerar adicionar: Vítima/Atendimento, Veículo, Animal,
+    Comunicação.
+  - "Encaminhado a outro local" como opção (não engessar a Limeira).
+
+Mudanças nos ícones da linha do tempo:
+  - Trocar ícones simbólicos opacos (olho-de-Hórus, touro) por
+    ícones semânticos:
+    * Abordagem -> silhueta humana
+    * Cão em ação -> pegada de pata
+    * Entorpecente -> frasco
+    * Busca feita -> lupa
+    * Início -> play
+
+Botão Finalizar Ocorrência:
+  - Confirmação obrigatória antes de finalizar (modal com resumo).
+  - Considerar swipe-to-confirm para ações irreversíveis.
+
+--------------------------------------------------------------------------------
+SPRINT 4.4 — EDIÇÃO DE EVENTO (MODAL "DETALHES DO EVENTO")
+--------------------------------------------------------------------------------
+
+Mudanças críticas:
+  - Implementar trilha de auditoria (todas as edições registradas).
+  - Soft delete com motivo obrigatório (não exclusão direta).
+  - Confirmação ao Excluir.
+  - Foto: aceita múltiplas, comportamento "adicionar"
+    (não "substituir").
+  - GPS: tratar caso de sobrescrita acidental
+    (atual diferente do original).
+  - Manter EXIF da foto e mostrar timestamp real da captura.
+  - Travar edição de título/observação após finalizar ocorrência
+    (só anexar evidências).
+  - Microcopy de observação como pergunta-guia, não texto default.
+  - Marcador "editado" visível na timeline (badge discreto).
+  - Padronizar ícone GPS com "+" (igual ao Foto).
+
+--------------------------------------------------------------------------------
+SPRINT 4.5 — FINALIZAÇÃO DA OCORRÊNCIA (WIZARD 3 PASSOS)
+--------------------------------------------------------------------------------
+
+Mudanças no Resultado (etapa 2):
+  - Adicionar resultado "Sem ocorrência / Negativo"
+    (vai ser muito usado).
+  - Ordenar cards por frequência ou agrupamento visual
+    (Operacional / Apreensões / Saúde).
+  - Cor da badge "Finalização" diferente de "Em Andamento"
+    (verde reusado confunde).
+
+Mudanças nos Detalhes (etapa 3):
+  - Confirmar campos condicionais para os 7 resultados
+    (hoje só Droga e Veículo aparecem).
+  - Adicionar para cada resultado:
+    * Apoio Prestado: quem foi apoiado + descrição
+    * BO Elaborado: número do BO + delegacia + foto do BO
+    * Encaminhamento Médico: dropdown de unidades (Santa Casa, UPA,
+      etc) + motivo
+    * Indivíduo Detido: nome (se identificado), idade, ato/crime
+    * Objetos Apreendidos: descrição + quantidade
+  - Forçar uppercase em placa + validação de formato.
+  - Dropdown fixo para "Tipo de veículo".
+
+Mudanças gerais no wizard:
+  - Aviso quando finalização tentada com 0 ações registradas
+    ("ocorrência fantasma").
+  - "Próximo" desabilitado se relato vazio (com aviso de mínimo).
+  - Tela de confirmação após Concluir (resumo + PDF + voltar ao
+    painel).
+  - Áudio da narração mantido como evidência vinculada.
+  - Formato de tempo padronizado (1h25m em vez de 85m).
+  - Salvar como rascunho de finalização (quando "Cancelar" é tocado).
+
+
+================================================================================
+FASE 5 — HISTÓRICO E EVOLUÇÃO
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 5.1 — LINHA DO TEMPO / HISTÓRICO
+--------------------------------------------------------------------------------
+
+Acertos a manter:
+  - Conceito de "Linha do Tempo" (vs "Histórico") — bom.
+  - Etapas numeradas em ocorrência funcionando.
+
+Ajustes:
+  - Trocar "MAY, 2026" por "MAIO, 2026" (sem inglês).
+  - Adicionar aba Saúde na timeline (hoje só Rotina/Treino/Ocorrência).
+  - Implementar trilha de auditoria visível (badge "editado" +
+    histórico ao tocar).
+  - Destacar ícone PDF de exportação (é o "produto institucional",
+    vence discussões).
+
+--------------------------------------------------------------------------------
+SPRINT 5.2 — DASHBOARD DE EVOLUÇÃO
+--------------------------------------------------------------------------------
+
+Acertos a manter:
+  - Sessões, tempo, comparativo, alertas inteligentes.
+  - Detecção de lacunas ("Guarda sem registro há 8 dias") — excelente.
+
+Ajustes:
+  - Cortar "+980% performance" em base pequena (desonesto, fragiliza
+    credibilidade).
+  - Substituir por números absolutos honestos.
+  - Adicionar trilha de auditoria de edições (quem editou o quê,
+    quando).
+
+--------------------------------------------------------------------------------
+SPRINT 5.3 — SAÚDE / PRONTUÁRIO DO CÃO
+--------------------------------------------------------------------------------
+
+Mudanças críticas de nomenclatura:
+  - Cortar "BIO-SURVEILLANCE" (inglês + sentido equivocado:
+    bioterrorismo, não prontuário).
+  - Cortar "Prontuário de Combate" (mistura tom bélico com médico).
+  - Substituir por: "Prontuário Veterinário" ou "Saúde do K9".
+
+Acertos a destacar:
+  - Gráfico "Análise Biométrica: Evolução de Peso" — vale ouro como
+    contraprova.
+  - Modal de atualizar peso — bom.
+
+Ajustes:
+  - Validação básica: rejeitar dados de teste tipo "detaols, jxnsn".
+  - Resolver duplicação Banho (Rotina vs Saúde).
+  - Trocar formato data "08MAI26 - 00:49h" por "08/05/2026 às 00:49".
+  - Carteira de vacinação em destaque com status por vacina
+    (em dia / vencida / próxima).
+
+
+================================================================================
+FASE 6 — REMOÇÃO DA GAMIFICAÇÃO
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 6.1 — DESCONTINUAR RANK + REFORMULAR PERFIL
+--------------------------------------------------------------------------------
+
+Cortar:
+  - XP / níveis
+  - Ranking competitivo entre condutores (Silva com 0h15m exposto)
+  - Troféus épicos / "Galeria de Troféus"
+  - Missões da semana
+  - "Faro de Elite", "Binômio de Ferro" e similares
+
+Manter no perfil:
+  - Identificação real (nome, RA, foto)
+  - "Trocar K9"
+  - "Encerrar Expediente"
+
+Substituir troféus por SELOS DE CONFORMIDADE PROFISSIONAL:
+  - Ex: "Cronograma vacinal em dia", "Plantões sem lacunas há 30 dias",
+    "100% das ocorrências com relato final"
+  - Aparecem no PDF como crédito real (não competição)
+
+Comunicação da mudança:
+  - Banner explicativo na primeira abertura após release.
+  - "Repensamos o app pra refletir o uso institucional.
+    Conformidade > competição."
+
+
+================================================================================
+FASE 7 — INTEGRAÇÕES E PRODUTO INSTITUCIONAL
+================================================================================
+
+--------------------------------------------------------------------------------
+SPRINT 7.1 — PDF DA OCORRÊNCIA (O "PRODUTO INSTITUCIONAL")
+--------------------------------------------------------------------------------
+
+Esse é o entregável que vence discussões com gestor.
+Merece atenção dedicada.
+
+Estrutura proposta:
+  1. Cabeçalho: Brasão GCM Limeira + Canil K9 + Número do registro
+  2. Identificação: Binômio (Condutor + Cão) + Plantão + Equipe
+  3. Ocorrência:
+     - Natureza
+     - Local + GPS + mapa estático
+     - Início + Fim + Duração
+  4. Linha do tempo de eventos (com timestamps imutáveis e GPS)
+  5. Relato final (texto + áudio link, se houver)
+  6. Resultado e detalhes (drogas, veículos, indivíduos, etc)
+  7. Anexos (fotos com EXIF preservado)
+  8. Histórico de edições (auditoria completa)
+  9. Assinatura digital (timestamp de geração + hash)
+
+Distribuição:
+  - Compartilhamento direto via WhatsApp / e-mail
+  - Upload pra Drive / nuvem da GCM
+  - Geração em tempo real (não precisa esperar finalizar)
+
+--------------------------------------------------------------------------------
+SPRINT 7.2 — CARTEIRA DE VACINAÇÃO EXPORTÁVEL
+--------------------------------------------------------------------------------
+
+PDF separado com:
+  - Foto do cão + identificação
+  - Tabela de vacinas (nome, data, lote, próxima)
+  - Histórico de exames
+  - Veterinários responsáveis (CRMV)
+
+--------------------------------------------------------------------------------
+SPRINT 7.3 — RELATÓRIO MENSAL DO CONDUTOR
+--------------------------------------------------------------------------------
+
+PDF agregado:
+  - Total de plantões
+  - Horas trabalhadas
+  - Ocorrências atendidas
+  - Treinos realizados
+  - Conformidade (vacinas, exames, registros)
+  - Lacunas detectadas
+
+Esse é o documento de prestação de contas que mata a discussão
+"canil não trabalha".
+
+
+================================================================================
+FASE 8 — REFINAMENTOS FUTUROS (PÓS-MVP)
+================================================================================
+
+  - Sequências sugeridas após eventos comuns (Abordagem -> Pessoa
+    identificada -> Documento)
+  - Detecção de ocorrência muito longa (banner sugerindo revisão)
+  - Notificações inteligentes (vacina vencendo em X dias, peso não
+    registrado há Y dias)
+  - Modo gestor (visualização de múltiplos condutores)
+  - Integração com sistemas da SSP / PM (BO, antecedentes)
+  - Versão tablet para uso no canil (visão consolidada)
+
+
+================================================================================
+ORDEM DE EXECUÇÃO RECOMENDADA
+================================================================================
+
+BLOCO A — FUNDAÇÃO (4-6 semanas)
+  1. Fase 0 (decisões transversais)
+  2. Trilha de auditoria (Fase 0.3) — afeta arquitetura de dados
+  3. Substituir ilustrações IA + cortar HUD militar
+
+BLOCO B — CRÍTICO INSTITUCIONAL (6-8 semanas)
+  4. Fase 4 (Ocorrências completa — entrada, andamento, edição,
+     finalização)
+  5. Fase 7.1 (PDF da Ocorrência)
+
+BLOCO C — DOMÍNIOS DIÁRIOS (4-6 semanas)
+  6. Fase 3.2 (Alimentação reforçada)
+  7. Fase 3.3 (Saúde + Carteira de vacinação)
+  8. Fases 3.1 e 3.4 (Rotina e Treino)
+
+BLOCO D — LIMPEZA (2-3 semanas)
+  9. Fase 6 (Remoção de gamificação)
+  10. Fase 5 (Histórico e Evolução)
+  11. Fases 1 e 2 (Login, Seleção, Dashboard)
+
+BLOCO E — PRODUTO INSTITUCIONAL (3-4 semanas)
+  12. Fases 7.2 e 7.3 (PDFs adicionais)
+
+
+================================================================================
+CHECKLIST POR TELA — RESUMO RÁPIDO
+================================================================================
+
+  Tela                          | Status               | Prioridade
+  ------------------------------|----------------------|------------
+  Login                         | Ajustes médios       | Média
+  Seleção de Cão                | Ajustes grandes      | Alta
+  Dashboard Ativo               | Ajustes grandes      | Alta
+  Central FAB                   | Refatorar arq.       | Alta
+  Rotina                        | Ajustes médios       | Média
+  Alimentação                   | REFORÇAR             | CRÍTICA
+  Saúde / Médico                | Ajustes grandes      | Alta
+  Treino                        | Ajustes médios       | Média
+  Iniciar Ocorrência            | Ajustes pequenos     | Baixa (boa)
+  Natureza Ocorrência           | Ajustes médios       | Média
+  Ocorrência Andamento          | Ajustes grandes      | CRÍTICA
+  Edição de Evento              | TRILHA AUDITORIA     | CRÍTICA
+  Finalização Ocorrência        | Ajustes grandes      | Alta
+  Histórico/Timeline            | Ajustes médios       | Média
+  Evolução                      | Ajustes pequenos     | Baixa
+  Saúde do Cão                  | Renomear + validar   | Alta
+  Rank                          | REMOVER              | Alta
+  Perfil                        | Reformular           | Média
+  PDF Ocorrência                | CONSTRUIR            | CRÍTICA
+
+
+================================================================================
+ADENDOS DA SESSÃO DE DESIGN — DECISÕES NOVAS
+================================================================================
+
+Durante a revisão tela por tela, algumas decisões novas foram tomadas
+que merecem destaque (não estavam no roadmap original):
+
+--------------------------------------------------------------------------------
+A1. NOVA ARQUITETURA DE TREINOS
+--------------------------------------------------------------------------------
+
+A tela de Treino foi reestruturada em duas camadas:
+
+  CAMADA 1 - ESPECIALIDADES (cards grandes, destacados):
+    - Guarda & Proteção
+    - Busca & Captura
+    - Detecção
+
+  Cada especialidade tem 3 estados possíveis:
+    - Operacional (verde) — cão formado, treino de manutenção
+    - Em formação (amarelo) — cão aprendendo, treino estruturado
+    - Não iniciada (cinza) — pode iniciar formação
+
+  CAMADA 2 - TREINOS GERAIS (chips compactos):
+    - Obediência (com biblioteca de comandos)
+    - Condicionamento
+
+--------------------------------------------------------------------------------
+A2. BIBLIOTECA DE COMANDOS POR CÃO
+--------------------------------------------------------------------------------
+
+Cada cão tem sua própria biblioteca de comandos editável.
+Bono tem 15+ comandos (Senta, Deita, Fica, Junto, Junto à direita,
+Meio, Atravessa, Levanta, Cumprimenta, Abraço, Jump, Hop, Parkour,
+etc.). Apolo começa com biblioteca vazia.
+
+5 estágios discretos por comando:
+  - Não treinado (cinza)
+  - Introduzido (amarelo) — cão conhece, executa às vezes
+  - Em desenvolvimento (laranja) — executa com erros
+  - Consolidado (azul) — executa consistentemente
+  - Operacional (verde) — executa em qualquer contexto
+
+Apenas o condutor titular pode editar a biblioteca e atualizar
+estágios.
+
+--------------------------------------------------------------------------------
+A3. ESTRUTURA DE FORMAÇÃO EM ESPECIALIDADES
+--------------------------------------------------------------------------------
+
+Cada especialidade tem 3 módulos progressivos (~1 mês cada):
+
+BUSCA & CAPTURA:
+  - M1: Pareamento e Indicação (mata fechada, objetos de odor forte)
+  - M2: Indicações estruturais (vegetação rasteira, obstáculos)
+  - M3: Operacional urbano (cenário real, vestígios mínimos)
+  - Avaliação Final (opcional)
+
+DETECÇÃO: (estrutura a definir — mais complexa que B&C)
+
+GUARDA & PROTEÇÃO: (estrutura a definir)
+
+Cada módulo tem MARCOS (objetivos específicos a atingir):
+  - Marcos podem ser marcados como atingidos manualmente.
+  - Não há critério rígido de progressão (avaliação humana).
+  - Marcos podem ser ADICIONADOS conforme uso real.
+
+A tela de Formação tem 4 abas:
+  - Roadmap (visão dos 3 módulos)
+  - Módulo atual (marcos detalhados)
+  - Histórico (todas as sessões)
+  - Estatísticas (gráfico de evolução)
+
+--------------------------------------------------------------------------------
+A4. MÓDULO RASTREADOR (GPS EM TEMPO REAL)
+--------------------------------------------------------------------------------
+
+Funcionalidade nova que registra automaticamente:
+  - Distância total percorrida
+  - Tempo total
+  - Velocidade média
+  - Mapa visual do trajeto
+  - Eventos marcados ao longo do caminho
+
+3 estados da tela:
+  1. Pré-trilha: configuração + verificação de sistema
+     (GPS, bateria, conexão)
+  2. Ao vivo: mapa em tempo real + botões de marcação
+     (Indicação / Checagem / Perda / Alvo encontrado)
+  3. Pós-trilha: resumo com mapa estático + métricas +
+     timeline de eventos
+
+Disponível em: Busca & Captura, Detecção, Passeios,
+Condicionamento.
+NÃO disponível em: Guarda & Proteção, Obediência.
+
+Diferenciação importante:
+  - CHECAGEM (50-75m fora da rota) = comportamento normal,
+    não é falha
+  - ERRO (100m+ fora) = perda de rastro, registrado mas
+    não invalida sessão
+
+--------------------------------------------------------------------------------
+A5. FORMAÇÃO vs MANUTENÇÃO — FILOSOFIA
+--------------------------------------------------------------------------------
+
+A fricção do registro deve ser PROPORCIONAL AO VALOR
+DA INFORMAÇÃO.
+
+CÃO EM FORMAÇÃO:
+  - Registro denso
+  - Marcos numerados
+  - Orientador obrigatório
+  - 4 abas dedicadas
+  - Resultado classificado (Completa/Checagem/Perda)
+  - Foco: construir competência
+
+CÃO OPERACIONAL:
+  - Registro leve
+  - Sem marcos / sem módulos
+  - Orientador opcional
+  - Tela única
+  - Desempenho subjetivo (Bom/Ótimo)
+  - Foco: preservar competência (manutenção)
+
+
+================================================================================
+MOCKUPS JÁ PRODUZIDOS NA SESSÃO DE DESIGN
+================================================================================
+
+Status dos mockups (arquivos HTML produzidos):
+
+  ✅ 01 - Iniciar Ocorrência
+  ✅ 02 - Ocorrência em Andamento
+  ✅ 03 - Edição de Evento (com trilha de auditoria)
+  ✅ 04 - Página de Treino (Obediência + biblioteca de comandos)
+  ✅ 05 - Tela inicial de Treino (cards de especialidades)
+  ✅ 06 - Formação em Busca & Captura (4 abas)
+  ✅ 07 - Rastreador GPS (3 estados)
+  ✅ 08 - Manutenção Operacional em B&C
+
+Mockups pendentes:
+
+  ⏳ Formulário detalhado de Nova Sessão de Formação
+  ⏳ Detecção - formação (estrutura a entender)
+  ⏳ Detecção - manutenção
+  ⏳ Guarda & Proteção - formação
+  ⏳ Guarda & Proteção - manutenção
+  ⏳ Modal de adicionar comando à biblioteca
+  ⏳ Modal de atualizar estágio de comando
+  ⏳ Finalização da Ocorrência (wizard 3 passos)
+  ⏳ Natureza da Ocorrência (dropdown search)
+  ⏳ Página de Rotina (com Alimentação reforçada)
+  ⏳ Página de Saúde (prontuário + carteira de vacinação)
+  ⏳ Login (com biometria primária)
+  ⏳ Seleção de Cão (carrossel ajustado)
+  ⏳ Dashboard Ativo
+  ⏳ Histórico / Linha do Tempo
+  ⏳ Dashboard de Evolução
+  ⏳ Saúde / Prontuário do Cão (renomeado)
+  ⏳ Perfil (sem gamificação, com selos)
+  ⏳ PDF da Ocorrência (produto institucional)
+
+
+================================================================================
+LEMBRETE DO "NORTE" DO APP
+================================================================================
+
+Esse não é um app de produtividade nem ferramenta motivacional.
+É um arquivo institucional de defesa profissional do canil K9.
+
+Cada decisão de design deveria passar pelo filtro:
+
+  "Se um gestor questionar o trabalho do condutor 6 meses depois,
+   esse registro defende ele?"
+
+Quando a resposta é sim -> mantém.
+Quando é "talvez" ou "fica bonito mas não defende" -> corta.
+
+
+================================================================================
+FIM DO DOCUMENTO
+================================================================================

@@ -1,30 +1,7 @@
 part of 'daily_timeline_screen.dart';
 
-extension _DailyTimelineEntryRoutineHealthBuilders
+extension _DailyTimelineEntryHealthBuilders
     on _DailyTimelineScreenState {
-  _TimelineEntry _buildRoutineTimelineEntry(
-    RoutineModel routine,
-    String dogName,
-  ) {
-    return _TimelineEntry(
-      id: routine.id,
-      category: 'Rotina',
-      originalModel: routine,
-      time: routine.timestamp,
-      title: 'ROTINA: ${routine.activityType}',
-      location: routine.dogName.isNotEmpty ? routine.dogName : dogName,
-      type: 'Rotina',
-      details: {
-        'Status': routine.status,
-        'Notas': routine.notes,
-        if (routine.mediaAttachments != null &&
-            routine.mediaAttachments!.isNotEmpty)
-          '_mediaAttachments': routine.mediaAttachments,
-        ...?routine.metadata,
-      },
-    );
-  }
-
   _TimelineEntry _buildHealthTimelineEntry(
     HealthLogModel healthLog,
     String dogName,

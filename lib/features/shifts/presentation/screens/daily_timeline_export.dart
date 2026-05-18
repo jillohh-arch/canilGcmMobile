@@ -5,7 +5,6 @@ extension _DailyTimelineExport on _DailyTimelineScreenState {
     final tVM = Provider.of<TrainingViewModel>(ctx, listen: false);
     final iVM = Provider.of<IncidentViewModel>(ctx, listen: false);
     final hVM = Provider.of<HealthViewModel>(ctx, listen: false);
-    final rVM = Provider.of<RoutineViewModel>(ctx, listen: false);
     final authVM = Provider.of<AuthViewModel>(ctx, listen: false);
     final userVM = Provider.of<UserViewModel>(ctx, listen: false);
     final dogVM = Provider.of<DogViewModel>(ctx, listen: false);
@@ -38,16 +37,6 @@ extension _DailyTimelineExport on _DailyTimelineScreenState {
               type: training.trainingType,
               location: training.location,
               observations: training.handlerNotes,
-            ),
-          ),
-      ...rVM.routines
-          .where((routine) => routine.dogId == dogId)
-          .map(
-            (routine) => ReportEntry(
-              date: routine.timestamp,
-              type: routine.activityType,
-              location: routine.dogName,
-              observations: routine.notes ?? '',
             ),
           ),
       ...hVM.healthLogs

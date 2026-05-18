@@ -16,27 +16,6 @@ extension _StandardSheetFields on _DynamicActivitySheetState {
     ];
   }
 
-  List<Widget> _buildRoutineMetaFields() {
-    if (widget.category != 'Rotina') {
-      return const [];
-    }
-
-    return [
-      RoutineActivityFields(
-        visible: true,
-        isFeeding: _selectedSubtype == ActivitySubtypeIds.feeding,
-        isPlayOrWalk:
-            _selectedSubtype == ActivitySubtypeIds.play ||
-            _selectedSubtype == ActivitySubtypeIds.walk,
-        isWalk: _selectedSubtype == ActivitySubtypeIds.walk,
-        rationBrandController: _racaoMarcaController,
-        rationAmountController: _racaoQtdController,
-        durationController: _durationController,
-        distanceController: _distanciaController,
-      ),
-    ];
-  }
-
   List<Widget> _buildHealthMetaFields() {
     if (widget.category != 'Saude') {
       return const [];

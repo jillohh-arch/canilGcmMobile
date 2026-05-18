@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Registrar" fiel ao mockup: quatro ações rápidas em uma linha.
+/// Seção "Registrar" fiel ao mockup: grid 2x2 com ícone + nome + meta.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -14,79 +14,32 @@ class _QuickActionsSection extends StatelessWidget {
     final incidentVM = Provider.of<IncidentViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
 
-    final cards = _dashboardCards(
-      context,
-      trainingVM,
-      healthVM,
-      incidentVM,
-      nutritionVM,
-    );
+    final cards = _buildCards(context, trainingVM, healthVM, incidentVM, nutritionVM);
 
-    return _DashboardPanel(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-      child: Column(
-        children: [
-          const _PanelTitle(icon: Icons.edit_outlined, label: 'REGISTRAR'),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 390) {
-                return Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: cards[0]),
-                        const SizedBox(width: 8),
-                        Expanded(child: cards[1]),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(child: cards[2]),
-                        const SizedBox(width: 8),
-                        Expanded(child: cards[3]),
-                      ],
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  for (int i = 0; i < cards.length; i++) ...[
-                    Expanded(child: cards[i]),
-                    if (i < cards.length - 1) const SizedBox(width: 7),
-                  ],
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel(emoji: '⚡', text: 'REGISTRAR'),
+        GridView.count(
+          crossAxisCount: 2,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.6,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: cards,
+        ),
+      ],
     );
   }
 
-  List<Widget> _dashboardCards(
+  List<Widget> _buildCards(
     BuildContext context,
     TrainingViewModel trainingVM,
     HealthViewModel healthVM,
     IncidentViewModel incidentVM,
     NutritionViewModel nutritionVM,
   ) {
-    if (actions.isNotEmpty) {
-      return actions.take(4).map((action) {
-        return _QuickActionCard(
-          label: action.nome,
-          sublabel: 'Último',
-          lastAgo: '—',
-          icon: _resolveIcon(action.icone),
-          color: _resolveColor(action.cor),
-          onTap: () => _openSheet(context, action.nome),
-        );
-      }).toList();
-    }
-
     final lastNutrition = _lastAgo(
       nutritionVM.todayFeedings.isNotEmpty
           ? nutritionVM.todayFeedings.first.fedAt
@@ -103,36 +56,32 @@ class _QuickActionsSection extends StatelessWidget {
     );
 
     return [
-      _QuickActionCard(
-        label: 'Nutrição',
-        sublabel: 'Última',
-        lastAgo: lastNutrition.isNotEmpty ? lastNutrition : '—',
+      _QuickCard(
         icon: Icons.rice_bowl_rounded,
-        color: AppTheme.warning,
+        color: const Color(0xFF9B59B6),
+        label: 'Rotina',
+        meta: lastNutrition.isNotEmpty ? 'última $lastNutrition' : 'sem registro',
         onTap: () => _openNutrition(context),
       ),
-      _QuickActionCard(
-        label: 'Saúde',
-        sublabel: 'Último',
-        lastAgo: lastHealth.isNotEmpty ? lastHealth : '—',
+      _QuickCard(
         icon: Icons.local_hospital_rounded,
-        color: const Color(0xFF8BE36D),
+        color: AppTheme.error,
+        label: 'Saúde',
+        meta: lastHealth.isNotEmpty ? 'última $lastHealth' : 'sem registro',
         onTap: () => _openSheet(context, 'Saúde'),
       ),
-      _QuickActionCard(
-        label: 'Treino',
-        sublabel: 'Último',
-        lastAgo: lastTraining.isNotEmpty ? lastTraining : '—',
+      _QuickCard(
         icon: Icons.fitness_center_rounded,
-        color: AppTheme.primary,
+        color: AppTheme.warning,
+        label: 'Treino',
+        meta: lastTraining.isNotEmpty ? 'última $lastTraining' : 'sem registro',
         onTap: () => _openSheet(context, 'Treino'),
       ),
-      _QuickActionCard(
+      _QuickCard(
+        icon: Icons.shield_rounded,
+        color: AppTheme.primary,
         label: 'Ocorrência',
-        sublabel: 'Última',
-        lastAgo: lastIncident.isNotEmpty ? lastIncident : '—',
-        icon: Icons.emergency_share_rounded,
-        color: AppTheme.error,
+        meta: lastIncident.isNotEmpty ? 'última $lastIncident' : 'sem registro',
         onTap: () => _openSheet(context, 'Ocorrência'),
       ),
     ];
@@ -144,7 +93,7 @@ class _QuickActionsSection extends StatelessWidget {
     if (diff.inMinutes < 1) return 'agora';
     if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
     if (diff.inHours < 24) return 'há ${diff.inHours}h';
-    if (diff.inDays == 1) return 'há 1 dia';
+    if (diff.inDays == 1) return 'há 1d';
     return 'há ${diff.inDays}d';
   }
 
@@ -172,171 +121,77 @@ class _QuickActionsSection extends StatelessWidget {
       ),
     );
   }
-
-  IconData _resolveIcon(String? iconName) {
-    switch (iconName) {
-      case 'assignment':
-        return Icons.assignment_outlined;
-      case 'fitness_center':
-        return Icons.fitness_center_rounded;
-      case 'medical_services':
-        return Icons.local_hospital_rounded;
-      case 'schedule':
-        return Icons.schedule_rounded;
-      case 'pets':
-        return Icons.pets_rounded;
-      case 'local_police':
-        return Icons.emergency_share_rounded;
-      case 'restaurant':
-        return Icons.rice_bowl_rounded;
-      default:
-        return Icons.radio_button_checked;
-    }
-  }
-
-  Color _resolveColor(String? colorName) {
-    switch (colorName) {
-      case 'red':
-      case 'danger':
-        return AppTheme.error;
-      case 'green':
-      case 'success':
-        return const Color(0xFF8BE36D);
-      case 'amber':
-      case 'warning':
-        return AppTheme.warning;
-      case 'orange':
-      case 'attention':
-        return AppTheme.attention;
-      default:
-        return AppTheme.primary;
-    }
-  }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final String label;
-  final String sublabel;
-  final String lastAgo;
+class _QuickCard extends StatelessWidget {
   final IconData icon;
   final Color color;
+  final String label;
+  final String meta;
   final VoidCallback onTap;
 
-  const _QuickActionCard({
-    required this.label,
-    required this.sublabel,
-    required this.lastAgo,
+  const _QuickCard({
     required this.icon,
     required this.color,
+    required this.label,
+    required this.meta,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth > 120;
-
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: onTap,
-            child: Container(
-              height: compact ? 70 : 116,
-              padding: compact
-                  ? const EdgeInsets.fromLTRB(10, 9, 10, 9)
-                  : const EdgeInsets.fromLTRB(6, 12, 6, 9),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(8),
+          border: Border.all(color: _kBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(7),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: _kBorder),
+                color: color.withAlpha(30),
+                borderRadius: BorderRadius.circular(9),
               ),
-              child: compact ? _compactContent() : _regularContent(),
+              child: Icon(icon, color: color, size: 16),
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _compactContent() {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _AutoFitText(
-                label,
-                alignment: Alignment.centerLeft,
-                textAlign: TextAlign.left,
-                style: GoogleFonts.inter(
-                  color: _kTextPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
-                ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: _kTextPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    meta,
+                    style: GoogleFonts.inter(
+                      color: _kTextMuted,
+                      fontSize: 9,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                '$sublabel $lastAgo',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: _kTextSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _regularContent() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: color, size: 29),
-        const SizedBox(height: 10),
-        _AutoFitText(
-          label,
-          style: GoogleFonts.inter(
-            color: _kTextPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          sublabel,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            color: _kTextSecondary,
-            fontSize: 10.5,
-            height: 1.08,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 2),
-        _AutoFitText(
-          lastAgo,
-          style: GoogleFonts.inter(
-            color: _kTextSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

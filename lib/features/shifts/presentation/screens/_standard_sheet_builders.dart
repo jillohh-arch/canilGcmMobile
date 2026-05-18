@@ -14,7 +14,6 @@ extension _StandardSheetBuilders on _DynamicActivitySheetState {
         ..._buildStandardContextFields(),
         ..._buildTrainingMetaFields(),
         ..._buildHealthMetaFields(),
-        ..._buildRoutineMetaFields(),
         const SizedBox(height: 24),
         _buildDescriptionField(),
         const SizedBox(height: 24),

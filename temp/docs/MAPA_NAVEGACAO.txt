@@ -1,0 +1,294 @@
+================================================================================
+MAPA DE NAVEGAÇÃO — APP CANIL K9 GCM LIMEIRA
+================================================================================
+
+Documento de referência consolidando toda a navegação decidida nas sessões
+de design. Use como mapa mental durante a implementação.
+
+================================================================================
+1. PONTOS DE ENTRADA E FLUXO INICIAL
+================================================================================
+
+SPLASH (decide pra onde ir)
+   │
+   ├─ Sem auth ──────→ LOGIN (biometria primária, senha fallback)
+   │                      │
+   ├─ Com auth ───────────┴──→ Verifica turno ativo
+                                  │
+                                  ├─ Sem turno ──→ SELEÇÃO DE CÃO + ASSUMIR TURNO
+                                  │
+                                  └─ Com turno ──→ DASHBOARD (Turno)
+
+
+================================================================================
+2. BOTTOM NAV — 4 ÁREAS + 1 FAB
+================================================================================
+
+┌──────────────────────────────────────────────────────┐
+│  🏠 Turno   📜 Histórico   🛡 FAB   🎯 Treino   🐕 Cão │
+└──────────────────────────────────────────────────────┘
+
+FAB central exclusivo → Iniciar Ocorrência (sem menu intermediário)
+
+
+================================================================================
+3. HEADER UNIVERSAL (presente em todas as 4 áreas)
+================================================================================
+
+┌────────────────────────────────────────────┐
+│ 🐾🧑‍✈️  Bono · GCM Ragonha         ⇄  👤  │
+│        ● Turno ativo · há 5h               │
+└────────────────────────────────────────────┘
+
+- ⇄ = trocar cão ativo (bottom sheet com lista)
+- 👤 = abre Perfil em tela cheia
+
+
+================================================================================
+4. ÁREA TURNO (Dashboard)
+================================================================================
+
+TURNO (rota inicial após login + assumir)
+   │
+   ├─ Alertas condicionais (se houver)
+   ├─ Atividades de hoje (lista)
+   ├─ Acesso rápido:
+   │   ├─ 🥩 Alimentação ────→ leva para CÃO > Registrar Alimentação
+   │   ├─ ⚕ Saúde ──────────→ leva para CÃO > Registrar Evento Saúde
+   │   ├─ 🎯 Treino ────────→ leva para TREINO (hub)
+   │   └─ 🛡 Ocorrência ────→ leva para FAB > Iniciar Ocorrência
+   ├─ Resumo do cão compacto
+   └─ Estado vazio (quando dia limpo) com 4 atalhos
+
+
+================================================================================
+5. ÁREA HISTÓRICO
+================================================================================
+
+HISTÓRICO
+   │
+   ├─ Filtros:
+   │   ├─ Período: Hoje · Ontem · Semana · Mês · Personalizado
+   │   └─ Tipo: Tudo · 🥩 Nutrição · ⚕ Saúde · 🎯 Treino · 🛡 Ocorrência
+   │
+   ├─ Botão Exportar PDF (sempre visível)
+   │
+   ├─ Timeline agrupada por dia (HOJE / ONTEM / data)
+   │   ├─ Badge de autoria (VOCÊ / GCM SILVA)
+   │   ├─ Badge "editado" se aplicável
+   │   └─ Status pulsante se ocorrência em andamento
+   │
+   └─ Tap em item ────→ DETALHE EXPANDIDO
+                          │
+                          ├─ Resumo completo
+                          ├─ Eventos internos (se ocorrência)
+                          ├─ Trilha de auditoria
+                          └─ CTAs: PDF · Compartilhar
+
+
+================================================================================
+6. FAB — INICIAR OCORRÊNCIA
+================================================================================
+
+FAB (🛡) — toque único, sem menu
+   │
+   └─ INICIAR OCORRÊNCIA
+        │
+        └─ OCORRÊNCIA EM ANDAMENTO (auto-save)
+             │
+             ├─ Adicionar evento (modal)
+             ├─ Editar evento (com trilha auditoria)
+             │
+             └─ Finalizar ────→ WIZARD 3 PASSOS
+                                  │
+                                  ├─ Passo 1: Relato (texto obrigatório + áudio opcional)
+                                  ├─ Passo 2: Resultado (multi-select de 8 cards)
+                                  ├─ Passo 3: Detalhes condicionais
+                                  │
+                                  └─ CONFIRMAÇÃO FINAL
+                                       ├─ Gerar PDF
+                                       ├─ Compartilhar
+                                       └─ Voltar ao Turno
+
+
+================================================================================
+7. ÁREA TREINO
+================================================================================
+
+TREINO (hub central)
+   │
+   ├─ Resumo da semana
+   │
+   ├─ ESPECIALIDADES (cards grandes):
+   │   │
+   │   ├─ 🎯 Busca & Captura
+   │   │    │
+   │   │    ├─ Se operacional ──→ MANUTENÇÃO (sessão livre)
+   │   │    └─ Se em formação ──→ FORMAÇÃO 4 abas
+   │   │                            ├─ Roadmap (M1/M2/M3)
+   │   │                            ├─ Módulo atual
+   │   │                            ├─ Histórico
+   │   │                            └─ Estatísticas
+   │   │
+   │   ├─ 👃 Detecção
+   │   │    │
+   │   │    └─ Tela de LINHAS (Drogas/Armas/Cadáver)
+   │   │         │
+   │   │         └─ Tap em linha:
+   │   │             ├─ Se operacional ──→ MANUTENÇÃO (linha + cenário)
+   │   │             └─ Se em formação ──→ FORMAÇÃO 5 abas
+   │   │                                     ├─ Roadmap (F1→F5)
+   │   │                                     ├─ Fase atual
+   │   │                                     ├─ Sessões
+   │   │                                     ├─ Estatísticas
+   │   │                                     └─ Documentos
+   │   │
+   │   └─ 🛡 Guarda & Proteção
+   │        │
+   │        ├─ Se operacional ──→ MANUTENÇÃO
+   │        └─ Se em formação ──→ FORMAÇÃO 4 abas
+   │                                ├─ Trilhas (3 impulsos paralelos)
+   │                                ├─ Impulso atual
+   │                                ├─ Sessões
+   │                                └─ Estatísticas
+   │
+   ├─ [+ Iniciar nova especialidade] ──→ Modal
+   │                                       │
+   │                                       └─ Se Detecção ──→ Sub-modal (linhas)
+   │
+   └─ TREINOS GERAIS (chips):
+       │
+       ├─ 🐾 Obediência ──→ Biblioteca de comandos por cão
+       │    │                  ├─ Modal: adicionar comando
+       │    │                  └─ Modal: atualizar estágio
+       │    │
+       │    └─ Sessão de treino (multi-select de comandos)
+       │
+       └─ 💪 Condicionamento ──→ Visão geral
+            │                       └─ Catálogo de 10+ exercícios
+            │
+            └─ Nova sessão (formulário inteligente por exercício)
+
+
+================================================================================
+8. ÁREA CÃO (Prontuário)
+================================================================================
+
+CÃO
+   │
+   ├─ Ficha do cão (foto, dados, selo operacional)
+   ├─ Status médico (4 cards: Vacinas · Antipulgas · Peso · Exames)
+   ├─ Especialidades operacionais (chips)
+   │
+   ├─ 🥩 NUTRIÇÃO (seção própria laranja)
+   │   ├─ Prescrição vigente (do laudo)
+   │   ├─ Refeições de hoje
+   │   ├─ Conformidade semanal
+   │   └─ Ver tudo →
+   │
+   ├─ Evolução do peso (gráfico)
+   ├─ Carteira de vacinação resumida
+   ├─ Laudos e documentos (lista unificada)
+   ├─ Eventos médicos recentes
+   │
+   └─ 2 CTAs:
+       ├─ 🥩 REGISTRAR ALIMENTAÇÃO ──→ Formulário com comparação à prescrição
+       └─ ⚕ REGISTRAR EVENTO SAÚDE ──→ Seleção de tipo (8 categorias)
+                                          │
+                                          └─ Formulário inteligente por tipo
+
+
+================================================================================
+9. TELAS GLOBAIS (via Header Universal)
+================================================================================
+
+⇄ TROCAR CÃO (bottom sheet)
+   └─ Lista de cães disponíveis
+       └─ Tap em outro cão ──→ contexto muda em todo o app
+
+👤 PERFIL (tela cheia)
+   ├─ Header (foto, nome, RA, função)
+   ├─ Selos de conformidade
+   ├─ Histórico do condutor
+   ├─ Configurações
+   ├─ Trocar K9
+   ├─ Encerrar Expediente
+   └─ Sair
+
+
+================================================================================
+10. PADRÕES TRANSVERSAIS
+================================================================================
+
+- Trilha de auditoria em todas as edições (visível como "editado HH:MM")
+- Soft delete com motivo obrigatório
+- PDF exportável em Histórico filtrado e em cada Ocorrência
+- GPS toggle opcional em treinos onde faz sentido
+- Rascunho automático ao cancelar finalização de ocorrência
+- Cão ativo determina contexto em todas as áreas
+- Estado da especialidade no cão determina automaticamente se sessão
+  é formação ou manutenção (app sabe, não pergunta)
+
+
+================================================================================
+11. PROFUNDIDADE MÁXIMA DE NAVEGAÇÃO (CONTAGEM DE TAPS)
+================================================================================
+
+DO DASHBOARD ATÉ:
+- Registrar alimentação:        3 taps (Cão → Registrar alimentação → preencher)
+- Iniciar treino de Detecção:   3 taps (Treino → Detecção → Linha Drogas)
+- Iniciar treino de Obediência: 2 taps (Treino → Obediência)
+- Iniciar ocorrência:           1 tap  (FAB)
+- Ver histórico de hoje:        1 tap  (Histórico → já filtrado em Hoje)
+- Trocar cão:                   2 taps (⇄ → tap em outro cão)
+- Acessar perfil:               1 tap  (👤)
+
+Princípio: ações frequentes em ≤3 taps.
+
+
+================================================================================
+12. LISTA DE MOCKUPS DE REFERÊNCIA
+================================================================================
+
+01_iniciar_ocorrencia.html
+02_ocorrencia_andamento.html
+03_edicao_evento.html (com trilha de auditoria)
+04_treino_v3.html (biblioteca de comandos)
+05_treino_inicial.html (cards de especialidades — substituído por 14)
+06_formacao_bc.html (formação Busca & Captura)
+07_rastreador.html (GPS 3 estados)
+08_manutencao_bc.html
+09_deteccao_v2.html (Detecção com multi-linha + certificação)
+10_dashboard.html (2 versões: A com alertas / B dia limpo)
+11_cao_prontuario_v2.html (substituído por 20)
+12_guarda_protecao.html (3 telas: formação/manutenção/sessão)
+13_historico.html (2 telas: lista + detalhe)
+14_hub_treinos.html (hub central de treinos)
+15_manutencao_deteccao_obediencia.html (2 telas)
+16_modais_auxiliares.html (4 modais)
+17_condicionamento.html (2 telas)
+18_evento_saude.html (2 telas)
+19_finalizacao_ocorrencia.html (4 telas: 3 passos + confirmação)
+20_cao_nutricao_e_alimentacao.html (3 telas)
+
+
+================================================================================
+13. TELAS AINDA PENDENTES (não mockadas)
+================================================================================
+
+- Login (com biometria primária)
+- Seleção de cão / Assumir turno
+- Perfil (com selos de conformidade)
+- Triagem (Fase 0 da Detecção)
+- PDF da Ocorrência (preview do documento final)
+- Carteira de vacinação completa (tela "Ver tudo →")
+- Histórico de peso completo (tela "Ver tudo →")
+- Nutrição completa (tela "Ver tudo →" da seção)
+- Telas internas de manutenção em Guarda & Proteção
+- Bottom sheet de trocar cão
+- Modal de ocorrência com 0 eventos (aviso na finalização)
+
+
+================================================================================
+FIM DO MAPA DE NAVEGAÇÃO
+================================================================================

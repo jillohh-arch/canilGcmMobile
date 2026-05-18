@@ -16,12 +16,6 @@ abstract final class ActivitySubtypeIds {
   static const exam = 'Exame';
   static const bath = 'Banho';
 
-  static const feeding = 'Alimentação';
-  static const cleaning = 'Limpeza';
-  static const walk = 'Passeio';
-  static const rest = 'Descanso';
-  static const play = 'Brincadeira';
-  static const brushing = 'Escovação';
-  static const other = 'Outros';
   static const narcoticsSearch = 'Busca de Entorpecentes';
+  static const other = 'Outros';
 }

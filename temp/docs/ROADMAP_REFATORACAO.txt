@@ -1,0 +1,815 @@
+================================================================================
+ROADMAP DE REFATORAÇÃO — APP CANIL K9 GCM LIMEIRA
+================================================================================
+
+CONTEXTO:
+- Projeto Flutter existente em produção (canil_gcm, v1.0.0+2)
+- 6 parceiros da própria GCM Limeira usando ativamente
+- Painel web React separado, acessa o mesmo Firestore diretamente
+- Você (Jilles) controla tanto o app quanto o painel
+- Arquitetura clean já parcialmente implementada (features/ + views/ legado)
+- Stack: Provider, Firebase, Geolocator, fl_chart, pdf, local_auth
+
+ESTE NÃO É UM ROADMAP DE CRIAÇÃO DO ZERO.
+É um plano de refatoração gradual que:
+- Mantém o app rodando pra parceiros sem downtime
+- Aproveita o código que já funciona
+- Migra visualmente pros mockups produzidos (01 a 13)
+- Conclui a refatoração arquitetural inacabada (views/ → features/)
+- Coordena evolução do schema Firestore com o painel React
+
+PRINCÍPIO FUNDAMENTAL DA MIGRAÇÃO:
+Toda mudança no schema Firestore precisa ser AVALIADA quanto ao impacto
+no painel React. Mudanças seguras: adicionar campos novos. Mudanças
+arriscadas: renomear ou remover campos existentes. Quando inevitável,
+atualizar app + painel no mesmo deploy.
+
+
+================================================================================
+SUMÁRIO
+================================================================================
+
+ETAPA 1 — LIMPEZA TÉCNICA (1 semana)
+  Resolver a duplicação views/ vs features/
+
+ETAPA 2 — SISTEMA VISUAL (3-4 dias)
+  Refatorar tema central, todo app pega visual novo
+
+ETAPA 3 — TELAS DE ALTO IMPACTO (2-3 semanas)
+  Dashboard, Cão/Prontuário, Histórico, Tela inicial de Treino
+
+ETAPA 4 — ESPECIALIDADES (3-4 semanas)
+  Obediência, Busca & Captura, Detecção (Protocolo Ragonha), Guarda & Proteção
+
+ETAPA 5 — OCORRÊNCIAS (1-2 semanas)
+  Refatoração visual + trilha de auditoria + PDF institucional
+
+ETAPA 6 — FEATURES NOVAS (a definir após base estável)
+  Triagem (F0 Detecção), perfil com selos, certificação externa, etc.
+
+
+================================================================================
+ETAPA 1 — LIMPEZA TÉCNICA
+================================================================================
+
+OBJETIVO: Resolver a duplicação views/ vs features/. Concluir a migração
+arquitetural que começou.
+
+DURAÇÃO ESTIMADA: 1 semana
+
+1.1 AUDITORIA DO LEGADO
+
+Executar no Claude Code:
+- [ ] Rodar grep recursivo pra mapear imports de views/, models/ e viewmodels/ raiz
+      Comando sugerido:
+      grep -r "package:canil_gcm/views/" lib/ > views_imports.txt
+      grep -r "package:canil_gcm/models/" lib/ > models_imports.txt
+      grep -r "package:canil_gcm/viewmodels/" lib/ > viewmodels_imports.txt
+
+- [ ] Pra cada arquivo importado, classificar:
+      a) Ainda usado → planejar migração pra features/
+      b) Não usado → código morto, deletar
+      c) Usado mas duplicado em features/ → consolidar versões
+
+- [ ] Documentar resultado em CHECKLIST_LIMPEZA.txt (gerado separadamente)
+
+1.2 DELETAR GAMIFICAÇÃO
+
+Decisão já tomada na sessão de design: gamificação sai.
+
+- [ ] Remover pasta views/gamification/ por completo
+- [ ] Buscar referências e remover:
+      grep -r "gamification" lib/
+- [ ] Remover models relacionados (XP, ranking, troféus, missões)
+- [ ] Remover qualquer aba de "Rank" do bottom nav atual
+- [ ] Verificar que app builda e roda
+- [ ] Commit: "remove: gamificação descontinuada conforme decisão de design"
+
+1.3 MIGRAR views/ → features/
+
+Pra cada feature ainda em views/, migrar pra estrutura clean.
+
+ORDEM SUGERIDA (das mais simples pras mais complexas):
+
+- [ ] views/auth/ → features/auth/presentation/screens/
+- [ ] views/users/ → features/users/presentation/screens/
+- [ ] views/profile/ → criar nova feature features/profile/
+- [ ] views/dogs/ → features/dogs/presentation/screens/
+- [ ] views/shifts/ → features/shifts/presentation/screens/
+- [ ] views/health/ → features/health/presentation/screens/
+- [ ] views/trainings/ → features/training/presentation/screens/
+- [ ] views/incidents/ → features/incidents/presentation/screens/
+
+PARA CADA MIGRAÇÃO:
+1. Move arquivo .dart
+2. Atualiza import path
+3. Roda flutter analyze
+4. Testa visualmente o fluxo afetado
+5. Commit isolado
+
+1.4 ESVAZIAR models/ e viewmodels/ NA RAIZ
+
+- [ ] Mover cada model pra features/X/data/models/
+- [ ] Mover cada viewmodel pra features/X/presentation/viewmodels/
+- [ ] Atualizar imports em todo lugar
+- [ ] Deletar pastas models/ e viewmodels/ da raiz quando vazias
+
+1.5 LIMPEZA DE ARQUIVOS DE LOG/SCREENSHOT
+
+O repositório tem ~15 arquivos .txt de log e ~16 screenshots na raiz.
+
+- [ ] Mover screenshots pra pasta docs/screenshots/ (caso queira guardar)
+      ou deletar se forem só rascunho
+- [ ] Deletar arquivos .txt de logs/analyze
+- [ ] Adicionar ao .gitignore:
+      *.log
+      analyze*.txt
+      flutter_errors.txt
+      build_log.txt
+      run_*.txt
+      logs_live.txt
+- [ ] Commit: "chore: limpa logs e screenshots do repositório"
+
+1.6 ATUALIZAR pubspec.yaml
+
+- [ ] Atualizar description:
+      description: "App de gestão do canil K9 da GCM Limeira"
+- [ ] Adicionar go_router (substitui Navigator manual gradualmente)
+      go_router: ^14.2.7
+- [ ] Adicionar hive_flutter pra cache offline robusto:
+      hive_flutter: ^1.1.0
+      hive: ^2.2.3
+- [ ] Adicionar flutter_riverpod (futuro - opcional, manter Provider por enquanto)
+
+1.7 ATUALIZAR README
+
+- [ ] Substituir README padrão por README real
+      Conteúdo sugerido:
+      # Canil K9 GCM Limeira
+      
+      App de gestão do canil K9 da Guarda Civil Municipal de Limeira-SP.
+      Ferramenta de prestação de contas, defesa profissional e prontuário
+      institucional dos cães operacionais.
+      
+      ## Stack
+      - Flutter (Dart)
+      - Firebase (Auth, Firestore, Storage, App Check)
+      - Provider (state management)
+      
+      ## Setup
+      [instruções de build]
+      
+      ## Arquitetura
+      Clean architecture por feature (data/domain/presentation)
+
+CRITÉRIO DE PRONTO DA ETAPA 1:
+- Pasta views/ vazia (ou deletada)
+- Pasta models/ raiz vazia (ou deletada)
+- Pasta viewmodels/ raiz vazia (ou deletada)
+- Pasta views/gamification/ deletada
+- Logs antigos removidos do repositório
+- App builda sem erros
+- App roda igual ao antes (zero regressão visual nessa etapa)
+- pubspec.yaml com description e dependências atualizadas
+
+
+================================================================================
+ETAPA 2 — SISTEMA VISUAL
+================================================================================
+
+OBJETIVO: Atualizar o tema central. Hot reload faz o app inteiro pegar visual
+novo. Esta etapa não muda layout, só cores/tipografia/espaçamentos.
+
+DURAÇÃO ESTIMADA: 3-4 dias
+
+2.1 REFATORAR core/theme/app_theme.dart
+
+- [ ] Criar core/theme/app_colors.dart com tokens exatos dos mockups:
+      
+      class AppColors {
+        // Backgrounds
+        static const background = Color(0xFF050D10);
+        static const surface = Color(0xFF0A1418);
+        static const surfaceElevated = Color(0xFF11202A);
+        
+        // Brand
+        static const primary = Color(0xFF4DD0E1);     // ciano
+        
+        // Status
+        static const success = Color(0xFF2ECC71);     // verde - operacional
+        static const warning = Color(0xFFF1C40F);     // amarelo - atenção
+        static const attention = Color(0xFFE67E22);   // laranja - desenvolvimento
+        static const error = Color(0xFFE74C3C);       // vermelho - crítico
+        
+        // Text
+        static const textPrimary = Color(0xFFFFFFFF);
+        static const textSecondary = Color(0xFFB0C4CC);
+        static const textTertiary = Color(0xFF7A8A92);
+        static const textDisabled = Color(0xFF5A7280);
+      }
+
+- [ ] Criar core/theme/app_typography.dart com estilos pré-definidos:
+      Substituir tipografia técnica monospace por sans-serif moderna.
+      Sugiro Inter (já tem google_fonts no pubspec):
+      
+      static TextStyle headingXl => GoogleFonts.inter(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textPrimary,
+      );
+      // ... etc
+
+- [ ] Criar core/theme/app_spacing.dart
+      class AppSpacing {
+        static const xs = 4.0;
+        static const sm = 8.0;
+        static const md = 12.0;
+        static const lg = 16.0;
+        static const xl = 20.0;
+        static const xxl = 24.0;
+      }
+
+- [ ] Criar core/theme/app_radius.dart
+      class AppRadius {
+        static const sm = 8.0;
+        static const md = 10.0;
+        static const lg = 12.0;
+        static const xl = 14.0;
+        static const pill = 24.0;
+      }
+
+2.2 CRIAR WIDGETS BASE EM core/widgets/
+
+- [ ] AppButton (primary ciano fill, secondary outline, destructive vermelho)
+- [ ] AppCard (card padrão com border + radius)
+- [ ] AppChip (selecionável, com variações de cor)
+- [ ] AppAvatar (tamanhos: 36px, 38px, 72px)
+- [ ] AppStatusBadge (genérico para status com cor + dot):
+      operational ●  in_training ◔  developing ◑  consolidated ◕  notStarted ○
+- [ ] AppTextField (estilizado com padrão ciano)
+- [ ] AppSectionLabel (label de seção com linha)
+- [ ] AppEmptyState (estado vazio com chamada à ação)
+- [ ] AppAlertBanner (3 níveis: error/warning/info)
+
+2.3 PADRONIZAR LINGUAGEM (BUSCA E SUBSTITUIÇÃO)
+
+Buscar e substituir no projeto inteiro:
+
+- [ ] "K9-INCIDENT COMMAND" → "Ocorrência"
+- [ ] "OCORRÊNCIA OPERACIONAL" → "Detalhes da Ocorrência" ou "Ocorrência"
+- [ ] "BIO-SURVEILLANCE" → "Saúde do K9" ou "Prontuário Veterinário"
+- [ ] "Prontuário de Combate" → "Prontuário Veterinário"
+- [ ] "Chave de Acesso" → "Senha"
+- [ ] "off-leash" → "Sem guia"
+- [ ] Datas tipo "08MAI26 - 00:49h" → "08/05/2026 às 00:49"
+- [ ] Meses em inglês ("MAY") → português ("MAIO")
+- [ ] Subtítulos motivacionais ("AÇÃO · CONTROLE · SEGURANÇA") → remover
+
+2.4 BACKUP VISUAL
+
+ANTES de aplicar o novo tema:
+- [ ] Tirar 1 screenshot de cada tela principal do app atual
+- [ ] Salvar em docs/screenshots/before/
+- [ ] Servem de referência pra ver evolução e detectar regressões
+
+CRITÉRIO DE PRONTO DA ETAPA 2:
+- App inteiro com visual coerente dos mockups (cores, tipografia, espaçamento)
+- Widgets base reutilizáveis disponíveis pra usar nas próximas etapas
+- Caixa alta excessiva removida
+- Inglês decorativo removido
+- Datas em formato brasileiro
+- Zero quebra funcional (só visual)
+
+
+================================================================================
+ETAPA 3 — TELAS DE ALTO IMPACTO
+================================================================================
+
+OBJETIVO: Refatorar as 4 telas mais visíveis usando os novos widgets base.
+
+DURAÇÃO ESTIMADA: 2-3 semanas
+
+ORDEM RECOMENDADA (do menor risco pro maior):
+
+3.1 DASHBOARD (mockup 10)
+
+Mockup ref: 10_dashboard.html (Versão A com alertas / Versão B dia limpo)
+Localização atual: features/dashboard/presentation/screens/
+
+- [ ] Substituir layout antigo por estrutura nova:
+      a. Header universal compacto (avatares sobrepostos + binômio + status)
+      b. Alertas condicionais (3 níveis: error/warning/info)
+      c. Atividades de hoje como protagonista (lista com hora + ícone + título)
+      d. Estado vazio educativo com 4 atalhos tappáveis
+      e. Acesso rápido (Rotina/Saúde/Treino/Ocorrência) com "última há Xh"
+      f. Resumo do cão compacto no fim (não no topo)
+      g. Bottom nav: Turno · Histórico · [🛡 FAB] · Treino · Cão
+
+- [ ] Remover do dashboard antigo:
+      - Foto gigante do cão
+      - "Prontidão Operacional 75%" (métrica opaca)
+      - Cronômetro em segundos ("há 5h44min" vira "há 5h")
+      - Badge "8" sem contexto
+      - Card "BONO Malinois Macho 28kg" no topo
+      - FAB ambíguo
+
+- [ ] Implementar lógica de alertas:
+      Calcular dinamicamente quais alertas mostrar:
+      - Vacina vencida/vencendo → crítico vermelho
+      - Exame atrasado → atenção amarelo
+      - Outros cães do canil com pendências → info ciano
+      - Clima crítico (calor extremo / chuva forte) → info ciano
+      
+      Se não houver alertas, seção inteira desaparece (não ocupa espaço).
+
+3.2 CÃO / PRONTUÁRIO (mockup 11)
+
+Mockup ref: 11_cao_prontuario_v2.html
+Localização atual: features/dogs/presentation/screens/
+
+- [ ] Criar nova tela DogProfileScreen (ou refatorar existente)
+- [ ] Implementar seções na ordem:
+      a. Ficha do cão (foto + dados + selo "OPERACIONAL HÁ X ANOS")
+      b. Status médico em 4 cards (Vacinas / Antipulgas / Peso / Exames)
+      c. Especialidades operacionais (chips)
+      d. Evolução do peso (gráfico fl_chart já tá no pubspec)
+      e. Carteira de vacinação resumida (3 últimas)
+      f. Laudos e documentos (lista unificada, SEM destaque defensivo no
+         laudo nutricional)
+      g. Eventos médicos recentes (timeline)
+      h. CTA fixo: "Registrar evento de saúde"
+
+- [ ] LIÇÃO IMPORTANTE: Laudo nutricional aparece como ITEM ENTRE OUTROS
+      na lista de documentos. NÃO destacar visualmente. Defesa profissional
+      proporcional, não chamativa.
+
+- [ ] Modelo de dados Firestore — ADITIVO:
+      Adicionar à coleção /dogs/{id}/documents (verificar nome real):
+      - type ('laudo' | 'certificacao' | 'curso' | 'honraria' | 'cadastro')
+      - issuer_credentials (CRMV)
+      - issuer_institution
+      Coordenar com painel React: o painel já lê documentos? Quais campos?
+
+3.3 HISTÓRICO (mockup 13)
+
+Mockup ref: 13_historico.html
+Localização atual: provavelmente em features/incidents/ ou nova feature
+
+- [ ] Criar nova feature features/history/ (se não existir)
+- [ ] Implementar tela HistoryScreen com:
+      a. Header universal
+      b. Botão "Exportar PDF" sempre visível no topo
+      c. Filtros em duas faixas de chips:
+         Faixa 1 - Período: Hoje / Ontem / Esta semana / Este mês / Personalizado
+         Faixa 2 - Tipo: Tudo / Rotina / Saúde / Treino / Ocorrência
+      d. "Mais filtros →" abre painel com subcategorias
+      e. Resumo do filtro ("X registros · Y dias")
+      f. Timeline agrupada por dia com header sticky (HOJE / ONTEM / data)
+      g. Linha vertical conectora entre itens
+      h. Badges de autoria visíveis (VOCÊ ciano / GCM SILVA cinza)
+      i. Badge "editado HH:MM" quando aplicável
+      j. Status especial pra ocorrência em andamento (amarelo pulsante)
+
+- [ ] Performance: paginação ao scrollar (30 itens iniciais, +30 ao chegar fim)
+
+- [ ] Tela ItemDetailScreen (universal de detalhe)
+      Renderiza diferente por tipo do item:
+      - Ocorrência: resumo + eventos internos + auditoria + CTA PDF/Compartilhar
+      - Treino: resumo + métricas + auditoria
+      - Rotina: resumo simples + auditoria
+      - Saúde: resumo + PDF anexo + auditoria
+
+3.4 TELA INICIAL DE TREINO (mockup 5)
+
+Mockup ref: 05_treino_inicial.html
+Localização atual: features/training/presentation/screens/
+
+- [ ] Reestruturar em duas camadas:
+      Camada 1 - Especialidades (cards grandes):
+      - 🛡 Guarda & Proteção
+      - 🎯 Busca & Captura
+      - 👃 Detecção
+      
+      Cada card mostra estado (Operacional/Em formação/Não iniciada) + última sessão
+
+      Camada 2 - Treinos gerais (chips compactos):
+      - 🐾 Obediência
+      - 💪 Condicionamento
+
+- [ ] Navegação correta:
+      Tap em especialidade operacional → tela de manutenção
+      Tap em especialidade em formação → tela de formação
+      Tap em especialidade não iniciada → modal "Iniciar formação"
+
+CRITÉRIO DE PRONTO DA ETAPA 3:
+- 4 telas refatoradas no padrão dos mockups
+- Parceiros testando podem ver a evolução visual
+- Sem perda funcional
+- Schema Firestore expandido sem quebrar painel React
+
+
+================================================================================
+ETAPA 4 — ESPECIALIDADES (BLOCO MAIS COMPLEXO)
+================================================================================
+
+OBJETIVO: Refatorar treinos pra refletir a arquitetura nova (especialidades
+com formação/manutenção, biblioteca de comandos, Protocolo Ragonha, impulsos
+de Guarda & Proteção).
+
+DURAÇÃO ESTIMADA: 3-4 semanas
+
+ATENÇÃO: Esta etapa MEXE NO SCHEMA do Firestore. Coordenar com painel React.
+Estratégia: coleções novas são criadas (não mexer nas antigas), painel React
+pode continuar usando o que já tem enquanto não migra também.
+
+4.1 OBEDIÊNCIA + BIBLIOTECA DE COMANDOS (mockup 4)
+
+Mockup ref: 04_treino_v3.html
+- [ ] Criar coleção Firestore /dogs/{id}/commands
+      Campos:
+      - id, name, category ('operacional' | 'posicional' | 'postural' | 'habilidade')
+      - stage ('not_trained' | 'introduced' | 'developing' | 'consolidated' | 'operational')
+      - learned_at, mastered_at
+      - notes
+      
+- [ ] Tela ObedienceScreen com biblioteca por cão
+- [ ] Modal "Adicionar comando" (apenas condutor titular)
+- [ ] Modal "Atualizar estágio" (apenas condutor titular, com audit log)
+- [ ] Tela ObedienceSessionFormScreen
+      Registro de sessão com multi-select de comandos trabalhados
+
+4.2 BUSCA & CAPTURA (mockups 6, 7, 8)
+
+- [ ] Criar features/training/search_capture/
+- [ ] Tela SearchCaptureSpecialtyScreen (visão da especialidade)
+- [ ] Tela SearchCaptureFormationScreen (4 abas: Roadmap / Módulo atual / Histórico / Estatísticas)
+- [ ] Tela SearchCaptureMaintenanceScreen
+- [ ] Tela SearchCaptureSessionForm com:
+      - Módulo (M1/M2/M3)
+      - Marco trabalhado
+      - Figurante, Objeto de odor, Ambiente
+      - Orientador (obrigatório em formação)
+      - Distância prevista
+      - Cenário (opcional)
+      - Resultado: COMPLETA / CHECAGEM (50-75m fora) / PERDA DE RASTRO (100m+)
+- [ ] Integração com módulo Rastreador GPS (Etapa 4.5)
+
+4.3 DETECÇÃO — PROTOCOLO RAGONHA (mockup 9)
+
+ATENÇÃO MÁXIMA AQUI. O Protocolo Ragonha tem rigor estatístico que precisa
+ser preservado em código. Erros aqui fragilizam o método.
+
+- [ ] Criar features/training/detection/
+- [ ] Schema Firestore:
+      /dogs/{id}/detection_lines (Drogas / Armas / Cadáver)
+      /dogs/{id}/training_sessions com phase_or_module
+      /dogs/{id}/training_attempts (granular tentativa por tentativa)
+      
+- [ ] Tela DetectionSpecialtyScreen (lista de linhas com card de atalho multi-linha)
+- [ ] Tela DetectionLineFormationScreen (5 abas)
+- [ ] Tela DetectionSessionLiveScreen (registrador estruturado)
+      - Banner topo: linhas trabalhadas (chips)
+      - Seleção de posição da caixa (E/M/D)
+      - Botão grande ACERTO / ERRO
+      - Se erro: modal de classificação (foi pra vazia / não sentou / hesitou)
+      - Contador "Consecutivos histórico" por linha
+      - Reset DURO: 1 erro zera contador, cão permanece na fase
+      - Multi-linha: acerto único alimenta TODAS as linhas marcadas
+      
+- [ ] Lógica de progressão:
+      F1: 3 acertos consecutivos (87,5% confiança)
+      F2: 3 acertos por variação posicional
+      F3: 10 acertos consecutivos (99,99983% confiança) ⭐ PONTO DE VIRADA
+      F4: 3 acertos consecutivos por subfase (4A estática, 4B horário, 4C anti-horário)
+      F5: 5 acertos consecutivos por sub-fase ambiental
+
+- [ ] Tela ExternalCertificationFormScreen
+      Registro independente da formação interna
+      Campos: data, avaliador, instituição, local, resultado, anexo PDF
+
+4.4 GUARDA & PROTEÇÃO (mockup 12)
+
+- [ ] Criar features/training/guard_protection/
+- [ ] Schema Firestore:
+      /dogs/{id}/guard_protection_state
+      - caca_impulse: 'not_started' | 'opening' | 'developing' | 'consolidated'
+      - defesa_impulse: idem
+      - agressao_impulse: idem
+      - technical_capabilities: array de objetos com nome + estado
+      - specialty_commands: array (Larga, Atenção)
+
+- [ ] Tela GuardProtectionFormationScreen (4 abas)
+      Trilhas dos 3 impulsos visíveis em paralelo
+      Capacidades técnicas em grid
+      Comandos da especialidade separados da obediência
+
+- [ ] Tela GuardProtectionSessionForm com:
+      - Impulso trabalhado
+      - Figurante, Equipamento, Capacidades trabalhadas
+      - Comandos (com "Nenhum" como opção)
+      - Cenário simulado (toggle expansível)
+      - Comportamento (Hesitante/Equilibrado/Firme/Exagerado)
+      - Avaliação multi-critério (Drive/Mordida/Controle/Equilíbrio)
+      - PAGAMENTO da sessão (Caça padrão / Defesa / Agressão / Sem)
+      - Observações do figurante
+
+- [ ] Tela GuardProtectionMaintenanceScreen
+      Foco de aprimoramento da sessão (campo destacado)
+      Sugestões: Mordida calma / Larga melhor / Atenção firme / Rotina
+
+4.5 MÓDULO RASTREADOR GPS (mockup 7)
+
+- [ ] Criar features/tracker/
+- [ ] Implementar 3 estados:
+      a. Pré-trilha: verificações (GPS, bateria, conexão, permissões)
+      b. Ao vivo: mapa em tempo real + botões grandes (Indicação, Checagem,
+         Perda, Alvo encontrado)
+      c. Pós-trilha: mapa estático + métricas + timeline de eventos
+
+- [ ] Background tracking (cuidado com bateria)
+- [ ] Offline-first: salva pontos localmente, sincroniza depois
+- [ ] Coleção /gps_tracks com pontos + métricas
+
+CRITÉRIO DE PRONTO DA ETAPA 4:
+- 3 especialidades funcionais com lógicas próprias
+- Rastreador GPS integrado em B&C
+- Schema Firestore expandido sem quebrar painel
+- Performance OK (timeline com 50+ eventos roda fluido)
+
+
+================================================================================
+ETAPA 5 — OCORRÊNCIAS
+================================================================================
+
+OBJETIVO: Refinar visualmente as telas de ocorrência (já funcionam bem,
+só precisam de polimento + trilha de auditoria + PDF institucional).
+
+DURAÇÃO ESTIMADA: 1-2 semanas
+
+5.1 INICIAR OCORRÊNCIA (mockup 01)
+
+- [ ] Aplicar layout do mockup
+- [ ] Remover "K9-INCIDENT COMMAND" (inglês decorativo)
+- [ ] Adicionar indicador de precisão do GPS (alta/baixa/sem sinal)
+- [ ] Mostrar binômio completo (condutor + cão)
+- [ ] Tratar caso de ocorrência em andamento (banner de aviso)
+- [ ] Dropdown de natureza com:
+      Categorias K9-específicas no topo (Faro veículo, Busca em mata, etc)
+      "Mais usadas/Recentes" como atalho
+      "Maus tratos contra animais" destacado (Lei 14.064/2020)
+
+5.2 OCORRÊNCIA EM ANDAMENTO (mockup 02)
+
+- [ ] Aplicar layout do mockup
+- [ ] Remover "OCORRÊNCIA OPERACIONAL" pomposo, virar "Ocorrência"
+- [ ] Substituir ícones simbólicos opacos (olho-de-Hórus, touro) por ícones
+      semânticos:
+      - Abordagem → silhueta humana
+      - Cão em ação → pegada de pata
+      - Entorpecente → frasco
+      - Busca feita → lupa
+      - Início → play
+- [ ] Cards de Registros Rápidos: cortar retículas HUD militares
+- [ ] Estados claros pra "Equipe": Sozinho / Preenchido / Pendente
+- [ ] Microcopy sem jargão técnico: "Sincronizado · em andamento"
+      (não "Firebase")
+- [ ] Contador de eventos visível ("X eventos")
+
+5.3 EDIÇÃO DE EVENTO (mockup 03)
+
+- [ ] Aplicar layout do mockup
+- [ ] IMPLEMENTAR TRILHA DE AUDITORIA (crítico):
+      Coleção /audit_logs centralizada
+      Hook em todas as edições de eventos:
+      - logCreate(entityType, entityId, data, performedBy)
+      - logUpdate(entityType, entityId, fieldName, oldValue, newValue)
+      - logDelete(entityType, entityId, reason, performedBy)
+
+- [ ] Soft delete com motivo obrigatório
+- [ ] Foto: aceita múltiplas, comportamento "adicionar" (não "substituir")
+- [ ] EXIF preservado
+- [ ] Marcador "editado HH:MM" visível na timeline
+- [ ] Travar edição após finalizar ocorrência (só anexar evidências)
+- [ ] Padronizar ícone GPS com "+" (igual ao Foto)
+
+5.4 FINALIZAÇÃO DE OCORRÊNCIA (WIZARD 3 PASSOS)
+
+Mockup pendente (decisões no roadmap antigo)
+
+- [ ] Wizard com 3 passos:
+      1. Relato final (texto + áudio opcional via speech_to_text)
+      2. Resultado (cards: Droga apreendida, Arma, Indivíduo detido, BO,
+         Apoio, Encaminhamento, Sem ocorrência)
+      3. Detalhes (campos condicionais por resultado)
+
+- [ ] Validações:
+      - Aviso se 0 eventos registrados
+      - "Próximo" desabilitado com relato vazio
+      - Placa em uppercase + validação de formato
+      - Dropdown fixo pra Tipo de veículo
+
+- [ ] Tela de confirmação após Concluir (resumo + PDF + voltar)
+
+5.5 PDF DA OCORRÊNCIA (PRODUTO INSTITUCIONAL)
+
+- [ ] Implementar geração com package pdf (já tá no pubspec)
+- [ ] Estrutura do PDF:
+      Capa: Brasão GCM + Canil K9 + Nº registro
+      Identificação: Binômio + Plantão + Equipe
+      Ocorrência: Natureza + Local + GPS + mapa estático + Início/Fim/Duração
+      Linha do tempo: eventos com timestamp + GPS + fotos EXIF
+      Relato final: texto + link de áudio
+      Resultado: detalhes específicos
+      Anexos: fotos
+      Auditoria: histórico de edições
+      Assinatura: timestamp + hash SHA-256
+
+- [ ] Compartilhamento nativo (WhatsApp, email, drive) via printing
+
+CRITÉRIO DE PRONTO DA ETAPA 5:
+- Fluxo completo de ocorrência funcional
+- PDF institucional gerado e compartilhável
+- Trilha de auditoria registra tudo
+- Finalização com wizard 3 passos
+
+
+================================================================================
+ETAPA 6 — FEATURES NOVAS
+================================================================================
+
+OBJETIVO: Após base estável, implementar features novas que ainda não existem.
+
+DURAÇÃO ESTIMADA: variável (cada feature de 1-2 semanas)
+
+CANDIDATAS:
+
+6.1 TRIAGEM (Fase 0 de Detecção)
+
+- [ ] Tela de avaliação inicial pra entrar no rol do canil
+- [ ] Testes de drive de presa, estabilidade, foco
+- [ ] Resultado: aprovado / reprovado
+- [ ] Se reprovado: motivo + decisão (doação registrada)
+- [ ] Selo permanente no prontuário
+
+6.2 PERFIL COM SELOS DE CONFORMIDADE
+
+Substituir gamificação antiga (já removida) por selos institucionais:
+- "Cronograma vacinal em dia"
+- "Plantões sem lacunas há 30 dias"
+- "100% das ocorrências com relato final"
+
+Calculados dinamicamente, aparecem no PDF como crédito real.
+
+6.3 RELATÓRIO MENSAL DO CONDUTOR
+
+PDF agregado:
+- Total de plantões
+- Horas trabalhadas
+- Ocorrências atendidas
+- Treinos realizados
+- Conformidade (vacinas, exames, registros)
+- Lacunas detectadas
+
+Documento que mata a discussão "canil não trabalha".
+
+6.4 ALIMENTAÇÃO REFORÇADA (cuidado com lição aprendida)
+
+Sem destaque defensivo. Apenas:
+- Comparação com laudo nutricional vigente
+- Alerta se quantidade diverge (com motivo opcional)
+- Foto da balança opcional (com EXIF + GPS automáticos)
+- Histórico agregado por período
+
+6.5 PÁGINA DE SAÚDE EXPANDIDA / CARTEIRA DE VACINAÇÃO COMPLETA
+
+- [ ] Carteira detalhada com PDF exportável separado
+- [ ] Histórico de medicações
+- [ ] Receitas e atestados anexados
+
+
+================================================================================
+ESTRATÉGIA DE COORDENAÇÃO COM PAINEL REACT
+================================================================================
+
+Como você controla os dois, fica mais fácil. Mas precisa ter disciplina.
+
+PRINCÍPIOS:
+
+1. MUDANÇAS ADITIVAS NO SCHEMA SÃO SEGURAS
+   Adicionar campo novo numa coleção existente não quebra o painel
+   (ele simplesmente ignora). Use isso à vontade.
+
+2. MUDANÇAS DE NOMEAÇÃO/REMOÇÃO PRECISAM SER COORDENADAS
+   Se vai renomear campo X pra Y:
+   a) Adiciona campo Y no Firestore mantendo X
+   b) App grava nos dois (X e Y) por um tempo
+   c) Painel React passa a ler Y
+   d) Quando confirmado, app para de gravar X
+   e) Depois, remove X do Firestore
+
+3. NOVAS COLEÇÕES PODEM SER CRIADAS LIVREMENTE
+   /dogs/{id}/commands não existe? Cria. Painel só usa quando estiver pronto.
+
+4. NOMENCLATURA CONSISTENTE
+   Definir: snake_case ou camelCase no Firestore?
+   No app Dart, manter convenção snake_case nos campos do Firestore,
+   converter pra camelCase nos models Dart.
+
+WORKFLOW SUGERIDO:
+
+A cada feature nova:
+1. Definir schema Firestore (campos novos)
+2. Criar models Dart correspondentes
+3. Criar repositories
+4. Implementar tela no app
+5. Testar com Bono e Apolo no Firestore
+6. Se painel React precisar exibir, planejar versão do painel
+7. Comunicar parceiros sobre nova feature
+
+
+================================================================================
+COMUNICAÇÃO COM PARCEIROS
+================================================================================
+
+6 parceiros da própria GCM Limeira testando = comunicação direta funciona.
+
+ANTES DE GRANDE MUDANÇA:
+- Avisar no grupo do canil (WhatsApp/Slack)
+- "Hoje à noite vou atualizar o app. Amanhã peguem versão nova."
+- Mudança significativa: gravar vídeo curto explicando o que mudou
+
+EM CASO DE BUG NOVO:
+- Pedir pra avisarem imediatamente
+- Ter canal direto pra reports
+- Cada bug reportado vira issue no GitHub do projeto
+
+VERSIONAMENTO:
+- Manter versão semântica (1.0.0+2 já tá)
+- Tag no Git pra cada release
+- Releases no GitHub com changelog
+
+
+================================================================================
+ORDEM DE EXECUÇÃO RECOMENDADA - VISÃO GERAL
+================================================================================
+
+MÊS 1
+- Semana 1: Etapa 1 (Limpeza técnica)
+- Semana 2: Etapa 2 (Sistema visual)
+- Semana 3-4: Etapa 3 (Dashboard + Cão/Prontuário)
+
+MÊS 2
+- Semana 5-6: Etapa 3 (Histórico + Tela inicial Treino)
+- Semana 7-8: Etapa 4 (Obediência + Busca & Captura)
+
+MÊS 3
+- Semana 9-10: Etapa 4 (Detecção - Protocolo Ragonha)
+- Semana 11-12: Etapa 4 (Guarda & Proteção + Rastreador GPS)
+
+MÊS 4
+- Semana 13-14: Etapa 5 (Ocorrências - polimento)
+- Semana 15-16: Etapa 5 (Finalização wizard + PDF institucional)
+
+MÊS 5+
+- Etapa 6 (Features novas conforme prioridade)
+
+
+================================================================================
+DICAS PARA USAR COM CLAUDE CODE
+================================================================================
+
+1. ATAQUE UMA ETAPA POR VEZ
+   Não pula. Etapa 1 (limpeza) é chata mas evita problemas nas seguintes.
+
+2. INICIE CADA SESSÃO COM CONTEXTO
+   Diga ao Claude Code:
+   "Estou refatorando o app Canil K9. Veja CONTEXTO_PROJETO.md.
+    Estou na Etapa X, item Y. Mockup de referência: Z.html"
+
+3. REFERENCIE OS MOCKUPS
+   Os 13 HTMLs são especificação visual. Abra antes de pedir implementação.
+
+4. PEÇA WIDGETS REUTILIZÁVEIS
+   Sempre que possível, peça widgets isolados em core/widgets/.
+   "Crie StatusBadge em core/widgets/ que receba status enum"
+
+5. TESTE A CADA MUDANÇA
+   Migração de uma view? Commit. Aplicação de tema novo? Commit.
+   Histórico do Git é seu rollback.
+
+6. NÃO PERCA O FOCO
+   Princípios:
+   - Forma segue função
+   - Defesa profissional proporcional (não chamativa - lição aprendida)
+   - Tom institucional sério
+   - Subtração no MVP
+   - Auditor invisível
+
+7. PARCEIROS COMO BETA TESTERS
+   Cada etapa concluída → atualiza app deles, pede feedback.
+   "Pessoal, o Histórico mudou. Avisem se ficou ruim de usar."
+
+
+================================================================================
+FIM DO ROADMAP DE REFATORAÇÃO
+================================================================================

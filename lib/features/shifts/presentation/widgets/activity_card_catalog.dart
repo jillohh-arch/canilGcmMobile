@@ -87,48 +87,9 @@ abstract final class ActivityCardCatalog {
     },
   ];
 
-  static const routineCards = [
-    {
-      'id': ActivitySubtypeIds.feeding,
-      'image': 'assets/images/card_alimentacao.png',
-      'glow': Colors.amber,
-    },
-    {
-      'id': ActivitySubtypeIds.cleaning,
-      'image': 'assets/images/card_limpeza.png',
-      'glow': Colors.orange,
-    },
-    {
-      'id': ActivitySubtypeIds.walk,
-      'image': 'assets/images/card_passeio.png',
-      'glow': Colors.lightGreen,
-    },
-    {
-      'id': ActivitySubtypeIds.rest,
-      'image': 'assets/images/card_descanso.png',
-      'glow': Colors.deepOrangeAccent,
-    },
-    {
-      'id': ActivitySubtypeIds.play,
-      'image': 'assets/images/card_brincadeira.png',
-      'glow': Colors.yellowAccent,
-    },
-    {
-      'id': ActivitySubtypeIds.brushing,
-      'image': 'assets/images/card_escovacao.png',
-      'glow': Colors.orangeAccent,
-    },
-    {
-      'id': ActivitySubtypeIds.other,
-      'image': 'assets/images/card_outros.png',
-      'glow': Colors.white54,
-    },
-  ];
-
   static List<Map<String, dynamic>> forCategory(String category) {
     if (category == 'Treino') return trainingCards;
     if (category == 'Saude') return healthCards;
-    if (category == 'Rotina') return routineCards;
     return occurrenceCards;
   }
 

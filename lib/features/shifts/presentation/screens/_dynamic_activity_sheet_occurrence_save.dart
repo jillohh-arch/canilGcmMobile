@@ -18,23 +18,6 @@ extension _DynamicActivitySheetOccurrenceSave on _DynamicActivitySheetState {
     return _occurrenceStatus != OccurrenceFormController.statusInProgress;
   }
 
-  Future<void> _grantOccurrenceBadgesIfNeeded({
-    required UserViewModel userVM,
-    required String currentRa,
-    required Map<String, dynamic> extraFields,
-  }) async {
-    final hasDetectedDrugs =
-        extraFields.containsKey('drogas') &&
-        (extraFields['drogas'] as List).isNotEmpty;
-    final isDetection =
-        _selectedSubtype == ActivitySubtypeIds.detection ||
-        _selectedSubtype == ActivitySubtypeIds.narcoticsSearch;
-
-    if (isDetection && hasDetectedDrugs) {
-      // Badge removida — gamificação descontinuada
-    }
-  }
-
   OperatorContext _operatorContext({
     required AuthViewModel authVM,
     required UserViewModel userVM,
@@ -104,11 +87,5 @@ extension _DynamicActivitySheetOccurrenceSave on _DynamicActivitySheetState {
     _occurrenceTimeline
       ..clear()
       ..addAll(incidentUpdates);
-
-    await _grantOccurrenceBadgesIfNeeded(
-      userVM: userVM,
-      currentRa: operatorContext.ra,
-      extraFields: extraFields,
-    );
   }
 }

@@ -43,22 +43,16 @@ extension _DynamicActivitySheetAccessors on _DynamicActivitySheetState {
       ? _occCtrl.descriptionController
       : widget.category == 'Treino'
       ? _trainingCtrl.descriptionController
-      : widget.category == 'Rotina'
-      ? _routineCtrl.descriptionController
       : _healthCtrl.descriptionController;
 
   TextEditingController get _timeController => _isOccurrenceOrEventCategory
       ? _occCtrl.timeController
       : widget.category == 'Treino'
       ? _trainingCtrl.timeController
-      : widget.category == 'Rotina'
-      ? _routineCtrl.timeController
       : _healthCtrl.timeController;
 
   TextEditingController get _durationController => widget.category == 'Treino'
       ? _trainingCtrl.durationController
-      : widget.category == 'Rotina'
-      ? _routineCtrl.durationController
       : _durationCtrlOther;
 
   TextEditingController get _tempController => _trainingCtrl.tempController;
@@ -71,15 +65,6 @@ extension _DynamicActivitySheetAccessors on _DynamicActivitySheetState {
 
   TextEditingController get _dificuldadesController =>
       _trainingCtrl.dificuldadesController;
-
-  TextEditingController get _racaoMarcaController =>
-      _routineCtrl.racaoMarcaController;
-
-  TextEditingController get _racaoQtdController =>
-      _routineCtrl.racaoQtdController;
-
-  TextEditingController get _distanciaController =>
-      _routineCtrl.distanciaController;
 
   TextEditingController get _vetNameController => _healthCtrl.vetNameController;
 

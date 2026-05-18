@@ -12,7 +12,6 @@ import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -31,7 +30,6 @@ import 'package:canil_gcm/features/training/presentation/widgets/dynamic_subtype
 import 'package:canil_gcm/features/training/presentation/widgets/training_activity_fields.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_activity_fields.dart';
 import 'package:canil_gcm/core/widgets/quick_location_actions.dart';
-import 'package:canil_gcm/features/routine/presentation/widgets/routine_activity_fields.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 import 'package:canil_gcm/features/shifts/presentation/widgets/activity_card_catalog.dart';
 import 'package:canil_gcm/features/shifts/presentation/widgets/activity_category_menu_sheet.dart';
@@ -76,7 +74,6 @@ import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_sta
 import 'package:canil_gcm/features/incidents/presentation/widgets/occurrence_start_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_occurrence_ctrl.dart';
 import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_training_ctrl.dart';
-import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_routine_ctrl.dart';
 import 'package:canil_gcm/features/shifts/presentation/controllers/activity_sheet_health_ctrl.dart';
 import 'live_tracking_screen.dart';
 
@@ -124,8 +121,8 @@ const Color _kHudAmber = AppTheme.warning;
 const Color _kHudGreen = AppTheme.success;
 const Color _kHudRed = AppTheme.error;
 
-class DynamicActivitySheet extends StatefulWidget {
-  final String category; // 'Ocorrencia', 'Treino', 'Rotina', 'Evento', 'Saude'
+  class DynamicActivitySheet extends StatefulWidget {
+  final String category; // 'Ocorrencia', 'Treino', 'Evento', 'Saude'
   final String dogId;
   final String dogName;
   final Map<String, dynamic>? initialData;
@@ -160,18 +157,10 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   late final ActivitySheetTrainingCtrl _trainingCtrl;
 
   // ---------------------------------------------------------------------------
-  // Routine controller (Fase 3)
-  // ---------------------------------------------------------------------------
-  late final ActivitySheetRoutineCtrl _routineCtrl;
-
-  // ---------------------------------------------------------------------------
   // Health controller (Fase 4)
   // ---------------------------------------------------------------------------
   late final ActivitySheetHealthCtrl _healthCtrl;
 
-  // Fallback para categorias sem controller dedicado para o campo.
-  // _locationCtrlOther: Rotina não tem campo de localização.
-  // _durationCtrlOther: duração de busca em Ocorrência/Evento.
   final _locationCtrlOther = TextEditingController();
   final _durationCtrlOther = TextEditingController();
 
@@ -236,9 +225,6 @@ class _DynamicActivitySheetState extends State<DynamicActivitySheet> {
   // Faro / clima e campos de treino: migrados para _trainingCtrl (Fase 2)
   // _tempController, _humidityController, _objetivoTreinoController,
   // _dificuldadesController agora são getters delegando para _trainingCtrl
-
-  // Rotina campos adicionais: migrados para _routineCtrl (Fase 3)
-  // _racaoMarcaController, _racaoQtdController, _distanciaController
 
   // Fotos / mídias globais
   final List<Map<String, dynamic>> _mediaAttachments = [];

@@ -15,13 +15,11 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
-import 'package:canil_gcm/features/routine/domain/routine_model.dart';
 import 'package:canil_gcm/core/services/report_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/widgets/hud_tab_bar.dart';

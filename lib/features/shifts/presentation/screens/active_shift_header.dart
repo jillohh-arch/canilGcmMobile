@@ -1,177 +1,59 @@
 part of 'active_shift_dashboard_screen.dart';
 
-const Color _kDashboardBackground = Color(0xFF050D10);
-const Color _kSurface = Color(0xF20B171C);
-const Color _kSurfaceElevated = Color(0xFF0F2026);
-const Color _kBorder = Color(0x523E7180);
-const Color _kBorderStrong = Color(0x804DD0E1);
-const Color _kTextPrimary = Color(0xFFF4F7F8);
-const Color _kTextSecondary = Color(0xFFA7B4BA);
-const Color _kTextMuted = Color(0xFF71828A);
+// ── Design tokens (mockup 10_dashboard) ──────────────────────────────────────
+const Color _kSurface = Color(0xFF0E1A1F);
+const Color _kBorder = Color(0x14FFFFFF); // white 8%
+const Color _kBorderSubtle = Color(0x0FFFFFFF); // white 6%
+const Color _kTextPrimary = Color(0xFFFFFFFF);
+const Color _kTextSecondary = Color(0xFFB0C4CC);
+const Color _kTextMuted = Color(0xFF5A7280);
 
-const LinearGradient _kPanelGradient = LinearGradient(
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-  colors: [Color(0xF2112028), Color(0xF207151B), Color(0xF20A1E25)],
-);
+/// Section label estilo mockup: "⚠ ALERTAS ────────────"
+class _SectionLabel extends StatelessWidget {
+  final String emoji;
+  final String text;
+  final Widget? trailing;
 
-BoxDecoration _panelDecoration({Color? borderColor}) {
-  return BoxDecoration(
-    gradient: _kPanelGradient,
-    borderRadius: BorderRadius.circular(6),
-    border: Border.all(color: borderColor ?? _kBorder, width: 1.1),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withAlpha(68),
-        blurRadius: 18,
-        offset: const Offset(0, 10),
-      ),
-      BoxShadow(
-        color: AppTheme.primary.withAlpha(12),
-        blurRadius: 20,
-        offset: const Offset(0, -2),
-      ),
-    ],
-  );
-}
-
-class _DashboardPanel extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final Color? borderColor;
-
-  const _DashboardPanel({
-    required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.borderColor,
+  const _SectionLabel({
+    required this.emoji,
+    required this.text,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: _panelDecoration(borderColor: borderColor),
-      child: child,
-    );
-  }
-}
-
-class _PanelTitle extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Widget? trailing;
-
-  const _PanelTitle({required this.icon, required this.label, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppTheme.primary, size: 20),
-        const SizedBox(width: 11),
-        Expanded(
-          child: _AutoFitText(
-            label,
-            alignment: Alignment.centerLeft,
-            textAlign: TextAlign.left,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Text(
+            '$emoji $text',
             style: GoogleFonts.inter(
-              color: _kTextPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.4,
+              color: AppTheme.primary,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
             ),
           ),
-        ),
-        if (trailing != null) trailing!,
-      ],
-    );
-  }
-}
-
-class _AutoFitText extends StatelessWidget {
-  final String text;
-  final TextStyle style;
-  final Alignment alignment;
-  final TextAlign textAlign;
-
-  const _AutoFitText(
-    this.text, {
-    required this.style,
-    this.alignment = Alignment.center,
-    this.textAlign = TextAlign.center,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fitted = FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: alignment,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
-            textAlign: textAlign,
-            style: style,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: AppTheme.primary.withAlpha(38),
+            ),
           ),
-        );
-
-        if (!constraints.maxWidth.isFinite) {
-          return fitted;
-        }
-
-        return SizedBox(width: constraints.maxWidth, child: fitted);
-      },
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _AutoFitBox extends StatelessWidget {
-  final Widget child;
-  final Alignment alignment;
 
-  const _AutoFitBox({required this.child, this.alignment = Alignment.center});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fitted = FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: alignment,
-          child: child,
-        );
-
-        if (!constraints.maxWidth.isFinite) {
-          return fitted;
-        }
-
-        return SizedBox(width: constraints.maxWidth, child: fitted);
-      },
-    );
-  }
-}
-
-/// Label de seção mantido para componentes antigos que ainda dependem dele.
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  final Widget? trailing;
-
-  const _SectionLabel({required this.text, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return _PanelTitle(
-      icon: Icons.label_important_outline_rounded,
-      label: text,
-      trailing: trailing,
-    );
-  }
-}
-
-/// Header operacional: avatares sobrepostos, nome do binômio, status e atalhos.
+/// Header compacto fiel ao mockup 10_dashboard.
 class _ShiftHeader extends StatelessWidget {
   final Dog dog;
   final String callsign;
@@ -188,354 +70,188 @@ class _ShiftHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
-    final startTime = _formatStartTime(shiftVM.shiftStartTime);
-    final conductorName = _shortConductorName(callsign);
+    final elapsed = _formatElapsed(shiftVM.shiftStartTime);
+    final conductorName = _shortName(callsign);
 
-    return _DashboardPanel(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      borderColor: AppTheme.primary.withAlpha(48),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 380;
-          final identity = _HeaderIdentity(
-            dog: dog,
-            conductorPhotoUrl: conductorPhotoUrl,
-            conductorName: conductorName,
-            startTime: startTime,
-            compact: compact,
-          );
-
-          if (compact) {
-            return Column(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(10),
+        border: Border(
+          bottom: BorderSide(color: AppTheme.primary.withAlpha(30)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Avatares sobrepostos
+          SizedBox(
+            width: 60,
+            height: 38,
+            child: Stack(
               children: [
-                identity,
-                const SizedBox(height: 12),
+                _SmallAvatar(
+                  imageUrl: dog.profileImageUrl,
+                  fallbackText: dog.name.isNotEmpty
+                      ? dog.name.substring(0, dog.name.length.clamp(0, 4)).toUpperCase()
+                      : 'K9',
+                  borderColor: AppTheme.primary,
+                ),
+                Positioned(
+                  left: 28,
+                  child: _SmallAvatar(
+                    imageUrl: conductorPhotoUrl,
+                    fallbackText: conductorName.length >= 3
+                        ? conductorName.substring(0, 3).toUpperCase()
+                        : conductorName.toUpperCase(),
+                    borderColor: AppTheme.primary.withAlpha(128),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${dog.name} · GCM $conductorName',
+                  style: GoogleFonts.inter(
+                    color: _kTextPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
                 Row(
                   children: [
-                    Expanded(
-                      child: _HeaderCommandButton(
-                        icon: Icons.compare_arrows_rounded,
-                        label: 'Trocar binômio',
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          onSwitchDog();
-                        },
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.success,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _HeaderCommandButton(
-                        icon: Icons.person_rounded,
-                        label: 'Meu perfil',
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ProfileScreen(),
-                            ),
-                          );
-                        },
+                    const SizedBox(width: 6),
+                    Text(
+                      'Turno ativo',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.success,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '· $elapsed',
+                      style: GoogleFonts.inter(
+                        color: _kTextSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: identity),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 122,
-                child: Column(
-                  children: [
-                    _HeaderCommandButton(
-                      icon: Icons.compare_arrows_rounded,
-                      label: 'Trocar binômio',
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onSwitchDog();
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _HeaderCommandButton(
-                      icon: Icons.person_rounded,
-                      label: 'Meu perfil',
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+            ),
+          ),
+          // Botão trocar cão
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onSwitchDog();
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primary.withAlpha(51)),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.compare_arrows_rounded,
+                  color: AppTheme.primary,
+                  size: 16,
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  String _shortConductorName(String value) {
+  String _shortName(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return 'Condutor';
     final pieces = trimmed.split(RegExp(r'\s+'));
     return pieces.length <= 1 ? pieces.first : pieces.last;
   }
 
-  String _formatStartTime(DateTime? start) {
-    if (start == null) return '--:--';
-    return '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+  String _formatElapsed(DateTime? start) {
+    if (start == null) return '--';
+    final diff = DateTime.now().difference(start);
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    return 'há ${diff.inHours}h';
   }
 }
 
-class _HeaderIdentity extends StatelessWidget {
-  final Dog dog;
-  final String? conductorPhotoUrl;
-  final String conductorName;
-  final String startTime;
-  final bool compact;
-
-  const _HeaderIdentity({
-    required this.dog,
-    required this.conductorPhotoUrl,
-    required this.conductorName,
-    required this.startTime,
-    required this.compact,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarWidth = compact ? 86.0 : 98.0;
-    final avatarHeight = compact ? 66.0 : 74.0;
-    final dogAvatarSize = compact ? 66.0 : 74.0;
-    final conductorAvatarSize = compact ? 58.0 : 66.0;
-
-    return Row(
-      children: [
-        SizedBox(
-          width: avatarWidth,
-          height: avatarHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                right: 0,
-                top: 4,
-                child: _HeaderAvatar(
-                  imageUrl: conductorPhotoUrl,
-                  fallbackIcon: Icons.person_rounded,
-                  borderColor: _kTextSecondary,
-                  size: conductorAvatarSize,
-                ),
-              ),
-              Positioned(
-                left: 0,
-                top: 0,
-                child: _HeaderAvatar(
-                  imageUrl: dog.profileImageUrl,
-                  fallbackText: dog.name.isNotEmpty ? dog.name[0] : 'K',
-                  borderColor: _kTextPrimary,
-                  size: dogAvatarSize,
-                ),
-              ),
-              Positioned(
-                left: compact ? 54 : 62,
-                bottom: 3,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.success,
-                    border: Border.all(color: _kSurfaceElevated, width: 3),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(width: compact ? 10 : 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _AutoFitText(
-                '${dog.name} • $conductorName',
-                alignment: Alignment.centerLeft,
-                textAlign: TextAlign.left,
-                style: GoogleFonts.inter(
-                  fontSize: compact ? 20 : 21,
-                  fontWeight: FontWeight.w900,
-                  color: _kTextPrimary,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.success,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.success.withAlpha(90),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _AutoFitText(
-                      'Turno ativo desde $startTime',
-                      alignment: Alignment.centerLeft,
-                      textAlign: TextAlign.left,
-                      style: GoogleFonts.inter(
-                        fontSize: compact ? 13 : 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.success,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'K9 Operacional',
-                style: GoogleFonts.inter(
-                  fontSize: compact ? 12 : 14,
-                  fontWeight: FontWeight.w500,
-                  color: _kTextSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _HeaderCommandButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _HeaderCommandButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _kBorder),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: _kTextPrimary, size: 25),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _AutoFitText(
-                  label,
-                  alignment: Alignment.centerLeft,
-                  textAlign: TextAlign.left,
-                  style: GoogleFonts.inter(
-                    color: _kTextPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderAvatar extends StatelessWidget {
+/// Avatar circular 38px para o header compacto.
+class _SmallAvatar extends StatelessWidget {
   final String? imageUrl;
-  final String? fallbackText;
-  final IconData? fallbackIcon;
+  final String fallbackText;
   final Color borderColor;
-  final double size;
 
-  const _HeaderAvatar({
+  const _SmallAvatar({
     this.imageUrl,
-    this.fallbackText,
-    this.fallbackIcon,
+    required this.fallbackText,
     required this.borderColor,
-    required this.size,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _kSurfaceElevated,
-        border: Border.all(color: borderColor, width: 1.5),
+        color: const Color(0xFF1A2A30),
+        border: Border.all(color: borderColor, width: 2),
       ),
       child: ClipOval(
         child: imageUrl != null && imageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
-                width: size,
-                height: size,
+                width: 38,
+                height: 38,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => _buildFallback(),
-                errorWidget: (_, __, ___) => _buildFallback(),
+                placeholder: (_, __) => _fallbackWidget(),
+                errorWidget: (_, __, ___) => _fallbackWidget(),
               )
-            : _buildFallback(),
+            : _fallbackWidget(),
       ),
     );
   }
 
-  Widget _buildFallback() {
+  Widget _fallbackWidget() {
     return Container(
-      color: _kSurfaceElevated,
-      child: Center(
-        child: fallbackText != null
-            ? Text(
-                fallbackText!,
-                style: GoogleFonts.inter(
-                  color: borderColor,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w900,
-                ),
-              )
-            : Icon(
-                fallbackIcon ?? Icons.person_rounded,
-                color: borderColor.withAlpha(190),
-                size: size * 0.42,
-              ),
+      color: const Color(0xFF1A2A30),
+      alignment: Alignment.center,
+      child: Text(
+        fallbackText,
+        style: GoogleFonts.inter(
+          color: AppTheme.primary,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

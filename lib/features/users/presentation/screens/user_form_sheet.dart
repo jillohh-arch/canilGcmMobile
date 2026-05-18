@@ -86,8 +86,6 @@ class _UserFormSheetState extends State<_UserFormSheet> {
         unit: _unitController.text.trim(),
         accessLevel: _accessLevel,
         photoUrl: finalPhotoUrl,
-        userBadges: widget.user?.userBadges ?? const [],
-        xp: widget.user?.xp ?? 0,
       );
 
       if (!mounted) return;

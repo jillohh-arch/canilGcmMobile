@@ -14,18 +14,14 @@ extension _DailyTimelineEntryTrainingBuilder on _DailyTimelineScreenState {
   }
 
   _TimelineEntry _buildTrainingTimelineEntry(TrainingSessionModel training) {
-    final isRoutine = _routineTrainingTypes.contains(training.trainingType);
-
     return _TimelineEntry(
       id: training.id,
-      category: isRoutine ? 'Rotina' : 'Treino',
+      category: 'Treino',
       originalModel: training,
       time: training.date,
-      title: isRoutine
-          ? 'ROTINA: ${training.trainingType}'
-          : 'TREINO: ${training.trainingType}',
+      title: 'TREINO: ${training.trainingType}',
       location: training.location,
-      type: isRoutine ? 'Rotina' : 'Treino',
+      type: 'Treino',
       details: {
         'Clima': training.weather,
         'Duração': training.searchDuration != null
@@ -40,15 +36,3 @@ extension _DailyTimelineEntryTrainingBuilder on _DailyTimelineScreenState {
     );
   }
 }
-
-const _routineTrainingTypes = {
-  'Passeio',
-  'Lazer/Brincadeira',
-  'Condicionamento Físico',
-  'Outros',
-  'Brincadeira',
-  'Alimentação',
-  'Limpeza',
-  'Descanso',
-  'Escovação',
-};

@@ -5,7 +5,6 @@ extension _DailyTimelineEntryData on _DailyTimelineScreenState {
     final tVM = Provider.of<TrainingViewModel>(context);
     final iVM = Provider.of<IncidentViewModel>(context);
     final hVM = Provider.of<HealthViewModel>(context);
-    final rVM = Provider.of<RoutineViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
     final dogName = _resolveTimelineDogName(dogId, dogVM);
     final dayRange = _selectedTimelineDayRange();
@@ -35,22 +34,10 @@ extension _DailyTimelineEntryData on _DailyTimelineScreenState {
         )
         .toList();
 
-    final routines = rVM.routines
-        .where(
-          (r) =>
-              r.dogId == dogId &&
-              _isWithinSelectedTimelineDay(r.timestamp, dayRange),
-        )
-        .toList();
-
     List<_TimelineEntry> entries = [];
 
     // Include trainings/health only if not in Ocorrência-only tab
     if (filterType != 'Ocorrência') {
-      for (var r in routines) {
-        entries.add(_buildRoutineTimelineEntry(r, dogName));
-      }
-
       for (var h in healthLogs) {
         entries.add(_buildHealthTimelineEntry(h, dogName));
       }

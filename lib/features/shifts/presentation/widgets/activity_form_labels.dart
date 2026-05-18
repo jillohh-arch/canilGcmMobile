@@ -4,15 +4,9 @@ abstract final class ActivityFormLabels {
   static String descriptionLabel({
     required String category,
     required String? subtype,
-    required String feedingSubtype,
   }) {
     if (category == 'Treino') return 'Descrição do treino';
     if (category == 'Saude') return 'Detalhes';
-    if (category == 'Rotina') {
-      return subtype == feedingSubtype
-          ? 'Observações da alimentação'
-          : 'Detalhes da rotina';
-    }
     return 'Descrição da ocorrência';
   }
 
@@ -22,7 +16,6 @@ abstract final class ActivityFormLabels {
   }) {
     if (category == 'Treino') return 'SALVAR TREINO';
     if (category == 'Saude') return 'SALVAR PRONTUÁRIO';
-    if (category == 'Rotina') return 'SALVAR ROTINA';
     return occurrenceStatus == OccurrenceFormController.statusInProgress
         ? 'SALVAR EM ANDAMENTO'
         : 'CONCLUIR OCORRÊNCIA';
@@ -40,7 +33,6 @@ abstract final class ActivityFormLabels {
     }
 
     if (category == 'Treino') return 'Treino salvo no Firebase.';
-    if (category == 'Rotina') return 'Rotina salva no Firebase.';
     if (category == 'Saude') return 'Prontuário salvo no Firebase.';
 
     return 'Registro salvo no Firebase.';

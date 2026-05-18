@@ -1,0 +1,375 @@
+================================================================================
+GUIA DE COEXISTÊNCIA — APP MOBILE + PAINEL REACT
+APP CANIL K9 GCM LIMEIRA
+================================================================================
+
+CONTEXTO:
+- App mobile Flutter em produção, 6 parceiros da GCM Limeira usando
+- Painel web React separado, acessa diretamente o mesmo Firestore
+- Você (Jilles) controla ambos os codebases
+- Refatoração do app mobile não pode quebrar painel React
+
+ESTE GUIA define como manter os dois sistemas sincronizados durante a
+refatoração descrita em ROADMAP_REFATORACAO.txt.
+
+
+================================================================================
+PRINCÍPIOS FUNDAMENTAIS
+================================================================================
+
+1. FIRESTORE É A FONTE ÚNICA DE VERDADE
+   Tanto app quanto painel leem/escrevem no mesmo Firestore.
+   Mudanças no schema afetam os dois.
+
+2. MUDANÇAS ADITIVAS SÃO SEMPRE SEGURAS
+   Adicionar campo novo, criar coleção nova: zero risco pro painel.
+   Painel simplesmente ignora o que não conhece.
+
+3. MUDANÇAS DESTRUTIVAS PRECISAM COORDENAÇÃO
+   Renomear, remover, mudar tipo de dado: risco alto.
+   Sempre fazer estratégia de transição em fases.
+
+4. VOCÊ CONTROLA OS DOIS — USE ISSO COM SABEDORIA
+   Vantagem: pode atualizar os dois juntos quando necessário.
+   Risco: pressa pode fazer você quebrar o que tava funcionando.
+
+5. PARCEIROS SÃO POUCOS E DA SUA EQUIPE
+   Comunicação direta resolve. Não precisa de feature flags sofisticadas.
+   "Pessoal, hoje à noite atualizo o app. Amanhã peguem versão nova."
+
+
+================================================================================
+MATRIZ DE DECISÃO PARA MUDANÇAS DE SCHEMA
+================================================================================
+
+ANTES de mexer em qualquer campo do Firestore, perguntar:
+
+PERGUNTA 1: O painel React lê esse campo?
+  Se NÃO → Mexer livremente
+  Se SIM → Continuar nas próximas perguntas
+
+PERGUNTA 2: O painel React escreve nesse campo?
+  Se NÃO → Risco médio. Apenas mudanças visuais no painel.
+  Se SIM → Risco alto. Coordenação obrigatória.
+
+PERGUNTA 3: É adição de campo novo?
+  Se SIM → Seguro, prossiga.
+  Se NÃO → Avaliar tipo de mudança:
+           - Renomear: estratégia de transição em 4 fases (ver abaixo)
+           - Remover: planejar com cuidado, comunicar parceiros
+           - Mudar tipo (string → number): NUNCA fazer direto. Migração de dados.
+
+PERGUNTA 4: Quantos documentos existentes têm esse campo?
+  Poucos (< 100) → Migração manual possível
+  Muitos (>= 100) → Script de migração no Firestore
+
+
+================================================================================
+ESTRATÉGIA DE TRANSIÇÃO EM 4 FASES
+================================================================================
+
+Use quando precisar RENOMEAR ou MUDAR ESTRUTURA de campo existente.
+
+Exemplo prático: mudar campo "dogActive" (atual) para "active_dog_id" (novo).
+
+FASE 1 — ADIÇÃO PARALELA (semana 1)
+
+App mobile:
+- [ ] Adicionar novo campo "active_dog_id" nos models
+- [ ] App grava NOS DOIS campos (dogActive e active_dog_id) com mesmo valor
+- [ ] App ainda lê de dogActive (preserva compatibilidade)
+- [ ] Deploy para parceiros
+
+Painel React:
+- Sem mudanças. Continua usando dogActive normalmente.
+
+Firestore:
+- Dados novos têm os dois campos. Dados antigos ainda só com dogActive.
+
+FASE 2 — MIGRAÇÃO DE DADOS ANTIGOS (semana 2)
+
+- [ ] Rodar script Firestore (Cloud Function ou Node.js local):
+      Para cada documento em /users que tem dogActive mas não tem
+      active_dog_id, copiar dogActive → active_dog_id.
+
+- [ ] Validar: todos os documentos têm ambos os campos preenchidos.
+
+FASE 3 — MIGRAÇÃO DO PAINEL (semana 3)
+
+Painel React:
+- [ ] Atualizar componentes que liam dogActive → lerem active_dog_id
+- [ ] Atualizar componentes que escreviam dogActive → escreverem active_dog_id
+- [ ] Deploy do painel
+
+App mobile:
+- [ ] Atualizar leitura para active_dog_id (não mais dogActive)
+- [ ] App continua escrevendo nos dois (segurança)
+- [ ] Deploy para parceiros
+
+FASE 4 — REMOÇÃO DO CAMPO ANTIGO (semana 4+)
+
+- [ ] App mobile: parar de escrever em dogActive
+- [ ] Deploy para parceiros
+- [ ] Aguardar 1-2 semanas para garantir todos atualizaram
+- [ ] Rodar script Firestore: deletar campo dogActive de todos os documentos
+- [ ] Painel React e app mobile: remover qualquer referência residual
+
+Total: ~4 semanas para uma mudança destrutiva. É chato, mas é o jeito seguro.
+
+
+================================================================================
+CRIAÇÃO DE NOVAS COLEÇÕES (FÁCIL)
+================================================================================
+
+Coleções novas são SEMPRE seguras. Nem precisa coordenar.
+
+Exemplo: criar /dogs/{id}/commands para biblioteca de comandos.
+
+WORKFLOW:
+
+App mobile:
+- [ ] Criar model CommandModel
+- [ ] Criar repository CommandsRepository
+- [ ] Criar tela ObedienceScreen que lê/escreve em /dogs/{id}/commands
+- [ ] Deploy para parceiros
+
+Painel React:
+- Sem mudanças necessárias.
+- Quando quiser exibir comandos no painel, implementar leitura.
+- Quando quiser editar pelo painel, implementar escrita.
+
+Sem fase de transição, sem migração. Coleção nova é nova.
+
+
+================================================================================
+COMUNICAÇÃO COM PARCEIROS
+================================================================================
+
+6 parceiros da GCM Limeira testando = comunicação direta é seu superpoder.
+
+CANAIS RECOMENDADOS:
+- Grupo no WhatsApp do canil (informal, rápido)
+- Lista de e-mails (formal, para registro)
+- Reuniões mensais (alinhar prioridades, ouvir feedback)
+
+PADRÕES DE COMUNICAÇÃO:
+
+ANTES DE GRANDE MUDANÇA:
+"Pessoal, hoje à noite vou atualizar o app. Mudanças importantes:
+- Dashboard reformulado
+- Nova tela de Histórico
+
+Quando abrirem amanhã, vai estar diferente. Qualquer coisa estranha,
+me avisem no grupo. Vídeo curto com a explicação:
+[link do vídeo de 2 minutos]"
+
+DURANTE TESTE DE FEATURE NOVA:
+"Tô lançando uma feature nova: biblioteca de comandos. Quem quiser testar
+hoje, atualiza o app. Quem não quiser, pode esperar a próxima semana.
+Reporta bugs aqui."
+
+AO LANÇAR MUDANÇA QUE PODE QUEBRAR ALGO:
+"Atenção: amanhã vou fazer mudança no banco de dados. Por segurança, vou
+atualizar TODOS ao mesmo tempo. Por favor, nada de mexer no app entre 22h
+e 23h hoje. Vou avisar quando estiver feito."
+
+EM CASO DE BUG REPORTADO:
+- Reproduzir localmente
+- Se urgente: hotfix no mesmo dia
+- Se não: agendar correção, comunicar prazo
+
+
+================================================================================
+VERSIONAMENTO E DEPLOY
+================================================================================
+
+VERSÃO SEMÂNTICA:
+Manter padrão MAJOR.MINOR.PATCH+BUILD
+
+Atualmente: 1.0.0+2
+
+Próximas versões sugeridas:
+- 1.1.0+X após Etapa 1 (limpeza)
+- 1.2.0+X após Etapa 2 (sistema visual)
+- 1.3.0+X após Dashboard refeito
+- ... etc
+
+PATCH (1.0.X) → bugfixes pequenos
+MINOR (1.X.0) → features novas, mudanças compatíveis
+MAJOR (X.0.0) → mudanças incompatíveis (raríssimas)
+
+TAGS NO GIT:
+A cada release importante, criar tag:
+
+git tag -a v1.1.0 -m "Etapa 1 concluída: limpeza técnica"
+git push --tags
+
+RELEASES NO GITHUB:
+Para cada tag, criar release com changelog.
+Permite reverter facilmente se necessário.
+
+
+================================================================================
+ESTRATÉGIAS DE ROLLBACK
+================================================================================
+
+Quando algo dá errado, precisa voltar.
+
+ROLLBACK DO APP:
+- Manter última versão estável buildada e disponível
+- Se nova versão quebrar: distribuir versão anterior para parceiros
+- Em produção (Play Store), você pode reverter na console
+
+ROLLBACK DO PAINEL REACT:
+- Manter branch main sempre estável
+- Features novas em branches separadas, merge só após teste
+- Hosting com versioning (Vercel/Netlify mantém histórico)
+
+ROLLBACK DO FIRESTORE:
+- Backups diários (configurar via Firebase)
+- Se script de migração quebrar: restaurar backup
+- Documentos individuais: histórico de versões via audit_logs
+
+
+================================================================================
+NOMENCLATURA E PADRÕES
+================================================================================
+
+Definir AGORA para não ter inconsistência depois.
+
+CAMPOS DO FIRESTORE:
+- Padrão sugerido: snake_case
+- Exemplo: active_dog_id, created_at, primary_handler_id
+- Razão: comum em backends, fácil de mapear pra qualquer linguagem
+
+MODELS DART:
+- Padrão Dart: camelCase
+- Conversão no .fromMap() / .toMap():
+      String activeDogId;
+      Map toMap() => { 'active_dog_id': activeDogId };
+      fromMap(Map map) => activeDogId = map['active_dog_id'];
+
+MODELS REACT (TypeScript ou JS):
+- Padrão JS: camelCase
+- Conversão similar
+
+COLEÇÕES FIRESTORE:
+- Plural, snake_case
+- Exemplos: /users, /dogs, /occurrences, /training_sessions
+
+SUBCOLEÇÕES:
+- Mesma regra
+- Exemplo: /dogs/{id}/health_events
+
+DOCUMENT IDs:
+- UUIDs (já tem package uuid no pubspec)
+- Não usar nomes legíveis como ID (evita ambiguidade)
+
+
+================================================================================
+CHECKLIST PARA CADA MUDANÇA NO SCHEMA
+================================================================================
+
+Toda vez que mexer no Firestore, passar por essa checklist:
+
+- [ ] Documentei o que vai mudar?
+- [ ] Identifiquei se o painel React usa esse campo/coleção?
+- [ ] Se sim, decidi se vou coordenar mudança ou fazer transição em fases?
+- [ ] Avisei parceiros se for mudança visível?
+- [ ] Tenho backup recente do Firestore?
+- [ ] Script de migração testado em ambiente dev?
+- [ ] Plano de rollback definido?
+- [ ] Versão Git tagueada antes da mudança?
+
+Se respondeu SIM pra todas: pode prosseguir.
+Se faltou alguma: pare, planeje melhor.
+
+
+================================================================================
+COLEÇÕES PREVISTAS NO ROADMAP NOVO
+================================================================================
+
+Coleções ADICIONAIS que o roadmap menciona (provavelmente ainda não existem).
+Cada uma é segura para criar — não afeta painel React até você implementar
+lá também.
+
+NOVAS COLEÇÕES PROPOSTAS:
+
+/dogs/{id}/commands
+  Biblioteca de comandos da Obediência
+
+/dogs/{id}/specialties_state
+  Estado atual de cada especialidade (operational/in_formation/not_started)
+
+/dogs/{id}/detection_lines
+  Linhas de Detecção (Drogas, Armas, Cadáver)
+
+/dogs/{id}/training_attempts
+  Tentativas granulares de sessões de Detecção
+
+/dogs/{id}/guard_protection_state
+  Estado dos 3 impulsos de Guarda & Proteção
+
+/dogs/{id}/documents
+  Laudos, certificações, honras (lista unificada)
+
+/dogs/{id}/external_certifications
+  Certificações externas (Detecção principalmente)
+
+/gps_tracks
+  Trilhas GPS de Rastreador
+
+/audit_logs
+  Trilha de auditoria centralizada
+
+CAMPOS NOVOS EM COLEÇÕES EXISTENTES:
+
+/dogs (verificar nome real)
+  + operational_since
+  + photo_url
+  + status ('active' | 'inactive' | 'retired' | 'donated')
+
+/users
+  + active_dog_id (se ainda não tiver)
+  + active_shift_id
+
+/training_sessions (se já existir)
+  + phase_or_module
+  + payment_type (para Guarda & Proteção)
+  + scenario_simulated
+
+Cada um desses pode ser ADICIONADO em qualquer momento sem afetar o painel.
+
+
+================================================================================
+RECOMENDAÇÕES FINAIS
+================================================================================
+
+1. NÃO TENHA PRESSA NA REFATORAÇÃO
+   App funciona. Parceiros estão usando. Cada etapa pode levar mais tempo
+   se for preciso. Qualidade > velocidade.
+
+2. COMITE FREQUENTE
+   Cada migração de arquivo, cada widget novo: commit isolado.
+   Histórico Git é seu rollback.
+
+3. TESTE EM DISPOSITIVO REAL FREQUENTE
+   Emulador é bom, mas usuários reais usam dispositivos reais.
+   Teste no seu celular antes de distribuir.
+
+4. PARCEIROS COMO ALIADOS
+   Eles veem o app no dia a dia. Feedback deles vale ouro.
+   Crie cultura de "se algo tiver estranho, fala."
+
+5. PAINEL REACT COMO LEMBRETE CONSTANTE
+   Antes de mexer no Firestore, abra o código do painel React.
+   Procure se ele usa o campo. Se sim, planeje coordenação.
+
+6. ROADMAP COMO GUIA, NÃO COMO LEI
+   Se durante a refatoração descobrir que tem caminho melhor: ajuste.
+   Documente a mudança. Atualize esse guia.
+
+
+================================================================================
+FIM DO GUIA DE COEXISTÊNCIA
+================================================================================

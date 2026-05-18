@@ -18,13 +18,6 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
       initialData: widget.initialData,
       onStateChanged: _notifySheetStateChanged,
     );
-    _routineCtrl = ActivitySheetRoutineCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: _notifySheetStateChanged,
-    );
     _healthCtrl = ActivitySheetHealthCtrl(
       dogId: widget.dogId,
       dogName: widget.dogName,
@@ -43,8 +36,6 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
       _occCtrl.init();
     } else if (widget.category == 'Treino') {
       _trainingCtrl.init();
-    } else if (widget.category == 'Rotina') {
-      _routineCtrl.init();
     } else if (widget.category == 'Saude') {
       _healthCtrl.init();
     }
@@ -66,7 +57,6 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
     final nowTime = _formatTimeOfDay(DateTime.now());
     _occCtrl.timeController.text = nowTime;
     _trainingCtrl.timeController.text = nowTime;
-    _routineCtrl.timeController.text = nowTime;
     _healthCtrl.timeController.text = nowTime;
   }
 
@@ -84,7 +74,6 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
   void _disposeActivityControllers() {
     _occCtrl.dispose();
     _trainingCtrl.dispose();
-    _routineCtrl.dispose();
     _healthCtrl.dispose();
   }
 

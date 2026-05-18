@@ -8,8 +8,6 @@ extension _DynamicActivitySheetHydration on _DynamicActivitySheetState {
 
     if (widget.category == 'Treino') {
       _populateTrainingEditData(d);
-    } else if (widget.category == 'Rotina') {
-      _populateRoutineEditData(d);
     } else if (_isOccurrenceCategory || widget.category == 'Evento') {
       _populateOccurrenceEditData(d);
     } else if (widget.category == 'Saude') {
@@ -29,11 +27,6 @@ extension _DynamicActivitySheetHydration on _DynamicActivitySheetState {
   void _populateTrainingEditData(Map<String, dynamic> data) {
     // Campos de texto populados por _trainingCtrl.init()
     _selectedSubtype = data['trainingType'];
-  }
-
-  void _populateRoutineEditData(Map<String, dynamic> data) {
-    // Campos de texto populados por _routineCtrl.init()
-    _selectedSubtype = data['activityType'];
   }
 
   void _populateHealthEditData(Map<String, dynamic> data) {

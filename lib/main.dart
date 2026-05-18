@@ -9,7 +9,6 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
@@ -36,7 +35,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => UserViewModel()),
         ChangeNotifierProvider(create: (_) => DogViewModel()),
         ChangeNotifierProvider(create: (_) => TrainingViewModel()),
-        ChangeNotifierProvider(create: (_) => RoutineViewModel()),
         ChangeNotifierProvider(create: (_) => HealthViewModel()),
         ChangeNotifierProvider(create: (_) => IncidentViewModel()),
         ChangeNotifierProvider(create: (_) => ShiftViewModel()),

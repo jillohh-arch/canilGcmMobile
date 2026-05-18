@@ -14,7 +14,6 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
@@ -22,7 +21,6 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
-import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
 import 'dynamic_activity_sheet.dart';
 
@@ -78,10 +76,6 @@ class _ActiveShiftDashboardScreenState
           context,
           listen: false,
         ).fetchIncidentsForDog(dogId);
-        Provider.of<RoutineViewModel>(
-          context,
-          listen: false,
-        ).fetchRoutinesForDog(dogId);
         Provider.of<NutritionViewModel>(
           context,
           listen: false,

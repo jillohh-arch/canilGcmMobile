@@ -1,17 +1,43 @@
-# canil_gcm
+# Canil K9 GCM Limeira
 
-A new Flutter project.
+App de gestão do canil K9 da Guarda Civil Municipal de Limeira-SP.
 
-## Getting Started
+Ferramenta de prestação de contas, defesa profissional e prontuário
+institucional dos cães operacionais. Acompanha rotina, treino,
+saúde e ocorrências dos binômios condutor-cão.
 
-This project is a starting point for a Flutter application.
+## Stack
 
-A few resources to get you started if this is your first Flutter project:
+- Flutter (Dart 3.11+)
+- Firebase: Auth, Firestore, Storage, App Check
+- Provider (state management)
+- go_router (navegação)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Setup
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run -d <device-id>
+```
+
+Necessário arquivo `google-services.json` (Android) e
+`GoogleService-Info.plist` (iOS) do projeto Firebase configurado.
+
+## Arquitetura
+
+Clean architecture por feature:
+
+```
+lib/
+  core/                    Recursos compartilhados (theme, services, widgets)
+  features/
+    <feature>/
+      data/                Models, repositories
+      domain/              Entities, use cases
+      presentation/        Screens, viewmodels, widgets
+```
+
+## Painel web
+
+Existe painel web React separado que consome o mesmo Firestore.
+Mudanças no schema precisam ser coordenadas.

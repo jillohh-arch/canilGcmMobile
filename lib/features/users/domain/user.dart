@@ -5,8 +5,6 @@ class UserModel {
   final String unit;
   final String accessLevel; // 'Admin' ou 'Condutor'
   final String? photoUrl;
-  final List<String> userBadges; // Gamification V1
-  final int xp; // Pontos de experiência
 
   UserModel({
     required this.ra,
@@ -15,8 +13,6 @@ class UserModel {
     required this.unit,
     this.accessLevel = 'Condutor',
     this.photoUrl,
-    this.userBadges = const [],
-    this.xp = 0,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -27,10 +23,6 @@ class UserModel {
       unit: json['unit'] ?? '',
       accessLevel: json['accessLevel'] ?? 'Condutor',
       photoUrl: json['photoUrl'],
-      userBadges: json['userBadges'] != null
-          ? List<String>.from(json['userBadges'])
-          : [],
-      xp: json['xp'] ?? 0,
     );
   }
 
@@ -42,8 +34,6 @@ class UserModel {
       'unit': unit,
       'accessLevel': accessLevel,
       'photoUrl': photoUrl,
-      'userBadges': userBadges,
-      'xp': xp,
     };
   }
 
@@ -54,8 +44,6 @@ class UserModel {
     String? unit,
     String? accessLevel,
     Object? photoUrl = _sentinel,
-    List<String>? userBadges,
-    int? xp,
   }) {
     return UserModel(
       ra: ra ?? this.ra,
@@ -64,8 +52,6 @@ class UserModel {
       unit: unit ?? this.unit,
       accessLevel: accessLevel ?? this.accessLevel,
       photoUrl: photoUrl == _sentinel ? this.photoUrl : photoUrl as String?,
-      userBadges: userBadges ?? this.userBadges,
-      xp: xp ?? this.xp,
     );
   }
 

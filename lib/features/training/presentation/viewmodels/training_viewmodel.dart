@@ -135,7 +135,7 @@ class TrainingViewModel extends ChangeNotifier {
     }
   }
 
-  // Fetch all trainings (For Gamification Ranking)
+  // Fetch all trainings
   Future<void> fetchAllTrainings() async {
     try {
       _setLoading(true);

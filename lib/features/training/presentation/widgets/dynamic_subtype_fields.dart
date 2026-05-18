@@ -26,7 +26,7 @@ class DynamicSubtypeFields extends StatelessWidget {
   static const physicalConditioningSubtype =
       ActivitySubtypeIds.physicalConditioning;
   static const leisureConditioningSubtype = 'Lazer/Condicionamento';
-  static const walkSubtype = ActivitySubtypeIds.walk;
+  static const walkSubtype = 'Passeio';
 
   final String? subtype;
   final Map<String, dynamic> formData;

@@ -48,7 +48,6 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
     return ActivityFormLabels.descriptionLabel(
       category: widget.category,
       subtype: _selectedSubtype,
-      feedingSubtype: ActivitySubtypeIds.feeding,
     );
   }
 
@@ -183,7 +182,8 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
         _durationController.text = (durationSeconds / 60).floor().toString();
       }
       if (distanceMeters is num) {
-        _distanciaController.text = (distanceMeters / 1000).toStringAsFixed(2);
+        _formData['_trackingDistanceKm'] =
+            (distanceMeters / 1000).toStringAsFixed(2);
       }
     });
 

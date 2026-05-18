@@ -1,0 +1,605 @@
+================================================================================
+CHECKLIST DE LIMPEZA TÉCNICA — ETAPA 1
+APP CANIL K9 GCM LIMEIRA
+================================================================================
+
+OBJETIVO: Resolver a duplicação views/ vs features/ e limpar dívida técnica
+antes de iniciar a refatoração visual.
+
+DURAÇÃO ESTIMADA: 1 semana
+
+PRINCÍPIO: Cada item desta checklist é um commit isolado no Git. Se algo
+quebrar, fácil reverter.
+
+================================================================================
+PASSO 1 — DIAGNÓSTICO INICIAL
+================================================================================
+
+ANTES de deletar qualquer coisa, mapear o que é usado.
+
+PROMPT PARA CLAUDE CODE:
+"Estou refatorando o app Canil K9. Preciso mapear o que está sendo usado das
+pastas legadas views/, models/ e viewmodels/ na raiz de lib/. Execute estes
+comandos e me mostre os resultados resumidos:
+
+1. grep -r 'package:canil_gcm/views/' lib/ --include='*.dart' | sort -u
+2. grep -r 'package:canil_gcm/models/' lib/ --include='*.dart' | sort -u
+3. grep -r 'package:canil_gcm/viewmodels/' lib/ --include='*.dart' | sort -u
+
+Para cada import encontrado, me diga:
+- Qual arquivo importa
+- Qual arquivo é importado
+- Se já existe versão equivalente em features/"
+
+CHECKLIST PASSO 1:
+- [ ] Executar os 3 greps acima
+- [ ] Salvar resultado em scratch/imports_audit.txt
+- [ ] Classificar cada import:
+      a) Ainda usado, sem duplicata em features/  → MIGRAR
+      b) Já tem duplicata em features/              → CONSOLIDAR + DELETAR antigo
+      c) Não usado em nenhum lugar                  → DELETAR código morto
+
+
+================================================================================
+PASSO 2 — DELETAR GAMIFICAÇÃO
+================================================================================
+
+Decisão já tomada na sessão de design: gamificação sai. Nada de XP, ranking,
+troféus, missões. Substituir no futuro por selos de conformidade.
+
+CHECKLIST PASSO 2:
+- [ ] Buscar referências de gamificação:
+      grep -rn "gamification\|gamif" lib/ --include='*.dart'
+
+- [ ] Listar todos os arquivos que importam algo de views/gamification/
+
+- [ ] Para cada arquivo que importa:
+      - Remover a importação
+      - Remover o uso da feature (botão, rota, widget)
+      - Substituir por placeholder se necessário (ou deletar bloco)
+
+- [ ] Buscar models relacionados:
+      grep -rn "XP\|Trophy\|Mission\|Ranking\|Badge" lib/models/ --include='*.dart'
+      (Ignorar Badge se for usado pra outros contextos válidos)
+
+- [ ] Deletar arquivos:
+      rm -rf lib/views/gamification/
+
+- [ ] Buscar bottom nav ou rotas que referenciem "Rank":
+      grep -rn "Rank\|rank" lib/ --include='*.dart' | grep -v "ranking\|ranked"
+
+- [ ] Remover aba Rank do bottom nav atual (se existir)
+
+- [ ] Buscar referências em assets ou strings:
+      grep -rn "ranking\|troféu\|trofeu\|missão\|missao" lib/
+
+- [ ] Rodar flutter analyze e corrigir erros
+
+- [ ] Testar app:
+      flutter run -d <device>
+      Navegar por todas as telas, confirmar nada quebrou.
+
+- [ ] Commit:
+      git add .
+      git commit -m "remove: gamificação descontinuada conforme decisão de design
+
+      - Remove pasta views/gamification/
+      - Remove referências em bottom nav e rotas
+      - Remove models de XP, ranking, troféus, missões
+      - Substituição por selos de conformidade fica para etapa futura"
+
+
+================================================================================
+PASSO 3 — LIMPAR ARQUIVOS DE LOG E SCREENSHOTS DA RAIZ
+================================================================================
+
+Arquivos identificados na raiz do repositório que não deveriam estar versionados:
+
+LOGS:
+- analyze.txt
+- analyze_main.txt
+- analyze_new.txt
+- analyze_out.txt
+- analyze_output.txt
+- analyze_output_utf8.txt
+- analyze.txt
+- build_log.txt
+- build_out.txt
+- devices.txt
+- flutter_errors.txt
+- flutter_log.txt
+- issues.txt
+- logs_live.txt
+- run_err.txt
+- run_out.txt
+- save_errors.txt
+
+SCREENSHOTS:
+- after_rules.png
+- dash.png
+- dash_fixed.png
+- dash_m3.png
+- flutter_01.png
+- guards.png
+- k9s_m3.png
+- new_dogcard.png
+- new_tab.png
+- screen.png
+- screen_final.png
+- screen_profile.png
+- screen_reinstall.png
+- screenshot.png
+- screenshot2.png
+- verified_dash.png
+
+CHECKLIST PASSO 3:
+
+- [ ] Decidir destino das screenshots:
+      Opção A: Manter para histórico → mover para docs/screenshots/archive/
+      Opção B: Não precisa mais → deletar
+
+- [ ] Se Opção A:
+      mkdir -p docs/screenshots/archive
+      mv *.png docs/screenshots/archive/
+
+- [ ] Se Opção B:
+      rm *.png (cuidado: garantir que não tem .png importante na raiz)
+
+- [ ] Deletar logs:
+      rm analyze*.txt build_*.txt devices.txt flutter_*.txt issues.txt
+      rm logs_live.txt run_*.txt save_errors.txt
+
+- [ ] Atualizar .gitignore (adicionar no final):
+
+      # Logs e outputs de debug
+      *.log
+      analyze*.txt
+      flutter_errors.txt
+      flutter_log.txt
+      build_log.txt
+      build_out.txt
+      run_*.txt
+      logs_live.txt
+      devices.txt
+      issues.txt
+      save_errors.txt
+      
+      # Screenshots de debug
+      screenshot*.png
+      screen_*.png
+      dash*.png
+      
+      # Scratch
+      scratch/
+
+- [ ] Verificar pasta scratch/ — provavelmente tem rascunhos
+      Se relevante: documentar e manter
+      Se não: rm -rf scratch/
+
+- [ ] Commit:
+      git add .
+      git commit -m "chore: limpa logs, screenshots e scratch do repositório
+
+      - Remove arquivos de log de análise/build/run
+      - Move screenshots antigos para docs/screenshots/archive/ (ou deleta)
+      - Atualiza .gitignore para evitar reentrada"
+
+
+================================================================================
+PASSO 4 — DESCRIÇÃO DO PROJETO E README
+================================================================================
+
+CHECKLIST PASSO 4:
+
+- [ ] Atualizar pubspec.yaml:
+      Trocar:
+        description: "A new Flutter project."
+      Por:
+        description: "App de gestão do canil K9 da GCM Limeira"
+
+- [ ] Reescrever README.md (criar arquivo limpo):
+
+      # Canil K9 GCM Limeira
+
+      App de gestão do canil K9 da Guarda Civil Municipal de Limeira-SP.
+
+      Ferramenta de prestação de contas, defesa profissional e prontuário
+      institucional dos cães operacionais. Acompanha rotina, treino,
+      saúde e ocorrências dos binômios condutor-cão.
+
+      ## Stack
+
+      - Flutter (Dart 3.11+)
+      - Firebase: Auth, Firestore, Storage, App Check
+      - Provider (state management)
+      - go_router (em adoção gradual)
+
+      ## Setup
+
+      ```bash
+      flutter pub get
+      flutter run -d <device-id>
+      ```
+
+      Necessário arquivo `google-services.json` (Android) e
+      `GoogleService-Info.plist` (iOS) do projeto Firebase configurado.
+
+      ## Arquitetura
+
+      Clean architecture por feature:
+
+      ```
+      lib/
+        core/                    Recursos compartilhados (theme, services, widgets)
+        features/
+          <feature>/
+            data/                Models, repositories
+            domain/              Entities, use cases
+            presentation/        Screens, viewmodels, widgets
+      ```
+
+      ## Documentação técnica
+
+      Ver `docs/` para roadmap, mockups de referência e guias.
+
+      ## Painel web
+
+      Existe painel web React separado que consome o mesmo Firestore.
+      Mudanças no schema precisam ser coordenadas.
+
+- [ ] Commit:
+      git add .
+      git commit -m "docs: atualiza description e README do projeto"
+
+
+================================================================================
+PASSO 5 — MIGRAR views/auth/ → features/auth/
+================================================================================
+
+Migração mais simples (auth é mais isolado).
+
+CHECKLIST PASSO 5:
+
+- [ ] Listar arquivos em views/auth/:
+      ls lib/views/auth/
+
+- [ ] Para cada arquivo .dart em views/auth/:
+      
+      a) Mover para features/auth/presentation/screens/:
+         mv lib/views/auth/<arquivo>.dart lib/features/auth/presentation/screens/
+
+      b) Atualizar import no arquivo migrado se ele referenciava outros
+         arquivos com path relativo (geralmente caminhos absolutos package:)
+
+      c) Atualizar TODOS os outros arquivos que importavam o antigo:
+         find lib/ -name "*.dart" -exec sed -i 's|canil_gcm/views/auth/|canil_gcm/features/auth/presentation/screens/|g' {} \;
+         (No Windows usar comando equivalente)
+
+- [ ] Rodar flutter analyze, corrigir erros de import restantes
+
+- [ ] Testar fluxo de login
+
+- [ ] Deletar pasta vazia views/auth/
+
+- [ ] Commit:
+      git add .
+      git commit -m "refactor: migra views/auth para features/auth"
+
+
+================================================================================
+PASSO 6 — MIGRAR views/users/ → features/users/
+================================================================================
+
+Mesmo padrão do Passo 5.
+
+CHECKLIST PASSO 6:
+
+- [ ] Listar conteúdo: ls lib/views/users/
+- [ ] Mover arquivos para features/users/presentation/screens/
+- [ ] Atualizar imports em todo o projeto (sed/grep)
+- [ ] Rodar flutter analyze
+- [ ] Testar fluxos relacionados a users
+- [ ] Deletar pasta vazia
+- [ ] Commit: "refactor: migra views/users para features/users"
+
+
+================================================================================
+PASSO 7 — CRIAR features/profile/ E MIGRAR views/profile/
+================================================================================
+
+Profile ainda não existe em features/. Criar do zero.
+
+CHECKLIST PASSO 7:
+
+- [ ] Criar estrutura:
+      mkdir -p lib/features/profile/data
+      mkdir -p lib/features/profile/domain
+      mkdir -p lib/features/profile/presentation/screens
+      mkdir -p lib/features/profile/presentation/viewmodels
+      mkdir -p lib/features/profile/presentation/widgets
+
+- [ ] Mover arquivos de views/profile/ para features/profile/presentation/screens/
+
+- [ ] Atualizar imports
+
+- [ ] Rodar flutter analyze
+
+- [ ] Testar tela de perfil
+
+- [ ] Deletar pasta vazia views/profile/
+
+- [ ] Commit: "refactor: migra views/profile para features/profile"
+
+
+================================================================================
+PASSO 8 — MIGRAR views/dogs/ → features/dogs/
+================================================================================
+
+ATENÇÃO: features/dogs/ já existe. Pode haver conflito ou duplicação.
+
+CHECKLIST PASSO 8:
+
+- [ ] Comparar conteúdo:
+      ls lib/views/dogs/
+      ls lib/features/dogs/presentation/screens/
+
+- [ ] Para cada arquivo em views/dogs/:
+      
+      Se NÃO existe equivalente em features/dogs/:
+      → Mover para features/dogs/presentation/screens/
+      → Atualizar imports
+
+      Se existe equivalente:
+      → Decidir qual versão é a correta/recente
+      → Verificar se o main.dart importa qual
+      → Manter a correta, deletar a obsoleta
+      → Atualizar imports onde necessário
+
+- [ ] Rodar flutter analyze
+
+- [ ] Testar fluxos relacionados a dogs (dashboard, seleção, perfil do cão)
+
+- [ ] Deletar pasta vazia views/dogs/
+
+- [ ] Commit: "refactor: consolida views/dogs em features/dogs"
+
+
+================================================================================
+PASSO 9 — MIGRAR views/shifts/ → features/shifts/
+================================================================================
+
+CHECKLIST PASSO 9:
+
+- [ ] Comparar conteúdo views/shifts vs features/shifts/presentation/screens/
+- [ ] Mover ou consolidar conforme passo 8
+- [ ] Atualizar imports
+- [ ] Rodar flutter analyze
+- [ ] Testar fluxo de assumir turno (ShiftAssumptionScreen)
+- [ ] Deletar pasta vazia
+- [ ] Commit: "refactor: consolida views/shifts em features/shifts"
+
+
+================================================================================
+PASSO 10 — MIGRAR views/health/ → features/health/
+================================================================================
+
+CHECKLIST PASSO 10:
+
+- [ ] Comparar conteúdo
+- [ ] Mover ou consolidar
+- [ ] Atualizar imports
+- [ ] Rodar flutter analyze
+- [ ] Testar fluxos de saúde
+- [ ] Deletar pasta vazia
+- [ ] Commit: "refactor: consolida views/health em features/health"
+
+
+================================================================================
+PASSO 11 — MIGRAR views/trainings/ → features/training/
+================================================================================
+
+Atenção: o nome muda de "trainings" (plural) para "training" (singular).
+
+CHECKLIST PASSO 11:
+
+- [ ] Comparar conteúdo
+- [ ] Mover ou consolidar em features/training/presentation/screens/
+- [ ] Atualizar imports
+- [ ] Rodar flutter analyze
+- [ ] Testar fluxos de treino (Obediência, especialidades existentes)
+- [ ] Deletar pasta vazia
+- [ ] Commit: "refactor: consolida views/trainings em features/training"
+
+
+================================================================================
+PASSO 12 — MIGRAR views/incidents/ → features/incidents/
+================================================================================
+
+ATENÇÃO ESPECIAL: incidents é onde mora a feature mais crítica do app.
+features/incidents/presentation/ já tem controllers/screens/viewmodels/widgets.
+views/incidents/ também tem controllers/widgets.
+
+Pode haver duplicação significativa. Migrar com cuidado.
+
+CHECKLIST PASSO 12:
+
+- [ ] Mapear todos os arquivos em views/incidents/ e features/incidents/
+
+- [ ] Para cada arquivo:
+      - Se tem mesmo nome em ambos: comparar conteúdo, manter o mais atualizado
+      - Se só existe em views/: mover para features/
+
+- [ ] Atualizar imports em main.dart e em todo o resto
+
+- [ ] Rodar flutter analyze
+
+- [ ] TESTAR EXTENSIVAMENTE:
+      - Iniciar ocorrência
+      - Adicionar eventos
+      - Editar evento
+      - Finalizar ocorrência
+      - Exportar PDF (se já existe)
+
+- [ ] Deletar pasta vazia views/incidents/
+
+- [ ] Commit: "refactor: consolida views/incidents em features/incidents"
+
+
+================================================================================
+PASSO 13 — ELIMINAR models/ NA RAIZ
+================================================================================
+
+Mover models pra dentro das features correspondentes.
+
+CHECKLIST PASSO 13:
+
+- [ ] Listar conteúdo: ls lib/models/
+
+- [ ] Para cada model:
+      a) Identificar a feature dona (ex: DogModel → features/dogs/data/models/)
+      b) Mover para features/<feature>/data/models/
+      c) Atualizar imports em todo o projeto
+
+- [ ] Se algum model é compartilhado entre features:
+      Mover para core/domain/models/
+
+- [ ] Rodar flutter analyze
+
+- [ ] Testar app completo
+
+- [ ] Deletar pasta vazia lib/models/
+
+- [ ] Commit: "refactor: distribui models por feature"
+
+
+================================================================================
+PASSO 14 — ELIMINAR viewmodels/ NA RAIZ
+================================================================================
+
+Mover viewmodels pra dentro das features correspondentes.
+
+CHECKLIST PASSO 14:
+
+- [ ] Listar conteúdo: ls lib/viewmodels/
+
+- [ ] Para cada viewmodel:
+      a) Identificar a feature dona
+      b) Mover para features/<feature>/presentation/viewmodels/
+      c) Atualizar imports em main.dart e onde mais for usado
+
+- [ ] Rodar flutter analyze
+
+- [ ] Testar app completo
+
+- [ ] Deletar pasta vazia lib/viewmodels/
+
+- [ ] Commit: "refactor: distribui viewmodels por feature"
+
+
+================================================================================
+PASSO 15 — VALIDAÇÃO FINAL DA ETAPA 1
+================================================================================
+
+CHECKLIST PASSO 15:
+
+- [ ] Estrutura final esperada:
+
+      lib/
+        main.dart
+        core/
+          controllers/
+          domain/
+          services/
+          theme/
+          utils/
+          widgets/
+        features/
+          app_shell/
+          auth/
+          dashboard/
+          dogs/
+          health/
+          incidents/
+          profile/        ← novo
+          routine/
+          shifts/
+          training/
+          users/
+        navigation/       ← criar se ainda não tiver
+
+- [ ] Confirmar que NÃO existe mais:
+      - lib/views/
+      - lib/models/
+      - lib/viewmodels/
+
+- [ ] Rodar análise final:
+      flutter analyze
+      Deve passar sem warnings críticos.
+
+- [ ] Rodar app completo:
+      flutter run
+      Navegar por TODAS as telas:
+      - Login
+      - Assumir turno
+      - Dashboard
+      - Iniciar ocorrência → adicionar eventos → editar → finalizar
+      - Treino (cada especialidade existente)
+      - Saúde
+      - Histórico
+      - Perfil
+      - Trocar cão
+
+- [ ] Confirmar que NADA visual mudou ainda
+      (Esta etapa é só estrutural. Visual muda na Etapa 2.)
+
+- [ ] Commit final da etapa:
+      git tag v1.1.0-cleanup
+      git push --tags
+
+- [ ] AVISAR PARCEIROS:
+      "Pessoal, fiz uma reorganização interna do app. Nenhuma feature mudou,
+       mas se notarem algo estranho, me avisem."
+
+
+================================================================================
+RESUMO DO QUE DEVE SOBRAR APÓS ETAPA 1
+================================================================================
+
+ANTES (estado atual):
+lib/
+  core/...
+  features/
+    app_shell/ auth/ dashboard/ dogs/ health/ incidents/
+    routine/ shifts/ training/ users/
+  models/                  ← APAGADO
+  viewmodels/              ← APAGADO
+  views/                   ← APAGADO
+    auth/ dogs/ gamification/ health/ incidents/
+    profile/ shifts/ trainings/ users/
+
+DEPOIS (esperado):
+lib/
+  main.dart
+  core/
+    controllers/ domain/ services/ theme/ utils/ widgets/
+  features/
+    app_shell/ auth/ dashboard/ dogs/ health/ incidents/
+    profile/                 ← NOVO (movido de views/)
+    routine/ shifts/ training/ users/
+
+
+================================================================================
+PRÓXIMOS PASSOS APÓS ETAPA 1
+================================================================================
+
+Com base limpa, partir para ETAPA 2 (Sistema Visual):
+- Atualizar core/theme/ com tokens dos mockups
+- Criar widgets base em core/widgets/
+- Padronizar linguagem (cortar inglês decorativo, caixa alta excessiva)
+
+Ver: ROADMAP_REFATORACAO.txt
+
+
+================================================================================
+FIM DO CHECKLIST DE LIMPEZA
+================================================================================

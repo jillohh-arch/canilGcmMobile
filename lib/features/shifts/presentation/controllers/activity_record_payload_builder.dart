@@ -1,36 +1,7 @@
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
-import 'package:canil_gcm/features/routine/domain/routine_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 
 abstract final class ActivityRecordPayloadBuilder {
-  static RoutineModel routine({
-    required String? documentId,
-    required String dogId,
-    required String dogName,
-    required String currentRa,
-    required String? initialHandlerId,
-    required String activityType,
-    required DateTime timestamp,
-    required String notes,
-    required List<Map<String, dynamic>> mediaAttachments,
-    required Map<String, dynamic> metadata,
-  }) {
-    return RoutineModel(
-      id: documentId,
-      dogId: dogId,
-      dogName: dogName,
-      handlerId: initialHandlerId ?? currentRa,
-      activityType: activityType,
-      status: 'Concluído',
-      timestamp: timestamp,
-      notes: _optionalText(notes),
-      mediaAttachments: _optionalMedia(mediaAttachments),
-      metadata: metadata.isNotEmpty
-          ? Map<String, dynamic>.from(metadata)
-          : null,
-    );
-  }
-
   static HealthLogModel healthLog({
     required String? documentId,
     required String dogId,

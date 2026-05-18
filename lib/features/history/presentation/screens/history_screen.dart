@@ -13,8 +13,6 @@ import 'package:canil_gcm/features/history/presentation/screens/history_detail_s
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
-import 'package:canil_gcm/features/routine/domain/routine_model.dart';
-import 'package:canil_gcm/features/routine/presentation/viewmodels/routine_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';

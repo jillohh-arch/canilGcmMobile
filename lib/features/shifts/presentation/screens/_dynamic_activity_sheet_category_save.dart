@@ -5,17 +5,11 @@ part of 'dynamic_activity_sheet.dart';
 extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
   Future<void> _saveByCategory({
     required AuthViewModel authVM,
-    required RoutineViewModel routineVM,
     required TrainingViewModel trainingVM,
     required IncidentViewModel incidentVM,
     required HealthViewModel healthVM,
     required UserViewModel userVM,
   }) async {
-    if (widget.category == 'Rotina') {
-      await _saveRoutine(routineVM: routineVM, authVM: authVM);
-      return;
-    }
-
     if (widget.category == 'Treino') {
       _setSaveStatus('Salvando treino no Firebase...');
       await _saveTraining(trainingVM: trainingVM, authVM: authVM);
@@ -46,27 +40,6 @@ extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
       selectedSubtype: _selectedSubtype,
       formData: _formData,
       mediaAttachments: _mediaAttachments,
-      onStatus: (msg) {
-        if (mounted) setState(() => _saveStatus = msg);
-      },
-      onUploading: _markMediaUploading,
-      onUploaded: _markMediaUploaded,
-      onPending: _markMediaPending,
-    );
-  }
-
-  Future<void> _saveRoutine({
-    required RoutineViewModel routineVM,
-    required AuthViewModel authVM,
-  }) async {
-    _setSaveStatus('Salvando rotina no Firebase...');
-    await _routineCtrl.save(
-      routineVM: routineVM,
-      authVM: authVM,
-      selectedSubtype: _selectedSubtype,
-      formData: _formData,
-      mediaAttachments: _mediaAttachments,
-      resolvedTimestamp: _resolveFormTimestamp(),
       onStatus: (msg) {
         if (mounted) setState(() => _saveStatus = msg);
       },

@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cão / Prontuário - Canil K9 GCM</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: #0a1418;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-label {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+    max-width: 390px;
+  }
+
+  .phone-label small {
+    display: block;
+    color: #5a7280;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #050d10;
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  /* HEADER UNIVERSAL */
+  .universal-header {
+    padding: 8px 16px 14px 16px;
+    background: rgba(77, 208, 225, 0.04);
+    border-bottom: 1px solid rgba(77, 208, 225, 0.12);
+    flex-shrink: 0;
+  }
+
+  .uh-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatars-stack {
+    display: flex;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 2px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .avatar-small.condutor {
+    border-color: rgba(77, 208, 225, 0.5);
+    margin-left: -10px;
+  }
+
+  .uh-info { flex: 1; min-width: 0; }
+
+  .uh-binomio {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .uh-turno {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #2ecc71;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .turno-dot {
+    width: 6px;
+    height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+  }
+
+  .uh-time {
+    color: #b0c4cc;
+    font-weight: 500;
+  }
+
+  .uh-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .uh-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.08);
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* SCROLL */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 110px 16px;
+  }
+
+  .scroll-area::-webkit-scrollbar { width: 0; }
+
+  /* TÍTULO DA PÁGINA */
+  .page-title {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+
+  /* FICHA DO CÃO */
+  .dog-card {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.05), rgba(46, 204, 113, 0.02));
+    border: 1px solid rgba(77, 208, 225, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .dog-photo {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #1a2a30;
+    border: 3px solid #4dd0e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 16px;
+    font-weight: 800;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .dog-photo-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #2ecc71;
+    color: #050d10;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #050d10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .dog-data { flex: 1; min-width: 0; }
+
+  .dog-name {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .dog-breed {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+
+  .dog-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .dog-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .dog-meta-item span:first-child {
+    color: #7a8a92;
+  }
+
+  .operational-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(46, 204, 113, 0.12);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    color: #2ecc71;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+
+  /* SECTION LABELS */
+  .section-label {
+    color: #4dd0e1;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-label-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .section-label-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(77, 208, 225, 0.15);
+  }
+
+  .section-action {
+    color: #4dd0e1;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+
+  /* STATUS MÉDICO RÁPIDO - 4 cards */
+  .med-status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .med-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .med-card.ok { border-left: 3px solid #2ecc71; }
+  .med-card.warn { border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.04); }
+  .med-card.critical { border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.04); }
+
+  .med-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .med-card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .med-card.ok .med-card-icon { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .med-card.warn .med-card-icon { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .med-card.critical .med-card-icon { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+
+  .med-card-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+
+  .med-card-value {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+
+  .med-card-sub {
+    color: #b0c4cc;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .med-card-sub strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .med-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .med-card.ok .med-tag { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+  .med-card.warn .med-tag { background: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+  .med-card.critical .med-tag { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+
+  /* ESPECIALIDADES */
+  .specialty-grid {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .specialty-grid::-webkit-scrollbar { height: 0; }
+
+  .spec-chip {
+    background: rgba(46, 204, 113, 0.08);
+    border: 1px solid rgba(46, 204, 113, 0.25);
+    border-radius: 12px;
+    padding: 10px 12px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .spec-chip-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .spec-chip-info { min-width: 0; }
+
+  .spec-chip-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+
+  .spec-chip-status {
+    color: #2ecc71;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  /* LAUDO NUTRICIONAL — DESTAQUE INSTITUCIONAL */
+  .laudo-card {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(77, 208, 225, 0.05));
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    border-radius: 14px;
+    padding: 14px;
+    margin-top: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .laudo-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+
+  .laudo-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .laudo-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(46, 204, 113, 0.15);
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #2ecc71;
+    flex-shrink: 0;
+  }
+
+  .laudo-info { flex: 1; min-width: 0; padding-right: 60px; }
+
+  .laudo-title {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .laudo-sub {
+    color: #b0c4cc;
+    font-size: 10px;
+  }
+
+  .laudo-quantity {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .laudo-q-label {
+    color: #7a8a92;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .laudo-q-value {
+    color: #2ecc71;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .laudo-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .laudo-btn {
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    color: #2ecc71;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  /* GRÁFICO DE PESO */
+  .weight-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .weight-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .weight-current {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .weight-current span {
+    color: #7a8a92;
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+
+  .weight-trend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(46, 204, 113, 0.12);
+    color: #2ecc71;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* Gráfico SVG */
+  .weight-chart {
+    margin: 0 -4px;
+    height: 80px;
+    position: relative;
+  }
+
+  .weight-chart svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .weight-x-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+
+  .weight-x-label {
+    color: #5a7280;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* CARTEIRA DE VACINAÇÃO */
+  .vaccine-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .vaccine-row {
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .vaccine-row:last-child { border-bottom: none; }
+
+  .vaccine-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .vaccine-status.ok { background: #2ecc71; }
+  .vaccine-status.warn { background: #f1c40f; }
+  .vaccine-status.critical { background: #e74c3c; }
+
+  .vaccine-info { flex: 1; min-width: 0; }
+
+  .vaccine-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .vaccine-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .vaccine-next {
+    color: #b0c4cc;
+    font-size: 10px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .vaccine-next strong {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: block;
+  }
+
+  /* DOCUMENTOS */
+  .doc-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 11px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .doc-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(77, 208, 225, 0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4dd0e1;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .doc-info { flex: 1; min-width: 0; }
+
+  .doc-name {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .doc-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  .doc-arrow {
+    color: #5a7280;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  /* EVENTOS RECENTES */
+  .event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .event-row:last-child { border-bottom: none; }
+
+  .event-date {
+    color: #5a7280;
+    font-size: 11px;
+    font-weight: 700;
+    width: 48px;
+    flex-shrink: 0;
+  }
+
+  .event-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .event-info { flex: 1; min-width: 0; }
+
+  .event-title {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+
+  .event-meta {
+    color: #7a8a92;
+    font-size: 10px;
+  }
+
+  /* CTA + BOTTOM NAV */
+  .cta-bar {
+    position: absolute;
+    bottom: 78px;
+    left: 0;
+    right: 0;
+    padding: 8px 16px 8px 16px;
+    background: linear-gradient(to top, #050d10 70%, transparent);
+    pointer-events: none;
+  }
+
+  .cta-btn {
+    width: 100%;
+    background: #4dd0e1;
+    color: #050d10;
+    border: none;
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    pointer-events: auto;
+    box-shadow: 0 4px 12px rgba(77, 208, 225, 0.2);
+  }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #050d10;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 8px 0 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #5a7280;
+  }
+
+  .nav-item.active {
+    color: #4dd0e1;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .fab-center {
+    width: 54px;
+    height: 54px;
+    background: #4dd0e1;
+    color: #050d10;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(77, 208, 225, 0.3);
+    cursor: pointer;
+    margin-top: -28px;
+    border: 4px solid #050d10;
+  }
+
+  /* NOTAS */
+  .design-notes {
+    width: 100%;
+    max-width: 1200px;
+    margin: 30px auto 0;
+    color: #888;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .design-notes h3 {
+    color: #4dd0e1;
+    font-size: 14px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .design-notes ul { list-style: none; padding-left: 0; }
+  .design-notes li {
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .design-notes li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #4dd0e1;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-wrap">
+  <div class="phone-label">
+    TELA — CÃO / PRONTUÁRIO
+    <small>Dossiê institucional do animal · acessada via bottom nav</small>
+  </div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>14:32</span>
+      <div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div>
+    </div>
+
+    <!-- HEADER UNIVERSAL -->
+    <div class="universal-header">
+      <div class="uh-row">
+        <div class="avatars-stack">
+          <div class="avatar-small">BONO</div>
+          <div class="avatar-small condutor">RAG</div>
+        </div>
+        <div class="uh-info">
+          <div class="uh-binomio">Bono · GCM Ragonha</div>
+          <div class="uh-turno">
+            <span class="turno-dot"></span>
+            <span>Turno ativo</span>
+            <span class="uh-time">· há 5h</span>
+          </div>
+        </div>
+        <div class="uh-actions">
+          <button class="uh-btn" title="Trocar cão">⇄</button>
+          <button class="uh-btn" title="Perfil">👤</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="page-title">🐕 PRONTUÁRIO DO CÃO</div>
+
+      <!-- FICHA -->
+      <div class="dog-card">
+        <div class="dog-photo">
+          BONO
+          <div class="dog-photo-badge">✓</div>
+        </div>
+        <div class="dog-data">
+          <div class="dog-name">Bono</div>
+          <div class="dog-breed">MALINOIS · MACHO</div>
+          <div class="dog-meta-row">
+            <div class="dog-meta-item">
+              <span>Idade:</span><strong style="color:#fff;">6 anos</strong>
+            </div>
+            <div class="dog-meta-item">
+              <span>·</span>
+            </div>
+            <div class="dog-meta-item">
+              <span>Peso:</span><strong style="color:#fff;">28kg</strong>
+            </div>
+          </div>
+          <div class="operational-badge">
+            <span>●</span> OPERACIONAL HÁ 4 ANOS
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUS MÉDICO RÁPIDO -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>STATUS MÉDICO</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="med-status-grid">
+        <!-- Vacinas -->
+        <div class="med-card ok">
+          <div class="med-card-top">
+            <div class="med-card-icon">💉</div>
+            <div class="med-card-label">VACINAS</div>
+          </div>
+          <div class="med-card-value">Em dia</div>
+          <div class="med-card-sub">Próxima: <strong>V10 em 28/06</strong></div>
+        </div>
+
+        <!-- Antipulgas -->
+        <div class="med-card warn">
+          <div class="med-card-top">
+            <div class="med-card-icon">🪲</div>
+            <div class="med-card-label">ANTIPULGAS</div>
+          </div>
+          <div class="med-card-value">Vence em 8d</div>
+          <div class="med-card-sub">Última: <strong>10/04</strong> · Bravecto</div>
+        </div>
+
+        <!-- Peso -->
+        <div class="med-card ok">
+          <div class="med-card-top">
+            <div class="med-card-icon">⚖</div>
+            <div class="med-card-label">PESO</div>
+          </div>
+          <div class="med-card-value">28.0 kg</div>
+          <div class="med-card-sub">Estável · últimos 3 meses</div>
+        </div>
+
+        <!-- Exames -->
+        <div class="med-card warn">
+          <div class="med-card-top">
+            <div class="med-card-icon">🩺</div>
+            <div class="med-card-label">EXAMES</div>
+          </div>
+          <div class="med-card-value">Vencendo</div>
+          <div class="med-card-sub">Hemograma há <strong>5 meses</strong></div>
+        </div>
+      </div>
+
+      <!-- LAUDO NUTRICIONAL (DESTAQUE INSTITUCIONAL) -->
+      <div class="laudo-card">
+        <div class="laudo-badge">DOC. INSTITUCIONAL</div>
+        <div class="laudo-top">
+          <div class="laudo-icon">📋</div>
+          <div class="laudo-info">
+            <div class="laudo-title">Laudo Nutricional</div>
+            <div class="laudo-sub">Dra. Ana Souza · CRMV 12345</div>
+          </div>
+        </div>
+        <div class="laudo-quantity">
+          <div class="laudo-q-label">QUANTIDADE PRESCRITA</div>
+          <div class="laudo-q-value">800 g/dia</div>
+        </div>
+        <div class="laudo-actions">
+          <button class="laudo-btn">📄 Ver PDF</button>
+          <button class="laudo-btn">📊 Histórico</button>
+        </div>
+      </div>
+
+      <!-- ESPECIALIDADES -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>ESPECIALIDADES OPERACIONAIS</span>
+          <span class="section-label-line"></span>
+        </div>
+      </div>
+
+      <div class="specialty-grid">
+        <div class="spec-chip">
+          <div class="spec-chip-icon">🛡</div>
+          <div class="spec-chip-info">
+            <div class="spec-chip-name">Guarda</div>
+            <div class="spec-chip-status">● OPERACIONAL</div>
+          </div>
+        </div>
+        <div class="spec-chip">
+          <div class="spec-chip-icon">🎯</div>
+          <div class="spec-chip-info">
+            <div class="spec-chip-name">Busca</div>
+            <div class="spec-chip-status">● OPERACIONAL</div>
+          </div>
+        </div>
+        <div class="spec-chip">
+          <div class="spec-chip-icon">👃</div>
+          <div class="spec-chip-info">
+            <div class="spec-chip-name">Detecção</div>
+            <div class="spec-chip-status">● OPERACIONAL</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO DE PESO -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>EVOLUÇÃO DO PESO</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-action">Ver tudo →</span>
+      </div>
+
+      <div class="weight-card">
+        <div class="weight-top">
+          <div class="weight-current">28.0<span>kg</span></div>
+          <div class="weight-trend">→ Estável</div>
+        </div>
+        <div class="weight-chart">
+          <svg viewBox="0 0 320 80" preserveAspectRatio="none">
+            <!-- Grid lines -->
+            <line x1="0" y1="20" x2="320" y2="20" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <line x1="0" y1="40" x2="320" y2="40" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <line x1="0" y1="60" x2="320" y2="60" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            
+            <!-- Linha do peso -->
+            <polyline 
+              points="20,45 70,42 120,40 170,38 220,38 270,40 310,40" 
+              fill="none" 
+              stroke="#4dd0e1" 
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"/>
+            
+            <!-- Pontos -->
+            <circle cx="20" cy="45" r="3" fill="#4dd0e1"/>
+            <circle cx="70" cy="42" r="3" fill="#4dd0e1"/>
+            <circle cx="120" cy="40" r="3" fill="#4dd0e1"/>
+            <circle cx="170" cy="38" r="3" fill="#4dd0e1"/>
+            <circle cx="220" cy="38" r="3" fill="#4dd0e1"/>
+            <circle cx="270" cy="40" r="3" fill="#4dd0e1"/>
+            <circle cx="310" cy="40" r="4" fill="#4dd0e1" stroke="#050d10" stroke-width="2"/>
+            
+            <!-- Área embaixo da linha -->
+            <polyline 
+              points="20,45 70,42 120,40 170,38 220,38 270,40 310,40 310,80 20,80" 
+              fill="rgba(77, 208, 225, 0.08)" 
+              stroke="none"/>
+          </svg>
+        </div>
+        <div class="weight-x-labels">
+          <span class="weight-x-label">NOV</span>
+          <span class="weight-x-label">DEZ</span>
+          <span class="weight-x-label">JAN</span>
+          <span class="weight-x-label">FEV</span>
+          <span class="weight-x-label">MAR</span>
+          <span class="weight-x-label">ABR</span>
+          <span class="weight-x-label">MAI</span>
+        </div>
+      </div>
+
+      <!-- CARTEIRA DE VACINAÇÃO -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>CARTEIRA DE VACINAÇÃO</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-action">Ver completa →</span>
+      </div>
+
+      <div class="vaccine-card">
+        <div class="vaccine-row">
+          <div class="vaccine-status ok"></div>
+          <div class="vaccine-info">
+            <div class="vaccine-name">V10 (Polivalente)</div>
+            <div class="vaccine-meta">Aplicada em 28/06/2025</div>
+          </div>
+          <div class="vaccine-next">
+            <strong>28/06/2026</strong>
+            em 1 mês
+          </div>
+        </div>
+        <div class="vaccine-row">
+          <div class="vaccine-status ok"></div>
+          <div class="vaccine-info">
+            <div class="vaccine-name">Antirrábica</div>
+            <div class="vaccine-meta">Aplicada em 15/09/2025</div>
+          </div>
+          <div class="vaccine-next">
+            <strong>15/09/2026</strong>
+            em 4 meses
+          </div>
+        </div>
+        <div class="vaccine-row">
+          <div class="vaccine-status warn"></div>
+          <div class="vaccine-info">
+            <div class="vaccine-name">Gripe Canina</div>
+            <div class="vaccine-meta">Aplicada em 02/05/2025</div>
+          </div>
+          <div class="vaccine-next">
+            <strong>Vencendo</strong>
+            em 11 dias
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTOS -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>DOCUMENTOS</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-action">+ Anexar</span>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">🏅</div>
+        <div class="doc-info">
+          <div class="doc-name">Certificação em Detecção de Drogas</div>
+          <div class="doc-meta">Ricardo Almeida · 15/08/2025</div>
+        </div>
+        <span class="doc-arrow">›</span>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">📋</div>
+        <div class="doc-info">
+          <div class="doc-name">Exame ortopédico anual</div>
+          <div class="doc-meta">CRMV 7890 · 20/12/2025</div>
+        </div>
+        <span class="doc-arrow">›</span>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-icon">📄</div>
+        <div class="doc-info">
+          <div class="doc-name">Cadastro institucional GCM</div>
+          <div class="doc-meta">RA 691755 · 14/03/2022</div>
+        </div>
+        <span class="doc-arrow">›</span>
+      </div>
+
+      <!-- EVENTOS MÉDICOS RECENTES -->
+      <div class="section-label">
+        <div class="section-label-text">
+          <span>EVENTOS MÉDICOS RECENTES</span>
+          <span class="section-label-line"></span>
+        </div>
+        <span class="section-action">Ver tudo →</span>
+      </div>
+
+      <div class="event-row">
+        <div class="event-date">10/04</div>
+        <div class="event-icon">🪲</div>
+        <div class="event-info">
+          <div class="event-title">Antipulgas Bravecto</div>
+          <div class="event-meta">Aplicação trimestral</div>
+        </div>
+      </div>
+
+      <div class="event-row">
+        <div class="event-date">15/03</div>
+        <div class="event-icon">🩺</div>
+        <div class="event-info">
+          <div class="event-title">Consulta de rotina</div>
+          <div class="event-meta">Dra. Ana Souza · CRMV 12345</div>
+        </div>
+      </div>
+
+      <div class="event-row">
+        <div class="event-date">28/02</div>
+        <div class="event-icon">💊</div>
+        <div class="event-info">
+          <div class="event-title">Vermífugo Drontal</div>
+          <div class="event-meta">Aplicação trimestral</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bar">
+      <button class="cta-btn">⚕ REGISTRAR EVENTO DE SAÚDE</button>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Turno</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Histórico</span>
+      </div>
+      <div class="fab-center">🛡</div>
+      <div class="nav-item">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Treino</span>
+      </div>
+      <div class="nav-item active">
+        <span class="nav-icon">🐕</span>
+        <span class="nav-label">Cão</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>DECISÕES APLICADAS</h3>
+  <ul>
+    <li><strong>Header universal</strong> idêntico ao do dashboard (avatares + binômio + ⇄ + 👤)</li>
+    <li>Botão 👤 no header substitui a aba Perfil que removemos do bottom nav</li>
+    <li>Bottom nav final: <strong>Turno · Histórico · [🛡 FAB] · Treino · Cão</strong> (Cão ativo)</li>
+    <li><strong>FAB com 🛡 escudo</strong> em vez de "+" — semântico, indica ocorrência</li>
+    <li><strong>Ficha do cão</strong> com foto destacada + selo verde "✓" (operacional) + badge "OPERACIONAL HÁ 4 ANOS"</li>
+    <li><strong>Status médico em 4 cards</strong> 2x2: Vacinas / Antipulgas / Peso / Exames (sem vermífugo no topo — vai em eventos)</li>
+    <li>Estados visuais nos cards: verde (em dia), amarelo (vencendo), vermelho (vencido) — barra lateral colorida</li>
+    <li><strong>Laudo Nutricional em DESTAQUE INSTITUCIONAL</strong> — defesa direta do caso 800g vs 300g</li>
+    <li>Badge "DOC. INSTITUCIONAL" no canto do laudo · valor 800g/dia explícito · CRMV do especialista visível</li>
+    <li>Botões "Ver PDF" + "Histórico" pra acessar diretamente</li>
+    <li><strong>Especialidades em chips horizontais</strong> tappáveis · scroll horizontal se aumentar</li>
+    <li><strong>Gráfico de peso</strong> com linha + área preenchida · tendência "Estável" destacada</li>
+    <li>Eixo X com meses (NOV → MAI) · ponto atual em destaque maior</li>
+    <li><strong>Carteira de vacinação resumida</strong>: 3 últimas vacinas com bolinha de status + data de aplicação + próxima</li>
+    <li>Link "Ver completa →" pra carteira detalhada</li>
+    <li><strong>Documentos institucionais:</strong> Certificação · Exames · Cadastro GCM</li>
+    <li>Cada doc com data + emissor (CRMV ou avaliador) · acesso direto ao PDF</li>
+    <li>Botão "+ Anexar" pra adicionar novos documentos</li>
+    <li><strong>Eventos médicos recentes</strong> em timeline compacta com data + ícone + título</li>
+    <li><strong>CTA fixo "Registrar evento de saúde"</strong> acima do bottom nav</li>
+    <li>Tela densa mas organizada · cada seção tem propósito institucional claro</li>
+    <li>Bottom nav aplica modelo 2 final · Cão ativo com indicador ciano</li>
+  </ul>
+</div>
+
+</body>
+</html>

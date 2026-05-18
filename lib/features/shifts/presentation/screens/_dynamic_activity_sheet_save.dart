@@ -27,7 +27,6 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
     }
 
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final routineVM = Provider.of<RoutineViewModel>(context, listen: false);
     final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
     final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
     final healthVM = Provider.of<HealthViewModel>(context, listen: false);
@@ -43,7 +42,6 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
     try {
       await _saveByCategory(
         authVM: authVM,
-        routineVM: routineVM,
         trainingVM: trainingVM,
         incidentVM: incidentVM,
         healthVM: healthVM,

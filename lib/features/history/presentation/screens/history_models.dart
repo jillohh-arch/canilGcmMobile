@@ -1,6 +1,6 @@
 part of 'history_screen.dart';
 
-enum HistoryEntryType { health, training, incident, nutrition, routine }
+enum HistoryEntryType { health, training, incident, nutrition }
 
 class HistoryEntry {
   final String id;
@@ -49,8 +49,6 @@ class HistoryEntry {
         return 'Ocorrência';
       case HistoryEntryType.nutrition:
         return 'Nutrição';
-      case HistoryEntryType.routine:
-        return 'Rotina';
     }
   }
 
@@ -166,8 +164,6 @@ class RecordDetail {
         return 'Ocorrência';
       case HistoryEntryType.nutrition:
         return 'Nutrição';
-      case HistoryEntryType.routine:
-        return 'Rotina';
     }
   }
 
@@ -288,8 +284,6 @@ class RecordDetail {
         return 'Ocorrência';
       case HistoryEntryType.nutrition:
         return 'Nutrição';
-      case HistoryEntryType.routine:
-        return 'Rotina';
     }
   }
 
