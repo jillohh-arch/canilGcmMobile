@@ -7,12 +7,14 @@ class StartOccurrenceBinomio extends StatelessWidget {
   final String dogName;
   final String? dogImageUrl;
   final String handlerName;
+  final String? handlerImageUrl;
 
   const StartOccurrenceBinomio({
     super.key,
     required this.dogName,
     this.dogImageUrl,
     required this.handlerName,
+    this.handlerImageUrl,
   });
 
   @override
@@ -30,7 +32,7 @@ class StartOccurrenceBinomio extends StatelessWidget {
             const SizedBox(width: 16),
             _Avatar(
               label: handlerName,
-              imageUrl: null,
+              imageUrl: handlerImageUrl,
               borderColor: AppTheme.primary,
             ),
           ],

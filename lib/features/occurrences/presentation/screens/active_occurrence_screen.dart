@@ -7,7 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -15,6 +18,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occur
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_finalize_cta.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_quick_grid.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_timeline.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 class ActiveOccurrenceScreen extends StatefulWidget {
   final String occurrenceId;
@@ -75,12 +79,25 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     final vm = context.read<OccurrenceViewModel>();
     final now = DateTime.now();
 
+    // Show immediate feedback
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registrando: ${item.autoTitle}...'),
+          duration: const Duration(seconds: 1),
+          backgroundColor: const Color(0xFF1A3A4A),
+        ),
+      );
+    }
+
     double? lat, lng;
     try {
       final loc = await _locationService.currentHighAccuracy();
       lat = loc.point.latitude;
       lng = loc.point.longitude;
-    } catch (_) {}
+    } catch (_) {
+      // GPS indisponível — continua sem coordenadas
+    }
 
     final event = OccurrenceEvent(
       id: const Uuid().v4(),
@@ -94,7 +111,29 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
       updatedAt: now,
     );
 
-    await vm.addEvent(event);
+    try {
+      await vm.addEvent(event);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ ${item.autoTitle} registrado'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao registrar evento: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 
   void _openOtherEventSheet() {
@@ -298,7 +337,26 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<OccurrenceViewModel>();
+    final dogVM = context.watch<DogViewModel>();
+    final authVM = context.watch<AuthViewModel>();
+    final userVM = context.watch<UserViewModel>();
     final occ = vm.openOccurrence;
+
+    // Resolve dog name and photo from dogId
+    final dogId = occ?.dogId;
+    final dogs = dogVM.dogs.where((d) => d.id == dogId);
+    final dog = dogs.isNotEmpty ? dogs.first : null;
+    final dogName = dog?.name ?? 'K9';
+    final dogImageUrl = dog?.profileImageUrl;
+
+    // Resolve handler name and photo from primaryHandlerId (Firebase UID → RA → UserModel)
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+    final handlerUser = userVM.findByRa(handlerRa);
+    final handlerName = userVM.displayNameFor(
+      ra: handlerRa,
+      firebaseUser: authVM.user,
+    );
+    final handlerImageUrl = handlerUser?.photoUrl ?? authVM.user?.photoURL;
 
     final typeName = occ?.typeName ?? 'Ocorrência';
     final locationAddress = occ?.locationAddress ?? '';
@@ -320,8 +378,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   const SizedBox(height: 16),
                   ActiveOccurrenceContextCard(
                     typeName: typeName,
-                    dogName: occ?.dogId ?? 'K9',
-                    handlerName: occ?.primaryHandlerId ?? '',
+                    dogName: dogName,
+                    dogImageUrl: dogImageUrl,
+                    handlerName: handlerName,
+                    handlerImageUrl: handlerImageUrl,
                     locationAddress: locationAddress,
                     startedAtLabel: startedAtLabel,
                     durationLabel: _durationLabel,
@@ -336,7 +396,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   ActiveOccurrenceTimeline(
                     events: vm.events,
                     onEventTap: _onEventTap,
-                    handlerName: occ?.primaryHandlerId,
+                    handlerName: handlerName,
                     locationLabel: locationAddress.isNotEmpty ? locationAddress : null,
                   ),
                 ],

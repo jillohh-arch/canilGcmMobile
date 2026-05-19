@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
@@ -178,10 +179,13 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     final dogName = dog?.name ?? 'K9';
     final dogImageUrl = dog?.profileImageUrl;
 
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+    final handlerUser = userVM.findByRa(handlerRa);
     final handlerName = userVM.displayNameFor(
-      ra: '',
+      ra: handlerRa,
       firebaseUser: authVM.user,
     );
+    final handlerImageUrl = handlerUser?.photoUrl ?? authVM.user?.photoURL;
 
     final timeStr =
         '${_currentTime.hour.toString().padLeft(2, '0')}:${_currentTime.minute.toString().padLeft(2, '0')}';
@@ -215,6 +219,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                     dogName: dogName,
                     dogImageUrl: dogImageUrl,
                     handlerName: handlerName,
+                    handlerImageUrl: handlerImageUrl,
                   ),
                   const SizedBox(height: 32),
                   StartOccurrenceInfoGrid(

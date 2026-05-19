@@ -6,7 +6,9 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 class ActiveOccurrenceContextCard extends StatelessWidget {
   final String typeName;
   final String dogName;
+  final String? dogImageUrl;
   final String handlerName;
+  final String? handlerImageUrl;
   final String locationAddress;
   final String startedAtLabel;
   final String durationLabel;
@@ -16,7 +18,9 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
     super.key,
     required this.typeName,
     required this.dogName,
+    this.dogImageUrl,
     required this.handlerName,
+    this.handlerImageUrl,
     required this.locationAddress,
     required this.startedAtLabel,
     required this.durationLabel,
@@ -57,9 +61,9 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
           // Binômio
           Row(
             children: [
-              _MiniAvatar(label: dogName),
+              _MiniAvatar(label: dogName, imageUrl: dogImageUrl),
               const SizedBox(width: 6),
-              _MiniAvatar(label: handlerName),
+              _MiniAvatar(label: handlerName, imageUrl: handlerImageUrl),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -193,8 +197,9 @@ class _StatusBadge extends StatelessWidget {
 
 class _MiniAvatar extends StatelessWidget {
   final String label;
+  final String? imageUrl;
 
-  const _MiniAvatar({required this.label});
+  const _MiniAvatar({required this.label, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -206,14 +211,19 @@ class _MiniAvatar extends StatelessWidget {
         color: const Color(0xFF1A2A30),
         border: Border.all(color: AppTheme.primary.withAlpha(100)),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        label.length > 3 ? label.substring(0, 3).toUpperCase() : label.toUpperCase(),
-        style: GoogleFonts.inter(
-          color: AppTheme.primary,
-          fontSize: 8,
-          fontWeight: FontWeight.w700,
-        ),
+      child: ClipOval(
+        child: imageUrl != null && imageUrl!.isNotEmpty
+            ? Image.network(imageUrl!, fit: BoxFit.cover, width: 28, height: 28)
+            : Center(
+                child: Text(
+                  label.length > 3 ? label.substring(0, 3).toUpperCase() : label.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
       ),
     );
   }
