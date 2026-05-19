@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:canil_gcm/core/services/media_processing_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
+import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
@@ -31,6 +32,7 @@ class EditEventScreen extends StatefulWidget {
 class _EditEventScreenState extends State<EditEventScreen> {
   final _mediaService = const MediaProcessingService();
   final _storageService = StorageService();
+  final _locationService = const LocationResolutionService();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
@@ -44,6 +46,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   bool _isSaving = false;
   bool _auditExpanded = false;
+  double? _gpsLat;
+  double? _gpsLng;
+  bool _isUpdatingGps = false;
 
   bool get _isEditing => widget.existingEvent != null;
 
@@ -72,6 +77,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
       _titleController.text = e.title ?? '';
       _descriptionController.text = e.description ?? '';
       _existingPhotoUrls = List.from(e.photoUrls);
+      _gpsLat = e.gpsLat;
+      _gpsLng = e.gpsLng;
       _selectedTimeChip = -1;
     } else {
       _selectedCategory = OccurrenceEventCategory.other;
@@ -125,6 +132,39 @@ class _EditEventScreenState extends State<EditEventScreen> {
       _selectedTimeChip = 2;
       _timestamp = candidate;
     });
+  }
+
+  Future<void> _updateGps() async {
+    setState(() => _isUpdatingGps = true);
+    try {
+      final loc = await _locationService.currentHighAccuracy();
+      setState(() {
+        _gpsLat = loc.point.latitude;
+        _gpsLng = loc.point.longitude;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('GPS atualizado', style: GoogleFonts.inter()),
+            backgroundColor: const Color(0xFF2ECC71),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('GPS indisponível', style: GoogleFonts.inter()),
+            backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingGps = false);
+    }
   }
 
   Future<void> _pickPhotos() async {
@@ -290,6 +330,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
   Future<void> _createEvent(List<String> photoUrls) async {
     final vm = context.read<OccurrenceViewModel>();
     final now = DateTime.now();
+
+    // Se não tem GPS ainda, tenta capturar agora
+    if (_gpsLat == null) {
+      try {
+        final loc = await _locationService.currentHighAccuracy();
+        _gpsLat = loc.point.latitude;
+        _gpsLng = loc.point.longitude;
+      } catch (_) {}
+    }
+
     final event = OccurrenceEvent(
       id: const Uuid().v4(),
       occurrenceId: widget.occurrenceId,
@@ -300,6 +350,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ? _descriptionController.text.trim()
           : null,
       photoUrls: photoUrls,
+      gpsLat: _gpsLat,
+      gpsLng: _gpsLng,
       createdAt: now,
       updatedAt: now,
     );
@@ -326,6 +378,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     if (photoUrls.join(',') != e.photoUrls.join(',')) {
       updates['photo_urls'] = photoUrls;
+    }
+    if (_gpsLat != e.gpsLat || _gpsLng != e.gpsLng) {
+      updates['gps_lat'] = _gpsLat;
+      updates['gps_lng'] = _gpsLng;
     }
 
     if (updates.isNotEmpty) {
@@ -397,6 +453,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     _buildTitleField(),
                     const SizedBox(height: 16),
                     _buildDescriptionField(),
+                    const SizedBox(height: 16),
+                    _buildGpsButton(),
                     const SizedBox(height: 24),
                     _buildPhotoSection(),
                     if (_isEditing &&
@@ -648,6 +706,71 @@ class _EditEventScreenState extends State<EditEventScreen> {
       ),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    );
+  }
+
+  Widget _buildGpsButton() {
+    final hasGps = _gpsLat != null && _gpsLng != null;
+    return GestureDetector(
+      onTap: _isUpdatingGps ? null : _updateGps,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: hasGps
+              ? const Color(0xFF2ECC71).withAlpha(12)
+              : Colors.white.withAlpha(5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: hasGps
+                ? const Color(0xFF2ECC71).withAlpha(60)
+                : Colors.white.withAlpha(20),
+          ),
+        ),
+        child: Row(
+          children: [
+            if (_isUpdatingGps)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: Color(0xFF2ECC71),
+                ),
+              )
+            else
+              Icon(
+                hasGps ? Icons.location_on : Icons.location_off_outlined,
+                size: 16,
+                color: hasGps
+                    ? const Color(0xFF2ECC71)
+                    : Colors.white.withAlpha(120),
+              ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                hasGps
+                    ? 'GPS: ${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}'
+                    : 'Sem localização',
+                style: GoogleFonts.inter(
+                  color: hasGps
+                      ? Colors.white.withAlpha(200)
+                      : Colors.white.withAlpha(100),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            Text(
+              _isUpdatingGps ? 'Atualizando...' : 'ATUALIZAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

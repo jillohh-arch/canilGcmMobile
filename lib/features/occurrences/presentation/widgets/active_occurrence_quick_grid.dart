@@ -68,11 +68,13 @@ const _quickEvents = [
 class ActiveOccurrenceQuickGrid extends StatelessWidget {
   final ValueChanged<QuickEventItem> onQuickEvent;
   final VoidCallback onOtherEvent;
+  final bool isLoading;
 
   const ActiveOccurrenceQuickGrid({
     super.key,
     required this.onQuickEvent,
     required this.onOtherEvent,
+    this.isLoading = false,
   });
 
   @override
@@ -83,10 +85,21 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
         // Section title
         Row(
           children: [
-            const Text('⚡', style: TextStyle(fontSize: 12)),
+            if (isLoading) ...[
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: Color(0xFF4DD0E1),
+                ),
+              ),
+            ] else ...[
+              const Text('⚡', style: TextStyle(fontSize: 12)),
+            ],
             const SizedBox(width: 8),
             Text(
-              'REGISTROS RÁPIDOS',
+              isLoading ? 'REGISTRANDO...' : 'REGISTROS RÁPIDOS',
               style: GoogleFonts.inter(
                 color: const Color(0xFF4DD0E1),
                 fontSize: 11,
@@ -109,10 +122,12 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
           children: _quickEvents.map((item) {
             return _QuickCard(
               item: item,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                onQuickEvent(item);
-              },
+              onTap: isLoading
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      onQuickEvent(item);
+                    },
             );
           }).toList(),
         ),
@@ -164,7 +179,7 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
 
 class _QuickCard extends StatelessWidget {
   final QuickEventItem item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _QuickCard({required this.item, required this.onTap});
 
