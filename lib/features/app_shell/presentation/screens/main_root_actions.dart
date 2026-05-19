@@ -178,7 +178,7 @@ extension _MainRootActions on _MainRootScreenState {
 
     rootNavigator.push(
       MaterialPageRoute(
-        builder: (_) => OccurrenceFlowScreen(dogId: dogId, dogName: dogName),
+        builder: (_) => const StartOccurrenceScreen(),
       ),
     );
   }
