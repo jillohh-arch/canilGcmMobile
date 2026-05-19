@@ -101,12 +101,19 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   }
 
   Future<void> _loadNatures() async {
-    final incidentVM = context.read<IncidentViewModel>();
-    final natures = await incidentVM.fetchNatures();
-    if (!mounted) return;
-    setState(() {
-      _natures = natures.isNotEmpty ? natures : OccurrenceNatureSeed.items;
-    });
+    try {
+      final incidentVM = context.read<IncidentViewModel>();
+      final natures = await incidentVM.fetchNatures();
+      if (!mounted) return;
+      setState(() {
+        _natures = natures.isNotEmpty ? natures : OccurrenceNatureSeed.items;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _natures = OccurrenceNatureSeed.items;
+      });
+    }
   }
 
   Future<void> _createOccurrence() async {
@@ -166,12 +173,10 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     final userVM = context.watch<UserViewModel>();
 
     final dogId = shiftVM.activeDogId;
-    final dog = dogVM.dogs.cast<dynamic>().firstWhere(
-          (d) => d.id == dogId,
-          orElse: () => null,
-        );
+    final dogs = dogVM.dogs.where((d) => d.id == dogId);
+    final dog = dogs.isNotEmpty ? dogs.first : null;
     final dogName = dog?.name ?? 'K9';
-    final dogImageUrl = dog?.photoUrl as String?;
+    final dogImageUrl = dog?.profileImageUrl;
 
     final handlerName = userVM.displayNameFor(
       ra: '',
