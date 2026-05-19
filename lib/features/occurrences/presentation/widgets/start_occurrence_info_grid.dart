@@ -13,6 +13,7 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
   final bool isLoadingGps;
   final VoidCallback onRefreshLocation;
   final VoidCallback onRefreshTime;
+  final VoidCallback? onManualLocation;
 
   const StartOccurrenceInfoGrid({
     super.key,
@@ -23,30 +24,65 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
     this.isLoadingGps = false,
     required this.onRefreshLocation,
     required this.onRefreshTime,
+    this.onManualLocation,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final showManualLink = !isLoadingGps &&
+        gpsPrecision == GpsPrecision.unavailable &&
+        onManualLocation != null;
+
+    return Column(
       children: [
-        Expanded(
-          child: _InfoCard(
-            icon: Icons.location_on_outlined,
-            label: 'LOCAL ATUAL',
-            value: isLoadingGps ? 'Capturando GPS...' : locationLabel,
-            footer: _buildGpsFooter(),
-            onTap: onRefreshLocation,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _InfoCard(
+                icon: Icons.location_on_outlined,
+                label: 'LOCAL ATUAL',
+                value: isLoadingGps
+                    ? 'Capturando GPS...'
+                    : locationLabel.isEmpty
+                        ? 'GPS indisponível'
+                        : locationLabel,
+                footer: _buildGpsFooter(),
+                onTap: onRefreshLocation,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _InfoCard(
+                icon: Icons.access_time_rounded,
+                label: 'HORA ATUAL',
+                value: '$timeLabel\n$dateLabel',
+                onTap: onRefreshTime,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _InfoCard(
-            icon: Icons.access_time_rounded,
-            label: 'HORA ATUAL',
-            value: '$timeLabel\n$dateLabel',
-            onTap: onRefreshTime,
+        if (showManualLink) ...[
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: onManualLocation,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.edit_location_alt_outlined,
+                    color: AppTheme.primary, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'Preencher local manualmente',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -84,7 +120,20 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
     };
 
     if (locationLabel.isEmpty && gpsPrecision == GpsPrecision.unavailable) {
-      return null;
+      return Row(
+        children: [
+          Icon(Icons.refresh_rounded, color: AppTheme.error, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            'Toque para tentar novamente',
+            style: GoogleFonts.inter(
+              color: AppTheme.error,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
     }
 
     return Row(

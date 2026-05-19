@@ -96,7 +96,7 @@ class OccurrenceEventRepository {
   Stream<List<OccurrenceEvent>> watchByOccurrence(String occurrenceId) {
     return _events(occurrenceId)
         .where('deleted_at', isNull: true)
-        .orderBy('timestamp', descending: false)
+        .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snap) => snap.docs
             .map((doc) => OccurrenceEvent.fromMap(
