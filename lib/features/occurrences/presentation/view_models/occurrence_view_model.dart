@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
+import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
@@ -127,6 +130,15 @@ class OccurrenceViewModel extends ChangeNotifier {
       final created = await _repository.create(occurrence);
       _openOccurrence = created;
       notifyListeners();
+
+      await _createInitialArrivalEvent(
+        occurrenceId: created.id,
+        startedAt: now,
+        locationAddress: locationAddress,
+        gpsLat: gpsLat,
+        gpsLng: gpsLng,
+      );
+
       return created;
     } catch (e) {
       _error = 'Erro ao criar ocorrência: $e';
@@ -135,6 +147,45 @@ class OccurrenceViewModel extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // ─── Evento Inicial ─────────────────────────────────────────────────
+
+  Future<void> _createInitialArrivalEvent({
+    required String occurrenceId,
+    required DateTime startedAt,
+    String? locationAddress,
+    double? gpsLat,
+    double? gpsLng,
+  }) async {
+    try {
+      final parts = <String>['Binômio em local'];
+      if (gpsLat != null && gpsLng != null) {
+        parts.add('GPS capturado');
+      }
+      parts.add('Aguardando próxima ação');
+
+      final entry = AuditService.buildInlineEntry(action: 'created');
+      entry['automatic'] = true;
+
+      final event = OccurrenceEvent(
+        id: const Uuid().v4(),
+        occurrenceId: occurrenceId,
+        category: OccurrenceEventCategory.arrival,
+        timestamp: startedAt,
+        title: 'Início da ocorrência',
+        description: parts.join(' · '),
+        gpsLat: gpsLat,
+        gpsLng: gpsLng,
+        createdAt: startedAt,
+        updatedAt: startedAt,
+        auditTrail: [entry],
+      );
+
+      await _eventRepository.create(event);
+    } catch (e) {
+      debugPrint('[OccurrenceVM] Falha ao criar evento inicial: $e');
     }
   }
 
