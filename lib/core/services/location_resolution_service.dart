@@ -5,8 +5,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class ResolvedLocation {
   final String address;
   final LatLng point;
+  final double accuracy;
 
-  const ResolvedLocation({required this.address, required this.point});
+  const ResolvedLocation({
+    required this.address,
+    required this.point,
+    this.accuracy = 0.0,
+  });
 }
 
 class LocationResolutionService {
@@ -18,7 +23,11 @@ class LocationResolutionService {
     );
     final point = LatLng(position.latitude, position.longitude);
     final address = await addressForPoint(point);
-    return ResolvedLocation(address: address, point: point);
+    return ResolvedLocation(
+      address: address,
+      point: point,
+      accuracy: position.accuracy,
+    );
   }
 
   Future<String> addressForPoint(LatLng point) async {
