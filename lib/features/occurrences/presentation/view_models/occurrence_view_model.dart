@@ -172,9 +172,9 @@ class OccurrenceViewModel extends ChangeNotifier {
       final event = OccurrenceEvent(
         id: const Uuid().v4(),
         occurrenceId: occurrenceId,
-        category: OccurrenceEventCategory.arrival,
+        category: OccurrenceEventCategory.opening,
         timestamp: startedAt,
-        title: 'Início da ocorrência',
+        title: 'Registro de ocorrência aberto',
         description: parts.join(' · '),
         gpsLat: gpsLat,
         gpsLng: gpsLng,

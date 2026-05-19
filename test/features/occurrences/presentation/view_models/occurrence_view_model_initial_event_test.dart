@@ -24,8 +24,8 @@ void main() {
     );
   });
 
-  group('createOccurrence — evento inicial arrival', () {
-    test('cria evento arrival na subcoleção /events após criar ocorrência',
+  group('createOccurrence — evento inicial opening', () {
+    test('cria evento opening na subcoleção /events após criar ocorrência',
         () async {
       final occId = const Uuid().v4();
 
@@ -51,15 +51,15 @@ void main() {
       expect(eventsSnap.docs, hasLength(1));
 
       final eventData = eventsSnap.docs.first.data();
-      expect(eventData['category'], 'arrival');
-      expect(eventData['title'], 'Início da ocorrência');
+      expect(eventData['category'], 'opening');
+      expect(eventData['title'], 'Registro de ocorrência aberto');
       expect(eventData['description'], contains('Binômio em local'));
       expect(eventData['description'], contains('GPS capturado'));
       expect(eventData['gps_lat'], -22.5642);
       expect(eventData['gps_lng'], -47.4019);
     });
 
-    test('evento arrival tem mesmo timestamp que startedAt da ocorrência',
+    test('evento opening tem mesmo timestamp que startedAt da ocorrência',
         () async {
       final occId = const Uuid().v4();
 
@@ -85,7 +85,7 @@ void main() {
       expect(eventTimestamp, created.startedAt);
     });
 
-    test('evento arrival sem GPS quando coordenadas não disponíveis',
+    test('evento opening sem GPS quando coordenadas não disponíveis',
         () async {
       final occId = const Uuid().v4();
 

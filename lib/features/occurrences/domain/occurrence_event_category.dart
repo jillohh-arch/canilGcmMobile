@@ -1,4 +1,5 @@
 enum OccurrenceEventCategory {
+  opening,
   arrival,
   approach,
   dogWork,
@@ -8,6 +9,7 @@ enum OccurrenceEventCategory {
   other;
 
   String toMap() => switch (this) {
+        opening => 'opening',
         arrival => 'arrival',
         approach => 'approach',
         dogWork => 'dog_work',
@@ -18,6 +20,7 @@ enum OccurrenceEventCategory {
       };
 
   static OccurrenceEventCategory fromMap(String? value) => switch (value) {
+        'opening' => OccurrenceEventCategory.opening,
         'arrival' => OccurrenceEventCategory.arrival,
         'approach' => OccurrenceEventCategory.approach,
         'dog_work' => OccurrenceEventCategory.dogWork,
@@ -28,7 +31,8 @@ enum OccurrenceEventCategory {
       };
 
   String get label => switch (this) {
-        arrival => 'Chegada',
+        opening => 'Abertura do registro',
+        arrival => 'Chegada à cena',
         approach => 'Abordagem',
         dogWork => 'Trabalho do Cão',
         positiveIndication => 'Indicação Positiva',
