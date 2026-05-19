@@ -16,6 +16,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_header.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_info_grid.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_nature_link.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
@@ -139,7 +140,11 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       );
 
       if (!mounted) return;
-      Navigator.of(context).pop(id);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ActiveOccurrenceScreen(occurrenceId: id),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
