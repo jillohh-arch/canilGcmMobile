@@ -44,6 +44,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   // Passo 3
   final Map<String, Map<String, TextEditingController>> _detailControllers = {};
+  final List<Map<String, TextEditingController>> _drugEntries = [];
 
   @override
   void dispose() {
@@ -52,6 +53,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     _speechService.stop();
     for (final map in _detailControllers.values) {
       for (final ctrl in map.values) {
+        ctrl.dispose();
+      }
+    }
+    for (final entry in _drugEntries) {
+      for (final ctrl in entry.values) {
         ctrl.dispose();
       }
     }
@@ -139,13 +145,24 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         } else {
           _selectedResults.clear();
           _selectedResults.add(result);
+          _drugEntries.clear();
         }
       } else {
         _selectedResults.remove(OccurrenceResult.noOccurrence);
         if (_selectedResults.contains(result)) {
           _selectedResults.remove(result);
+          if (result == OccurrenceResult.drugSeized) {
+            _drugEntries.clear();
+          }
         } else {
           _selectedResults.add(result);
+          if (result == OccurrenceResult.drugSeized &&
+              _drugEntries.isEmpty) {
+            _drugEntries.add({
+              'type': TextEditingController(),
+              'weight': TextEditingController(),
+            });
+          }
         }
       }
     });
@@ -160,6 +177,24 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     return _detailControllers[resultKey]![field]!;
   }
 
+  void _addDrugEntry() {
+    setState(() {
+      _drugEntries.add({
+        'type': TextEditingController(),
+        'weight': TextEditingController(),
+      });
+    });
+  }
+
+  void _removeDrugEntry(int index) {
+    setState(() {
+      final entry = _drugEntries.removeAt(index);
+      for (final ctrl in entry.values) {
+        ctrl.dispose();
+      }
+    });
+  }
+
   Map<String, dynamic>? _buildDetails() {
     final details = <String, dynamic>{};
     for (final result in _selectedResults) {
@@ -168,6 +203,24 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         continue;
       }
       final key = result.toMap();
+
+      // Drogas: lista dinâmica
+      if (result == OccurrenceResult.drugSeized) {
+        final drugs = <Map<String, dynamic>>[];
+        for (final entry in _drugEntries) {
+          final type = entry['type']!.text.trim();
+          final weight = entry['weight']!.text.trim();
+          if (type.isNotEmpty || weight.isNotEmpty) {
+            drugs.add({
+              'type': type,
+              'weight_grams': weight,
+            });
+          }
+        }
+        if (drugs.isNotEmpty) details[key] = drugs;
+        continue;
+      }
+
       final fields = _detailControllers[key];
       if (fields == null) continue;
       final map = <String, dynamic>{};
@@ -726,6 +779,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   }
 
   Widget _buildDetailSection(OccurrenceResult result) {
+    if (result == OccurrenceResult.drugSeized) {
+      return _buildDrugSection();
+    }
+
     final fields = _fieldsForResult(result);
     final key = result.toMap();
 
@@ -769,33 +826,164 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                       : null,
                   style:
                       GoogleFonts.inter(color: Colors.white, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: field.label,
-                    labelStyle: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(120), fontSize: 13),
-                    filled: true,
-                    fillColor: Colors.white.withAlpha(8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          BorderSide(color: Colors.white.withAlpha(20)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          BorderSide(color: Colors.white.withAlpha(20)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: AppTheme.primary),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                  ),
+                  decoration: _detailFieldDecoration(field.label),
                 ),
               )),
         ],
       ),
+    );
+  }
+
+  Widget _buildDrugSection() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withAlpha(15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('💊', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'DROGA APREENDIDA',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _addDrugEntry,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withAlpha(20),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.primary.withAlpha(60)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, size: 14, color: AppTheme.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'ADICIONAR',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ..._drugEntries.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final controllers = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(3),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withAlpha(10)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Substância ${idx + 1}',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_drugEntries.length > 1)
+                        GestureDetector(
+                          onTap: () => _removeDrugEntry(idx),
+                          child: Icon(Icons.close,
+                              size: 16,
+                              color: AppTheme.error.withAlpha(180)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controllers['type']!,
+                    style: GoogleFonts.inter(
+                        color: Colors.white, fontSize: 14),
+                    decoration:
+                        _detailFieldDecoration('Tipo (maconha, cocaína, crack...)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controllers['weight']!,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.inter(
+                        color: Colors.white, fontSize: 14),
+                    decoration: _detailFieldDecoration('Peso em gramas'),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (_drugEntries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Toque em ADICIONAR para registrar substâncias',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(80),
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _detailFieldDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle:
+          GoogleFonts.inter(color: Colors.white.withAlpha(120), fontSize: 13),
+      filled: true,
+      fillColor: Colors.white.withAlpha(8),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: AppTheme.primary),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 
@@ -810,12 +998,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   List<_DetailField> _fieldsForResult(OccurrenceResult result) =>
       switch (result) {
-        OccurrenceResult.drugSeized => [
-            const _DetailField(label: 'Tipo de droga', key: 'type'),
-            const _DetailField(
-                label: 'Quantidade', key: 'quantity', numeric: true),
-            const _DetailField(label: 'Unidade (g, kg, porções)', key: 'unit'),
-          ],
+        OccurrenceResult.drugSeized => [], // handled by _buildDrugSection
         OccurrenceResult.weaponSeized => [
             const _DetailField(label: 'Tipo de arma', key: 'type'),
             const _DetailField(

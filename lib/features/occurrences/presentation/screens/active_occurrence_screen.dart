@@ -39,6 +39,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   Duration _elapsed = Duration.zero;
   DateTime? _startedAt;
   bool _showSavedBadge = false;
+  bool _isAddingEvent = false;
 
   @override
   void initState() {
@@ -99,6 +100,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   }
 
   Future<void> _addQuickEvent(QuickEventItem item) async {
+    setState(() => _isAddingEvent = true);
+    HapticFeedback.lightImpact();
+
     final vm = context.read<OccurrenceViewModel>();
     final now = DateTime.now();
 
@@ -137,6 +141,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isAddingEvent = false);
     }
   }
 
@@ -418,6 +424,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   ActiveOccurrenceQuickGrid(
                     onQuickEvent: _addQuickEvent,
                     onOtherEvent: _openOtherEventSheet,
+                    isLoading: _isAddingEvent,
                   ),
                   const SizedBox(height: 24),
                   ActiveOccurrenceTimeline(
