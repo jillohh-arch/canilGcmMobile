@@ -14,7 +14,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 /// - Nunca bloquear o fluxo principal (fire-and-forget)
 class AuditService {
   static final _firestore = FirebaseFirestore.instance;
-  static final _auth = FirebaseAuth.instance;
+
+  static FirebaseAuth? get _auth {
+    try {
+      return FirebaseAuth.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Registra uma ação de auditoria.
   ///
@@ -144,7 +151,7 @@ class AuditService {
   }) async {
     await docRef.update({
       'deleted_at': FieldValue.serverTimestamp(),
-      'deleted_by': _auth.currentUser?.uid,
+      'deleted_by': _auth?.currentUser?.uid,
       'delete_reason': reason,
     });
 
@@ -229,15 +236,24 @@ class AuditService {
   // ─── Helpers ──────────────────────────────────────────────────────
 
   static Map<String, dynamic> _buildActor() {
-    final user = _auth.currentUser;
-    final email = user?.email ?? 'desconhecido';
-    final ra = email.contains('@') ? email.split('@')[0] : email;
-    return {
-      'uid': user?.uid,
-      'email': email,
-      'ra': ra,
-      'name': user?.displayName ?? ra,
-    };
+    try {
+      final user = _auth?.currentUser;
+      final email = user?.email ?? 'desconhecido';
+      final ra = email.contains('@') ? email.split('@')[0] : email;
+      return {
+        'uid': user?.uid,
+        'email': email,
+        'ra': ra,
+        'name': user?.displayName ?? ra,
+      };
+    } catch (_) {
+      return {
+        'uid': null,
+        'email': 'desconhecido',
+        'ra': 'desconhecido',
+        'name': 'desconhecido',
+      };
+    }
   }
 
   /// Remove valores nulos e converte Timestamps para ISO strings.
