@@ -28,7 +28,6 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -68,15 +67,77 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
           ...events.asMap().entries.map((entry) {
             final index = entry.key;
             final event = entry.value;
-            return ActiveOccurrenceEventCard(
-              event: event,
-              isRecent: index == 0,
-              onTap: () => onEventTap(event),
-              handlerName: handlerName,
-              locationLabel: locationLabel,
+            final isFirst = index == 0;
+            final isLast = index == events.length - 1;
+
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _TimelineConnector(
+                    isFirst: isFirst,
+                    isLast: isLast,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ActiveOccurrenceEventCard(
+                      event: event,
+                      isRecent: isFirst,
+                      onTap: () => onEventTap(event),
+                      handlerName: handlerName,
+                      locationLabel: locationLabel,
+                    ),
+                  ),
+                ],
+              ),
             );
           }),
       ],
+    );
+  }
+}
+
+class _TimelineConnector extends StatelessWidget {
+  final bool isFirst;
+  final bool isLast;
+
+  const _TimelineConnector({required this.isFirst, required this.isLast});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 20,
+      child: Column(
+        children: [
+          // Line above dot
+          Expanded(
+            child: Container(
+              width: 2,
+              color: isFirst ? Colors.transparent : AppTheme.primary.withAlpha(40),
+            ),
+          ),
+          // Dot
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isFirst ? AppTheme.primary : Colors.transparent,
+              border: Border.all(
+                color: AppTheme.primary,
+                width: isFirst ? 0 : 1.5,
+              ),
+            ),
+          ),
+          // Line below dot
+          Expanded(
+            child: Container(
+              width: 2,
+              color: isLast ? Colors.transparent : AppTheme.primary.withAlpha(40),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

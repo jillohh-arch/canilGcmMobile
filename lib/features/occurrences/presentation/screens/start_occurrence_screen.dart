@@ -17,6 +17,8 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_header.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_info_grid.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_nature_link.dart';
+import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_observation.dart';
+import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -32,6 +34,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
   final _natureController = TextEditingController();
   final _natureFocusNode = FocusNode();
+  final _observationController = TextEditingController();
 
   // GPS state
   String _locationAddress = '';
@@ -39,10 +42,12 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   double? _gpsLng;
   double? _gpsAccuracy;
   bool _isLoadingGps = true;
+  bool _manualLocationSet = false;
   GpsPrecision _gpsPrecision = GpsPrecision.unavailable;
 
   // Time state
-  late DateTime _currentTime;
+  DateTime _startedAt = DateTime.now();
+  int _selectedTimeChip = 0;
 
   // Nature state
   bool _natureExpanded = false;
@@ -55,17 +60,26 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   @override
   void initState() {
     super.initState();
-    _currentTime = DateTime.now();
     _captureGps();
     _loadNatures();
+    _checkOpenOccurrence();
   }
 
   @override
   void dispose() {
     _natureController.dispose();
     _natureFocusNode.dispose();
+    _observationController.dispose();
     super.dispose();
   }
+
+  bool get _hasUnsavedData =>
+      _selectedNature != null || _observationController.text.isNotEmpty;
+
+  bool get _ctaEnabled =>
+      !_isLoadingGps && (_gpsLat != null || _manualLocationSet);
+
+  // ─── GPS ────────────────────────────────────────────────────────────
 
   Future<void> _captureGps() async {
     setState(() => _isLoadingGps = true);
@@ -96,10 +110,101 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     return GpsPrecision.low;
   }
 
-  void _refreshTime() {
-    HapticFeedback.lightImpact();
-    setState(() => _currentTime = DateTime.now());
+  void _showManualLocationDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0E1A1F),
+        title: Text(
+          'Preencher local',
+          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'Endereço completo',
+            hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(100)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppTheme.primary.withAlpha(100)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppTheme.primary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('CANCELAR',
+                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+          ),
+          TextButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                setState(() {
+                  _locationAddress = text;
+                  _manualLocationSet = true;
+                });
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: Text('CONFIRMAR',
+                style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
+
+  // ─── Time Chips ─────────────────────────────────────────────────────
+
+  void _onTimeChipSelected(int index) {
+    setState(() {
+      _selectedTimeChip = index;
+      _startedAt = switch (index) {
+        1 => DateTime.now().subtract(const Duration(minutes: 5)),
+        2 => DateTime.now().subtract(const Duration(minutes: 15)),
+        _ => DateTime.now(),
+      };
+    });
+  }
+
+  Future<void> _onTimeEditTap() async {
+    final now = TimeOfDay.now();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: now,
+    );
+    if (picked == null || !mounted) return;
+
+    final today = DateTime.now();
+    final candidate = DateTime(
+      today.year, today.month, today.day, picked.hour, picked.minute,
+    );
+
+    if (candidate.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Horário não pode ser no futuro',
+              style: GoogleFonts.inter()),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _selectedTimeChip = 3;
+      _startedAt = candidate;
+    });
+  }
+
+  // ─── Natures ────────────────────────────────────────────────────────
 
   Future<void> _loadNatures() async {
     try {
@@ -116,6 +221,93 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       });
     }
   }
+
+  // ─── Open Occurrence Check ──────────────────────────────────────────
+
+  void _checkOpenOccurrence() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final occVM = context.read<OccurrenceViewModel>();
+      if (occVM.hasOpen) {
+        _showOpenOccurrenceDialog(occVM.openOccurrence!.id);
+      }
+    });
+  }
+
+  void _showOpenOccurrenceDialog(String existingId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0E1A1F),
+        title: Text(
+          'Ocorrência em andamento',
+          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Você já tem uma ocorrência aberta. Deseja continuar nela ou iniciar uma nova?',
+          style: GoogleFonts.inter(color: Colors.white.withAlpha(200), fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
+            child: Text('NOVA',
+                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => ActiveOccurrenceScreen(occurrenceId: existingId),
+                ),
+              );
+            },
+            child: Text('CONTINUAR',
+                style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Pop Confirmation ───────────────────────────────────────────────
+
+  Future<bool> _onPopAttempt() async {
+    if (!_hasUnsavedData) return true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0E1A1F),
+        title: Text(
+          'Descartar dados?',
+          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Você tem dados preenchidos que serão perdidos.',
+          style: GoogleFonts.inter(color: Colors.white.withAlpha(200), fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('CANCELAR',
+                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('DESCARTAR',
+                style: GoogleFonts.inter(color: AppTheme.error, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  // ─── Create ─────────────────────────────────────────────────────────
 
   Future<void> _createOccurrence() async {
     setState(() => _isCreating = true);
@@ -145,6 +337,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         gpsLat: _gpsLat,
         gpsLng: _gpsLng,
         gpsAccuracy: _gpsAccuracy,
+        initialObservation: _observationController.text.trim().isNotEmpty
+            ? _observationController.text.trim()
+            : null,
       );
 
       if (!mounted) return;
@@ -165,6 +360,8 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       if (mounted) setState(() => _isCreating = false);
     }
   }
+
+  // ─── Build ──────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -188,89 +385,113 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     final handlerImageUrl = handlerUser?.photoUrl ?? authVM.user?.photoURL;
 
     final timeStr =
-        '${_currentTime.hour.toString().padLeft(2, '0')}:${_currentTime.minute.toString().padLeft(2, '0')}';
+        '${_startedAt.hour.toString().padLeft(2, '0')}:${_startedAt.minute.toString().padLeft(2, '0')}';
     final dateStr =
-        '${_currentTime.day.toString().padLeft(2, '0')}/${_currentTime.month.toString().padLeft(2, '0')}/${_currentTime.year}';
+        '${_startedAt.day.toString().padLeft(2, '0')}/${_startedAt.month.toString().padLeft(2, '0')}/${_startedAt.year}';
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-              child: Column(
-                children: [
-                  StartOccurrenceHeader(onBack: () => Navigator.of(context).pop()),
-                  Container(
-                    height: 1,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          AppTheme.primary.withAlpha(50),
-                          Colors.transparent,
-                        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final shouldPop = await _onPopAttempt();
+        if (shouldPop && mounted) {
+          navigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                child: Column(
+                  children: [
+                    StartOccurrenceHeader(
+                        onBack: () => Navigator.of(context).maybePop()),
+                    Container(
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            AppTheme.primary.withAlpha(50),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  StartOccurrenceBinomio(
-                    dogName: dogName,
-                    dogImageUrl: dogImageUrl,
-                    handlerName: handlerName,
-                    handlerImageUrl: handlerImageUrl,
-                  ),
-                  const SizedBox(height: 32),
-                  StartOccurrenceInfoGrid(
-                    locationLabel: _locationAddress,
-                    gpsPrecision: _gpsPrecision,
-                    timeLabel: timeStr,
-                    dateLabel: dateStr,
-                    isLoadingGps: _isLoadingGps,
-                    onRefreshLocation: _captureGps,
-                    onRefreshTime: _refreshTime,
-                  ),
-                  const SizedBox(height: 24),
-                  StartOccurrenceNatureLink(
-                    expanded: _natureExpanded,
-                    natureText: _selectedNature?.label ?? '',
-                    controller: _natureController,
-                    focusNode: _natureFocusNode,
-                    natures: _natures,
-                    onToggle: () =>
-                        setState(() => _natureExpanded = !_natureExpanded),
-                    onSelected: (nature) {
-                      setState(() {
-                        _selectedNature = nature;
-                        _natureExpanded = false;
-                      });
-                    },
-                    onChanged: (_) {},
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Local e horário são preenchidos automaticamente.\nToque nos cards para ajustar antes de iniciar.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withAlpha(100),
-                      fontSize: 12,
-                      height: 1.5,
+                    const SizedBox(height: 24),
+                    StartOccurrenceBinomio(
+                      dogName: dogName,
+                      dogImageUrl: dogImageUrl,
+                      handlerName: handlerName,
+                      handlerImageUrl: handlerImageUrl,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 32),
+                    StartOccurrenceInfoGrid(
+                      locationLabel: _locationAddress,
+                      gpsPrecision: _gpsPrecision,
+                      timeLabel: timeStr,
+                      dateLabel: dateStr,
+                      isLoadingGps: _isLoadingGps,
+                      onRefreshLocation: _captureGps,
+                      onRefreshTime: () {},
+                      onManualLocation: _showManualLocationDialog,
+                    ),
+                    const SizedBox(height: 20),
+                    StartOccurrenceTimeChips(
+                      selectedIndex: _selectedTimeChip,
+                      formattedTime: timeStr,
+                      onSelected: _onTimeChipSelected,
+                      onEditTap: _onTimeEditTap,
+                    ),
+                    const SizedBox(height: 24),
+                    StartOccurrenceNatureLink(
+                      expanded: _natureExpanded,
+                      natureText: _selectedNature?.label ?? '',
+                      controller: _natureController,
+                      focusNode: _natureFocusNode,
+                      natures: _natures,
+                      onToggle: () =>
+                          setState(() => _natureExpanded = !_natureExpanded),
+                      onSelected: (nature) {
+                        setState(() {
+                          _selectedNature = nature;
+                          _natureExpanded = false;
+                        });
+                      },
+                      onChanged: (_) {},
+                    ),
+                    const SizedBox(height: 20),
+                    StartOccurrenceObservation(
+                        controller: _observationController),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Local e horário são preenchidos automaticamente.\nToque nos cards para ajustar antes de iniciar.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withAlpha(100),
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: StartOccurrenceCta(
-                isLoading: _isCreating,
-                onPressed: _createOccurrence,
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: StartOccurrenceCta(
+                  isLoading: _isCreating,
+                  enabled: _ctaEnabled,
+                  onPressed: _createOccurrence,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

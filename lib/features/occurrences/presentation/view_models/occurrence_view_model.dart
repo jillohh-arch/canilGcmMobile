@@ -290,6 +290,12 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   // ─── Utilitários ───────────────────────────────────────────────────
 
+  Future<void> updateDurationSoFar(String id, int seconds) async {
+    try {
+      await _repository.update(id, {'duration_so_far': seconds});
+    } catch (_) {}
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();

@@ -5,11 +5,13 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 
 class StartOccurrenceCta extends StatelessWidget {
   final bool isLoading;
+  final bool enabled;
   final VoidCallback onPressed;
 
   const StartOccurrenceCta({
     super.key,
     this.isLoading = false,
+    this.enabled = true,
     required this.onPressed,
   });
 
@@ -34,7 +36,7 @@ class StartOccurrenceCta extends StatelessWidget {
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: isLoading ? null : onPressed,
+            onPressed: isLoading || !enabled ? null : onPressed,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: AppTheme.background,

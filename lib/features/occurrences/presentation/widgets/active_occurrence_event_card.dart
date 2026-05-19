@@ -43,7 +43,6 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon + time column
             Column(
               children: [
                 _CategoryIcon(category: event.category),
@@ -59,8 +58,6 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 12),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,6 +112,19 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                     ),
                   ],
 
+                  // Edited badge
+                  if (event.auditTrail.length > 1) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'editado',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withAlpha(100),
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+
                   // Meta chips
                   if (handlerName != null ||
                       locationLabel != null ||
@@ -134,46 +144,97 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                     ),
                   ],
 
-                  // Address
-                  if (locationLabel != null &&
-                      locationLabel!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      locationLabel!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-
-                  // Photos indicator
+                  // Photo thumbnails
                   if (event.photoUrls.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.photo_camera_outlined,
-                            color: AppTheme.primary, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${event.photoUrls.length} foto${event.photoUrls.length > 1 ? 's' : ''}',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
+                    _PhotoThumbnails(photoUrls: event.photoUrls),
                   ],
+
+                  // Edit button
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: onTap,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              color: AppTheme.primary, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            'editar',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PhotoThumbnails extends StatelessWidget {
+  final List<String> photoUrls;
+
+  const _PhotoThumbnails({required this.photoUrls});
+
+  @override
+  Widget build(BuildContext context) {
+    final displayCount = photoUrls.length > 4 ? 4 : photoUrls.length;
+    final extraCount = photoUrls.length - 4;
+
+    return Row(
+      children: List.generate(displayCount, (i) {
+        final isLast = i == 3 && extraCount > 0;
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    photoUrls[i],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      color: Colors.white.withAlpha(10),
+                      child: Icon(Icons.broken_image_outlined,
+                          color: Colors.white.withAlpha(60), size: 20),
+                    ),
+                  ),
+                  if (isLast)
+                    Container(
+                      color: Colors.black.withAlpha(150),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '+$extraCount',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 }
@@ -186,6 +247,7 @@ class _CategoryIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (category) {
+      OccurrenceEventCategory.opening => ('▶', AppTheme.primary),
       OccurrenceEventCategory.arrival => ('▶', AppTheme.primary),
       OccurrenceEventCategory.approach => ('👤', const Color(0xFFF1C40F)),
       OccurrenceEventCategory.dogWork => ('🐾', const Color(0xFF2ECC71)),

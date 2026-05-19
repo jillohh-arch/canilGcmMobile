@@ -12,13 +12,15 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
-import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_context_card.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_finalize_cta.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_quick_grid.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_timeline.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+
+import 'edit_event_screen.dart';
+import 'finalize_occurrence_screen.dart';
 
 class ActiveOccurrenceScreen extends StatefulWidget {
   final String occurrenceId;
@@ -32,8 +34,11 @@ class ActiveOccurrenceScreen extends StatefulWidget {
 class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
   Timer? _durationTimer;
+  Timer? _durationPersistTimer;
+  Timer? _savedBadgeTimer;
   Duration _elapsed = Duration.zero;
   DateTime? _startedAt;
+  bool _showSavedBadge = false;
 
   @override
   void initState() {
@@ -45,6 +50,14 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     _updateElapsed();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateElapsed();
+    });
+
+    _durationPersistTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_elapsed.inSeconds > 0) {
+        context
+            .read<OccurrenceViewModel>()
+            .updateDurationSoFar(widget.occurrenceId, _elapsed.inSeconds);
+      }
     });
   }
 
@@ -63,6 +76,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   @override
   void dispose() {
     _durationTimer?.cancel();
+    _durationPersistTimer?.cancel();
+    _savedBadgeTimer?.cancel();
     super.dispose();
   }
 
@@ -75,20 +90,17 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     return '${s}s';
   }
 
+  void _showSavedFeedback() {
+    _savedBadgeTimer?.cancel();
+    setState(() => _showSavedBadge = true);
+    _savedBadgeTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showSavedBadge = false);
+    });
+  }
+
   Future<void> _addQuickEvent(QuickEventItem item) async {
     final vm = context.read<OccurrenceViewModel>();
     final now = DateTime.now();
-
-    // Show immediate feedback
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Registrando: ${item.autoTitle}...'),
-          duration: const Duration(seconds: 1),
-          backgroundColor: const Color(0xFF1A3A4A),
-        ),
-      );
-    }
 
     double? lat, lng;
     try {
@@ -114,18 +126,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     try {
       await vm.addEvent(event);
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✓ ${item.autoTitle} registrado'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        _showSavedFeedback();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao registrar evento: $e'),
@@ -136,149 +140,31 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     }
   }
 
-  void _openOtherEventSheet() {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    OccurrenceEventCategory selectedCat = OccurrenceEventCategory.other;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0F2027),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: StatefulBuilder(
-          builder: (ctx, setSheetState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Novo Evento',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SheetTextField(controller: titleCtrl, hint: 'Título do evento'),
-              const SizedBox(height: 12),
-              _SheetTextField(
-                  controller: descCtrl, hint: 'Descrição (opcional)'),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: OccurrenceEventCategory.values.map((cat) {
-                  final selected = cat == selectedCat;
-                  return GestureDetector(
-                    onTap: () => setSheetState(() => selectedCat = cat),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppTheme.primary.withAlpha(40)
-                            : Colors.white.withAlpha(8),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: selected
-                              ? AppTheme.primary
-                              : Colors.white.withAlpha(20),
-                        ),
-                      ),
-                      child: Text(
-                        cat.label,
-                        style: GoogleFonts.inter(
-                          color: selected ? AppTheme.primary : Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (titleCtrl.text.trim().isEmpty) return;
-                    Navigator.of(ctx).pop();
-                    await _addCustomEvent(
-                      title: titleCtrl.text.trim(),
-                      description: descCtrl.text.trim().isNotEmpty
-                          ? descCtrl.text.trim()
-                          : null,
-                      category: selectedCat,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    'Adicionar',
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+  void _openOtherEventSheet() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => EditEventScreen(
+          occurrenceId: widget.occurrenceId,
         ),
       ),
     );
+    if (result == 'saved' && mounted) {
+      _showSavedFeedback();
+    }
   }
 
-  Future<void> _addCustomEvent({
-    required String title,
-    String? description,
-    required OccurrenceEventCategory category,
-  }) async {
-    final vm = context.read<OccurrenceViewModel>();
-    final now = DateTime.now();
-
-    double? lat, lng;
-    try {
-      final loc = await _locationService.currentHighAccuracy();
-      lat = loc.point.latitude;
-      lng = loc.point.longitude;
-    } catch (_) {}
-
-    final event = OccurrenceEvent(
-      id: const Uuid().v4(),
-      occurrenceId: widget.occurrenceId,
-      category: category,
-      timestamp: now,
-      title: title,
-      description: description,
-      gpsLat: lat,
-      gpsLng: lng,
-      createdAt: now,
-      updatedAt: now,
-    );
-
-    await vm.addEvent(event);
-  }
-
-  void _onEventTap(OccurrenceEvent event) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Evento: ${event.title ?? event.category.label}'),
-        duration: const Duration(seconds: 2),
+  void _onEventTap(OccurrenceEvent event) async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => EditEventScreen(
+          occurrenceId: widget.occurrenceId,
+          existingEvent: event,
+        ),
       ),
     );
+    if (result == 'saved' || result == 'deleted') {
+      if (mounted) _showSavedFeedback();
+    }
   }
 
   void _onFinalize() {
@@ -286,12 +172,24 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     if (vm.events.isEmpty) {
       _showEmptyFinalizeDialog();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Finalização será implementada na Tela 2.4'),
-          duration: Duration(seconds: 2),
+      _navigateToFinalize();
+    }
+  }
+
+  void _navigateToFinalize() async {
+    final vm = context.read<OccurrenceViewModel>();
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => FinalizeOccurrenceScreen(
+          occurrenceId: widget.occurrenceId,
+          typeName: vm.openOccurrence?.typeName ?? '',
+          durationLabel: _durationLabel,
+          eventCount: vm.events.length,
         ),
-      );
+      ),
+    );
+    if (result == 'finalized' && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -336,15 +234,81 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Finalização será implementada na Tela 2.4'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              _navigateToFinalize();
             },
             child: Text('Finalizar',
                 style: GoogleFonts.inter(color: const Color(0xFFE74C3C))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDiscardDialog(OccurrenceViewModel vm) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F2027),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Descartar ocorrência?',
+          style: GoogleFonts.inter(
+              color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Esta ação não pode ser desfeita. A ocorrência será marcada como descartada.',
+              style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Motivo (obrigatório)',
+                hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+                filled: true,
+                fillColor: Colors.white.withAlpha(8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppTheme.error),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancelar',
+                style: GoogleFonts.inter(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) return;
+              Navigator.of(ctx).pop();
+              final authVM = context.read<AuthViewModel>();
+              final userId = authVM.user?.uid ?? '';
+              await vm.cancelOccurrence(widget.occurrenceId, userId, reason);
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: Text('Descartar',
+                style: GoogleFonts.inter(
+                    color: AppTheme.error, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -391,7 +355,21 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Header(typeName: typeName, onBack: () => Navigator.of(context).pop()),
+                  _Header(
+                    typeName: typeName,
+                    durationLabel: _durationLabel,
+                    eventCount: vm.events.length,
+                    onBack: () => Navigator.of(context).pop(),
+                    onEditData: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Edição será implementada na Tela 2.3'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    onDiscard: () => _showDiscardDialog(vm),
+                  ),
                   if (vm.error != null)
                     _SyncErrorBanner(
                       onRetry: () {
@@ -399,6 +377,31 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                         vm.watchEvents(widget.occurrenceId);
                       },
                     ),
+                  AnimatedOpacity(
+                    opacity: _showSavedBadge ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: _showSavedBadge
+                        ? Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_outline,
+                                    color: AppTheme.success, size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Salvo agora',
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.success,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                   const SizedBox(height: 16),
                   ActiveOccurrenceContextCard(
                     typeName: typeName,
@@ -448,12 +451,26 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
 
 class _Header extends StatelessWidget {
   final String typeName;
+  final String durationLabel;
+  final int eventCount;
   final VoidCallback onBack;
+  final VoidCallback? onEditData;
+  final VoidCallback? onDiscard;
 
-  const _Header({required this.typeName, required this.onBack});
+  const _Header({
+    required this.typeName,
+    required this.durationLabel,
+    required this.eventCount,
+    required this.onBack,
+    this.onEditData,
+    this.onDiscard,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final subtitle =
+        'Em andamento · $durationLabel · $eventCount evento${eventCount != 1 ? 's' : ''}';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
@@ -481,12 +498,12 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'OCORRÊNCIA EM ANDAMENTO',
+                  subtitle,
                   style: GoogleFonts.inter(
                     color: AppTheme.primary,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
+                    letterSpacing: 1.0,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -502,42 +519,43 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: Colors.white.withAlpha(180), size: 22),
+            color: const Color(0xFF0F2027),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            onSelected: (value) {
+              if (value == 'edit') {
+                onEditData?.call();
+              } else if (value == 'discard') {
+                onDiscard?.call();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, color: AppTheme.primary, size: 18),
+                    const SizedBox(width: 10),
+                    Text('Editar dados',
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'discard',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
+                    const SizedBox(width: 10),
+                    Text('Descartar ocorrência',
+                        style: GoogleFonts.inter(color: AppTheme.error, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class _SheetTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-
-  const _SheetTextField({required this.controller, required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
-        filled: true,
-        fillColor: Colors.white.withAlpha(8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withAlpha(20)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withAlpha(20)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppTheme.primary),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
