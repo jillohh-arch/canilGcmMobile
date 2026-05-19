@@ -10,6 +10,8 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
   final ValueChanged<OccurrenceEvent> onEventTap;
   final String? handlerName;
   final String? locationLabel;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   const ActiveOccurrenceTimeline({
     super.key,
@@ -17,6 +19,8 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
     required this.onEventTap,
     this.handlerName,
     this.locationLabel,
+    this.errorMessage,
+    this.onRetry,
   });
 
   @override
@@ -56,8 +60,9 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // Events list or empty state
-        if (events.isEmpty)
+        if (errorMessage != null)
+          _ErrorState(message: errorMessage!, onRetry: onRetry)
+        else if (events.isEmpty)
           _EmptyState()
         else
           ...events.asMap().entries.map((entry) {
@@ -72,6 +77,73 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
             );
           }),
       ],
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+
+  const _ErrorState({required this.message, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE53935).withAlpha(12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE53935).withAlpha(60)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Color(0xFFE53935),
+            size: 32,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Erro ao carregar eventos',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: Colors.white.withAlpha(160),
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(
+                'Tentar novamente',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4DD0E1),
+                side: const BorderSide(color: Color(0xFF4DD0E1)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

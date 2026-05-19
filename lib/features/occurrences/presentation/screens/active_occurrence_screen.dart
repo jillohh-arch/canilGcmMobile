@@ -295,6 +295,23 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     }
   }
 
+  String _translateError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('permission') || lower.contains('permission_denied')) {
+      return 'Sem permissão para acessar esses dados.';
+    }
+    if (lower.contains('failed-precondition') || lower.contains('precondition')) {
+      return 'Erro de configuração do servidor.';
+    }
+    if (lower.contains('unavailable') || lower.contains('network')) {
+      return 'Sem conexão com o servidor.';
+    }
+    if (lower.contains('not-found')) {
+      return 'Dados não encontrados.';
+    }
+    return 'Erro ao carregar dados. Tente novamente.';
+  }
+
   void _showEmptyFinalizeDialog() {
     showDialog(
       context: context,
@@ -375,6 +392,13 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _Header(typeName: typeName, onBack: () => Navigator.of(context).pop()),
+                  if (vm.error != null)
+                    _SyncErrorBanner(
+                      onRetry: () {
+                        vm.clearError();
+                        vm.watchEvents(widget.occurrenceId);
+                      },
+                    ),
                   const SizedBox(height: 16),
                   ActiveOccurrenceContextCard(
                     typeName: typeName,
@@ -398,6 +422,13 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     onEventTap: _onEventTap,
                     handlerName: handlerName,
                     locationLabel: locationAddress.isNotEmpty ? locationAddress : null,
+                    errorMessage: vm.error != null ? _translateError(vm.error!) : null,
+                    onRetry: vm.error != null
+                        ? () {
+                            vm.clearError();
+                            vm.watchEvents(widget.occurrenceId);
+                          }
+                        : null,
                   ),
                 ],
               ),
@@ -507,6 +538,54 @@ class _SheetTextField extends StatelessWidget {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+    );
+  }
+}
+
+class _SyncErrorBanner extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _SyncErrorBanner({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onRetry,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE53935).withAlpha(20),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE53935).withAlpha(80)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFE53935),
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Sincronização com falha. Toque para tentar novamente.',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(200),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.refresh_rounded,
+              color: Color(0xFF4DD0E1),
+              size: 16,
+            ),
+          ],
+        ),
       ),
     );
   }

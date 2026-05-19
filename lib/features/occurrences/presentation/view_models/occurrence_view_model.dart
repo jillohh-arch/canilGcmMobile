@@ -76,7 +76,9 @@ class OccurrenceViewModel extends ChangeNotifier {
         _events = list;
         notifyListeners();
       },
-      onError: (e) {
+      onError: (e, stack) {
+        debugPrint('[OccurrenceVM] watchEvents error: $e');
+        debugPrint('[OccurrenceVM] stack: $stack');
         _error = 'Erro ao carregar eventos: $e';
         notifyListeners();
       },
