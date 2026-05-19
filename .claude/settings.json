@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "firebase": {
+      "command": "npx",
+      "args": ["-y", "firebase-mcp", "--project", "canil-gcm"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {}
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/Projetos/canil_gcm_mobile_chatgpt/canil-gcm"],
+      "env": {}
+    }
+  },
+  "hooks": {
+    "PostEdit": [
+      {
+        "matcher": "**/*.dart",
+        "command": "bash .claude/hooks/post-edit-dart.sh $FILE",
+        "description": "Formata e analisa arquivo Dart editado"
+      },
+      {
+        "matcher": "**/pubspec.yaml",
+        "command": "flutter pub get",
+        "description": "Atualiza dependências após edição do pubspec.yaml"
+      }
+    ],
+    "PreCommit": [
+      {
+        "command": "bash .claude/hooks/pre-commit.sh",
+        "description": "Analyze + testes antes do commit - bloqueia se falhar"
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "bash .claude/hooks/session-start.sh",
+        "description": "Exibe status do projeto no início da sessão"
+      }
+    ]
+  }
+}

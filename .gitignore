@@ -82,3 +82,9 @@ flutter_01.png
 
 # Scripts utilit√°rios tempor√°rios
 /scratch/
+
+# Claude Code internals
+.claude/worktrees/
+
+# Di·rios de sess„o locais
+temp/docs/SESSAO_*.md
