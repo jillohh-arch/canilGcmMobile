@@ -94,6 +94,50 @@ class AuditService {
     );
   }
 
+  /// Verifica se um documento está soft-deleted.
+  /// Compatível com formato antigo (_deleted: bool) e novo (deleted_at: Timestamp).
+  static bool isDeleted(Map<String, dynamic> doc) {
+    return doc['deleted_at'] != null || doc['_deleted'] == true;
+  }
+
+  /// Restaura um documento soft-deleted.
+  /// Remove campos de deleção e registra no audit trail.
+  static Future<void> restoreSoftDeleted({
+    required String entityType,
+    required String entityId,
+    required DocumentReference docRef,
+  }) async {
+    await docRef.update({
+      'deleted_at': FieldValue.delete(),
+      'deleted_by': FieldValue.delete(),
+      'delete_reason': FieldValue.delete(),
+      '_deleted': FieldValue.delete(),
+      '_deleted_at': FieldValue.delete(),
+      '_deleted_by': FieldValue.delete(),
+      '_delete_reason': FieldValue.delete(),
+    });
+
+    final entry = buildInlineEntry(action: 'restored');
+    await appendInlineEntry(docRef: docRef, entry: entry);
+
+    await log(
+      action: 'restored',
+      entityType: entityType,
+      entityId: entityId,
+      summary: 'Registro restaurado',
+    );
+  }
+
+  /// Adiciona uma entrada de auditoria inline no array `audit_trail` do documento.
+  static Future<void> appendInlineEntry({
+    required DocumentReference docRef,
+    required Map<String, dynamic> entry,
+  }) async {
+    await docRef.update({
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    });
+  }
+
   /// Registra soft delete com motivo obrigatório.
   /// Marca o documento como deletado sem removê-lo fisicamente.
   static Future<void> logSoftDelete({
@@ -103,15 +147,12 @@ class AuditService {
     required DocumentReference docRef,
     Map<String, dynamic>? beforeState,
   }) async {
-    // Marca o documento como soft-deleted
     await docRef.update({
-      '_deleted': true,
-      '_deleted_at': FieldValue.serverTimestamp(),
-      '_deleted_by': _auth.currentUser?.uid,
-      '_delete_reason': reason,
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by': _auth.currentUser?.uid,
+      'delete_reason': reason,
     });
 
-    // Registra no audit log
     await log(
       action: 'deleted',
       entityType: entityType,
@@ -200,6 +241,7 @@ class AuditService {
       'uid': user?.uid,
       'email': email,
       'ra': ra,
+      'name': user?.displayName ?? ra,
     };
   }
 
