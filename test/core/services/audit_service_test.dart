@@ -8,18 +8,8 @@ void main() {
       expect(AuditService.isDeleted(doc), isTrue);
     });
 
-    test('retorna true quando _deleted é true (formato antigo)', () {
-      final doc = {'_deleted': true, 'name': 'test'};
-      expect(AuditService.isDeleted(doc), isTrue);
-    });
-
     test('retorna false quando nenhum campo de deleção existe', () {
       final doc = {'name': 'test', 'status': 'active'};
-      expect(AuditService.isDeleted(doc), isFalse);
-    });
-
-    test('retorna false quando _deleted é false', () {
-      final doc = {'_deleted': false, 'name': 'test'};
       expect(AuditService.isDeleted(doc), isFalse);
     });
 

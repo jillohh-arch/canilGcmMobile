@@ -95,9 +95,8 @@ class AuditService {
   }
 
   /// Verifica se um documento está soft-deleted.
-  /// Compatível com formato antigo (_deleted: bool) e novo (deleted_at: Timestamp).
   static bool isDeleted(Map<String, dynamic> doc) {
-    return doc['deleted_at'] != null || doc['_deleted'] == true;
+    return doc['deleted_at'] != null;
   }
 
   /// Restaura um documento soft-deleted.
@@ -111,10 +110,6 @@ class AuditService {
       'deleted_at': FieldValue.delete(),
       'deleted_by': FieldValue.delete(),
       'delete_reason': FieldValue.delete(),
-      '_deleted': FieldValue.delete(),
-      '_deleted_at': FieldValue.delete(),
-      '_deleted_by': FieldValue.delete(),
-      '_delete_reason': FieldValue.delete(),
     });
 
     final entry = buildInlineEntry(action: 'restored');
