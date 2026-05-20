@@ -51,7 +51,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   // Passo 3
   final Map<String, Map<String, TextEditingController>> _detailControllers = {};
-  final List<Map<String, TextEditingController>> _drugEntries = [];
+  final List<_DrugEntry> _drugEntries = [];
+
+  static const _drugTypes = ['Maconha', 'Cocaína', 'Crack', 'Ecstasy', 'Outros'];
 
   @override
   void dispose() {
@@ -64,9 +66,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       }
     }
     for (final entry in _drugEntries) {
-      for (final ctrl in entry.values) {
-        ctrl.dispose();
-      }
+      entry.dispose();
     }
     super.dispose();
   }
@@ -152,6 +152,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         } else {
           _selectedResults.clear();
           _selectedResults.add(result);
+          for (final e in _drugEntries) {
+            e.dispose();
+          }
           _drugEntries.clear();
         }
       } else {
@@ -159,16 +162,16 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         if (_selectedResults.contains(result)) {
           _selectedResults.remove(result);
           if (result == OccurrenceResult.drugSeized) {
+            for (final e in _drugEntries) {
+              e.dispose();
+            }
             _drugEntries.clear();
           }
         } else {
           _selectedResults.add(result);
           if (result == OccurrenceResult.drugSeized &&
               _drugEntries.isEmpty) {
-            _drugEntries.add({
-              'type': TextEditingController(),
-              'weight': TextEditingController(),
-            });
+            _drugEntries.add(_DrugEntry());
           }
         }
       }
@@ -186,19 +189,14 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   void _addDrugEntry() {
     setState(() {
-      _drugEntries.add({
-        'type': TextEditingController(),
-        'weight': TextEditingController(),
-      });
+      _drugEntries.add(_DrugEntry());
     });
   }
 
   void _removeDrugEntry(int index) {
     setState(() {
-      final entry = _drugEntries.removeAt(index);
-      for (final ctrl in entry.values) {
-        ctrl.dispose();
-      }
+      _drugEntries[index].dispose();
+      _drugEntries.removeAt(index);
     });
   }
 
@@ -215,8 +213,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       if (result == OccurrenceResult.drugSeized) {
         final drugs = <Map<String, dynamic>>[];
         for (final entry in _drugEntries) {
-          final type = entry['type']!.text.trim();
-          final weight = entry['weight']!.text.trim();
+          final type = entry.type ?? '';
+          final weight = entry.weightController.text.trim();
           if (type.isNotEmpty || weight.isNotEmpty) {
             drugs.add({
               'type': type,
@@ -916,7 +914,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           const SizedBox(height: 14),
           ..._drugEntries.asMap().entries.map((entry) {
             final idx = entry.key;
-            final controllers = entry.value;
+            final drugEntry = entry.value;
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
@@ -949,16 +947,55 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  TextField(
-                    controller: controllers['type']!,
+                  Text(
+                    'TIPO',
                     style: GoogleFonts.inter(
-                        color: Colors.white, fontSize: 14),
-                    decoration:
-                        _detailFieldDecoration('Tipo (maconha, cocaína, crack...)'),
+                      color: Colors.white.withAlpha(120),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _drugTypes.map((type) {
+                      final selected = drugEntry.type == type;
+                      return GestureDetector(
+                        onTap: () => setState(() => drugEntry.type = type),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppTheme.primary.withAlpha(30)
+                                : Colors.white.withAlpha(5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: selected
+                                  ? AppTheme.primary
+                                  : Colors.white.withAlpha(30),
+                            ),
+                          ),
+                          child: Text(
+                            type,
+                            style: GoogleFonts.inter(
+                              color: selected
+                                  ? AppTheme.primary
+                                  : Colors.white.withAlpha(180),
+                              fontSize: 12,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: controllers['weight']!,
+                    controller: drugEntry.weightController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     style: GoogleFonts.inter(
@@ -1118,4 +1155,13 @@ class _ResultCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DrugEntry {
+  String? type;
+  final TextEditingController weightController;
+
+  _DrugEntry() : weightController = TextEditingController();
+
+  void dispose() => weightController.dispose();
 }
