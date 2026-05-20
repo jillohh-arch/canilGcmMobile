@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -48,6 +49,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   bool _auditExpanded = false;
   double? _gpsLat;
   double? _gpsLng;
+  String? _gpsAddress;
   bool _isUpdatingGps = false;
 
   bool get _isEditing => widget.existingEvent != null;
@@ -80,11 +82,22 @@ class _EditEventScreenState extends State<EditEventScreen> {
       _gpsLat = e.gpsLat;
       _gpsLng = e.gpsLng;
       _selectedTimeChip = -1;
+      _resolveExistingGpsAddress();
     } else {
       _selectedCategory = OccurrenceEventCategory.other;
       _timestamp = DateTime.now();
       _selectedTimeChip = 0;
     }
+  }
+
+  Future<void> _resolveExistingGpsAddress() async {
+    if (_gpsLat == null || _gpsLng == null) return;
+    try {
+      final address = await _locationService.addressForPoint(
+        LatLng(_gpsLat!, _gpsLng!),
+      );
+      if (mounted) setState(() => _gpsAddress = address);
+    } catch (_) {}
   }
 
   @override
@@ -141,6 +154,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       setState(() {
         _gpsLat = loc.point.latitude;
         _gpsLng = loc.point.longitude;
+        _gpsAddress = loc.address;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -748,17 +762,36 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                hasGps
-                    ? 'GPS: ${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}'
-                    : 'Sem localização',
-                style: GoogleFonts.inter(
-                  color: hasGps
-                      ? Colors.white.withAlpha(200)
-                      : Colors.white.withAlpha(100),
-                  fontSize: 12,
-                ),
-              ),
+              child: hasGps
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _gpsAddress ?? '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withAlpha(200),
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (_gpsAddress != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
+                            style: GoogleFonts.inter(
+                              color: Colors.white.withAlpha(80),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ],
+                    )
+                  : Text(
+                      'Sem localização',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withAlpha(100),
+                        fontSize: 12,
+                      ),
+                    ),
             ),
             Text(
               _isUpdatingGps ? 'Atualizando...' : 'ATUALIZAR',
