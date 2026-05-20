@@ -184,13 +184,30 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
 
   void _navigateToFinalize() async {
     final vm = context.read<OccurrenceViewModel>();
+    final dogVM = context.read<DogViewModel>();
+    final authVM = context.read<AuthViewModel>();
+    final userVM = context.read<UserViewModel>();
+
+    final occ = vm.openOccurrence;
+    final dogs = dogVM.dogs.where((d) => d.id == occ?.dogId);
+    final dog = dogs.isNotEmpty ? dogs.first : null;
+    final dogName = dog?.name ?? 'K9';
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+    final handlerName = userVM.displayNameFor(
+      ra: handlerRa,
+      firebaseUser: authVM.user,
+    );
+
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => FinalizeOccurrenceScreen(
           occurrenceId: widget.occurrenceId,
-          typeName: vm.openOccurrence?.typeName ?? '',
+          typeName: occ?.typeName ?? '',
           durationLabel: _durationLabel,
           eventCount: vm.events.length,
+          dogName: dogName,
+          handlerName: handlerName,
+          locationAddress: occ?.locationAddress,
         ),
       ),
     );

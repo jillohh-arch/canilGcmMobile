@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 class FinalizeOccurrenceScreen extends StatefulWidget {
@@ -16,6 +17,9 @@ class FinalizeOccurrenceScreen extends StatefulWidget {
   final String typeName;
   final String durationLabel;
   final int eventCount;
+  final String dogName;
+  final String handlerName;
+  final String? locationAddress;
 
   const FinalizeOccurrenceScreen({
     super.key,
@@ -23,6 +27,9 @@ class FinalizeOccurrenceScreen extends StatefulWidget {
     required this.typeName,
     required this.durationLabel,
     required this.eventCount,
+    required this.dogName,
+    required this.handlerName,
+    this.locationAddress,
   });
 
   @override
@@ -258,7 +265,23 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop('finalized');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => OccurrenceConfirmationScreen(
+              data: OccurrenceConfirmationData(
+                occurrenceId: widget.occurrenceId,
+                typeName: widget.typeName,
+                durationLabel: widget.durationLabel,
+                locationAddress: widget.locationAddress,
+                dogName: widget.dogName,
+                handlerName: widget.handlerName,
+                eventCount: widget.eventCount,
+                results: results,
+                details: details,
+              ),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
