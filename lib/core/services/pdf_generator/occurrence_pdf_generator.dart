@@ -358,7 +358,6 @@ class OccurrencePdfGenerator {
       decoration: pw.BoxDecoration(
         color: PdfInstitutionalColors.lightGray,
         border: pw.Border(left: pw.BorderSide(color: _identityColor, width: 3)),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
       ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -557,7 +556,6 @@ class OccurrencePdfGenerator {
           left: pw.BorderSide(
               color: PdfInstitutionalColors.greenInstitutional, width: 3),
         ),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
       ),
       child: pw.Text(result.label,
           style: fonts.bodyBold(color: PdfInstitutionalColors.greenInstitutional)),
