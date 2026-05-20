@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 class OccurrenceConfirmationData {
   final String occurrenceId;
@@ -15,6 +22,7 @@ class OccurrenceConfirmationData {
   final int eventCount;
   final List<OccurrenceResult> results;
   final Map<String, dynamic>? details;
+  final String integrityHash;
 
   const OccurrenceConfirmationData({
     required this.occurrenceId,
@@ -26,6 +34,7 @@ class OccurrenceConfirmationData {
     required this.eventCount,
     required this.results,
     this.details,
+    required this.integrityHash,
   });
 }
 
@@ -60,6 +69,8 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         _buildResultsCard(),
                       ],
+                      const SizedBox(height: 12),
+                      _buildIntegrityCard(context),
                       const SizedBox(height: 16),
                       _buildActionButtons(context),
                       const SizedBox(height: 24),
@@ -210,6 +221,68 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildIntegrityCard(BuildContext context) {
+    final shortHash = data.integrityHash.length > 16
+        ? '${data.integrityHash.substring(0, 16)}...'
+        : data.integrityHash;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(51)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified_outlined, color: AppTheme.primary, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                'INTEGRIDADE VERIFICADA',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: data.integrityHash));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Hash copiado', style: GoogleFonts.inter()),
+                  backgroundColor: AppTheme.primary,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'SHA-256: $shortHash',
+                    style: GoogleFonts.sourceCodePro(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                Icon(Icons.copy_outlined, color: Colors.white38, size: 14),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getResultDetail(OccurrenceResult result) {
     if (data.details == null) return '';
     final key = result.toMap();
@@ -256,17 +329,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           child: _ActionButton(
             icon: Icons.description_outlined,
             label: 'Gerar PDF',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Geração de PDF disponível em breve',
-                      style: GoogleFonts.inter()),
-                  backgroundColor: AppTheme.primary,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
+            onTap: () => _generateAndPreviewPdf(context),
           ),
         ),
         const SizedBox(width: 8),
@@ -274,20 +337,123 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           child: _ActionButton(
             icon: Icons.share_outlined,
             label: 'Compartilhar',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Compartilhamento disponível em breve',
-                      style: GoogleFonts.inter()),
-                  backgroundColor: AppTheme.primary,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
+            onTap: () => _generateAndSharePdf(context),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _generateAndPreviewPdf(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    _showLoadingSnackbar(context, 'Gerando PDF...');
+
+    try {
+      final bytes = await _buildPdfBytes(context);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showErrorSnackbar(context, 'Erro ao gerar PDF: $e');
+    }
+  }
+
+  Future<void> _generateAndSharePdf(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    _showLoadingSnackbar(context, 'Preparando PDF...');
+
+    try {
+      final bytes = await _buildPdfBytes(context);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showErrorSnackbar(context, 'Erro ao compartilhar: $e');
+    }
+  }
+
+  Future<Uint8List> _buildPdfBytes(BuildContext context) async {
+    final occVM = context.read<OccurrenceViewModel>();
+    final dogVM = context.read<DogViewModel>();
+    final authVM = context.read<AuthViewModel>();
+
+    // Buscar ocorrência: tenta na lista local, depois openOccurrence, depois Firestore
+    Occurrence? occ;
+    final localMatch = occVM.occurrences.where((o) => o.id == data.occurrenceId);
+    if (localMatch.isNotEmpty) {
+      occ = localMatch.first;
+    }
+    occ ??= occVM.openOccurrence;
+    occ ??= await occVM.getById(data.occurrenceId);
+
+    if (occ == null) {
+      throw Exception('Ocorrência não encontrada');
+    }
+
+    final events = occVM.events;
+
+    // Buscar cão
+    final dogId = occ.dogId;
+    final dogs = dogVM.dogs.where((d) => d.id == dogId);
+    final dog = dogs.isNotEmpty
+        ? dogs.first
+        : (dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null);
+
+    if (dog == null) {
+      throw Exception('Dados do cão não disponíveis');
+    }
+
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
+
+    return occVM.generatePdf(
+      occurrence: occ,
+      events: events,
+      dog: dog,
+      handlerName: data.handlerName,
+      handlerRa: handlerRa,
+    );
+  }
+
+  void _showLoadingSnackbar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Text(message, style: GoogleFonts.inter()),
+          ],
+        ),
+        backgroundColor: AppTheme.primary,
+        duration: const Duration(seconds: 30),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.inter()),
+        backgroundColor: AppTheme.error,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 

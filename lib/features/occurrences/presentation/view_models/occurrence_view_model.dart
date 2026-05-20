@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
+import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -299,6 +301,31 @@ class OccurrenceViewModel extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Busca uma ocorrência por ID diretamente do Firestore.
+  Future<Occurrence?> getById(String id) async {
+    return _repository.getById(id);
+  }
+
+  // ─── PDF ────────────────────────────────────────────────────────────
+
+  /// Gera o PDF institucional da ocorrência e retorna os bytes.
+  Future<Uint8List> generatePdf({
+    required Occurrence occurrence,
+    required List<OccurrenceEvent> events,
+    required Dog dog,
+    required String handlerName,
+    required String handlerRa,
+  }) async {
+    final generator = OccurrencePdfGenerator();
+    return generator.generate(
+      occurrence: occurrence,
+      events: events,
+      dog: dog,
+      handlerName: handlerName,
+      handlerRa: handlerRa,
+    );
   }
 
   @override

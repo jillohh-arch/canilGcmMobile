@@ -276,6 +276,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 eventCount: widget.eventCount,
                 results: results,
                 details: details,
+                integrityHash: hash,
               ),
             ),
           ),
