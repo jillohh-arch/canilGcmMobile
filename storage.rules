@@ -67,6 +67,18 @@ service firebase.storage {
       allow create, update: if canWritePdf(20);
       allow delete: if signedIn();
     }
+    match /occurrences/{occurrenceId}/events/{fileName} {
+  allow read: if signedIn();
+  allow create, update: if canWriteImage(10);
+  allow delete: if signedIn();
+}
+
+match /dogs/{dogId}/feeding_photos/{fileName} {
+  allow read: if signedIn();
+  allow create, update: if canWriteImage(10);
+  allow delete: if signedIn();
+}
+
 
     match /{allPaths=**} {
       allow read, write: if false;
