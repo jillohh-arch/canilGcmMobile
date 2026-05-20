@@ -10,9 +10,9 @@ extension _HistoryFilters on _HistoryScreenState {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.dark(
-            primary: AppTheme.primary,
-            surface: _historySurfaceHigh,
-            onSurface: _historyTextPrimary,
+            primary: _hCyan,
+            surface: Color(0xFF0F2026),
+            onSurface: _hTextPrimary,
           ),
         ),
         child: child!,
@@ -37,10 +37,10 @@ extension _HistoryFilters on _HistoryScreenState {
             return Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
               decoration: const BoxDecoration(
-                color: _historySurfaceHigh,
+                color: Color(0xFF0F2026),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                 border: Border(
-                  top: BorderSide(color: _historyBorderStrong, width: 1),
+                  top: BorderSide(color: _hCyan, width: 1),
                 ),
               ),
               child: Column(
@@ -52,7 +52,7 @@ extension _HistoryFilters on _HistoryScreenState {
                       width: 42,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _historyTextMuted,
+                        color: _hTextMuted,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -61,14 +61,14 @@ extension _HistoryFilters on _HistoryScreenState {
                   Text(
                     'FILTROS DO HISTÓRICO',
                     style: GoogleFonts.inter(
-                      color: AppTheme.primary,
+                      color: _hCyan,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.1,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _FilterGroup(
+                  _FilterSheetGroup(
                     title: 'Período',
                     options: const [
                       'Hoje',
@@ -90,15 +90,14 @@ extension _HistoryFilters on _HistoryScreenState {
                     },
                   ),
                   const SizedBox(height: 18),
-                  _FilterGroup(
+                  _FilterSheetGroup(
                     title: 'Categoria',
                     options: const [
                       'Tudo',
+                      'Rotina',
                       'Saúde',
                       'Treino',
                       'Ocorrência',
-                      'Nutrição',
-                      'Rotina',
                     ],
                     selected: _typeFilter,
                     onSelected: (value) {
@@ -162,13 +161,131 @@ extension _HistoryFilters on _HistoryScreenState {
   }
 }
 
-class _FilterGroup extends StatelessWidget {
+class _PeriodFilterChips extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _PeriodFilterChips({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const chips = ['Hoje', 'Ontem', 'Esta semana', 'Este mês', 'Personalizado'];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 0, 8),
+      child: SizedBox(
+        height: 32,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: chips.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 6),
+          padding: const EdgeInsets.only(right: 16),
+          itemBuilder: (context, index) {
+            final chip = chips[index];
+            final active = selected == chip;
+            return _FilterChip(
+              label: chip,
+              active: active,
+              onTap: () => onSelected(chip),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryFilterChips extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _CategoryFilterChips({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const chips = [
+      ('Tudo', ''),
+      ('Rotina', '🍖'),
+      ('Saúde', '⚕'),
+      ('Treino', '🎯'),
+      ('Ocorrência', '🛡'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 0, 0),
+      child: SizedBox(
+        height: 32,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: chips.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 6),
+          padding: const EdgeInsets.only(right: 16),
+          itemBuilder: (context, index) {
+            final (value, emoji) = chips[index];
+            final active = selected == value;
+            final label = emoji.isEmpty ? value : '$emoji $value';
+            return _FilterChip(
+              label: label,
+              active: active,
+              onTap: () => onSelected(value),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? _hCyan.withAlpha(31) : Colors.white.withAlpha(8),
+          border: Border.all(
+            color: active ? _hCyan : Colors.white.withAlpha(20),
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            color: active ? _hCyan : _hTextSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterSheetGroup extends StatelessWidget {
   final String title;
   final List<String> options;
   final String selected;
   final ValueChanged<String> onSelected;
 
-  const _FilterGroup({
+  const _FilterSheetGroup({
     required this.title,
     required this.options,
     required this.selected,
@@ -183,7 +300,7 @@ class _FilterGroup extends StatelessWidget {
         Text(
           title,
           style: GoogleFonts.inter(
-            color: _historyTextSecondary,
+            color: _hTextSecondary,
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
@@ -194,8 +311,7 @@ class _FilterGroup extends StatelessWidget {
           runSpacing: 8,
           children: options.map((option) {
             final isActive = option == selected;
-            return InkWell(
-              borderRadius: BorderRadius.circular(6),
+            return GestureDetector(
               onTap: () => onSelected(option),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -204,17 +320,17 @@ class _FilterGroup extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? AppTheme.primary.withAlpha(24)
-                      : Colors.white.withAlpha(7),
-                  borderRadius: BorderRadius.circular(6),
+                      ? _hCyan.withAlpha(31)
+                      : Colors.white.withAlpha(8),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isActive ? AppTheme.primary : _historyBorder,
+                    color: isActive ? _hCyan : Colors.white.withAlpha(20),
                   ),
                 ),
                 child: Text(
                   option,
                   style: GoogleFonts.inter(
-                    color: isActive ? AppTheme.primary : _historyTextSecondary,
+                    color: isActive ? _hCyan : _hTextSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),

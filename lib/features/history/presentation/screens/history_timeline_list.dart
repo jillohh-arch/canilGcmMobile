@@ -1,144 +1,80 @@
 part of 'history_screen.dart';
 
-class HistoryTimelineCard extends StatelessWidget {
+class _HistoryTimeline extends StatelessWidget {
   final List<HistoryDayGroup> groups;
 
-  const HistoryTimelineCard({super.key, required this.groups});
+  const _HistoryTimeline({required this.groups});
 
   @override
   Widget build(BuildContext context) {
-    return _HistoryPanel(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-      child: groups.isEmpty
-          ? const _HistoryEmptyState()
-          : Column(
-              children: [
-                for (int i = 0; i < groups.length; i++) ...[
-                  HistoryDaySection(group: groups[i]),
-                  if (i < groups.length - 1) const SizedBox(height: 14),
-                ],
-                const SizedBox(height: 12),
-                _LoadMoreButton(onTap: () {}),
-              ],
-            ),
+    if (groups.isEmpty) {
+      return const _HistoryEmptyState();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 100),
+      itemCount: _itemCount(),
+      itemBuilder: (context, index) {
+        int offset = 0;
+        for (final group in groups) {
+          if (index == offset) {
+            return _DayHeader(group: group);
+          }
+          offset++;
+          if (index < offset + group.entries.length) {
+            final entryIndex = index - offset;
+            final isLast = entryIndex == group.entries.length - 1;
+            return HistoryTimelineItem(
+              entry: group.entries[entryIndex],
+              isLast: isLast,
+            );
+          }
+          offset += group.entries.length;
+        }
+        return const SizedBox.shrink();
+      },
     );
+  }
+
+  int _itemCount() {
+    int count = 0;
+    for (final group in groups) {
+      count += 1 + group.entries.length;
+    }
+    return count;
   }
 }
 
-class HistoryDaySection extends StatelessWidget {
+class _DayHeader extends StatelessWidget {
   final HistoryDayGroup group;
 
-  const HistoryDaySection({super.key, required this.group});
+  const _DayHeader({required this.group});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.calendar_month_outlined,
-              color: AppTheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: RichText(
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                text: TextSpan(
-                  style: GoogleFonts.inter(
-                    color: _historyTextSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: group.label,
-                      style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    TextSpan(text: ' - ${group.dateFormatted}'),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(height: 1, color: _historyBorder),
-        const SizedBox(height: 9),
-        Stack(
-          children: [
-            Positioned(
-              left: 16,
-              top: 22,
-              bottom: 22,
-              child: Container(width: 1.2, color: _historyTextSecondary),
-            ),
-            Column(
-              children: [
-                for (int i = 0; i < group.entries.length; i++) ...[
-                  HistoryTimelineItem(
-                    entry: group.entries[i],
-                    railColor: _railColorForIndex(i),
-                  ),
-                  if (i < group.entries.length - 1)
-                    Divider(height: 1, color: _historyBorder, indent: 74),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Color _railColorForIndex(int index) {
-    switch (index) {
-      case 0:
-        return _historyTextSecondary;
-      case 1:
-        return _historyYellow;
-      default:
-        return _historyGreen;
-    }
-  }
-}
-
-class _HistoryEmptyState extends StatelessWidget {
-  const _HistoryEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
-      child: Column(
+    return Container(
+      color: _hBg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
-          Icon(
-            Icons.history_toggle_off_rounded,
-            color: _historyTextMuted,
-            size: 42,
-          ),
-          const SizedBox(height: 12),
           Text(
-            'Nenhum registro encontrado',
+            group.label,
             style: GoogleFonts.inter(
-              color: _historyTextPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
+              color: _hCyan,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 5),
           Text(
-            'Ajuste os filtros ou registre uma atividade do binômio.',
-            textAlign: TextAlign.center,
+            group.dateFormatted,
             style: GoogleFonts.inter(
-              color: _historyTextSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              color: _hTextMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -147,29 +83,39 @@ class _HistoryEmptyState extends StatelessWidget {
   }
 }
 
-class _LoadMoreButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _LoadMoreButton({required this.onTap});
+class _HistoryEmptyState extends StatelessWidget {
+  const _HistoryEmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sync_rounded, color: AppTheme.primary, size: 18),
-            const SizedBox(width: 8),
+            Icon(
+              Icons.history_toggle_off_rounded,
+              color: _hTextMuted,
+              size: 42,
+            ),
+            const SizedBox(height: 12),
             Text(
-              'Carregar mais registros',
+              'Nenhum registro encontrado',
               style: GoogleFonts.inter(
-                color: AppTheme.primary,
-                fontSize: 14,
+                color: _hTextPrimary,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Ajuste os filtros ou registre uma atividade.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: _hTextMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -204,7 +150,7 @@ extension _HistoryGrouping on _HistoryScreenState {
       return HistoryDayGroup(
         date: date,
         label: label,
-        dateFormatted: _formatDayDate(date),
+        dateFormatted: _formatDayDateExtended(date),
         entries: dayEntries,
       );
     }).toList();
@@ -213,14 +159,22 @@ extension _HistoryGrouping on _HistoryScreenState {
   String _labelForDate(DateTime date, DateTime today, DateTime yesterday) {
     if (_isSameDay(date, today)) return 'HOJE';
     if (_isSameDay(date, yesterday)) return 'ONTEM';
-    return DateFormat('dd/MM/yyyy').format(date);
+    return DateFormat('dd/MM').format(date).toUpperCase();
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  String _formatDayDate(DateTime date) {
-    return DateFormat('dd/MM/yyyy').format(date);
+  String _formatDayDateExtended(DateTime date) {
+    const weekdays = ['', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+    const months = [
+      '', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+    ];
+    final day = date.day;
+    final month = months[date.month];
+    final weekday = weekdays[date.weekday];
+    return '$day de $month · $weekday';
   }
 }

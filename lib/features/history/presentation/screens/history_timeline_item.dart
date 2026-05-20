@@ -2,219 +2,294 @@ part of 'history_screen.dart';
 
 class HistoryTimelineItem extends StatelessWidget {
   final HistoryEntry entry;
-  final Color railColor;
+  final bool isLast;
 
   const HistoryTimelineItem({
     super.key,
     required this.entry,
-    required this.railColor,
+    this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final time = DateFormat('HH:mm').format(entry.time);
+    final categoryStyle = _categoryStyle(entry.type);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: () {
-          HapticFeedback.lightImpact();
-          Navigator.of(context).push(
-            PageRouteBuilder<void>(
-              transitionDuration: const Duration(milliseconds: 260),
-              reverseTransitionDuration: const Duration(milliseconds: 220),
-              pageBuilder: (context, animation, secondaryAnimation) {
-                return RegistroDetalhePage(entry: entry);
-              },
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 330;
-              return Row(
-                children: [
-                  SizedBox(
-                    width: compact ? 30 : 34,
-                    child: Center(
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: railColor,
-                          border: Border.all(
-                            color: _historyBackground,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _navigate(context);
+      },
+      child: Container(
+        color: Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Stack(
+          children: [
+            // Linha conectora vertical
+            if (!isLast)
+              Positioned(
+                left: 32 + 16 - 0.5, // time width + gap + half icon
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 1,
+                  color: Colors.white.withAlpha(15),
+                ),
+              ),
+            Row(
+              children: [
+                // Horário
+                SizedBox(
+                  width: 36,
+                  child: Text(
+                    time,
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.inter(
+                      color: _hTextMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  SizedBox(
-                    width: compact ? 42 : 48,
+                ),
+                const SizedBox(width: 12),
+                // Ícone circular
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: categoryStyle.color.withAlpha(46),
+                    border: Border.all(color: _hBg, width: 2),
+                  ),
+                  child: Center(
                     child: Text(
-                      time,
-                      style: GoogleFonts.inter(
-                        color: _historyTextPrimary,
-                        fontSize: compact ? 14 : 15,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      categoryStyle.emoji,
+                      style: const TextStyle(fontSize: 14),
                     ),
                   ),
-                  Hero(
-                    tag: '${entry.heroTag}_icon',
-                    child: Container(
-                      width: compact ? 38 : 42,
-                      height: compact ? 38 : 42,
-                      decoration: BoxDecoration(
-                        color: entry.color.withAlpha(13),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: _historyBorder),
-                      ),
-                      child: Icon(
-                        entry.icon,
-                        color: entry.color,
-                        size: compact ? 21 : 24,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: compact ? 10 : 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Hero(
-                          tag: entry.heroTag,
-                          flightShuttleBuilder:
-                              (
-                                flightContext,
-                                animation,
-                                flightDirection,
-                                fromHeroContext,
-                                toHeroContext,
-                              ) {
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: toHeroContext.widget,
-                                );
-                              },
-                          child: Material(
-                            color: Colors.transparent,
-                            child: Text(
-                              entry.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                color: _historyTextPrimary,
-                                fontSize: compact ? 13.5 : 14,
-                                height: 1.08,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
+                ),
+                const SizedBox(width: 12),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: _hTextPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                        if (entry.subtitle.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            entry.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              color: _historyTextSecondary,
-                              fontSize: compact ? 12.5 : 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.person_rounded,
-                              color: _historyTextMuted,
-                              size: 15,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                entry.author.isEmpty ? 'Ragonha' : entry.author,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  color: _historyTextSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (compact) ...[
-                          const SizedBox(height: 6),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _HistoryCategoryTag(
-                              entry: entry,
-                              maxWidth: 92,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 2),
+                      _buildMeta(),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  if (!compact) ...[
-                    _HistoryCategoryTag(entry: entry, maxWidth: 86),
-                    const SizedBox(width: 4),
-                  ],
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: _historyTextSecondary,
-                    size: compact ? 20 : 23,
+                ),
+                const SizedBox(width: 8),
+                // Chevron
+                Text(
+                  '›',
+                  style: GoogleFonts.inter(
+                    color: _hTextMuted,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeta() {
+    final children = <Widget>[];
+
+    // Info contextual (subtitle)
+    if (entry.subtitle.trim().isNotEmpty) {
+      children.add(
+        Flexible(
+          child: Text(
+            entry.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: _hTextDimmed,
+              fontSize: 10,
+            ),
           ),
+        ),
+      );
+    }
+
+    // Badge de autoria
+    final isYou = entry.tag == 'VOCÊ';
+    children.add(
+      _AuthorBadge(
+        label: isYou ? 'VOCÊ' : entry.author.toUpperCase(),
+        isYou: isYou,
+      ),
+    );
+
+    // Badge "EM ANDAMENTO" pulsante
+    if (entry.isInProgress) {
+      children.add(const _InProgressBadge());
+    }
+
+    // Badge "editado"
+    if (entry.editedAt != null) {
+      final editTime = DateFormat('HH:mm').format(entry.editedAt!);
+      children.add(
+        Text(
+          'editado $editTime',
+          style: GoogleFonts.inter(
+            color: _hTextDimmed,
+            fontSize: 9,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: children,
+    );
+  }
+
+  void _navigate(BuildContext context) {
+    if (entry.isInProgress && entry.type == HistoryEntryType.incident) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ActiveOccurrenceScreen(occurrenceId: entry.id),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RegistroDetalhePage(entry: entry),
+        ),
+      );
+    }
+  }
+
+  _CategoryStyle _categoryStyle(HistoryEntryType type) {
+    switch (type) {
+      case HistoryEntryType.nutrition:
+        return const _CategoryStyle(color: _hPurple, emoji: '🍖');
+      case HistoryEntryType.health:
+        return const _CategoryStyle(color: _hRed, emoji: '⚕');
+      case HistoryEntryType.training:
+        return const _CategoryStyle(color: _hYellow, emoji: '🎯');
+      case HistoryEntryType.incident:
+        return const _CategoryStyle(color: _hCyan, emoji: '🛡');
+    }
+  }
+}
+
+class _CategoryStyle {
+  final Color color;
+  final String emoji;
+
+  const _CategoryStyle({required this.color, required this.emoji});
+}
+
+class _AuthorBadge extends StatelessWidget {
+  final String label;
+  final bool isYou;
+
+  const _AuthorBadge({required this.label, required this.isYou});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isYou ? _hCyan : const Color(0xFF95A5A6);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withAlpha(26),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
         ),
       ),
     );
   }
 }
 
-class _HistoryCategoryTag extends StatelessWidget {
-  final HistoryEntry entry;
-  final double maxWidth;
+class _InProgressBadge extends StatefulWidget {
+  const _InProgressBadge();
 
-  const _HistoryCategoryTag({required this.entry, this.maxWidth = 92});
+  @override
+  State<_InProgressBadge> createState() => _InProgressBadgeState();
+}
+
+class _InProgressBadgeState extends State<_InProgressBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 1.0, end: 0.4).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: entry.color.withAlpha(8),
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: entry.color.withAlpha(170)),
-        ),
-        child: _HistoryAutoFitText(
-          entry.tag,
-          style: GoogleFonts.inter(
-            color: entry.color,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _hYellow.withAlpha(31),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FadeTransition(
+            opacity: _opacity,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: _hYellow,
+              ),
+            ),
           ),
-        ),
+          const SizedBox(width: 4),
+          Text(
+            'EM ANDAMENTO',
+            style: GoogleFonts.inter(
+              color: _hYellow,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }

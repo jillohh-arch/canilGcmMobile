@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
@@ -13,10 +16,15 @@ import 'package:canil_gcm/features/history/presentation/screens/history_detail_s
 import 'package:canil_gcm/features/incidents/domain/incident.dart';
 import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
 part 'history_models.dart';
 part 'history_filters.dart';
@@ -24,41 +32,16 @@ part 'history_timeline_list.dart';
 part 'history_timeline_item.dart';
 part 'history_data_loader.dart';
 
-const Color _historyBackground = Color(0xFF050D10);
-const Color _historySurfaceHigh = Color(0xFF0F2026);
-const Color _historyBorder = Color(0x523E7180);
-const Color _historyBorderStrong = Color(0x804DD0E1);
-const Color _historyTextPrimary = Color(0xFFF4F7F8);
-const Color _historyTextSecondary = Color(0xFFA7B4BA);
-const Color _historyTextMuted = Color(0xFF71828A);
-const Color _historyGreen = Color(0xFF74DB69);
-const Color _historyYellow = Color(0xFFFFC23A);
-
-const LinearGradient _historyPanelGradient = LinearGradient(
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-  colors: [Color(0xF2112028), Color(0xF207151B), Color(0xF20A1E25)],
-);
-
-BoxDecoration _historyPanelDecoration({Color? borderColor}) {
-  return BoxDecoration(
-    gradient: _historyPanelGradient,
-    borderRadius: BorderRadius.circular(6),
-    border: Border.all(color: borderColor ?? _historyBorder, width: 1.1),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withAlpha(68),
-        blurRadius: 18,
-        offset: const Offset(0, 10),
-      ),
-      BoxShadow(
-        color: AppTheme.primary.withAlpha(12),
-        blurRadius: 20,
-        offset: const Offset(0, -2),
-      ),
-    ],
-  );
-}
+const Color _hBg = Color(0xFF050D10);
+const Color _hCyan = Color(0xFF4DD0E1);
+const Color _hTextPrimary = Color(0xFFFFFFFF);
+const Color _hTextSecondary = Color(0xFFB0C4CC);
+const Color _hTextMuted = Color(0xFF5A7280);
+const Color _hTextDimmed = Color(0xFF7A8A92);
+const Color _hGreen = Color(0xFF2ECC71);
+const Color _hYellow = Color(0xFFF1C40F);
+const Color _hRed = Color(0xFFE74C3C);
+const Color _hPurple = Color(0xFF9B59B6);
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -82,6 +65,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
+    final dogVM = Provider.of<DogViewModel>(context);
+    final userVM = Provider.of<UserViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context);
 
     if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) {
       return const _HistoryNoShift();
@@ -96,66 +82,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
       });
     }
 
+    final dog = dogVM.dogs.cast<Dog?>().firstWhere(
+      (d) => d?.id == dogId,
+      orElse: () => dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null,
+    );
+
+    if (dog == null) {
+      return const _HistoryNoShift();
+    }
+
+    final fbUser = authVM.user;
+    final currentRa = HandlerIdentityService.raFromUser(fbUser);
+    final callsign = userVM.displayNameFor(
+      ra: currentRa,
+      firebaseUser: fbUser,
+    );
+
     final allEntries = _buildAllEntries(dogId);
     final filteredEntries = _filterEntries(allEntries);
     final groupedEntries = _groupEntriesByDay(filteredEntries);
-    final monthEntries = _entriesThisMonth(allEntries);
+    final daysCount = groupedEntries.length;
 
     return Scaffold(
-      backgroundColor: _historyBackground,
+      backgroundColor: _hBg,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
           statusBarColor: Colors.transparent,
-          systemNavigationBarColor: const Color(0xFF07141B),
+          systemNavigationBarColor: _hBg,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF061017), Color(0xFF050D10), Color(0xFF050D10)],
-            ),
-          ),
-          child: SafeArea(
-            top: true,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 126),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  HistoryHeader(
-                    onFilterTap: _openFilterSheet,
-                    onCalendarTap: _openDateRangePicker,
-                  ),
-                  const SizedBox(height: 16),
-                  HistorySummaryCard(
-                    total: allEntries.length,
-                    month: monthEntries.length,
-                    incidents: monthEntries
-                        .where(
-                          (entry) => entry.type == HistoryEntryType.incident,
-                        )
-                        .length,
-                    trainings: monthEntries
-                        .where(
-                          (entry) => entry.type == HistoryEntryType.training,
-                        )
-                        .length,
-                  ),
-                  const SizedBox(height: 14),
-                  HistoryTypeFilterBadges(
-                    selected: _typeFilter,
-                    onSelected: (value) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _typeFilter = value);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  HistoryTimelineCard(groups: groupedEntries),
-                ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              _HistoryShiftHeader(
+                dog: dog,
+                callsign: callsign,
+                shiftStartTime: shiftVM.shiftStartTime,
               ),
-            ),
+              _PageTitleRow(onExport: _exportPdf),
+              _PeriodFilterChips(
+                selected: _periodFilter,
+                onSelected: (v) {
+                  HapticFeedback.selectionClick();
+                  if (v == 'Personalizado') {
+                    _openDateRangePicker();
+                    return;
+                  }
+                  setState(() => _periodFilter = v);
+                },
+              ),
+              _CategoryFilterChips(
+                selected: _typeFilter,
+                onSelected: (v) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _typeFilter = v);
+                },
+              ),
+              _FilterSummaryRow(
+                count: filteredEntries.length,
+                days: daysCount,
+                onMoreFilters: _openFilterSheet,
+              ),
+              Expanded(
+                child: _HistoryTimeline(
+                  groups: groupedEntries,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -175,303 +168,64 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
   }
 
-  List<HistoryEntry> _entriesThisMonth(List<HistoryEntry> entries) {
-    final now = DateTime.now();
-    return entries
-        .where(
-          (entry) =>
-              entry.time.year == now.year && entry.time.month == now.month,
-        )
-        .toList();
-  }
-}
-
-class HistoryHeader extends StatelessWidget {
-  final VoidCallback onFilterTap;
-  final VoidCallback onCalendarTap;
-
-  const HistoryHeader({
-    super.key,
-    required this.onFilterTap,
-    required this.onCalendarTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Histórico',
-                style: GoogleFonts.inter(
-                  color: _historyTextPrimary,
-                  fontSize: 31,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Acompanhe todos os registros do binômio.',
-                style: GoogleFonts.inter(
-                  color: _historyTextSecondary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
-          ),
+  void _exportPdf() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'PDF do histórico em desenvolvimento',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(width: 12),
-        _HeaderButton(
-          icon: Icons.filter_alt_outlined,
-          label: 'Filtros',
-          onTap: onFilterTap,
-        ),
-        const SizedBox(width: 8),
-        _HeaderButton(
-          icon: Icons.calendar_month_outlined,
-          onTap: onCalendarTap,
-        ),
-      ],
-    );
-  }
-}
-
-class _HeaderButton extends StatelessWidget {
-  final IconData icon;
-  final String? label;
-  final VoidCallback onTap;
-
-  const _HeaderButton({required this.icon, this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          height: 40,
-          width: label == null ? 40 : 102,
-          padding: const EdgeInsets.symmetric(horizontal: 11),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withAlpha(10),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.primary.withAlpha(135)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppTheme.primary, size: 21),
-              if (label != null) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: _HistoryAutoFitText(
-                    label!,
-                    style: GoogleFonts.inter(
-                      color: AppTheme.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+        backgroundColor: _hCyan.withAlpha(200),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 }
 
-class HistorySummaryCard extends StatelessWidget {
-  final int total;
-  final int month;
-  final int incidents;
-  final int trainings;
+class _PageTitleRow extends StatelessWidget {
+  final VoidCallback onExport;
 
-  const HistorySummaryCard({
-    super.key,
-    required this.total,
-    required this.month,
-    required this.incidents,
-    required this.trainings,
-  });
+  const _PageTitleRow({required this.onExport});
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final formattedMonth = '${_monthName(now.month)}/${now.year}';
-    final metrics = [
-      _SummaryMetricData(
-        icon: Icons.assignment_outlined,
-        value: '$total',
-        label: 'Total registros',
-        meta: 'Todos os tipos',
-        color: AppTheme.primary,
-      ),
-      _SummaryMetricData(
-        icon: Icons.schedule_rounded,
-        value: '$month',
-        label: 'Este mês',
-        meta: formattedMonth,
-        color: AppTheme.primary,
-      ),
-      _SummaryMetricData(
-        icon: Icons.assignment_outlined,
-        value: '$incidents',
-        label: 'Ocorrências',
-        meta: 'Este mês',
-        color: _historyYellow,
-      ),
-      _SummaryMetricData(
-        icon: Icons.fitness_center_rounded,
-        value: '$trainings',
-        label: 'Treinos',
-        meta: 'Este mês',
-        color: _historyGreen,
-      ),
-    ];
-
-    return _HistoryPanel(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 390) {
-            return Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _SummaryMetric(data: metrics[0])),
-                    const SizedBox(width: 10),
-                    Expanded(child: _SummaryMetric(data: metrics[1])),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: _SummaryMetric(data: metrics[2])),
-                    const SizedBox(width: 10),
-                    Expanded(child: _SummaryMetric(data: metrics[3])),
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return IntrinsicHeight(
-            child: Row(
-              children: [
-                for (int i = 0; i < metrics.length; i++) ...[
-                  Expanded(child: _SummaryMetric(data: metrics[i])),
-                  if (i < metrics.length - 1) const _SummaryDivider(),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  String _monthName(int month) {
-    const names = [
-      '',
-      'Janeiro',
-      'Fevereiro',
-      'Março',
-      'Abril',
-      'Maio',
-      'Junho',
-      'Julho',
-      'Agosto',
-      'Setembro',
-      'Outubro',
-      'Novembro',
-      'Dezembro',
-    ];
-    return names[month];
-  }
-}
-
-class _SummaryMetricData {
-  final IconData icon;
-  final String value;
-  final String label;
-  final String meta;
-  final Color color;
-
-  const _SummaryMetricData({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.meta,
-    required this.color,
-  });
-}
-
-class _SummaryMetric extends StatelessWidget {
-  final _SummaryMetricData data;
-
-  const _SummaryMetric({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 74),
-      padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Row(
         children: [
-          Icon(data.icon, color: data.color, size: 24),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _HistoryAutoFitText(
-                  data.value,
-                  alignment: Alignment.centerLeft,
-                  textAlign: TextAlign.left,
-                  style: GoogleFonts.inter(
-                    color: _historyTextPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
+          Text(
+            'Histórico',
+            style: GoogleFonts.inter(
+              color: _hTextPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: onExport,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: _hCyan.withAlpha(26),
+                border: Border.all(color: _hCyan.withAlpha(77)),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('📄', style: TextStyle(fontSize: 12)),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Exportar PDF',
+                    style: GoogleFonts.inter(
+                      color: _hCyan,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  data.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: _historyTextSecondary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  data.meta,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: _historyTextMuted,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -480,213 +234,278 @@ class _SummaryMetric extends StatelessWidget {
   }
 }
 
-class _SummaryDivider extends StatelessWidget {
-  const _SummaryDivider();
+class _FilterSummaryRow extends StatelessWidget {
+  final int count;
+  final int days;
+  final VoidCallback onMoreFilters;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: _historyBorderStrong.withAlpha(70),
-    );
-  }
-}
-
-class HistoryTypeFilterBadges extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  const HistoryTypeFilterBadges({
-    super.key,
-    required this.selected,
-    required this.onSelected,
+  const _FilterSummaryRow({
+    required this.count,
+    required this.days,
+    required this.onMoreFilters,
   });
 
   @override
   Widget build(BuildContext context) {
-    const filters = [
-      _HistoryTypeBadgeData(
-        label: 'Tudo',
-        value: 'Tudo',
-        icon: Icons.all_inclusive_rounded,
-        color: AppTheme.primary,
-      ),
-      _HistoryTypeBadgeData(
-        label: 'Ocorrências',
-        value: 'Ocorrência',
-        icon: Icons.assignment_outlined,
-        color: _historyYellow,
-      ),
-      _HistoryTypeBadgeData(
-        label: 'Treinos',
-        value: 'Treino',
-        icon: Icons.fitness_center_rounded,
-        color: _historyGreen,
-      ),
-      _HistoryTypeBadgeData(
-        label: 'Rotinas',
-        value: 'Rotina',
-        icon: Icons.format_list_bulleted_rounded,
-        color: AppTheme.primary,
-      ),
-      _HistoryTypeBadgeData(
-        label: 'Saúde',
-        value: 'Saúde',
-        icon: Icons.monitor_heart_outlined,
-        color: _historyGreen,
-      ),
-      _HistoryTypeBadgeData(
-        label: 'Nutrição',
-        value: 'Nutrição',
-        icon: Icons.rice_bowl_rounded,
-        color: _historyYellow,
-      ),
-    ];
-
-    return _HistoryPanel(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      child: SizedBox(
-        height: 38,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: filters.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final filter = filters[index];
-            final active = selected == filter.value;
-            return _HistoryTypeBadge(
-              data: filter,
-              active: active,
-              onTap: () => onSelected(filter.value),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _HistoryTypeBadgeData {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _HistoryTypeBadgeData({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-}
-
-class _HistoryTypeBadge extends StatelessWidget {
-  final _HistoryTypeBadgeData data;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _HistoryTypeBadge({
-    required this.data,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? data.color : _historyTextSecondary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(7),
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 72, maxWidth: 126),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-          decoration: BoxDecoration(
-            color: active
-                ? data.color.withAlpha(18)
-                : Colors.white.withAlpha(7),
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(
-              color: active ? data.color.withAlpha(170) : _historyBorder,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(data.icon, color: color, size: 17),
-              const SizedBox(width: 7),
-              Flexible(
-                child: _HistoryAutoFitText(
-                  data.label,
-                  style: GoogleFonts.inter(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          RichText(
+            text: TextSpan(
+              style: GoogleFonts.inter(
+                color: _hTextDimmed,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              children: [
+                TextSpan(
+                  text: '$count registros',
+                  style: const TextStyle(
+                    color: _hTextPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
+                TextSpan(text: ' · $days ${days == 1 ? 'dia' : 'dias'}'),
+              ],
+            ),
           ),
+          const Spacer(),
+          GestureDetector(
+            onTap: onMoreFilters,
+            child: Text(
+              'Mais filtros →',
+              style: GoogleFonts.inter(
+                color: _hCyan,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryShiftHeader extends StatelessWidget {
+  final Dog dog;
+  final String callsign;
+  final DateTime? shiftStartTime;
+
+  const _HistoryShiftHeader({
+    required this.dog,
+    required this.callsign,
+    this.shiftStartTime,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = _formatElapsed(shiftStartTime);
+    final conductorName = _shortName(callsign);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(10),
+        border: const Border(
+          bottom: BorderSide(color: Color(0x1E4DD0E1)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Avatares sobrepostos
+          SizedBox(
+            width: 70,
+            height: 44,
+            child: Stack(
+              children: [
+                _HAvatar(
+                  imageUrl: dog.profileImageUrl,
+                  fallbackText: dog.name.isNotEmpty
+                      ? dog.name.substring(0, dog.name.length.clamp(0, 4)).toUpperCase()
+                      : 'K9',
+                  borderColor: AppTheme.primary,
+                ),
+                Positioned(
+                  left: 30,
+                  child: _HAvatar(
+                    imageUrl: null,
+                    fallbackText: conductorName.length >= 3
+                        ? conductorName.substring(0, 3).toUpperCase()
+                        : conductorName.toUpperCase(),
+                    borderColor: AppTheme.primary.withAlpha(128),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${dog.name} · GCM $conductorName',
+                  style: GoogleFonts.inter(
+                    color: _hTextPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _hGreen,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Turno ativo',
+                      style: GoogleFonts.inter(
+                        color: _hGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '· $elapsed',
+                      style: GoogleFonts.inter(
+                        color: _hTextSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Botão trocar cão
+          _HActionButton(
+            icon: Icons.compare_arrows_rounded,
+            onTap: () {},
+          ),
+          const SizedBox(width: 6),
+          // Botão perfil
+          _HActionButton(
+            icon: Icons.person_outline_rounded,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _shortName(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 'Condutor';
+    final pieces = trimmed.split(RegExp(r'\s+'));
+    return pieces.length <= 1 ? pieces.first : pieces.last;
+  }
+
+  String _formatElapsed(DateTime? start) {
+    if (start == null) return '--';
+    final diff = DateTime.now().difference(start);
+    if (diff.inMinutes < 1) return 'agora';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    return 'há ${diff.inDays}d';
+  }
+}
+
+class _HAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String fallbackText;
+  final Color borderColor;
+
+  const _HAvatar({
+    this.imageUrl,
+    required this.fallbackText,
+    required this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF1A2A30),
+        border: Border.all(color: borderColor, width: 2),
+      ),
+      child: ClipOval(
+        child: imageUrl != null && imageUrl!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: imageUrl!,
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => _fallbackWidget(),
+                errorWidget: (_, _, _) => _fallbackWidget(),
+              )
+            : _fallbackWidget(),
+      ),
+    );
+  }
+
+  Widget _fallbackWidget() {
+    return Container(
+      color: const Color(0xFF1A2A30),
+      alignment: Alignment.center,
+      child: Text(
+        fallbackText,
+        style: GoogleFonts.inter(
+          color: AppTheme.primary,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 }
 
-class _HistoryPanel extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
+class _HActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
 
-  const _HistoryPanel({
-    required this.child,
-    this.padding = const EdgeInsets.all(14),
-  });
+  const _HActionButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: _historyPanelDecoration(),
-      child: child,
-    );
-  }
-}
-
-class _HistoryAutoFitText extends StatelessWidget {
-  final String text;
-  final TextStyle style;
-  final Alignment alignment;
-  final TextAlign textAlign;
-
-  const _HistoryAutoFitText(
-    this.text, {
-    required this.style,
-    this.alignment = Alignment.center,
-    this.textAlign = TextAlign.center,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fitted = FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: alignment,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
-            textAlign: textAlign,
-            style: style,
-          ),
-        );
-
-        if (!constraints.maxWidth.isFinite) return fitted;
-        return SizedBox(width: constraints.maxWidth, child: fitted);
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
       },
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(20),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.primary.withAlpha(51)),
+        ),
+        child: Center(
+          child: Icon(icon, color: AppTheme.primary, size: 16),
+        ),
+      ),
     );
   }
 }
@@ -696,12 +515,17 @@ class _HistoryNoShift extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: _historyBackground,
+    return Scaffold(
+      backgroundColor: _hBg,
       body: Center(
         child: Text(
-          'Nenhum turno ativo.',
-          style: TextStyle(color: _historyTextSecondary),
+          'Nenhum turno ativo.\nInicie um turno para ver o histórico.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            color: _hTextMuted,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );

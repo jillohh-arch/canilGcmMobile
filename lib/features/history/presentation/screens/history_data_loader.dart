@@ -20,6 +20,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
       listen: false,
     ).fetchHealthLogsForDog(dogId);
     Provider.of<NutritionViewModel>(context, listen: false).loadForDog(dogId);
+    Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
   }
 
   List<HistoryEntry> _buildAllEntries(String dogId) {
@@ -27,6 +28,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
     final incidentVM = Provider.of<IncidentViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
 
     final dogName = _resolveDogName(dogId, dogVM);
@@ -38,6 +40,10 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
     for (final incident in incidentVM.incidents) {
       if (incident.dogId == dogId) entries.add(_buildIncidentEntry(incident));
+    }
+
+    for (final occ in occurrenceVM.occurrences) {
+      if (occ.dogId == dogId) entries.add(_buildOccurrenceEntry(occ));
     }
 
     for (final training in trainingVM.trainings) {
@@ -56,7 +62,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
           authorId: feeding.fedBy,
           tag: 'NUTRIÇÃO',
           icon: Icons.rice_bowl_rounded,
-          color: _historyYellow,
+          color: _hYellow,
           details: {
             'Período': _periodLabel(feeding.period),
             'Quantidade': '${feeding.amountGrams}g',
@@ -96,7 +102,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
       author: author,
       tag: 'SAÚDE',
       icon: isWeight ? Icons.monitor_weight_outlined : Icons.vaccines_outlined,
-      color: _historyGreen,
+      color: _hGreen,
       originalModel: log,
       details: {
         'Cão': dogName,
@@ -128,7 +134,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
       authorId: incident.handlerId,
       tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
       icon: Icons.assignment_outlined,
-      color: isYou ? _historyYellow : AppTheme.error,
+      color: isYou ? _hYellow : AppTheme.error,
       location: incident.location,
       isInProgress: incident.isInProgress,
       editedAt: !incident.updatedAt.isAtSameMomentAs(incident.date)
@@ -173,7 +179,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
       authorId: training.handlerId,
       tag: 'TREINO',
       icon: Icons.fitness_center_rounded,
-      color: _historyGreen,
+      color: _hGreen,
       location: training.location,
       originalModel: training,
       details: {
@@ -188,6 +194,44 @@ extension _HistoryDataLoader on _HistoryScreenState {
         if (training.metadata != null) ...training.metadata!,
         if (training.mediaAttachments?.isNotEmpty == true)
           '_mediaAttachments': training.mediaAttachments,
+      },
+    );
+  }
+
+  HistoryEntry _buildOccurrenceEntry(Occurrence occ) {
+    final isYou = _isCurrentUser(occ.primaryHandlerId);
+    final isOpen = occ.status == OccurrenceStatus.inProgress ||
+        occ.status == OccurrenceStatus.finalizing;
+
+    return HistoryEntry(
+      id: occ.id,
+      type: HistoryEntryType.incident,
+      title: 'Ocorrência · ${occ.typeName}',
+      subtitle: occ.locationAddress?.trim().isNotEmpty == true
+          ? occ.locationAddress!.trim()
+          : 'Local não informado',
+      time: occ.startedAt,
+      author: isYou ? 'Você' : _resolveAuthorName(occ.primaryHandlerId),
+      authorId: occ.primaryHandlerId,
+      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
+      icon: Icons.assignment_outlined,
+      color: isYou ? _hYellow : _hCyan,
+      location: occ.locationAddress ?? '',
+      isInProgress: isOpen,
+      editedAt: occ.auditTrail.length > 1 ? occ.updatedAt : null,
+      originalModel: occ,
+      details: {
+        'Tipo': occ.typeName,
+        'Status': occ.status.toMap(),
+        if (occ.locationAddress?.isNotEmpty == true) 'Local': occ.locationAddress,
+        'Condutor': _resolveAuthorName(occ.primaryHandlerId),
+        'Início': DateFormat('HH:mm').format(occ.startedAt),
+        if (occ.finalizedAt != null)
+          'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
+        if (occ.finalReport?.isNotEmpty == true)
+          'Descrição': occ.finalReport,
+        if (occ.results.isNotEmpty)
+          '_outcomes': occ.results.map((r) => r.toMap()).toList(),
       },
     );
   }
@@ -263,7 +307,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Ragonha',
         tag: 'SAÚDE',
         icon: Icons.monitor_weight_outlined,
-        color: _historyGreen,
+        color: _hGreen,
         details: const {'Peso': '27.0 kg', 'Responsável': 'Ragonha'},
       ),
       HistoryEntry(
@@ -275,7 +319,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Você',
         tag: 'VOCÊ',
         icon: Icons.assignment_outlined,
-        color: _historyYellow,
+        color: _hYellow,
         location: 'Rua Guido Orsi, Jardim Ouro Verde',
         details: const {
           'Status': 'Concluída',
@@ -292,7 +336,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Ragonha',
         tag: 'TREINO',
         icon: Icons.fitness_center_rounded,
-        color: _historyGreen,
+        color: _hGreen,
         details: const {'Tipo': 'Obediência', 'Condutor': 'Ragonha'},
       ),
       HistoryEntry(
@@ -304,7 +348,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Ragonha',
         tag: 'NUTRIÇÃO',
         icon: Icons.rice_bowl_rounded,
-        color: _historyYellow,
+        color: _hYellow,
         details: const {'Quantidade': '450g', 'Responsável': 'Ragonha'},
       ),
       HistoryEntry(
@@ -332,7 +376,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Veterinário João',
         tag: 'SAÚDE',
         icon: Icons.vaccines_outlined,
-        color: _historyGreen,
+        color: _hGreen,
         details: const {'Vacina': 'V8', 'Lote': '24521', 'Veterinário': 'João'},
       ),
       HistoryEntry(
@@ -344,7 +388,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         author: 'Ragonha',
         tag: 'TREINO',
         icon: Icons.fitness_center_rounded,
-        color: _historyGreen,
+        color: _hGreen,
         details: const {'Tipo': 'Detecção', 'Substância': 'Cocaína'},
       ),
     ]..sort((a, b) => b.time.compareTo(a.time));
