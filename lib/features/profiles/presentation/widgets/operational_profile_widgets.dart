@@ -220,15 +220,14 @@ class MetricSummaryCard extends StatelessWidget {
         children: [
           SectionTitle(title),
           const SizedBox(height: 16),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                for (int i = 0; i < metrics.length; i++) ...[
-                  Expanded(child: _MetricCell(data: metrics[i])),
-                  if (i < metrics.length - 1) const ProfileVerticalDivider(),
-                ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (int i = 0; i < metrics.length; i++) ...[
+                Expanded(child: _MetricCell(data: metrics[i])),
+                if (i < metrics.length - 1) const ProfileVerticalDivider(),
               ],
-            ),
+            ],
           ),
         ],
       ),
@@ -643,6 +642,7 @@ class ProfileVerticalDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
+      height: 72,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       color: profileBorder.withAlpha(180),
     );
