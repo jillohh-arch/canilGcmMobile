@@ -8,6 +8,7 @@ enum GpsPrecision { high, medium, low, unavailable }
 class StartOccurrenceInfoGrid extends StatelessWidget {
   final String locationLabel;
   final GpsPrecision gpsPrecision;
+  final double? gpsAccuracy;
   final String timeLabel;
   final String dateLabel;
   final bool isLoadingGps;
@@ -19,6 +20,7 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
     super.key,
     required this.locationLabel,
     required this.gpsPrecision,
+    this.gpsAccuracy,
     required this.timeLabel,
     required this.dateLabel,
     this.isLoadingGps = false,
@@ -29,7 +31,8 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showManualLink = !isLoadingGps &&
+    final showManualLink =
+        !isLoadingGps &&
         gpsPrecision == GpsPrecision.unavailable &&
         onManualLocation != null;
 
@@ -44,8 +47,8 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
                 value: isLoadingGps
                     ? 'Capturando GPS...'
                     : locationLabel.isEmpty
-                        ? 'GPS indisponível'
-                        : locationLabel,
+                    ? 'GPS indisponível'
+                    : locationLabel,
                 footer: _buildGpsFooter(),
                 onTap: onRefreshLocation,
               ),
@@ -68,8 +71,11 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.edit_location_alt_outlined,
-                    color: AppTheme.primary, size: 16),
+                Icon(
+                  Icons.edit_location_alt_outlined,
+                  color: AppTheme.primary,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'Preencher local manualmente',
@@ -112,10 +118,13 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
       );
     }
 
+    final accuracyLabel = gpsAccuracy == null
+        ? ''
+        : ' · ± ${gpsAccuracy!.toStringAsFixed(gpsAccuracy! < 10 ? 1 : 0)}m';
     final (color, text) = switch (gpsPrecision) {
-      GpsPrecision.high => (AppTheme.success, 'GPS preciso'),
-      GpsPrecision.medium => (AppTheme.warning, 'GPS aproximado'),
-      GpsPrecision.low => (AppTheme.error, 'GPS impreciso'),
+      GpsPrecision.high => (AppTheme.success, 'GPS preciso$accuracyLabel'),
+      GpsPrecision.medium => (AppTheme.warning, 'GPS aproximado$accuracyLabel'),
+      GpsPrecision.low => (AppTheme.warning, 'GPS impreciso$accuracyLabel'),
       GpsPrecision.unavailable => (AppTheme.error, 'GPS indisponível'),
     };
 
@@ -144,12 +153,16 @@ class StartOccurrenceInfoGrid extends StatelessWidget {
           decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
         const SizedBox(width: 5),
-        Text(
-          text,
-          style: GoogleFonts.inter(
-            color: color,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -214,10 +227,7 @@ class _InfoCard extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            if (footer != null) ...[
-              const SizedBox(height: 6),
-              footer!,
-            ],
+            if (footer != null) ...[const SizedBox(height: 6), footer!],
           ],
         ),
       ),

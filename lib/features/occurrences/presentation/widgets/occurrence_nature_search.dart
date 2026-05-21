@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 
 part 'occurrence_nature_search_hint.dart';
 part 'occurrence_nature_search_options.dart';

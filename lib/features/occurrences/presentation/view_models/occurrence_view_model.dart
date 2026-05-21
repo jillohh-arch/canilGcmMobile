@@ -11,6 +11,7 @@ import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
@@ -21,14 +22,15 @@ class OccurrenceViewModel extends ChangeNotifier {
   OccurrenceViewModel({
     required OccurrenceRepository repository,
     required OccurrenceEventRepository eventRepository,
-  })  : _repository = repository,
-        _eventRepository = eventRepository;
+  }) : _repository = repository,
+       _eventRepository = eventRepository;
 
   // ─── Estado ─────────────────────────────────────────────────────────
 
   List<Occurrence> _occurrences = [];
   Occurrence? _openOccurrence;
   List<OccurrenceEvent> _events = [];
+  List<OccurrenceNature> _natures = OccurrenceNatureSeed.items;
   bool _isLoading = false;
   String? _error;
 
@@ -42,6 +44,7 @@ class OccurrenceViewModel extends ChangeNotifier {
   Occurrence? get openOccurrence => _openOccurrence;
   bool get hasOpen => _openOccurrence != null;
   List<OccurrenceEvent> get events => _events;
+  List<OccurrenceNature> get natures => _natures;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -49,45 +52,65 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   void watchByDog(String dogId) {
     _occurrencesSub?.cancel();
-    _occurrencesSub = _repository.watchByDog(dogId).listen(
-      (list) {
-        _occurrences = list;
-        notifyListeners();
-      },
-      onError: (e) {
-        _error = 'Erro ao carregar ocorrências: $e';
-        notifyListeners();
-      },
-    );
+    _occurrencesSub = _repository
+        .watchByDog(dogId)
+        .listen(
+          (list) {
+            _occurrences = list;
+            notifyListeners();
+          },
+          onError: (e) {
+            _error = 'Erro ao carregar ocorrências: $e';
+            notifyListeners();
+          },
+        );
   }
 
   void watchOpen(String dogId) {
     _openSub?.cancel();
-    _openSub = _repository.watchOpen(dogId).listen(
-      (occ) {
-        _openOccurrence = occ;
-        notifyListeners();
-      },
-      onError: (e) {
-        debugPrint('[OccurrenceViewModel] watchOpen error: $e');
-      },
-    );
+    _openSub = _repository
+        .watchOpen(dogId)
+        .listen(
+          (occ) {
+            _openOccurrence = occ;
+            notifyListeners();
+          },
+          onError: (e) {
+            debugPrint('[OccurrenceViewModel] watchOpen error: $e');
+          },
+        );
   }
 
   void watchEvents(String occurrenceId) {
     _eventsSub?.cancel();
-    _eventsSub = _eventRepository.watchByOccurrence(occurrenceId).listen(
-      (list) {
-        _events = list;
-        notifyListeners();
-      },
-      onError: (e, stack) {
-        debugPrint('[OccurrenceVM] watchEvents error: $e');
-        debugPrint('[OccurrenceVM] stack: $stack');
-        _error = 'Erro ao carregar eventos: $e';
-        notifyListeners();
-      },
-    );
+    _eventsSub = _eventRepository
+        .watchByOccurrence(occurrenceId)
+        .listen(
+          (list) {
+            _events = list;
+            notifyListeners();
+          },
+          onError: (e, stack) {
+            debugPrint('[OccurrenceVM] watchEvents error: $e');
+            debugPrint('[OccurrenceVM] stack: $stack');
+            _error = 'Erro ao carregar eventos: $e';
+            notifyListeners();
+          },
+        );
+  }
+
+  Future<List<OccurrenceNature>> fetchNatures() async {
+    try {
+      final natures = await _repository.getOccurrenceNatures();
+      _natures = natures.isNotEmpty ? natures : OccurrenceNatureSeed.items;
+      notifyListeners();
+      return _natures;
+    } catch (e) {
+      debugPrint('[OccurrenceViewModel] Erro ao carregar naturezas: $e');
+      _natures = OccurrenceNatureSeed.items;
+      notifyListeners();
+      return _natures;
+    }
   }
 
   // ─── Criação ────────────────────────────────────────────────────────
@@ -104,6 +127,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     double? gpsLng,
     double? gpsAccuracy,
     String? initialObservation,
+    DateTime? startedAt,
   }) async {
     _isLoading = true;
     _error = null;
@@ -111,6 +135,7 @@ class OccurrenceViewModel extends ChangeNotifier {
 
     try {
       final now = DateTime.now();
+      final resolvedStartedAt = startedAt ?? now;
       final occurrence = Occurrence(
         id: id,
         shiftId: shiftId,
@@ -122,7 +147,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         gpsLat: gpsLat,
         gpsLng: gpsLng,
         gpsAccuracy: gpsAccuracy,
-        startedAt: now,
+        startedAt: resolvedStartedAt,
         createdAt: now,
         updatedAt: now,
         status: OccurrenceStatus.inProgress,
@@ -135,7 +160,7 @@ class OccurrenceViewModel extends ChangeNotifier {
 
       await _createInitialArrivalEvent(
         occurrenceId: created.id,
-        startedAt: now,
+        startedAt: resolvedStartedAt,
         locationAddress: locationAddress,
         gpsLat: gpsLat,
         gpsLng: gpsLng,
@@ -193,10 +218,7 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   // ─── Atualização ───────────────────────────────────────────────────
 
-  Future<void> updateOccurrence(
-    String id,
-    Map<String, dynamic> updates,
-  ) async {
+  Future<void> updateOccurrence(String id, Map<String, dynamic> updates) async {
     try {
       await _repository.update(id, updates);
     } catch (e) {
@@ -308,6 +330,14 @@ class OccurrenceViewModel extends ChangeNotifier {
     return _repository.getById(id);
   }
 
+  Future<Occurrence?> findOpen(String dogId) async {
+    return _repository.findOpen(dogId);
+  }
+
+  Future<List<OccurrenceEvent>> getEvents(String occurrenceId) async {
+    return _eventRepository.listByOccurrence(occurrenceId);
+  }
+
   // ─── PDF ────────────────────────────────────────────────────────────
 
   /// Gera o PDF institucional da ocorrência e retorna os bytes.
@@ -325,6 +355,18 @@ class OccurrenceViewModel extends ChangeNotifier {
       dog: dog,
       handlerName: handlerName,
       handlerRa: handlerRa,
+    );
+  }
+
+  Future<void> recordPdfAccess({
+    required String occurrenceId,
+    required String action,
+    String? pdfUrl,
+  }) {
+    return _repository.recordPdfAccess(
+      id: occurrenceId,
+      action: action,
+      pdfUrl: pdfUrl,
     );
   }
 

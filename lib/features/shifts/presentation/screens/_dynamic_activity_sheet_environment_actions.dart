@@ -9,7 +9,6 @@ extension _DynamicActivitySheetEnvironmentActions
           .currentHighAccuracy();
       _updateState(() {
         _locationController.text = location.address;
-        _occCtrl.selectedLocationLatLng = location.point;
       });
       HapticFeedback.mediumImpact();
     } catch (e) {
@@ -18,16 +17,6 @@ extension _DynamicActivitySheetEnvironmentActions
           context,
         ).showSnackBar(SnackBar(content: Text('Erro ao obter endereço: $e')));
       }
-    }
-  }
-
-  Future<void> _selectOccurrenceLocation(LatLng point) async {
-    _updateState(() => _occCtrl.selectedLocationLatLng = point);
-    final address = await const LocationResolutionService().addressForPoint(
-      point,
-    );
-    if (address.isNotEmpty) {
-      _updateState(() => _locationController.text = address);
     }
   }
 
@@ -46,9 +35,6 @@ extension _DynamicActivitySheetEnvironmentActions
         _updateState(() {
           _tempController.text = weather.temperature.toString();
           _humidityController.text = weather.humidity.toString();
-          if (_condicaoTerrenoController.text.isEmpty) {
-            _condicaoTerrenoController.text = weather.terrainSummary;
-          }
         });
         HapticFeedback.mediumImpact();
         if (mounted) {

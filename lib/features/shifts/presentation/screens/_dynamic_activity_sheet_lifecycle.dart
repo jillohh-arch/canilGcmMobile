@@ -4,13 +4,6 @@ part of 'dynamic_activity_sheet.dart';
 
 extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
   void _initActivityControllers() {
-    _occCtrl = ActivitySheetOccurrenceCtrl(
-      dogId: widget.dogId,
-      dogName: widget.dogName,
-      documentId: widget.documentId,
-      initialData: widget.initialData,
-      onStateChanged: _notifySheetStateChanged,
-    );
     _trainingCtrl = ActivitySheetTrainingCtrl(
       dogId: widget.dogId,
       dogName: widget.dogName,
@@ -32,9 +25,7 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
   }
 
   void _initSelectedActivityController() {
-    if (_isOccurrenceCategory) {
-      _occCtrl.init();
-    } else if (widget.category == 'Treino') {
+    if (widget.category == 'Treino') {
       _trainingCtrl.init();
     } else if (widget.category == 'Saude') {
       _healthCtrl.init();
@@ -55,30 +46,20 @@ extension _DynamicActivitySheetLifecycle on _DynamicActivitySheetState {
     if (widget.initialData != null) return;
 
     final nowTime = _formatTimeOfDay(DateTime.now());
-    _occCtrl.timeController.text = nowTime;
     _trainingCtrl.timeController.text = nowTime;
     _healthCtrl.timeController.text = nowTime;
-  }
-
-  void _scheduleOccurrenceStartContext() {
-    if (widget.initialData != null) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _didAutoPrimeOccurrenceStart) return;
-      _didAutoPrimeOccurrenceStart = true;
-      _setTimeToNow();
-      _fetchCurrentAddress();
-    });
+    _timeCtrlOther.text = nowTime;
   }
 
   void _disposeActivityControllers() {
-    _occCtrl.dispose();
     _trainingCtrl.dispose();
     _healthCtrl.dispose();
   }
 
   void _disposeSheetResources() {
     _locationCtrlOther.dispose();
+    _descriptionCtrlOther.dispose();
+    _timeCtrlOther.dispose();
     _durationCtrlOther.dispose();
     MediaAttachmentRows.disposeAll(_mediaAttachments);
     _menuPageController.dispose();

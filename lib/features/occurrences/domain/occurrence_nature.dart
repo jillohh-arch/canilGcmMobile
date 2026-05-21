@@ -15,9 +15,13 @@ class OccurrenceNature {
 
   factory OccurrenceNature.fromJson(Map<String, dynamic> json) {
     return OccurrenceNature(
-      code: json['code']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      group: json['group']?.toString() ?? '',
+      code: json['code']?.toString() ?? json['id']?.toString() ?? '',
+      name:
+          json['name']?.toString() ??
+          json['label']?.toString() ??
+          json['title']?.toString() ??
+          '',
+      group: json['group']?.toString() ?? json['category']?.toString() ?? '',
       active: json['active'] as bool? ?? true,
     );
   }

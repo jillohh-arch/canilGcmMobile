@@ -31,14 +31,11 @@ class HistoryTimelineItem extends StatelessWidget {
                 left: 32 + 16 - 0.5, // time width + gap + half icon
                 top: 0,
                 bottom: 0,
-                child: Container(
-                  width: 1,
-                  color: Colors.white.withAlpha(15),
-                ),
+                child: Container(width: 1, color: Colors.white.withAlpha(15)),
               ),
             Row(
               children: [
-                // Horário
+                // HorÃ¡rio
                 SizedBox(
                   width: 36,
                   child: Text(
@@ -52,7 +49,7 @@ class HistoryTimelineItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Ícone circular
+                // Ãcone circular
                 Container(
                   width: 32,
                   height: 32,
@@ -92,7 +89,7 @@ class HistoryTimelineItem extends StatelessWidget {
                 const SizedBox(width: 8),
                 // Chevron
                 Text(
-                  '›',
+                  'â€º',
                   style: GoogleFonts.inter(
                     color: _hTextMuted,
                     fontSize: 16,
@@ -118,20 +115,17 @@ class HistoryTimelineItem extends StatelessWidget {
             entry.subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              color: _hTextDimmed,
-              fontSize: 10,
-            ),
+            style: GoogleFonts.inter(color: _hTextDimmed, fontSize: 10),
           ),
         ),
       );
     }
 
     // Badge de autoria
-    final isYou = entry.tag == 'VOCÊ';
+    final isYou = entry.tag == 'VOCÃŠ';
     children.add(
       _AuthorBadge(
-        label: isYou ? 'VOCÊ' : entry.author.toUpperCase(),
+        label: isYou ? 'VOCÃŠ' : entry.author.toUpperCase(),
         isYou: isYou,
       ),
     );
@@ -165,7 +159,7 @@ class HistoryTimelineItem extends StatelessWidget {
   }
 
   void _navigate(BuildContext context) {
-    if (entry.isInProgress && entry.type == HistoryEntryType.incident) {
+    if (entry.isInProgress && entry.type == HistoryEntryType.occurrence) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ActiveOccurrenceScreen(occurrenceId: entry.id),
@@ -183,13 +177,13 @@ class HistoryTimelineItem extends StatelessWidget {
   _CategoryStyle _categoryStyle(HistoryEntryType type) {
     switch (type) {
       case HistoryEntryType.nutrition:
-        return const _CategoryStyle(color: _hPurple, emoji: '🍖');
+        return const _CategoryStyle(color: _hPurple, emoji: 'ðŸ–');
       case HistoryEntryType.health:
-        return const _CategoryStyle(color: _hRed, emoji: '⚕');
+        return const _CategoryStyle(color: _hRed, emoji: 'âš•');
       case HistoryEntryType.training:
-        return const _CategoryStyle(color: _hYellow, emoji: '🎯');
-      case HistoryEntryType.incident:
-        return const _CategoryStyle(color: _hCyan, emoji: '🛡');
+        return const _CategoryStyle(color: _hYellow, emoji: 'ðŸŽ¯');
+      case HistoryEntryType.occurrence:
+        return const _CategoryStyle(color: _hCyan, emoji: 'ðŸ›¡');
     }
   }
 }

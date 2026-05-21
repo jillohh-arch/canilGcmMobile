@@ -6,9 +6,7 @@ extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
   Future<void> _saveByCategory({
     required AuthViewModel authVM,
     required TrainingViewModel trainingVM,
-    required IncidentViewModel incidentVM,
     required HealthViewModel healthVM,
-    required UserViewModel userVM,
   }) async {
     if (widget.category == 'Treino') {
       _setSaveStatus('Salvando treino no Firebase...');
@@ -16,18 +14,12 @@ extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
       return;
     }
 
-    if (_isOccurrenceCategory || widget.category == 'Evento') {
-      await _saveOccurrenceOrEvent(
-        authVM: authVM,
-        incidentVM: incidentVM,
-        userVM: userVM,
-      );
+    if (widget.category == 'Saude') {
+      await _saveHealth(healthVM: healthVM);
       return;
     }
 
-    if (widget.category == 'Saude') {
-      await _saveHealth(healthVM: healthVM);
-    }
+    throw StateError('Categoria não suportada por DynamicActivitySheet.');
   }
 
   Future<void> _saveTraining({
@@ -64,14 +56,5 @@ extension _DynamicActivitySheetCategorySave on _DynamicActivitySheetState {
       onUploaded: _markMediaUploaded,
       onPending: _markMediaPending,
     );
-  }
-
-  void _saveOccurrenceInProgress() {
-    setState(() {
-      _occurrenceStatus = OccurrenceFormController.statusInProgress;
-      _occurrenceSuccessful = null;
-      _showOccurrenceFinalization = false;
-    });
-    _save(closeAfterSave: false);
   }
 }

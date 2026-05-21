@@ -8,7 +8,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 void main() {
   final now = DateTime(2026, 5, 18, 14, 30);
 
-  Occurrence _buildOccurrence({
+  Occurrence buildOccurrence({
     OccurrenceStatus status = OccurrenceStatus.inProgress,
     DateTime? deletedAt,
   }) {
@@ -36,7 +36,7 @@ void main() {
   group('Occurrence', () {
     group('fromMap/toMap roundtrip', () {
       test('preserva todos os campos', () {
-        final original = _buildOccurrence();
+        final original = buildOccurrence();
         final map = original.toMap();
         final restored = Occurrence.fromMap(map, 'occ-001');
 
@@ -56,7 +56,7 @@ void main() {
       });
 
       test('toMap usa snake_case', () {
-        final map = _buildOccurrence().toMap();
+        final map = buildOccurrence().toMap();
 
         expect(map.containsKey('shift_id'), isTrue);
         expect(map.containsKey('primary_handler_id'), isTrue);
@@ -75,7 +75,7 @@ void main() {
       });
 
       test('toMap serializa Timestamps', () {
-        final map = _buildOccurrence().toMap();
+        final map = buildOccurrence().toMap();
 
         expect(map['started_at'], isA<Timestamp>());
         expect(map['created_at'], isA<Timestamp>());
@@ -100,11 +100,44 @@ void main() {
         expect(occ.startedAt, equals(now));
         expect(occ.status, equals(OccurrenceStatus.finalized));
       });
+
+      test('fromMap aceita dados legados sem quebrar o histÃ³rico', () {
+        final map = {
+          'shift_id': 'shift-001',
+          'primary_handler_id': 'handler-001',
+          'dog_id': 'dog-001',
+          'type_code': 'PATRULHA',
+          'type_name': 'Patrulha',
+          'status': 'ConcluÃ­da',
+          'results': [
+            {'code': 'bo_created'},
+            'drug_seized',
+          ],
+          'details': {'Equipe': '2 GCMs'},
+          'audit_trail': [
+            {'action': 'created'},
+            'ignorar',
+          ],
+        };
+
+        final occ = Occurrence.fromMap(map, 'occ-legacy');
+
+        expect(occ.status, equals(OccurrenceStatus.finalized));
+        expect(
+          occ.results,
+          containsAll([
+            OccurrenceResult.boCreated,
+            OccurrenceResult.drugSeized,
+          ]),
+        );
+        expect(occ.details, containsPair('Equipe', '2 GCMs'));
+        expect(occ.auditTrail, hasLength(1));
+      });
     });
 
     group('copyWith', () {
       test('altera campo específico mantendo outros', () {
-        final original = _buildOccurrence();
+        final original = buildOccurrence();
         final updated = original.copyWith(
           status: OccurrenceStatus.finalized,
           finalReport: 'Droga localizada no painel',
@@ -120,17 +153,17 @@ void main() {
 
     group('SoftDeletable', () {
       test('isDeleted retorna false quando deletedAt é null', () {
-        final occ = _buildOccurrence();
+        final occ = buildOccurrence();
         expect(occ.isDeleted, isFalse);
       });
 
       test('isDeleted retorna true quando deletedAt está presente', () {
-        final occ = _buildOccurrence(deletedAt: now);
+        final occ = buildOccurrence(deletedAt: now);
         expect(occ.isDeleted, isTrue);
       });
 
       test('softDeleteFields inclui campos no toMap', () {
-        final occ = _buildOccurrence(deletedAt: now);
+        final occ = buildOccurrence(deletedAt: now);
         final map = occ.toMap();
 
         expect(map.containsKey('deleted_at'), isTrue);

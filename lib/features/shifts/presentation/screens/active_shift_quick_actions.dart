@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Registrar" fiel ao mockup: grid 2x2 com ícone + nome + meta.
+/// SeÃ§Ã£o "Registrar" fiel ao mockup: grid 2x2 com Ã­cone + nome + meta.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -11,15 +11,21 @@ class _QuickActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
-    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
 
-    final cards = _buildCards(context, trainingVM, healthVM, incidentVM, nutritionVM);
+    final cards = _buildCards(
+      context,
+      trainingVM,
+      healthVM,
+      occurrenceVM,
+      nutritionVM,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(emoji: '⚡', text: 'REGISTRAR'),
+        _SectionLabel(emoji: 'âš¡', text: 'REGISTRAR'),
         GridView.count(
           crossAxisCount: 2,
           mainAxisSpacing: 10,
@@ -37,7 +43,7 @@ class _QuickActionsSection extends StatelessWidget {
     BuildContext context,
     TrainingViewModel trainingVM,
     HealthViewModel healthVM,
-    IncidentViewModel incidentVM,
+    OccurrenceViewModel occurrenceVM,
     NutritionViewModel nutritionVM,
   ) {
     final lastNutrition = _lastAgo(
@@ -51,38 +57,46 @@ class _QuickActionsSection extends StatelessWidget {
     final lastTraining = _lastAgo(
       trainingVM.trainings.isNotEmpty ? trainingVM.trainings.first.date : null,
     );
-    final lastIncident = _lastAgo(
-      incidentVM.incidents.isNotEmpty ? incidentVM.incidents.first.date : null,
+    final lastOccurrence = _lastAgo(
+      occurrenceVM.occurrences.isNotEmpty
+          ? occurrenceVM.occurrences.first.startedAt
+          : null,
     );
 
     return [
       _QuickCard(
         icon: Icons.restaurant_rounded,
         color: const Color(0xFFE67E22),
-        label: 'Nutrição',
-        meta: lastNutrition.isNotEmpty ? 'última $lastNutrition' : 'sem registro',
+        label: 'NutriÃ§Ã£o',
+        meta: lastNutrition.isNotEmpty
+            ? 'Ãºltima $lastNutrition'
+            : 'sem registro',
         onTap: () => _openNutrition(context),
       ),
       _QuickCard(
         icon: Icons.local_hospital_rounded,
         color: AppTheme.error,
-        label: 'Saúde',
-        meta: lastHealth.isNotEmpty ? 'última $lastHealth' : 'sem registro',
-        onTap: () => _openSheet(context, 'Saúde'),
+        label: 'SaÃºde',
+        meta: lastHealth.isNotEmpty ? 'Ãºltima $lastHealth' : 'sem registro',
+        onTap: () => _openSheet(context, 'SaÃºde'),
       ),
       _QuickCard(
         icon: Icons.fitness_center_rounded,
         color: AppTheme.warning,
         label: 'Treino',
-        meta: lastTraining.isNotEmpty ? 'última $lastTraining' : 'sem registro',
+        meta: lastTraining.isNotEmpty
+            ? 'Ãºltima $lastTraining'
+            : 'sem registro',
         onTap: () => _openSheet(context, 'Treino'),
       ),
       _QuickCard(
         icon: Icons.shield_rounded,
         color: AppTheme.primary,
-        label: 'Ocorrência',
-        meta: lastIncident.isNotEmpty ? 'última $lastIncident' : 'sem registro',
-        onTap: () => _openSheet(context, 'Ocorrência'),
+        label: 'OcorrÃªncia',
+        meta: lastOccurrence.isNotEmpty
+            ? 'Ãºltima $lastOccurrence'
+            : 'sem registro',
+        onTap: () => _openOccurrence(context),
       ),
     ];
   }
@@ -91,10 +105,10 @@ class _QuickActionsSection extends StatelessWidget {
     if (date == null) return '';
     final diff = DateTime.now().difference(date);
     if (diff.inMinutes < 1) return 'agora';
-    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
-    if (diff.inHours < 24) return 'há ${diff.inHours}h';
-    if (diff.inDays == 1) return 'há 1d';
-    return 'há ${diff.inDays}d';
+    if (diff.inMinutes < 60) return 'hÃ¡ ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'hÃ¡ ${diff.inHours}h';
+    if (diff.inDays == 1) return 'hÃ¡ 1d';
+    return 'hÃ¡ ${diff.inDays}d';
   }
 
   void _openNutrition(BuildContext context) {
@@ -120,6 +134,13 @@ class _QuickActionsSection extends StatelessWidget {
         dogName: dog.name,
       ),
     );
+  }
+
+  void _openOccurrence(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()));
   }
 }
 
@@ -179,10 +200,7 @@ class _QuickCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     meta,
-                    style: GoogleFonts.inter(
-                      color: _kTextMuted,
-                      fontSize: 10,
-                    ),
+                    style: GoogleFonts.inter(color: _kTextMuted, fontSize: 10),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 
 void main() {
   group('OccurrenceNature', () {

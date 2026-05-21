@@ -1,6 +1,6 @@
-part of 'active_shift_dashboard_screen.dart';
+﻿part of 'active_shift_dashboard_screen.dart';
 
-/// Seção "Atividades de Hoje" fiel ao mockup — timeline com cards ou empty state.
+/// SeÃ§Ã£o "Atividades de Hoje" fiel ao mockup â€” timeline com cards ou empty state.
 class _TodayActivitiesSection extends StatelessWidget {
   final String dogId;
   final String dogName;
@@ -11,16 +11,16 @@ class _TodayActivitiesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
-    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
 
-    final entries = _buildEntries(trainingVM, healthVM, incidentVM, nutritionVM);
+    final entries = _buildEntries(trainingVM, healthVM, occurrenceVM, nutritionVM);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionLabel(
-          emoji: '📋',
+          emoji: 'ðŸ“‹',
           text: 'ATIVIDADES DE HOJE',
           trailing: entries.isNotEmpty
               ? Container(
@@ -51,7 +51,7 @@ class _TodayActivitiesSection extends StatelessWidget {
   List<_ActivityEntry> _buildEntries(
     TrainingViewModel trainingVM,
     HealthViewModel healthVM,
-    IncidentViewModel incidentVM,
+    OccurrenceViewModel occurrenceVM,
     NutritionViewModel nutritionVM,
   ) {
     final now = DateTime.now();
@@ -60,7 +60,7 @@ class _TodayActivitiesSection extends StatelessWidget {
 
     for (final f in nutritionVM.todayFeedings) {
       entries.add(_ActivityEntry(
-        title: 'Alimentação · ${f.amountGrams}g',
+        title: 'AlimentaÃ§Ã£o Â· ${f.amountGrams}g',
         subtitle: 'Registrado',
         time: f.fedAt,
         icon: Icons.restaurant_rounded,
@@ -74,7 +74,7 @@ class _TodayActivitiesSection extends StatelessWidget {
           title: h.logType,
           subtitle: h.healthObservations.isNotEmpty
               ? h.healthObservations
-              : 'Registro de saúde',
+              : 'Registro de saÃºde',
           time: h.date,
           icon: Icons.local_hospital_rounded,
           color: AppTheme.error,
@@ -85,8 +85,8 @@ class _TodayActivitiesSection extends StatelessWidget {
     for (final t in trainingVM.trainings) {
       if (t.date.isAfter(startOfDay)) {
         entries.add(_ActivityEntry(
-          title: 'Treino · ${t.trainingType}',
-          subtitle: 'Sessão registrada',
+          title: 'Treino Â· ${t.trainingType}',
+          subtitle: 'SessÃ£o registrada',
           time: t.date,
           icon: Icons.fitness_center_rounded,
           color: AppTheme.warning,
@@ -94,12 +94,12 @@ class _TodayActivitiesSection extends StatelessWidget {
       }
     }
 
-    for (final i in incidentVM.incidents) {
-      if (i.date.isAfter(startOfDay)) {
+    for (final occurrence in occurrenceVM.occurrences) {
+      if (occurrence.startedAt.isAfter(startOfDay)) {
         entries.add(_ActivityEntry(
-          title: 'Ocorrência · ${i.type ?? 'Registro'}',
-          subtitle: i.location,
-          time: i.date,
+          title: 'Ocorrência · ${occurrence.typeName}',
+          subtitle: occurrence.locationAddress ?? 'Local não informado',
+          time: occurrence.startedAt,
           icon: Icons.shield_rounded,
           color: AppTheme.primary,
         ));
@@ -111,7 +111,7 @@ class _TodayActivitiesSection extends StatelessWidget {
   }
 }
 
-/// Card de atividade individual — horário + ícone + info.
+/// Card de atividade individual â€” horÃ¡rio + Ã­cone + info.
 class _ActivityCard extends StatelessWidget {
   final _ActivityEntry entry;
 
@@ -132,7 +132,7 @@ class _ActivityCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Horário
+          // HorÃ¡rio
           SizedBox(
             width: 42,
             child: Text(
@@ -144,7 +144,7 @@ class _ActivityCard extends StatelessWidget {
               ),
             ),
           ),
-          // Ícone
+          // Ãcone
           Container(
             width: 32,
             height: 32,
@@ -191,7 +191,7 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-/// Estado vazio com chamada à ação (4 atalhos).
+/// Estado vazio com chamada Ã  aÃ§Ã£o (4 atalhos).
 class _EmptyActivitiesState extends StatelessWidget {
   final String dogId;
   final String dogName;
@@ -230,7 +230,7 @@ class _EmptyActivitiesState extends StatelessWidget {
                   ),
                 ),
                 const TextSpan(
-                  text: 'Registre alimentação, treino, saúde ou ocorrência',
+                  text: 'Registre alimentaÃ§Ã£o, treino, saÃºde ou ocorrÃªncia',
                 ),
               ],
             ),
@@ -240,14 +240,14 @@ class _EmptyActivitiesState extends StatelessWidget {
             children: [
               _EmptyActionChip(
                 icon: Icons.restaurant_rounded,
-                label: 'Nutrição',
-                onTap: () => _openSheet(context, 'Nutrição'),
+                label: 'NutriÃ§Ã£o',
+                onTap: () => _openSheet(context, 'NutriÃ§Ã£o'),
               ),
               const SizedBox(width: 8),
               _EmptyActionChip(
                 icon: Icons.local_hospital_rounded,
-                label: 'Saúde',
-                onTap: () => _openSheet(context, 'Saúde'),
+                label: 'SaÃºde',
+                onTap: () => _openSheet(context, 'SaÃºde'),
               ),
               const SizedBox(width: 8),
               _EmptyActionChip(
@@ -259,7 +259,7 @@ class _EmptyActivitiesState extends StatelessWidget {
               _EmptyActionChip(
                 icon: Icons.shield_rounded,
                 label: 'Ocorr.',
-                onTap: () => _openSheet(context, 'Ocorrência'),
+                onTap: () => _openOccurrence(context),
               ),
             ],
           ),
@@ -270,7 +270,7 @@ class _EmptyActivitiesState extends StatelessWidget {
 
   void _openSheet(BuildContext context, String category) {
     HapticFeedback.mediumImpact();
-    if (category == 'Nutrição') {
+    if (category == 'NutriÃ§Ã£o') {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => FeedingRegistrationScreen(dogId: dogId, dogName: dogName),
@@ -288,6 +288,13 @@ class _EmptyActivitiesState extends StatelessWidget {
         dogId: dogId,
         dogName: dogName,
       ),
+    );
+  }
+
+  void _openOccurrence(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
     );
   }
 }

@@ -9,8 +9,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/domain/occurrence_nature.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_binomio.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_cta.dart';
@@ -74,10 +73,17 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   }
 
   bool get _hasUnsavedData =>
-      _selectedNature != null || _observationController.text.isNotEmpty;
+      _selectedNature != null ||
+      _observationController.text.isNotEmpty ||
+      _locationAddress.trim().isNotEmpty ||
+      _manualLocationSet ||
+      _selectedTimeChip != 0;
 
   bool get _ctaEnabled =>
-      !_isLoadingGps && (_gpsLat != null || _manualLocationSet);
+      _selectedNature != null &&
+      (_locationAddress.trim().isNotEmpty ||
+          _gpsLat != null ||
+          _manualLocationSet);
 
   // ─── GPS ────────────────────────────────────────────────────────────
 
@@ -111,49 +117,93 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   }
 
   void _showManualLocationDialog() {
-    final controller = TextEditingController();
+    final cepController = TextEditingController();
+    final addressController = TextEditingController(text: _locationAddress);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E1A1F),
         title: Text(
           'Preencher local',
-          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: 'Endereço completo',
-            hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(100)),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppTheme.primary.withAlpha(100)),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppTheme.primary),
-            ),
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
           ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: cepController,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'CEP (opcional)',
+                hintStyle: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(100),
+                ),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(
+                    color: AppTheme.primary.withAlpha(100),
+                  ),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: AppTheme.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: addressController,
+              autofocus: true,
+              maxLines: 2,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Endereço completo',
+                hintStyle: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(100),
+                ),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(
+                    color: AppTheme.primary.withAlpha(100),
+                  ),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: AppTheme.primary),
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('CANCELAR',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'CANCELAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) {
+              final cep = cepController.text.trim();
+              final address = addressController.text.trim();
+              if (address.isNotEmpty) {
                 setState(() {
-                  _locationAddress = text;
+                  _locationAddress = cep.isEmpty
+                      ? address
+                      : '$address · CEP $cep';
                   _manualLocationSet = true;
                 });
               }
               Navigator.of(ctx).pop();
             },
-            child: Text('CONFIRMAR',
-                style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'CONFIRMAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -175,22 +225,25 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
 
   Future<void> _onTimeEditTap() async {
     final now = TimeOfDay.now();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: now,
-    );
+    final picked = await showTimePicker(context: context, initialTime: now);
     if (picked == null || !mounted) return;
 
     final today = DateTime.now();
     final candidate = DateTime(
-      today.year, today.month, today.day, picked.hour, picked.minute,
+      today.year,
+      today.month,
+      today.day,
+      picked.hour,
+      picked.minute,
     );
 
     if (candidate.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Horário não pode ser no futuro',
-              style: GoogleFonts.inter()),
+          content: Text(
+            'Horário não pode ser no futuro',
+            style: GoogleFonts.inter(),
+          ),
           backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 2),
         ),
@@ -208,8 +261,8 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
 
   Future<void> _loadNatures() async {
     try {
-      final incidentVM = context.read<IncidentViewModel>();
-      final natures = await incidentVM.fetchNatures();
+      final occurrenceVM = context.read<OccurrenceViewModel>();
+      final natures = await occurrenceVM.fetchNatures();
       if (!mounted) return;
       setState(() {
         _natures = natures.isNotEmpty ? natures : OccurrenceNatureSeed.items;
@@ -225,12 +278,15 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   // ─── Open Occurrence Check ──────────────────────────────────────────
 
   void _checkOpenOccurrence() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final occVM = context.read<OccurrenceViewModel>();
-      if (occVM.hasOpen) {
-        _showOpenOccurrenceDialog(occVM.openOccurrence!.id);
-      }
+      final dogId = context.read<ShiftViewModel>().activeDogId;
+      final openOccurrence =
+          occVM.openOccurrence ??
+          (dogId == null ? null : await occVM.findOpen(dogId));
+      if (!mounted || openOccurrence == null) return;
+      _showOpenOccurrenceDialog(openOccurrence.id);
     });
   }
 
@@ -242,31 +298,46 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         backgroundColor: const Color(0xFF0E1A1F),
         title: Text(
           'Ocorrência em andamento',
-          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
-          'Você já tem uma ocorrência aberta. Deseja continuar nela ou iniciar uma nova?',
-          style: GoogleFonts.inter(color: Colors.white.withAlpha(200), fontSize: 14),
+          'Voce ja tem uma ocorrencia aberta. Continue nela para finalizar ou registrar novos eventos.',
+          style: GoogleFonts.inter(
+            color: Colors.white.withAlpha(200),
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
+              Navigator.of(context).maybePop();
             },
-            child: Text('NOVA',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'VOLTAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (_) => ActiveOccurrenceScreen(occurrenceId: existingId),
+                  builder: (_) =>
+                      ActiveOccurrenceScreen(occurrenceId: existingId),
                 ),
               );
             },
-            child: Text('CONTINUAR',
-                style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'CONTINUAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -284,27 +355,48 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         backgroundColor: const Color(0xFF0E1A1F),
         title: Text(
           'Descartar dados?',
-          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           'Você tem dados preenchidos que serão perdidos.',
-          style: GoogleFonts.inter(color: Colors.white.withAlpha(200), fontSize: 14),
+          style: GoogleFonts.inter(
+            color: Colors.white.withAlpha(200),
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('CANCELAR',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'CANCELAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('DESCARTAR',
-                style: GoogleFonts.inter(color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'DESCARTAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
     return result ?? false;
+  }
+
+  Future<void> _requestExit() async {
+    final navigator = Navigator.of(context);
+    final shouldPop = await _onPopAttempt();
+    if (shouldPop && mounted) {
+      navigator.pop();
+    }
   }
 
   // ─── Create ─────────────────────────────────────────────────────────
@@ -340,6 +432,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         initialObservation: _observationController.text.trim().isNotEmpty
             ? _observationController.text.trim()
             : null,
+        startedAt: _startedAt,
       );
 
       if (!mounted) return;
@@ -393,11 +486,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final navigator = Navigator.of(context);
-        final shouldPop = await _onPopAttempt();
-        if (shouldPop && mounted) {
-          navigator.pop();
-        }
+        await _requestExit();
       },
       child: Scaffold(
         backgroundColor: AppTheme.background,
@@ -409,7 +498,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                 child: Column(
                   children: [
                     StartOccurrenceHeader(
-                        onBack: () => Navigator.of(context).maybePop()),
+                      onBack: _requestExit,
+                      onClose: _requestExit,
+                    ),
                     Container(
                       height: 1,
                       decoration: BoxDecoration(
@@ -433,6 +524,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                     StartOccurrenceInfoGrid(
                       locationLabel: _locationAddress,
                       gpsPrecision: _gpsPrecision,
+                      gpsAccuracy: _gpsAccuracy,
                       timeLabel: timeStr,
                       dateLabel: dateStr,
                       isLoadingGps: _isLoadingGps,
@@ -459,6 +551,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                       onSelected: (nature) {
                         setState(() {
                           _selectedNature = nature;
+                          _natureController.text = nature.label;
                           _natureExpanded = false;
                         });
                       },
@@ -466,7 +559,8 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                     ),
                     const SizedBox(height: 20),
                     StartOccurrenceObservation(
-                        controller: _observationController),
+                      controller: _observationController,
+                    ),
                     const SizedBox(height: 24),
                     Text(
                       'Local e horário são preenchidos automaticamente.\nToque nos cards para ajustar antes de iniciar.',

@@ -8,7 +8,6 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
@@ -40,7 +39,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => DogViewModel()),
         ChangeNotifierProvider(create: (_) => TrainingViewModel()),
         ChangeNotifierProvider(create: (_) => HealthViewModel()),
-        ChangeNotifierProvider(create: (_) => IncidentViewModel()),
         ChangeNotifierProvider(create: (_) {
           final firestore = FirebaseFirestore.instance;
           return OccurrenceViewModel(

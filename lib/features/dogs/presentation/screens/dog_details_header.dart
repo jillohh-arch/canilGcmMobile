@@ -106,8 +106,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      OccurrenceFlowScreen(dogId: dog.id, dogName: dog.name),
+                  builder: (_) => const StartOccurrenceScreen(),
                 ),
               ),
             ),

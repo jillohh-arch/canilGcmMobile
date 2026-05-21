@@ -12,7 +12,7 @@ void main() {
 
   final now = DateTime(2026, 5, 18, 14, 30);
 
-  Occurrence _buildOccurrence({
+  Occurrence buildOccurrence({
     String id = 'occ-001',
     String dogId = 'dog-001',
     OccurrenceStatus status = OccurrenceStatus.inProgress,
@@ -43,11 +43,13 @@ void main() {
   group('OccurrenceRepository', () {
     group('create', () {
       test('salva documento na coleção occurrences', () async {
-        final occ = _buildOccurrence();
+        final occ = buildOccurrence();
         final created = await repository.create(occ);
 
-        final snap =
-            await fakeFirestore.collection('occurrences').doc('occ-001').get();
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-001')
+            .get();
         expect(snap.exists, isTrue);
         expect(snap.data()!['dog_id'], equals('dog-001'));
         expect(snap.data()!['type_code'], equals('FARO_VEICULO'));
@@ -59,7 +61,7 @@ void main() {
 
     group('getById', () {
       test('retorna occurrence existente', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         final result = await repository.getById('occ-001');
 
         expect(result, isNotNull);
@@ -73,7 +75,7 @@ void main() {
       });
 
       test('retorna null se soft-deleted', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         await repository.softDelete('occ-001', 'user-001', 'Teste');
 
         final result = await repository.getById('occ-001');
@@ -83,13 +85,15 @@ void main() {
 
     group('update', () {
       test('atualiza campos e registra audit entry', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         await repository.update('occ-001', {
           'location_address': 'Rua Nova, 200',
         });
 
-        final snap =
-            await fakeFirestore.collection('occurrences').doc('occ-001').get();
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-001')
+            .get();
         final data = snap.data()!;
 
         expect(data['location_address'], equals('Rua Nova, 200'));
@@ -103,11 +107,13 @@ void main() {
 
     group('softDelete', () {
       test('marca campos de deleção e registra audit', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         await repository.softDelete('occ-001', 'user-001', 'Duplicada');
 
-        final snap =
-            await fakeFirestore.collection('occurrences').doc('occ-001').get();
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-001')
+            .get();
         final data = snap.data()!;
 
         expect(data['deleted_by'], equals('user-001'));
@@ -118,7 +124,7 @@ void main() {
 
     group('finalize', () {
       test('marca status finalized e salva hash', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         await repository.finalize(
           id: 'occ-001',
           integrityHash: 'abc123hash',
@@ -127,8 +133,10 @@ void main() {
           details: {'drug_type': 'cocaína', 'drug_weight': '50g'},
         );
 
-        final snap =
-            await fakeFirestore.collection('occurrences').doc('occ-001').get();
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-001')
+            .get();
         final data = snap.data()!;
 
         expect(data['status'], equals('finalized'));
@@ -139,9 +147,34 @@ void main() {
       });
     });
 
+    group('recordPdfAccess', () {
+      test('registra acesso ao PDF no documento', () async {
+        await repository.create(buildOccurrence());
+        await repository.recordPdfAccess(
+          id: 'occ-001',
+          action: 'pdf_previewed',
+          pdfUrl: 'https://storage.test/pdf_final.pdf',
+        );
+
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-001')
+            .get();
+        final data = snap.data()!;
+        final accessLog = data['pdf_access_log'] as List;
+        final auditTrail = data['audit_trail'] as List;
+
+        expect(accessLog, hasLength(1));
+        expect(accessLog.first['action'], equals('pdf_previewed'));
+        expect(accessLog.first['pdf_url'], contains('pdf_final.pdf'));
+        expect(accessLog.first['ip'], equals('client-unavailable'));
+        expect(auditTrail.last['action'], equals('pdf_previewed'));
+      });
+    });
+
     group('findOpen', () {
       test('retorna ocorrência in_progress do cão', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         final result = await repository.findOpen('dog-001');
 
         expect(result, isNotNull);
@@ -149,23 +182,23 @@ void main() {
       });
 
       test('retorna null se não há aberta', () async {
-        await repository.create(_buildOccurrence(
-          status: OccurrenceStatus.finalized,
-        ));
+        await repository.create(
+          buildOccurrence(status: OccurrenceStatus.finalized),
+        );
         final result = await repository.findOpen('dog-001');
 
         expect(result, isNull);
       });
 
       test('retorna null para outro cão', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         final result = await repository.findOpen('dog-999');
 
         expect(result, isNull);
       });
 
       test('ignora soft-deleted', () async {
-        await repository.create(_buildOccurrence());
+        await repository.create(buildOccurrence());
         await repository.softDelete('occ-001', 'user-001', 'Teste');
 
         final result = await repository.findOpen('dog-001');

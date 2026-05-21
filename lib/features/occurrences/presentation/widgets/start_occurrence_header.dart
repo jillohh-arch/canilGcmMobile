@@ -5,8 +5,13 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 
 class StartOccurrenceHeader extends StatelessWidget {
   final VoidCallback onBack;
+  final VoidCallback onClose;
 
-  const StartOccurrenceHeader({super.key, required this.onBack});
+  const StartOccurrenceHeader({
+    super.key,
+    required this.onBack,
+    required this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +49,11 @@ class StartOccurrenceHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 48), // spacer to balance back button
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded, size: 22),
+            color: Colors.white70,
+          ),
         ],
       ),
     );

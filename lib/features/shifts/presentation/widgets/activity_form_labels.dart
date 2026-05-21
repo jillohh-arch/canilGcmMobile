@@ -1,5 +1,3 @@
-import 'package:canil_gcm/features/incidents/presentation/controllers/occurrence_form_controller.dart';
-
 abstract final class ActivityFormLabels {
   static String descriptionLabel({
     required String category,
@@ -7,48 +5,18 @@ abstract final class ActivityFormLabels {
   }) {
     if (category == 'Treino') return 'Descrição do treino';
     if (category == 'Saude') return 'Detalhes';
-    return 'Descrição da ocorrência';
+    return 'Descrição';
   }
 
-  static String saveButtonLabel({
-    required String category,
-    required String occurrenceStatus,
-  }) {
+  static String saveButtonLabel({required String category}) {
     if (category == 'Treino') return 'SALVAR TREINO';
     if (category == 'Saude') return 'SALVAR PRONTUÁRIO';
-    return occurrenceStatus == OccurrenceFormController.statusInProgress
-        ? 'SALVAR EM ANDAMENTO'
-        : 'CONCLUIR OCORRÊNCIA';
+    return 'SALVAR REGISTRO';
   }
 
-  static String successSaveMessage({
-    required String category,
-    required bool isOccurrenceCategory,
-    required String occurrenceStatus,
-  }) {
-    if (isOccurrenceCategory || category == 'Evento') {
-      return occurrenceStatus == OccurrenceFormController.statusInProgress
-          ? 'Ocorrência salva em andamento no Firebase.'
-          : 'Ocorrência concluída e sincronizada.';
-    }
-
+  static String successSaveMessage({required String category}) {
     if (category == 'Treino') return 'Treino salvo no Firebase.';
     if (category == 'Saude') return 'Prontuário salvo no Firebase.';
-
     return 'Registro salvo no Firebase.';
-  }
-
-  static String occurrenceModeLabel({required bool isNewRecord}) {
-    return isNewRecord ? 'NOVA OCORRÊNCIA' : 'OCORRÊNCIA OPERACIONAL';
-  }
-
-  static String occurrenceStatusLabel({
-    required String occurrenceStatus,
-    required bool isNewRecord,
-  }) {
-    if (occurrenceStatus == OccurrenceFormController.statusCompleted) {
-      return 'FECHADA';
-    }
-    return isNewRecord ? 'NOVA' : 'ABERTA';
   }
 }

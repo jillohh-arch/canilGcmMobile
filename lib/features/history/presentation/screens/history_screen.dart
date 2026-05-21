@@ -13,8 +13,6 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_detail_screen.dart';
-import 'package:canil_gcm/features/incidents/domain/incident.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
@@ -51,7 +49,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _periodFilter = 'Hoje';
+  String _periodFilter = 'Esta semana';
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
   String? _lastLoadedDogId;
@@ -93,10 +91,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final fbUser = authVM.user;
     final currentRa = HandlerIdentityService.raFromUser(fbUser);
-    final callsign = userVM.displayNameFor(
-      ra: currentRa,
-      firebaseUser: fbUser,
-    );
+    final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
+    final handlerUser = userVM.findByRa(currentRa);
+    final handlerPhoto = handlerUser?.photoUrl?.trim();
+    final firebasePhoto = fbUser?.photoURL?.trim();
+    final handlerImageUrl = handlerPhoto != null && handlerPhoto.isNotEmpty
+        ? handlerPhoto
+        : firebasePhoto != null && firebasePhoto.isNotEmpty
+        ? firebasePhoto
+        : null;
 
     final allEntries = _buildAllEntries(dogId);
     final filteredEntries = _filterEntries(allEntries);
@@ -117,6 +120,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               _HistoryShiftHeader(
                 dog: dog,
                 callsign: callsign,
+                handlerImageUrl: handlerImageUrl,
                 shiftStartTime: shiftVM.shiftStartTime,
               ),
               _PageTitleRow(onExport: _exportPdf),
@@ -143,11 +147,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 days: daysCount,
                 onMoreFilters: _openFilterSheet,
               ),
-              Expanded(
-                child: _HistoryTimeline(
-                  groups: groupedEntries,
-                ),
-              ),
+              Expanded(child: _HistoryTimeline(groups: groupedEntries)),
             ],
           ),
         ),
@@ -291,11 +291,13 @@ class _FilterSummaryRow extends StatelessWidget {
 class _HistoryShiftHeader extends StatelessWidget {
   final Dog dog;
   final String callsign;
+  final String? handlerImageUrl;
   final DateTime? shiftStartTime;
 
   const _HistoryShiftHeader({
     required this.dog,
     required this.callsign,
+    this.handlerImageUrl,
     this.shiftStartTime,
   });
 
@@ -308,9 +310,7 @@ class _HistoryShiftHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
         color: AppTheme.primary.withAlpha(10),
-        border: const Border(
-          bottom: BorderSide(color: Color(0x1E4DD0E1)),
-        ),
+        border: const Border(bottom: BorderSide(color: Color(0x1E4DD0E1))),
       ),
       child: Row(
         children: [
@@ -323,14 +323,16 @@ class _HistoryShiftHeader extends StatelessWidget {
                 _HAvatar(
                   imageUrl: dog.profileImageUrl,
                   fallbackText: dog.name.isNotEmpty
-                      ? dog.name.substring(0, dog.name.length.clamp(0, 4)).toUpperCase()
+                      ? dog.name
+                            .substring(0, dog.name.length.clamp(0, 4))
+                            .toUpperCase()
                       : 'K9',
                   borderColor: AppTheme.primary,
                 ),
                 Positioned(
                   left: 30,
                   child: _HAvatar(
-                    imageUrl: null,
+                    imageUrl: handlerImageUrl,
                     fallbackText: conductorName.length >= 3
                         ? conductorName.substring(0, 3).toUpperCase()
                         : conductorName.toUpperCase(),
@@ -393,10 +395,7 @@ class _HistoryShiftHeader extends StatelessWidget {
             ),
           ),
           // Botão trocar cão
-          _HActionButton(
-            icon: Icons.compare_arrows_rounded,
-            onTap: () {},
-          ),
+          _HActionButton(icon: Icons.compare_arrows_rounded, onTap: () {}),
           const SizedBox(width: 6),
           // Botão perfil
           _HActionButton(
@@ -502,9 +501,7 @@ class _HActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTheme.primary.withAlpha(51)),
         ),
-        child: Center(
-          child: Icon(icon, color: AppTheme.primary, size: 16),
-        ),
+        child: Center(child: Icon(icon, color: AppTheme.primary, size: 16)),
       ),
     );
   }

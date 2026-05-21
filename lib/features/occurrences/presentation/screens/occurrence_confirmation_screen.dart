@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -105,7 +106,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
 
   Widget _buildSuccessTitle() {
     return Text(
-      'Ocorrência finalizada',
+      'OcorrÃªncia finalizada',
       style: GoogleFonts.inter(
         color: Colors.white,
         fontSize: 22,
@@ -143,11 +144,10 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           ),
           _SummaryRow(
             icon: Icons.schedule_outlined,
-            label: 'Duração',
+            label: 'DuraÃ§Ã£o',
             value: data.durationLabel,
           ),
-          if (data.locationAddress != null &&
-              data.locationAddress!.isNotEmpty)
+          if (data.locationAddress != null && data.locationAddress!.isNotEmpty)
             _SummaryRow(
               icon: Icons.location_on_outlined,
               label: 'Local',
@@ -155,13 +155,14 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
             ),
           _SummaryRow(
             icon: Icons.pets_outlined,
-            label: 'Binômio',
-            value: '${data.dogName} · ${data.handlerName}',
+            label: 'BinÃ´mio',
+            value: '${data.dogName} Â· ${data.handlerName}',
           ),
           _SummaryRow(
             icon: Icons.list_alt_outlined,
             label: 'Eventos registrados',
-            value: '${data.eventCount} evento${data.eventCount != 1 ? "s" : ""}',
+            value:
+                '${data.eventCount} evento${data.eventCount != 1 ? "s" : ""}',
             isLast: true,
           ),
         ],
@@ -170,8 +171,9 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
   }
 
   Widget _buildResultsCard() {
-    final activeResults =
-        data.results.where((r) => r != OccurrenceResult.noOccurrence).toList();
+    final activeResults = data.results
+        .where((r) => r != OccurrenceResult.noOccurrence)
+        .toList();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -184,7 +186,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'RESULTADOS DA OCORRÊNCIA',
+            'RESULTADOS DA OCORRÃŠNCIA',
             style: GoogleFonts.inter(
               color: AppTheme.success,
               fontSize: 10,
@@ -209,11 +211,8 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              detail.isNotEmpty ? '${result.label} · $detail' : result.label,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 12,
-              ),
+              detail.isNotEmpty ? '${result.label} Â· $detail' : result.label,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 12),
             ),
           ),
         ],
@@ -303,20 +302,22 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         }
         return parts.join(' de ');
       }
-      return '${drugs.length} substâncias';
+      return '${drugs.length} substÃ¢ncias';
     }
 
     if (detail is Map<String, dynamic>) {
       if (result == OccurrenceResult.personDetained) {
-        final qty = detail['quantity'] ?? '';
-        final dest = detail['destination'] ?? '';
+        final qty = detail['count'] ?? detail['quantity'] ?? '';
+        final dest = detail['referral'] ?? detail['destination'] ?? '';
         final parts = <String>[];
         if (qty.toString().isNotEmpty) parts.add('$qty pessoa(s)');
         if (dest.toString().isNotEmpty) parts.add(dest.toString());
-        return parts.join(' · ');
+        return parts.join(' Â· ');
       }
       if (result == OccurrenceResult.boCreated) {
-        return detail['number']?.toString() ?? '';
+        return detail['bo_number']?.toString() ??
+            detail['number']?.toString() ??
+            '';
       }
     }
     return '';
@@ -349,7 +350,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     _showLoadingSnackbar(context, 'Gerando PDF...');
 
     try {
-      final bytes = await _buildPdfBytes(context);
+      final bytes = await _buildPdfBytes(context, auditAction: 'pdf_previewed');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
@@ -369,7 +370,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     _showLoadingSnackbar(context, 'Preparando PDF...');
 
     try {
-      final bytes = await _buildPdfBytes(context);
+      final bytes = await _buildPdfBytes(context, auditAction: 'pdf_shared');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
@@ -384,14 +385,19 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     }
   }
 
-  Future<Uint8List> _buildPdfBytes(BuildContext context) async {
+  Future<Uint8List> _buildPdfBytes(
+    BuildContext context, {
+    required String auditAction,
+  }) async {
     final occVM = context.read<OccurrenceViewModel>();
     final dogVM = context.read<DogViewModel>();
     final authVM = context.read<AuthViewModel>();
 
-    // Buscar ocorrência: tenta na lista local, depois openOccurrence, depois Firestore
+    // Buscar ocorrÃªncia: tenta na lista local, depois openOccurrence, depois Firestore
     Occurrence? occ;
-    final localMatch = occVM.occurrences.where((o) => o.id == data.occurrenceId);
+    final localMatch = occVM.occurrences.where(
+      (o) => o.id == data.occurrenceId,
+    );
     if (localMatch.isNotEmpty) {
       occ = localMatch.first;
     }
@@ -399,12 +405,12 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     occ ??= await occVM.getById(data.occurrenceId);
 
     if (occ == null) {
-      throw Exception('Ocorrência não encontrada');
+      throw Exception('OcorrÃªncia nÃ£o encontrada');
     }
 
-    final events = occVM.events;
+    final events = await occVM.getEvents(data.occurrenceId);
 
-    // Buscar cão
+    // Buscar cÃ£o
     final dogId = occ.dogId;
     final dogs = dogVM.dogs.where((d) => d.id == dogId);
     final dog = dogs.isNotEmpty
@@ -412,18 +418,57 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         : (dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null);
 
     if (dog == null) {
-      throw Exception('Dados do cão não disponíveis');
+      throw Exception('Dados do cÃ£o nÃ£o disponÃ­veis');
     }
 
     final handlerRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
 
-    return occVM.generatePdf(
+    final bytes = await occVM.generatePdf(
       occurrence: occ,
       events: events,
       dog: dog,
       handlerName: data.handlerName,
       handlerRa: handlerRa,
     );
+
+    final pdfUrl = await _cachePdfInStorageIfNeeded(occVM, occ, bytes);
+    await occVM.recordPdfAccess(
+      occurrenceId: occ.id,
+      action: auditAction,
+      pdfUrl: pdfUrl,
+    );
+    return bytes;
+  }
+
+  Future<String?> _cachePdfInStorageIfNeeded(
+    OccurrenceViewModel occurrenceVM,
+    Occurrence occurrence,
+    Uint8List bytes,
+  ) async {
+    final existingUrl = occurrence.pdfExportUrl?.trim();
+    if (existingUrl?.isNotEmpty == true) return existingUrl;
+
+    try {
+      final url = await StorageService().uploadBytes(
+        bytes,
+        'occurrences/${occurrence.id}/pdf_final.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (url == null) return null;
+      await occurrenceVM.updateOccurrence(occurrence.id, {
+        'pdf_export_url': url,
+      });
+      await occurrenceVM.recordPdfAccess(
+        occurrenceId: occurrence.id,
+        action: 'pdf_cached',
+        pdfUrl: url,
+      );
+      return url;
+    } catch (_) {
+      // A visualizaÃ§Ã£o/compartilhamento do PDF nÃ£o deve falhar se o cache remoto
+      // estiver indisponÃ­vel. A prÃ³xima geraÃ§Ã£o tenta salvar novamente.
+      return null;
+    }
   }
 
   void _showLoadingSnackbar(BuildContext context, String message) {
@@ -435,7 +480,9 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white),
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 12),
             Text(message, style: GoogleFonts.inter()),
@@ -464,10 +511,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppTheme.background.withAlpha(0),
-            AppTheme.background,
-          ],
+          colors: [AppTheme.background.withAlpha(0), AppTheme.background],
           stops: const [0.0, 0.2],
         ),
       ),

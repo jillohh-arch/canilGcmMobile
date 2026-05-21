@@ -62,6 +62,41 @@ class StorageService {
     }
   }
 
+  /// Faz upload de bytes para um caminho fixo no Storage.
+  /// Usado para documentos institucionais que precisam de caminho estavel.
+  Future<String?> uploadBytes(
+    Uint8List bytes,
+    String path, {
+    String mimeType = 'application/octet-stream',
+  }) async {
+    try {
+      final cleanPath = path.replaceAll(RegExp(r'^/+|/+$'), '');
+      final Reference ref = _storage.ref().child(cleanPath);
+      final UploadTask uploadTask = ref.putData(
+        bytes,
+        SettableMetadata(contentType: mimeType),
+      );
+
+      final TaskSnapshot snapshot = await uploadTask;
+      if (snapshot.state == TaskState.success) {
+        return snapshot.ref.getDownloadURL();
+      }
+      throw Exception('O upload nÃ£o foi concluÃ­do com sucesso.');
+    } on FirebaseException catch (e) {
+      if (e.code == 'object-not-found') {
+        debugPrint(
+          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
+        );
+        return null;
+      }
+      debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
+      throw Exception('Falha ao subir arquivo: ${e.message}');
+    } catch (e) {
+      debugPrint('[StorageService] Erro genÃ©rico: $e');
+      throw Exception('Falha ao subir arquivo. Verifique sua conexÃ£o.');
+    }
+  }
+
   String _extensionFromPath(String path) {
     final parts = path.split('.');
     return parts.length > 1 ? parts.last.toLowerCase() : 'bin';

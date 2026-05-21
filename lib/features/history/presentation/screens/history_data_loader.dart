@@ -7,10 +7,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
     if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) return;
 
     final dogId = shiftVM.activeDogId!;
-    Provider.of<IncidentViewModel>(
-      context,
-      listen: false,
-    ).fetchIncidentsForDog(dogId);
     Provider.of<TrainingViewModel>(
       context,
       listen: false,
@@ -25,7 +21,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   List<HistoryEntry> _buildAllEntries(String dogId) {
     final trainingVM = Provider.of<TrainingViewModel>(context);
-    final incidentVM = Provider.of<IncidentViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
@@ -36,10 +31,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
     for (final log in healthVM.healthLogs) {
       if (log.dogId == dogId) entries.add(_buildHealthEntry(log, dogName));
-    }
-
-    for (final incident in incidentVM.incidents) {
-      if (incident.dogId == dogId) entries.add(_buildIncidentEntry(incident));
     }
 
     for (final occ in occurrenceVM.occurrences) {
@@ -55,27 +46,25 @@ extension _HistoryDataLoader on _HistoryScreenState {
         HistoryEntry(
           id: feeding.id ?? 'nutrition_${feeding.fedAt.millisecondsSinceEpoch}',
           type: HistoryEntryType.nutrition,
-          title: 'Alimentação registrada',
-          subtitle: 'Ração: ${feeding.amountGrams}g',
+          title: 'AlimentaÃ§Ã£o registrada',
+          subtitle: 'RaÃ§Ã£o: ${feeding.amountGrams}g',
           time: feeding.fedAt,
           author: _resolveAuthorName(feeding.fedBy),
           authorId: feeding.fedBy,
-          tag: 'NUTRIÇÃO',
+          tag: 'NUTRIÃ‡ÃƒO',
           icon: Icons.rice_bowl_rounded,
           color: _hYellow,
           details: {
-            'Período': _periodLabel(feeding.period),
+            'PerÃ­odo': _periodLabel(feeding.period),
             'Quantidade': '${feeding.amountGrams}g',
-            'Prescrição': '${feeding.prescriptionAtTime}g',
-            'Divergência': '${feeding.divergencePercent.toStringAsFixed(1)}%',
+            'PrescriÃ§Ã£o': '${feeding.prescriptionAtTime}g',
+            'DivergÃªncia': '${feeding.divergencePercent.toStringAsFixed(1)}%',
             if (feeding.observations?.trim().isNotEmpty == true)
-              'Observações': feeding.observations,
+              'ObservaÃ§Ãµes': feeding.observations,
           },
         ),
       );
     }
-
-    if (entries.isEmpty) return _mockEntries();
 
     entries.sort((a, b) => b.time.compareTo(a.time));
     return entries;
@@ -100,70 +89,27 @@ extension _HistoryDataLoader on _HistoryScreenState {
       subtitle: subtitle,
       time: log.date,
       author: author,
-      tag: 'SAÚDE',
+      tag: 'SAÃšDE',
       icon: isWeight ? Icons.monitor_weight_outlined : Icons.vaccines_outlined,
       color: _hGreen,
       originalModel: log,
       details: {
-        'Cão': dogName,
+        'CÃ£o': dogName,
         'Tipo': log.logType,
         if (log.weight != null) 'Peso': '${log.weight!.toStringAsFixed(1)} kg',
         if (log.vaccines.isNotEmpty) 'Vacinas': log.vaccines.join(', '),
         if (log.healthObservations.trim().isNotEmpty)
-          'Observações': log.healthObservations,
-        if (log.vetName?.trim().isNotEmpty == true) 'Responsável': log.vetName,
+          'ObservaÃ§Ãµes': log.healthObservations,
+        if (log.vetName?.trim().isNotEmpty == true) 'ResponsÃ¡vel': log.vetName,
         if (log.mediaAttachments?.isNotEmpty == true)
           '_mediaAttachments': log.mediaAttachments,
       },
     );
   }
 
-  HistoryEntry _buildIncidentEntry(Incident incident) {
-    final type = (incident.type ?? 'Registro').trim();
-    final isYou = _isCurrentUser(incident.handlerId);
-
-    return HistoryEntry(
-      id: incident.id,
-      type: HistoryEntryType.incident,
-      title: 'Ocorrência • $type',
-      subtitle: incident.location.trim().isEmpty
-          ? 'Local não informado'
-          : incident.location.trim(),
-      time: incident.date,
-      author: isYou ? 'Você' : _resolveAuthorName(incident.handlerId),
-      authorId: incident.handlerId,
-      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
-      icon: Icons.assignment_outlined,
-      color: isYou ? _hYellow : AppTheme.error,
-      location: incident.location,
-      isInProgress: incident.isInProgress,
-      editedAt: !incident.updatedAt.isAtSameMomentAs(incident.date)
-          ? incident.updatedAt
-          : null,
-      originalModel: incident,
-      details: {
-        'Resultado': incident.displayResult,
-        'Status': incident.status,
-        'Descrição': incident.description,
-        'Local': incident.location,
-        'Condutor': _resolveAuthorName(incident.handlerId),
-        if (incident.startedAt != incident.date)
-          'Início': DateFormat('HH:mm').format(incident.startedAt),
-        if (incident.endedAt != null)
-          'Fim': DateFormat('HH:mm').format(incident.endedAt!),
-        if (incident.outcomes.isNotEmpty) '_outcomes': incident.outcomes,
-        if (incident.progressUpdates.isNotEmpty)
-          '_progressUpdates': incident.progressUpdates,
-        if (incident.extraFields != null) ...incident.extraFields!,
-        if (incident.mediaAttachments?.isNotEmpty == true)
-          '_mediaAttachments': incident.mediaAttachments,
-      },
-    );
-  }
-
   HistoryEntry _buildTrainingEntry(TrainingSessionModel training) {
     final subtitle = training.location.trim().isEmpty
-        ? 'Sessão registrada'
+        ? 'SessÃ£o registrada'
         : training.location.trim();
     final duration = training.searchDuration != null
         ? '${(training.searchDuration! / 60).round()} min'
@@ -172,7 +118,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
     return HistoryEntry(
       id: training.id ?? 'training_${training.date.millisecondsSinceEpoch}',
       type: HistoryEntryType.training,
-      title: 'Treino • ${training.trainingType}',
+      title: 'Treino â€¢ ${training.trainingType}',
       subtitle: subtitle,
       time: training.date,
       author: _resolveAuthorName(training.handlerId),
@@ -184,13 +130,13 @@ extension _HistoryDataLoader on _HistoryScreenState {
       originalModel: training,
       details: {
         'Tipo': training.trainingType,
-        if (duration.isNotEmpty) 'Duração': duration,
+        if (duration.isNotEmpty) 'DuraÃ§Ã£o': duration,
         if (training.location.trim().isNotEmpty) 'Local': training.location,
         if (training.weather.trim().isNotEmpty) 'Clima': training.weather,
         if (training.handlerNotes.trim().isNotEmpty)
           'Notas': training.handlerNotes,
         if (training.substanceUsed?.trim().isNotEmpty == true)
-          'Substância': training.substanceUsed,
+          'SubstÃ¢ncia': training.substanceUsed,
         if (training.metadata != null) ...training.metadata!,
         if (training.mediaAttachments?.isNotEmpty == true)
           '_mediaAttachments': training.mediaAttachments,
@@ -200,20 +146,21 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   HistoryEntry _buildOccurrenceEntry(Occurrence occ) {
     final isYou = _isCurrentUser(occ.primaryHandlerId);
-    final isOpen = occ.status == OccurrenceStatus.inProgress ||
+    final isOpen =
+        occ.status == OccurrenceStatus.inProgress ||
         occ.status == OccurrenceStatus.finalizing;
 
     return HistoryEntry(
       id: occ.id,
-      type: HistoryEntryType.incident,
-      title: 'Ocorrência · ${occ.typeName}',
+      type: HistoryEntryType.occurrence,
+      title: 'OcorrÃªncia Â· ${occ.typeName}',
       subtitle: occ.locationAddress?.trim().isNotEmpty == true
           ? occ.locationAddress!.trim()
-          : 'Local não informado',
+          : 'Local nÃ£o informado',
       time: occ.startedAt,
-      author: isYou ? 'Você' : _resolveAuthorName(occ.primaryHandlerId),
+      author: isYou ? 'VocÃª' : _resolveAuthorName(occ.primaryHandlerId),
       authorId: occ.primaryHandlerId,
-      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
+      tag: isYou ? 'VOCÃŠ' : 'OCORRÃŠNCIA',
       icon: Icons.assignment_outlined,
       color: isYou ? _hYellow : _hCyan,
       location: occ.locationAddress ?? '',
@@ -223,15 +170,16 @@ extension _HistoryDataLoader on _HistoryScreenState {
       details: {
         'Tipo': occ.typeName,
         'Status': occ.status.toMap(),
-        if (occ.locationAddress?.isNotEmpty == true) 'Local': occ.locationAddress,
+        if (occ.locationAddress?.isNotEmpty == true)
+          'Local': occ.locationAddress,
         'Condutor': _resolveAuthorName(occ.primaryHandlerId),
-        'Início': DateFormat('HH:mm').format(occ.startedAt),
+        'InÃ­cio': DateFormat('HH:mm').format(occ.startedAt),
         if (occ.finalizedAt != null)
           'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
-        if (occ.finalReport?.isNotEmpty == true)
-          'Descrição': occ.finalReport,
+        if (occ.finalReport?.isNotEmpty == true) 'DescriÃ§Ã£o': occ.finalReport,
         if (occ.results.isNotEmpty)
           '_outcomes': occ.results.map((r) => r.toMap()).toList(),
+        if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
       },
     );
   }
@@ -245,7 +193,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   String _resolveAuthorName(String handlerId) {
     if (handlerId.trim().isEmpty) return 'Ragonha';
-    if (_isCurrentUser(handlerId)) return 'Você';
+    if (_isCurrentUser(handlerId)) return 'VocÃª';
 
     final userVM = Provider.of<UserViewModel>(context, listen: false);
     for (final user in userVM.users) {
@@ -264,26 +212,26 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   String _healthTitle(HealthLogModel log) {
     final logType = log.logType.trim();
-    if (logType.toLowerCase().contains('vacin')) return 'Vacinação aplicada';
+    if (logType.toLowerCase().contains('vacin')) return 'VacinaÃ§Ã£o aplicada';
     if (logType.isNotEmpty && logType.toLowerCase() != 'rotina') {
       return '$logType registrado';
     }
-    if (log.vaccines.isNotEmpty) return 'Vacinação aplicada';
-    return 'Registro de saúde';
+    if (log.vaccines.isNotEmpty) return 'VacinaÃ§Ã£o aplicada';
+    return 'Registro de saÃºde';
   }
 
   String _healthSubtitle(HealthLogModel log) {
-    if (log.vaccines.isNotEmpty) return log.vaccines.join(' • ');
+    if (log.vaccines.isNotEmpty) return log.vaccines.join(' â€¢ ');
     if (log.healthObservations.trim().isNotEmpty) return log.healthObservations;
-    return 'Registro clínico operacional';
+    return 'Registro clÃ­nico operacional';
   }
 
   String _periodLabel(String period) {
     switch (period) {
       case 'manha':
-        return 'Manhã';
+        return 'ManhÃ£';
       case 'almoco':
-        return 'Almoço';
+        return 'AlmoÃ§o';
       case 'noite':
         return 'Noite';
       default:
@@ -291,6 +239,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
     }
   }
 
+  // ignore: unused_element
   List<HistoryEntry> _mockEntries() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -305,91 +254,95 @@ extension _HistoryDataLoader on _HistoryScreenState {
         subtitle: 'Peso atual: 27.0 kg',
         time: today.add(const Duration(hours: 14, minutes: 23)),
         author: 'Ragonha',
-        tag: 'SAÚDE',
+        tag: 'SAÃšDE',
         icon: Icons.monitor_weight_outlined,
         color: _hGreen,
-        details: const {'Peso': '27.0 kg', 'Responsável': 'Ragonha'},
+        details: const {'Peso': '27.0 kg', 'ResponsÃ¡vel': 'Ragonha'},
       ),
       HistoryEntry(
-        id: 'mock_incident_1',
-        type: HistoryEntryType.incident,
-        title: 'Ocorrência • Averiguação',
+        id: 'mock_occurrence_1',
+        type: HistoryEntryType.occurrence,
+        title: 'OcorrÃªncia â€¢ AveriguaÃ§Ã£o',
         subtitle: 'Rua Guido Orsi, Jardim Ouro Verde',
         time: today.add(const Duration(hours: 13, minutes: 17)),
-        author: 'Você',
-        tag: 'VOCÊ',
+        author: 'VocÃª',
+        tag: 'VOCÃŠ',
         icon: Icons.assignment_outlined,
         color: _hYellow,
         location: 'Rua Guido Orsi, Jardim Ouro Verde',
         details: const {
-          'Status': 'Concluída',
+          'Status': 'ConcluÃ­da',
           'Local': 'Rua Guido Orsi, Jardim Ouro Verde',
-          'Resultado': 'Sem alteração',
+          'Resultado': 'Sem alteraÃ§Ã£o',
         },
       ),
       HistoryEntry(
         id: 'mock_training_1',
         type: HistoryEntryType.training,
-        title: 'Treino • Obediência',
-        subtitle: 'Sessão registrada',
+        title: 'Treino â€¢ ObediÃªncia',
+        subtitle: 'SessÃ£o registrada',
         time: today.add(const Duration(hours: 12, minutes: 37)),
         author: 'Ragonha',
         tag: 'TREINO',
         icon: Icons.fitness_center_rounded,
         color: _hGreen,
-        details: const {'Tipo': 'Obediência', 'Condutor': 'Ragonha'},
+        details: const {'Tipo': 'ObediÃªncia', 'Condutor': 'Ragonha'},
       ),
       HistoryEntry(
         id: 'mock_nutrition',
         type: HistoryEntryType.nutrition,
-        title: 'Alimentação registrada',
-        subtitle: 'Ração: 450g',
+        title: 'AlimentaÃ§Ã£o registrada',
+        subtitle: 'RaÃ§Ã£o: 450g',
         time: yesterday.add(const Duration(hours: 17, minutes: 48)),
         author: 'Ragonha',
-        tag: 'NUTRIÇÃO',
+        tag: 'NUTRIÃ‡ÃƒO',
         icon: Icons.rice_bowl_rounded,
         color: _hYellow,
-        details: const {'Quantidade': '450g', 'Responsável': 'Ragonha'},
+        details: const {'Quantidade': '450g', 'ResponsÃ¡vel': 'Ragonha'},
       ),
       HistoryEntry(
-        id: 'mock_incident_2',
-        type: HistoryEntryType.incident,
-        title: 'Ocorrência • Apoio em abordagem',
-        subtitle: 'Av. das Américas, 1200',
+        id: 'mock_occurrence_2',
+        type: HistoryEntryType.occurrence,
+        title: 'OcorrÃªncia â€¢ Apoio em abordagem',
+        subtitle: 'Av. das AmÃ©ricas, 1200',
         time: yesterday.add(const Duration(hours: 9, minutes: 12)),
         author: 'Ragonha',
-        tag: 'OCORRÊNCIA',
+        tag: 'OCORRÃŠNCIA',
         icon: Icons.emergency_share_rounded,
         color: AppTheme.error,
-        location: 'Av. das Américas, 1200',
+        location: 'Av. das AmÃ©ricas, 1200',
         details: const {
-          'Status': 'Concluída',
-          'Local': 'Av. das Américas, 1200',
+          'Status': 'ConcluÃ­da',
+          'Local': 'Av. das AmÃ©ricas, 1200',
         },
       ),
       HistoryEntry(
         id: 'mock_vaccine',
         type: HistoryEntryType.health,
-        title: 'Vacinação aplicada',
-        subtitle: 'V8 • Lote 24521',
+        title: 'VacinaÃ§Ã£o aplicada',
+        subtitle: 'V8 â€¢ Lote 24521',
         time: previous.add(const Duration(hours: 16, minutes: 2)),
-        author: 'Veterinário João',
-        tag: 'SAÚDE',
+        author: 'VeterinÃ¡rio JoÃ£o',
+        tag: 'SAÃšDE',
         icon: Icons.vaccines_outlined,
         color: _hGreen,
-        details: const {'Vacina': 'V8', 'Lote': '24521', 'Veterinário': 'João'},
+        details: const {
+          'Vacina': 'V8',
+          'Lote': '24521',
+          'VeterinÃ¡rio': 'JoÃ£o',
+        },
       ),
       HistoryEntry(
         id: 'mock_training_2',
         type: HistoryEntryType.training,
-        title: 'Treino • Detecção',
-        subtitle: 'Odor: Cocaína',
+        title: 'Treino â€¢ DetecÃ§Ã£o',
+        subtitle: 'Odor: CocaÃ­na',
         time: previous.add(const Duration(hours: 10, minutes: 31)),
         author: 'Ragonha',
         tag: 'TREINO',
         icon: Icons.fitness_center_rounded,
         color: _hGreen,
-        details: const {'Tipo': 'Detecção', 'Substância': 'Cocaína'},
+        details: const {'Tipo': 'DetecÃ§Ã£o', 'SubstÃ¢ncia': 'CocaÃ­na'},
       ),
     ]..sort((a, b) => b.time.compareTo(a.time));
   }

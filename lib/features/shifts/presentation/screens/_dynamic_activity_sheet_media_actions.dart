@@ -48,31 +48,4 @@ extension _DynamicActivitySheetMediaActions on _DynamicActivitySheetState {
       HapticFeedback.selectionClick();
     }
   }
-
-  Future<List<Map<String, dynamic>>> _uploadAllMedia(String folder) async {
-    if (_mediaAttachments.isEmpty) return const [];
-
-    if (mounted) {
-      _updateState(() {
-        _saveStatus = 'Fazendo upload de mídias...';
-      });
-    }
-
-    return _occCtrl.uploadAllMedia(
-      attachments: _mediaAttachments,
-      folder: folder,
-      onUploading: _markMediaUploading,
-      onUploaded: _markMediaUploaded,
-      onPending: _markMediaPending,
-    );
-  }
-
-  List<Map<String, dynamic>> _mergeExistingIncidentMedia(
-    List<Map<String, dynamic>> uploadedMedia,
-  ) {
-    return MediaAttachmentRows.mergeExistingWithUploaded(
-      existing: widget.initialData?['mediaAttachments'],
-      uploaded: uploadedMedia,
-    );
-  }
 }

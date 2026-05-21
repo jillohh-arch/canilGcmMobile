@@ -155,45 +155,30 @@ extension _MainRootActions on _MainRootScreenState {
       return;
     }
 
-    final dogName = _dogNameFor(context, dogId);
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
-    final openIncident = await incidentVM.findOpenIncident(dogId: dogId);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(
+      context,
+      listen: false,
+    );
+    final openOccurrence =
+        occurrenceVM.openOccurrence ?? await occurrenceVM.findOpen(dogId);
     if (!context.mounted) return;
 
-    if (openIncident != null) {
-      final shouldContinue = await _showOpenIncidentDialog(context);
+    if (openOccurrence != null) {
+      final shouldContinue = await _showOpenOccurrenceDialog(context);
       if (!context.mounted || shouldContinue != true) return;
       rootNavigator.push(
         MaterialPageRoute(
-          builder: (_) => OccurrenceFlowScreen(
-            dogId: dogId,
-            dogName: dogName,
-            incident: openIncident,
-          ),
+          builder: (_) =>
+              ActiveOccurrenceScreen(occurrenceId: openOccurrence.id),
         ),
       );
       return;
     }
 
     rootNavigator.push(
-      MaterialPageRoute(
-        builder: (_) => const StartOccurrenceScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
     );
-  }
-
-  Incident? _activeIncidentForDog(List<Incident> incidents, String dogId) {
-    final openIncidents =
-        incidents
-            .where(
-              (incident) => incident.dogId == dogId && incident.isInProgress,
-            )
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-    if (openIncidents.isEmpty) return null;
-    return openIncidents.first;
   }
 
   String _dogNameFor(BuildContext context, String dogId) {
@@ -204,19 +189,14 @@ extension _MainRootActions on _MainRootScreenState {
     return dogVM.dogs.isNotEmpty ? dogVM.dogs.first.name : 'K9';
   }
 
-  void _continueActiveIncident(
+  void _continueActiveOccurrence(
     BuildContext context, {
-    required String dogId,
-    required Incident incident,
+    required Occurrence occurrence,
   }) {
     HapticFeedback.lightImpact();
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
-        builder: (_) => OccurrenceFlowScreen(
-          dogId: dogId,
-          dogName: _dogNameFor(context, dogId),
-          incident: incident,
-        ),
+        builder: (_) => ActiveOccurrenceScreen(occurrenceId: occurrence.id),
       ),
     );
   }

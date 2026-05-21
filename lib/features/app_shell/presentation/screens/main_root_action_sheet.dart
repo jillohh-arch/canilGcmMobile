@@ -1,7 +1,7 @@
 part of 'main_root_screen.dart';
 
 extension _MainRootOccurrenceDialog on _MainRootScreenState {
-  Future<bool?> _showOpenIncidentDialog(BuildContext context) {
+  Future<bool?> _showOpenOccurrenceDialog(BuildContext context) {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

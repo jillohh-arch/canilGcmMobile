@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/profiles/domain/operational_profile_models.dart';
 import 'package:canil_gcm/features/profiles/presentation/widgets/operational_profile_widgets.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
@@ -58,7 +58,7 @@ class K9ProfilePage extends StatelessWidget {
                   child: Column(
                     children: [
                       ProfileHeader(
-                        eyebrow: 'PERFIL DO CÃO',
+                        eyebrow: 'PERFIL DO CÃƒO',
                         title: data.name,
                         onBack: () => Navigator.of(context).maybePop(),
                       ),
@@ -67,7 +67,7 @@ class K9ProfilePage extends StatelessWidget {
                         photoUrl: data.photoUrl,
                         fallbackIcon: Icons.pets_rounded,
                         rows: [
-                          MapEntry('Raça:', data.breed),
+                          MapEntry('RaÃ§a:', data.breed),
                           MapEntry('Sexo:', data.sex),
                           MapEntry('Idade:', '${data.age} anos'),
                           MapEntry(
@@ -106,7 +106,7 @@ class K9ProfilePage extends StatelessWidget {
   K9ProfileData _buildData(BuildContext context, Dog dog) {
     final healthVM = Provider.of<HealthViewModel>(context);
     final trainingVM = Provider.of<TrainingViewModel>(context);
-    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final now = DateTime.now();
 
     final dogHealthLogs =
@@ -115,9 +115,9 @@ class K9ProfilePage extends StatelessWidget {
     final dogTrainings =
         trainingVM.trainings.where((item) => item.dogId == dog.id).toList()
           ..sort((a, b) => b.date.compareTo(a.date));
-    final dogIncidents =
-        incidentVM.incidents.where((item) => item.dogId == dog.id).toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
+    final dogOccurrences =
+        occurrenceVM.occurrences.where((item) => item.dogId == dog.id).toList()
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
     final latestWeight = dogHealthLogs
         .where((log) => log.weight != null)
@@ -126,10 +126,10 @@ class K9ProfilePage extends StatelessWidget {
     final weight = latestWeight ?? dog.weight ?? 27.0;
     final lastTraining = dogTrainings.isNotEmpty
         ? _ago(dogTrainings.first.date, now)
-        : _ago(dog.lastTrainingDate, now, fallback: 'há 3h');
-    final lastIncident = dogIncidents.isNotEmpty
-        ? _ago(dogIncidents.first.date, now)
-        : 'há 11h';
+        : _ago(dog.lastTrainingDate, now, fallback: 'hÃ¡ 3h');
+    final lastOccurrence = dogOccurrences.isNotEmpty
+        ? _ago(dogOccurrences.first.startedAt, now)
+        : 'hÃ¡ 11h';
     final specialtyList = (dog.specialties ?? const [])
         .where((item) => item.trim().isNotEmpty)
         .take(3)
@@ -145,31 +145,31 @@ class K9ProfilePage extends StatelessWidget {
       operationalStatus: _operationalBadge(dog),
       photoUrl: dog.profileImageUrl ?? '',
       specialties: specialtyList.isEmpty
-          ? const ['Guarda & Proteção', 'Busca & Captura', 'Detecção']
+          ? const ['Guarda & ProteÃ§Ã£o', 'Busca & Captura', 'DetecÃ§Ã£o']
           : specialtyList,
       metrics: [
         const MetricData(
           icon: Icons.monitor_heart_outlined,
-          label: 'Saúde',
+          label: 'SaÃºde',
           value: 'OK',
           color: profileSuccess,
         ),
         MetricData(
           icon: Icons.fitness_center_rounded,
-          label: 'Último treino',
+          label: 'Ãšltimo treino',
           value: lastTraining,
           color: profileTextPrimary,
         ),
         MetricData(
           icon: Icons.shield_outlined,
-          label: 'Última ocorrência',
-          value: lastIncident,
+          label: 'Ãšltima ocorrÃªncia',
+          value: lastOccurrence,
           color: profileTextPrimary,
         ),
         const MetricData(
           icon: Icons.calendar_month_outlined,
           label: 'Status',
-          value: 'Em serviço',
+          value: 'Em serviÃ§o',
           color: profileSuccess,
         ),
       ],
@@ -177,7 +177,7 @@ class K9ProfilePage extends StatelessWidget {
       documents: const [
         DocumentData(
           icon: Icons.workspace_premium_outlined,
-          name: 'Certificação Detecção',
+          name: 'CertificaÃ§Ã£o DetecÃ§Ã£o',
         ),
         DocumentData(
           icon: Icons.description_outlined,
@@ -185,7 +185,7 @@ class K9ProfilePage extends StatelessWidget {
         ),
         DocumentData(
           icon: Icons.description_outlined,
-          name: 'Laudo veterinário',
+          name: 'Laudo veterinÃ¡rio',
         ),
         DocumentData(
           icon: Icons.badge_outlined,
@@ -195,7 +195,7 @@ class K9ProfilePage extends StatelessWidget {
       recentActivities: _recentEntries(
         dogHealthLogs,
         dogTrainings,
-        dogIncidents,
+        dogOccurrences,
       ),
     );
   }
@@ -216,7 +216,7 @@ class K9ProfilePage extends StatelessWidget {
       ),
       const StatusLineData(
         icon: Icons.calendar_month_outlined,
-        label: 'Antirrábica',
+        label: 'AntirrÃ¡bica',
         value: 'em dia',
         color: profileSuccess,
       ),
@@ -229,15 +229,15 @@ class K9ProfilePage extends StatelessWidget {
       ),
       const StatusLineData(
         icon: Icons.health_and_safety_outlined,
-        label: 'Vermífugo',
-        value: 'próximo em 15 dias',
+        label: 'VermÃ­fugo',
+        value: 'prÃ³ximo em 15 dias',
         color: profileAttention,
         statusIcon: Icons.schedule_rounded,
       ),
       StatusLineData(
         icon: Icons.monitor_weight_outlined,
         label: 'Peso',
-        value: weight > 0 ? 'estável' : 'pendente',
+        value: weight > 0 ? 'estÃ¡vel' : 'pendente',
         color: weight > 0 ? profileSuccess : profileAttention,
       ),
       const StatusLineData(
@@ -253,7 +253,7 @@ class K9ProfilePage extends StatelessWidget {
   List<MiniTimelineEntry> _recentEntries(
     List<dynamic> healthLogs,
     List<dynamic> trainings,
-    List<dynamic> incidents,
+    List<dynamic> occurrences,
   ) {
     final entries = <MiniTimelineEntry>[];
     if (healthLogs.isNotEmpty && healthLogs.first.weight != null) {
@@ -267,14 +267,14 @@ class K9ProfilePage extends StatelessWidget {
         ),
       );
     }
-    if (incidents.isNotEmpty) {
+    if (occurrences.isNotEmpty) {
       entries.add(
         MiniTimelineEntry(
-          time: _time(incidents.first.date),
+          time: _time(occurrences.first.startedAt),
           icon: Icons.shield_outlined,
           color: profileAttention,
-          title: 'Ocorrência • ${incidents.first.type ?? 'Averiguação'}',
-          subtitle: incidents.first.location,
+          title: 'Ocorrência • ${occurrences.first.typeName}',
+          subtitle: occurrences.first.locationAddress ?? 'Local não informado',
         ),
       );
     }
@@ -284,8 +284,8 @@ class K9ProfilePage extends StatelessWidget {
           time: _time(trainings.first.date),
           icon: Icons.fitness_center_rounded,
           color: profileSuccess,
-          title: 'Treino • ${trainings.first.trainingType}',
-          subtitle: 'Sessão registrada',
+          title: 'Treino â€¢ ${trainings.first.trainingType}',
+          subtitle: 'SessÃ£o registrada',
         ),
       );
     }
@@ -302,22 +302,22 @@ class K9ProfilePage extends StatelessWidget {
         time: '13:17',
         icon: Icons.shield_outlined,
         color: profileAttention,
-        title: 'Ocorrência • Averiguação',
+        title: 'OcorrÃªncia â€¢ AveriguaÃ§Ã£o',
         subtitle: 'Rua Guido Orsi, Jd. Ouro Verde',
       ),
       MiniTimelineEntry(
         time: '12:37',
         icon: Icons.fitness_center_rounded,
         color: profileSuccess,
-        title: 'Treino • Obediência',
-        subtitle: 'Sessão registrada',
+        title: 'Treino â€¢ ObediÃªncia',
+        subtitle: 'SessÃ£o registrada',
       ),
     ];
   }
 
   String _sexLabel(String value) {
     final normalized = value.trim().toLowerCase();
-    if (normalized == 'f' || normalized.startsWith('fem')) return 'Fêmea';
+    if (normalized == 'f' || normalized.startsWith('fem')) return 'FÃªmea';
     return 'Macho';
   }
 
@@ -329,13 +329,13 @@ class K9ProfilePage extends StatelessWidget {
     return dog.operationalStatus.toUpperCase();
   }
 
-  String _ago(DateTime? date, DateTime now, {String fallback = '—'}) {
+  String _ago(DateTime? date, DateTime now, {String fallback = 'â€”'}) {
     if (date == null) return fallback;
     final diff = now.difference(date);
-    if (diff.inMinutes < 60) return 'há ${diff.inMinutes.clamp(1, 59)}min';
-    if (diff.inHours < 24) return 'há ${diff.inHours}h';
-    if (diff.inDays == 1) return 'há 1 dia';
-    return 'há ${diff.inDays}d';
+    if (diff.inMinutes < 60) return 'hÃ¡ ${diff.inMinutes.clamp(1, 59)}min';
+    if (diff.inHours < 24) return 'hÃ¡ ${diff.inHours}h';
+    if (diff.inDays == 1) return 'hÃ¡ 1 dia';
+    return 'hÃ¡ ${diff.inDays}d';
   }
 
   String _time(DateTime date) {
@@ -354,7 +354,7 @@ class _K9ProfileSections extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle('SAÚDE E CONFORMIDADE'),
+          const SectionTitle('SAÃšDE E CONFORMIDADE'),
           const SizedBox(height: 10),
           for (int i = 0; i < data.healthItems.length; i++)
             StatusLineItem(
@@ -381,7 +381,7 @@ class _K9ProfileSections extends StatelessWidget {
     );
 
     final timeline = MiniTimelineCard(
-      title: 'ÚLTIMOS REGISTROS',
+      title: 'ÃšLTIMOS REGISTROS',
       entries: data.recentActivities,
     );
 

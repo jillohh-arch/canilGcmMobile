@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
@@ -19,11 +20,7 @@ class OccurrenceRepository {
 
     final entry = AuditService.buildInlineEntry(action: 'created');
     final data = occurrence
-        .copyWith(
-          createdAt: now,
-          updatedAt: now,
-          auditTrail: [entry],
-        )
+        .copyWith(createdAt: now, updatedAt: now, auditTrail: [entry])
         .toMap();
 
     await docRef.set(data);
@@ -60,12 +57,14 @@ class OccurrenceRepository {
       final oldValue = currentData[key];
       final newValue = updates[key];
       if (oldValue != newValue) {
-        entries.add(AuditService.buildInlineEntry(
-          action: 'updated',
-          fieldName: key,
-          oldValue: _serializeForAudit(oldValue),
-          newValue: _serializeForAudit(newValue),
-        ));
+        entries.add(
+          AuditService.buildInlineEntry(
+            action: 'updated',
+            fieldName: key,
+            oldValue: _serializeForAudit(oldValue),
+            newValue: _serializeForAudit(newValue),
+          ),
+        );
       }
     }
 
@@ -136,6 +135,37 @@ class OccurrenceRepository {
     );
   }
 
+  Future<void> recordPdfAccess({
+    required String id,
+    required String action,
+    String? pdfUrl,
+  }) async {
+    final docRef = _collection.doc(id);
+    final entry = AuditService.buildInlineEntry(action: action);
+    final access = {
+      'at': DateTime.now().toIso8601String(),
+      'by': entry['performed_by'],
+      'ip': 'client-unavailable',
+      'action': action,
+      if (pdfUrl?.trim().isNotEmpty == true) 'pdf_url': pdfUrl,
+    };
+
+    await docRef.update({
+      'pdf_access_log': FieldValue.arrayUnion([access]),
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    });
+
+    AuditService.log(
+      action: action,
+      entityType: 'occurrence',
+      entityId: id,
+      summary: action == 'pdf_shared'
+          ? 'PDF da ocorrencia compartilhado'
+          : 'PDF da ocorrencia acessado',
+      metadata: access,
+    );
+  }
+
   Future<Occurrence?> getById(String id) async {
     final snap = await _collection.doc(id).get();
     if (!snap.exists) return null;
@@ -146,41 +176,83 @@ class OccurrenceRepository {
   }
 
   Stream<List<Occurrence>> watchByDog(String dogId) {
-    return _collection
-        .where('dog_id', isEqualTo: dogId)
-        .where('deleted_at', isNull: true)
-        .orderBy('started_at', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
-            .toList());
+    return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
+      snap,
+    ) {
+      final occurrences =
+          snap.docs
+              .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+              .where((occ) => !occ.isDeleted)
+              .toList()
+            ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      return occurrences;
+    });
   }
 
   Stream<Occurrence?> watchOpen(String dogId) {
-    return _collection
-        .where('dog_id', isEqualTo: dogId)
-        .where('status', whereIn: ['in_progress', 'finalizing'])
-        .where('deleted_at', isNull: true)
-        .limit(1)
-        .snapshots()
-        .map((snap) {
-      if (snap.docs.isEmpty) return null;
-      final doc = snap.docs.first;
-      return Occurrence.fromMap(doc.data(), doc.id);
+    return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
+      snap,
+    ) {
+      final open =
+          snap.docs
+              .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+              .where((occ) => !occ.isDeleted && occ.status.isOpen)
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      if (open.isEmpty) return null;
+      return open.first;
     });
   }
 
   Future<Occurrence?> findOpen(String dogId) async {
-    final snap = await _collection
-        .where('dog_id', isEqualTo: dogId)
-        .where('status', whereIn: ['in_progress', 'finalizing'])
-        .where('deleted_at', isNull: true)
-        .limit(1)
+    final snap = await _collection.where('dog_id', isEqualTo: dogId).get();
+    final open =
+        snap.docs
+            .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+            .where((occ) => !occ.isDeleted && occ.status.isOpen)
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    if (open.isEmpty) return null;
+    return open.first;
+  }
+
+  Future<List<OccurrenceNature>> getOccurrenceNatures() async {
+    try {
+      final configured = await _getOccurrenceNaturesFrom('occurrence_types');
+      if (configured.isNotEmpty) return configured;
+    } catch (_) {
+      // Mantem a tela funcional se a colecao nova ainda nao estiver populada.
+    }
+
+    try {
+      return _getOccurrenceNaturesFrom('occurrence_natures');
+    } catch (_) {
+      return OccurrenceNatureSeed.items;
+    }
+  }
+
+  Future<List<OccurrenceNature>> _getOccurrenceNaturesFrom(
+    String collectionName,
+  ) async {
+    final snapshot = await _firestore
+        .collection(collectionName)
+        .where('active', isEqualTo: true)
         .get();
 
-    if (snap.docs.isEmpty) return null;
-    final doc = snap.docs.first;
-    return Occurrence.fromMap(doc.data(), doc.id);
+    final natures = snapshot.docs.map((doc) {
+      final data = doc.data();
+      return OccurrenceNature.fromJson({
+        ...data,
+        'code': data['code'] ?? data['id'] ?? doc.id,
+      });
+    }).toList();
+
+    natures.sort((a, b) {
+      final byGroup = a.group.compareTo(b.group);
+      if (byGroup != 0) return byGroup;
+      return a.name.compareTo(b.name);
+    });
+    return natures;
   }
 
   static dynamic _serializeForAudit(dynamic value) {

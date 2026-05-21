@@ -39,6 +39,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   Timer? _savedBadgeTimer;
   Duration _elapsed = Duration.zero;
   DateTime? _startedAt;
+  Occurrence? _loadedOccurrence;
   bool _showSavedBadge = false;
   bool _isAddingEvent = false;
 
@@ -47,8 +48,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     super.initState();
     final vm = context.read<OccurrenceViewModel>();
     vm.watchEvents(widget.occurrenceId);
+    _loadOccurrence();
 
-    _startedAt = vm.openOccurrence?.startedAt;
+    _startedAt = _currentOccurrence(vm)?.startedAt;
     _updateElapsed();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateElapsed();
@@ -56,17 +58,35 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
 
     _durationPersistTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_elapsed.inSeconds > 0) {
-        context
-            .read<OccurrenceViewModel>()
-            .updateDurationSoFar(widget.occurrenceId, _elapsed.inSeconds);
+        context.read<OccurrenceViewModel>().updateDurationSoFar(
+          widget.occurrenceId,
+          _elapsed.inSeconds,
+        );
       }
     });
+  }
+
+  Occurrence? _currentOccurrence(OccurrenceViewModel vm) {
+    final open = vm.openOccurrence;
+    if (open != null && open.id == widget.occurrenceId) return open;
+    return _loadedOccurrence;
+  }
+
+  Future<void> _loadOccurrence() async {
+    final vm = context.read<OccurrenceViewModel>();
+    final loaded = await vm.getById(widget.occurrenceId);
+    if (!mounted) return;
+    setState(() {
+      _loadedOccurrence = loaded;
+      _startedAt ??= loaded?.startedAt;
+    });
+    _updateElapsed();
   }
 
   void _updateElapsed() {
     if (_startedAt == null) {
       final vm = context.read<OccurrenceViewModel>();
-      _startedAt = vm.openOccurrence?.startedAt;
+      _startedAt = _currentOccurrence(vm)?.startedAt;
     }
     if (_startedAt != null) {
       setState(() {
@@ -150,9 +170,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   void _openOtherEventSheet() async {
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) => EditEventScreen(
-          occurrenceId: widget.occurrenceId,
-        ),
+        builder: (_) => EditEventScreen(occurrenceId: widget.occurrenceId),
       ),
     );
     if (result == 'saved' && mounted) {
@@ -189,7 +207,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     final authVM = context.read<AuthViewModel>();
     final userVM = context.read<UserViewModel>();
 
-    final occ = vm.openOccurrence;
+    final occ = _currentOccurrence(vm);
     final dogs = dogVM.dogs.where((d) => d.id == occ?.dogId);
     final dog = dogs.isNotEmpty ? dogs.first : null;
     final dogName = dog?.name ?? 'K9';
@@ -222,7 +240,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     if (lower.contains('permission') || lower.contains('permission_denied')) {
       return 'Sem permissão para acessar esses dados.';
     }
-    if (lower.contains('failed-precondition') || lower.contains('precondition')) {
+    if (lower.contains('failed-precondition') ||
+        lower.contains('precondition')) {
       return 'Erro de configuração do servidor.';
     }
     if (lower.contains('unavailable') || lower.contains('network')) {
@@ -243,7 +262,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         title: Text(
           'Nenhum evento registrado',
           style: GoogleFonts.inter(
-              color: Colors.white, fontWeight: FontWeight.w600),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           'Deseja finalizar a ocorrência sem nenhum evento?',
@@ -252,16 +273,20 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancelar',
-                style: GoogleFonts.inter(color: Colors.white54)),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               _navigateToFinalize();
             },
-            child: Text('Finalizar',
-                style: GoogleFonts.inter(color: const Color(0xFFE74C3C))),
+            child: Text(
+              'Finalizar',
+              style: GoogleFonts.inter(color: const Color(0xFFE74C3C)),
+            ),
           ),
         ],
       ),
@@ -271,7 +296,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   void _showEditOccurrenceDialog(OccurrenceViewModel vm, Occurrence? occ) {
     if (occ == null) return;
     final locationCtrl = TextEditingController(text: occ.locationAddress ?? '');
-    final observationCtrl = TextEditingController(text: occ.initialObservation ?? '');
+    final observationCtrl = TextEditingController(
+      text: occ.initialObservation ?? '',
+    );
 
     showDialog(
       context: context,
@@ -281,26 +308,35 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         title: Text(
           'Editar dados da ocorrência',
           style: GoogleFonts.inter(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('LOCAL',
-                  style: GoogleFonts.inter(
-                      color: AppTheme.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.0)),
+              Text(
+                'LOCAL',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.0,
+                ),
+              ),
               const SizedBox(height: 6),
               TextField(
                 controller: locationCtrl,
                 style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Endereço',
-                  hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+                  hintStyle: GoogleFonts.inter(
+                    color: Colors.white38,
+                    fontSize: 14,
+                  ),
                   filled: true,
                   fillColor: Colors.white.withAlpha(8),
                   border: OutlineInputBorder(
@@ -315,17 +351,22 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: AppTheme.primary),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              Text('OBSERVAÇÃO INICIAL',
-                  style: GoogleFonts.inter(
-                      color: AppTheme.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.0)),
+              Text(
+                'OBSERVAÇÃO INICIAL',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.0,
+                ),
+              ),
               const SizedBox(height: 6),
               TextField(
                 controller: observationCtrl,
@@ -333,7 +374,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                 style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Observação (opcional)',
-                  hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+                  hintStyle: GoogleFonts.inter(
+                    color: Colors.white38,
+                    fontSize: 14,
+                  ),
                   filled: true,
                   fillColor: Colors.white.withAlpha(8),
                   border: OutlineInputBorder(
@@ -348,8 +392,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: AppTheme.primary),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ],
@@ -358,8 +404,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancelar',
-                style: GoogleFonts.inter(color: Colors.white54)),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -383,9 +431,13 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               await vm.updateOccurrence(occ.id, updates);
               if (mounted) _showSavedFeedback();
             },
-            child: Text('Salvar',
-                style: GoogleFonts.inter(
-                    color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Salvar',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -402,7 +454,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         title: Text(
           'Descartar ocorrência?',
           style: GoogleFonts.inter(
-              color: Colors.white, fontWeight: FontWeight.w600),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -417,7 +471,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Motivo (obrigatório)',
-                hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+                hintStyle: GoogleFonts.inter(
+                  color: Colors.white38,
+                  fontSize: 14,
+                ),
                 filled: true,
                 fillColor: Colors.white.withAlpha(8),
                 border: OutlineInputBorder(
@@ -432,8 +489,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: AppTheme.error),
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -441,8 +500,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancelar',
-                style: GoogleFonts.inter(color: Colors.white54)),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -454,9 +515,13 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               await vm.cancelOccurrence(widget.occurrenceId, userId, reason);
               if (mounted) Navigator.of(context).pop();
             },
-            child: Text('Descartar',
-                style: GoogleFonts.inter(
-                    color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Descartar',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -469,7 +534,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     final dogVM = context.watch<DogViewModel>();
     final authVM = context.watch<AuthViewModel>();
     final userVM = context.watch<UserViewModel>();
-    final occ = vm.openOccurrence;
+    final occ = _currentOccurrence(vm);
 
     // Resolve dog name and photo from dogId
     final dogId = occ?.dogId;
@@ -527,8 +592,11 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.check_circle_outline,
-                                    color: AppTheme.success, size: 14),
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: AppTheme.success,
+                                  size: 14,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Salvo agora',
@@ -566,8 +634,12 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     events: vm.events,
                     onEventTap: _onEventTap,
                     handlerName: handlerName,
-                    locationLabel: locationAddress.isNotEmpty ? locationAddress : null,
-                    errorMessage: vm.error != null ? _translateError(vm.error!) : null,
+                    locationLabel: locationAddress.isNotEmpty
+                        ? locationAddress
+                        : null,
+                    errorMessage: vm.error != null
+                        ? _translateError(vm.error!)
+                        : null,
                     onRetry: vm.error != null
                         ? () {
                             vm.clearError();
@@ -630,8 +702,11 @@ class _Header extends StatelessWidget {
                 color: Colors.white.withAlpha(10),
                 border: Border.all(color: Colors.white.withAlpha(20)),
               ),
-              child: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 16),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 16,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -662,9 +737,15 @@ class _Header extends StatelessWidget {
             ),
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: Colors.white.withAlpha(180), size: 22),
+            icon: Icon(
+              Icons.more_vert,
+              color: Colors.white.withAlpha(180),
+              size: 22,
+            ),
             color: const Color(0xFF0F2027),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             onSelected: (value) {
               if (value == 'edit') {
                 onEditData?.call();
@@ -677,10 +758,19 @@ class _Header extends StatelessWidget {
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit_outlined, color: AppTheme.primary, size: 18),
+                    Icon(
+                      Icons.edit_outlined,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 10),
-                    Text('Editar dados',
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 13)),
+                    Text(
+                      'Editar dados',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -690,8 +780,13 @@ class _Header extends StatelessWidget {
                   children: [
                     Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
                     const SizedBox(width: 10),
-                    Text('Descartar ocorrência',
-                        style: GoogleFonts.inter(color: AppTheme.error, fontSize: 13)),
+                    Text(
+                      'Descartar ocorrência',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.error,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),

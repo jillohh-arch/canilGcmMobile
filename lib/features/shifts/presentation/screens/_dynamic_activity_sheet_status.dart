@@ -3,12 +3,6 @@ part of 'dynamic_activity_sheet.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {
-  void _onOccurrenceDescriptionChanged() {
-    if (_isOccurrenceCategory && mounted) {
-      setState(() {});
-    }
-  }
-
   void _setSaveStatus(String status, {bool failed = false}) {
     if (!mounted) return;
     setState(() {
@@ -33,7 +27,7 @@ extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {
       return;
     }
 
-    Navigator.pop(context, result || _hasActiveIncidentDocument);
+    Navigator.pop(context, result);
   }
 
   void _showOperationalSnack(
@@ -86,10 +80,6 @@ extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {
   }
 
   String _successSaveMessage() {
-    return ActivityFormLabels.successSaveMessage(
-      category: widget.category,
-      isOccurrenceCategory: _isOccurrenceCategory,
-      occurrenceStatus: _occurrenceStatus,
-    );
+    return ActivityFormLabels.successSaveMessage(category: widget.category);
   }
 }

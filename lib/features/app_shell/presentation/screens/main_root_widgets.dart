@@ -1,23 +1,49 @@
 part of 'main_root_screen.dart';
 
-class _ActiveIncidentBanner extends StatelessWidget {
-  final Incident incident;
+class _ActiveOccurrenceBanner extends StatelessWidget {
+  final Occurrence occurrence;
   final String dogName;
   final VoidCallback onTap;
 
-  const _ActiveIncidentBanner({
-    required this.incident,
+  const _ActiveOccurrenceBanner({
+    required this.occurrence,
     required this.dogName,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final title = (incident.type ?? 'Ocorrência').trim();
-    final location = incident.location.trim().isEmpty
-        ? 'Local não informado'
-        : incident.location.trim();
+    final title = occurrence.typeName.trim().isEmpty
+        ? 'Ocorrência'
+        : occurrence.typeName;
+    final location = occurrence.locationAddress?.trim().isNotEmpty == true
+        ? occurrence.locationAddress!.trim()
+        : 'Local não informado';
 
+    return _ActiveOperationBannerFrame(
+      label: 'OCORRÊNCIA EM ANDAMENTO',
+      title: title,
+      subtitle: '$dogName • $location',
+      onTap: onTap,
+    );
+  }
+}
+
+class _ActiveOperationBannerFrame extends StatelessWidget {
+  final String label;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ActiveOperationBannerFrame({
+    required this.label,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       top: false,
       child: Material(
@@ -55,9 +81,7 @@ class _ActiveIncidentBanner extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.warning.withAlpha(24),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: AppTheme.warning.withAlpha(150),
-                    ),
+                    border: Border.all(color: AppTheme.warning.withAlpha(150)),
                   ),
                   child: const Icon(
                     Icons.pending_actions_rounded,
@@ -72,7 +96,7 @@ class _ActiveIncidentBanner extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'OCORRÊNCIA EM ANDAMENTO',
+                        label,
                         style: GoogleFonts.inter(
                           color: AppTheme.warning,
                           fontSize: 9,
@@ -94,7 +118,7 @@ class _ActiveIncidentBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$dogName • $location',
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(

@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
@@ -79,7 +81,25 @@ class BinomioHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userVM = Provider.of<UserViewModel>(context);
-    final handlerName = userVM.displayNameFor(ra: dog.conductorRa);
+    final authVM = Provider.of<AuthViewModel>(context);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+    final handlerRa = dog.conductorRa ?? currentRa;
+    final handlerName = userVM.displayNameFor(
+      ra: handlerRa,
+      firebaseUser: handlerRa == currentRa ? authVM.user : null,
+    );
+    final propPhoto = conductorPhotoUrl?.trim();
+    final userPhoto = userVM.findByRa(handlerRa)?.photoUrl?.trim();
+    final firebasePhoto = handlerRa == currentRa
+        ? authVM.user?.photoURL?.trim()
+        : null;
+    final resolvedConductorPhotoUrl = propPhoto != null && propPhoto.isNotEmpty
+        ? propPhoto
+        : userPhoto != null && userPhoto.isNotEmpty
+        ? userPhoto
+        : firebasePhoto != null && firebasePhoto.isNotEmpty
+        ? firebasePhoto
+        : null;
     final dogColor = dogBorderColor ?? AppTheme.primary;
     final conductorColor = conductorBorderColor ?? AppTheme.success;
 
@@ -105,7 +125,7 @@ class BinomioHeader extends StatelessWidget {
                 left: avatarSize * 0.65,
                 top: 2,
                 child: _BinomioAvatar(
-                  imageUrl: conductorPhotoUrl,
+                  imageUrl: resolvedConductorPhotoUrl,
                   fallbackIcon: Icons.person_rounded,
                   borderColor: conductorColor,
                   size: avatarSize,
@@ -145,7 +165,8 @@ class BinomioHeader extends StatelessWidget {
                           color: statusDotColor ?? AppTheme.success,
                           boxShadow: [
                             BoxShadow(
-                              color: (statusDotColor ?? AppTheme.success).withAlpha(80),
+                              color: (statusDotColor ?? AppTheme.success)
+                                  .withAlpha(80),
                               blurRadius: 6,
                               spreadRadius: 1,
                             ),
@@ -176,7 +197,7 @@ class BinomioHeader extends StatelessWidget {
         // Trailing widget + profile button
         if (trailing != null || showProfileButton) ...[
           const SizedBox(width: 8),
-          if (trailing != null) trailing!,
+          ?trailing,
           if (showProfileButton) ...[
             if (trailing != null) const SizedBox(width: 6),
             GestureDetector(
@@ -271,8 +292,8 @@ class _BinomioAvatar extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => _buildFallback(),
-                errorWidget: (_, __, ___) => _buildFallback(),
+                placeholder: (_, _) => _buildFallback(),
+                errorWidget: (_, _, _) => _buildFallback(),
               )
             : _buildFallback(),
       ),

@@ -9,12 +9,12 @@ class _MissionLog extends StatelessWidget {
   Widget build(BuildContext context) {
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
-    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
 
     final items = [
       ...trainingVM.trainings.map(_timelineItemFromTraining),
       ...healthVM.healthLogs.map(_timelineItemFromHealthLog),
-      ...incidentVM.incidents.map(_timelineItemFromIncident),
+      ...occurrenceVM.occurrences.map(_timelineItemFromOccurrence),
     ]..sort((a, b) => b.date.compareTo(a.date));
 
     final visibleItems = items.take(12).toList();
@@ -75,11 +75,12 @@ class _MissionLog extends StatelessWidget {
     );
   }
 
-  _MissionTimelineItem _timelineItemFromIncident(Incident incident) {
+  _MissionTimelineItem _timelineItemFromOccurrence(Occurrence occurrence) {
     return _MissionTimelineItem(
-      date: incident.date,
-      title: incident.type ?? 'Ocorrência',
-      subtitle: '${incident.result} · ${incident.location}',
+      date: occurrence.startedAt,
+      title: occurrence.typeName.isEmpty ? 'Ocorrência' : occurrence.typeName,
+      subtitle:
+          '${occurrence.status.toMap()} · ${occurrence.locationAddress ?? 'Local não informado'}',
       icon: Icons.report_rounded,
       color: AppTheme.primary,
       tag: 'OCORRÊNCIA',

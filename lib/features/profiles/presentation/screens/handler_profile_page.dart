@@ -11,7 +11,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
@@ -494,7 +494,7 @@ class _StatsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final incidentVM = Provider.of<IncidentViewModel>(context);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final trainingVM = Provider.of<TrainingViewModel>(context);
 
     return Column(
@@ -524,7 +524,7 @@ class _StatsSection extends StatelessWidget {
             _StatCard(
               icon: Icons.shield_rounded,
               color: AppTheme.primary,
-              value: '${incidentVM.incidents.length}',
+              value: '${occurrenceVM.occurrences.length}',
               label: 'OCORRÊNCIAS',
             ),
             _StatCard(

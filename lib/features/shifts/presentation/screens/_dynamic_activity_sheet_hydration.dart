@@ -8,8 +8,6 @@ extension _DynamicActivitySheetHydration on _DynamicActivitySheetState {
 
     if (widget.category == 'Treino') {
       _populateTrainingEditData(d);
-    } else if (_isOccurrenceCategory || widget.category == 'Evento') {
-      _populateOccurrenceEditData(d);
     } else if (widget.category == 'Saude') {
       _populateHealthEditData(d);
     }

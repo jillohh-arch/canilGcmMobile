@@ -4,10 +4,6 @@ part of 'dynamic_activity_sheet.dart';
 
 extension _DynamicActivitySheetLayout on _DynamicActivitySheetState {
   Widget _buildFormScaffold() {
-    if (_isOccurrenceCategory) {
-      return _buildOccurrenceFormScaffold();
-    }
-
     return ActivityFormScaffold(
       title: _selectedSubtype?.toUpperCase() ?? '',
       imagePath: _selectedSubtypeImagePath,
@@ -57,15 +53,6 @@ extension _DynamicActivitySheetLayout on _DynamicActivitySheetState {
   }
 
   Color _getCategoryColor() {
-    if (_isOccurrenceCategory) {
-      if (_occurrenceStatus == OccurrenceFormController.statusCanceled) {
-        return _kHudRed;
-      }
-      if (_occurrenceStatus == OccurrenceFormController.statusCompleted) {
-        return _kHudGreen;
-      }
-      return _kHudCyan;
-    }
     return ActivityCardCatalog.glowFor(
       category: widget.category,
       id: _selectedSubtype,
@@ -75,13 +62,6 @@ extension _DynamicActivitySheetLayout on _DynamicActivitySheetState {
 
   Widget _buildFormContent() {
     final tColor = _getCategoryColor();
-    if (_isOccurrenceCategory) {
-      return _buildOccurrenceStepperContent(tColor);
-    }
-    if (_selectedSubtype == ActivitySubtypeIds.detection ||
-        _selectedSubtype == ActivitySubtypeIds.missingPerson) {
-      return _buildGroupedFormContent(tColor);
-    }
     return _buildStandardFormContent(tColor);
   }
 }

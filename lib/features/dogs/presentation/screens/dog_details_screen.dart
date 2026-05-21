@@ -9,9 +9,9 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/domain/incident.dart';
-import 'package:canil_gcm/features/incidents/presentation/viewmodels/incident_viewmodel.dart';
-import 'package:canil_gcm/features/incidents/presentation/screens/occurrence_flow_screen.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 
@@ -48,10 +48,10 @@ class _DogDetailsScreenState extends State<DogDetailsScreen> {
         context,
         listen: false,
       ).fetchHealthLogsForDog(widget.dog.id);
-      Provider.of<IncidentViewModel>(
+      Provider.of<OccurrenceViewModel>(
         context,
         listen: false,
-      ).fetchIncidentsForDog(widget.dog.id);
+      ).watchByDog(widget.dog.id);
     });
   }
 

@@ -7,11 +7,14 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
   final userVM = Provider.of<UserViewModel>(context);
   final authVM = Provider.of<AuthViewModel>(context);
   final currentRa = HandlerIdentityService.raFromUser(authVM.user);
-  final userModel = userVM.users.cast<dynamic>().firstWhere(
-    (u) => u?.ra == currentRa,
-    orElse: () => null,
-  );
-  final conductorPhoto = userModel?.photoUrl as String?;
+  final userModel = userVM.findByRa(currentRa);
+  final userPhoto = userModel?.photoUrl?.trim();
+  final firebasePhoto = authVM.user?.photoURL?.trim();
+  final conductorPhoto = userPhoto != null && userPhoto.isNotEmpty
+      ? userPhoto
+      : firebasePhoto != null && firebasePhoto.isNotEmpty
+      ? firebasePhoto
+      : null;
 
   return SafeArea(
     child: Column(

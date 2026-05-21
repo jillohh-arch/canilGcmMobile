@@ -3,19 +3,49 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart' as printing;
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 
-import 'pdf_colors.dart';
 import 'pdf_common_widgets.dart';
 
-/// Gerador do PDF institucional de Ocorrência (6 páginas).
+/// Gerador do PDF institucional de ocorrencia baseado nos mockups V2.
 class OccurrencePdfGenerator {
-  static final _identityColor = PdfInstitutionalColors.cyan;
-  static const _docType = 'REGISTRO DE OCORRÊNCIA';
+  static final _paper = PdfColors.white;
+  static final _ink = PdfColor.fromHex('14202B');
+  static final _inkSoft = PdfColor.fromHex('46586A');
+  static final _inkFaint = PdfColor.fromHex('8493A1');
+  static final _line = PdfColor.fromHex('DDE4EA');
+  static final _lineSoft = PdfColor.fromHex('EAEFF3');
+  static final _cyan = PdfColor.fromHex('0A8E9D');
+  static final _cyanDeep = PdfColor.fromHex('07707C');
+  static final _green = PdfColor.fromHex('1F9D52');
+  static final _greenBg = PdfColor.fromHex('F1FAF4');
+  static final _greenLine = PdfColor.fromHex('BFE6CF');
+  static final _amber = PdfColor.fromHex('B07D0A');
+  static final _amberBg = PdfColor.fromHex('FDF8EC');
+  static final _amberLine = PdfColor.fromHex('ECDCA8');
+  static final _headerBg = PdfColor.fromHex('0E1A24');
+  static final _headerAccent = PdfColor.fromHex('2BB6C4');
+  static final _mapBg = PdfColor.fromHex('F3F6F8');
+  static final _mapRoad = PdfColor.fromHex('DDE4EA');
+  static final _mediaBg = PdfColor.fromHex('D5E0E6');
+
+  static const _docType = 'Registro de Ocorrencia';
+  static const _systemName = 'Sistema Canil K9 GCM';
+  static const _googleMapsStaticApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_STATIC_API_KEY',
+  );
+  static const _verificationBaseUrl = String.fromEnvironment(
+    'K9_VERIFICATION_BASE_URL',
+    defaultValue: 'https://canilk9.limeira.sp.gov.br/v',
+  );
+  static const _pagePadding = 30.0;
+  static const _contentGap = 18.0;
 
   /// Gera o PDF completo e retorna os bytes.
   Future<Uint8List> generate({
@@ -27,689 +57,2580 @@ class OccurrencePdfGenerator {
   }) async {
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
-      title: 'Registro de Ocorrência - ${occurrence.typeName}',
+      title: 'Registro de Ocorrencia - ${occurrence.typeName}',
     );
     final fonts = await PdfFonts.load();
     final docId = _buildDocId(occurrence);
     final sortedEvents = [...events]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final context = _OccurrencePdfContext(
+      occurrence: occurrence,
+      events: sortedEvents,
+      dog: dog,
+      handlerName: handlerName,
+      handlerRa: handlerRa,
+      docId: docId,
+      fonts: fonts,
+      media: await _buildMediaItems(sortedEvents),
+      staticMapImage: await _buildStaticMapImage(occurrence),
+    );
 
-    // Página 1: Capa
-    pdf.addPage(_buildCoverPage(occurrence, dog, handlerName, handlerRa, docId, fonts));
-
-    // Página 2: Identificação
-    pdf.addPage(_buildIdentificationPage(occurrence, dog, handlerName, handlerRa, docId, fonts));
-
-    // Página 3: Ocorrência e Localização
-    pdf.addPage(_buildLocationPage(occurrence, docId, fonts));
-
-    // Página 4: Timeline de Eventos
-    pdf.addPage(_buildTimelinePage(sortedEvents, docId, fonts));
-
-    // Página 5: Relato e Resultado
-    pdf.addPage(_buildReportPage(occurrence, docId, fonts));
-
-    // Página 6: Auditoria e Assinatura
-    pdf.addPage(_buildAuditPage(occurrence, handlerName, docId, fonts));
+    pdf
+      ..addPage(_page(context, 1, _buildCoverPage))
+      ..addPage(_page(context, 2, _buildLocationPage))
+      ..addPage(_page(context, 3, _buildTimelinePage))
+      ..addPage(_page(context, 4, _buildMediaPage))
+      ..addPage(_page(context, 5, _buildReportPage))
+      ..addPage(_page(context, 6, _buildValidationPage));
 
     return pdf.save();
   }
 
-  String _buildDocId(Occurrence occ) {
-    final date = occ.startedAt;
-    final y = date.year;
-    final m = date.month.toString().padLeft(2, '0');
-    final seq = occ.id.substring(0, 4).toUpperCase();
-    return 'REG $y/$m/$seq-K9';
-  }
-
-  String _formatDate(DateTime dt) => DateFormat('dd/MM/yyyy').format(dt);
-  String _formatTime(DateTime dt) => DateFormat('HH:mm').format(dt);
-
-  String _formatDuration(Occurrence occ) {
-    if (occ.finalizedAt == null) return '--';
-    final diff = occ.finalizedAt!.difference(occ.startedAt);
-    final h = diff.inHours;
-    final m = diff.inMinutes.remainder(60);
-    if (h > 0) return '${h}h ${m.toString().padLeft(2, "0")}min';
-    return '${m}min';
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 1 — CAPA
-  // ═══════════════════════════════════════════════════════════════════
-
-  pw.Page _buildCoverPage(
-    Occurrence occ,
-    Dog dog,
-    String handlerName,
-    String handlerRa,
-    String docId,
-    PdfFonts fonts,
+  pw.Page _page(
+    _OccurrencePdfContext ctx,
+    int pageNumber,
+    pw.Widget Function(_OccurrencePdfContext ctx) bodyBuilder,
   ) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(40),
-      build: (context) => pw.Column(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          // Topo: Brasão + Instituição
-          pw.Column(
-            children: [
-              pw.SizedBox(height: 40),
-              pw.Container(
-                width: 60,
-                height: 60,
-                decoration: pw.BoxDecoration(
-                  color: _identityColor,
-                  shape: pw.BoxShape.circle,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => pw.Container(
+        color: _paper,
+        child: pw.Column(
+          children: [
+            _header(ctx, pageNumber),
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.fromLTRB(
+                  _pagePadding,
+                  21,
+                  _pagePadding,
+                  0,
                 ),
-                child: pw.Center(
-                  child: pw.Text('K9',
-                      style: pw.TextStyle(
-                          font: fonts.black, fontSize: 20, color: PdfColors.white)),
-                ),
+                child: bodyBuilder(ctx),
               ),
-              pw.SizedBox(height: 16),
-              pw.Text('GUARDA CIVIL MUNICIPAL',
-                  style: pw.TextStyle(
-                      font: fonts.black, fontSize: 14, letterSpacing: 2)),
-              pw.Text('DE LIMEIRA',
-                  style: pw.TextStyle(
-                      font: fonts.bold, fontSize: 12, letterSpacing: 2)),
-              pw.SizedBox(height: 6),
-              pw.Text('CANIL K9 · SEÇÃO OPERACIONAL',
-                  style: fonts.label(color: _identityColor)),
-            ],
-          ),
-          // Centro: Tipo + Título
-          pw.Column(
-            children: [
-              pw.Container(height: 2, width: 200, color: _identityColor),
-              pw.SizedBox(height: 20),
-              pw.Text(_docType,
-                  style: fonts.label(color: PdfInstitutionalColors.textTertiary)),
-              pw.SizedBox(height: 8),
-              pw.Text(occ.typeName,
-                  style: fonts.heading(),
-                  textAlign: pw.TextAlign.center),
-              pw.SizedBox(height: 20),
-              // Metadata card
-              PdfCommonWidgets.card(
-                borderColor: _identityColor,
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _metaItem('DATA', _formatDate(occ.startedAt), fonts),
-                    _metaItem('INÍCIO', _formatTime(occ.startedAt), fonts),
-                    _metaItem('DURAÇÃO', _formatDuration(occ), fonts),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 16),
-              pw.Text(docId,
-                  style: pw.TextStyle(
-                      font: fonts.bold, fontSize: 14, color: _identityColor)),
-            ],
-          ),
-          // Rodapé: Binômio
-          pw.Column(
-            children: [
-              pw.Text('BINÔMIO RESPONSÁVEL',
-                  style: fonts.label(color: _identityColor)),
-              pw.SizedBox(height: 8),
-              pw.Text(handlerName,
-                  style: pw.TextStyle(font: fonts.bold, fontSize: 13)),
-              pw.Text('RA $handlerRa · K9 ${dog.name}',
-                  style: fonts.caption()),
-              pw.SizedBox(height: 20),
-            ],
-          ),
-        ],
+            ),
+            _footer(pageNumber == 1),
+          ],
+        ),
       ),
     );
   }
 
-  pw.Widget _metaItem(String label, String value, PdfFonts fonts) {
+  Future<List<_PdfMediaItem>> _buildMediaItems(
+    List<OccurrenceEvent> events,
+  ) async {
+    final items = <_PdfMediaItem>[];
+    var index = 1;
+    for (final event in events) {
+      for (final url in event.photoUrls) {
+        pw.ImageProvider? image;
+        try {
+          image = await printing.networkImage(url);
+        } catch (_) {
+          image = null;
+        }
+        items.add(
+          _PdfMediaItem(number: index++, url: url, image: image, event: event),
+        );
+      }
+    }
+    return items;
+  }
+
+  Future<pw.ImageProvider?> _buildStaticMapImage(Occurrence occurrence) async {
+    if (_googleMapsStaticApiKey.trim().isEmpty) return null;
+    final lat = occurrence.gpsLat;
+    final lng = occurrence.gpsLng;
+    if (lat == null || lng == null) return null;
+
+    final center = '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
+    final uri = Uri.https('maps.googleapis.com', '/maps/api/staticmap', {
+      'center': center,
+      'zoom': '17',
+      'size': '800x420',
+      'scale': '2',
+      'maptype': 'roadmap',
+      'markers': 'color:0x0A8E9D|$center',
+      'key': _googleMapsStaticApiKey,
+    });
+
+    try {
+      return await printing.networkImage(uri.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _buildDocId(Occurrence occ) {
+    final seq = occ.id.length >= 4
+        ? occ.id.substring(0, 4).toUpperCase()
+        : occ.id.toUpperCase().padRight(4, '0');
+    return 'REG ${occ.startedAt.year}/${_two(occ.startedAt.month)}/$seq-K9';
+  }
+
+  static String _two(int value) => value.toString().padLeft(2, '0');
+  String _formatDate(DateTime value) => DateFormat('dd/MM/yyyy').format(value);
+  String _formatShortDate(DateTime value) => DateFormat('dd/MM').format(value);
+  String _formatTime(DateTime value) => DateFormat('HH:mm').format(value);
+  String _formatDateTime(DateTime value) =>
+      DateFormat('dd/MM/yyyy HH:mm').format(value);
+
+  DateTime _operationStart(_OccurrencePdfContext ctx) => ctx.events.isNotEmpty
+      ? ctx.events.first.timestamp
+      : ctx.occurrence.startedAt;
+
+  DateTime _operationEnd(_OccurrencePdfContext ctx) {
+    if (ctx.occurrence.finalizedAt != null) return ctx.occurrence.finalizedAt!;
+    if (ctx.events.isNotEmpty) return ctx.events.last.timestamp;
+    return ctx.occurrence.updatedAt;
+  }
+
+  String _durationLabel(DateTime start, DateTime end) {
+    final diff = end.difference(start);
+    final totalMinutes = diff.inMinutes <= 0 ? 1 : diff.inMinutes;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes.remainder(60);
+    if (hours > 0) return '${hours}h ${_two(minutes)}min';
+    return '$totalMinutes min';
+  }
+
+  String _timeWindow(_OccurrencePdfContext ctx) {
+    final start = _operationStart(ctx);
+    final end = _operationEnd(ctx);
+    return '${_formatTime(start)} -> ${_formatTime(end)}';
+  }
+
+  String _statusLabel(Occurrence occurrence) =>
+      switch (occurrence.status.toMap()) {
+        'finalized' => 'Finalizado',
+        'finalizing' => 'Em finalizacao',
+        'canceled' => 'Cancelado',
+        _ => 'Em andamento',
+      };
+
+  int _boCount(Occurrence occurrence) =>
+      occurrence.results.contains(OccurrenceResult.boCreated) ? 1 : 0;
+
+  String _locationMain(Occurrence occurrence) {
+    final raw = occurrence.locationAddress?.trim();
+    if (raw == null || raw.isEmpty) return 'Endereco nao informado';
+    final parts = raw.split(',').map((part) => part.trim()).toList();
+    return parts.firstWhere((part) => part.isNotEmpty, orElse: () => raw);
+  }
+
+  String _locationSub(Occurrence occurrence) {
+    final raw = occurrence.locationAddress?.trim();
+    if (raw == null || raw.isEmpty) return 'Limeira/SP';
+    final parts = raw.split(',').map((part) => part.trim()).toList();
+    if (parts.length <= 1) return 'Limeira/SP';
+    return parts.skip(1).where((part) => part.isNotEmpty).take(2).join(' - ');
+  }
+
+  String _gpsText(double? lat, double? lng, {int precision = 6}) {
+    if (lat == null || lng == null) return 'GPS indisponivel';
+    return '${lat.toStringAsFixed(precision)}, ${lng.toStringAsFixed(precision)}';
+  }
+
+  String _accuracyText(double? accuracy) {
+    if (accuracy == null) return 'N/I';
+    return '+/-${accuracy.toStringAsFixed(0)}m';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared visual primitives
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _header(_OccurrencePdfContext ctx, int pageNumber) {
+    final f = ctx.fonts;
     return pw.Column(
       children: [
-        pw.Text(label, style: fonts.label()),
-        pw.SizedBox(height: 4),
-        pw.Text(value, style: pw.TextStyle(font: fonts.bold, fontSize: 13)),
+        pw.Container(
+          height: 72,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+          color: _headerBg,
+          child: pw.Row(
+            children: [
+              _crest(f),
+              pw.SizedBox(width: 12),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                  children: [
+                    pw.Text(
+                      'GUARDA CIVIL MUNICIPAL DE LIMEIRA',
+                      style: pw.TextStyle(
+                        font: f.bold,
+                        color: PdfColors.white,
+                        fontSize: 13.5,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'CANIL K9 - SECAO OPERACIONAL',
+                      style: pw.TextStyle(
+                        font: f.medium,
+                        color: _headerAccent,
+                        fontSize: 8,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    ctx.docId,
+                    style: pw.TextStyle(
+                      font: f.bold,
+                      color: PdfColors.white,
+                      fontSize: 11,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'PAGINA $pageNumber DE 6',
+                    style: pw.TextStyle(
+                      font: f.medium,
+                      color: PdfColor.fromHex('8AA0AD'),
+                      fontSize: 7.5,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        pw.Row(
+          children: [
+            pw.Container(width: 260, height: 2.3, color: _cyan),
+            pw.Container(width: 180, height: 2.3, color: _green),
+            pw.Expanded(child: pw.Container(height: 2.3, color: _headerBg)),
+          ],
+        ),
       ],
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 2 — IDENTIFICAÇÃO
-  // ═══════════════════════════════════════════════════════════════════
-
-  pw.Page _buildIdentificationPage(
-    Occurrence occ,
-    Dog dog,
-    String handlerName,
-    String handlerRa,
-    String docId,
-    PdfFonts fonts,
-  ) {
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-      build: (context) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+  pw.Widget _footer(bool cover) {
+    return pw.Container(
+      height: 38,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 30),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: _line, width: 0.8)),
+      ),
+      child: pw.Row(
         children: [
-          PdfCommonWidgets.pageHeader(
-              docType: _docType, docId: docId, fonts: fonts, color: _identityColor),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Identificação do Binômio', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Condutor
-              pw.Expanded(
-                child: PdfCommonWidgets.card(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('CONDUTOR',
-                          style: fonts.label(color: _identityColor)),
-                      pw.SizedBox(height: 6),
-                      pw.Text(handlerName,
-                          style: pw.TextStyle(font: fonts.bold, fontSize: 14)),
-                      pw.SizedBox(height: 4),
-                      pw.Text('RA: $handlerRa', style: fonts.body()),
-                      pw.Text('Função: Condutor K9', style: fonts.caption()),
-                    ],
-                  ),
-                ),
-              ),
-              pw.SizedBox(width: 12),
-              // Cão
-              pw.Expanded(
-                child: PdfCommonWidgets.card(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('CÃO K9',
-                          style: fonts.label(color: _identityColor)),
-                      pw.SizedBox(height: 6),
-                      pw.Text(dog.name.toUpperCase(),
-                          style: pw.TextStyle(font: fonts.bold, fontSize: 14)),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Raça: ${dog.breed}', style: fonts.body()),
-                      pw.Text('Matrícula: ${dog.registrationNumber ?? "N/I"}',
-                          style: fonts.body()),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          _smallShield(_inkFaint),
+          pw.SizedBox(width: 7),
+          pw.Text(
+            'Documento gerado automaticamente pelo $_systemName',
+            style: pw.TextStyle(fontSize: 7.5, color: _inkFaint),
           ),
-          pw.SizedBox(height: 20),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Dados Administrativos', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          PdfCommonWidgets.infoTable(
-            rows: [
-              MapEntry('TURNO/PLANTÃO', occ.shiftId.isNotEmpty ? occ.shiftId.substring(0, 8) : 'N/I'),
-              MapEntry('DATA', _formatDate(occ.startedAt)),
-              MapEntry('INÍCIO', _formatTime(occ.startedAt)),
-              MapEntry('TÉRMINO', occ.finalizedAt != null ? _formatTime(occ.finalizedAt!) : 'N/I'),
-              MapEntry('DURAÇÃO', _formatDuration(occ)),
-              MapEntry('NATUREZA', occ.typeName),
-            ],
-            fonts: fonts,
+          pw.Spacer(),
+          pw.Text(
+            cover
+                ? 'DOCUMENTO DIGITAL - assinatura e integridade na pag. 6'
+                : 'DOCUMENTO DIGITAL - nao impresso',
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              color: _inkFaint,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 3 — OCORRÊNCIA E LOCALIZAÇÃO
-  // ═══════════════════════════════════════════════════════════════════
-
-  pw.Page _buildLocationPage(
-    Occurrence occ,
-    String docId,
-    PdfFonts fonts,
-  ) {
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-      build: (context) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+  pw.Widget _crest(PdfFonts fonts) {
+    return pw.Container(
+      width: 32,
+      height: 38,
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('13242F'),
+        border: pw.Border.all(color: _headerAccent, width: 1.1),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
+      ),
+      child: pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
-          PdfCommonWidgets.pageHeader(
-              docType: _docType, docId: docId, fonts: fonts, color: _identityColor),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Ocorrência e Localização', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          // Mapa placeholder
           pw.Container(
-            height: 160,
-            width: double.infinity,
+            width: 14,
+            height: 14,
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('E8F0F2'),
-              border: pw.Border.all(color: _identityColor),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              color: _headerAccent,
+              shape: pw.BoxShape.circle,
             ),
             child: pw.Center(
-              child: pw.Column(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  pw.Text('LOCALIZAÇÃO GPS',
-                      style: fonts.label(color: _identityColor)),
-                  pw.SizedBox(height: 8),
-                  if (occ.gpsLat != null && occ.gpsLng != null)
-                    pw.Text(
-                      '${occ.gpsLat!.toStringAsFixed(6)}, ${occ.gpsLng!.toStringAsFixed(6)}',
-                      style: pw.TextStyle(font: fonts.bold, fontSize: 12),
-                    )
-                  else
-                    pw.Text('Coordenadas indisponíveis', style: fonts.body()),
-                  pw.SizedBox(height: 4),
-                  pw.Text('Mapa estático disponível em versão futura',
-                      style: fonts.caption()),
-                ],
+              child: pw.Text(
+                'K',
+                style: pw.TextStyle(
+                  font: fonts.black,
+                  fontSize: 8,
+                  color: PdfColor.fromHex('13242F'),
+                ),
               ),
             ),
           ),
-          pw.SizedBox(height: 6),
-          if (occ.locationAddress != null && occ.locationAddress!.isNotEmpty)
-            pw.Text(occ.locationAddress!,
-                style: fonts.caption(), textAlign: pw.TextAlign.center),
-          pw.SizedBox(height: 16),
-          // Boxes destacados
-          pw.Row(
-            children: [
-              pw.Expanded(
-                child: _highlightBox('NATUREZA', occ.typeName, fonts),
-              ),
-              pw.SizedBox(width: 12),
-              pw.Expanded(
-                child: _highlightBox('DURAÇÃO', _formatDuration(occ), fonts),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 20),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Dados de Localização', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          PdfCommonWidgets.infoTable(
-            rows: [
-              MapEntry('ENDEREÇO', occ.locationAddress ?? 'N/I'),
-              MapEntry('LATITUDE', occ.gpsLat?.toStringAsFixed(6) ?? 'N/I'),
-              MapEntry('LONGITUDE', occ.gpsLng?.toStringAsFixed(6) ?? 'N/I'),
-              MapEntry('PRECISÃO GPS',
-                  occ.gpsAccuracy != null ? '±${occ.gpsAccuracy!.toStringAsFixed(0)}m' : 'N/I'),
-            ],
-            fonts: fonts,
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'K9',
+            style: pw.TextStyle(
+              font: fonts.black,
+              color: PdfColors.white,
+              fontSize: 8,
+            ),
           ),
         ],
       ),
     );
   }
 
-  pw.Widget _highlightBox(String label, String value, PdfFonts fonts) {
+  pw.Widget _smallShield(PdfColor color) {
+    return pw.Container(
+      width: 11,
+      height: 12,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: color, width: 1),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+      ),
+    );
+  }
+
+  pw.Widget _sectionLabel(String label, PdfFonts fonts) {
+    return pw.Row(
+      children: [
+        pw.Text(
+          label.toUpperCase(),
+          style: pw.TextStyle(
+            font: fonts.bold,
+            color: _inkSoft,
+            fontSize: 8.2,
+            letterSpacing: 1.5,
+          ),
+        ),
+        pw.SizedBox(width: 8),
+        pw.Expanded(child: pw.Container(height: 0.8, color: _line)),
+      ],
+    );
+  }
+
+  pw.Widget _contextBar(_OccurrencePdfContext ctx, {bool status = false}) {
+    final start = _operationStart(ctx);
+    final cells = <_KeyValue>[
+      _KeyValue('Natureza', ctx.occurrence.typeName),
+      _KeyValue('Data', _formatDate(start), mono: true),
+      _KeyValue('Horario', _timeWindow(ctx), mono: true),
+      _KeyValue(
+        status ? 'Status' : 'Duracao',
+        status
+            ? _statusLabel(ctx.occurrence)
+            : _durationLabel(start, _operationEnd(ctx)),
+        mono: !status,
+        green: status && ctx.occurrence.status.isClosed,
+      ),
+    ];
+    return _gridBox(
+      columns: [2.0, 1.0, 1.25, 1.0],
+      children: cells.map((cell) => _contextCell(cell, ctx.fonts)).toList(),
+    );
+  }
+
+  pw.Widget _contextCell(_KeyValue value, PdfFonts fonts) {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: pw.BoxDecoration(
-        color: PdfInstitutionalColors.lightGray,
-        border: pw.Border(left: pw.BorderSide(color: _identityColor, width: 3)),
-      ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(label, style: fonts.label()),
+          _tinyLabel(value.label, fonts),
           pw.SizedBox(height: 4),
-          pw.Text(value, style: pw.TextStyle(font: fonts.black, fontSize: 13)),
+          pw.Text(
+            value.value,
+            maxLines: 2,
+            overflow: pw.TextOverflow.clip,
+            style: pw.TextStyle(
+              font: value.mono ? fonts.regular : fonts.bold,
+              fontSize: 9.8,
+              color: value.green ? _green : _ink,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 4 — TIMELINE DE EVENTOS
-  // ═══════════════════════════════════════════════════════════════════
-
-  pw.Page _buildTimelinePage(
-    List<OccurrenceEvent> events,
-    String docId,
-    PdfFonts fonts,
-  ) {
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-      build: (context) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          PdfCommonWidgets.pageHeader(
-              docType: _docType, docId: docId, fonts: fonts, color: _identityColor),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Linha do Tempo de Eventos', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          if (events.isEmpty)
-            pw.Text('Nenhum evento registrado.', style: fonts.body())
-          else
-            ...events.map((e) => _buildTimelineEntry(e, fonts)),
-        ],
+  pw.Widget _tinyLabel(String text, PdfFonts fonts, {PdfColor? color}) {
+    return pw.Text(
+      text.toUpperCase(),
+      style: pw.TextStyle(
+        font: fonts.bold,
+        fontSize: 6.7,
+        letterSpacing: 0.9,
+        color: color ?? _inkFaint,
       ),
     );
   }
 
-  pw.Widget _buildTimelineEntry(OccurrenceEvent event, PdfFonts fonts) {
-    final time = _formatTime(event.timestamp);
-    final hasPhotos = event.photoUrls.isNotEmpty;
+  pw.TextStyle _mono(PdfFonts fonts, {double size = 9, PdfColor? color}) {
+    return pw.TextStyle(
+      font: fonts.regular,
+      fontSize: size,
+      color: color ?? _ink,
+    );
+  }
 
+  pw.TextStyle _body(PdfFonts fonts, {double size = 9, PdfColor? color}) {
+    return pw.TextStyle(
+      font: fonts.regular,
+      fontSize: size,
+      color: color ?? _ink,
+      lineSpacing: 2,
+    );
+  }
+
+  pw.TextStyle _bodyBold(PdfFonts fonts, {double size = 9, PdfColor? color}) {
+    return pw.TextStyle(font: fonts.bold, fontSize: size, color: color ?? _ink);
+  }
+
+  pw.Widget _gridBox({
+    required List<double> columns,
+    required List<pw.Widget> children,
+  }) {
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 10),
-      padding: const pw.EdgeInsets.only(bottom: 10),
       decoration: pw.BoxDecoration(
-        border: pw.Border(
-          bottom: pw.BorderSide(color: PdfInstitutionalColors.cardBorder, width: 0.5),
-        ),
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
       ),
       child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          // Horário
-          pw.SizedBox(
-            width: 42,
-            child: pw.Text(time,
-                style: pw.TextStyle(
-                    font: fonts.bold, fontSize: 10, color: _identityColor)),
-          ),
-          // Dot
-          pw.Container(
-            width: 9,
-            height: 9,
-            margin: const pw.EdgeInsets.only(top: 2, right: 10),
-            decoration: pw.BoxDecoration(
-              color: _identityColor,
-              shape: pw.BoxShape.circle,
-              border: pw.Border.all(color: PdfColors.white, width: 1.5),
-            ),
-          ),
-          // Content
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(event.title ?? event.category.label,
-                    style: pw.TextStyle(font: fonts.bold, fontSize: 11)),
-                if (event.description != null && event.description!.isNotEmpty)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 2),
-                    child: pw.Text(event.description!,
-                        style: fonts.body(
-                            color: PdfInstitutionalColors.textSecondary)),
-                  ),
-                if (hasPhotos)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 4),
-                    child: pw.Text(
-                      '${event.photoUrls.length} foto(s) anexada(s)',
-                      style: fonts.caption(color: _identityColor),
-                    ),
-                  ),
-                if (event.gpsLat != null)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 2),
-                    child: pw.Text(
-                      'GPS: ${event.gpsLat!.toStringAsFixed(5)}, ${event.gpsLng!.toStringAsFixed(5)}',
-                      style: fonts.mono(),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 5 — RELATO E RESULTADO
-  // ═══════════════════════════════════════════════════════════════════
-
-  pw.Page _buildReportPage(
-    Occurrence occ,
-    String docId,
-    PdfFonts fonts,
-  ) {
-    final activeResults = occ.results
-        .where((r) => r != OccurrenceResult.noOccurrence)
-        .toList();
-
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-      build: (context) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          PdfCommonWidgets.pageHeader(
-              docType: _docType, docId: docId, fonts: fonts, color: _identityColor),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Relato Institucional', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          // Relato card
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-              color: PdfInstitutionalColors.lightGray,
-              border: pw.Border.all(color: PdfInstitutionalColors.cardBorder),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Row(
-                  children: [
-                    pw.Text('TRANSCRIÇÃO DE ÁUDIO · REVISADA',
-                        style: fonts.label(color: _identityColor)),
-                  ],
-                ),
-                pw.SizedBox(height: 8),
-                pw.Container(
-                  height: 0.5,
-                  color: PdfInstitutionalColors.divider,
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  occ.finalReport ?? 'Relato não registrado.',
-                  style: fonts.body(),
-                  textAlign: pw.TextAlign.justify,
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 20),
-          if (activeResults.isNotEmpty) ...[
-            PdfCommonWidgets.sectionTitle(
-                title: 'Resultados da Ocorrência',
-                fonts: fonts,
-                color: PdfInstitutionalColors.greenInstitutional),
-            pw.SizedBox(height: 8),
-            ...activeResults.map((r) => _buildResultEntry(r, occ, fonts)),
-          ] else ...[
-            PdfCommonWidgets.sectionTitle(
-                title: 'Resultado', fonts: fonts, color: _identityColor),
-            pw.SizedBox(height: 8),
-            pw.Text('Sem ocorrência policial registrada.', style: fonts.body()),
+          for (var i = 0; i < children.length; i++) ...[
+            pw.Expanded(flex: (columns[i] * 100).round(), child: children[i]),
+            if (i < children.length - 1)
+              pw.Container(width: 0.8, height: 48, color: _line),
           ],
         ],
       ),
     );
   }
 
-  pw.Widget _buildResultEntry(
-      OccurrenceResult result, Occurrence occ, PdfFonts fonts) {
+  pw.Widget _roundedCard({
+    required pw.Widget child,
+    PdfColor? border,
+    PdfColor? background,
+    double radius = 8,
+    pw.EdgeInsets padding = const pw.EdgeInsets.all(12),
+  }) {
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 8),
-      padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: padding,
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromHex('E8F5ED'),
-        border: pw.Border(
-          left: pw.BorderSide(
-              color: PdfInstitutionalColors.greenInstitutional, width: 3),
-        ),
+        color: background ?? _paper,
+        border: pw.Border.all(color: border ?? _line),
+        borderRadius: pw.BorderRadius.all(pw.Radius.circular(radius)),
       ),
-      child: pw.Text(result.label,
-          style: fonts.bodyBold(color: PdfInstitutionalColors.greenInstitutional)),
+      child: child,
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PÁGINA 6 — AUDITORIA E ASSINATURA
-  // ═══════════════════════════════════════════════════════════════════
+  pw.Widget _avatar(String top, PdfFonts fonts, {PdfColor? color}) {
+    final c = color ?? _cyan;
+    return pw.Container(
+      width: 48,
+      height: 48,
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('EEF2F5'),
+        shape: pw.BoxShape.circle,
+        border: pw.Border.all(color: c, width: 1.4),
+      ),
+      child: pw.Center(
+        child: pw.Text(
+          top,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            font: fonts.bold,
+            fontSize: 7,
+            lineSpacing: 1,
+            color: c == _cyan ? _cyanDeep : _inkFaint,
+          ),
+        ),
+      ),
+    );
+  }
 
-  pw.Page _buildAuditPage(
-    Occurrence occ,
-    String handlerName,
-    String docId,
-    PdfFonts fonts,
-  ) {
-    final hash = occ.integrityHash ?? 'N/I';
-    final verificationUrl = 'https://canilk9-limeira.web.app/v/${occ.id}';
-
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-      build: (context) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+  pw.Widget _binomio(_OccurrencePdfContext ctx, {bool compact = false}) {
+    final f = ctx.fonts;
+    return _roundedCard(
+      padding: pw.EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 18,
+        vertical: compact ? 12 : 15,
+      ),
+      child: pw.Row(
         children: [
-          PdfCommonWidgets.pageHeader(
-              docType: _docType, docId: docId, fonts: fonts, color: _identityColor),
-          PdfCommonWidgets.sectionTitle(
-              title: 'Trilha de Auditoria', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          // Audit trail entries
-          if (occ.auditTrail.isEmpty)
-            pw.Text('Nenhuma alteração registrada após criação.', style: fonts.body())
-          else
-            ...occ.auditTrail.take(15).map((entry) => _buildAuditEntry(entry, fonts)),
-          pw.SizedBox(height: 20),
-          // Hash card
-          PdfCommonWidgets.sectionTitle(
-              title: 'Integridade do Documento', fonts: fonts, color: _identityColor),
-          pw.SizedBox(height: 8),
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-              color: PdfInstitutionalColors.lightGray,
-              border: pw.Border.all(color: _identityColor),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+          pw.Expanded(
+            child: pw.Row(
               children: [
-                pw.Text('HASH DE INTEGRIDADE',
-                    style: fonts.label(color: _identityColor)),
-                pw.SizedBox(height: 6),
-                pw.Text('SHA-256: $hash', style: fonts.mono(fontSize: 9)),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  'Este hash garante que o documento não foi alterado após a finalização.',
-                  style: fonts.caption(),
+                _avatar('FOTO\nK9', f),
+                pw.SizedBox(width: 10),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _tinyLabel('Cao K9', f, color: _cyanDeep),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      ctx.dog.name,
+                      style: _bodyBold(f, size: compact ? 11 : 12),
+                    ),
+                    pw.Text(
+                      'Raca: ${ctx.dog.breed}\nMatricula: ${ctx.dog.registrationNumber ?? 'N/I'}',
+                      style: _body(f, size: 8, color: _inkSoft),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          pw.SizedBox(height: 16),
-          // QR Code
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.BarcodeWidget(
-                data: verificationUrl,
-                barcode: pw.Barcode.qrCode(),
-                width: 70,
-                height: 70,
+          pw.Container(
+            width: 20,
+            alignment: pw.Alignment.center,
+            child: pw.Text('<>', style: _mono(f, color: _inkFaint)),
+          ),
+          pw.Expanded(
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    _tinyLabel('Condutor', f, color: _cyanDeep),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      ctx.handlerName,
+                      style: _bodyBold(f, size: compact ? 11 : 12),
+                    ),
+                    pw.Text(
+                      'RA: ${ctx.handlerRa}\nUnidade: Canil K9 - Limeira',
+                      textAlign: pw.TextAlign.right,
+                      style: _body(f, size: 8, color: _inkSoft),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(width: 10),
+                _avatar('FOTO\nGCM', f),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _mapCanvas(
+    _OccurrencePdfContext ctx, {
+    required double height,
+    bool detailed = false,
+  }) {
+    final f = ctx.fonts;
+    return pw.Container(
+      height: height,
+      color: _mapBg,
+      child: pw.Stack(
+        children: [
+          if (ctx.staticMapImage != null)
+            pw.Positioned.fill(
+              child: pw.Image(ctx.staticMapImage!, fit: pw.BoxFit.cover),
+            )
+          else ...[
+            _mapRoadLine(left: 0, top: height * .18, width: 535, height: 5),
+            _mapRoadLine(left: 0, top: height * .44, width: 535, height: 7),
+            _mapRoadLine(left: 0, top: height * .72, width: 535, height: 5),
+            _mapRoadLine(left: 125, top: 0, width: 5, height: height),
+            _mapRoadLine(left: 255, top: 0, width: 7, height: height),
+            _mapRoadLine(left: 385, top: 0, width: 5, height: height),
+            _roadLabel(
+              'R. Frederico Rotulo',
+              left: 18,
+              top: height * .39,
+              fonts: f,
+            ),
+            _roadLabel('R. Guido Orsi', left: 280, top: height * .13, fonts: f),
+            _roadLabel(
+              'R. Jose Brunatti',
+              left: 42,
+              top: height * .8,
+              fonts: f,
+            ),
+            _roadLabel(
+              'E. E. Jd. Ouro Verde',
+              left: 365,
+              top: height * .56,
+              fonts: f,
+            ),
+          ],
+          pw.Positioned(
+            top: 10,
+            right: 12,
+            child: pw.Column(
+              children: [
+                pw.Text('N', style: _mono(f, size: 8, color: _inkSoft)),
+                pw.Text('^', style: _mono(f, size: 11, color: _cyan)),
+              ],
+            ),
+          ),
+          if (detailed)
+            pw.Positioned(
+              bottom: 12,
+              left: 12,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    '0 ---- 100m',
+                    style: _mono(f, size: 7, color: _inkSoft),
+                  ),
+                  pw.Container(
+                    width: 60,
+                    height: 3,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        bottom: pw.BorderSide(color: _inkSoft),
+                        left: pw.BorderSide(color: _inkSoft),
+                        right: pw.BorderSide(color: _inkSoft),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              pw.SizedBox(width: 14),
+            ),
+          pw.Positioned(
+            left: 260,
+            top: height * .45,
+            child: pw.Column(
+              children: [
+                pw.Container(
+                  width: 16,
+                  height: 16,
+                  decoration: pw.BoxDecoration(
+                    color: _cyan,
+                    shape: pw.BoxShape.circle,
+                    border: pw.Border.all(color: PdfColors.white, width: 2),
+                  ),
+                ),
+                pw.Container(
+                  width: 36,
+                  height: 7,
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromInt(0x330A8E9D),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _mapRoadLine({
+    required double left,
+    required double top,
+    required double width,
+    required double height,
+  }) {
+    return pw.Positioned(
+      left: left,
+      top: top,
+      child: pw.Container(width: width, height: height, color: _mapRoad),
+    );
+  }
+
+  pw.Widget _roadLabel(
+    String text, {
+    required double left,
+    required double top,
+    required PdfFonts fonts,
+  }) {
+    return pw.Positioned(
+      left: left,
+      top: top,
+      child: pw.Text(
+        text,
+        style: _body(fonts, size: 6.5, color: PdfColor.fromHex('97A6B2')),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 1
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildCoverPage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final start = _operationStart(ctx);
+    final end = _operationEnd(ctx);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Container(
+                    padding: const pw.EdgeInsets.only(left: 8),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        left: pw.BorderSide(color: _cyan, width: 2.5),
+                      ),
+                    ),
+                    child: pw.Text(
+                      _docType.toUpperCase(),
+                      style: pw.TextStyle(
+                        font: f.bold,
+                        fontSize: 8,
+                        letterSpacing: 1.8,
+                        color: _cyanDeep,
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Text(
+                    ctx.occurrence.typeName,
+                    maxLines: 2,
+                    style: pw.TextStyle(
+                      font: f.black,
+                      color: _ink,
+                      fontSize: 26,
+                      lineSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 18),
+            _statusChip(ctx),
+          ],
+        ),
+        pw.SizedBox(height: _contentGap),
+        _gridBox(
+          columns: [1, 1, 1],
+          children: [
+            _metaCell('Data', _formatDate(start), f),
+            _metaCell(
+              'Janela da operacao',
+              '${_formatTime(start)} -> ${_formatTime(end)}',
+              f,
+              note: 'do 1o evento a finalizacao',
+            ),
+            _metaCell('Duracao', _durationLabel(start, end), f),
+          ],
+        ),
+        pw.SizedBox(height: _contentGap),
+        _mapCard(ctx, height: 178),
+        pw.SizedBox(height: _contentGap),
+        _sectionLabel('Resumo operacional', f),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          children: [
+            _statCard(
+              'TEMPO',
+              _durationLabel(start, end),
+              'Duracao da operacao',
+              f,
+            ),
+            pw.SizedBox(width: 9),
+            _statCard('EV', '${ctx.events.length}', 'Eventos registrados', f),
+            pw.SizedBox(width: 9),
+            _statCard('MID', '${ctx.media.length}', 'Midias anexadas', f),
+            pw.SizedBox(width: 9),
+            _statCard('BO', '${_boCount(ctx.occurrence)}', 'BO registrado', f),
+          ],
+        ),
+        pw.SizedBox(height: _contentGap),
+        _sectionLabel('Binomio responsavel', f),
+        pw.SizedBox(height: 10),
+        _binomio(ctx),
+      ],
+    );
+  }
+
+  pw.Widget _statusChip(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final label = _statusLabel(ctx.occurrence).toUpperCase();
+    return pw.Container(
+      width: 126,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: pw.BoxDecoration(
+        color: _greenBg,
+        border: pw.Border.all(color: _greenLine),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Container(
+                width: 6,
+                height: 6,
+                decoration: pw.BoxDecoration(
+                  color: _green,
+                  shape: pw.BoxShape.circle,
+                ),
+              ),
+              pw.SizedBox(width: 5),
+              pw.Text(label, style: _bodyBold(f, size: 9, color: _green)),
+            ],
+          ),
+          pw.SizedBox(height: 5),
+          _tinyLabel('Sincronizado', f),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            _formatDateTime(ctx.occurrence.updatedAt),
+            style: _mono(f, size: 7.5, color: _inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _metaCell(
+    String label,
+    String value,
+    PdfFonts fonts, {
+    String? note,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _tinyLabel(label, fonts),
+          pw.SizedBox(height: 5),
+          pw.Text(value, style: _mono(fonts, size: 12.5)),
+          if (note != null) ...[
+            pw.SizedBox(height: 2),
+            pw.Text(note, style: _body(fonts, size: 7.5, color: _inkFaint)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _mapCard(_OccurrencePdfContext ctx, {required double height}) {
+    final f = ctx.fonts;
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(color: _line)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Text('P', style: _bodyBold(f, size: 9, color: _cyanDeep)),
+                pw.SizedBox(width: 6),
+                pw.Text(
+                  'LOCAL DA OCORRENCIA',
+                  style: _bodyBold(f, size: 8, color: _cyanDeep),
+                ),
+              ],
+            ),
+          ),
+          _mapCanvas(ctx, height: height),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('FAFCFD'),
+              border: pw.Border(top: pw.BorderSide(color: _line)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Text('P', style: _bodyBold(f, size: 10, color: _cyan)),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        _locationMain(ctx.occurrence),
+                        style: _bodyBold(f, size: 10.5),
+                      ),
+                      pw.Text(
+                        _locationSub(ctx.occurrence),
+                        style: _body(f, size: 8, color: _inkSoft),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Text(
+                  _gpsText(ctx.occurrence.gpsLat, ctx.occurrence.gpsLng),
+                  style: _mono(f, size: 8, color: _cyanDeep),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _statCard(
+    String icon,
+    String number,
+    String caption,
+    PdfFonts fonts,
+  ) {
+    return pw.Expanded(
+      child: _roundedCard(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: pw.Column(
+          children: [
+            pw.Text(icon, style: _bodyBold(fonts, size: 9, color: _cyan)),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              number,
+              style: pw.TextStyle(font: fonts.black, fontSize: 20, color: _ink),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              caption,
+              textAlign: pw.TextAlign.center,
+              style: _body(fonts, size: 7.5, color: _inkSoft),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 2
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildLocationPage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final start = _operationStart(ctx);
+    final end = _operationEnd(ctx);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _contextBar(ctx),
+        pw.SizedBox(height: 18),
+        _sectionLabel('Localizacao e dados operacionais', f),
+        pw.SizedBox(height: 11),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              flex: 7,
+              child: pw.Container(
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: _line),
+                  borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(8),
+                  ),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(bottom: pw.BorderSide(color: _line)),
+                      ),
+                      child: pw.Row(
+                        children: [
+                          pw.Text(
+                            'P',
+                            style: _bodyBold(f, size: 9, color: _cyanDeep),
+                          ),
+                          pw.SizedBox(width: 6),
+                          pw.Text(
+                            'MAPA DA OCORRENCIA',
+                            style: _bodyBold(f, size: 8, color: _cyanDeep),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _mapCanvas(ctx, height: 230, detailed: true),
+                  ],
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 12),
+            pw.Expanded(
+              flex: 5,
+              child: pw.Column(
+                children: [
+                  _infoBox('Endereco', [
+                    _locationMain(ctx.occurrence),
+                    _locationSub(ctx.occurrence),
+                    'Limeira/SP',
+                  ], f),
+                  pw.SizedBox(height: 10),
+                  _coordinateBox(ctx),
+                  pw.SizedBox(height: 10),
+                  _gpsSignal(ctx),
+                ],
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 18),
+        _sectionLabel('Dados administrativos', f),
+        pw.SizedBox(height: 10),
+        _gridBox(
+          columns: [1, 1, 1, 1, 1],
+          children: [
+            _adminCell(
+              'Turno / Plantao',
+              _shortId(ctx.occurrence.shiftId),
+              f,
+              mono: true,
+            ),
+            _adminCell('Data', _formatDate(start), f, mono: true),
+            _adminCell('Inicio', _formatTime(start), f, mono: true),
+            _adminCell('Termino', _formatTime(end), f, mono: true),
+            _adminCell(
+              'Duracao reg.',
+              _durationLabel(start, end),
+              f,
+              mono: true,
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        _gridBox(
+          columns: [1, 1],
+          children: [
+            _adminCell('Prioridade', 'Normal', f, green: true),
+            _adminCell(
+              'Status do registro - sincronizacao',
+              '${_statusLabel(ctx.occurrence)} - sincronizado ${_formatTime(ctx.occurrence.updatedAt)}',
+              f,
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 18),
+        _sectionLabel('Binomio responsavel', f),
+        pw.SizedBox(height: 10),
+        _binomio(ctx, compact: true),
+      ],
+    );
+  }
+
+  pw.Widget _infoBox(String title, List<String> lines, PdfFonts fonts) {
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            title.toUpperCase(),
+            style: _bodyBold(fonts, size: 8, color: _cyanDeep),
+          ),
+          pw.SizedBox(height: 8),
+          for (var i = 0; i < lines.length; i++)
+            pw.Text(
+              lines[i],
+              style: i == 0
+                  ? _bodyBold(fonts, size: 10)
+                  : _body(fonts, size: 9, color: _inkSoft),
+            ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _coordinateBox(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'COORDENADAS GPS',
+            style: _bodyBold(f, size: 8, color: _cyanDeep),
+          ),
+          pw.SizedBox(height: 8),
+          _coordRow(
+            'Latitude',
+            ctx.occurrence.gpsLat?.toStringAsFixed(6) ?? 'N/I',
+            f,
+          ),
+          _coordRow(
+            'Longitude',
+            ctx.occurrence.gpsLng?.toStringAsFixed(6) ?? 'N/I',
+            f,
+          ),
+          _coordRow('Precisao', _accuracyText(ctx.occurrence.gpsAccuracy), f),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _coordRow(String key, String value, PdfFonts fonts) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3.5),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: _lineSoft, width: 0.6)),
+      ),
+      child: pw.Row(
+        children: [
+          pw.Expanded(child: _tinyLabel(key, fonts)),
+          pw.Text(value, style: _mono(fonts, size: 8.4)),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _gpsSignal(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final accuracy = ctx.occurrence.gpsAccuracy;
+    final strong = accuracy != null && accuracy <= 50;
+    final color = strong ? _green : _amber;
+    final bg = strong ? _greenBg : _amberBg;
+    final line = strong ? _greenLine : _amberLine;
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: pw.BoxDecoration(
+        color: bg,
+        border: pw.Border.all(color: line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+      ),
+      child: pw.Row(
+        children: [
+          pw.Text('GPS', style: _bodyBold(f, size: 9, color: color)),
+          pw.SizedBox(width: 8),
+          pw.Text(
+            'Sinal GPS - ${strong ? 'FORTE' : 'PRECISAO LIMITADA'}',
+            style: _bodyBold(f, size: 8, color: color),
+          ),
+          pw.Spacer(),
+          for (var i = 0; i < 4; i++)
+            pw.Container(
+              width: 3,
+              height: 5.0 + (i * 3),
+              margin: const pw.EdgeInsets.only(left: 2),
+              color: color,
+            ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _adminCell(
+    String label,
+    String value,
+    PdfFonts fonts, {
+    bool mono = false,
+    bool green = false,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _tinyLabel(label, fonts),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            value,
+            maxLines: 2,
+            style: pw.TextStyle(
+              font: mono ? fonts.regular : fonts.bold,
+              fontSize: 8.5,
+              color: green ? _green : _ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _shortId(String value) {
+    if (value.trim().isEmpty) return 'N/I';
+    return value.length > 8 ? value.substring(0, 8) : value;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 3
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildTimelinePage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final start = _operationStart(ctx);
+    final end = _operationEnd(ctx);
+    final entries = ctx.events.take(6).toList();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Linha do tempo operacional',
+          style: pw.TextStyle(font: f.black, fontSize: 16, color: _ink),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          'Sequencia cronologica dos eventos registrados na ocorrencia',
+          style: _body(f, size: 8.8, color: _inkSoft),
+        ),
+        pw.SizedBox(height: 16),
+        _gridBox(
+          columns: [1, 1, 1],
+          children: [
+            _timelineSummary('Inicio da atividade', _formatTime(start), f),
+            _timelineSummary(
+              'Eventos registrados',
+              '${ctx.events.length} acoes',
+              f,
+            ),
+            _timelineSummary(
+              'Duracao total',
+              '${_durationLabel(start, end)}  ${_formatTime(start)} -> ${_formatTime(end)}',
+              f,
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 18),
+        if (entries.isEmpty)
+          _emptyBox('Nenhum evento registrado na ocorrencia.', f)
+        else
+          ...entries.asMap().entries.map(
+            (entry) => _timelineEvent(
+              entry.value,
+              f,
+              first: entry.key == 0,
+              last: entry.key == entries.length - 1,
+            ),
+          ),
+        pw.Spacer(),
+        _timelineLegend(f),
+      ],
+    );
+  }
+
+  pw.Widget _timelineSummary(String key, String value, PdfFonts fonts) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _tinyLabel(key, fonts),
+          pw.SizedBox(height: 5),
+          pw.Text(value, style: _mono(fonts, size: 11.5)),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _timelineEvent(
+    OccurrenceEvent event,
+    PdfFonts fonts, {
+    required bool first,
+    required bool last,
+  }) {
+    final color = _eventColor(event.category);
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(
+          width: 48,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                _formatTime(event.timestamp),
+                style: _mono(fonts, size: 10.5),
+              ),
+              pw.Text(
+                _formatShortDate(event.timestamp),
+                style: _mono(fonts, size: 7, color: _inkFaint),
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Container(
+          width: 22,
+          child: pw.Column(
+            children: [
+              pw.Container(
+                width: 20,
+                height: 20,
+                decoration: pw.BoxDecoration(
+                  color: _paper,
+                  shape: pw.BoxShape.circle,
+                  border: pw.Border.all(color: color, width: 1.5),
+                ),
+                child: pw.Center(
+                  child: pw.Text(
+                    _eventMark(event.category),
+                    style: _bodyBold(fonts, size: 7, color: color),
+                  ),
+                ),
+              ),
+              if (!last) pw.Container(width: 1.4, height: 50, color: _line),
+            ],
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.Expanded(
+          child: pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 12),
+            padding: const pw.EdgeInsets.all(11),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(
+                left: pw.BorderSide(color: color, width: 2.5),
+                top: pw.BorderSide(color: _line),
+                right: pw.BorderSide(color: _line),
+                bottom: pw.BorderSide(color: _line),
+              ),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        (event.title?.trim().isNotEmpty ?? false)
+                            ? event.title!.toUpperCase()
+                            : event.category.label.toUpperCase(),
+                        style: _bodyBold(fonts, size: 10, color: color),
+                      ),
+                      if ((event.description ?? '').trim().isNotEmpty) ...[
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          event.description!,
+                          maxLines: 3,
+                          style: _body(fonts, size: 8.7, color: _inkSoft),
+                        ),
+                      ],
+                      pw.SizedBox(height: 5),
+                      pw.Text(
+                        _gpsText(event.gpsLat, event.gpsLng, precision: 5),
+                        style: _mono(fonts, size: 7.5, color: _cyanDeep),
+                      ),
+                    ],
+                  ),
+                ),
+                if (event.photoUrls.isNotEmpty) ...[
+                  pw.SizedBox(width: 10),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Container(
+                        width: 90,
+                        height: 50,
+                        decoration: pw.BoxDecoration(
+                          color: _mediaBg,
+                          border: pw.Border.all(color: _line),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(6),
+                          ),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            '${event.photoUrls.length} foto(s)',
+                            style: _body(fonts, size: 7.5, color: _inkFaint),
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        'SINC ${_formatTime(event.updatedAt)}',
+                        style: _bodyBold(fonts, size: 7, color: _green),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  PdfColor _eventColor(OccurrenceEventCategory category) => switch (category) {
+    OccurrenceEventCategory.arrival => _amber,
+    OccurrenceEventCategory.dogWork => _green,
+    OccurrenceEventCategory.positiveIndication => _green,
+    OccurrenceEventCategory.seizure => _green,
+    OccurrenceEventCategory.closure => _green,
+    _ => _cyan,
+  };
+
+  String _eventMark(OccurrenceEventCategory category) => switch (category) {
+    OccurrenceEventCategory.arrival => 'B',
+    OccurrenceEventCategory.approach => 'A',
+    OccurrenceEventCategory.dogWork => 'K9',
+    OccurrenceEventCategory.positiveIndication => '+',
+    OccurrenceEventCategory.seizure => 'R',
+    OccurrenceEventCategory.closure => 'F',
+    _ => 'E',
+  };
+
+  pw.Widget _timelineLegend(PdfFonts fonts) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: _line)),
+      ),
+      child: pw.Row(
+        children: [
+          _legendDot('Busca / Investigacao', _amber, fonts),
+          pw.SizedBox(width: 18),
+          _legendDot('Registro / Abordagem', _cyan, fonts),
+          pw.SizedBox(width: 18),
+          _legendDot('Emprego / Resultado', _green, fonts),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _legendDot(String label, PdfColor color, PdfFonts fonts) {
+    return pw.Row(
+      children: [
+        pw.Container(
+          width: 7,
+          height: 7,
+          decoration: pw.BoxDecoration(color: color, shape: pw.BoxShape.circle),
+        ),
+        pw.SizedBox(width: 5),
+        pw.Text(label, style: _body(fonts, size: 7.8, color: _inkSoft)),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 4
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildMediaPage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final visibleMedia = ctx.media.take(4).toList();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Midias operacionais',
+                    style: pw.TextStyle(
+                      font: f.black,
+                      fontSize: 16,
+                      color: _ink,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Registros fotograficos e documentos relacionados a ocorrencia, com geolocalizacao quando disponivel.',
+                    style: _body(f, size: 8.8, color: _inkSoft),
+                  ),
+                ],
+              ),
+            ),
+            _mediaCount(ctx),
+          ],
+        ),
+        pw.SizedBox(height: 18),
+        if (visibleMedia.isEmpty)
+          _emptyBox('Nenhuma midia anexada aos eventos desta ocorrencia.', f)
+        else
+          pw.Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: visibleMedia
+                .map((item) => _mediaCard(item, ctx))
+                .toList(),
+          ),
+        pw.SizedBox(height: 16),
+        _sectionLabel('Anexos', f),
+        pw.SizedBox(height: 10),
+        _attachmentCard(ctx),
+      ],
+    );
+  }
+
+  pw.Widget _mediaCount(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Row(
+        children: [
+          _mediaCountCell('Fotos', ctx.media.length.toString(), f),
+          _mediaCountCell('Video', '0', f),
+          _mediaCountCell('Audios', '0', f),
+          _mediaCountCell('Outros', _boCount(ctx.occurrence).toString(), f),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _mediaCountCell(String label, String value, PdfFonts fonts) {
+    return pw.Container(
+      width: 47,
+      padding: const pw.EdgeInsets.symmetric(vertical: 8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          left: pw.BorderSide(
+            color: label == 'Fotos' ? PdfColors.white : _line,
+          ),
+        ),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(
+            value,
+            style: pw.TextStyle(font: fonts.black, fontSize: 13, color: _ink),
+          ),
+          pw.SizedBox(height: 3),
+          pw.Text(
+            label.toUpperCase(),
+            style: _body(fonts, size: 6.3, color: _inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _mediaCard(_PdfMediaItem item, _OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final event = item.event;
+    return pw.Container(
+      width: 258,
+      height: 198,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(9)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: pw.Row(
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: _line),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(4),
+                    ),
+                  ),
+                  child: pw.Text(
+                    item.number.toString().padLeft(2, '0'),
+                    style: _mono(f, size: 8, color: _cyanDeep),
+                  ),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        event.title?.trim().isNotEmpty == true
+                            ? event.title!
+                            : event.category.label,
+                        maxLines: 1,
+                        style: _bodyBold(f, size: 9.3),
+                      ),
+                      pw.Text(
+                        'FOTO',
+                        style: _body(f, size: 6.8, color: _inkFaint),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Text(
+                  _formatTime(event.timestamp),
+                  style: _mono(f, size: 8.2, color: _inkSoft),
+                ),
+              ],
+            ),
+          ),
+          pw.Container(
+            height: 110,
+            color: _mediaBg,
+            child: pw.Stack(
+              children: [
+                if (item.image != null)
+                  pw.Positioned.fill(
+                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                  )
+                else
+                  pw.Center(
+                    child: pw.Text(
+                      'imagem indisponivel',
+                      style: _body(f, size: 8, color: _inkFaint),
+                    ),
+                  ),
+                pw.Positioned(
+                  right: 8,
+                  top: 8,
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: _green,
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(4),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'SINC',
+                      style: _bodyBold(f, size: 6.3, color: PdfColors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: _lineSoft)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(
+                    '${_locationMain(ctx.occurrence)}\n${_gpsText(event.gpsLat, event.gpsLng, precision: 5)}',
+                    style: _body(f, size: 7.2, color: _inkSoft),
+                  ),
+                ),
+                pw.Text(
+                  _accuracyText(ctx.occurrence.gpsAccuracy),
+                  style: _mono(f, size: 7, color: _inkFaint),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _attachmentCard(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final boDetails = _detailsMap(
+      ctx.occurrence.details,
+      OccurrenceResult.boCreated,
+    );
+    final boNumber = boDetails?['bo_number']?.toString();
+    final label = boNumber?.trim().isNotEmpty == true
+        ? 'BO_$boNumber.pdf'
+        : (_boCount(ctx.occurrence) > 0
+              ? 'BO registrado - numero nao informado'
+              : 'Sem anexos administrativos registrados');
+    final meta = _boCount(ctx.occurrence) > 0
+        ? 'Boletim de Ocorrencia - documento relacionado'
+        : 'Nenhum arquivo anexado no modelo atual';
+
+    return _roundedCard(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: pw.Row(
+        children: [
+          pw.Container(
+            width: 32,
+            height: 32,
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('EEF2F5'),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                'PDF',
+                style: _bodyBold(f, size: 8, color: _cyanDeep),
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 11),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(label, style: _bodyBold(f, size: 9.4)),
+                pw.Text(meta, style: _body(f, size: 7.5, color: _inkFaint)),
+              ],
+            ),
+          ),
+          pw.Text(
+            _boCount(ctx.occurrence) > 0 ? 'anexo logico' : 'N/I',
+            style: _mono(f, size: 8, color: _inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 5
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildReportPage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final activeResults = ctx.occurrence.results
+        .where((r) => r != OccurrenceResult.noOccurrence)
+        .toList();
+    final report = ctx.occurrence.finalReport?.trim();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _contextBar(ctx, status: true),
+        pw.SizedBox(height: 20),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              flex: 6,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('Relato institucional', f),
+                  pw.SizedBox(height: 12),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromHex('EEF9FB'),
+                      border: pw.Border.all(color: PdfColor.fromHex('B8E3E8')),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(7),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'TRANSCRICAO DE AUDIO - REVISADA PELO CONDUTOR',
+                      style: _bodyBold(f, size: 7.8, color: _cyanDeep),
+                    ),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.only(left: 11),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        left: pw.BorderSide(color: _cyan, width: 2.4),
+                      ),
+                    ),
+                    child: pw.Text(
+                      report == null || report.isEmpty
+                          ? 'Relato institucional nao registrado na finalizacao.'
+                          : report,
+                      textAlign: pw.TextAlign.justify,
+                      style: _body(
+                        f,
+                        size: 9.5,
+                        color: PdfColor.fromHex('26313C'),
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromHex('F7F9FB'),
+                      border: pw.Border.all(color: _lineSoft),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(7),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'Relato transcrito de audio gravado em campo, quando aplicavel, e revisado pelo condutor responsavel antes da finalizacao.',
+                      style: _body(f, size: 7.8, color: _inkSoft),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 18),
+            pw.Expanded(
+              flex: 5,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('Resultados', f),
+                  pw.SizedBox(height: 12),
+                  if (activeResults.isEmpty)
+                    _resultCard(OccurrenceResult.noOccurrence, ctx)
+                  else
+                    ...activeResults.map((result) => _resultCard(result, ctx)),
+                  if (ctx.media.isNotEmpty) _resultCard(null, ctx),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _resultCard(OccurrenceResult? result, _OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final title = result == null ? 'Midias registradas' : result.label;
+    final desc = result == null
+        ? '${ctx.media.length} foto(s) anexada(s) ao registro.'
+        : _resultDescription(result, ctx.occurrence);
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 9),
+      padding: const pw.EdgeInsets.all(11),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: 24,
+            height: 24,
+            decoration: pw.BoxDecoration(
+              color: _greenBg,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                result == null ? 'M' : _resultMark(result),
+                style: _bodyBold(f, size: 8, color: _green),
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 10),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(title.toUpperCase(), style: _bodyBold(f, size: 8.8)),
+                pw.SizedBox(height: 2),
+                pw.Text(desc, style: _body(f, size: 7.8, color: _inkSoft)),
+              ],
+            ),
+          ),
+          pw.Text('OK', style: _bodyBold(f, size: 7.8, color: _green)),
+        ],
+      ),
+    );
+  }
+
+  String _resultMark(OccurrenceResult result) => switch (result) {
+    OccurrenceResult.drugSeized => 'D',
+    OccurrenceResult.weaponSeized => 'A',
+    OccurrenceResult.personDetained => 'P',
+    OccurrenceResult.boCreated => 'BO',
+    OccurrenceResult.supportProvided => 'AP',
+    OccurrenceResult.noOccurrence => '0',
+  };
+
+  String _resultDescription(OccurrenceResult result, Occurrence occurrence) {
+    final raw = _detailsValue(occurrence.details, result);
+    final details = raw is Map ? Map<String, dynamic>.from(raw) : null;
+    return switch (result) {
+      OccurrenceResult.drugSeized => _drugDescription(raw),
+      OccurrenceResult.weaponSeized => _weaponDescription(details),
+      OccurrenceResult.personDetained => _personDescription(details),
+      OccurrenceResult.boCreated => _boDescription(details),
+      OccurrenceResult.supportProvided =>
+        'Apoio prestado e registrado pela equipe.',
+      OccurrenceResult.noOccurrence =>
+        'Nada foi localizado ou constatado durante a atuacao.',
+    };
+  }
+
+  dynamic _detailsValue(
+    Map<String, dynamic>? details,
+    OccurrenceResult result,
+  ) {
+    if (details == null) return null;
+    final primary = details[result.toMap()];
+    if (primary != null) return primary;
+    return switch (result) {
+      OccurrenceResult.drugSeized =>
+        details['drogasApreendidas'] ?? details['drogas'],
+      OccurrenceResult.weaponSeized => details['objetosApreendidos'],
+      OccurrenceResult.personDetained => details['individuosDetidos'],
+      OccurrenceResult.boCreated => details['bo'],
+      OccurrenceResult.noOccurrence || OccurrenceResult.supportProvided => null,
+    };
+  }
+
+  Map<String, dynamic>? _detailsMap(
+    Map<String, dynamic>? details,
+    OccurrenceResult result,
+  ) {
+    final raw = _detailsValue(details, result);
+    return raw is Map ? Map<String, dynamic>.from(raw) : null;
+  }
+
+  String _drugDescription(dynamic raw) {
+    if (raw is List && raw.isNotEmpty) {
+      final entries = raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map((e) {
+            final type = (e['type'] ?? e['tipo'] ?? 'substancia').toString();
+            final amount = (e['weight_grams'] ?? e['quantidade'] ?? '')
+                .toString();
+            return amount.isEmpty ? type : '$type - $amount';
+          })
+          .join('; ');
+      if (entries.isNotEmpty) return entries;
+    }
+    return 'Substancia analoga a entorpecente apreendida e registrada na ocorrencia.';
+  }
+
+  String _weaponDescription(Map<String, dynamic>? details) {
+    final type = details?['type']?.toString();
+    final quantity = details?['quantity']?.toString();
+    if ((type ?? '').isEmpty && (quantity ?? '').isEmpty) {
+      return 'Arma apreendida e registrada na ocorrencia.';
+    }
+    return [
+      if ((type ?? '').isNotEmpty) type,
+      if ((quantity ?? '').isNotEmpty) 'Quantidade: $quantity',
+    ].join(' - ');
+  }
+
+  String _personDescription(Map<String, dynamic>? details) {
+    final count = details?['count']?.toString();
+    final referral = details?['referral']?.toString();
+    if ((count ?? '').isEmpty && (referral ?? '').isEmpty) {
+      return 'Pessoa conduzida a autoridade competente.';
+    }
+    return [
+      if ((count ?? '').isNotEmpty) '$count pessoa(s)',
+      if ((referral ?? '').isNotEmpty) referral,
+    ].join(' - ');
+  }
+
+  String _boDescription(Map<String, dynamic>? details) {
+    final number = details?['bo_number']?.toString();
+    final type = details?['bo_type']?.toString();
+    if ((number ?? '').isEmpty && (type ?? '').isEmpty) {
+      return 'Boletim de ocorrencia registrado.';
+    }
+    return [
+      if ((number ?? '').isNotEmpty) 'Numero: $number',
+      if ((type ?? '').isNotEmpty) type,
+    ].join(' - ');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Page 6
+  // ---------------------------------------------------------------------------
+
+  pw.Widget _buildValidationPage(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final createdAt = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _contextBar(ctx, status: true),
+        pw.SizedBox(height: 14),
+        _sectionLabel('Trilha de auditoria', f),
+        pw.SizedBox(height: 8),
+        _auditTrailBox(ctx),
+        pw.SizedBox(height: 14),
+        _sectionLabel('Validacao e assinatura', f),
+        pw.SizedBox(height: 5),
+        pw.Text(
+          'Cada integrante confirma a participacao com seu proprio login no Sistema Canil K9. A confirmacao registra identidade, data e hora; nao substitui assinatura digital com certificado.',
+          style: _body(f, size: 8, color: _inkFaint),
+        ),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          children: [
+            pw.Expanded(child: _validationPerson(ctx, confirmed: true)),
+            pw.SizedBox(width: 12),
+            pw.Expanded(child: _supportPerson(ctx)),
+          ],
+        ),
+        pw.SizedBox(height: 14),
+        _sectionLabel('Integridade do documento', f),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: _hashBox(ctx)),
+            pw.SizedBox(width: 12),
+            pw.Expanded(child: _verificationBox(ctx)),
+          ],
+        ),
+        pw.SizedBox(height: 14),
+        pw.Container(height: 1, color: _line),
+        pw.SizedBox(height: 11),
+        pw.Wrap(
+          spacing: 24,
+          runSpacing: 10,
+          children: [
+            _docInfo('ID do documento', ctx.docId, f, mono: true),
+            _docInfo('Tipo', 'Registro Operacional K9', f),
+            _docInfo('Versao', '1.0', f, mono: true),
+            _docInfo('Criado em', _formatDateTime(createdAt), f, mono: true),
+            _docInfo(
+              'Sincronizado',
+              _formatDateTime(ctx.occurrence.updatedAt),
+              f,
+              mono: true,
+            ),
+            _docInfo('Sistema', 'Canil K9 - GCM Limeira', f),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _auditTrailBox(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final entries = _auditEntries(ctx);
+    final visibleEntries = entries.take(6).toList();
+
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(11),
+      radius: 9,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            children: [
+              pw.Text(
+                '${entries.length} REGISTRO(S)',
+                style: _bodyBold(f, size: 8, color: _cyanDeep),
+              ),
+              pw.Spacer(),
+              pw.Text(
+                'ocorrencia + eventos',
+                style: _body(f, size: 7.3, color: _inkFaint),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 7),
+          if (visibleEntries.isEmpty)
+            pw.Text(
+              'Nenhuma entrada de auditoria recebida no documento.',
+              style: _body(f, size: 8, color: _inkSoft),
+            )
+          else
+            for (final entry in visibleEntries) _auditRow(entry, f),
+          if (entries.length > visibleEntries.length) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(
+              '+ ${entries.length - visibleEntries.length} registro(s) preservado(s) na trilha completa do Firestore.',
+              style: _body(f, size: 7, color: _inkFaint),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _auditRow(_PdfAuditEntry entry, PdfFonts fonts) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: _lineSoft, width: 0.5)),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 74,
+            child: pw.Text(
+              entry.when == null ? 'sem data' : _formatDateTime(entry.when!),
+              style: _mono(fonts, size: 6.8, color: _inkSoft),
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(entry.title, style: _bodyBold(fonts, size: 7.8)),
+                pw.Text(
+                  entry.detail,
+                  maxLines: 2,
+                  style: _body(fonts, size: 6.9, color: _inkSoft),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Text(
+            entry.actor,
+            maxLines: 1,
+            style: _mono(fonts, size: 6.8, color: _cyanDeep),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<_PdfAuditEntry> _auditEntries(_OccurrencePdfContext ctx) {
+    final entries = <_PdfAuditEntry>[];
+
+    void addRaw(Map<String, dynamic> raw, String source) {
+      final action = raw['action']?.toString() ?? 'audit';
+      final field = raw['field_name']?.toString() ?? raw['field']?.toString();
+      final reason = raw['reason']?.toString();
+      final oldValue = raw['old_value']?.toString();
+      final newValue = raw['new_value']?.toString();
+      final actor =
+          raw['performed_by']?.toString() ??
+          raw['by']?.toString() ??
+          raw['actor']?.toString() ??
+          'sistema';
+      final when = _parseAuditDate(
+        raw['performed_at'] ?? raw['at'] ?? raw['created_at'],
+      );
+      final title = field == null
+          ? _auditActionLabel(action)
+          : '${_auditActionLabel(action)} - $field';
+      final details = [
+        source,
+        if (oldValue != null && newValue != null) '$oldValue -> $newValue',
+        if (reason != null) 'Motivo: $reason',
+      ].join(' | ');
+
+      entries.add(
+        _PdfAuditEntry(when: when, title: title, detail: details, actor: actor),
+      );
+    }
+
+    for (final raw in ctx.occurrence.auditTrail) {
+      addRaw(raw, 'Ocorrencia');
+    }
+    for (final event in ctx.events) {
+      final eventLabel = event.title?.trim().isNotEmpty == true
+          ? event.title!.trim()
+          : event.category.label;
+      for (final raw in event.auditTrail) {
+        addRaw(raw, 'Evento: $eventLabel');
+      }
+    }
+
+    entries.sort((a, b) {
+      final aWhen = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bWhen = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return aWhen.compareTo(bWhen);
+    });
+    return entries;
+  }
+
+  DateTime? _parseAuditDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    try {
+      final converted = value.toDate();
+      if (converted is DateTime) return converted;
+    } catch (_) {}
+    return null;
+  }
+
+  String _auditActionLabel(String action) => switch (action) {
+    'created' => 'Criacao registrada',
+    'updated' => 'Edicao registrada',
+    'deleted' => 'Exclusao registrada',
+    'restored' => 'Restauracao registrada',
+    'finalized' => 'Finalizacao registrada',
+    'pdf_previewed' => 'PDF visualizado',
+    'pdf_shared' => 'PDF compartilhado',
+    'pdf_cached' => 'PDF salvo no Storage',
+    _ => action.replaceAll('_', ' '),
+  };
+
+  pw.Widget _validationPerson(
+    _OccurrencePdfContext ctx, {
+    required bool confirmed,
+  }) {
+    final f = ctx.fonts;
+    final when = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(13),
+      radius: 9,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            children: [
+              _avatar('FOTO\nGCM', f),
+              pw.SizedBox(width: 10),
               pw.Expanded(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('VERIFICAÇÃO ONLINE',
-                        style: fonts.label(color: _identityColor)),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Escaneie o QR Code para verificar a autenticidade deste documento.',
-                      style: fonts.body(),
+                    _tinyLabel(
+                      'Condutor responsavel - autor',
+                      f,
+                      color: _cyanDeep,
                     ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(verificationUrl, style: fonts.mono()),
+                    pw.SizedBox(height: 2),
+                    pw.Text(ctx.handlerName, style: _bodyBold(f, size: 12.5)),
+                    pw.Text(
+                      'RA: ${ctx.handlerRa} - Funcao: Condutor K9\nUnidade: GCM Limeira - Canil',
+                      style: _body(f, size: 7.8, color: _inkSoft),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          pw.Spacer(),
-          // Assinatura
-          PdfCommonWidgets.divider(),
-          pw.SizedBox(height: 30),
-          pw.Center(
-            child: pw.Column(
+          pw.SizedBox(height: 11),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: pw.BoxDecoration(
+              color: _greenBg,
+              border: pw.Border.all(color: _greenLine),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+            ),
+            child: pw.Row(
               children: [
-                pw.Container(
-                  width: 250,
-                  height: 0.5,
-                  color: PdfInstitutionalColors.textPrimary,
+                pw.Text('OK', style: _bodyBold(f, size: 8, color: _green)),
+                pw.SizedBox(width: 8),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'CONFIRMADO NO APP',
+                      style: _bodyBold(f, size: 8.4, color: _green),
+                    ),
+                    pw.Text(
+                      '${_formatDateTime(when)} - login autenticado',
+                      style: _mono(f, size: 7.2, color: _inkSoft),
+                    ),
+                  ],
                 ),
-                pw.SizedBox(height: 6),
-                pw.Text(handlerName,
-                    style: pw.TextStyle(font: fonts.bold, fontSize: 11)),
-                pw.Text('Condutor K9 · GCM Limeira', style: fonts.caption()),
               ],
             ),
           ),
-          pw.SizedBox(height: 20),
-          pw.Center(
-            child: pw.Text(
-              'Documento gerado automaticamente pelo Sistema Canil K9 GCM',
-              style: fonts.caption(),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  pw.Widget _buildAuditEntry(Map<String, dynamic> entry, PdfFonts fonts) {
-    final action = entry['action'] as String? ?? '';
-    final field = entry['field_name'] as String? ?? '';
-    final at = entry['at'] as String? ?? '';
-    final description = field.isNotEmpty ? '$action · $field' : action;
-
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 4),
-      child: pw.Row(
+  pw.Widget _supportPerson(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(13),
+      radius: 9,
+      child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.SizedBox(
-            width: 60,
-            child: pw.Text(at.length >= 16 ? at.substring(11, 16) : at,
-                style: fonts.mono()),
+          pw.Row(
+            children: [
+              _avatar('FOTO\nGCM', f, color: PdfColor.fromHex('C9D3DB')),
+              pw.SizedBox(width: 10),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _tinyLabel('Testemunha / apoio', f),
+                    pw.SizedBox(height: 2),
+                    pw.Text('Nao vinculado', style: _bodyBold(f, size: 12.5)),
+                    pw.Text(
+                      'O modelo atual ainda nao possui participante de apoio vinculado a ocorrencia.',
+                      style: _body(f, size: 7.8, color: _inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          pw.SizedBox(height: 11),
           pw.Container(
-            width: 6,
-            height: 6,
-            margin: const pw.EdgeInsets.only(top: 3, right: 8),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             decoration: pw.BoxDecoration(
-              color: PdfInstitutionalColors.divider,
-              shape: pw.BoxShape.circle,
+              color: _amberBg,
+              border: pw.Border.all(color: _amberLine),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
             ),
-          ),
-          pw.Expanded(
-            child: pw.Text(description, style: fonts.caption()),
+            child: pw.Row(
+              children: [
+                pw.Text('!', style: _bodyBold(f, size: 8, color: _amber)),
+                pw.SizedBox(width: 8),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'AGUARDANDO MODELO DE CONFIRMACAO',
+                      style: _bodyBold(f, size: 8.1, color: _amber),
+                    ),
+                    pw.Text(
+                      'Campo reservado para fluxo futuro',
+                      style: _body(f, size: 7.2, color: _inkSoft),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+
+  pw.Widget _hashBox(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final storedHash = ctx.occurrence.integrityHash?.trim();
+    final hasHash = storedHash != null && storedHash.isNotEmpty;
+    final hash = hasHash ? storedHash : 'Hash ainda nao calculado';
+    final stateColor = hasHash ? _green : _amber;
+    final stateBg = hasHash ? _greenBg : _amberBg;
+    final stateLine = hasHash ? _greenLine : _amberLine;
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(13),
+      radius: 9,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'HASH DE INTEGRIDADE',
+            style: _bodyBold(f, size: 8.2, color: _cyanDeep),
+          ),
+          pw.SizedBox(height: 10),
+          _tinyLabel('SHA-256 - conteudo operacional', f),
+          pw.SizedBox(height: 5),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(9),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F6F8FA'),
+              border: pw.Border.all(color: _lineSoft),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Text(hash, style: _mono(f, size: 7.9, color: _ink)),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(9),
+            decoration: pw.BoxDecoration(
+              color: stateBg,
+              border: pw.Border.all(color: stateLine),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  hasHash ? 'OK' : '!',
+                  style: _bodyBold(f, size: 8, color: stateColor),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Text(
+                    hasHash
+                        ? 'INTEGRO\nConteudo nao alterado apos a finalizacao.'
+                        : 'PENDENTE\nFinalize a ocorrencia para cristalizar o hash.',
+                    style: _body(
+                      f,
+                      size: 7.7,
+                      color: hasHash ? _inkSoft : _amber,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _verificationBox(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final code = _verificationCode(ctx);
+    final url = _verificationUrl(ctx);
+    return _roundedCard(
+      padding: const pw.EdgeInsets.all(13),
+      radius: 9,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'VERIFICACAO ONLINE',
+            style: _bodyBold(f, size: 8.2, color: _cyanDeep),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.BarcodeWidget(
+                data: url,
+                barcode: pw.Barcode.qrCode(),
+                width: 72,
+                height: 72,
+              ),
+              pw.SizedBox(width: 12),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Escaneie para verificar a autenticidade no Sistema Canil K9.',
+                      style: _body(f, size: 8, color: _inkSoft),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Text(code, style: _mono(f, size: 8.5, color: _cyanDeep)),
+                    pw.SizedBox(height: 6),
+                    pw.Text(
+                      url,
+                      maxLines: 2,
+                      style: _body(f, size: 7.2, color: _inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _verificationCode(_OccurrencePdfContext ctx) {
+    final seq = ctx.occurrence.id.length >= 4
+        ? ctx.occurrence.id.substring(0, 4).toUpperCase()
+        : ctx.occurrence.id.toUpperCase();
+    final start = _operationStart(ctx);
+    return '$seq-K9-${start.year}-${_two(start.month)}-${_two(start.day)}-${_two(start.hour)}${_two(start.minute)}';
+  }
+
+  String _verificationUrl(_OccurrencePdfContext ctx) {
+    final base = _verificationBaseUrl.replaceFirst(RegExp(r'/+$'), '');
+    return '$base/${Uri.encodeComponent(ctx.occurrence.id)}';
+  }
+
+  pw.Widget _docInfo(
+    String key,
+    String value,
+    PdfFonts fonts, {
+    bool mono = false,
+  }) {
+    return pw.SizedBox(
+      width: 145,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          _tinyLabel(key, fonts),
+          pw.SizedBox(height: 3),
+          pw.Text(
+            value,
+            maxLines: 2,
+            style: pw.TextStyle(
+              font: mono ? fonts.regular : fonts.bold,
+              fontSize: 8.2,
+              color: _ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _emptyBox(String message, PdfFonts fonts) {
+    return _roundedCard(
+      background: PdfColor.fromHex('F7F9FB'),
+      padding: const pw.EdgeInsets.all(14),
+      child: pw.Text(message, style: _body(fonts, size: 9, color: _inkSoft)),
+    );
+  }
+}
+
+class _OccurrencePdfContext {
+  final Occurrence occurrence;
+  final List<OccurrenceEvent> events;
+  final Dog dog;
+  final String handlerName;
+  final String handlerRa;
+  final String docId;
+  final PdfFonts fonts;
+  final List<_PdfMediaItem> media;
+  final pw.ImageProvider? staticMapImage;
+
+  const _OccurrencePdfContext({
+    required this.occurrence,
+    required this.events,
+    required this.dog,
+    required this.handlerName,
+    required this.handlerRa,
+    required this.docId,
+    required this.fonts,
+    required this.media,
+    required this.staticMapImage,
+  });
+}
+
+class _PdfMediaItem {
+  final int number;
+  final String url;
+  final pw.ImageProvider? image;
+  final OccurrenceEvent event;
+
+  const _PdfMediaItem({
+    required this.number,
+    required this.url,
+    required this.image,
+    required this.event,
+  });
+}
+
+class _PdfAuditEntry {
+  final DateTime? when;
+  final String title;
+  final String detail;
+  final String actor;
+
+  const _PdfAuditEntry({
+    required this.when,
+    required this.title,
+    required this.detail,
+    required this.actor,
+  });
+}
+
+class _KeyValue {
+  final String label;
+  final String value;
+  final bool mono;
+  final bool green;
+
+  const _KeyValue(
+    this.label,
+    this.value, {
+    this.mono = false,
+    this.green = false,
+  });
 }

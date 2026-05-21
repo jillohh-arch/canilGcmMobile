@@ -3,6 +3,10 @@ part of 'dynamic_activity_sheet.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _StandardSheetFields on _DynamicActivitySheetState {
+  List<Widget> _buildStandardContextFields() {
+    return const [];
+  }
+
   List<Widget> _buildTrainingMetaFields() {
     if (widget.category != 'Treino') {
       return const [];
@@ -99,47 +103,6 @@ extension _StandardSheetFields on _DynamicActivitySheetState {
   }
 
   List<Widget> _buildCategorySpecificFields() {
-    if (!_isOccurrenceCategory ||
-        !OccurrenceSpecificFields.handles(_selectedSubtype)) {
-      return const [];
-    }
-
-    return [
-      OccurrenceSpecificFields(
-        subtype: _selectedSubtype,
-        formData: _formData,
-        drugs: _detecaoDrogas,
-        drugOptions: _detectionDrugOptions,
-        accentColor: _getCategoryColor(),
-        detectionAccentColor: _kHudCyan,
-        supportTeamController: _equipeController,
-        reportNumberController: _boController,
-        garrisonController: _guarnicaoController,
-        situationController: _situacaoController,
-        outcomeController: _desfechoController,
-        odorObjectController: _odorObjetoController,
-        missingTimeController: _tempoDesaparecimentoController,
-        durationController: _durationController,
-        terrainConditionController: _condicaoTerrenoController,
-        orderNumberController: _numeroOsController,
-        audienceController: _publicoController,
-        themeController: _temaController,
-        onAddDrug: _addDrug,
-        onRemoveDrug: _removeDrug,
-        onDrugTypeChanged: (drug, type) {
-          setState(() => drug['tipo'] = type);
-        },
-        onSearchTypeChanged: (value) {
-          setState(() {
-            if (value == null) {
-              _formData.remove('Tipo de Busca');
-            } else {
-              _formData['Tipo de Busca'] = value;
-            }
-          });
-        },
-        onPullWeather: _pullCurrentWeather,
-      ),
-    ];
+    return const [];
   }
 }

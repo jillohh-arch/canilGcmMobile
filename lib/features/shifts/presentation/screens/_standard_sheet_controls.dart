@@ -64,27 +64,6 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
     );
   }
 
-  Widget _buildPrimarySaveButton(Color tColor) {
-    return ActivityPrimarySaveButton(
-      accentColor: tColor,
-      foregroundColor: _kHudBackground,
-      isSaving: _isSaving,
-      isCompressing: _isCompressing,
-      saveStatus: _saveStatus,
-      idleLabel: _saveButtonLabel(),
-      onSave: _handlePrimarySave,
-    );
-  }
-
-  Widget _buildSaveStatusPanel(Color accent) {
-    return ActivitySaveStatusPanel(
-      accentColor: accent,
-      isSaving: _isSaving,
-      saveFailed: _saveFailed,
-      saveStatus: _saveStatus,
-    );
-  }
-
   void _handlePrimarySave() {
     HapticFeedback.heavyImpact();
     _save();
@@ -155,10 +134,7 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
   }
 
   String _saveButtonLabel() {
-    return ActivityFormLabels.saveButtonLabel(
-      category: widget.category,
-      occurrenceStatus: _occurrenceStatus,
-    );
+    return ActivityFormLabels.saveButtonLabel(category: widget.category);
   }
 
   Future<void> _openLiveTracking({bool isLightMode = false}) async {
@@ -182,8 +158,8 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
         _durationController.text = (durationSeconds / 60).floor().toString();
       }
       if (distanceMeters is num) {
-        _formData['_trackingDistanceKm'] =
-            (distanceMeters / 1000).toStringAsFixed(2);
+        _formData['_trackingDistanceKm'] = (distanceMeters / 1000)
+            .toStringAsFixed(2);
       }
     });
 

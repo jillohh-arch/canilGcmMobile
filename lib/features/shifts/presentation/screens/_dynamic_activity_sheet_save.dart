@@ -4,20 +4,8 @@ part of 'dynamic_activity_sheet.dart';
 
 extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
   Future<bool> _save({bool closeAfterSave = true}) async {
-    if (_isOccurrenceCategory) {
-      _syncSelectedOccurrenceNatureFromText();
-    }
     if (_selectedSubtype == null || _selectedSubtype!.trim().isEmpty) {
-      if (_isOccurrenceCategory) {
-        _selectedSubtype = _naturezaOcorrenciaController.text.trim().isEmpty
-            ? 'Averiguação'
-            : _naturezaOcorrenciaController.text.trim();
-        if (_naturezaOcorrenciaController.text.trim().isEmpty) {
-          _naturezaOcorrenciaController.text = _selectedSubtype!;
-        }
-      } else {
-        return false;
-      }
+      return false;
     }
     if (_isSaving) return false;
     HapticFeedback.lightImpact();
@@ -28,9 +16,7 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
 
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
-    final incidentVM = Provider.of<IncidentViewModel>(context, listen: false);
     final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    final userVM = Provider.of<UserViewModel>(context, listen: false);
 
     _formKey.currentState!.save();
     setState(() {
@@ -43,9 +29,7 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
       await _saveByCategory(
         authVM: authVM,
         trainingVM: trainingVM,
-        incidentVM: incidentVM,
         healthVM: healthVM,
-        userVM: userVM,
       );
 
       if (mounted) {

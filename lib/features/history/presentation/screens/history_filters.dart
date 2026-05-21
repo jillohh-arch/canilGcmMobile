@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_protected_member
+
 part of 'history_screen.dart';
 
 extension _HistoryFilters on _HistoryScreenState {
@@ -39,9 +41,7 @@ extension _HistoryFilters on _HistoryScreenState {
               decoration: const BoxDecoration(
                 color: Color(0xFF0F2026),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-                border: Border(
-                  top: BorderSide(color: _hCyan, width: 1),
-                ),
+                border: Border(top: BorderSide(color: _hCyan, width: 1)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -94,7 +94,7 @@ extension _HistoryFilters on _HistoryScreenState {
                     title: 'Categoria',
                     options: const [
                       'Tudo',
-                      'Rotina',
+                      'Nutrição',
                       'Saúde',
                       'Treino',
                       'Ocorrência',
@@ -165,10 +165,7 @@ class _PeriodFilterChips extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
 
-  const _PeriodFilterChips({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _PeriodFilterChips({required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +208,7 @@ class _CategoryFilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     const chips = [
       ('Tudo', ''),
-      ('Rotina', '🍖'),
+      ('Nutrição', '🍖'),
       ('Saúde', '⚕'),
       ('Treino', '🎯'),
       ('Ocorrência', '🛡'),

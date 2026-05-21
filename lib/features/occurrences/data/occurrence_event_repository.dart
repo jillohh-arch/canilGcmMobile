@@ -20,12 +20,11 @@ class OccurrenceEventRepository {
     final now = DateTime.now();
 
     final entry = AuditService.buildInlineEntry(action: 'created');
+    final auditTrail = event.auditTrail.isNotEmpty
+        ? event.auditTrail
+        : <Map<String, dynamic>>[entry];
     final data = event
-        .copyWith(
-          createdAt: now,
-          updatedAt: now,
-          auditTrail: [entry],
-        )
+        .copyWith(createdAt: now, updatedAt: now, auditTrail: auditTrail)
         .toMap();
 
     await docRef.set(data);
@@ -33,7 +32,7 @@ class OccurrenceEventRepository {
     return event.copyWith(
       createdAt: now,
       updatedAt: now,
-      auditTrail: [entry],
+      auditTrail: auditTrail,
     );
   }
 
@@ -54,12 +53,14 @@ class OccurrenceEventRepository {
       final oldValue = currentData[key];
       final newValue = updates[key];
       if (oldValue != newValue) {
-        entries.add(AuditService.buildInlineEntry(
-          action: 'updated',
-          fieldName: key,
-          oldValue: _serializeForAudit(oldValue),
-          newValue: _serializeForAudit(newValue),
-        ));
+        entries.add(
+          AuditService.buildInlineEntry(
+            action: 'updated',
+            fieldName: key,
+            oldValue: _serializeForAudit(oldValue),
+            newValue: _serializeForAudit(newValue),
+          ),
+        );
       }
     }
 
@@ -98,19 +99,37 @@ class OccurrenceEventRepository {
         .where('deleted_at', isNull: true)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => OccurrenceEvent.fromMap(
+        .map(
+          (snap) => snap.docs
+              .map(
+                (doc) => OccurrenceEvent.fromMap(
                   doc.data(),
                   doc.id,
                   occurrenceId: occurrenceId,
-                ))
-            .toList());
+                ),
+              )
+              .toList(),
+        );
   }
 
-  Future<OccurrenceEvent?> getById(
-    String occurrenceId,
-    String eventId,
-  ) async {
+  Future<List<OccurrenceEvent>> listByOccurrence(String occurrenceId) async {
+    final snap = await _events(occurrenceId)
+        .where('deleted_at', isNull: true)
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    return snap.docs
+        .map(
+          (doc) => OccurrenceEvent.fromMap(
+            doc.data(),
+            doc.id,
+            occurrenceId: occurrenceId,
+          ),
+        )
+        .toList();
+  }
+
+  Future<OccurrenceEvent?> getById(String occurrenceId, String eventId) async {
     final snap = await _events(occurrenceId).doc(eventId).get();
     if (!snap.exists) return null;
 
@@ -124,10 +143,9 @@ class OccurrenceEventRepository {
   }
 
   Future<int> countByOccurrence(String occurrenceId) async {
-    final snap = await _events(occurrenceId)
-        .where('deleted_at', isNull: true)
-        .count()
-        .get();
+    final snap = await _events(
+      occurrenceId,
+    ).where('deleted_at', isNull: true).count().get();
     return snap.count ?? 0;
   }
 

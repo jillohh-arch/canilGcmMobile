@@ -1,6 +1,8 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 part of 'history_screen.dart';
 
-enum HistoryEntryType { health, training, incident, nutrition }
+enum HistoryEntryType { health, training, occurrence, nutrition }
 
 class HistoryEntry {
   final String id;
@@ -42,13 +44,13 @@ class HistoryEntry {
   String get category {
     switch (type) {
       case HistoryEntryType.health:
-        return 'Saúde';
+        return 'SaÃºde';
       case HistoryEntryType.training:
         return 'Treino';
-      case HistoryEntryType.incident:
-        return 'Ocorrência';
+      case HistoryEntryType.occurrence:
+        return 'OcorrÃªncia';
       case HistoryEntryType.nutrition:
-        return 'Nutrição';
+        return 'NutriÃ§Ã£o';
     }
   }
 
@@ -157,13 +159,13 @@ class RecordDetail {
   String get typeLabel {
     switch (type) {
       case HistoryEntryType.health:
-        return 'Saúde';
+        return 'SaÃºde';
       case HistoryEntryType.training:
         return 'Treino';
-      case HistoryEntryType.incident:
-        return 'Ocorrência';
+      case HistoryEntryType.occurrence:
+        return 'OcorrÃªncia';
       case HistoryEntryType.nutrition:
-        return 'Nutrição';
+        return 'NutriÃ§Ã£o';
     }
   }
 
@@ -171,10 +173,10 @@ class RecordDetail {
 
   String get headerTitle {
     if (title.trim().isEmpty || title == typeLabel) return typeLabel;
-    return '$typeLabel • $title';
+    return '$typeLabel â€¢ $title';
   }
 
-  bool get isOccurrence => type == HistoryEntryType.incident;
+  bool get isOccurrence => type == HistoryEntryType.occurrence;
 
   static RecordDetail fromEntry(HistoryEntry entry) {
     final normalizedTitle = _cleanText(entry.title);
@@ -183,7 +185,7 @@ class RecordDetail {
     final details = entry.details;
 
     final category = _firstNonEmpty([
-      if (entry.type == HistoryEntryType.incident ||
+      if (entry.type == HistoryEntryType.occurrence ||
           entry.type == HistoryEntryType.training)
         splitTitle,
       _detailValue(details, const ['Categoria', 'category']),
@@ -192,7 +194,7 @@ class RecordDetail {
     ]);
 
     final title = _firstNonEmpty([
-      if (entry.type == HistoryEntryType.incident ||
+      if (entry.type == HistoryEntryType.occurrence ||
           entry.type == HistoryEntryType.training)
         category,
       normalizedTitle,
@@ -202,18 +204,18 @@ class RecordDetail {
     final location = _firstNonEmpty([
       entry.location,
       _detailValue(details, const ['Local', 'local']),
-      if (entry.type == HistoryEntryType.incident) entry.subtitle,
-      'Local não informado',
+      if (entry.type == HistoryEntryType.occurrence) entry.subtitle,
+      'Local nÃ£o informado',
     ]);
 
     final author = _normalizeAuthor(entry.author);
     final handlerName = _firstNonEmpty([
-      _detailValue(details, const ['Condutor', 'Responsável', 'Responsavel']),
+      _detailValue(details, const ['Condutor', 'ResponsÃ¡vel', 'Responsavel']),
       author.replaceFirst('GCM ', ''),
       'Ragonha',
     ]);
     final dogName = _firstNonEmpty([
-      _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
+      _detailValue(details, const ['CÃ£o', 'Cao', 'Dog', 'dogName']),
       'Bono',
     ]);
 
@@ -227,22 +229,22 @@ class RecordDetail {
 
     final notes = _firstNonEmpty([
       _detailValue(details, const [
-        'Observações',
-        'Observacoes',
         'ObservaÃ§Ãµes',
-        'Descrição',
-        'Descricao',
+        'Observacoes',
+        'ObservaÃƒÂ§ÃƒÂµes',
         'DescriÃ§Ã£o',
+        'Descricao',
+        'DescriÃƒÂ§ÃƒÂ£o',
         'Notas',
         'Detalhes',
       ]),
-      if (entry.type != HistoryEntryType.incident) entry.subtitle,
+      if (entry.type != HistoryEntryType.occurrence) entry.subtitle,
     ]);
 
     final duration = _firstNonEmpty([
-      _detailValue(details, const ['Duração', 'Duracao', 'DuraÃ§Ã£o']),
-      _incidentDuration(entry),
-      entry.type == HistoryEntryType.incident ? '42 min' : 'Não informado',
+      _detailValue(details, const ['DuraÃ§Ã£o', 'Duracao', 'DuraÃƒÂ§ÃƒÂ£o']),
+      _occurrenceDuration(entry),
+      entry.type == HistoryEntryType.occurrence ? '42 min' : 'NÃ£o informado',
     ]);
 
     return RecordDetail(
@@ -261,9 +263,9 @@ class RecordDetail {
       duration: duration,
       team: _firstNonEmpty([
         _detailValue(details, const ['Equipe', 'team']),
-        entry.type == HistoryEntryType.incident
+        entry.type == HistoryEntryType.occurrence
             ? '2 GCMs'
-            : 'Equipe não informada',
+            : 'Equipe nÃ£o informada',
       ]),
       notes: notes,
       icon: entry.icon,
@@ -277,20 +279,20 @@ class RecordDetail {
   static String _typeLabel(HistoryEntryType type) {
     switch (type) {
       case HistoryEntryType.health:
-        return 'Saúde';
+        return 'SaÃºde';
       case HistoryEntryType.training:
         return 'Treino';
-      case HistoryEntryType.incident:
-        return 'Ocorrência';
+      case HistoryEntryType.occurrence:
+        return 'OcorrÃªncia';
       case HistoryEntryType.nutrition:
-        return 'Nutrição';
+        return 'NutriÃ§Ã£o';
     }
   }
 
   static String _lastTitlePart(String title) {
-    final normalized = title.replaceAll('â€¢', '•');
+    final normalized = title.replaceAll('Ã¢â‚¬Â¢', 'â€¢');
     final parts = normalized
-        .split('•')
+        .split('â€¢')
         .map((part) => part.trim())
         .where((part) => part.isNotEmpty)
         .toList();
@@ -323,8 +325,8 @@ class RecordDetail {
   static String _normalizeAuthor(String author) {
     final cleaned = _cleanText(author).trim();
     if (cleaned.isEmpty) return 'GCM Ragonha';
-    if (cleaned == 'Você') return 'GCM Ragonha';
-    if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
+    if (cleaned == 'VocÃª') return 'GCM Ragonha';
+    if (cleaned.startsWith('GCM ') || cleaned.startsWith('VeterinÃ¡rio')) {
       return cleaned;
     }
     return 'GCM $cleaned';
@@ -340,15 +342,15 @@ class RecordDetail {
     return cleaned;
   }
 
-  static String _incidentDuration(HistoryEntry entry) {
+  static String _occurrenceDuration(HistoryEntry entry) {
     final startRaw = _detailValue(entry.details, const [
-      'Início',
-      'Inicio',
       'InÃ­cio',
+      'Inicio',
+      'InÃƒÂ­cio',
     ]);
     final endRaw = _detailValue(entry.details, const [
       'Fim',
-      'Término',
+      'TÃ©rmino',
       'Termino',
     ]);
     if (startRaw.isEmpty || endRaw.isEmpty) return '';
@@ -380,14 +382,14 @@ class RecordDetail {
           time: timestamp,
           title: _firstNonEmpty([
             _readUpdateField(update, 'title'),
-            'Atualização operacional',
+            'AtualizaÃ§Ã£o operacional',
           ]),
           subtitle: _readUpdateField(update, 'description'),
         );
       }).toList();
     }
 
-    if (entry.type == HistoryEntryType.incident) {
+    if (entry.type == HistoryEntryType.occurrence) {
       final events = [
         InternalEvent(time: entry.time, title: 'Registro iniciado'),
         InternalEvent(
@@ -396,7 +398,7 @@ class RecordDetail {
         ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 11)),
-          title: 'Cão empregado na varredura',
+          title: 'CÃ£o empregado na varredura',
         ),
         if (_hasMedia(entry))
           InternalEvent(
@@ -405,7 +407,7 @@ class RecordDetail {
           ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 17)),
-          title: 'Área verificada',
+          title: 'Ãrea verificada',
         ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 42)),
@@ -422,7 +424,7 @@ class RecordDetail {
       InternalEvent(
         time: (entry.editedAt ?? entry.time).add(const Duration(minutes: 1)),
         title: entry.isInProgress
-            ? 'Aguardando sincronização'
+            ? 'Aguardando sincronizaÃ§Ã£o'
             : 'Sincronizado com o sistema',
       ),
     ];
@@ -455,6 +457,17 @@ class RecordDetail {
   }
 
   static List<AuditEvent> _auditEventsFor(HistoryEntry entry, String author) {
+    final rawTrail = entry.details['_auditTrail'];
+    if (rawTrail is List && rawTrail.isNotEmpty) {
+      final events =
+          rawTrail
+              .whereType<Map>()
+              .map((raw) => _auditEventFromMap(raw, author, entry.time))
+              .toList()
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      if (events.isNotEmpty) return events;
+    }
+
     final editedAt = entry.editedAt;
     return [
       AuditEvent(timestamp: entry.time, action: 'Criado por', user: author),
@@ -469,10 +482,49 @@ class RecordDetail {
       AuditEvent(
         timestamp: (editedAt ?? entry.time).add(const Duration(minutes: 1)),
         action: entry.isInProgress
-            ? 'Sincronização pendente'
+            ? 'SincronizaÃ§Ã£o pendente'
             : 'Sincronizado com o sistema',
       ),
     ];
+  }
+
+  static AuditEvent _auditEventFromMap(
+    Map raw,
+    String fallbackUser,
+    DateTime fallbackTime,
+  ) {
+    final action = _cleanText(raw['action']?.toString() ?? '');
+    final fieldName = _cleanText(raw['field_name']?.toString() ?? '');
+    final user = _cleanText(raw['performed_by']?.toString() ?? fallbackUser);
+    final timestamp =
+        _parseAuditTimestamp(raw['performed_at']) ??
+        _parseAuditTimestamp(raw['created_at']) ??
+        fallbackTime;
+
+    final label = switch (action) {
+      'created' => 'Criado por',
+      'updated' when fieldName.isNotEmpty => 'Alterou $fieldName por',
+      'updated' => 'Editado por',
+      'finalized' => 'Finalizado por',
+      'deleted' => 'ExcluÃ­do por',
+      'restored' => 'Restaurado por',
+      _ => action.isEmpty ? 'Registrado por' : '$action por',
+    };
+
+    return AuditEvent(timestamp: timestamp, action: label, user: user);
+  }
+
+  static DateTime? _parseAuditTimestamp(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    try {
+      final converted = value.toDate();
+      if (converted is DateTime) return converted;
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 
   static bool _hasMedia(HistoryEntry entry) {
@@ -482,24 +534,24 @@ class RecordDetail {
 
   static String _cleanText(String value) {
     return value
-        .replaceAll('Ã¡', 'á')
-        .replaceAll('Ã ', 'à')
-        .replaceAll('Ã£', 'ã')
-        .replaceAll('Ã¢', 'â')
-        .replaceAll('Ã©', 'é')
-        .replaceAll('Ãª', 'ê')
-        .replaceAll('Ã­', 'í')
-        .replaceAll('Ã³', 'ó')
-        .replaceAll('Ã´', 'ô')
-        .replaceAll('Ãµ', 'õ')
-        .replaceAll('Ãº', 'ú')
-        .replaceAll('Ã§', 'ç')
-        .replaceAll('Ã‡', 'Ç')
-        .replaceAll('Ãš', 'Ú')
-        .replaceAll('Ãª', 'ê')
-        .replaceAll('â€¢', '•')
-        .replaceAll('â€“', '–')
-        .replaceAll('â€”', '—');
+        .replaceAll('ÃƒÂ¡', 'Ã¡')
+        .replaceAll('ÃƒÂ ', 'Ã ')
+        .replaceAll('ÃƒÂ£', 'Ã£')
+        .replaceAll('ÃƒÂ¢', 'Ã¢')
+        .replaceAll('ÃƒÂ©', 'Ã©')
+        .replaceAll('ÃƒÂª', 'Ãª')
+        .replaceAll('ÃƒÂ­', 'Ã­')
+        .replaceAll('ÃƒÂ³', 'Ã³')
+        .replaceAll('ÃƒÂ´', 'Ã´')
+        .replaceAll('ÃƒÂµ', 'Ãµ')
+        .replaceAll('ÃƒÂº', 'Ãº')
+        .replaceAll('ÃƒÂ§', 'Ã§')
+        .replaceAll('Ãƒâ€¡', 'Ã‡')
+        .replaceAll('ÃƒÅ¡', 'Ãš')
+        .replaceAll('ÃƒÂª', 'Ãª')
+        .replaceAll('Ã¢â‚¬Â¢', 'â€¢')
+        .replaceAll('Ã¢â‚¬â€œ', 'â€“')
+        .replaceAll('Ã¢â‚¬â€', 'â€”');
   }
 }
 

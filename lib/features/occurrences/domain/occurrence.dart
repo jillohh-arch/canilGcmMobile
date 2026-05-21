@@ -74,36 +74,30 @@ class Occurrence with SoftDeletable {
   factory Occurrence.fromMap(Map<String, dynamic> map, String id) {
     return Occurrence(
       id: id,
-      shiftId: map['shift_id'] as String? ?? '',
-      primaryHandlerId: map['primary_handler_id'] as String? ?? '',
-      dogId: map['dog_id'] as String? ?? '',
-      typeCode: map['type_code'] as String? ?? '',
-      typeName: map['type_name'] as String? ?? '',
-      locationAddress: map['location_address'] as String?,
-      gpsLat: (map['gps_lat'] as num?)?.toDouble(),
-      gpsLng: (map['gps_lng'] as num?)?.toDouble(),
-      gpsAccuracy: (map['gps_accuracy'] as num?)?.toDouble(),
+      shiftId: _parseString(map['shift_id']) ?? '',
+      primaryHandlerId: _parseString(map['primary_handler_id']) ?? '',
+      dogId: _parseString(map['dog_id']) ?? '',
+      typeCode: _parseString(map['type_code']) ?? '',
+      typeName: _parseString(map['type_name']) ?? '',
+      locationAddress: _parseString(map['location_address']),
+      gpsLat: _parseDouble(map['gps_lat']),
+      gpsLng: _parseDouble(map['gps_lng']),
+      gpsAccuracy: _parseDouble(map['gps_accuracy']),
       startedAt: _parseDateTime(map['started_at']) ?? DateTime.now(),
       finalizedAt: _parseDateTime(map['finalized_at']),
       createdAt: _parseDateTime(map['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(map['updated_at']) ?? DateTime.now(),
-      status: OccurrenceStatus.fromMap(map['status'] as String?),
-      finalReport: map['final_report'] as String?,
-      results: (map['results'] as List<dynamic>?)
-              ?.map((e) => OccurrenceResult.fromMap(e as String?))
-              .toList() ??
-          const [],
-      details: map['details'] as Map<String, dynamic>?,
-      integrityHash: map['integrity_hash'] as String?,
-      pdfExportUrl: map['pdf_export_url'] as String?,
-      initialObservation: map['initial_observation'] as String?,
-      auditTrail: (map['audit_trail'] as List<dynamic>?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          const [],
+      status: OccurrenceStatus.fromMap(_parseString(map['status'])),
+      finalReport: _parseString(map['final_report']),
+      results: _parseResults(map['results']),
+      details: _parseStringMap(map['details']),
+      integrityHash: _parseString(map['integrity_hash']),
+      pdfExportUrl: _parseString(map['pdf_export_url']),
+      initialObservation: _parseString(map['initial_observation']),
+      auditTrail: _parseMapList(map['audit_trail']),
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
-      deletedBy: map['deleted_by'] as String?,
-      deleteReason: map['delete_reason'] as String?,
+      deletedBy: _parseString(map['deleted_by']),
+      deleteReason: _parseString(map['delete_reason']),
     );
   }
 
@@ -119,8 +113,9 @@ class Occurrence with SoftDeletable {
       'gps_lng': gpsLng,
       'gps_accuracy': gpsAccuracy,
       'started_at': Timestamp.fromDate(startedAt),
-      'finalized_at':
-          finalizedAt != null ? Timestamp.fromDate(finalizedAt!) : null,
+      'finalized_at': finalizedAt != null
+          ? Timestamp.fromDate(finalizedAt!)
+          : null,
       'created_at': Timestamp.fromDate(createdAt),
       'updated_at': Timestamp.fromDate(updatedAt),
       'status': status.toMap(),
@@ -197,5 +192,49 @@ class Occurrence with SoftDeletable {
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
+  }
+
+  static String? _parseString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.replaceAll(',', '.'));
+    return null;
+  }
+
+  static Map<String, dynamic>? _parseStringMap(dynamic value) {
+    if (value == null || value is! Map) return null;
+    return value.map((key, item) => MapEntry(key.toString(), item));
+  }
+
+  static List<Map<String, dynamic>> _parseMapList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map(
+          (item) => item.map((key, value) => MapEntry(key.toString(), value)),
+        )
+        .toList();
+  }
+
+  static List<OccurrenceResult> _parseResults(dynamic value) {
+    if (value is! List) return const [];
+    return value.map((item) {
+      if (item is Map) {
+        final map = item.map((key, value) => MapEntry(key.toString(), value));
+        return OccurrenceResult.fromMap(
+          _parseString(map['code']) ??
+              _parseString(map['type']) ??
+              _parseString(map['result']) ??
+              _parseString(map['value']) ??
+              _parseString(map['id']),
+        );
+      }
+      return OccurrenceResult.fromMap(_parseString(item));
+    }).toList();
   }
 }

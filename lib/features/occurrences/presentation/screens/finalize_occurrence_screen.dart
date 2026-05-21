@@ -53,7 +53,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   final Map<String, Map<String, TextEditingController>> _detailControllers = {};
   final List<_DrugEntry> _drugEntries = [];
 
-  static const _drugTypes = ['Maconha', 'Cocaína', 'Crack', 'Ecstasy', 'Outros'];
+  static const _drugTypes = [
+    'Maconha',
+    'Cocaína',
+    'Crack',
+    'Ecstasy',
+    'Outros',
+  ];
 
   @override
   void dispose() {
@@ -77,8 +83,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     if (_currentStep == 0 && _reportController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Preencha o relato para avançar',
-              style: GoogleFonts.inter()),
+          content: Text(
+            'Preencha o relato para avançar',
+            style: GoogleFonts.inter(),
+          ),
           backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 2),
         ),
@@ -88,8 +96,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     if (_currentStep == 1 && _selectedResults.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Selecione pelo menos um resultado',
-              style: GoogleFonts.inter()),
+          content: Text(
+            'Selecione pelo menos um resultado',
+            style: GoogleFonts.inter(),
+          ),
           backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 2),
         ),
@@ -132,8 +142,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       if (!started && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Microfone não disponível',
-                style: GoogleFonts.inter()),
+            content: Text(
+              'Microfone não disponível',
+              style: GoogleFonts.inter(),
+            ),
             backgroundColor: AppTheme.error,
             duration: const Duration(seconds: 2),
           ),
@@ -169,8 +181,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           }
         } else {
           _selectedResults.add(result);
-          if (result == OccurrenceResult.drugSeized &&
-              _drugEntries.isEmpty) {
+          if (result == OccurrenceResult.drugSeized && _drugEntries.isEmpty) {
             _drugEntries.add(_DrugEntry());
           }
         }
@@ -183,7 +194,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   TextEditingController _getDetailController(String resultKey, String field) {
     _detailControllers.putIfAbsent(resultKey, () => {});
     _detailControllers[resultKey]!.putIfAbsent(
-        field, () => TextEditingController());
+      field,
+      () => TextEditingController(),
+    );
     return _detailControllers[resultKey]![field]!;
   }
 
@@ -216,10 +229,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           final type = entry.type ?? '';
           final weight = entry.weightController.text.trim();
           if (type.isNotEmpty || weight.isNotEmpty) {
-            drugs.add({
-              'type': type,
-              'weight_grams': weight,
-            });
+            drugs.add({'type': type, 'weight_grams': weight});
           }
         }
         if (drugs.isNotEmpty) details[key] = drugs;
@@ -238,9 +248,134 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     return details.isNotEmpty ? details : null;
   }
 
+  bool get _canAdvance {
+    if (_isFinalizing) return false;
+    return switch (_currentStep) {
+      0 => _reportController.text.trim().isNotEmpty,
+      1 => _selectedResults.isNotEmpty,
+      2 => _missingDetailMessage() == null,
+      _ => false,
+    };
+  }
+
+  String? _missingDetailMessage() {
+    for (final result in _selectedResults) {
+      final message = _missingDetailFor(result);
+      if (message != null) return message;
+    }
+    return null;
+  }
+
+  String? _missingDetailFor(OccurrenceResult result) {
+    if (result == OccurrenceResult.noOccurrence ||
+        result == OccurrenceResult.supportProvided) {
+      return null;
+    }
+
+    if (result == OccurrenceResult.drugSeized) {
+      if (_drugEntries.isEmpty) return 'Informe ao menos uma droga apreendida';
+      for (final entry in _drugEntries) {
+        if ((entry.type ?? '').trim().isEmpty) {
+          return 'Informe o tipo da droga apreendida';
+        }
+        if (entry.weightController.text.trim().isEmpty) {
+          return 'Informe a quantidade da droga apreendida';
+        }
+      }
+      return null;
+    }
+
+    final key = result.toMap();
+    String field(String name) =>
+        _detailControllers[key]?[name]?.text.trim() ?? '';
+
+    return switch (result) {
+      OccurrenceResult.weaponSeized
+          when field('type').isEmpty || field('quantity').isEmpty =>
+        'Informe tipo e quantidade da arma apreendida',
+      OccurrenceResult.personDetained
+          when field('count').isEmpty || field('referral').isEmpty =>
+        'Informe quantidade e encaminhamento da pessoa detida',
+      OccurrenceResult.boCreated when field('bo_number').isEmpty =>
+        'Informe o número do BO',
+      _ => null,
+    };
+  }
+
+  String _buildIntegrityHash({
+    required String report,
+    required List<OccurrenceResult> results,
+    required Map<String, dynamic>? details,
+  }) {
+    final vm = context.read<OccurrenceViewModel>();
+    final occ = vm.openOccurrence;
+    final eventPayload =
+        vm.events
+            .map(
+              (event) => {
+                'id': event.id,
+                'category': event.category.toMap(),
+                'timestamp': event.timestamp.toIso8601String(),
+                'title': event.title,
+                'description': event.description,
+                'photo_urls': event.photoUrls,
+                'gps_lat': event.gpsLat,
+                'gps_lng': event.gpsLng,
+              },
+            )
+            .toList()
+          ..sort(
+            (a, b) =>
+                (a['timestamp'] as String).compareTo(b['timestamp'] as String),
+          );
+    final resultPayload = results.map((r) => r.toMap()).toList()..sort();
+
+    final payload = {
+      'occurrence_id': widget.occurrenceId,
+      'type_name': widget.typeName,
+      'dog_name': widget.dogName,
+      'handler_name': widget.handlerName,
+      'location_address': widget.locationAddress,
+      'started_at': occ?.startedAt.toIso8601String(),
+      'event_count': widget.eventCount,
+      'events': eventPayload,
+      'final_report': report,
+      'results': resultPayload,
+      'details': _stableJsonValue(details),
+    };
+
+    return sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+  }
+
+  dynamic _stableJsonValue(dynamic value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => k.toString()).toList()..sort();
+      return {for (final key in keys) key: _stableJsonValue(value[key])};
+    }
+    if (value is Iterable) {
+      return value.map(_stableJsonValue).toList();
+    }
+    if (value is DateTime) {
+      return value.toIso8601String();
+    }
+    return value;
+  }
+
   // ─── Finalize ───────────────────────────────────────────────────────
 
   Future<void> _finalize() async {
+    final missing = _missingDetailMessage();
+    if (missing != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(missing, style: GoogleFonts.inter()),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isFinalizing = true);
     HapticFeedback.heavyImpact();
 
@@ -250,9 +385,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final results = _selectedResults.toList();
       final details = _buildDetails();
 
-      final hashInput =
-          '$report|${results.map((r) => r.toMap()).join(',')}|$details';
-      final hash = sha256.convert(utf8.encode(hashInput)).toString();
+      final hash = _buildIntegrityHash(
+        report: report,
+        results: results,
+        details: details,
+      );
 
       await vm.finalizeOccurrence(
         id: widget.occurrenceId,
@@ -303,13 +440,19 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E1A1F),
-        title: Text('Salvar como rascunho?',
-            style: GoogleFonts.inter(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Salvar como rascunho?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           'Você poderá retomar a finalização depois.',
           style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(200), fontSize: 14),
+            color: Colors.white.withAlpha(200),
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
@@ -317,30 +460,37 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               Navigator.of(ctx).pop();
               Navigator.of(context).pop();
             },
-            child: Text('DESCARTAR',
-                style: GoogleFonts.inter(
-                    color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'DESCARTAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
               final vm = context.read<OccurrenceViewModel>();
-              final updates = <String, dynamic>{
-                'status': 'finalizing',
-              };
+              final updates = <String, dynamic>{'status': 'finalizing'};
               if (_reportController.text.trim().isNotEmpty) {
                 updates['final_report'] = _reportController.text.trim();
               }
               if (_selectedResults.isNotEmpty) {
-                updates['results'] =
-                    _selectedResults.map((r) => r.toMap()).toList();
+                updates['results'] = _selectedResults
+                    .map((r) => r.toMap())
+                    .toList();
               }
               await vm.updateOccurrence(widget.occurrenceId, updates);
               if (mounted) Navigator.of(context).pop();
             },
-            child: Text('SALVAR RASCUNHO',
-                style: GoogleFonts.inter(
-                    color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'SALVAR RASCUNHO',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -369,11 +519,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 child: PageView(
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildStep1(),
-                    _buildStep2(),
-                    _buildStep3(),
-                  ],
+                  children: [_buildStep1(), _buildStep2(), _buildStep3()],
                 ),
               ),
               _buildFooter(),
@@ -505,20 +651,23 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   side: BorderSide(color: Colors.white.withAlpha(40)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: Text('‹ VOLTAR',
-                    style: GoogleFonts.inter(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
+                child: Text(
+                  '‹ VOLTAR',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           if (_currentStep > 0) const SizedBox(width: 12),
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: _isFinalizing
-                  ? null
-                  : (isLast ? _finalize : _goNext),
+              onPressed: _canAdvance ? (isLast ? _finalize : _goNext) : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: isLast
                     ? const Color(0xFF2ECC71)
@@ -526,14 +675,17 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 disabledBackgroundColor: Colors.white.withAlpha(30),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: _isFinalizing
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(
                       isLast ? '✓ CONCLUIR' : 'PRÓXIMO ›',
@@ -596,8 +748,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   Text(
                     _isListening ? 'PARAR GRAVAÇÃO' : '🎙 GRAVAR RELATO',
                     style: GoogleFonts.inter(
-                      color:
-                          _isListening ? AppTheme.error : AppTheme.primary,
+                      color: _isListening ? AppTheme.error : AppTheme.primary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -648,10 +799,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText:
-                  'Equipe foi acionada às... descreva o que aconteceu...',
-              hintStyle:
-                  GoogleFonts.inter(color: Colors.white.withAlpha(60)),
+              hintText: 'Equipe foi acionada às... descreva o que aconteceu...',
+              hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(60)),
               filled: true,
               fillColor: Colors.white.withAlpha(8),
               border: OutlineInputBorder(
@@ -742,9 +891,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   // ─── Step 3: Detalhes ───────────────────────────────────────────────
 
   Widget _buildStep3() {
-    final needsDetails = _selectedResults.where((r) =>
-        r != OccurrenceResult.noOccurrence &&
-        r != OccurrenceResult.supportProvided);
+    final needsDetails = _selectedResults.where(
+      (r) =>
+          r != OccurrenceResult.noOccurrence &&
+          r != OccurrenceResult.supportProvided,
+    );
 
     if (needsDetails.isEmpty) {
       return Center(
@@ -753,8 +904,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle_outline,
-                  color: const Color(0xFF2ECC71), size: 48),
+              Icon(
+                Icons.check_circle_outline,
+                color: const Color(0xFF2ECC71),
+                size: 48,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Nenhum detalhe adicional necessário',
@@ -821,8 +975,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         children: [
           Row(
             children: [
-              Text(_iconForResult(result),
-                  style: const TextStyle(fontSize: 16)),
+              Text(
+                _iconForResult(result),
+                style: const TextStyle(fontSize: 16),
+              ),
               const SizedBox(width: 8),
               Text(
                 result.label.toUpperCase(),
@@ -836,21 +992,23 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          ...fields.map((field) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: _getDetailController(key, field.key),
-                  keyboardType: field.numeric
-                      ? TextInputType.number
-                      : TextInputType.text,
-                  inputFormatters: field.numeric
-                      ? [FilteringTextInputFormatter.digitsOnly]
-                      : null,
-                  style:
-                      GoogleFonts.inter(color: Colors.white, fontSize: 14),
-                  decoration: _detailFieldDecoration(field.label),
-                ),
-              )),
+          ...fields.map(
+            (field) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextField(
+                controller: _getDetailController(key, field.key),
+                keyboardType: field.numeric
+                    ? TextInputType.number
+                    : TextInputType.text,
+                inputFormatters: field.numeric
+                    ? [FilteringTextInputFormatter.digitsOnly]
+                    : null,
+                onChanged: (_) => setState(() {}),
+                style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+                decoration: _detailFieldDecoration(field.label),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -886,8 +1044,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               GestureDetector(
                 onTap: _addDrugEntry,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
@@ -941,9 +1101,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                       if (_drugEntries.length > 1)
                         GestureDetector(
                           onTap: () => _removeDrugEntry(idx),
-                          child: Icon(Icons.close,
-                              size: 16,
-                              color: AppTheme.error.withAlpha(180)),
+                          child: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: AppTheme.error.withAlpha(180),
+                          ),
                         ),
                     ],
                   ),
@@ -967,7 +1129,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                         onTap: () => setState(() => drugEntry.type = type),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 7),
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppTheme.primary.withAlpha(30)
@@ -986,8 +1150,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                                   ? AppTheme.primary
                                   : Colors.white.withAlpha(180),
                               fontSize: 12,
-                              fontWeight:
-                                  selected ? FontWeight.w700 : FontWeight.w500,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                             ),
                           ),
                         ),
@@ -997,10 +1162,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: drugEntry.weightController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: GoogleFonts.inter(
-                        color: Colors.white, fontSize: 14),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                     decoration: _detailFieldDecoration('Peso em gramas'),
                   ),
                 ],
@@ -1027,8 +1193,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   InputDecoration _detailFieldDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle:
-          GoogleFonts.inter(color: Colors.white.withAlpha(120), fontSize: 13),
+      labelStyle: GoogleFonts.inter(
+        color: Colors.white.withAlpha(120),
+        fontSize: 13,
+      ),
       filled: true,
       fillColor: Colors.white.withAlpha(8),
       border: OutlineInputBorder(
@@ -1043,41 +1211,37 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: AppTheme.primary),
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 
   String _iconForResult(OccurrenceResult result) => switch (result) {
-        OccurrenceResult.drugSeized => '💊',
-        OccurrenceResult.weaponSeized => '🔫',
-        OccurrenceResult.personDetained => '👤',
-        OccurrenceResult.boCreated => '📄',
-        OccurrenceResult.noOccurrence => '⊘',
-        OccurrenceResult.supportProvided => '✋',
-      };
+    OccurrenceResult.drugSeized => '💊',
+    OccurrenceResult.weaponSeized => '🔫',
+    OccurrenceResult.personDetained => '👤',
+    OccurrenceResult.boCreated => '📄',
+    OccurrenceResult.noOccurrence => '⊘',
+    OccurrenceResult.supportProvided => '✋',
+  };
 
-  List<_DetailField> _fieldsForResult(OccurrenceResult result) =>
-      switch (result) {
-        OccurrenceResult.drugSeized => [], // handled by _buildDrugSection
-        OccurrenceResult.weaponSeized => [
-            const _DetailField(label: 'Tipo de arma', key: 'type'),
-            const _DetailField(
-                label: 'Quantidade', key: 'quantity', numeric: true),
-          ],
-        OccurrenceResult.personDetained => [
-            const _DetailField(
-                label: 'Quantidade', key: 'count', numeric: true),
-            const _DetailField(
-                label: 'Encaminhamento (DP, etc)', key: 'referral'),
-          ],
-        OccurrenceResult.boCreated => [
-            const _DetailField(label: 'Número do BO', key: 'bo_number'),
-            const _DetailField(
-                label: 'Tipo (flagrante, TCO, etc)', key: 'bo_type'),
-          ],
-        _ => [],
-      };
+  List<_DetailField> _fieldsForResult(
+    OccurrenceResult result,
+  ) => switch (result) {
+    OccurrenceResult.drugSeized => [], // handled by _buildDrugSection
+    OccurrenceResult.weaponSeized => [
+      const _DetailField(label: 'Tipo de arma', key: 'type'),
+      const _DetailField(label: 'Quantidade', key: 'quantity', numeric: true),
+    ],
+    OccurrenceResult.personDetained => [
+      const _DetailField(label: 'Quantidade', key: 'count', numeric: true),
+      const _DetailField(label: 'Encaminhamento (DP, etc)', key: 'referral'),
+    ],
+    OccurrenceResult.boCreated => [
+      const _DetailField(label: 'Número do BO', key: 'bo_number'),
+      const _DetailField(label: 'Tipo (flagrante, TCO, etc)', key: 'bo_type'),
+    ],
+    _ => [],
+  };
 }
 
 class _DetailField {
@@ -1104,13 +1268,13 @@ class _ResultCard extends StatelessWidget {
   });
 
   String get _icon => switch (result) {
-        OccurrenceResult.drugSeized => '💊',
-        OccurrenceResult.weaponSeized => '🔫',
-        OccurrenceResult.personDetained => '👤',
-        OccurrenceResult.boCreated => '📄',
-        OccurrenceResult.noOccurrence => '⊘',
-        OccurrenceResult.supportProvided => '✋',
-      };
+    OccurrenceResult.drugSeized => '💊',
+    OccurrenceResult.weaponSeized => '🔫',
+    OccurrenceResult.personDetained => '👤',
+    OccurrenceResult.boCreated => '📄',
+    OccurrenceResult.noOccurrence => '⊘',
+    OccurrenceResult.supportProvided => '✋',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1135,8 +1299,11 @@ class _ResultCard extends StatelessWidget {
                 alignment: Alignment.topRight,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8, top: 4),
-                  child: Icon(Icons.check_circle,
-                      color: AppTheme.primary, size: 16),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: AppTheme.primary,
+                    size: 16,
+                  ),
                 ),
               ),
             Text(_icon, style: const TextStyle(fontSize: 22)),
@@ -1145,8 +1312,7 @@ class _ResultCard extends StatelessWidget {
               result.label,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                color:
-                    selected ? Colors.white : Colors.white.withAlpha(180),
+                color: selected ? Colors.white : Colors.white.withAlpha(180),
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),

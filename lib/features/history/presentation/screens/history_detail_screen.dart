@@ -1,9 +1,19 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 // --- Design tokens from mockup ---
 const Color _bg = Color(0xFF050D10);
@@ -39,7 +49,11 @@ class RegistroDetalhePage extends StatelessWidget {
           children: [
             Column(
               children: [
-                _DetailHeader(detail: detail, onBack: () => Navigator.of(context).pop(), onMenuTap: () => _openRecordMenu(context)),
+                _DetailHeader(
+                  detail: detail,
+                  onBack: () => Navigator.of(context).pop(),
+                  onMenuTap: () => _openRecordMenu(context),
+                ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(14, 14, 16, 110),
@@ -52,7 +66,13 @@ class RegistroDetalhePage extends StatelessWidget {
                         ],
                         _InformacoesSection(detail: detail),
                         const SizedBox(height: 16),
-                        _TimelineSection(detail: detail),
+                        if (detail.source.originalModel is Occurrence)
+                          _OccurrenceTimelineSection(
+                            occurrenceId: detail.id,
+                            fallback: detail,
+                          )
+                        else
+                          _TimelineSection(detail: detail),
                         const SizedBox(height: 16),
                         _AuditSection(detail: detail),
                       ],
@@ -62,16 +82,86 @@ class RegistroDetalhePage extends StatelessWidget {
               ],
             ),
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: _CtaBar(
-                onPdfTap: () => _notify(context, 'Geração de PDF preparada.'),
-                onShareTap: () => _notify(context, 'Compartilhamento preparado.'),
+                onPdfTap: () => _handlePdfAction(context, detail, share: false),
+                onShareTap: () =>
+                    _handlePdfAction(context, detail, share: true),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handlePdfAction(
+    BuildContext context,
+    RecordDetail detail, {
+    required bool share,
+  }) async {
+    final original = detail.source.originalModel;
+    if (original is! Occurrence) {
+      _notify(context, 'PDF disponÃ­vel apenas para ocorrÃªncias.');
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: const Color(0xFF0F2026),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    try {
+      final occurrenceVM = context.read<OccurrenceViewModel>();
+      final dogVM = context.read<DogViewModel>();
+      final authVM = context.read<AuthViewModel>();
+      final events = await occurrenceVM.getEvents(original.id);
+      final matchingDogs = dogVM.dogs.where((d) => d.id == original.dogId);
+      final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
+      if (dog == null) throw Exception('Dados do cÃ£o nÃ£o disponÃ­veis');
+
+      final bytes = await occurrenceVM.generatePdf(
+        occurrence: original,
+        events: events,
+        dog: dog,
+        handlerName: detail.handlerName,
+        handlerRa: HandlerIdentityService.raFromUser(authVM.user) ?? '',
+      );
+
+      if (!context.mounted) return;
+      messenger.hideCurrentSnackBar();
+      final filename = 'Ocorrencia_${original.id.substring(0, 8)}.pdf';
+      if (share) {
+        await Printing.sharePdf(bytes: bytes, filename: filename);
+      } else {
+        await Printing.layoutPdf(onLayout: (_) => bytes, name: filename);
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erro ao gerar PDF: $e',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: const Color(0xFFE74C3C),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
   }
 
   void _openRecordMenu(BuildContext context) {
@@ -94,9 +184,23 @@ class RegistroDetalhePage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _MenuRow(icon: Icons.edit_outlined, label: 'Editar registro', onTap: () { Navigator.of(ctx).pop(); _notify(context, 'Edição do registro preparada.'); }),
+                _MenuRow(
+                  icon: Icons.edit_outlined,
+                  label: 'Editar registro',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _notify(context, 'EdiÃ§Ã£o do registro preparada.');
+                  },
+                ),
                 Divider(height: 1, color: _cyan.withAlpha(30)),
-                _MenuRow(icon: Icons.copy_all_outlined, label: 'Copiar resumo operacional', onTap: () { Navigator.of(ctx).pop(); _notify(context, 'Resumo operacional copiado.'); }),
+                _MenuRow(
+                  icon: Icons.copy_all_outlined,
+                  label: 'Copiar resumo operacional',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _notify(context, 'Resumo operacional copiado.');
+                  },
+                ),
               ],
             ),
           ),
@@ -108,12 +212,20 @@ class RegistroDetalhePage extends StatelessWidget {
   void _notify(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message, style: GoogleFonts.inter(color: _textPrimary, fontWeight: FontWeight.w700)),
-        backgroundColor: const Color(0xFF0F2026),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: GoogleFonts.inter(
+              color: _textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: const Color(0xFF0F2026),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
   }
 }
 
@@ -125,7 +237,11 @@ class _DetailHeader extends StatelessWidget {
   final RecordDetail detail;
   final VoidCallback onBack;
   final VoidCallback onMenuTap;
-  const _DetailHeader({required this.detail, required this.onBack, required this.onMenuTap});
+  const _DetailHeader({
+    required this.detail,
+    required this.onBack,
+    required this.onMenuTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -142,20 +258,37 @@ class _DetailHeader extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Row(
               children: [
-                _HeaderIconBtn(text: '‹', size: 36, onTap: onBack),
+                _HeaderIconBtn(text: 'â€¹', size: 36, onTap: onBack),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('DETALHE DO REGISTRO', style: GoogleFonts.inter(color: _cyan, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
+                      Text(
+                        'DETALHE DO REGISTRO',
+                        style: GoogleFonts.inter(
+                          color: _cyan,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(detail.headerTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w700)),
+                      Text(
+                        detail.headerTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: _textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 10),
-                _HeaderIconBtn(text: '⋯', size: 32, onTap: onMenuTap),
+                _HeaderIconBtn(text: 'â‹¯', size: 32, onTap: onMenuTap),
               ],
             ),
           ),
@@ -172,7 +305,8 @@ class _DetailHeader extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: detail.color.withAlpha(38),
                       borderRadius: BorderRadius.circular(11),
@@ -189,12 +323,26 @@ class _DetailHeader extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(detail.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+                        Text(
+                          detail.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: _textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 3),
                         Text(
-                          '${_fmtDate(detail.dateTime)} • ${_fmtTime(detail.dateTime)} • ${detail.location}',
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                          '${_fmtDate(detail.dateTime)} â€¢ ${_fmtTime(detail.dateTime)} â€¢ ${detail.location}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: _textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -228,21 +376,23 @@ class _ResultadoSection extends StatelessWidget {
         const SizedBox(height: 8),
         if (outcomes.isEmpty)
           _ResultCard(
-            emoji: '✓',
+            emoji: 'âœ“',
             color: _green,
             label: 'FINALIZADO',
             value: detail.status,
           )
         else
-          ...outcomes.map((o) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _ResultCard(
-              emoji: o.emoji,
-              color: o.color,
-              label: o.label.toUpperCase(),
-              value: o.detail,
+          ...outcomes.map(
+            (o) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ResultCard(
+                emoji: o.emoji,
+                color: o.color,
+                label: o.label.toUpperCase(),
+                value: o.detail,
+              ),
             ),
-          )),
+          ),
       ],
     );
   }
@@ -251,27 +401,79 @@ class _ResultadoSection extends StatelessWidget {
     final raw = details['_outcomes'];
     if (raw is! List || raw.isEmpty) {
       final resultado = details['Resultado'];
-      if (resultado is String && resultado.trim().isNotEmpty && !resultado.toLowerCase().contains('final')) {
-        return [_OutcomeDisplay(emoji: '✓', color: _green, label: resultado, detail: '')];
+      if (resultado is String &&
+          resultado.trim().isNotEmpty &&
+          !resultado.toLowerCase().contains('final')) {
+        return [
+          _OutcomeDisplay(
+            emoji: 'âœ“',
+            color: _green,
+            label: resultado,
+            detail: '',
+          ),
+        ];
       }
       return [];
     }
 
     return raw.map<_OutcomeDisplay>((item) {
-      final value = item is Map ? (item['result'] ?? item.values.first)?.toString() ?? '' : item.toString();
+      final value = item is Map
+          ? (item['result'] ?? item.values.first)?.toString() ?? ''
+          : item.toString();
       return _mapResultToDisplay(value);
     }).toList();
   }
 
   _OutcomeDisplay _mapResultToDisplay(String value) {
     final lower = value.toLowerCase().replaceAll('_', ' ');
-    if (lower.contains('drug')) return _OutcomeDisplay(emoji: '🚨', color: const Color(0xFFE74C3C), label: 'Droga apreendida', detail: '');
-    if (lower.contains('weapon')) return _OutcomeDisplay(emoji: '🔫', color: const Color(0xFFE74C3C), label: 'Arma apreendida', detail: '');
-    if (lower.contains('person') || lower.contains('detain')) return _OutcomeDisplay(emoji: '🚔', color: const Color(0xFFF39C12), label: 'Pessoa detida', detail: '');
-    if (lower.contains('bo')) return _OutcomeDisplay(emoji: '📋', color: const Color(0xFF3498DB), label: 'BO registrado', detail: '');
-    if (lower.contains('support')) return _OutcomeDisplay(emoji: '🤝', color: _green, label: 'Apoio prestado', detail: '');
-    if (lower.contains('no ') || lower.contains('sem')) return _OutcomeDisplay(emoji: '✓', color: _green, label: 'Sem constatação', detail: '');
-    return _OutcomeDisplay(emoji: '✓', color: _green, label: value, detail: '');
+    if (lower.contains('drug'))
+      return _OutcomeDisplay(
+        emoji: 'ðŸš¨',
+        color: const Color(0xFFE74C3C),
+        label: 'Droga apreendida',
+        detail: '',
+      );
+    if (lower.contains('weapon'))
+      return _OutcomeDisplay(
+        emoji: 'ðŸ”«',
+        color: const Color(0xFFE74C3C),
+        label: 'Arma apreendida',
+        detail: '',
+      );
+    if (lower.contains('person') || lower.contains('detain'))
+      return _OutcomeDisplay(
+        emoji: 'ðŸš”',
+        color: const Color(0xFFF39C12),
+        label: 'Pessoa detida',
+        detail: '',
+      );
+    if (lower.contains('bo'))
+      return _OutcomeDisplay(
+        emoji: 'ðŸ“‹',
+        color: const Color(0xFF3498DB),
+        label: 'BO registrado',
+        detail: '',
+      );
+    if (lower.contains('support'))
+      return _OutcomeDisplay(
+        emoji: 'ðŸ¤',
+        color: _green,
+        label: 'Apoio prestado',
+        detail: '',
+      );
+    if (lower.contains('no ') || lower.contains('sem'))
+      return _OutcomeDisplay(
+        emoji: 'âœ“',
+        color: _green,
+        label: 'Sem constataÃ§Ã£o',
+        detail: '',
+      );
+    return _OutcomeDisplay(
+      emoji: 'âœ“',
+      color: _green,
+      label: value,
+      detail: '',
+    );
   }
 }
 
@@ -280,7 +482,12 @@ class _OutcomeDisplay {
   final Color color;
   final String label;
   final String detail;
-  const _OutcomeDisplay({required this.emoji, required this.color, required this.label, required this.detail});
+  const _OutcomeDisplay({
+    required this.emoji,
+    required this.color,
+    required this.label,
+    required this.detail,
+  });
 }
 
 class _ResultCard extends StatelessWidget {
@@ -288,7 +495,12 @@ class _ResultCard extends StatelessWidget {
   final Color color;
   final String label;
   final String value;
-  const _ResultCard({required this.emoji, required this.color, required this.label, required this.value});
+  const _ResultCard({
+    required this.emoji,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -302,22 +514,40 @@ class _ResultCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 32, height: 32,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: color.withAlpha(38),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+            child: Center(
+              child: Text(emoji, style: const TextStyle(fontSize: 16)),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: GoogleFonts.inter(color: color, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
+                ),
                 if (value.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(value, style: GoogleFonts.inter(color: _textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      color: _textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -339,18 +569,18 @@ class _InformacoesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = <_InfoItem>[
-      _InfoItem(emoji: '⏱', label: 'Duração', value: detail.duration),
-      _InfoItem(emoji: '👤', label: 'Condutor', value: detail.handlerName),
-      _InfoItem(emoji: '🐕', label: 'Cão', value: detail.dogName),
-      _InfoItem(emoji: '👥', label: 'Equipe', value: detail.team),
-      _InfoItem(emoji: '🚗', label: 'Veículo', value: _vehicle(detail)),
-      _InfoItem(emoji: '📍', label: 'Local', value: detail.location),
+      _InfoItem(emoji: 'â±', label: 'DuraÃ§Ã£o', value: detail.duration),
+      _InfoItem(emoji: 'ðŸ‘¤', label: 'Condutor', value: detail.handlerName),
+      _InfoItem(emoji: 'ðŸ•', label: 'CÃ£o', value: detail.dogName),
+      _InfoItem(emoji: 'ðŸ‘¥', label: 'Equipe', value: detail.team),
+      _InfoItem(emoji: 'ðŸš—', label: 'VeÃ­culo', value: _vehicle(detail)),
+      _InfoItem(emoji: 'ðŸ“', label: 'Local', value: detail.location),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel('INFORMAÇÕES'),
+        _SectionLabel('INFORMAÃ‡Ã•ES'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
@@ -363,7 +593,8 @@ class _InformacoesSection extends StatelessWidget {
             children: [
               for (int i = 0; i < rows.length; i++) ...[
                 _InfoRowV2(item: rows[i]),
-                if (i < rows.length - 1) Divider(height: 16, color: Colors.white.withAlpha(10)),
+                if (i < rows.length - 1)
+                  Divider(height: 16, color: Colors.white.withAlpha(10)),
               ],
             ],
           ),
@@ -374,13 +605,13 @@ class _InformacoesSection extends StatelessWidget {
 
   String _vehicle(RecordDetail d) {
     final details = d.source.details;
-    for (final key in const ['Veículo', 'Veiculo', 'vehicle', 'Viatura']) {
+    for (final key in const ['VeÃ­culo', 'Veiculo', 'vehicle', 'Viatura']) {
       if (details.containsKey(key)) {
         final v = details[key]?.toString().trim() ?? '';
         if (v.isNotEmpty && v != 'null') return v;
       }
     }
-    return 'Viatura padrão';
+    return 'Viatura padrÃ£o';
   }
 }
 
@@ -388,7 +619,11 @@ class _InfoItem {
   final String emoji;
   final String label;
   final String value;
-  const _InfoItem({required this.emoji, required this.label, required this.value});
+  const _InfoItem({
+    required this.emoji,
+    required this.label,
+    required this.value,
+  });
 }
 
 class _InfoRowV2 extends StatelessWidget {
@@ -403,13 +638,26 @@ class _InfoRowV2 extends StatelessWidget {
         const SizedBox(width: 8),
         SizedBox(
           width: 80,
-          child: Text(item.label, style: GoogleFonts.inter(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w500)),
+          child: Text(
+            item.label,
+            style: GoogleFonts.inter(
+              color: _textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         Expanded(
           child: Text(
-            item.value.isEmpty ? '—' : item.value,
-            maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right,
-            style: GoogleFonts.inter(color: _textPrimary, fontSize: 12, fontWeight: FontWeight.w700),
+            item.value.isEmpty ? 'â€”' : item.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.inter(
+              color: _textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -421,6 +669,77 @@ class _InfoRowV2 extends StatelessWidget {
 // SECTION: TIMELINE
 // =============================================================================
 
+class _OccurrenceTimelineSection extends StatelessWidget {
+  final String occurrenceId;
+  final RecordDetail fallback;
+
+  const _OccurrenceTimelineSection({
+    required this.occurrenceId,
+    required this.fallback,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<OccurrenceEvent>>(
+      future: context.read<OccurrenceViewModel>().getEvents(occurrenceId),
+      builder: (context, snapshot) {
+        final events = snapshot.data ?? const <OccurrenceEvent>[];
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _TimelineSection(detail: fallback);
+        }
+        if (events.isEmpty) {
+          return _TimelineSection(detail: fallback);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel('LINHA DO TEMPO Â· ${events.length} EVENTOS'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withAlpha(15)),
+              ),
+              child: Column(
+                children: [
+                  for (int i = 0; i < events.length; i++)
+                    _TimelineEventRow(
+                      event: _internalEventFromOccurrence(events[i]),
+                      isLast: i == events.length - 1,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  InternalEvent _internalEventFromOccurrence(OccurrenceEvent event) {
+    final photoCount = event.photoUrls.length;
+    final description = event.description?.trim() ?? '';
+    final photoText = photoCount == 0
+        ? ''
+        : '$photoCount foto${photoCount == 1 ? '' : 's'} anexada${photoCount == 1 ? '' : 's'}';
+    final subtitle = [
+      if (description.isNotEmpty) description,
+      if (photoText.isNotEmpty) photoText,
+    ].join(' Â· ');
+
+    return InternalEvent(
+      time: event.timestamp,
+      title: event.title?.trim().isNotEmpty == true
+          ? event.title!.trim()
+          : event.category.label,
+      subtitle: subtitle,
+    );
+  }
+}
+
 class _TimelineSection extends StatelessWidget {
   final RecordDetail detail;
   const _TimelineSection({required this.detail});
@@ -431,7 +750,7 @@ class _TimelineSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel('LINHA DO TEMPO · ${events.length} EVENTOS'),
+        _SectionLabel('LINHA DO TEMPO Â· ${events.length} EVENTOS'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
@@ -443,7 +762,10 @@ class _TimelineSection extends StatelessWidget {
           child: Column(
             children: [
               for (int i = 0; i < events.length; i++)
-                _TimelineEventRow(event: events[i], isLast: i == events.length - 1),
+                _TimelineEventRow(
+                  event: events[i],
+                  isLast: i == events.length - 1,
+                ),
             ],
           ),
         ),
@@ -467,26 +789,50 @@ class _TimelineEventRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 42,
-            child: Text(_fmtTime(event.time), style: GoogleFonts.inter(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
+            child: Text(
+              _fmtTime(event.time),
+              style: GoogleFonts.inter(
+                color: _textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Container(
-            width: 26, height: 26,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               color: style.color.withAlpha(30),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: Center(child: Text(style.emoji, style: const TextStyle(fontSize: 12))),
+            child: Center(
+              child: Text(style.emoji, style: const TextStyle(fontSize: 12)),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(event.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(color: _textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
+                Text(
+                  event.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (event.subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(event.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(color: _textMuted, fontSize: 10)),
+                  Text(
+                    event.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(color: _textMuted, fontSize: 10),
+                  ),
                 ],
               ],
             ),
@@ -498,16 +844,27 @@ class _TimelineEventRow extends StatelessWidget {
 
   _EventStyle _eventStyle(String title) {
     final lower = title.toLowerCase();
-    if (lower.contains('iniciado') || lower.contains('início')) return const _EventStyle(emoji: '▶', color: Color(0xFF4DD0E1));
-    if (lower.contains('chegada') || lower.contains('local')) return const _EventStyle(emoji: '📍', color: Color(0xFF3498DB));
-    if (lower.contains('cão') || lower.contains('varredura') || lower.contains('empregado')) return const _EventStyle(emoji: '🐾', color: Color(0xFFF1C40F));
-    if (lower.contains('foto') || lower.contains('anexa')) return const _EventStyle(emoji: '📷', color: Color(0xFF9B59B6));
-    if (lower.contains('verifica') || lower.contains('área')) return const _EventStyle(emoji: '🛡', color: Color(0xFF2ECC71));
-    if (lower.contains('finaliz') || lower.contains('conclu')) return const _EventStyle(emoji: '✓', color: Color(0xFF2ECC71));
-    if (lower.contains('andamento') || lower.contains('pendente')) return const _EventStyle(emoji: '⏳', color: Color(0xFFF39C12));
-    if (lower.contains('sincroniz')) return const _EventStyle(emoji: '☁', color: Color(0xFF4DD0E1));
-    if (lower.contains('atualiz')) return const _EventStyle(emoji: '✏', color: Color(0xFF3498DB));
-    return const _EventStyle(emoji: '•', color: Color(0xFF4DD0E1));
+    if (lower.contains('iniciado') || lower.contains('inÃ­cio'))
+      return const _EventStyle(emoji: 'â–¶', color: Color(0xFF4DD0E1));
+    if (lower.contains('chegada') || lower.contains('local'))
+      return const _EventStyle(emoji: 'ðŸ“', color: Color(0xFF3498DB));
+    if (lower.contains('cÃ£o') ||
+        lower.contains('varredura') ||
+        lower.contains('empregado'))
+      return const _EventStyle(emoji: 'ðŸ¾', color: Color(0xFFF1C40F));
+    if (lower.contains('foto') || lower.contains('anexa'))
+      return const _EventStyle(emoji: 'ðŸ“·', color: Color(0xFF9B59B6));
+    if (lower.contains('verifica') || lower.contains('Ã¡rea'))
+      return const _EventStyle(emoji: 'ðŸ›¡', color: Color(0xFF2ECC71));
+    if (lower.contains('finaliz') || lower.contains('conclu'))
+      return const _EventStyle(emoji: 'âœ“', color: Color(0xFF2ECC71));
+    if (lower.contains('andamento') || lower.contains('pendente'))
+      return const _EventStyle(emoji: 'â³', color: Color(0xFFF39C12));
+    if (lower.contains('sincroniz'))
+      return const _EventStyle(emoji: 'â˜', color: Color(0xFF4DD0E1));
+    if (lower.contains('atualiz'))
+      return const _EventStyle(emoji: 'âœ', color: Color(0xFF3498DB));
+    return const _EventStyle(emoji: 'â€¢', color: Color(0xFF4DD0E1));
   }
 }
 
@@ -542,7 +899,10 @@ class _AuditSection extends StatelessWidget {
           child: Column(
             children: [
               for (int i = 0; i < detail.auditEvents.length; i++)
-                _AuditRow(event: detail.auditEvents[i], isLast: i == detail.auditEvents.length - 1),
+                _AuditRow(
+                  event: detail.auditEvents[i],
+                  isLast: i == detail.auditEvents.length - 1,
+                ),
             ],
           ),
         ),
@@ -559,8 +919,8 @@ class _AuditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = event.user.trim().isEmpty
-        ? '${event.action} • ${_fmtDate(event.timestamp)} às ${_fmtTime(event.timestamp)}'
-        : '${event.action} ${event.user} • ${_fmtDate(event.timestamp)} às ${_fmtTime(event.timestamp)}';
+        ? '${event.action} â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}'
+        : '${event.action} ${event.user} â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}';
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
       child: Row(
@@ -573,12 +933,26 @@ class _AuditRow extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
-                style: GoogleFonts.inter(color: _textMuted, fontSize: 11, height: 1.3),
+                style: GoogleFonts.inter(
+                  color: _textMuted,
+                  fontSize: 11,
+                  height: 1.3,
+                ),
                 children: [
                   if (event.user.trim().isNotEmpty) ...[
                     TextSpan(text: '${event.action} '),
-                    TextSpan(text: event.user, style: GoogleFonts.inter(color: _textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-                    TextSpan(text: ' • ${_fmtDate(event.timestamp)} às ${_fmtTime(event.timestamp)}'),
+                    TextSpan(
+                      text: event.user,
+                      style: GoogleFonts.inter(
+                        color: _textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextSpan(
+                      text:
+                          ' â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}',
+                    ),
                   ] else
                     TextSpan(text: text),
                 ],
@@ -643,7 +1017,12 @@ class _CtaButton extends StatelessWidget {
   final IconData icon;
   final bool filled;
   final VoidCallback onTap;
-  const _CtaButton({required this.label, required this.icon, required this.filled, required this.onTap});
+  const _CtaButton({
+    required this.label,
+    required this.icon,
+    required this.filled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -651,7 +1030,10 @@ class _CtaButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () { HapticFeedback.lightImpact(); onTap(); },
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
@@ -693,7 +1075,15 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(text, style: GoogleFonts.inter(color: _cyan, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+        Text(
+          text,
+          style: GoogleFonts.inter(
+            color: _cyan,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(width: 8),
         Expanded(child: Container(height: 1, color: _cyan.withAlpha(38))),
       ],
@@ -705,21 +1095,36 @@ class _HeaderIconBtn extends StatelessWidget {
   final String text;
   final double size;
   final VoidCallback onTap;
-  const _HeaderIconBtn({required this.text, required this.size, required this.onTap});
+  const _HeaderIconBtn({
+    required this.text,
+    required this.size,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () { HapticFeedback.lightImpact(); onTap(); },
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
-        width: size, height: size,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: _cyan.withAlpha(15),
           borderRadius: BorderRadius.circular(size / 4),
           border: Border.all(color: _cyan.withAlpha(51)),
         ),
         alignment: Alignment.center,
-        child: Text(text, style: GoogleFonts.inter(color: _textPrimary, fontSize: size * 0.5, fontWeight: FontWeight.w600)),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            color: _textPrimary,
+            fontSize: size * 0.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
@@ -729,21 +1134,37 @@ class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _MenuRow({required this.icon, required this.label, required this.onTap});
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () { HapticFeedback.lightImpact(); onTap(); },
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
               Icon(icon, color: _cyan, size: 20),
               const SizedBox(width: 12),
-              Expanded(child: Text(label, style: GoogleFonts.inter(color: _textPrimary, fontSize: 14, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    color: _textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -761,13 +1182,13 @@ String _fmtTime(DateTime d) => DateFormat('HH:mm').format(d);
 
 String _summaryEmoji(HistoryEntryType type) {
   switch (type) {
-    case HistoryEntryType.incident:
-      return '🛡';
+    case HistoryEntryType.occurrence:
+      return 'ðŸ›¡';
     case HistoryEntryType.health:
-      return '⚕';
+      return 'âš•';
     case HistoryEntryType.training:
-      return '🎯';
+      return 'ðŸŽ¯';
     case HistoryEntryType.nutrition:
-      return '🍖';
+      return 'ðŸ–';
   }
 }
