@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/core/services/pdf_generator/weight_history_pdf.dart';
 
 /// Tela 2.11 — Histórico de Peso Completo.
 /// Gráfico ampliado, estatísticas, lista cronológica, registro de pesagem.
@@ -62,15 +64,25 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           IconButton(
             icon: Icon(Icons.picture_as_pdf_outlined,
                 color: AppTheme.primary, size: 20),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Exportação PDF em desenvolvimento',
-                      style: GoogleFonts.inter(fontSize: 12)),
-                  backgroundColor: AppTheme.primary,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onPressed: () async {
+              try {
+                final pdfBytes = await WeightHistoryPdf.generate(widget.dog, healthVM.healthLogs);
+                await Printing.layoutPdf(
+                  onLayout: (format) async => pdfBytes,
+                  name: 'Historico_Peso_${widget.dog.name}.pdf',
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao gerar PDF: $e',
+                          style: GoogleFonts.inter(fontSize: 12)),
+                      backgroundColor: AppTheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -266,6 +278,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 size: const Size(double.infinity, 140),
                 painter: _WeightFullChartPainter(
                   data: entries,
+                  idealWeightMin: widget.dog.idealWeightMin,
+                  idealWeightMax: widget.dog.idealWeightMax,
                 ),
               ),
             ),
@@ -688,17 +702,53 @@ class _WeightEntry {
 /// Painter para gráfico de peso ampliado.
 class _WeightFullChartPainter extends CustomPainter {
   final List<_WeightEntry> data;
+  final double? idealWeightMin;
+  final double? idealWeightMax;
 
-  _WeightFullChartPainter({required this.data});
+  _WeightFullChartPainter({
+    required this.data,
+    this.idealWeightMin,
+    this.idealWeightMax,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (data.length < 2) return;
 
     final weights = data.map((e) => e.weight).toList();
-    final minVal = weights.reduce((a, b) => a < b ? a : b) - 0.5;
-    final maxVal = weights.reduce((a, b) => a > b ? a : b) + 0.5;
-    final range = maxVal - minVal;
+    double minWeight = weights.reduce((a, b) => a < b ? a : b);
+    double maxWeight = weights.reduce((a, b) => a > b ? a : b);
+
+    if (idealWeightMin != null && idealWeightMin! < minWeight) {
+      minWeight = idealWeightMin!;
+    }
+    if (idealWeightMax != null && idealWeightMax! > maxWeight) {
+      maxWeight = idealWeightMax!;
+    }
+
+    final minVal = minWeight - 0.5;
+    final maxVal = maxWeight + 0.5;
+    final range = maxVal - minVal > 0 ? maxVal - minVal : 1.0;
+
+    // Draw ideal weight shaded range band
+    if (idealWeightMin != null && idealWeightMax != null) {
+      final yMin = size.height - ((idealWeightMin! - minVal) / range) * size.height;
+      final yMax = size.height - ((idealWeightMax! - minVal) / range) * size.height;
+
+      final rectPaint = Paint()
+        ..color = const Color(0x152ECC71) // Semi-transparent green
+        ..style = PaintingStyle.fill;
+
+      canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
+
+      final boundaryPaint = Paint()
+        ..color = const Color(0x352ECC71)
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(Offset(0, yMax), Offset(size.width, yMax), boundaryPaint);
+      canvas.drawLine(Offset(0, yMin), Offset(size.width, yMin), boundaryPaint);
+    }
 
     final linePaint = Paint()
       ..color = AppTheme.primary

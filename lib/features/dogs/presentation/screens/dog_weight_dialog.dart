@@ -117,7 +117,8 @@ void _showDogWeightDialog(
                 dogId: dog.id,
                 dogName: dog.name,
                 date: DateTime.now(),
-                logType: 'Rotina',
+                type: 'other',
+                subtype: 'Pesagem',
                 healthObservations: 'Pesagem de rotina registrada no dossiÃª.',
                 weight: weight,
               );

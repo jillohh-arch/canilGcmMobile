@@ -93,17 +93,28 @@ class HealthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteHealthLog(String id) async {
+  Future<void> deleteHealthLog({
+    required String id,
+    required String userId,
+    required String reason,
+  }) async {
     try {
       _setLoading(true);
-      await _healthService.deleteHealthLog(id);
+      final log = _healthLogs.firstWhere((h) => h.id == id);
+      await _healthService.deleteHealthLog(
+        dogId: log.dogId,
+        id: id,
+        userId: userId,
+        reason: reason,
+      );
       _healthLogs.removeWhere((h) => h.id == id);
 
       AuditService.log(
-        action: 'delete',
+        action: 'deleted',
         entityType: 'health',
         entityId: id,
-        summary: 'Registro de saúde excluído: $id',
+        summary: 'Registro de saúde excluído: $id - Motivo: $reason',
+        reason: reason,
       );
 
       developer.log('Health log deleted: $id', name: 'HealthViewModel');
@@ -142,7 +153,8 @@ class HealthViewModel extends ChangeNotifier {
     final log = HealthLogModel(
       dogId: dogId,
       date: DateTime.now(),
-      logType: 'Pesagem',
+      type: 'other',
+      subtype: 'Pesagem',
       weight: weight,
       healthObservations: 'Pesagem registrada: ${weight.toStringAsFixed(1)} kg',
     );

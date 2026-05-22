@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/core/services/pdf_generator/vaccination_pdf.dart';
 
 /// Tela 2.10 — Carteira de Vacinação Completa.
 /// Timeline horizontal de próximas doses, histórico agrupado por tipo, exportar PDF.
@@ -55,15 +57,25 @@ class VaccinationHistoryScreen extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.picture_as_pdf_outlined,
                 color: AppTheme.success, size: 20),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Exportação PDF em desenvolvimento',
-                      style: GoogleFonts.inter(fontSize: 12)),
-                  backgroundColor: AppTheme.success,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onPressed: () async {
+              try {
+                final pdfBytes = await VaccinationPdf.generate(dog, healthVM.healthLogs);
+                await Printing.layoutPdf(
+                  onLayout: (format) async => pdfBytes,
+                  name: 'Carteira_Vacinas_${dog.name}.pdf',
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao gerar PDF: $e',
+                          style: GoogleFonts.inter(fontSize: 12)),
+                      backgroundColor: AppTheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],

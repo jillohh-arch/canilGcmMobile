@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/profiles/domain/operational_profile_models.dart';
 import 'package:canil_gcm/features/profiles/presentation/widgets/operational_profile_widgets.dart';
@@ -53,7 +55,7 @@ class K9ProfilePage extends StatelessWidget {
                     16,
                     12,
                     16,
-                    showBottomNav ? 126 : 30,
+                    showBottomNav ? 176 : 90,
                   ),
                   child: Column(
                     children: [
@@ -85,6 +87,56 @@ class K9ProfilePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       _K9ProfileSections(data: data),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: showBottomNav ? 106 : 20,
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => HealthTypeSelectorScreen(dogId: dog.id),
+                    ),
+                  ).then((_) {
+                    Provider.of<HealthViewModel>(context, listen: false)
+                        .fetchHealthLogsForDog(dog.id);
+                  });
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A8E9D),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0A8E9D).withAlpha(51),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.healing_outlined,
+                          color: Color(0xFF050D10), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '⚕ REGISTRAR EVENTO DE SAÚDE',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF050D10),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
                     ],
                   ),
                 ),

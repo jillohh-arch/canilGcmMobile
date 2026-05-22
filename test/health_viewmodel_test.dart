@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,10 +26,19 @@ void main() {
     String logType = 'Consulta',
     DateTime? date,
   }) {
+    String typeVal = 'other';
+    if (logType == 'Vacina') typeVal = 'vaccination';
+    if (logType == 'Consulta') typeVal = 'consultation';
+    if (logType == 'Exame') typeVal = 'exam';
+    if (logType == 'Medicação') typeVal = 'medication';
+    if (logType == 'Banho') typeVal = 'other';
+    if (logType == 'Pesagem') typeVal = 'other';
+
     return HealthLogModel(
       id: id,
       dogId: dogId,
-      logType: logType,
+      type: typeVal,
+      subtype: logType,
       date: date ?? DateTime(2026, 5, 10),
       healthObservations: 'Observacao teste',
     );
@@ -46,7 +55,11 @@ void main() {
       expect(viewModel.healthLogs.first.id, isNotNull);
 
       // Verify persisted
-      final snapshot = await fakeFirestore.collection('health_logs').get();
+      final snapshot = await fakeFirestore
+          .collection('dogs')
+          .doc('dog-1')
+          .collection('health_events')
+          .get();
       expect(snapshot.docs, hasLength(1));
     });
 
@@ -59,7 +72,8 @@ void main() {
       final updated = HealthLogModel(
         id: savedId,
         dogId: 'dog-1',
-        logType: 'Vacina',
+        type: 'vaccination',
+        subtype: 'Vacina',
         date: DateTime(2026, 5, 10),
         healthObservations: 'Vacina aplicada',
       );
@@ -74,30 +88,55 @@ void main() {
       await viewModel.addHealthLog(createLog());
       final savedId = viewModel.healthLogs.first.id!;
 
-      await viewModel.deleteHealthLog(savedId);
+      await viewModel.deleteHealthLog(
+        id: savedId,
+        userId: 'test-user',
+        reason: 'Teste de exclusão',
+      );
 
       expect(viewModel.healthLogs, isEmpty);
-      final doc = await fakeFirestore.collection('health_logs').doc(savedId).get();
-      expect(doc.exists, isFalse);
+      final doc = await fakeFirestore
+          .collection('dogs')
+          .doc('dog-1')
+          .collection('health_events')
+          .doc(savedId)
+          .get();
+      expect(doc.exists, isTrue);
+      expect(doc.data()?['deleted_at'], isNotNull);
     });
 
     test('fetchHealthLogsForDog loads logs for given dog', () async {
       // Add logs directly to Firestore
-      await fakeFirestore.collection('health_logs').add({
+      await fakeFirestore
+          .collection('dogs')
+          .doc('dog-1')
+          .collection('health_events')
+          .add({
         'dogId': 'dog-1',
-        'logType': 'Banho',
+        'type': 'other',
+        'subtype': 'Banho',
         'date': Timestamp.fromDate(DateTime(2026, 5, 8)),
         'healthObservations': 'Banho completo',
       });
-      await fakeFirestore.collection('health_logs').add({
+      await fakeFirestore
+          .collection('dogs')
+          .doc('dog-1')
+          .collection('health_events')
+          .add({
         'dogId': 'dog-1',
-        'logType': 'Consulta',
+        'type': 'consultation',
+        'subtype': 'Consulta',
         'date': Timestamp.fromDate(DateTime(2026, 5, 10)),
         'healthObservations': 'Consulta rotina',
       });
-      await fakeFirestore.collection('health_logs').add({
+      await fakeFirestore
+          .collection('dogs')
+          .doc('dog-2')
+          .collection('health_events')
+          .add({
         'dogId': 'dog-2',
-        'logType': 'Vacina',
+        'type': 'vaccination',
+        'subtype': 'Vacina',
         'date': Timestamp.fromDate(DateTime(2026, 5, 9)),
         'healthObservations': 'Vacina outro cao',
       });
@@ -107,7 +146,7 @@ void main() {
       expect(viewModel.healthLogs, hasLength(2));
       // Should be sorted by date descending
       expect(viewModel.healthLogs.first.logType, 'Consulta');
-      expect(viewModel.healthLogs.last.logType, 'Banho');
+      expect(viewModel.healthLogs.last.subtype, 'Banho');
     });
 
     test('isLoading is false after operation completes', () async {
