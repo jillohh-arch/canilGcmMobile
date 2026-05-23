@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 class AddSpecialtyModal extends StatefulWidget {
@@ -100,7 +102,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _selectedSpecialty == null ? null : _saveSpecialty,
+                  onPressed: _selectedSpecialty == null ? null : () => _saveSpecialty(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4DD0E1),
                     foregroundColor: const Color(0xFF050D10),
@@ -241,18 +243,62 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
     );
   }
 
-  void _saveSpecialty() {
+  Future<void> _saveSpecialty() async {
     HapticFeedback.mediumImpact();
-    // Simulate save success
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _selectedSpecialty == 'Detecção'
-              ? 'Especialidade de Detecção iniciada com as substâncias: ${_selectedSubstances.join(", ")}!'
-              : 'Especialidade de $_selectedSpecialty iniciada com sucesso!',
+    
+    String? typeKey;
+    if (_selectedSpecialty == 'Busca & Captura') {
+      typeKey = 'busca_captura';
+    } else if (_selectedSpecialty == 'Detecção') {
+      typeKey = 'deteccao';
+    } else if (_selectedSpecialty == 'Guarda & Proteção') {
+      typeKey = 'guarda_protecao';
+    }
+
+    if (typeKey == null) return;
+
+    final data = <String, dynamic>{
+      'type': typeKey,
+      'status': 'in_formation',
+      'started_at': FieldValue.serverTimestamp(),
+    };
+
+    if (typeKey == 'deteccao') {
+      data['sub_areas'] = _selectedSubstances.map((subName) => {
+        'name': subName,
+        'status': 'in_formation',
+      }).toList();
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('dogs')
+          .doc(widget.dog.id)
+          .collection('specialties')
+          .doc(typeKey)
+          .set(data);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _selectedSpecialty == 'Detecção'
+                ? 'Especialidade de Detecção iniciada com as substâncias: ${_selectedSubstances.join(", ")}!'
+                : 'Especialidade de $_selectedSpecialty iniciada com sucesso!',
+          ),
+          backgroundColor: AppTheme.success,
         ),
-      ),
-    );
-    Navigator.of(context).pop();
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao iniciar especialidade: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
   }
 }
