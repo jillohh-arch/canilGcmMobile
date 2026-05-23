@@ -234,7 +234,7 @@ class WeightHistoryPdf {
                       pw.Container(
                         width: 8,
                         height: 8,
-                        decoration: BoxDecoration(
+                        decoration: pw.BoxDecoration(
                           color: PdfInstitutionalColors.greenInstitutional,
                           shape: pw.BoxShape.circle,
                         ),

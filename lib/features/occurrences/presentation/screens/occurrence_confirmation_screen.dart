@@ -106,7 +106,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
 
   Widget _buildSuccessTitle() {
     return Text(
-      'OcorrÃªncia finalizada',
+      'Ocorrência finalizada',
       style: GoogleFonts.inter(
         color: Colors.white,
         fontSize: 22,
@@ -144,7 +144,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           ),
           _SummaryRow(
             icon: Icons.schedule_outlined,
-            label: 'DuraÃ§Ã£o',
+            label: 'Duração',
             value: data.durationLabel,
           ),
           if (data.locationAddress != null && data.locationAddress!.isNotEmpty)
@@ -155,8 +155,8 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
             ),
           _SummaryRow(
             icon: Icons.pets_outlined,
-            label: 'BinÃ´mio',
-            value: '${data.dogName} Â· ${data.handlerName}',
+            label: 'Binômio',
+            value: '${data.dogName} · ${data.handlerName}',
           ),
           _SummaryRow(
             icon: Icons.list_alt_outlined,
@@ -186,7 +186,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'RESULTADOS DA OCORRÃŠNCIA',
+            'RESULTADOS DA OCORRÊNCIA',
             style: GoogleFonts.inter(
               color: AppTheme.success,
               fontSize: 10,
@@ -211,7 +211,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              detail.isNotEmpty ? '${result.label} Â· $detail' : result.label,
+              detail.isNotEmpty ? '${result.label} · $detail' : result.label,
               style: GoogleFonts.inter(color: Colors.white, fontSize: 12),
             ),
           ),
@@ -302,7 +302,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         }
         return parts.join(' de ');
       }
-      return '${drugs.length} substÃ¢ncias';
+      return '${drugs.length} substâncias';
     }
 
     if (detail is Map<String, dynamic>) {
@@ -312,7 +312,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         final parts = <String>[];
         if (qty.toString().isNotEmpty) parts.add('$qty pessoa(s)');
         if (dest.toString().isNotEmpty) parts.add(dest.toString());
-        return parts.join(' Â· ');
+        return parts.join(' · ');
       }
       if (result == OccurrenceResult.boCreated) {
         return detail['bo_number']?.toString() ??
@@ -393,7 +393,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     final dogVM = context.read<DogViewModel>();
     final authVM = context.read<AuthViewModel>();
 
-    // Buscar ocorrÃªncia: tenta na lista local, depois openOccurrence, depois Firestore
+    // Buscar ocorrência: tenta na lista local, depois openOccurrence, depois Firestore
     Occurrence? occ;
     final localMatch = occVM.occurrences.where(
       (o) => o.id == data.occurrenceId,
@@ -405,12 +405,12 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     occ ??= await occVM.getById(data.occurrenceId);
 
     if (occ == null) {
-      throw Exception('OcorrÃªncia nÃ£o encontrada');
+      throw Exception('Ocorrência não encontrada');
     }
 
     final events = await occVM.getEvents(data.occurrenceId);
 
-    // Buscar cÃ£o
+    // Buscar cão
     final dogId = occ.dogId;
     final dogs = dogVM.dogs.where((d) => d.id == dogId);
     final dog = dogs.isNotEmpty
@@ -418,7 +418,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         : (dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null);
 
     if (dog == null) {
-      throw Exception('Dados do cÃ£o nÃ£o disponÃ­veis');
+      throw Exception('Dados do cão não disponíveis');
     }
 
     final handlerRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
@@ -465,8 +465,8 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
       );
       return url;
     } catch (_) {
-      // A visualizaÃ§Ã£o/compartilhamento do PDF nÃ£o deve falhar se o cache remoto
-      // estiver indisponÃ­vel. A prÃ³xima geraÃ§Ã£o tenta salvar novamente.
+      // A visualização/compartilhamento do PDF não deve falhar se o cache remoto
+      // estiver indisponível. A próxima geração tenta salvar novamente.
       return null;
     }
   }

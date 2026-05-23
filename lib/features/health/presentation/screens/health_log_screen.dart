@@ -56,7 +56,7 @@ class _HealthLogScreenState extends State<HealthLogScreen>
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(
-          'ProntuÃ¡rio MÃ©dico',
+          'Prontuário Médico',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         bottom: TabBar(
@@ -73,7 +73,7 @@ class _HealthLogScreenState extends State<HealthLogScreen>
             fontSize: 13,
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.timeline_rounded), text: 'HistÃ³rico'),
+            Tab(icon: Icon(Icons.timeline_rounded), text: 'Histórico'),
             Tab(
               icon: Icon(Icons.add_circle_outline_rounded),
               text: 'Novo Registro',
@@ -95,4 +95,4 @@ class _HealthLogScreenState extends State<HealthLogScreen>
   }
 }
 
-// â”€â”€ Health Timeline (Apple Health style) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Health Timeline (Apple Health style) ──────────────────────────────────────

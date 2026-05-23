@@ -1,4 +1,4 @@
-﻿part of 'training_log_screen.dart';
+part of 'training_log_screen.dart';
 
 class _TrainingSectionLabel extends StatelessWidget {
   final String title;
@@ -23,16 +23,16 @@ class _TrainingSectionLabel extends StatelessWidget {
 }
 
 String? _requiredField(String? value) {
-  return value == null || value.isEmpty ? 'ObrigatÃ³rio' : null;
+  return value == null || value.isEmpty ? 'Obrigatório' : null;
 }
 
 (IconData, Color) _trainingSessionStyle(String type) {
   switch (type) {
     case 'Faro':
       return (Icons.track_changes_rounded, const Color(0xFFFFB300));
-    case 'ProteÃ§Ã£o':
+    case 'Proteção':
       return (Icons.shield_rounded, const Color(0xFFEF5350));
-    case 'ObediÃªncia':
+    case 'Obediência':
       return (Icons.school_rounded, const Color(0xFF42A5F5));
     default:
       return (Icons.fitness_center_rounded, AppTheme.amber);

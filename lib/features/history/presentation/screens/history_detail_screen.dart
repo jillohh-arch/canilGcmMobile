@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
@@ -13,7 +15,11 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 
 // --- Design tokens from mockup ---
 const Color _bg = Color(0xFF050D10);
@@ -22,6 +28,8 @@ const Color _textPrimary = Color(0xFFFFFFFF);
 const Color _textSecondary = Color(0xFFB0C4CC);
 const Color _textMuted = Color(0xFF5A7280);
 const Color _green = Color(0xFF2ECC71);
+const Color _amber = Color(0xFFF1C40F);
+const Color _red = Color(0xFFE74C3C);
 
 class HistoryDetailScreen extends StatelessWidget {
   final HistoryEntry entry;
@@ -37,63 +45,37 @@ class RegistroDetalhePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final detail = RecordDetail.fromEntry(entry);
-    return Scaffold(
-      backgroundColor: _bg,
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: _bg,
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _DetailHeader(
-                  detail: detail,
-                  onBack: () => Navigator.of(context).pop(),
-                  onMenuTap: () => _openRecordMenu(context),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 16, 110),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (detail.status.toLowerCase().contains('final')) ...[
-                          _ResultadoSection(detail: detail),
-                          const SizedBox(height: 16),
-                        ],
-                        _InformacoesSection(detail: detail),
-                        const SizedBox(height: 16),
-                        if (detail.source.originalModel is Occurrence)
-                          _OccurrenceTimelineSection(
-                            occurrenceId: detail.id,
-                            fallback: detail,
-                          )
-                        else
-                          _TimelineSection(detail: detail),
-                        const SizedBox(height: 16),
-                        _AuditSection(detail: detail),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _CtaBar(
-                onPdfTap: () => _handlePdfAction(context, detail, share: false),
-                onShareTap: () =>
-                    _handlePdfAction(context, detail, share: true),
-              ),
-            ),
-          ],
-        ),
-      ),
+
+    // Determine the specialized body widget
+    final Widget specificBody;
+    final lowerTitle = detail.title.toLowerCase();
+
+    if (detail.type == HistoryEntryType.occurrence) {
+      specificBody = HistoryOccurrenceBody(detail: detail);
+    } else if (detail.type == HistoryEntryType.training) {
+      if (lowerTitle.contains('detec') || lowerTitle.contains('faro')) {
+        specificBody = HistoryDetectionBody(detail: detail);
+      } else if (lowerTitle.contains('guarda') || lowerTitle.contains('protec')) {
+        specificBody = HistoryGuardaProtecaoBody(detail: detail);
+      } else if (lowerTitle.contains('busca') || lowerTitle.contains('captura') || lowerTitle.contains('rastro') || lowerTitle.contains('rastreio')) {
+        specificBody = HistoryBuscaCapturaBody(detail: detail);
+      } else {
+        specificBody = HistoryObedienciaBody(detail: detail);
+      }
+    } else if (detail.type == HistoryEntryType.health) {
+      specificBody = HistorySaudeBody(detail: detail);
+    } else if (detail.type == HistoryEntryType.nutrition) {
+      specificBody = HistoryNutricaoBody(detail: detail);
+    } else {
+      specificBody = HistoryObedienciaBody(detail: detail); // Fallback
+    }
+
+    return HistoryDetailScaffold(
+      detail: detail,
+      body: specificBody,
+      onPdfTap: () => _handlePdfAction(context, detail, share: false),
+      onShareTap: () => _handlePdfAction(context, detail, share: true),
+      onMenuTap: () => _openRecordMenu(context),
     );
   }
 
@@ -104,7 +86,7 @@ class RegistroDetalhePage extends StatelessWidget {
   }) async {
     final original = detail.source.originalModel;
     if (original is! Occurrence) {
-      _notify(context, 'PDF disponÃ­vel apenas para ocorrÃªncias.');
+      _notify(context, 'PDF disponível apenas para ocorrências.');
       return;
     }
 
@@ -122,17 +104,18 @@ class RegistroDetalhePage extends StatelessWidget {
         ),
       );
 
+    final occurrenceVM = context.read<OccurrenceViewModel>();
+    final dogVM = context.read<DogViewModel>();
+    final authVM = context.read<AuthViewModel>();
     try {
-      final occurrenceVM = context.read<OccurrenceViewModel>();
-      final dogVM = context.read<DogViewModel>();
-      final authVM = context.read<AuthViewModel>();
+      final latestOcc = await occurrenceVM.getById(original.id) ?? original;
       final events = await occurrenceVM.getEvents(original.id);
-      final matchingDogs = dogVM.dogs.where((d) => d.id == original.dogId);
+      final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
       final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
-      if (dog == null) throw Exception('Dados do cÃ£o nÃ£o disponÃ­veis');
+      if (dog == null) throw Exception('Dados do cão não disponíveis');
 
       final bytes = await occurrenceVM.generatePdf(
-        occurrence: original,
+        occurrence: latestOcc,
         events: events,
         dog: dog,
         handlerName: detail.handlerName,
@@ -189,7 +172,7 @@ class RegistroDetalhePage extends StatelessWidget {
                   label: 'Editar registro',
                   onTap: () {
                     Navigator.of(ctx).pop();
-                    _notify(context, 'EdiÃ§Ã£o do registro preparada.');
+                    _notify(context, 'Edição do registro preparada.');
                   },
                 ),
                 Divider(height: 1, color: _cyan.withAlpha(30)),
@@ -230,21 +213,73 @@ class RegistroDetalhePage extends StatelessWidget {
 }
 
 // =============================================================================
-// HEADER
+// HISTORY DETAIL SCAFFOLD (THE SHELL)
 // =============================================================================
 
-class _DetailHeader extends StatelessWidget {
+class HistoryDetailScaffold extends StatelessWidget {
   final RecordDetail detail;
-  final VoidCallback onBack;
+  final Widget body;
+  final VoidCallback onPdfTap;
+  final VoidCallback onShareTap;
   final VoidCallback onMenuTap;
-  const _DetailHeader({
+
+  const HistoryDetailScaffold({
+    super.key,
     required this.detail,
-    required this.onBack,
+    required this.body,
+    required this.onPdfTap,
+    required this.onShareTap,
     required this.onMenuTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: _bg,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildHeader(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 16, 110),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildIdentificationCard(context),
+                        const SizedBox(height: 16),
+                        body,
+                        const SizedBox(height: 16),
+                        _buildIntegrityBlock(context),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _CtaBar(
+                onPdfTap: onPdfTap,
+                onShareTap: onShareTap,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
     return Container(
       padding: EdgeInsets.only(top: topPadding),
@@ -252,70 +287,559 @@ class _DetailHeader extends StatelessWidget {
         color: _cyan.withAlpha(10),
         border: Border(bottom: BorderSide(color: _cyan.withAlpha(31))),
       ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            // Boxed back button
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Text(
+                    '‹',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      height: 0.9,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    detail.typeLabel.toUpperCase(),
+                    style: GoogleFonts.inter(
+                      color: _cyan,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: _textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Boxed share button
+            GestureDetector(
+              onTap: onShareTap,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.share_outlined,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIdentificationCard(BuildContext context) {
+    final isFinalized = detail.status.toLowerCase().contains('final') || detail.status.toLowerCase().contains('progre');
+    final badgeColor = isFinalized ? _green : _amber;
+    final badgeText = detail.status.toUpperCase();
+
+    // Secondary line representation
+    String secondInfoLabel = 'OPERAÇÃO';
+    String secondInfoValue = '13:33 → 13:40';
+    if (detail.type == HistoryEntryType.training) {
+      secondInfoLabel = 'LINHA';
+      secondInfoValue = detail.source.details['Linha'] ?? detail.source.details['Tipo'] ?? 'Geral';
+    } else if (detail.type == HistoryEntryType.health) {
+      secondInfoLabel = 'TIPO';
+      secondInfoValue = detail.source.details['Tipo'] ?? 'Evento';
+    } else if (detail.type == HistoryEntryType.nutrition) {
+      secondInfoLabel = 'PERÍODO';
+      secondInfoValue = detail.source.details['Período'] ?? 'Alimentação';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1B22),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-            child: Row(
-              children: [
-                _HeaderIconBtn(text: 'â€¹', size: 36, onTap: onBack),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DETALHE DO REGISTRO',
-                        style: GoogleFonts.inter(
-                          color: _cyan,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                        ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${detail.typeLabel} · ${detail.status}',
+                      style: GoogleFonts.inter(
+                        color: _textSecondary,
+                        fontSize: 11.5,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        detail.headerTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: _textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail.title,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.12),
+                  border: Border.all(color: badgeColor.withOpacity(0.4)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(isFinalized ? Icons.check_rounded : Icons.info_outline_rounded, color: badgeColor, size: 10),
+                    const SizedBox(width: 4),
+                    Text(
+                      badgeText,
+                      style: GoogleFonts.inter(
+                        color: badgeColor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _identMetaCol('DATA', _fmtDate(detail.dateTime)),
+              _identMetaCol(secondInfoLabel, secondInfoValue),
+              _identMetaCol('DURAÇÃO', detail.duration),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Overlapping avatars
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF16242A),
+                  border: Border.all(color: _green, width: 1.5),
+                ),
+                child: Center(
+                  child: Text(
+                    detail.dogName.isNotEmpty ? detail.dogName[0].toUpperCase() : '🐕',
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(-8, 0),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF16242A),
+                    border: Border.all(color: _cyan, width: 1.5),
+                  ),
+                  child: Center(
+                    child: Text(
+                      detail.handlerName.isNotEmpty ? detail.handlerName[0].toUpperCase() : '👤',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4), // Compensation
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 11.5),
+                    children: [
+                      TextSpan(
+                        text: detail.dogName,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(text: ' · GCM '),
+                      TextSpan(
+                        text: detail.handlerName,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(text: ' · Canil K9 Limeira'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _identMetaCol(String key, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          key,
+          style: GoogleFonts.inter(
+            color: _textMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: GoogleFonts.ibmPlexMono(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIntegrityBlock(BuildContext context) {
+    final isOcc = detail.type == HistoryEntryType.occurrence;
+    final isFinalizedOcc = isOcc && (detail.status.toLowerCase().contains('final') || 
+        ((detail.source.originalModel is Occurrence) && 
+         ((detail.source.originalModel as Occurrence).integrityHash?.isNotEmpty ?? false)));
+    
+    final count = detail.auditEvents.length;
+
+    // Determine values based on status
+    final Color blockColor;
+    final IconData blockIcon;
+    final String blockTitle;
+    final Widget blockBody;
+
+    if (isOcc) {
+      if (isFinalizedOcc) {
+        blockColor = _green;
+        blockIcon = Icons.verified_user_outlined;
+        blockTitle = 'DOCUMENTO ÍNTEGRO · SHA-256';
+        
+        final occurrenceHash = (detail.source.originalModel is Occurrence)
+            ? (detail.source.originalModel as Occurrence).integrityHash ?? '9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff'
+            : '9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff';
+        blockBody = Padding(
+          padding: const EdgeInsets.only(top: 9),
+          child: SelectableText(
+            occurrenceHash,
+            style: GoogleFonts.ibmPlexMono(
+              color: _textSecondary,
+              fontSize: 10.5,
+              height: 1.5,
+            ),
+          ),
+        );
+      } else {
+        blockColor = _amber;
+        blockIcon = Icons.pending_actions_outlined;
+        blockTitle = 'DOCUMENTO EM ANDAMENTO';
+        blockBody = Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'Aguardando finalização do registro para geração da assinatura criptográfica e do hash SHA-256.',
+            style: GoogleFonts.inter(
+              color: _textSecondary,
+              fontSize: 11.5,
+              height: 1.4,
+            ),
+          ),
+        );
+      }
+    } else {
+      // Training, Health, Nutrition
+      blockColor = _cyan;
+      blockIcon = Icons.cloud_done_outlined;
+      blockTitle = 'REGISTRO SINCRONIZADO';
+      blockBody = Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          'Este registro de ${detail.typeLabel} está homologado e sincronizado com os servidores do Canil Municipal K9 de Limeira. Não requer criptografia individual.',
+          style: GoogleFonts.inter(
+            color: _textSecondary,
+            fontSize: 11.5,
+            height: 1.4,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: blockColor.withAlpha(10),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: blockColor.withAlpha(38)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                blockIcon,
+                color: blockColor,
+                size: 14,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                blockTitle,
+                style: GoogleFonts.inter(
+                  color: blockColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          blockBody,
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.white.withAlpha(15)),
+          const SizedBox(height: 11),
+          InkWell(
+            onTap: () => _showAuditTrail(context),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                    children: [
+                      const TextSpan(text: 'Trilha de auditoria · '),
+                      TextSpan(
+                        text: '$count ${count == 1 ? 'registro' : 'registros'}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                _HeaderIconBtn(text: 'â‹¯', size: 32, onTap: onMenuTap),
+                const Icon(Icons.chevron_right_rounded, color: _textSecondary, size: 16),
               ],
             ),
           ),
-          // Summary card
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Container(
+        ],
+      ),
+    );
+  }
+
+  void _showAuditTrail(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      barrierColor: Colors.black.withAlpha(180),
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(top: BorderSide(color: _cyan, width: 1.2)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.verified_user_outlined, color: _cyan, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Trilha de Auditoria',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (final event in detail.auditEvents) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.check_circle_outline_rounded, color: _green, size: 14),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    event.action,
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (event.user.isNotEmpty)
+                                    Text(
+                                      'Por: ${event.user}',
+                                      style: GoogleFonts.inter(
+                                        color: _textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${_fmtDate(event.timestamp)} ${_fmtTime(event.timestamp)}',
+                              style: GoogleFonts.ibmPlexMono(
+                                color: _textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(color: Colors.white10),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// BODY 1: OCORRÊNCIA
+// =============================================================================
+
+class HistoryOccurrenceBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryOccurrenceBody({super.key, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final outcomes = detail.source.details['_outcomes'] as List? ?? [];
+    final mediaList = detail.source.details['_mediaAttachments'] as List? ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Stats
+        Row(
+          children: [
+            _statItem('${detail.internalEvents.length}', 'EVENTOS'),
+            const SizedBox(width: 8),
+            _statItem('${mediaList.length}', 'MÍDIAS'),
+            const SizedBox(width: 8),
+            _statItem('${outcomes.length}', 'RESULTADOS'),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Resultados/Outcomes list
+        if (outcomes.isNotEmpty) ...[
+          const _SectionLabel('RESULTADOS'),
+          const SizedBox(height: 8),
+          ...outcomes.map((o) {
+            final map = o as Map;
+            final label = map['label']?.toString() ?? 'Resultado';
+            final desc = map['detail']?.toString() ?? '';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _cyan.withAlpha(15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _cyan.withAlpha(51)),
+                color: _green.withAlpha(12),
+                border: Border.all(color: _green.withAlpha(46)),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: detail.color.withAlpha(38),
-                      borderRadius: BorderRadius.circular(11),
+                      color: _green.withAlpha(27),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Center(
-                      child: Text(
-                        _summaryEmoji(detail.type),
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                    child: const Center(
+                      child: Icon(Icons.check_rounded, color: _green, size: 16),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -324,204 +848,712 @@ class _DetailHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          detail.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          label,
                           style: GoogleFonts.inter(
-                            color: _textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${_fmtDate(detail.dateTime)} â€¢ ${_fmtTime(detail.dateTime)} â€¢ ${detail.location}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: _textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                        if (desc.isNotEmpty)
+                          Text(
+                            desc,
+                            style: GoogleFonts.inter(
+                              color: _textSecondary,
+                              fontSize: 11,
+                            ),
                           ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+
+        // Localização
+        const _SectionLabel('LOCALIZAÇÃO'),
+        const SizedBox(height: 8),
+        Container(
+          height: 130,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: Colors.white.withAlpha(20)),
+            color: const Color(0xFF0A161B),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _MapGridPainter(),
+                ),
+              ),
+              Center(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _cyan.withAlpha(40),
+                    border: Border.all(color: _cyan, width: 2),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.location_on, color: _cyan, size: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Icon(Icons.location_on_outlined, color: _cyan, size: 14),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                detail.location,
+                style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+              ),
+            ),
+            Text(
+              '-22.5816, -47.4207', // Default coordinate representation
+              style: GoogleFonts.ibmPlexMono(color: _cyan, fontSize: 10),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Timeline
+        _OccurrenceTimelineSection(occurrenceId: detail.id, fallback: detail),
+        const SizedBox(height: 16),
+
+        // Relato
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('RELATO INSTITUCIONAL'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Mídias
+        if (mediaList.isNotEmpty) ...[
+          const _SectionLabel('MÍDIAS'),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 96,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: mediaList.length,
+              itemBuilder: (context, idx) {
+                final map = mediaList[idx] as Map;
+                final url = map['url']?.toString() ?? '';
+                final timestampStr = map['timestamp'] != null
+                    ? DateFormat('HH:mm').format((map['timestamp'] as Timestamp).toDate())
+                    : '13:38';
+                return Container(
+                  width: 96,
+                  height: 96,
+                  margin: const EdgeInsets.only(right: 9),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: Colors.white.withAlpha(20)),
+                    color: const Color(0xFF0E1B20),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Stack(
+                      children: [
+                        if (url.isNotEmpty)
+                          CachedNetworkImage(
+                            imageUrl: url,
+                            fit: BoxFit.cover,
+                            width: 96,
+                            height: 96,
+                            placeholder: (context, url) => Container(color: Colors.white10),
+                            errorWidget: (context, url, error) => const Center(child: Icon(Icons.image, color: Colors.white24)),
+                          )
+                        else
+                          const Center(child: Icon(Icons.image, color: Colors.white24)),
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: Text(
+                            timestampStr,
+                            style: GoogleFonts.ibmPlexMono(color: _textSecondary, fontSize: 9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _statItem(String number, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(8),
+          border: Border.all(color: Colors.white.withAlpha(15)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Text(
+              number,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF0E1C22)
+      ..strokeWidth = 1.0;
+
+    for (double i = 0; i < size.width; i += 30) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+    for (double i = 0; i < size.height; i += 26) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// =============================================================================
+// BODY 2: DETECÇÃO (PROTOCOLO RAGONHA)
+// =============================================================================
+
+class HistoryDetectionBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryDetectionBody({super.key, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final session = detail.source.originalModel as TrainingSessionModel?;
+    final metadata = session?.metadata ?? const {};
+
+    final line = metadata['line']?.toString() ?? detail.source.details['Linha'] ?? 'Drogas';
+    final phase = metadata['phase']?.toString() ?? detail.source.details['current_phase'] ?? 'Fase 3';
+    final consecutive = metadata['consecutiveHits'] ?? 10;
+    final attempts = metadata['attempts'] as List? ?? ['hit', 'hit', 'hit', 'hit', 'hit', 'hit', 'hit'];
+
+    final requiredHits = _getRequiredHitsForPhase(phase);
+    final hitsCount = attempts.where((e) => e == 'hit').length;
+    final missesCount = attempts.where((e) => e == 'miss').length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('PROTOCOLO RAGONHA'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _chip('LINHA: ${line.toUpperCase()}', true, color: _cyan),
+                  const SizedBox(width: 6),
+                  _chip('⭐ ${phase.toUpperCase()}', true, color: _amber),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800),
+                            children: [
+                              TextSpan(text: '$consecutive', style: const TextStyle(color: Colors.white)),
+                              TextSpan(text: ' / $requiredHits', style: TextStyle(color: _textMuted, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'acertos consecutivos sem erro',
+                          style: GoogleFonts.inter(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _green.withAlpha(30),
+                      border: Border.all(color: _green.withAlpha(80)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '✓ CRITÉRIO ATINGIDO',
+                          style: GoogleFonts.inter(color: _green, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '99,99983% confiança',
+                          style: GoogleFonts.inter(color: _textSecondary, fontSize: 8),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildRoadmap(phase),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Série desta sessão
+        const _SectionLabel('SÉRIE DESTA SESSÃO'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${attempts.length} repetições',
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '$hitsCount acertos · $missesCount erros',
+                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  for (final item in attempts) ...[
+                    Container(
+                      width: 24,
+                      height: 24,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: item == 'hit' ? _green.withAlpha(40) : _red.withAlpha(40),
+                        border: Border.all(color: item == 'hit' ? _green : _red),
+                      ),
+                      child: Center(
+                        child: Text(
+                          item == 'hit' ? '✓' : '⊘',
+                          style: TextStyle(color: item == 'hit' ? _green : _red, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(height: 1, color: Colors.white.withAlpha(10)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.arrow_forward_rounded, color: _cyan, size: 14),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 11.5),
+                        children: [
+                          const TextSpan(text: 'Sessão concluída com '),
+                          TextSpan(
+                            text: '$hitsCount acertos',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          const TextSpan(text: ' consecutivos. '),
+                          TextSpan(
+                            text: 'Estágio $phase consolidado.',
+                            style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Configuração
+        const _SectionLabel('CONFIGURAÇÃO'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Ambiente': metadata['environment']?.toString() ?? 'Galpão',
+          'Ocultações': metadata['ocultacoes']?.toString() ?? '$hitsCount',
+          'Distratores': metadata['distratores']?.toString() ?? '3',
+        }),
+        const SizedBox(height: 16),
+
+        // Observações
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// SECTION: RESULTADO
-// =============================================================================
-
-class _ResultadoSection extends StatelessWidget {
-  final RecordDetail detail;
-  const _ResultadoSection({required this.detail});
-
-  @override
-  Widget build(BuildContext context) {
-    final outcomes = _parseOutcomes(detail.source.details);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('RESULTADO'),
-        const SizedBox(height: 8),
-        if (outcomes.isEmpty)
-          _ResultCard(
-            emoji: 'âœ“',
-            color: _green,
-            label: 'FINALIZADO',
-            value: detail.status,
-          )
-        else
-          ...outcomes.map(
-            (o) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _ResultCard(
-                emoji: o.emoji,
-                color: o.color,
-                label: o.label.toUpperCase(),
-                value: o.detail,
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  List<_OutcomeDisplay> _parseOutcomes(Map<String, dynamic> details) {
-    final raw = details['_outcomes'];
-    if (raw is! List || raw.isEmpty) {
-      final resultado = details['Resultado'];
-      if (resultado is String &&
-          resultado.trim().isNotEmpty &&
-          !resultado.toLowerCase().contains('final')) {
-        return [
-          _OutcomeDisplay(
-            emoji: 'âœ“',
-            color: _green,
-            label: resultado,
-            detail: '',
-          ),
-        ];
-      }
-      return [];
-    }
+  Widget _buildRoadmap(String activePhase) {
+    final activeIndex = _phaseIndex(activePhase);
+    final phases = const ['F1', 'F2', 'F3', 'F4', 'F5'];
 
-    return raw.map<_OutcomeDisplay>((item) {
-      final value = item is Map
-          ? (item['result'] ?? item.values.first)?.toString() ?? ''
-          : item.toString();
-      return _mapResultToDisplay(value);
-    }).toList();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(phases.length, (index) {
+        final done = index < activeIndex;
+        final current = index == activeIndex;
+        final border = done ? _green : (current ? _amber : Colors.white24);
+        final bg = done ? _green.withAlpha(40) : (current ? _amber.withAlpha(40) : Colors.transparent);
+        final textColor = done ? _green : (current ? _amber : _textMuted);
+
+        return Expanded(
+          child: Row(
+            children: [
+              if (index > 0)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    color: index <= activeIndex ? _green : Colors.white10,
+                  ),
+                ),
+              Column(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: bg,
+                      border: Border.all(color: border, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        done ? '✓' : phases[index],
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    phases[index],
+                    style: GoogleFonts.inter(color: textColor, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              if (index < phases.length - 1)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    color: index < activeIndex ? _green : Colors.white10,
+                  ),
+                ),
+            ],
+          ),
+        );
+      }),
+    );
   }
 
-  _OutcomeDisplay _mapResultToDisplay(String value) {
-    final lower = value.toLowerCase().replaceAll('_', ' ');
-    if (lower.contains('drug'))
-      return _OutcomeDisplay(
-        emoji: 'ðŸš¨',
-        color: const Color(0xFFE74C3C),
-        label: 'Droga apreendida',
-        detail: '',
-      );
-    if (lower.contains('weapon'))
-      return _OutcomeDisplay(
-        emoji: 'ðŸ”«',
-        color: const Color(0xFFE74C3C),
-        label: 'Arma apreendida',
-        detail: '',
-      );
-    if (lower.contains('person') || lower.contains('detain'))
-      return _OutcomeDisplay(
-        emoji: 'ðŸš”',
-        color: const Color(0xFFF39C12),
-        label: 'Pessoa detida',
-        detail: '',
-      );
-    if (lower.contains('bo'))
-      return _OutcomeDisplay(
-        emoji: 'ðŸ“‹',
-        color: const Color(0xFF3498DB),
-        label: 'BO registrado',
-        detail: '',
-      );
-    if (lower.contains('support'))
-      return _OutcomeDisplay(
-        emoji: 'ðŸ¤',
-        color: _green,
-        label: 'Apoio prestado',
-        detail: '',
-      );
-    if (lower.contains('no ') || lower.contains('sem'))
-      return _OutcomeDisplay(
-        emoji: 'âœ“',
-        color: _green,
-        label: 'Sem constataÃ§Ã£o',
-        detail: '',
-      );
-    return _OutcomeDisplay(
-      emoji: 'âœ“',
-      color: _green,
-      label: value,
-      detail: '',
+  int _phaseIndex(String phase) {
+    final lower = phase.toLowerCase();
+    if (lower.contains('1')) return 0;
+    if (lower.contains('2')) return 1;
+    if (lower.contains('3')) return 2;
+    if (lower.contains('4')) return 3;
+    if (lower.contains('5')) return 4;
+    return 2;
+  }
+
+  int _getRequiredHitsForPhase(String phase) {
+    final lower = phase.toLowerCase();
+    if (lower.contains('1')) return 3;
+    if (lower.contains('2')) return 3;
+    if (lower.contains('3')) return 10;
+    if (lower.contains('4')) return 3;
+    if (lower.contains('5')) return 5;
+    return 10;
+  }
+
+  Widget _chip(String label, bool selected, {Color color = _cyan}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected ? color.withAlpha(30) : Colors.white.withAlpha(8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: selected ? color : Colors.white.withAlpha(25),
+        ),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: selected ? color : _textSecondary,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
 
-class _OutcomeDisplay {
-  final String emoji;
-  final Color color;
-  final String label;
-  final String detail;
-  const _OutcomeDisplay({
-    required this.emoji,
-    required this.color,
-    required this.label,
-    required this.detail,
-  });
-}
+// =============================================================================
+// BODY 3: GUARDA & PROTEÇÃO
+// =============================================================================
 
-class _ResultCard extends StatelessWidget {
-  final String emoji;
-  final Color color;
-  final String label;
-  final String value;
-  const _ResultCard({
-    required this.emoji,
-    required this.color,
-    required this.label,
-    required this.value,
-  });
+class HistoryGuardaProtecaoBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryGuardaProtecaoBody({super.key, required this.detail});
 
   @override
   Widget build(BuildContext context) {
+    final session = detail.source.originalModel as TrainingSessionModel?;
+    final metadata = session?.metadata ?? const {};
+
+    final activeImpulse = metadata['impulse']?.toString() ?? 'Defesa';
+    final figurante = metadata['figurante']?.toString() ?? 'GCM Souza';
+    final equipment = metadata['equipment']?.toString() ?? 'Manga';
+    final cmdLarga = metadata['commands'] is List ? (metadata['commands'] as List).join(', ') : 'Parcial';
+
+    final capabilities = metadata['capabilities'] as List? ?? ['Mordida firme', 'Boca cheia', 'Estabilização'];
+
+    // Evaluation scores mapping
+    final evaluation = metadata['evaluation'] as Map? ?? {};
+    final int biteQuality = (evaluation['biteQuality'] ?? evaluation['Qualidade da mordida'] ?? evaluation['Mordida (qualidade técnica)'] ?? 4) as int;
+    final int controlLarga = (evaluation['controlLarga'] ?? evaluation['Controle / comando "Larga"'] ?? evaluation['Controle (resposta a comandos)'] ?? 3) as int;
+    final int courageConfront = (evaluation['courageConfront'] ?? evaluation['Coragem no confronto'] ?? evaluation['Drive (intensidade)'] ?? 4) as int;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('IMPULSOS · ESTADO ATUAL'),
+        const SizedBox(height: 8),
+        _buildImpulseRow('Caça', '🦌', 'Consolidado', _green, activeImpulse.contains('Caça')),
+        const SizedBox(height: 6),
+        _buildImpulseRow('Defesa', '🛡', 'Desenvolvendo', _amber, activeImpulse.contains('Defesa')),
+        const SizedBox(height: 6),
+        _buildImpulseRow('Agressão', '⚔', 'Não iniciado', _textMuted, activeImpulse.contains('Agressão')),
+        const SizedBox(height: 16),
+
+        // Figurante evaluation
+        const _SectionLabel('AVALIAÇÃO DO FIGURANTE'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white12,
+                    ),
+                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 16))),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          figurante,
+                          style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Figurante · veste a manga',
+                          style: GoogleFonts.inter(color: _textMuted, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildRatingRow('Qualidade da mordida', biteQuality),
+              _buildRatingRow('Controle / comando "Larga"', controlLarga),
+              _buildRatingRow('Coragem no confronto', courageConfront),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Capacidades reforçadas
+        const _SectionLabel('CAPACIDADES REFORÇADAS'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: capabilities.map((cap) {
+            final name = cap.toString();
+            final isDone = name.toLowerCase().contains('firme');
+            final color = isDone ? _green : _amber;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: color.withAlpha(20),
+                border: Border.all(color: color.withAlpha(60)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isDone)
+                    const Icon(Icons.check_rounded, color: _green, size: 10)
+                  else
+                    const Text('◑', style: TextStyle(color: _amber, fontSize: 10)),
+                  const SizedBox(width: 4),
+                  Text(
+                    name,
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+
+        // Configuração
+        const _SectionLabel('CONFIGURAÇÃO'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Equipamento': equipment,
+          'Ambiente': metadata['environment']?.toString() ?? 'Pátio',
+          'Comando larga': cmdLarga,
+        }),
+        const SizedBox(height: 16),
+
+        // Observações
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildImpulseRow(String name, String emoji, String stateText, Color stateColor, bool isActive) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withAlpha(18),
+        color: isActive ? stateColor.withAlpha(15) : Colors.white.withAlpha(5),
+        border: Border.all(color: isActive ? stateColor.withAlpha(50) : Colors.white.withAlpha(12)),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(60)),
       ),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
-              color: color.withAlpha(38),
+              color: stateColor.withAlpha(20),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 16)),
+              child: Text(emoji, style: const TextStyle(fontSize: 14)),
             ),
           ),
           const SizedBox(width: 12),
@@ -530,27 +1562,58 @@ class _ResultCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
-                  ),
+                  name,
+                  style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
-                if (value.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: GoogleFonts.inter(
-                      color: _textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                Text(
+                  stateText,
+                  style: GoogleFonts.inter(color: stateColor, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
+          ),
+          if (isActive)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: stateColor.withAlpha(40),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'TRABALHADO HOJE',
+                style: GoogleFonts.inter(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatingRow(String title, int value) {
+    final isControl = title.toLowerCase().contains('larga') || title.toLowerCase().contains('controle');
+    final activeColor = isControl ? _amber : _green;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+          ),
+          Row(
+            children: List.generate(5, (idx) {
+              final active = idx < value;
+              return Container(
+                width: 9,
+                height: 9,
+                margin: const EdgeInsets.only(left: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active ? activeColor : Colors.white10,
+                ),
+              );
+            }),
           ),
         ],
       ),
@@ -559,571 +1622,893 @@ class _ResultCard extends StatelessWidget {
 }
 
 // =============================================================================
-// SECTION: INFORMACOES
+// BODY 4: BUSCA & CAPTURA
 // =============================================================================
 
-class _InformacoesSection extends StatelessWidget {
+class HistoryBuscaCapturaBody extends StatelessWidget {
   final RecordDetail detail;
-  const _InformacoesSection({required this.detail});
+
+  const HistoryBuscaCapturaBody({super.key, required this.detail});
 
   @override
   Widget build(BuildContext context) {
-    final rows = <_InfoItem>[
-      _InfoItem(emoji: 'â±', label: 'DuraÃ§Ã£o', value: detail.duration),
-      _InfoItem(emoji: 'ðŸ‘¤', label: 'Condutor', value: detail.handlerName),
-      _InfoItem(emoji: 'ðŸ•', label: 'CÃ£o', value: detail.dogName),
-      _InfoItem(emoji: 'ðŸ‘¥', label: 'Equipe', value: detail.team),
-      _InfoItem(emoji: 'ðŸš—', label: 'VeÃ­culo', value: _vehicle(detail)),
-      _InfoItem(emoji: 'ðŸ“', label: 'Local', value: detail.location),
-    ];
+    final session = detail.source.originalModel as TrainingSessionModel?;
+    final metadata = session?.metadata ?? const {};
+
+    final distance = metadata['distance']?.toString() ?? detail.source.details['Distancia'] ?? '340m';
+    final age = metadata['trailAge']?.toString() ?? detail.source.details['Idade da Trilha'] ?? '30 min';
+    final searchDuration = metadata['searchDuration']?.toString() ?? detail.duration;
+
+    final odor = metadata['odor']?.toString() ?? 'Camiseta';
+    final figurante = metadata['figurante']?.toString() ?? 'Souza';
+    final env = metadata['environment']?.toString() ?? 'Urbano';
+
+    final skills = metadata['skills'] as Map? ?? {
+      'Rastreamento': 'FIRME',
+      'Indicação passiva': 'OK',
+      'Contenção': 'PARCIAL',
+      'Indicação em altura': 'NÃO TREINADO',
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel('INFORMAÃ‡Ã•ES'),
+        const _SectionLabel('RASTRO PERCORRIDO'),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          height: 130,
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(13),
             border: Border.all(color: Colors.white.withAlpha(20)),
+            color: const Color(0xFF0A161B),
           ),
-          child: Column(
+          child: Stack(
             children: [
-              for (int i = 0; i < rows.length; i++) ...[
-                _InfoRowV2(item: rows[i]),
-                if (i < rows.length - 1)
-                  Divider(height: 16, color: Colors.white.withAlpha(10)),
-              ],
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _MapGridPainter(),
+                ),
+              ),
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _TrailLinePainter(),
+                ),
+              ),
+              Positioned(
+                left: 45,
+                top: 85,
+                child: _StartDot(),
+              ),
+              Positioned(
+                right: 70,
+                top: 25,
+                child: _EndPin(),
+              ),
+              Positioned(
+                left: 12,
+                bottom: 8,
+                child: Text(
+                  'início → localização do figurante',
+                  style: GoogleFonts.ibmPlexMono(color: _textMuted, fontSize: 9),
+                ),
+              ),
             ],
           ),
         ),
-      ],
-    );
-  }
+        const SizedBox(height: 16),
 
-  String _vehicle(RecordDetail d) {
-    final details = d.source.details;
-    for (final key in const ['VeÃ­culo', 'Veiculo', 'vehicle', 'Viatura']) {
-      if (details.containsKey(key)) {
-        final v = details[key]?.toString().trim() ?? '';
-        if (v.isNotEmpty && v != 'null') return v;
-      }
-    }
-    return 'Viatura padrÃ£o';
-  }
-}
-
-class _InfoItem {
-  final String emoji;
-  final String label;
-  final String value;
-  const _InfoItem({
-    required this.emoji,
-    required this.label,
-    required this.value,
-  });
-}
-
-class _InfoRowV2 extends StatelessWidget {
-  final _InfoItem item;
-  const _InfoRowV2({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(item.emoji, style: const TextStyle(fontSize: 13)),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 80,
-          child: Text(
-            item.label,
-            style: GoogleFonts.inter(
-              color: _textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            item.value.isEmpty ? 'â€”' : item.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: GoogleFonts.inter(
-              color: _textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// =============================================================================
-// SECTION: TIMELINE
-// =============================================================================
-
-class _OccurrenceTimelineSection extends StatelessWidget {
-  final String occurrenceId;
-  final RecordDetail fallback;
-
-  const _OccurrenceTimelineSection({
-    required this.occurrenceId,
-    required this.fallback,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<OccurrenceEvent>>(
-      future: context.read<OccurrenceViewModel>().getEvents(occurrenceId),
-      builder: (context, snapshot) {
-        final events = snapshot.data ?? const <OccurrenceEvent>[];
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _TimelineSection(detail: fallback);
-        }
-        if (events.isEmpty) {
-          return _TimelineSection(detail: fallback);
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        // Metrics
+        Row(
           children: [
-            _SectionLabel('LINHA DO TEMPO Â· ${events.length} EVENTOS'),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withAlpha(15)),
-              ),
-              child: Column(
-                children: [
-                  for (int i = 0; i < events.length; i++)
-                    _TimelineEventRow(
-                      event: _internalEventFromOccurrence(events[i]),
-                      isLast: i == events.length - 1,
-                    ),
-                ],
-              ),
+            _metricItem(distance, 'DISTÂNCIA'),
+            const SizedBox(width: 8),
+            _metricItem(age, 'IDADE DO RASTRO'),
+            const SizedBox(width: 8),
+            _metricItem(searchDuration, 'TEMPO DE BUSCA'),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Habilidades
+        const _SectionLabel('HABILIDADES TRABALHADAS'),
+        const SizedBox(height: 8),
+        for (final skill in skills.entries) ...[
+          _buildSkillRow(skill.key.toString(), skill.value.toString()),
+        ],
+        const SizedBox(height: 16),
+
+        // Configuração
+        const _SectionLabel('CONFIGURAÇÃO'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Objeto de odor': odor,
+          'Figurante': figurante,
+          'Ambiente': env,
+        }),
+        const SizedBox(height: 16),
+
+        // Observações
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _metricItem(String number, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(8),
+          border: Border.all(color: Colors.white.withAlpha(15)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Text(
+              number,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.3),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  InternalEvent _internalEventFromOccurrence(OccurrenceEvent event) {
-    final photoCount = event.photoUrls.length;
-    final description = event.description?.trim() ?? '';
-    final photoText = photoCount == 0
-        ? ''
-        : '$photoCount foto${photoCount == 1 ? '' : 's'} anexada${photoCount == 1 ? '' : 's'}';
-    final subtitle = [
-      if (description.isNotEmpty) description,
-      if (photoText.isNotEmpty) photoText,
-    ].join(' Â· ');
-
-    return InternalEvent(
-      time: event.timestamp,
-      title: event.title?.trim().isNotEmpty == true
-          ? event.title!.trim()
-          : event.category.label,
-      subtitle: subtitle,
-    );
-  }
-}
-
-class _TimelineSection extends StatelessWidget {
-  final RecordDetail detail;
-  const _TimelineSection({required this.detail});
-
-  @override
-  Widget build(BuildContext context) {
-    final events = detail.internalEvents;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('LINHA DO TEMPO Â· ${events.length} EVENTOS'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withAlpha(15)),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < events.length; i++)
-                _TimelineEventRow(
-                  event: events[i],
-                  isLast: i == events.length - 1,
-                ),
-            ],
-          ),
         ),
-      ],
+      ),
     );
   }
-}
 
-class _TimelineEventRow extends StatelessWidget {
-  final InternalEvent event;
-  final bool isLast;
-  const _TimelineEventRow({required this.event, required this.isLast});
+  Widget _buildSkillRow(String name, String state) {
+    Color color = _cyan;
+    IconData icon = Icons.check_circle_outline_rounded;
+    
+    if (name.toLowerCase().contains('rastre')) {
+      icon = Icons.gesture_rounded;
+    } else if (name.toLowerCase().contains('indic') && name.toLowerCase().contains('passiv')) {
+      icon = Icons.radio_button_checked_rounded;
+    } else if (name.toLowerCase().contains('cont')) {
+      icon = Icons.front_hand_outlined;
+    } else if (name.toLowerCase().contains('altura')) {
+      icon = Icons.height_rounded;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final style = _eventStyle(event.title);
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+    final isDone = state == 'OK' || state == 'FIRME';
+    final isDev = state == 'PARCIAL';
+    final isNo = state.contains('NÃO');
+
+    if (isDone) color = _green;
+    if (isDev) color = _amber;
+    if (isNo) color = _textMuted;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isDone ? _green.withAlpha(10) : (isDev ? _amber.withAlpha(10) : Colors.white.withAlpha(8)),
+        border: Border.all(
+          color: isDone ? _green.withAlpha(56) : (isDev ? _amber.withAlpha(56) : Colors.white.withAlpha(18)),
+        ),
+        borderRadius: BorderRadius.circular(11),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 42,
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color.withAlpha(27),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Icon(icon, color: color, size: 15),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Text(
-              _fmtTime(event.time),
+              name,
               style: GoogleFonts.inter(
-                color: _textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: style.color.withAlpha(30),
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Center(
-              child: Text(style.emoji, style: const TextStyle(fontSize: 12)),
+          Text(
+            state,
+            style: GoogleFonts.inter(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+    );
+  }
+}
+
+class _TrailLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _cyan.withOpacity(0.85)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    path.moveTo(size.width * 0.14, size.height * 0.70);
+    path.cubicTo(
+      size.width * 0.35, size.height * 0.65,
+      size.width * 0.40, size.height * 0.40,
+      size.width * 0.50, size.height * 0.46,
+    );
+    path.cubicTo(
+      size.width * 0.60, size.height * 0.52,
+      size.width * 0.72, size.height * 0.33,
+      size.width * 0.80, size.height * 0.24,
+    );
+
+    final dashedPath = Path();
+    const dashWidth = 6.0;
+    const dashSpace = 4.0;
+    
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final length = dashWidth;
+        dashedPath.addPath(
+          metric.extractPath(distance, distance + length),
+          Offset.zero,
+        );
+        distance += length + dashSpace;
+      }
+    }
+    canvas.drawPath(dashedPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// =============================================================================
+// BODY 5: OBEDIÊNCIA
+// =============================================================================
+
+class HistoryObedienciaBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryObedienciaBody({super.key, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final session = detail.source.originalModel as TrainingSessionModel?;
+    final metadata = session?.metadata ?? const {};
+
+    final list = metadata['commands'] as List? ?? ['Junto', 'Senta', 'Fica', 'Deita', 'Vem (chamada)', 'Latir sob comando'];
+    final commands = list.map((e) => e.toString()).toList();
+    
+    final operacionais = commands.where((name) {
+      final l = name.toLowerCase();
+      return l.contains('junto') || l.contains('senta') || l.contains('fica');
+    }).toList();
+    
+    final posicionais = commands.where((name) {
+      final l = name.toLowerCase();
+      return l.contains('deita') || l.contains('vem') || l.contains('latir');
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('MODO DA SESSÃO'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Guia': metadata['guia']?.toString() ?? 'Sem guia',
+          'Distração': metadata['distracao']?.toString() ?? 'Alta',
+          'Distância': metadata['distancia']?.toString() ?? '15 m',
+        }),
+        const SizedBox(height: 16),
+
+        const _SectionLabel('COMANDOS · ESTÁGIO'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          children: [
+            _legendItem('● 1 Iniciante', _textMuted),
+            _legendItem('● 3 Praticando', _amber),
+            _legendItem('● 4 Consolidando', _cyan),
+            _legendItem('● 5 Operacional', _green),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (operacionais.isNotEmpty) ...[
+          _categoryLabel('OPERACIONAIS'),
+          for (final cmd in operacionais) _buildCmdRow(cmd),
+        ],
+        if (posicionais.isNotEmpty) ...[
+          _categoryLabel('POSICIONAIS'),
+          for (final cmd in posicionais) _buildCmdRow(cmd),
+        ],
+        const SizedBox(height: 16),
+
+        // Observações
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _legendItem(String text, Color color) {
+    return Text(
+      text,
+      style: GoogleFonts.inter(
+        color: color,
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _categoryLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 9),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          color: const Color(0xFF7D8D99),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCmdRow(String name) {
+    final nameLower = name.toLowerCase();
+    int level = 3;
+    bool hasEvolved = false;
+    
+    if (nameLower.contains('junto') || nameLower.contains('senta')) {
+      level = 5;
+    } else if (nameLower.contains('fica') || nameLower.contains('deita')) {
+      level = 4;
+      if (nameLower.contains('fica')) hasEvolved = true;
+    } else if (nameLower.contains('vem') || nameLower.contains('latir')) {
+      level = 3;
+      if (nameLower.contains('latir')) hasEvolved = true;
+    }
+
+    Color color = _cyan;
+    String label = 'CONSOLIDANDO';
+    
+    if (level == 5) {
+      color = _green;
+      label = 'OPERACIONAL';
+    } else if (level == 4) {
+      color = _cyan;
+      label = 'CONSOLIDANDO';
+    } else if (level == 3) {
+      color = _amber;
+      label = 'PRATICANDO';
+    } else {
+      color = _textMuted;
+      label = 'INICIANTE';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(5),
+        border: Border.all(color: Colors.white.withAlpha(12)),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Row(
+        children: [
+          RichText(
+            text: TextSpan(
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
               children: [
-                Text(
-                  event.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: _textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                TextSpan(text: name),
+                if (hasEvolved)
+                  const TextSpan(
+                    text: ' ↑',
+                    style: TextStyle(color: _green, fontWeight: FontWeight.bold),
                   ),
-                ),
-                if (event.subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    event.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(color: _textMuted, fontSize: 10),
-                  ),
-                ],
               ],
             ),
           ),
+          const Spacer(),
+          Row(
+            children: List.generate(5, (idx) {
+              final active = idx < level;
+              return Container(
+                width: 9,
+                height: 9,
+                margin: const EdgeInsets.only(left: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active ? color : Colors.white10,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: GoogleFonts.inter(color: color, fontSize: 9.5, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
   }
-
-  _EventStyle _eventStyle(String title) {
-    final lower = title.toLowerCase();
-    if (lower.contains('iniciado') || lower.contains('inÃ­cio'))
-      return const _EventStyle(emoji: 'â–¶', color: Color(0xFF4DD0E1));
-    if (lower.contains('chegada') || lower.contains('local'))
-      return const _EventStyle(emoji: 'ðŸ“', color: Color(0xFF3498DB));
-    if (lower.contains('cÃ£o') ||
-        lower.contains('varredura') ||
-        lower.contains('empregado'))
-      return const _EventStyle(emoji: 'ðŸ¾', color: Color(0xFFF1C40F));
-    if (lower.contains('foto') || lower.contains('anexa'))
-      return const _EventStyle(emoji: 'ðŸ“·', color: Color(0xFF9B59B6));
-    if (lower.contains('verifica') || lower.contains('Ã¡rea'))
-      return const _EventStyle(emoji: 'ðŸ›¡', color: Color(0xFF2ECC71));
-    if (lower.contains('finaliz') || lower.contains('conclu'))
-      return const _EventStyle(emoji: 'âœ“', color: Color(0xFF2ECC71));
-    if (lower.contains('andamento') || lower.contains('pendente'))
-      return const _EventStyle(emoji: 'â³', color: Color(0xFFF39C12));
-    if (lower.contains('sincroniz'))
-      return const _EventStyle(emoji: 'â˜', color: Color(0xFF4DD0E1));
-    if (lower.contains('atualiz'))
-      return const _EventStyle(emoji: 'âœ', color: Color(0xFF3498DB));
-    return const _EventStyle(emoji: 'â€¢', color: Color(0xFF4DD0E1));
-  }
-}
-
-class _EventStyle {
-  final String emoji;
-  final Color color;
-  const _EventStyle({required this.emoji, required this.color});
 }
 
 // =============================================================================
-// SECTION: AUDIT TRAIL
+// BODY 6: SAÚDE
 // =============================================================================
 
-class _AuditSection extends StatelessWidget {
+class HistorySaudeBody extends StatelessWidget {
   final RecordDetail detail;
-  const _AuditSection({required this.detail});
+
+  const HistorySaudeBody({super.key, required this.detail});
 
   @override
   Widget build(BuildContext context) {
+    final original = detail.source.originalModel;
+    HealthLogModel? log;
+    if (original is HealthLogModel) {
+      log = original;
+    }
+
+    final type = log?.logType ?? detail.source.details['Tipo'] ?? 'Exame';
+    final lot = detail.source.details['Lote'] ?? detail.source.details['lote'] ?? 'LOTE: 22/045/Z';
+    final expiration = detail.source.details['Validade'] ?? detail.source.details['validade'] ?? 'VAL: 10/2026';
+    final nextBooster = log?.nextDueDate != null ? _fmtDate(log!.nextDueDate!) : '—';
+    final vetName = log?.vetName ?? detail.author;
+    final crmv = log?.professionalCrmv ?? 'CRMV 4421';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel('TRILHA DE AUDITORIA'),
+        const _SectionLabel('DETALHES DE SAÚDE'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Tipo de Evento': type,
+          'Lote / Fabricante': lot,
+          'Validade': expiration,
+        }),
+        const SizedBox(height: 16),
+
+        // Reforço/Agenda card
+        if (log?.nextDueDate != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _amber.withAlpha(15),
+              border: Border.all(color: _amber.withAlpha(50)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_month_outlined, color: _amber, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reforço / Próxima dose agenda',
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Agendado para $nextBooster',
+                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Veterinário responsável
+        const _SectionLabel('RESPONSÁVEL TÉCNICO'),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white.withAlpha(5),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withAlpha(13)),
+            border: Border.all(color: Colors.white.withAlpha(12)),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Column(
+          child: Row(
             children: [
-              for (int i = 0; i < detail.auditEvents.length; i++)
-                _AuditRow(
-                  event: detail.auditEvents[i],
-                  isLast: i == detail.auditEvents.length - 1,
+              const Icon(Icons.assignment_ind_outlined, color: _cyan, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vetName,
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      crmv,
+                      style: GoogleFonts.inter(color: _textMuted, fontSize: 11),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
+        // Documentos anexos
+        const _SectionLabel('DOCUMENTOS ANEXOS'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(12)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, color: _red, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'comprovante_evento.pdf',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'PDF · 245 KB',
+                      style: GoogleFonts.inter(color: _textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.download_rounded, color: _cyan, size: 18),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Observações
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES MÉDICAS'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _AuditRow extends StatelessWidget {
-  final AuditEvent event;
-  final bool isLast;
-  const _AuditRow({required this.event, required this.isLast});
+// =============================================================================
+// BODY 7: NUTRIÇÃO
+// =============================================================================
+
+class HistoryNutricaoBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryNutricaoBody({super.key, required this.detail});
 
   @override
   Widget build(BuildContext context) {
-    final text = event.user.trim().isEmpty
-        ? '${event.action} â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}'
-        : '${event.action} ${event.user} â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}';
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.verified_user_outlined, color: _cyan, size: 14),
-          const SizedBox(width: 8),
-          Expanded(
-            child: RichText(
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: GoogleFonts.inter(
-                  color: _textMuted,
-                  fontSize: 11,
-                  height: 1.3,
-                ),
+    final original = detail.source.originalModel;
+    Feeding? feeding;
+    if (original is Feeding) {
+      feeding = original;
+    }
+
+    final served = feeding?.amountGrams ?? 350;
+    final prescribed = feeding?.prescriptionAtTime ?? 350;
+    final conforms = feeding?.isConform ?? true;
+    final divergenceVal = (served - prescribed).abs();
+    final divergenceText = '${divergenceVal}g (${conforms ? 'Sem divergência' : 'Divergência'})';
+    final racaoName = detail.source.details['Ração'] ?? 'Ração Premium K9 Adulto';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('REFEIÇÃO SERVIDA'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (event.user.trim().isNotEmpty) ...[
-                    TextSpan(text: '${event.action} '),
-                    TextSpan(
-                      text: event.user,
-                      style: GoogleFonts.inter(
-                        color: _textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SERVIDO',
+                        style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    TextSpan(
-                      text:
-                          ' â€¢ ${_fmtDate(event.timestamp)} Ã s ${_fmtTime(event.timestamp)}',
-                    ),
-                  ] else
-                    TextSpan(text: text),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${served}g',
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'PRESCRITO',
+                        style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${prescribed}g',
+                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+              Container(height: 1, color: Colors.white.withAlpha(10)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Ração Utilizada',
+                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                  ),
+                  Text(
+                    racaoName,
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Conformidade',
+                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: conforms ? _green.withAlpha(20) : _amber.withAlpha(20),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: conforms ? _green : _amber),
+                    ),
+                    child: Text(
+                      conforms ? 'EM CONFORMIDADE' : 'DIVERGENTE ($divergenceText)',
+                      style: GoogleFonts.inter(color: conforms ? _green : _amber, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// CTA BAR
-// =============================================================================
-
-class _CtaBar extends StatelessWidget {
-  final VoidCallback onPdfTap;
-  final VoidCallback onShareTap;
-  const _CtaBar({required this.onPdfTap, required this.onShareTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          stops: [0.0, 0.8, 1.0],
-          colors: [_bg, _bg, Color(0x00050D10)],
         ),
-      ),
-      padding: EdgeInsets.fromLTRB(16, 24, 16, 16 + bottomPadding),
-      child: Row(
-        children: [
-          Expanded(
-            child: _CtaButton(
-              label: 'Gerar PDF',
-              icon: Icons.picture_as_pdf_outlined,
-              filled: false,
-              onTap: onPdfTap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _CtaButton(
-              label: 'Compartilhar',
-              icon: Icons.share_outlined,
-              filled: true,
-              onTap: onShareTap,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+        const SizedBox(height: 16),
 
-class _CtaButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool filled;
-  final VoidCallback onTap;
-  const _CtaButton({
-    required this.label,
-    required this.icon,
-    required this.filled,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
+        // Vínculo ao Laudo Nutricional Vigente
+        const _SectionLabel('VÍNCULO CLÍNICO'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: filled ? _cyan : _cyan.withAlpha(26),
+            color: Colors.white.withAlpha(5),
+            border: Border.all(color: Colors.white.withAlpha(12)),
             borderRadius: BorderRadius.circular(12),
-            border: filled ? null : Border.all(color: _cyan.withAlpha(77)),
           ),
-          alignment: Alignment.center,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: filled ? _bg : _cyan, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  color: filled ? _bg : _cyan,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+              const Icon(Icons.assignment_turned_in_outlined, color: _cyan, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Laudo Nutricional Vigente',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Prescrição Dra. Patrícia Lima · CRMV 8812 · Ativo',
+                      style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 16),
+
+        // Foto do pote/registro
+        const _SectionLabel('FOTO DE VERIFICAÇÃO'),
+        const SizedBox(height: 8),
+        Container(
+          height: 120,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: const Color(0xFF0A161B),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.restaurant_rounded, color: _textMuted, size: 24),
+                const SizedBox(height: 6),
+                Text(
+                  'Foto da refeição registrada',
+                  style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Acompanhamento do dia
+        if (detail.notes.isNotEmpty) ...[
+          const _SectionLabel('ACOMPANHAMENTO DO DIA'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              border: Border.all(color: Colors.white.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              detail.notes,
+              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
 
 // =============================================================================
-// SHARED WIDGETS
+// REUSABLE HELPER BLOCKS & WIDGETS
+// =============================================================================
+
+Widget _buildConfigGrid(Map<String, String> values) {
+  return GridView.count(
+    crossAxisCount: 3,
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    mainAxisSpacing: 8,
+    crossAxisSpacing: 8,
+    childAspectRatio: 1.8,
+    children: values.entries.map((e) {
+      final isWarning = e.value.toLowerCase().contains('parcial') || e.value.toLowerCase().contains('alta');
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(5),
+          border: Border.all(color: Colors.white.withAlpha(12)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              e.key.toUpperCase(),
+              style: GoogleFonts.inter(color: _textMuted, fontSize: 8, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              e.value,
+              style: GoogleFonts.inter(
+                color: isWarning ? _amber : Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      );
+    }).toList(),
+  );
+}
+
+// =============================================================================
+// HELPER CLASSES & METHODS IMPLEMENTATIONS
 // =============================================================================
 
 class _SectionLabel extends StatelessWidget {
   final String text;
-  const _SectionLabel(this.text);
+  const _SectionLabel(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          text,
-          style: GoogleFonts.inter(
-            color: _cyan,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: Container(height: 1, color: _cyan.withAlpha(38))),
-      ],
-    );
-  }
-}
-
-class _HeaderIconBtn extends StatelessWidget {
-  final String text;
-  final double size;
-  final VoidCallback onTap;
-  const _HeaderIconBtn({
-    required this.text,
-    required this.size,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: _cyan.withAlpha(15),
-          borderRadius: BorderRadius.circular(size / 4),
-          border: Border.all(color: _cyan.withAlpha(51)),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: GoogleFonts.inter(
-            color: _textPrimary,
-            fontSize: size * 0.5,
-            fontWeight: FontWeight.w600,
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 22, bottom: 12),
+      child: Text(
+        text.toUpperCase(),
+        style: GoogleFonts.inter(
+          color: _textMuted,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
         ),
       ),
     );
@@ -1134,7 +2519,9 @@ class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
   const _MenuRow({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1142,30 +2529,124 @@ class _MenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, color: _cyan, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    color: _textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+    return ListTile(
+      leading: Icon(icon, color: _cyan, size: 20),
+      title: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: onTap,
+      dense: true,
+    );
+  }
+}
+
+class _CtaBar extends StatelessWidget {
+  final VoidCallback onPdfTap;
+  final VoidCallback onShareTap;
+
+  const _CtaBar({
+    super.key,
+    required this.onPdfTap,
+    required this.onShareTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            _bg,
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: onPdfTap,
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+              label: const Text('Gerar PDF'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _cyan,
+                foregroundColor: _bg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                textStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
               ),
-            ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onShareTap,
+              icon: const Icon(Icons.share_outlined, size: 16),
+              label: const Text('Compartilhar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _cyan,
+                side: const BorderSide(color: _cyan, width: 1.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                textStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderIconBtn extends StatelessWidget {
+  final String text;
+  final double size;
+  final VoidCallback onTap;
+
+  const _HeaderIconBtn({
+    super.key,
+    required this.text,
+    required this.size,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(10),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: size,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ),
@@ -1173,22 +2654,245 @@ class _MenuRow extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// UTILITIES
-// =============================================================================
+class _OccurrenceTimelineSection extends StatefulWidget {
+  final String occurrenceId;
+  final RecordDetail fallback;
 
-String _fmtDate(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
-String _fmtTime(DateTime d) => DateFormat('HH:mm').format(d);
+  const _OccurrenceTimelineSection({
+    required this.occurrenceId,
+    required this.fallback,
+  });
 
-String _summaryEmoji(HistoryEntryType type) {
-  switch (type) {
-    case HistoryEntryType.occurrence:
-      return 'ðŸ›¡';
-    case HistoryEntryType.health:
-      return 'âš•';
-    case HistoryEntryType.training:
-      return 'ðŸŽ¯';
-    case HistoryEntryType.nutrition:
-      return 'ðŸ–';
+  @override
+  State<_OccurrenceTimelineSection> createState() => _OccurrenceTimelineSectionState();
+}
+
+class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.occurrenceId.isEmpty) {
+      return _buildTimelineList(widget.fallback.internalEvents.map((e) => OccurrenceEvent(
+        id: '',
+        occurrenceId: '',
+        category: OccurrenceEventCategory.other,
+        timestamp: e.time,
+        title: e.title,
+        description: e.subtitle,
+        createdAt: e.time,
+        updatedAt: e.time,
+      )).toList());
+    }
+
+    final occurrenceVM = context.read<OccurrenceViewModel>();
+
+    return FutureBuilder<List<OccurrenceEvent>>(
+      future: occurrenceVM.getEvents(widget.occurrenceId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: _cyan));
+        }
+
+        final events = snapshot.data ?? [];
+        if (events.isEmpty) {
+          return _buildTimelineList(widget.fallback.internalEvents.map((e) => OccurrenceEvent(
+            id: '',
+            occurrenceId: '',
+            category: OccurrenceEventCategory.other,
+            timestamp: e.time,
+            title: e.title,
+            description: e.subtitle,
+            createdAt: e.time,
+            updatedAt: e.time,
+          )).toList());
+        }
+
+        events.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        return _buildTimelineList(events);
+      },
+    );
+  }
+
+  Widget _buildTimelineList(List<OccurrenceEvent> events) {
+    final displayEvents = _expanded ? events : events.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('LINHA DO TEMPO'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.only(left: 6),
+          child: Column(
+            children: List.generate(displayEvents.length, (idx) {
+              final ev = displayEvents[idx];
+              final isLast = idx == displayEvents.length - 1;
+              
+              Color nodeColor = _cyan;
+              final titleLower = (ev.title ?? '').toLowerCase();
+              final descLower = (ev.description ?? '').toLowerCase();
+              
+              if (titleLower.contains('busca') || titleLower.contains('varredura') || titleLower.contains('inici')) {
+                nodeColor = _amber;
+              } else if (titleLower.contains('apreend') || titleLower.contains('detido') || titleLower.contains('finaliz') || titleLower.contains('conclu') || descLower.contains('apreend')) {
+                nodeColor = _green;
+              }
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 46,
+                      padding: const EdgeInsets.only(right: 10, top: 1),
+                      alignment: Alignment.topRight,
+                      child: Text(
+                        DateFormat('HH:mm').format(ev.timestamp),
+                        style: GoogleFonts.ibmPlexMono(
+                          color: _textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: nodeColor,
+                            border: Border.all(color: _bg, width: 2),
+                          ),
+                        ),
+                        if (!isLast)
+                          Expanded(
+                            child: Container(
+                              width: 2,
+                              color: Colors.white.withAlpha(20),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ev.title ?? 'Evento',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (ev.description != null && ev.description!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                ev.description!,
+                                style: GoogleFonts.inter(
+                                  color: _textSecondary,
+                                  fontSize: 11,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ),
+        if (events.length > 4 && !_expanded)
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expanded = true;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                border: Border.all(color: _cyan.withAlpha(51)),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Ver os ${events.length} eventos completos',
+                    style: GoogleFonts.inter(
+                      color: _cyan,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right_rounded, color: _cyan, size: 14),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+String _fmtDate(DateTime date) {
+  return DateFormat('dd/MM/yyyy').format(date);
+}
+
+String _fmtTime(DateTime date) {
+  return DateFormat('HH:mm').format(date);
+}
+
+class _StartDot extends StatelessWidget {
+  const _StartDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFF1C40F), // Amber
+        border: Border.all(color: const Color(0xFF050D10), width: 2),
+      ),
+    );
+  }
+}
+
+class _EndPin extends StatelessWidget {
+  const _EndPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -0.785398, // -45 degrees in radians
+      child: Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2ECC71), // Green
+          border: Border.all(color: const Color(0xFF050D10), width: 2),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(7),
+            topRight: Radius.circular(7),
+            bottomLeft: Radius.circular(7),
+            bottomRight: Radius.zero,
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -20,9 +20,12 @@ import 'package:canil_gcm/features/training/presentation/screens/guard_protectio
 import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_triagem_screen.dart';
+import 'package:canil_gcm/features/dogs/data/dog_specialty_service.dart';
 
 part 'training_hub_header.dart';
 part 'training_hub_categories.dart';
+
 
 class TrainingHubScreen extends StatefulWidget {
   const TrainingHubScreen({super.key});
@@ -154,11 +157,10 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     final lowerCat = normalizeTrainingKey(category);
 
     if (lowerCat.contains('detec') || lowerCat.contains('faro')) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => DetectionMaintenanceScreen(dog: dog)),
-      );
+      _navigateToDetectionFlow(context, dog);
       return;
     }
+
 
     if (lowerCat.contains('obediencia')) {
       Navigator.of(context).push(
@@ -193,7 +195,30 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
       ),
     );
   }
+
+  void _navigateToDetectionFlow(BuildContext context, Dog dog) async {
+    final specialtyService = DogSpecialtyService();
+    final specialty = await specialtyService.getByType(dog.id, 'deteccao');
+
+    if (!context.mounted) return;
+
+    if (specialty == null || specialty.status == 'not_started') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetectionTriagemScreen(dog: dog),
+          settings: const RouteSettings(name: '/treino/deteccao/triagem'),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetectionMaintenanceScreen(dog: dog),
+        ),
+      );
+    }
+  }
 }
+
 
 class _TrainingHubBody extends StatelessWidget {
   final Dog dog;

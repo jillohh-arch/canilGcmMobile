@@ -56,9 +56,9 @@ class _SessionCardState extends State<_SessionCard> {
     switch (type) {
       case 'Faro':
         return (Icons.track_changes_rounded, const Color(0xFFFFB300));
-      case 'ProteÃ§Ã£o':
+      case 'Proteção':
         return (Icons.shield_rounded, const Color(0xFFEF5350));
-      case 'ObediÃªncia':
+      case 'Obediência':
         return (Icons.school_rounded, const Color(0xFF42A5F5));
       default:
         return (Icons.fitness_center_rounded, AppTheme.amber);
@@ -151,7 +151,7 @@ class _EmptyTraining extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Toque em + para adicionar uma sessÃ£o.',
+                'Toque em + para adicionar uma sessão.',
                 style: GoogleFonts.inter(
                   fontSize: 11,
                   color: Colors.white54,

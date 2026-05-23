@@ -30,6 +30,9 @@ class AppTheme {
   /// Vermelho - critico, saude, erros.
   static const Color error = Color(0xFFE74C3C);
 
+  /// Cinza escuro para bordas e divisores.
+  static const Color outline = Color(0xFF2C3B42);
+
   /// Texto principal (branco).
   static const Color textPrimary = Color(0xFFFFFFFF);
 

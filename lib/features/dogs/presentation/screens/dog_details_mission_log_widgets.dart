@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _MissionTimelineItem {
   final DateTime date;
@@ -26,7 +26,7 @@ class _MissionLogHeader extends StatelessWidget {
     return Row(
       children: [
         Text(
-          'LOG DE MISSÃ•ES',
+          'LOG DE MISSÕES',
           style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w800,

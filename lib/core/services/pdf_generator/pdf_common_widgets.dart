@@ -10,20 +10,29 @@ class PdfFonts {
   final pw.Font medium;
   final pw.Font bold;
   final pw.Font black;
+  final pw.Font semiBold;
+  final pw.Font monoRegular;
+  final pw.Font monoBold;
 
   const PdfFonts({
     required this.regular,
     required this.medium,
     required this.bold,
     required this.black,
+    required this.semiBold,
+    required this.monoRegular,
+    required this.monoBold,
   });
 
   static Future<PdfFonts> load() async {
     return PdfFonts(
-      regular: await PdfGoogleFonts.interRegular(),
-      medium: await PdfGoogleFonts.interMedium(),
-      bold: await PdfGoogleFonts.interBold(),
-      black: await PdfGoogleFonts.interExtraBold(),
+      regular: await PdfGoogleFonts.iBMPlexSansRegular(),
+      medium: await PdfGoogleFonts.iBMPlexSansMedium(),
+      bold: await PdfGoogleFonts.iBMPlexSansBold(),
+      black: await PdfGoogleFonts.iBMPlexSansBold(), // Mapped to bold to maintain compatibility
+      semiBold: await PdfGoogleFonts.iBMPlexSansSemiBold(),
+      monoRegular: await PdfGoogleFonts.iBMPlexMonoRegular(),
+      monoBold: await PdfGoogleFonts.iBMPlexMonoBold(),
     );
   }
 
@@ -65,7 +74,7 @@ class PdfFonts {
       );
 
   pw.TextStyle mono({PdfColor? color, double? fontSize}) => pw.TextStyle(
-        font: regular,
+        font: monoRegular,
         fontSize: fontSize ?? 8,
         color: color ?? PdfInstitutionalColors.textTertiary,
       );

@@ -187,7 +187,7 @@ class VaccinationPdf {
                       pw.Container(
                         width: 8,
                         height: 8,
-                        decoration: BoxDecoration(
+                        decoration: pw.BoxDecoration(
                           color: PdfInstitutionalColors.greenInstitutional,
                           shape: pw.BoxShape.circle,
                         ),
@@ -314,7 +314,7 @@ class VaccinationPdf {
             pw.Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
+              decoration: pw.BoxDecoration(
                 color: PdfInstitutionalColors.greenInstitutional,
                 shape: pw.BoxShape.circle,
               ),
@@ -358,7 +358,7 @@ class VaccinationPdf {
               pw.Container(
                 width: 6,
                 height: 6,
-                decoration: BoxDecoration(
+                decoration: pw.BoxDecoration(
                   color: color,
                   shape: pw.BoxShape.circle,
                 ),

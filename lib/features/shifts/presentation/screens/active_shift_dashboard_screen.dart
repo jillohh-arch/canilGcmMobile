@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
+import 'package:canil_gcm/core/services/dog_fitness_service.dart';
 
 import 'dynamic_activity_sheet.dart';
 

@@ -1,4 +1,4 @@
-﻿part of 'health_log_screen.dart';
+part of 'health_log_screen.dart';
 
 class _HealthExpandedDetails extends StatelessWidget {
   final HealthLogModel log;
@@ -24,7 +24,7 @@ class _HealthExpandedDetails extends StatelessWidget {
           const SizedBox(height: 6),
           _DetailRow(
             icon: Icons.notes_rounded,
-            label: 'ObservaÃ§Ãµes',
+            label: 'Observações',
             value: log.healthObservations,
             color: color,
           ),

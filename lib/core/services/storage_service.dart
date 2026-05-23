@@ -81,7 +81,7 @@ class StorageService {
       if (snapshot.state == TaskState.success) {
         return snapshot.ref.getDownloadURL();
       }
-      throw Exception('O upload nÃ£o foi concluÃ­do com sucesso.');
+      throw Exception('O upload não foi concluído com sucesso.');
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
         debugPrint(
@@ -92,8 +92,8 @@ class StorageService {
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
       throw Exception('Falha ao subir arquivo: ${e.message}');
     } catch (e) {
-      debugPrint('[StorageService] Erro genÃ©rico: $e');
-      throw Exception('Falha ao subir arquivo. Verifique sua conexÃ£o.');
+      debugPrint('[StorageService] Erro genérico: $e');
+      throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
     }
   }
 

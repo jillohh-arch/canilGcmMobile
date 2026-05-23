@@ -147,7 +147,7 @@ class OccurrencePdfGenerator {
     final center = '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
     final uri = Uri.https('maps.googleapis.com', '/maps/api/staticmap', {
       'center': center,
-      'zoom': '17',
+      'zoom': '15',
       'size': '800x420',
       'scale': '2',
       'maptype': 'roadmap',
@@ -176,14 +176,19 @@ class OccurrencePdfGenerator {
   String _formatDateTime(DateTime value) =>
       DateFormat('dd/MM/yyyy HH:mm').format(value);
 
-  DateTime _operationStart(_OccurrencePdfContext ctx) => ctx.events.isNotEmpty
-      ? ctx.events.first.timestamp
-      : ctx.occurrence.startedAt;
+  DateTime _operationStart(_OccurrencePdfContext ctx) {
+    if (ctx.events.isEmpty) return ctx.occurrence.startedAt;
+    final sorted = List<OccurrenceEvent>.from(ctx.events)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return sorted.first.timestamp;
+  }
 
   DateTime _operationEnd(_OccurrencePdfContext ctx) {
     if (ctx.occurrence.finalizedAt != null) return ctx.occurrence.finalizedAt!;
-    if (ctx.events.isNotEmpty) return ctx.events.last.timestamp;
-    return ctx.occurrence.updatedAt;
+    if (ctx.events.isEmpty) return ctx.occurrence.updatedAt;
+    final sorted = List<OccurrenceEvent>.from(ctx.events)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return sorted.last.timestamp;
   }
 
   String _durationLabel(DateTime start, DateTime end) {
@@ -201,10 +206,21 @@ class OccurrencePdfGenerator {
     return '${_formatTime(start)} -> ${_formatTime(end)}';
   }
 
+  String _eventTitle(OccurrenceEvent event) {
+    if (event.title?.trim().isNotEmpty ?? false) {
+      return event.title!.toUpperCase();
+    }
+    return switch (event.category) {
+      OccurrenceEventCategory.opening => 'REGISTRO DE OCORRÊNCIA ABERTO',
+      OccurrenceEventCategory.arrival => 'BUSCA / INVESTIGAÇÃO',
+      _ => event.category.label.toUpperCase(),
+    };
+  }
+
   String _statusLabel(Occurrence occurrence) =>
       switch (occurrence.status.toMap()) {
-        'finalized' => 'Finalizado',
-        'finalizing' => 'Em finalizacao',
+        'finalized' => 'Finalizado\n1 de 2 confirmações',
+        'finalizing' => 'Em finalização',
         'canceled' => 'Cancelado',
         _ => 'Em andamento',
       };
@@ -1414,9 +1430,7 @@ class OccurrencePdfGenerator {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        (event.title?.trim().isNotEmpty ?? false)
-                            ? event.title!.toUpperCase()
-                            : event.category.label.toUpperCase(),
+                        _eventTitle(event),
                         style: _bodyBold(fonts, size: 10, color: color),
                       ),
                       if ((event.description ?? '').trim().isNotEmpty) ...[
@@ -1483,13 +1497,14 @@ class OccurrencePdfGenerator {
   };
 
   String _eventMark(OccurrenceEventCategory category) => switch (category) {
+    OccurrenceEventCategory.opening => 'A',
     OccurrenceEventCategory.arrival => 'B',
-    OccurrenceEventCategory.approach => 'A',
+    OccurrenceEventCategory.approach => 'AB',
     OccurrenceEventCategory.dogWork => 'K9',
-    OccurrenceEventCategory.positiveIndication => '+',
-    OccurrenceEventCategory.seizure => 'R',
-    OccurrenceEventCategory.closure => 'F',
-    _ => 'E',
+    OccurrenceEventCategory.positiveIndication => 'IP',
+    OccurrenceEventCategory.seizure => 'AP',
+    OccurrenceEventCategory.closure => 'FN',
+    _ => 'O',
   };
 
   pw.Widget _timelineLegend(PdfFonts fonts) {
@@ -1500,7 +1515,7 @@ class OccurrencePdfGenerator {
       ),
       child: pw.Row(
         children: [
-          _legendDot('Busca / Investigacao', _amber, fonts),
+          _legendDot('Busca / Investigação', _amber, fonts),
           pw.SizedBox(width: 18),
           _legendDot('Registro / Abordagem', _cyan, fonts),
           pw.SizedBox(width: 18),
@@ -1662,9 +1677,7 @@ class OccurrencePdfGenerator {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        event.title?.trim().isNotEmpty == true
-                            ? event.title!
-                            : event.category.label,
+                        _eventTitle(event),
                         maxLines: 1,
                         style: _bodyBold(f, size: 9.3),
                       ),
@@ -2062,14 +2075,10 @@ class OccurrencePdfGenerator {
       children: [
         _contextBar(ctx, status: true),
         pw.SizedBox(height: 14),
-        _sectionLabel('Trilha de auditoria', f),
-        pw.SizedBox(height: 8),
-        _auditTrailBox(ctx),
-        pw.SizedBox(height: 14),
-        _sectionLabel('Validacao e assinatura', f),
+        _sectionLabel('Validação e assinatura', f),
         pw.SizedBox(height: 5),
         pw.Text(
-          'Cada integrante confirma a participacao com seu proprio login no Sistema Canil K9. A confirmacao registra identidade, data e hora; nao substitui assinatura digital com certificado.',
+          'Cada integrante confirma a participação com seu próprio login no Sistema Canil K9. A confirmação registra identidade, data e hora; não substitui assinatura digital com certificado.',
           style: _body(f, size: 8, color: _inkFaint),
         ),
         pw.SizedBox(height: 10),
@@ -2079,6 +2088,27 @@ class OccurrencePdfGenerator {
             pw.SizedBox(width: 12),
             pw.Expanded(child: _supportPerson(ctx)),
           ],
+        ),
+        pw.SizedBox(height: 10),
+        _roundedCard(
+          background: PdfColor.fromHex('F7F9FB'),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: pw.Row(
+            children: [
+              pw.Container(
+                width: 4,
+                height: 16,
+                color: _cyan,
+                margin: const pw.EdgeInsets.only(right: 8),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  'Legenda: O status verde indica confirmação eletrônica via senha pessoal. O status âmbar indica notificação pendente de confirmação pelo integrante.',
+                  style: _body(f, size: 7.8, color: _inkSoft),
+                ),
+              ),
+            ],
+          ),
         ),
         pw.SizedBox(height: 14),
         _sectionLabel('Integridade do documento', f),
@@ -2100,7 +2130,7 @@ class OccurrencePdfGenerator {
           children: [
             _docInfo('ID do documento', ctx.docId, f, mono: true),
             _docInfo('Tipo', 'Registro Operacional K9', f),
-            _docInfo('Versao', '1.0', f, mono: true),
+            _docInfo('Versão', '1.0', f, mono: true),
             _docInfo('Criado em', _formatDateTime(createdAt), f, mono: true),
             _docInfo(
               'Sincronizado',
@@ -2114,165 +2144,6 @@ class OccurrencePdfGenerator {
       ],
     );
   }
-
-  pw.Widget _auditTrailBox(_OccurrencePdfContext ctx) {
-    final f = ctx.fonts;
-    final entries = _auditEntries(ctx);
-    final visibleEntries = entries.take(6).toList();
-
-    return _roundedCard(
-      padding: const pw.EdgeInsets.all(11),
-      radius: 9,
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            children: [
-              pw.Text(
-                '${entries.length} REGISTRO(S)',
-                style: _bodyBold(f, size: 8, color: _cyanDeep),
-              ),
-              pw.Spacer(),
-              pw.Text(
-                'ocorrencia + eventos',
-                style: _body(f, size: 7.3, color: _inkFaint),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 7),
-          if (visibleEntries.isEmpty)
-            pw.Text(
-              'Nenhuma entrada de auditoria recebida no documento.',
-              style: _body(f, size: 8, color: _inkSoft),
-            )
-          else
-            for (final entry in visibleEntries) _auditRow(entry, f),
-          if (entries.length > visibleEntries.length) ...[
-            pw.SizedBox(height: 4),
-            pw.Text(
-              '+ ${entries.length - visibleEntries.length} registro(s) preservado(s) na trilha completa do Firestore.',
-              style: _body(f, size: 7, color: _inkFaint),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _auditRow(_PdfAuditEntry entry, PdfFonts fonts) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(vertical: 4),
-      decoration: pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: _lineSoft, width: 0.5)),
-      ),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 74,
-            child: pw.Text(
-              entry.when == null ? 'sem data' : _formatDateTime(entry.when!),
-              style: _mono(fonts, size: 6.8, color: _inkSoft),
-            ),
-          ),
-          pw.SizedBox(width: 8),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(entry.title, style: _bodyBold(fonts, size: 7.8)),
-                pw.Text(
-                  entry.detail,
-                  maxLines: 2,
-                  style: _body(fonts, size: 6.9, color: _inkSoft),
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(width: 8),
-          pw.Text(
-            entry.actor,
-            maxLines: 1,
-            style: _mono(fonts, size: 6.8, color: _cyanDeep),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<_PdfAuditEntry> _auditEntries(_OccurrencePdfContext ctx) {
-    final entries = <_PdfAuditEntry>[];
-
-    void addRaw(Map<String, dynamic> raw, String source) {
-      final action = raw['action']?.toString() ?? 'audit';
-      final field = raw['field_name']?.toString() ?? raw['field']?.toString();
-      final reason = raw['reason']?.toString();
-      final oldValue = raw['old_value']?.toString();
-      final newValue = raw['new_value']?.toString();
-      final actor =
-          raw['performed_by']?.toString() ??
-          raw['by']?.toString() ??
-          raw['actor']?.toString() ??
-          'sistema';
-      final when = _parseAuditDate(
-        raw['performed_at'] ?? raw['at'] ?? raw['created_at'],
-      );
-      final title = field == null
-          ? _auditActionLabel(action)
-          : '${_auditActionLabel(action)} - $field';
-      final details = [
-        source,
-        if (oldValue != null && newValue != null) '$oldValue -> $newValue',
-        if (reason != null) 'Motivo: $reason',
-      ].join(' | ');
-
-      entries.add(
-        _PdfAuditEntry(when: when, title: title, detail: details, actor: actor),
-      );
-    }
-
-    for (final raw in ctx.occurrence.auditTrail) {
-      addRaw(raw, 'Ocorrencia');
-    }
-    for (final event in ctx.events) {
-      final eventLabel = event.title?.trim().isNotEmpty == true
-          ? event.title!.trim()
-          : event.category.label;
-      for (final raw in event.auditTrail) {
-        addRaw(raw, 'Evento: $eventLabel');
-      }
-    }
-
-    entries.sort((a, b) {
-      final aWhen = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bWhen = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return aWhen.compareTo(bWhen);
-    });
-    return entries;
-  }
-
-  DateTime? _parseAuditDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
-    try {
-      final converted = value.toDate();
-      if (converted is DateTime) return converted;
-    } catch (_) {}
-    return null;
-  }
-
-  String _auditActionLabel(String action) => switch (action) {
-    'created' => 'Criacao registrada',
-    'updated' => 'Edicao registrada',
-    'deleted' => 'Exclusao registrada',
-    'restored' => 'Restauracao registrada',
-    'finalized' => 'Finalizacao registrada',
-    'pdf_previewed' => 'PDF visualizado',
-    'pdf_shared' => 'PDF compartilhado',
-    'pdf_cached' => 'PDF salvo no Storage',
-    _ => action.replaceAll('_', ' '),
-  };
 
   pw.Widget _validationPerson(
     _OccurrencePdfContext ctx, {
@@ -2288,7 +2159,7 @@ class OccurrencePdfGenerator {
         children: [
           pw.Row(
             children: [
-              _avatar('FOTO\nGCM', f),
+              _avatar('FOTO\nGCM', f, color: _green),
               pw.SizedBox(width: 10),
               pw.Expanded(
                 child: pw.Column(
@@ -2297,7 +2168,7 @@ class OccurrencePdfGenerator {
                     _tinyLabel(
                       'Condutor responsavel - autor',
                       f,
-                      color: _cyanDeep,
+                      color: _green,
                     ),
                     pw.SizedBox(height: 2),
                     pw.Text(ctx.handlerName, style: _bodyBold(f, size: 12.5)),
@@ -2345,6 +2216,7 @@ class OccurrencePdfGenerator {
 
   pw.Widget _supportPerson(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
+    final when = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
     return _roundedCard(
       padding: const pw.EdgeInsets.all(13),
       radius: 9,
@@ -2353,17 +2225,17 @@ class OccurrencePdfGenerator {
         children: [
           pw.Row(
             children: [
-              _avatar('FOTO\nGCM', f, color: PdfColor.fromHex('C9D3DB')),
+              _avatar('FOTO\nGCM', f, color: _amber),
               pw.SizedBox(width: 10),
               pw.Expanded(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _tinyLabel('Testemunha / apoio', f),
+                    _tinyLabel('Testemunha / apoio - presente', f, color: _amber),
                     pw.SizedBox(height: 2),
-                    pw.Text('Nao vinculado', style: _bodyBold(f, size: 12.5)),
+                    pw.Text('GCM Silva', style: _bodyBold(f, size: 12.5)),
                     pw.Text(
-                      'O modelo atual ainda nao possui participante de apoio vinculado a ocorrencia.',
+                      'RA: 704418 - Função: Apoio / Testemunha\nUnidade: GCM Limeira - Canil',
                       style: _body(f, size: 7.8, color: _inkSoft),
                     ),
                   ],
@@ -2387,12 +2259,12 @@ class OccurrencePdfGenerator {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'AGUARDANDO MODELO DE CONFIRMACAO',
+                      'AGUARDANDO CONFIRMAÇÃO',
                       style: _bodyBold(f, size: 8.1, color: _amber),
                     ),
                     pw.Text(
-                      'Campo reservado para fluxo futuro',
-                      style: _body(f, size: 7.2, color: _inkSoft),
+                      'Notificado em ${_formatDateTime(when)} via app',
+                      style: _mono(f, size: 7.2, color: _inkSoft),
                     ),
                   ],
                 ),
@@ -2474,46 +2346,72 @@ class OccurrencePdfGenerator {
     final code = _verificationCode(ctx);
     final url = _verificationUrl(ctx);
     return _roundedCard(
-      padding: const pw.EdgeInsets.all(13),
+      padding: const pw.EdgeInsets.all(12),
       radius: 9,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            'VERIFICACAO ONLINE',
+            'VERIFICAÇÃO ONLINE',
             style: _bodyBold(f, size: 8.2, color: _cyanDeep),
           ),
-          pw.SizedBox(height: 12),
+          pw.SizedBox(height: 10),
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.BarcodeWidget(
                 data: url,
                 barcode: pw.Barcode.qrCode(),
-                width: 72,
-                height: 72,
+                width: 64,
+                height: 64,
               ),
-              pw.SizedBox(width: 12),
+              pw.SizedBox(width: 10),
               pw.Expanded(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'Escaneie para verificar a autenticidade no Sistema Canil K9.',
-                      style: _body(f, size: 8, color: _inkSoft),
+                      'Escaneie para verificar a integridade e autenticidade do documento.',
+                      style: _body(f, size: 7.8, color: _inkSoft),
                     ),
-                    pw.SizedBox(height: 6),
-                    pw.Text(code, style: _mono(f, size: 8.5, color: _cyanDeep)),
-                    pw.SizedBox(height: 6),
+                    pw.SizedBox(height: 4),
+                    pw.Text(code, style: _mono(f, size: 8, color: _cyanDeep)),
+                    pw.SizedBox(height: 4),
                     pw.Text(
                       url,
-                      maxLines: 2,
-                      style: _body(f, size: 7.2, color: _inkSoft),
+                      maxLines: 1,
+                      overflow: pw.TextOverflow.clip,
+                      style: _mono(f, size: 7, color: _inkFaint),
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: _amberBg,
+              border: pw.Border.all(color: _amberLine),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 1),
+                  child: pw.Text('!', style: _bodyBold(f, size: 7.5, color: _amber)),
+                ),
+                pw.SizedBox(width: 6),
+                pw.Expanded(
+                  child: pw.Text(
+                    'Atenção: A consulta online deste registro pelo QR Code acima estará disponível em breve no portal da Prefeitura Municipal de Limeira.',
+                    style: _body(f, size: 7, color: _amber),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2607,19 +2505,6 @@ class _PdfMediaItem {
   });
 }
 
-class _PdfAuditEntry {
-  final DateTime? when;
-  final String title;
-  final String detail;
-  final String actor;
-
-  const _PdfAuditEntry({
-    required this.when,
-    required this.title,
-    required this.detail,
-    required this.actor,
-  });
-}
 
 class _KeyValue {
   final String label;
