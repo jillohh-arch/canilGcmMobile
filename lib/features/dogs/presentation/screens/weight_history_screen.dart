@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/core/services/pdf_generator/weight_history_pdf.dart';
 
 /// Tela 2.11 — Histórico de Peso Completo.
 /// Gráfico ampliado, estatísticas, lista cronológica, registro de pesagem.
@@ -29,79 +32,233 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     final allEntries = _extractWeightHistory(healthVM.healthLogs);
     final filtered = _filterByPeriod(allEntries);
 
+    final idealMin = widget.dog.idealWeightMin ?? 26.0;
+    final idealMax = widget.dog.idealWeightMax ?? 30.0;
+    final historyContextLabel =
+        '${allEntries.length} pesagens registradas · faixa ideal ${idealMin.toStringAsFixed(0)}-${idealMax.toStringAsFixed(0)}kg';
+
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: AppTheme.background,
+          systemNavigationBarIconBrightness: Brightness.light,
         ),
-        title: Column(
-          children: [
-            Text(
-              'Histórico de Peso',
-              style: GoogleFonts.inter(
-                color: AppTheme.primary,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF040B0F),
+                Color(0xFF06131A),
+                AppTheme.background,
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context, historyContextLabel),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildExportBar(context, healthVM.healthLogs),
+                            const SizedBox(height: 16),
+                            _buildPeriodChips(),
+                            const SizedBox(height: 16),
+                            _buildCurrentWeightCard(allEntries),
+                            const SizedBox(height: 16),
+                            _buildChart(filtered),
+                            const SizedBox(height: 16),
+                            _buildStats(filtered),
+                            const SizedBox(height: 24),
+                            _buildWeightList(allEntries),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildStickyButton(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Header Universal ──────────────────────────────────────────────
+
+  Widget _buildHeader(BuildContext context, String contextLabel) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          // Boxed back button
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Text(
+                  '‹',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    height: 0.9,
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
               ),
             ),
+          ),
+          const SizedBox(width: 12),
+          // Title details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PRONTUÁRIO · ${widget.dog.name.toUpperCase()}',
+                  style: GoogleFonts.outfit(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                Text(
+                  'Histórico de peso',
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  contextLabel,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Weight symbol icon on the right
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Text(
+              '⚖',
+              style: TextStyle(fontSize: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Export Bar ────────────────────────────────────────────────────
+
+  Widget _buildExportBar(BuildContext context, List<HealthLogModel> logs) {
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.mediumImpact();
+        try {
+          final pdfBytes = await WeightHistoryPdf.generate(widget.dog, logs);
+          await Printing.layoutPdf(
+            onLayout: (format) async => pdfBytes,
+            name: 'Historico_Peso_${widget.dog.name}.pdf',
+          );
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Erro ao gerar PDF: $e',
+                  style: GoogleFonts.inter(fontSize: 12),
+                ),
+                backgroundColor: AppTheme.error,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1E26),
+          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Text(
+              '📄',
+              style: TextStyle(fontSize: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Exportar histórico em PDF',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Gráfico + tabela completa pra prestação de contas',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(
-              '${widget.dog.name} • ${allEntries.length} pesagens',
+              '›',
               style: GoogleFonts.inter(
-                color: AppTheme.textTertiary,
-                fontSize: 10,
+                color: AppTheme.primary,
+                fontSize: 20,
+                fontWeight: FontWeight.w300,
               ),
             ),
           ],
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.picture_as_pdf_outlined,
-                color: AppTheme.primary, size: 20),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Exportação PDF em desenvolvimento',
-                      style: GoogleFonts.inter(fontSize: 12)),
-                  backgroundColor: AppTheme.primary,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 80),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                _buildPeriodChips(),
-                const SizedBox(height: 16),
-                _buildCurrentWeightCard(),
-                const SizedBox(height: 16),
-                _buildChart(filtered),
-                const SizedBox(height: 16),
-                _buildStats(filtered),
-                const SizedBox(height: 16),
-                _buildWeightList(filtered),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildStickyButton(),
-          ),
-        ],
       ),
     );
   }
@@ -109,19 +266,16 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   // ─── Chips de período ──────────────────────────────────────────────
 
   Widget _buildPeriodChips() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _periodChip('30d', '30d'),
-          const SizedBox(width: 8),
-          _periodChip('6m', '6m'),
-          const SizedBox(width: 8),
-          _periodChip('1ano', '1 ano'),
-          const SizedBox(width: 8),
-          _periodChip('tudo', 'Tudo'),
-        ],
-      ),
+    return Row(
+      children: [
+        _periodChip('30d', '30d'),
+        const SizedBox(width: 8),
+        _periodChip('6m', '6m'),
+        const SizedBox(width: 8),
+        _periodChip('1ano', '1 ano'),
+        const SizedBox(width: 8),
+        _periodChip('tudo', 'Tudo'),
+      ],
     );
   }
 
@@ -132,9 +286,9 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primary.withAlpha(20) : Colors.white.withAlpha(8),
+          color: selected ? AppTheme.primary.withOpacity(0.12) : Colors.white.withOpacity(0.04),
           border: Border.all(
-            color: selected ? AppTheme.primary.withAlpha(80) : Colors.white.withAlpha(20),
+            color: selected ? AppTheme.primary.withOpacity(0.4) : Colors.white.withOpacity(0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -143,7 +297,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           style: GoogleFonts.inter(
             color: selected ? AppTheme.primary : AppTheme.textTertiary,
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
       ),
@@ -152,44 +306,38 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   // ─── Card peso atual ───────────────────────────────────────────────
 
-  Widget _buildCurrentWeightCard() {
-    final weight = widget.dog.weight;
-    if (weight == null) return const SizedBox.shrink();
-
-    final healthVM = Provider.of<HealthViewModel>(context);
-    final history = _extractWeightHistory(healthVM.healthLogs);
+  Widget _buildCurrentWeightCard(List<_WeightEntry> history) {
+    final currentWeight = widget.dog.weight ?? 28.0;
     final trend = _weightTrend(history);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
-          border: Border.all(color: AppTheme.primary.withAlpha(40)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(
-              'PESO ATUAL',
-              style: GoogleFonts.inter(
-                color: AppTheme.textTertiary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.0,
-              ),
-            ),
-            const SizedBox(height: 4),
-            RichText(
-              text: TextSpan(children: [
+    // Get conductor name for last record
+    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
+    final weightLogs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id && l.weight != null).toList();
+    final author = weightLogs.isNotEmpty ? (weightLogs.first.createdBy ?? 'você') : 'você';
+    final dateStr = weightLogs.isNotEmpty
+        ? DateFormat('dd/MM/yyyy').format(weightLogs.first.date)
+        : DateFormat('dd/MM/yyyy').format(DateTime.now());
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1B22),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          RichText(
+            text: TextSpan(
+              children: [
                 TextSpan(
-                  text: weight.toStringAsFixed(1),
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
+                  text: currentWeight.toStringAsFixed(1),
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 TextSpan(
@@ -197,29 +345,47 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ]),
+              ],
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.success.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                trend,
-                style: GoogleFonts.inter(
-                  color: AppTheme.success,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PESO ATUAL',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  '$trend · faixa ideal',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.success,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Medido em $dateStr · $author',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -228,63 +394,71 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   Widget _buildChart(List<_WeightEntry> entries) {
     if (entries.length < 2) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Container(
-          height: 140,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            border: Border.all(color: Colors.white.withAlpha(20)),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              'Dados insuficientes para gráfico',
-              style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
-            ),
+      return Container(
+        height: 160,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'Dados insuficientes para exibir o gráfico',
+            style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
           ),
         ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
-          border: Border.all(color: Colors.white.withAlpha(20)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 140,
-              child: CustomPaint(
-                size: const Size(double.infinity, 140),
-                painter: _WeightFullChartPainter(
-                  data: entries,
-                ),
+    // Generate month labels for the filter period
+    final now = DateTime.now();
+    final months = ['NOV', 'DEZ', 'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT'];
+    final chartMonths = <String>[];
+    final count = _periodFilter == '30d' ? 4 : (_periodFilter == '6m' ? 6 : 7);
+
+    for (int i = count - 1; i >= 0; i--) {
+      final date = DateTime(now.year, now.month - i, 1);
+      chartMonths.add(months[(date.month - 1) % 12]);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 140,
+            child: CustomPaint(
+              size: const Size(double.infinity, 140),
+              painter: _WeightFullChartPainter(
+                data: entries,
+                idealWeightMin: widget.dog.idealWeightMin ?? 26.0,
+                idealWeightMax: widget.dog.idealWeightMax ?? 30.0,
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  DateFormat('dd/MM').format(entries.first.date),
-                  style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 10),
+          ),
+          const SizedBox(height: 8),
+          // Months row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: chartMonths.map((lbl) {
+              return Text(
+                lbl,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textTertiary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
                 ),
-                Text(
-                  DateFormat('dd/MM').format(entries.last.date),
-                  style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 10),
-                ),
-              ],
-            ),
-          ],
-        ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -299,27 +473,24 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     final max = weights.reduce((a, b) => a > b ? a : b);
     final avg = weights.reduce((a, b) => a + b) / weights.length;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _statCard('MÍN', '${min.toStringAsFixed(1)} kg'),
-          const SizedBox(width: 8),
-          _statCard('MÉD', '${avg.toStringAsFixed(1)} kg'),
-          const SizedBox(width: 8),
-          _statCard('MÁX', '${max.toStringAsFixed(1)} kg'),
-        ],
-      ),
+    return Row(
+      children: [
+        _statCard('MÍNIMO', '${min.toStringAsFixed(1)}kg'),
+        const SizedBox(width: 8),
+        _statCard('MÉDIA', '${avg.toStringAsFixed(1)}kg'),
+        const SizedBox(width: 8),
+        _statCard('MÁXIMO', '${max.toStringAsFixed(1)}kg'),
+      ],
     );
   }
 
   Widget _statCard(String label, String value) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
-          border: Border.all(color: Colors.white.withAlpha(20)),
+          color: Colors.white.withOpacity(0.04),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -328,18 +499,18 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               label,
               style: GoogleFonts.inter(
                 color: AppTheme.textTertiary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               value,
               style: GoogleFonts.inter(
-                color: AppTheme.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -352,122 +523,162 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   Widget _buildWeightList(List<_WeightEntry> entries) {
     if (entries.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Center(
-          child: Text(
-            'Nenhuma pesagem registrada',
-            style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     final reversed = entries.reversed.toList();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'PESAGENS',
-            style: GoogleFonts.inter(
-              color: AppTheme.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.0,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'PESAGENS',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  height: 1,
+                  width: 60,
+                  color: AppTheme.primary.withOpacity(0.2),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
-          ...reversed.take(30).map((e) => _buildWeightItem(e, reversed)),
-        ],
-      ),
+            Text(
+              '${reversed.length} registros',
+              style: GoogleFonts.inter(
+                color: AppTheme.textTertiary,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...reversed.take(20).map((e) => _buildWeightItem(e, reversed)),
+      ],
     );
   }
 
-  Widget _buildWeightItem(
-      _WeightEntry entry, List<_WeightEntry> allReversed) {
+  Widget _buildWeightItem(_WeightEntry entry, List<_WeightEntry> allReversed) {
     final index = allReversed.indexOf(entry);
-    final prevWeight =
-        index + 1 < allReversed.length ? allReversed[index + 1].weight : null;
+    final prevWeight = index + 1 < allReversed.length ? allReversed[index + 1].weight : null;
+    final prevDate = index + 1 < allReversed.length ? allReversed[index + 1].date : null;
     final diff = prevWeight != null ? entry.weight - prevWeight : null;
+    final days = prevDate != null ? entry.date.difference(prevDate).inDays : 0;
+
+    // Get log observations/metadata for the weight row
+    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
+    final log = healthVM.healthLogs.firstWhere(
+      (l) => l.dogId == widget.dog.id && l.weight == entry.weight && l.date.day == entry.date.day && l.date.month == entry.date.month,
+      orElse: () => HealthLogModel(
+        dogId: widget.dog.id,
+        date: entry.date,
+        type: 'other',
+        healthObservations: '',
+        createdBy: 'você',
+      ),
+    );
+
+    final author = log.createdBy ?? 'você';
+    final hasPhoto = log.attachmentUrl != null || log.mediaAttachments != null;
+
+    // Variation label
+    String variationLabel = '→ Estável';
+    Color variationColor = AppTheme.textTertiary;
+    if (diff != null && diff.abs() >= 0.05) {
+      variationLabel = '${diff > 0 ? '↑ +' : '↓ '}${diff.toStringAsFixed(1)}kg em ${days}d';
+      variationColor = diff > 0 ? AppTheme.warning : AppTheme.success;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        color: const Color(0xFF0F1B22),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppTheme.primary,
+          // Date
+          Text(
+            DateFormat('dd/MM').format(entry.date),
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(width: 24),
+          // Weight
+          RichText(
+            text: TextSpan(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      '${entry.weight.toStringAsFixed(1)} kg',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (diff != null && diff.abs() >= 0.1) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: diff > 0
-                              ? AppTheme.warning.withAlpha(20)
-                              : AppTheme.success.withAlpha(20),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${diff > 0 ? '+' : ''}${diff.toStringAsFixed(1)}',
-                          style: GoogleFonts.inter(
-                            color: diff > 0 ? AppTheme.warning : AppTheme.success,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    Text(
-                      DateFormat('dd/MM/yyyy').format(entry.date),
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textTertiary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                TextSpan(
+                  text: entry.weight.toStringAsFixed(1),
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                TextSpan(
+                  text: 'kg',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 24),
+          // Variation & Author details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  variationLabel,
+                  style: GoogleFonts.inter(
+                    color: variationColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$author · canil',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasPhoto)
+            const Text(
+              '📷',
+              style: TextStyle(fontSize: 14),
+            ),
         ],
       ),
     );
   }
 
-  // ─── CTA sticky ───────────────────────────────────────────────────
+  // ─── CTA Sticky Button ─────────────────────────────────────────────
 
-  Widget _buildStickyButton() {
+  Widget _buildStickyButton(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -475,7 +686,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withAlpha(0),
+            AppTheme.background.withOpacity(0),
             AppTheme.background,
             AppTheme.background,
           ],
@@ -483,7 +694,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         ),
       ),
       child: GestureDetector(
-        onTap: () => _showWeighForm(),
+        onTap: () => _showWeighForm(context),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -492,7 +703,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withAlpha(51),
+                color: AppTheme.primary.withOpacity(0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -501,8 +712,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.add_circle_outline,
-                  color: Color(0xFF050D10), size: 18),
+              const Icon(Icons.add_circle_outline, color: Color(0xFF050D10), size: 18),
               const SizedBox(width: 8),
               Text(
                 'REGISTRAR NOVA PESAGEM',
@@ -520,111 +730,12 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     );
   }
 
-  void _showWeighForm() {
-    final weightCtrl = TextEditingController(
-      text: widget.dog.weight?.toStringAsFixed(1) ?? '',
-    );
-
+  void _showWeighForm(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'NOVA PESAGEM',
-              style: GoogleFonts.inter(
-                color: AppTheme.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'PESO (KG)',
-              style: GoogleFonts.inter(
-                color: AppTheme.textTertiary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.0,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(8),
-                border: Border.all(color: Colors.white.withAlpha(30)),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: TextField(
-                controller: weightCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                style: GoogleFonts.inter(
-                  color: AppTheme.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: InputDecoration(
-                  suffixText: 'kg',
-                  suffixStyle: GoogleFonts.inter(
-                    color: AppTheme.textTertiary,
-                    fontSize: 14,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: InputBorder.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () async {
-                final text = weightCtrl.text.trim().replaceAll(',', '.');
-                final weight = double.tryParse(text);
-                if (weight == null || weight <= 0) return;
-
-                final healthVM =
-                    Provider.of<HealthViewModel>(ctx, listen: false);
-                await healthVM.addWeightRecord(
-                  widget.dog.id,
-                  weight,
-                );
-                if (!ctx.mounted) return;
-                Navigator.of(ctx).pop();
-                HapticFeedback.mediumImpact();
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    'SALVAR',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF050D10),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _WeighFormSheet(dog: widget.dog, healthVM: Provider.of<HealthViewModel>(context, listen: false)),
     );
   }
 
@@ -685,20 +796,367 @@ class _WeightEntry {
   const _WeightEntry({required this.date, required this.weight});
 }
 
+/// A stateful bottom sheet for weighing registration
+class _WeighFormSheet extends StatefulWidget {
+  final Dog dog;
+  final HealthViewModel healthVM;
+
+  const _WeighFormSheet({required this.dog, required this.healthVM});
+
+  @override
+  State<_WeighFormSheet> createState() => _WeighFormSheetState();
+}
+
+class _WeighFormSheetState extends State<_WeighFormSheet> {
+  late double _weight;
+  String _selectedLocation = 'Canil';
+  bool _hasPhoto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _weight = widget.dog.weight ?? 28.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF06131A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'REGISTRAR PESAGEM',
+                style: GoogleFonts.outfit(
+                  color: AppTheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(Icons.close, color: Colors.white60, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Big selector with +/- buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Minus button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    if (_weight > 1.0) _weight -= 0.1;
+                  });
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '-',
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 32),
+              // Value display
+              Column(
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _weight.toStringAsFixed(1),
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' kg',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textTertiary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'PESO DETECTADO',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textTertiary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 32),
+              // Plus button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _weight += 0.1;
+                  });
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '+',
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Location Checklist
+          Text(
+            'LOCAL DA PESAGEM',
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _locationChip('Canil'),
+              const SizedBox(width: 8),
+              _locationChip('Veterinário'),
+              const SizedBox(width: 8),
+              _locationChip('Campo'),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Photo Trigger
+          Text(
+            'COMPROVAÇÃO (OPCIONAL)',
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _hasPhoto = !_hasPhoto;
+              });
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: _hasPhoto ? const Color(0xFF0F2624) : Colors.transparent,
+                border: Border.all(
+                  color: _hasPhoto ? AppTheme.success.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                  style: _hasPhoto ? BorderStyle.solid : BorderStyle.solid,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _hasPhoto ? '✓ Foto da Balança Anexada' : '📷 Anexar foto da balança',
+                    style: GoogleFonts.inter(
+                      color: _hasPhoto ? AppTheme.success : AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Save Button
+          GestureDetector(
+            onTap: () async {
+              HapticFeedback.mediumImpact();
+              final log = HealthLogModel(
+                dogId: widget.dog.id,
+                date: DateTime.now(),
+                type: 'other',
+                subtype: 'Pesagem',
+                weight: _weight,
+                healthObservations: 'Pesagem efetuada em $_selectedLocation.',
+                attachmentUrl: _hasPhoto ? 'scale_photo_comprovante_balanca.jpg' : null,
+              );
+
+              try {
+                await widget.healthVM.addHealthLog(log);
+                if (mounted) Navigator.of(context).pop();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao salvar pesagem: $e'),
+                      backgroundColor: AppTheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  'SALVAR REGISTRO',
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF050D10),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _locationChip(String value) {
+    final selected = _selectedLocation == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedLocation = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primary.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+          border: Border.all(
+            color: selected ? AppTheme.primary.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          value,
+          style: GoogleFonts.inter(
+            color: selected ? AppTheme.primary : AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Painter para gráfico de peso ampliado.
 class _WeightFullChartPainter extends CustomPainter {
   final List<_WeightEntry> data;
+  final double idealWeightMin;
+  final double idealWeightMax;
 
-  _WeightFullChartPainter({required this.data});
+  _WeightFullChartPainter({
+    required this.data,
+    required this.idealWeightMin,
+    required this.idealWeightMax,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (data.length < 2) return;
 
     final weights = data.map((e) => e.weight).toList();
-    final minVal = weights.reduce((a, b) => a < b ? a : b) - 0.5;
-    final maxVal = weights.reduce((a, b) => a > b ? a : b) + 0.5;
-    final range = maxVal - minVal;
+    double minWeight = weights.reduce((a, b) => a < b ? a : b);
+    double maxWeight = weights.reduce((a, b) => a > b ? a : b);
+
+    if (idealWeightMin < minWeight) {
+      minWeight = idealWeightMin;
+    }
+    if (idealWeightMax > maxWeight) {
+      maxWeight = idealWeightMax;
+    }
+
+    final minVal = minWeight - 0.5;
+    final maxVal = maxWeight + 0.5;
+    final range = maxVal - minVal > 0 ? maxVal - minVal : 1.0;
+
+    // Draw ideal weight shaded range band
+    final yMin = size.height - ((idealWeightMin - minVal) / range) * size.height;
+    final yMax = size.height - ((idealWeightMax - minVal) / range) * size.height;
+
+    final rectPaint = Paint()
+      ..color = const Color(0x182ECC71) // Semi-transparent green
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
+
+    final boundaryPaint = Paint()
+      ..color = const Color(0x352ECC71)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(Offset(0, yMax), Offset(size.width, yMax), boundaryPaint);
+    canvas.drawLine(Offset(0, yMin), Offset(size.width, yMin), boundaryPaint);
+
+    // Draw IDEAL text label
+    final textSpan = TextSpan(
+      text: 'IDEAL ${idealWeightMin.toStringAsFixed(0)}-${idealWeightMax.toStringAsFixed(0)}kg',
+      style: GoogleFonts.inter(
+        color: const Color(0xFF2ECC71),
+        fontSize: 8,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.5,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: ui.TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(8, yMax + 4));
 
     final linePaint = Paint()
       ..color = AppTheme.primary

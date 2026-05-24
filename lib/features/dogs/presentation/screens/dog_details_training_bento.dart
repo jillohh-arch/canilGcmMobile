@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _TrainingSummaryBento extends StatelessWidget {
   final TrainingSessionModel? lastTraining;
@@ -52,8 +52,8 @@ class _TrainingSummaryText extends StatelessWidget {
       children: [
         Text(
           lastTraining != null
-              ? 'ÃšLTIMO TREINO DE ${lastTraining!.trainingType.toUpperCase()}'
-              : 'ÃšLTIMO TREINO DE FARO',
+              ? 'ÚLTIMO TREINO DE ${lastTraining!.trainingType.toUpperCase()}'
+              : 'ÚLTIMO TREINO DE FARO',
           style: GoogleFonts.inter(
             fontSize: 9,
             fontWeight: FontWeight.w800,
@@ -64,7 +64,7 @@ class _TrainingSummaryText extends StatelessWidget {
         const SizedBox(height: 4),
         if (lastTraining != null) ...[
           Text(
-            '${lastTraining!.trainingType}${lastTraining!.substanceUsed != null ? " Â· ${lastTraining!.substanceUsed}" : ""}',
+            '${lastTraining!.trainingType}${lastTraining!.substanceUsed != null ? " · ${lastTraining!.substanceUsed}" : ""}',
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -108,7 +108,7 @@ class _SessionCounter extends StatelessWidget {
           ),
         ),
         Text(
-          'SESSÃ•ES',
+          'SESSÕES',
           style: GoogleFonts.inter(
             fontSize: 8,
             fontWeight: FontWeight.w700,

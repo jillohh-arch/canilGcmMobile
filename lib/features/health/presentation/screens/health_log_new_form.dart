@@ -1,111 +1,99 @@
 part of 'health_log_screen.dart';
 
-class _NewHealthLogForm extends StatefulWidget {
+class _NewHealthLogForm extends StatelessWidget {
   final String dogId;
   final VoidCallback onSaved;
 
   const _NewHealthLogForm({required this.dogId, required this.onSaved});
 
   @override
-  State<_NewHealthLogForm> createState() => _NewHealthLogFormState();
-}
-
-class _NewHealthLogFormState extends State<_NewHealthLogForm> {
-  static const _logTypes = [
-    'Consulta',
-    'Vacina',
-    'Exame',
-    'Medicação',
-    'Banho',
-  ];
-
-  final _formKey = GlobalKey<FormState>();
-  final _weightController = TextEditingController();
-  final _observationsController = TextEditingController();
-  final _vaccineNameController = TextEditingController();
-
-  String _selectedLogType = 'Consulta';
-
-  @override
-  void dispose() {
-    _weightController.dispose();
-    _observationsController.dispose();
-    _vaccineNameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveHealthLog() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final log = HealthLogModel(
-      dogId: widget.dogId,
-      date: DateTime.now(),
-      logType: _selectedLogType,
-      weight: double.tryParse(
-        _weightController.text.trim().replaceAll(',', '.'),
-      ),
-      vaccines:
-          _selectedLogType == 'Vacina' &&
-              _vaccineNameController.text.trim().isNotEmpty
-          ? [_vaccineNameController.text.trim()]
-          : [],
-      healthObservations: _observationsController.text.trim(),
-    );
-    final viewModel = Provider.of<HealthViewModel>(context, listen: false);
-
-    try {
-      await viewModel.addHealthLog(log);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registro médico salvo!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _clearForm();
-      widget.onSaved();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  void _clearForm() {
-    _weightController.clear();
-    _observationsController.clear();
-    _vaccineNameController.clear();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _formKey,
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _HealthLogTypeSelector(
-              logTypes: _logTypes,
-              selectedLogType: _selectedLogType,
-              onSelected: (type) => setState(() => _selectedLogType = type),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(20),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppTheme.primary.withAlpha(40),
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.medical_services_rounded,
+                size: 64,
+                color: AppTheme.primary,
+              ),
             ),
             const SizedBox(height: 24),
-            if (_selectedLogType == 'Vacina') ...[
-              _VaccineNameField(controller: _vaccineNameController),
-              const SizedBox(height: 20),
-            ],
-            _HealthWeightField(controller: _weightController),
-            const SizedBox(height: 20),
-            _HealthObservationField(controller: _observationsController),
-            const SizedBox(height: 32),
-            _SaveHealthLogButton(
-              selectedLogType: _selectedLogType,
-              onPressed: _saveHealthLog,
+            Text(
+              'Prontuário de Saúde K9',
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            Text(
+              'Garante a integridade do histórico do cão registrando vacinas, exames, consultas, cirurgias, medicamentos, sintomas e pesagens de forma organizada e auditável.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 36),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                label: Text(
+                  'Iniciar Registro Médico',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HealthTypeSelectorScreen(dogId: dogId),
+                    ),
+                  ).then((saved) {
+                    if (saved == true) {
+                      onSaved();
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Todos os registros geram trilha de auditoria para o condutor.',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: AppTheme.textTertiary,
+              ),
+            ),
           ],
         ),
       ),

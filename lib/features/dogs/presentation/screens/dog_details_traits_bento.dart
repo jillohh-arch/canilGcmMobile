@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _DogTraitsBentoRow extends StatelessWidget {
   final Dog dog;
@@ -15,7 +15,7 @@ class _DogTraitsBentoRow extends StatelessWidget {
           child: _DogTraitBentoBlock(
             icon: dog.sex == 'F' ? Icons.female_rounded : Icons.male_rounded,
             accent: sexAccent,
-            value: dog.sex == 'F' ? 'FÃªmea' : 'Macho',
+            value: dog.sex == 'F' ? 'Fêmea' : 'Macho',
             label: 'SEXO',
           ),
         ),

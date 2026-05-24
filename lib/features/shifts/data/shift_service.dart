@@ -69,6 +69,7 @@ class ShiftService {
       final activeSnapshot = await transaction.get(activeRef);
       final activeData = activeSnapshot.data();
       final shiftId = activeData?['shiftId'] as String?;
+      final fromDogId = activeData?['dogId'] as String? ?? '';
 
       transaction.set(activeRef, {
         'handlerId': handlerId,
@@ -83,6 +84,9 @@ class ShiftService {
           'currentDogId': dogId,
           'dogSwitches': FieldValue.arrayUnion([
             {'dogId': dogId, 'switchedAt': switchedAt},
+          ]),
+          'dog_changes': FieldValue.arrayUnion([
+            {'at': switchedAt, 'from': fromDogId, 'to': dogId},
           ]),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));

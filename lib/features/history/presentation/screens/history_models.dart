@@ -44,13 +44,13 @@ class HistoryEntry {
   String get category {
     switch (type) {
       case HistoryEntryType.health:
-        return 'SaÃºde';
+        return 'Saúde';
       case HistoryEntryType.training:
         return 'Treino';
       case HistoryEntryType.occurrence:
-        return 'OcorrÃªncia';
+        return 'Ocorrência';
       case HistoryEntryType.nutrition:
-        return 'NutriÃ§Ã£o';
+        return 'Nutrição';
     }
   }
 
@@ -159,13 +159,13 @@ class RecordDetail {
   String get typeLabel {
     switch (type) {
       case HistoryEntryType.health:
-        return 'SaÃºde';
+        return 'Saúde';
       case HistoryEntryType.training:
         return 'Treino';
       case HistoryEntryType.occurrence:
-        return 'OcorrÃªncia';
+        return 'Ocorrência';
       case HistoryEntryType.nutrition:
-        return 'NutriÃ§Ã£o';
+        return 'Nutrição';
     }
   }
 
@@ -173,7 +173,7 @@ class RecordDetail {
 
   String get headerTitle {
     if (title.trim().isEmpty || title == typeLabel) return typeLabel;
-    return '$typeLabel â€¢ $title';
+    return '$typeLabel • $title';
   }
 
   bool get isOccurrence => type == HistoryEntryType.occurrence;
@@ -205,17 +205,17 @@ class RecordDetail {
       entry.location,
       _detailValue(details, const ['Local', 'local']),
       if (entry.type == HistoryEntryType.occurrence) entry.subtitle,
-      'Local nÃ£o informado',
+      'Local não informado',
     ]);
 
     final author = _normalizeAuthor(entry.author);
     final handlerName = _firstNonEmpty([
-      _detailValue(details, const ['Condutor', 'ResponsÃ¡vel', 'Responsavel']),
+      _detailValue(details, const ['Condutor', 'Responsável', 'Responsavel']),
       author.replaceFirst('GCM ', ''),
       'Ragonha',
     ]);
     final dogName = _firstNonEmpty([
-      _detailValue(details, const ['CÃ£o', 'Cao', 'Dog', 'dogName']),
+      _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
       'Bono',
     ]);
 
@@ -229,12 +229,12 @@ class RecordDetail {
 
     final notes = _firstNonEmpty([
       _detailValue(details, const [
-        'ObservaÃ§Ãµes',
+        'Observações',
         'Observacoes',
-        'ObservaÃƒÂ§ÃƒÂµes',
-        'DescriÃ§Ã£o',
+        'ObservaÃÂ§ÃÂµes',
+        'Descrição',
         'Descricao',
-        'DescriÃƒÂ§ÃƒÂ£o',
+        'DescriÃÂ§ÃÂ£o',
         'Notas',
         'Detalhes',
       ]),
@@ -242,9 +242,9 @@ class RecordDetail {
     ]);
 
     final duration = _firstNonEmpty([
-      _detailValue(details, const ['DuraÃ§Ã£o', 'Duracao', 'DuraÃƒÂ§ÃƒÂ£o']),
+      _detailValue(details, const ['Duração', 'Duracao', 'DuraÃÂ§ÃÂ£o']),
       _occurrenceDuration(entry),
-      entry.type == HistoryEntryType.occurrence ? '42 min' : 'NÃ£o informado',
+      entry.type == HistoryEntryType.occurrence ? '42 min' : 'Não informado',
     ]);
 
     return RecordDetail(
@@ -265,7 +265,7 @@ class RecordDetail {
         _detailValue(details, const ['Equipe', 'team']),
         entry.type == HistoryEntryType.occurrence
             ? '2 GCMs'
-            : 'Equipe nÃ£o informada',
+            : 'Equipe não informada',
       ]),
       notes: notes,
       icon: entry.icon,
@@ -279,20 +279,20 @@ class RecordDetail {
   static String _typeLabel(HistoryEntryType type) {
     switch (type) {
       case HistoryEntryType.health:
-        return 'SaÃºde';
+        return 'Saúde';
       case HistoryEntryType.training:
         return 'Treino';
       case HistoryEntryType.occurrence:
-        return 'OcorrÃªncia';
+        return 'Ocorrência';
       case HistoryEntryType.nutrition:
-        return 'NutriÃ§Ã£o';
+        return 'Nutrição';
     }
   }
 
   static String _lastTitlePart(String title) {
-    final normalized = title.replaceAll('Ã¢â‚¬Â¢', 'â€¢');
+    final normalized = title.replaceAll('ââ‚¬Â¢', '•');
     final parts = normalized
-        .split('â€¢')
+        .split('•')
         .map((part) => part.trim())
         .where((part) => part.isNotEmpty)
         .toList();
@@ -325,8 +325,8 @@ class RecordDetail {
   static String _normalizeAuthor(String author) {
     final cleaned = _cleanText(author).trim();
     if (cleaned.isEmpty) return 'GCM Ragonha';
-    if (cleaned == 'VocÃª') return 'GCM Ragonha';
-    if (cleaned.startsWith('GCM ') || cleaned.startsWith('VeterinÃ¡rio')) {
+    if (cleaned == 'Você') return 'GCM Ragonha';
+    if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
       return cleaned;
     }
     return 'GCM $cleaned';
@@ -344,13 +344,13 @@ class RecordDetail {
 
   static String _occurrenceDuration(HistoryEntry entry) {
     final startRaw = _detailValue(entry.details, const [
-      'InÃ­cio',
+      'Início',
       'Inicio',
-      'InÃƒÂ­cio',
+      'InÃÂ­cio',
     ]);
     final endRaw = _detailValue(entry.details, const [
       'Fim',
-      'TÃ©rmino',
+      'Término',
       'Termino',
     ]);
     if (startRaw.isEmpty || endRaw.isEmpty) return '';
@@ -382,7 +382,7 @@ class RecordDetail {
           time: timestamp,
           title: _firstNonEmpty([
             _readUpdateField(update, 'title'),
-            'AtualizaÃ§Ã£o operacional',
+            'Atualização operacional',
           ]),
           subtitle: _readUpdateField(update, 'description'),
         );
@@ -398,7 +398,7 @@ class RecordDetail {
         ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 11)),
-          title: 'CÃ£o empregado na varredura',
+          title: 'Cão empregado na varredura',
         ),
         if (_hasMedia(entry))
           InternalEvent(
@@ -407,7 +407,7 @@ class RecordDetail {
           ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 17)),
-          title: 'Ãrea verificada',
+          title: 'Área verificada',
         ),
         InternalEvent(
           time: entry.time.add(const Duration(minutes: 42)),
@@ -424,7 +424,7 @@ class RecordDetail {
       InternalEvent(
         time: (entry.editedAt ?? entry.time).add(const Duration(minutes: 1)),
         title: entry.isInProgress
-            ? 'Aguardando sincronizaÃ§Ã£o'
+            ? 'Aguardando sincronização'
             : 'Sincronizado com o sistema',
       ),
     ];
@@ -482,7 +482,7 @@ class RecordDetail {
       AuditEvent(
         timestamp: (editedAt ?? entry.time).add(const Duration(minutes: 1)),
         action: entry.isInProgress
-            ? 'SincronizaÃ§Ã£o pendente'
+            ? 'Sincronização pendente'
             : 'Sincronizado com o sistema',
       ),
     ];
@@ -506,7 +506,7 @@ class RecordDetail {
       'updated' when fieldName.isNotEmpty => 'Alterou $fieldName por',
       'updated' => 'Editado por',
       'finalized' => 'Finalizado por',
-      'deleted' => 'ExcluÃ­do por',
+      'deleted' => 'Excluído por',
       'restored' => 'Restaurado por',
       _ => action.isEmpty ? 'Registrado por' : '$action por',
     };
@@ -534,24 +534,24 @@ class RecordDetail {
 
   static String _cleanText(String value) {
     return value
-        .replaceAll('ÃƒÂ¡', 'Ã¡')
-        .replaceAll('ÃƒÂ ', 'Ã ')
-        .replaceAll('ÃƒÂ£', 'Ã£')
-        .replaceAll('ÃƒÂ¢', 'Ã¢')
-        .replaceAll('ÃƒÂ©', 'Ã©')
-        .replaceAll('ÃƒÂª', 'Ãª')
-        .replaceAll('ÃƒÂ­', 'Ã­')
-        .replaceAll('ÃƒÂ³', 'Ã³')
-        .replaceAll('ÃƒÂ´', 'Ã´')
-        .replaceAll('ÃƒÂµ', 'Ãµ')
-        .replaceAll('ÃƒÂº', 'Ãº')
-        .replaceAll('ÃƒÂ§', 'Ã§')
-        .replaceAll('Ãƒâ€¡', 'Ã‡')
-        .replaceAll('ÃƒÅ¡', 'Ãš')
-        .replaceAll('ÃƒÂª', 'Ãª')
-        .replaceAll('Ã¢â‚¬Â¢', 'â€¢')
-        .replaceAll('Ã¢â‚¬â€œ', 'â€“')
-        .replaceAll('Ã¢â‚¬â€', 'â€”');
+        .replaceAll('ÃÂ¡', 'á')
+        .replaceAll('ÃÂ ', 'à')
+        .replaceAll('ÃÂ£', 'ã')
+        .replaceAll('ÃÂ¢', 'â')
+        .replaceAll('ÃÂ©', 'é')
+        .replaceAll('ÃÂª', 'ê')
+        .replaceAll('ÃÂ­', 'í')
+        .replaceAll('ÃÂ³', 'ó')
+        .replaceAll('ÃÂ´', 'ô')
+        .replaceAll('ÃÂµ', 'õ')
+        .replaceAll('ÃÂº', 'ú')
+        .replaceAll('ÃÂ§', 'ç')
+        .replaceAll('Ãâ€¡', 'Ç')
+        .replaceAll('ÃÅ¡', 'Ú')
+        .replaceAll('ÃÂª', 'ê')
+        .replaceAll('ââ‚¬Â¢', '•')
+        .replaceAll('ââ‚¬â€œ', 'â€“')
+        .replaceAll('ââ‚¬â€', '—');
   }
 }
 

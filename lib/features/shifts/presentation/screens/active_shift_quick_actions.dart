@@ -1,6 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
-/// SeÃ§Ã£o "Registrar" fiel ao mockup: grid 2x2 com Ã­cone + nome + meta.
+/// Seção "Registrar" fiel ao mockup: grid 2x2 com ícone + nome + meta.
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
@@ -67,34 +67,34 @@ class _QuickActionsSection extends StatelessWidget {
       _QuickCard(
         icon: Icons.restaurant_rounded,
         color: const Color(0xFFE67E22),
-        label: 'NutriÃ§Ã£o',
+        label: 'Nutrição',
         meta: lastNutrition.isNotEmpty
-            ? 'Ãºltima $lastNutrition'
+            ? 'última $lastNutrition'
             : 'sem registro',
         onTap: () => _openNutrition(context),
       ),
       _QuickCard(
         icon: Icons.local_hospital_rounded,
         color: AppTheme.error,
-        label: 'SaÃºde',
-        meta: lastHealth.isNotEmpty ? 'Ãºltima $lastHealth' : 'sem registro',
-        onTap: () => _openSheet(context, 'SaÃºde'),
+        label: 'Saúde',
+        meta: lastHealth.isNotEmpty ? 'última $lastHealth' : 'sem registro',
+        onTap: () => _openSheet(context, 'Saúde'),
       ),
       _QuickCard(
         icon: Icons.fitness_center_rounded,
         color: AppTheme.warning,
         label: 'Treino',
         meta: lastTraining.isNotEmpty
-            ? 'Ãºltima $lastTraining'
+            ? 'última $lastTraining'
             : 'sem registro',
         onTap: () => _openSheet(context, 'Treino'),
       ),
       _QuickCard(
         icon: Icons.shield_rounded,
         color: AppTheme.primary,
-        label: 'OcorrÃªncia',
+        label: 'Ocorrência',
         meta: lastOccurrence.isNotEmpty
-            ? 'Ãºltima $lastOccurrence'
+            ? 'última $lastOccurrence'
             : 'sem registro',
         onTap: () => _openOccurrence(context),
       ),
@@ -105,10 +105,10 @@ class _QuickActionsSection extends StatelessWidget {
     if (date == null) return '';
     final diff = DateTime.now().difference(date);
     if (diff.inMinutes < 1) return 'agora';
-    if (diff.inMinutes < 60) return 'hÃ¡ ${diff.inMinutes}min';
-    if (diff.inHours < 24) return 'hÃ¡ ${diff.inHours}h';
-    if (diff.inDays == 1) return 'hÃ¡ 1d';
-    return 'hÃ¡ ${diff.inDays}d';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    if (diff.inDays == 1) return 'há 1d';
+    return 'há ${diff.inDays}d';
   }
 
   void _openNutrition(BuildContext context) {

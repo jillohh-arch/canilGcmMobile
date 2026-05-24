@@ -35,7 +35,7 @@ class HistoryTimelineItem extends StatelessWidget {
               ),
             Row(
               children: [
-                // HorÃ¡rio
+                // Horário
                 SizedBox(
                   width: 36,
                   child: Text(
@@ -49,7 +49,7 @@ class HistoryTimelineItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Ãcone circular
+                // Ícone circular
                 Container(
                   width: 32,
                   height: 32,
@@ -81,7 +81,19 @@ class HistoryTimelineItem extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      if (entry.subtitle.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          entry.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: _hTextDimmed,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
                       _buildMeta(),
                     ],
                   ),
@@ -89,7 +101,7 @@ class HistoryTimelineItem extends StatelessWidget {
                 const SizedBox(width: 8),
                 // Chevron
                 Text(
-                  'â€º',
+                  '›',
                   style: GoogleFonts.inter(
                     color: _hTextMuted,
                     fontSize: 16,
@@ -107,25 +119,11 @@ class HistoryTimelineItem extends StatelessWidget {
   Widget _buildMeta() {
     final children = <Widget>[];
 
-    // Info contextual (subtitle)
-    if (entry.subtitle.trim().isNotEmpty) {
-      children.add(
-        Flexible(
-          child: Text(
-            entry.subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(color: _hTextDimmed, fontSize: 10),
-          ),
-        ),
-      );
-    }
-
     // Badge de autoria
-    final isYou = entry.tag == 'VOCÃŠ';
+    final isYou = entry.tag == 'VOCÊ';
     children.add(
       _AuthorBadge(
-        label: isYou ? 'VOCÃŠ' : entry.author.toUpperCase(),
+        label: isYou ? 'VOCÊ' : entry.author.toUpperCase(),
         isYou: isYou,
       ),
     );
@@ -149,6 +147,8 @@ class HistoryTimelineItem extends StatelessWidget {
         ),
       );
     }
+
+    if (children.isEmpty) return const SizedBox.shrink();
 
     return Wrap(
       spacing: 4,
@@ -177,13 +177,13 @@ class HistoryTimelineItem extends StatelessWidget {
   _CategoryStyle _categoryStyle(HistoryEntryType type) {
     switch (type) {
       case HistoryEntryType.nutrition:
-        return const _CategoryStyle(color: _hPurple, emoji: 'ðŸ–');
+        return const _CategoryStyle(color: _hPurple, emoji: '🍖');
       case HistoryEntryType.health:
-        return const _CategoryStyle(color: _hRed, emoji: 'âš•');
+        return const _CategoryStyle(color: _hRed, emoji: '⚕');
       case HistoryEntryType.training:
-        return const _CategoryStyle(color: _hYellow, emoji: 'ðŸŽ¯');
+        return const _CategoryStyle(color: _hYellow, emoji: '🎯');
       case HistoryEntryType.occurrence:
-        return const _CategoryStyle(color: _hCyan, emoji: 'ðŸ›¡');
+        return const _CategoryStyle(color: _hCyan, emoji: '🛡️');
     }
   }
 }

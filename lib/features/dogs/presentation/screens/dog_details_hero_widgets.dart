@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _DogHeroAvatar extends StatelessWidget {
   final Dog dog;
@@ -79,7 +79,7 @@ class _DogHeroIdentity extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${dog.age} anos Â· ID: ${dog.id.substring(0, 8).toUpperCase()}',
+          '${dog.age} anos · ID: ${dog.id.substring(0, 8).toUpperCase()}',
           style: GoogleFonts.inter(
             fontSize: 10,
             color: Colors.white38,

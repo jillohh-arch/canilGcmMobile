@@ -8,8 +8,7 @@ description: Regras críticas de coexistência com painel React que acessa o mes
 ## Contexto crítico
 
 Existe um **painel web React em produção** que acessa o MESMO Firestore que o app 
-Flutter. Ambos pertencem ao Jilles (gestor + condutor), mas o painel React **não pode 
-quebrar**.
+Flutter. Ambos pertencem ao Jilles (gestor + condutor), mas o painel React **ainda nao esta em uso**.
 
 **Regra de ouro:** "Nunca quebre o painel React. Em dúvida, pergunte."
 

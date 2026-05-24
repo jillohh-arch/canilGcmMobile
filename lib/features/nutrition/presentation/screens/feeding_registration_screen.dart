@@ -42,6 +42,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   File? _photoFile;
   DateTime _selectedTime = DateTime.now();
   String _timeOption = 'agora'; // 'agora' | '5min' | '15min' | 'custom'
+  bool _isCompliant = true;
 
   @override
   void initState() {
@@ -59,6 +60,21 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     }
     // Listener para atualizar campo de divergência quando quantidade muda
     _amountController.addListener(() => setState(() {}));
+
+    // Pre-fill amount based on prescription
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vm = Provider.of<NutritionViewModel>(context, listen: false);
+      if (vm.prescription != null) {
+        setState(() {
+          _amountController.text = vm.prescription!.amountPerMeal.toString();
+        });
+      } else {
+        // Sem prescrição, a conformidade não faz sentido
+        setState(() {
+          _isCompliant = false;
+        });
+      }
+    });
   }
 
   @override
@@ -109,11 +125,13 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                     // Período selector
                     _buildPeriodSelector(),
                     const SizedBox(height: 20),
+                    // Compliance toggle
+                    if (prescription != null) _buildComplianceCheckbox(prescription),
                     // Quantidade
                     _buildAmountField(prescription),
                     const SizedBox(height: 20),
                     // Divergência condicional
-                    _buildDivergenceField(prescription),
+                    if (!_isCompliant) _buildDivergenceField(prescription),
                     // Horário
                     _buildTimeSelector(),
                     const SizedBox(height: 20),
@@ -141,8 +159,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
-        border: Border.all(color: Colors.white.withAlpha(20)),
+        color: Colors.white.withOpacity(0.04),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -201,7 +219,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   Widget _buildPeriodChip(String value, String label, IconData icon) {
     final selected = _selectedPeriod == value;
     final color = selected ? _nutritionColor : AppTheme.textTertiary;
-    final bgAlpha = selected ? 25 : 8;
+    final bgAlpha = selected ? 30 : 8;
     final borderAlpha = selected ? 80 : 30;
 
     return Expanded(
@@ -213,8 +231,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: color.withAlpha(bgAlpha),
-            border: Border.all(color: color.withAlpha(borderAlpha)),
+            color: color.withOpacity(bgAlpha / 255.0),
+            border: Border.all(color: color.withOpacity(borderAlpha / 255.0)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -226,13 +244,64 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                 style: GoogleFonts.inter(
                   color: color,
                   fontSize: 11,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildComplianceCheckbox(dynamic prescription) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _isCompliant = !_isCompliant;
+              if (_isCompliant) {
+                _amountController.text = prescription.amountPerMeal.toString();
+                _divergenceReasonController.clear();
+              }
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            decoration: BoxDecoration(
+              color: _isCompliant ? AppTheme.success.withOpacity(0.08) : Colors.white.withOpacity(0.04),
+              border: Border.all(
+                color: _isCompliant ? AppTheme.success.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isCompliant ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: _isCompliant ? AppTheme.success : AppTheme.textTertiary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Servido em conformidade com a prescrição (${prescription.amountPerMeal}g)',
+                    style: GoogleFonts.inter(
+                      color: _isCompliant ? Colors.white : AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: _isCompliant ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 
@@ -255,36 +324,38 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                 letterSpacing: 1.0,
               ),
             ),
-            Text(
-              'Prescrito: $prescribedPerMeal',
-              style: GoogleFonts.inter(
-                color: _nutritionColor,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+            if (prescription != null)
+              Text(
+                'Prescrito: $prescribedPerMeal',
+                style: GoogleFonts.inter(
+                  color: _nutritionColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            border: Border.all(color: Colors.white.withAlpha(30)),
+            color: _isCompliant ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.06),
+            border: Border.all(color: _isCompliant ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
             controller: _amountController,
+            enabled: !_isCompliant,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             style: GoogleFonts.inter(
-              color: AppTheme.textPrimary,
+              color: _isCompliant ? AppTheme.textTertiary : AppTheme.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
               hintText: '0',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withAlpha(100),
+                color: AppTheme.textTertiary.withOpacity(0.4),
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -323,14 +394,13 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           padding: const EdgeInsets.all(10),
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: AppTheme.warning.withAlpha(15),
-            border: Border.all(color: AppTheme.warning.withAlpha(60)),
+            color: AppTheme.warning.withOpacity(0.06),
+            border: Border.all(color: AppTheme.warning.withOpacity(0.24)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: AppTheme.warning, size: 16),
+              Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -338,7 +408,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                   style: GoogleFonts.inter(
                     color: AppTheme.warning,
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -357,8 +427,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            border: Border.all(color: AppTheme.warning.withAlpha(40)),
+            color: Colors.white.withOpacity(0.04),
+            border: Border.all(color: AppTheme.warning.withOpacity(0.15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -371,7 +441,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             decoration: InputDecoration(
               hintText: 'Ex: pós-treino intenso, orientação veterinária...',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withAlpha(100),
+                color: AppTheme.textTertiary.withOpacity(0.4),
                 fontSize: 12,
               ),
               contentPadding:
@@ -402,6 +472,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
+          runSpacing: 8,
           children: [
             _buildTimeChip('agora', 'Agora · ${DateFormat('HH:mm').format(DateTime.now())}'),
             _buildTimeChip('5min', 'Há 5min'),
@@ -454,8 +525,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withAlpha(selected ? 20 : 8),
-          border: Border.all(color: color.withAlpha(selected ? 80 : 30)),
+          color: color.withOpacity(selected ? 0.12 : 0.04),
+          border: Border.all(color: color.withOpacity(selected ? 0.4 : 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -465,7 +536,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           style: GoogleFonts.inter(
             color: color,
             fontSize: 11,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
       ),
@@ -493,8 +564,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             width: double.infinity,
             height: _photoFile != null ? 120 : 60,
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(30)),
+              color: Colors.white.withOpacity(0.04),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
               borderRadius: BorderRadius.circular(10),
             ),
             child: _photoFile != null
@@ -517,7 +588,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppTheme.error.withAlpha(200),
+                              color: AppTheme.error.withOpacity(0.8),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.close,
@@ -610,8 +681,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            border: Border.all(color: Colors.white.withAlpha(30)),
+            color: Colors.white.withOpacity(0.04),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -624,7 +695,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             decoration: InputDecoration(
               hintText: 'Ex: cão comeu com apetite normal...',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withAlpha(100),
+                color: AppTheme.textTertiary.withOpacity(0.4),
                 fontSize: 13,
               ),
               contentPadding:
@@ -642,8 +713,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _nutritionColor.withAlpha(10),
-        border: Border.all(color: _nutritionColor.withAlpha(30)),
+        color: _nutritionColor.withOpacity(0.08),
+        border: Border.all(color: _nutritionColor.withOpacity(0.24)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -672,7 +743,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withAlpha(0),
+            AppTheme.background.withOpacity(0),
             AppTheme.background,
           ],
         ),
@@ -683,11 +754,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: _saving ? _nutritionColor.withAlpha(100) : _nutritionColor,
+            color: _saving ? _nutritionColor.withOpacity(0.4) : _nutritionColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: _nutritionColor.withAlpha(51),
+                color: _nutritionColor.withOpacity(0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -738,14 +809,19 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       return;
     }
 
+    final prescription = vm.prescription;
+    final prescriptionAtTime = prescription?.amountPerMeal ?? 0;
+    final divergence = prescription != null ? Feeding.calculateDivergence(amount, prescriptionAtTime) : 0.0;
+
+    // Motivo é obrigatório quando a quantidade diverge > 10%
+    if (prescription != null && !_isCompliant && divergence.abs() > 10 && _divergenceReasonController.text.trim().isEmpty) {
+      _showError('Informe o motivo da divergência');
+      return;
+    }
+
     setState(() => _saving = true);
 
     try {
-      final prescription = vm.prescription;
-      final prescriptionAtTime = prescription?.amountPerMeal ?? 0;
-      final divergence =
-          Feeding.calculateDivergence(amount, prescriptionAtTime);
-
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final fedBy = authVM.user?.uid ?? 'unknown';
 
@@ -757,7 +833,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         amountGrams: amount,
         prescriptionAtTime: prescriptionAtTime,
         divergencePercent: divergence,
-        divergenceReason: divergence.abs() > 10
+        divergenceReason: !_isCompliant && divergence.abs() > 10
             ? _divergenceReasonController.text.trim().isNotEmpty
                 ? _divergenceReasonController.text.trim()
                 : null

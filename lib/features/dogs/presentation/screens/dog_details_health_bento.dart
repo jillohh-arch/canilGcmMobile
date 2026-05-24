@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _HealthSummaryBento extends StatelessWidget {
   final HealthLogModel? lastHealth;
@@ -27,7 +27,7 @@ class _HealthSummaryBento extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'SAÃšDE',
+                'SAÚDE',
                 style: GoogleFonts.inter(
                   fontSize: 9,
                   fontWeight: FontWeight.w800,

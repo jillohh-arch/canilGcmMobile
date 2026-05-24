@@ -1,6 +1,6 @@
-﻿part of 'active_shift_dashboard_screen.dart';
+part of 'active_shift_dashboard_screen.dart';
 
-/// SeÃ§Ã£o "Atividades de Hoje" fiel ao mockup â€” timeline com cards ou empty state.
+/// Seção "Atividades de Hoje" fiel ao mockup — timeline com cards ou empty state.
 class _TodayActivitiesSection extends StatelessWidget {
   final String dogId;
   final String dogName;
@@ -20,7 +20,7 @@ class _TodayActivitiesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionLabel(
-          emoji: 'ðŸ“‹',
+          emoji: '📋',
           text: 'ATIVIDADES DE HOJE',
           trailing: entries.isNotEmpty
               ? Container(
@@ -60,7 +60,7 @@ class _TodayActivitiesSection extends StatelessWidget {
 
     for (final f in nutritionVM.todayFeedings) {
       entries.add(_ActivityEntry(
-        title: 'AlimentaÃ§Ã£o Â· ${f.amountGrams}g',
+        title: 'Alimentação · ${f.amountGrams}g',
         subtitle: 'Registrado',
         time: f.fedAt,
         icon: Icons.restaurant_rounded,
@@ -74,7 +74,7 @@ class _TodayActivitiesSection extends StatelessWidget {
           title: h.logType,
           subtitle: h.healthObservations.isNotEmpty
               ? h.healthObservations
-              : 'Registro de saÃºde',
+              : 'Registro de saúde',
           time: h.date,
           icon: Icons.local_hospital_rounded,
           color: AppTheme.error,
@@ -85,8 +85,8 @@ class _TodayActivitiesSection extends StatelessWidget {
     for (final t in trainingVM.trainings) {
       if (t.date.isAfter(startOfDay)) {
         entries.add(_ActivityEntry(
-          title: 'Treino Â· ${t.trainingType}',
-          subtitle: 'SessÃ£o registrada',
+          title: 'Treino · ${t.trainingType}',
+          subtitle: 'Sessão registrada',
           time: t.date,
           icon: Icons.fitness_center_rounded,
           color: AppTheme.warning,
@@ -111,7 +111,7 @@ class _TodayActivitiesSection extends StatelessWidget {
   }
 }
 
-/// Card de atividade individual â€” horÃ¡rio + Ã­cone + info.
+/// Card de atividade individual — horário + ícone + info.
 class _ActivityCard extends StatelessWidget {
   final _ActivityEntry entry;
 
@@ -132,7 +132,7 @@ class _ActivityCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // HorÃ¡rio
+          // Horário
           SizedBox(
             width: 42,
             child: Text(
@@ -144,7 +144,7 @@ class _ActivityCard extends StatelessWidget {
               ),
             ),
           ),
-          // Ãcone
+          // Ícone
           Container(
             width: 32,
             height: 32,
@@ -191,7 +191,7 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-/// Estado vazio com chamada Ã  aÃ§Ã£o (4 atalhos).
+/// Estado vazio com chamada à ação (4 atalhos).
 class _EmptyActivitiesState extends StatelessWidget {
   final String dogId;
   final String dogName;
@@ -230,7 +230,7 @@ class _EmptyActivitiesState extends StatelessWidget {
                   ),
                 ),
                 const TextSpan(
-                  text: 'Registre alimentaÃ§Ã£o, treino, saÃºde ou ocorrÃªncia',
+                  text: 'Registre alimentação, treino, saúde ou ocorrência',
                 ),
               ],
             ),
@@ -240,14 +240,14 @@ class _EmptyActivitiesState extends StatelessWidget {
             children: [
               _EmptyActionChip(
                 icon: Icons.restaurant_rounded,
-                label: 'NutriÃ§Ã£o',
-                onTap: () => _openSheet(context, 'NutriÃ§Ã£o'),
+                label: 'Nutrição',
+                onTap: () => _openSheet(context, 'Nutrição'),
               ),
               const SizedBox(width: 8),
               _EmptyActionChip(
                 icon: Icons.local_hospital_rounded,
-                label: 'SaÃºde',
-                onTap: () => _openSheet(context, 'SaÃºde'),
+                label: 'Saúde',
+                onTap: () => _openSheet(context, 'Saúde'),
               ),
               const SizedBox(width: 8),
               _EmptyActionChip(
@@ -270,7 +270,7 @@ class _EmptyActivitiesState extends StatelessWidget {
 
   void _openSheet(BuildContext context, String category) {
     HapticFeedback.mediumImpact();
-    if (category == 'NutriÃ§Ã£o') {
+    if (category == 'Nutrição') {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => FeedingRegistrationScreen(dogId: dogId, dogName: dogName),

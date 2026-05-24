@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'health_type_selector_screen.dart';
 
 part 'health_log_timeline.dart';
 part 'health_log_filter_bar.dart';
@@ -55,7 +56,7 @@ class _HealthLogScreenState extends State<HealthLogScreen>
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(
-          'ProntuÃ¡rio MÃ©dico',
+          'Prontuário Médico',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         bottom: TabBar(
@@ -72,7 +73,7 @@ class _HealthLogScreenState extends State<HealthLogScreen>
             fontSize: 13,
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.timeline_rounded), text: 'HistÃ³rico'),
+            Tab(icon: Icon(Icons.timeline_rounded), text: 'Histórico'),
             Tab(
               icon: Icon(Icons.add_circle_outline_rounded),
               text: 'Novo Registro',
@@ -94,4 +95,4 @@ class _HealthLogScreenState extends State<HealthLogScreen>
   }
 }
 
-// â”€â”€ Health Timeline (Apple Health style) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Health Timeline (Apple Health style) ──────────────────────────────────────

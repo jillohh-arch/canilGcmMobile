@@ -31,7 +31,7 @@ void _showDogWeightDialog(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Insira o novo peso do cÃ£o em quilogramas (kg).',
+            'Insira o novo peso do cão em quilogramas (kg).',
             style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
           ),
           const SizedBox(height: 16),
@@ -83,7 +83,7 @@ void _showDogWeightDialog(
             if (weight == null || weight <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Informe um peso vÃ¡lido.'),
+                  content: Text('Informe um peso válido.'),
                   backgroundColor: Color(0xFFE53935),
                 ),
               );
@@ -117,8 +117,9 @@ void _showDogWeightDialog(
                 dogId: dog.id,
                 dogName: dog.name,
                 date: DateTime.now(),
-                logType: 'Rotina',
-                healthObservations: 'Pesagem de rotina registrada no dossiÃª.',
+                type: 'other',
+                subtype: 'Pesagem',
+                healthObservations: 'Pesagem de rotina registrada no dossiê.',
                 weight: weight,
               );
               await healthVM.addHealthLog(hLog);
@@ -126,7 +127,7 @@ void _showDogWeightDialog(
               if (!context.mounted) return;
               messenger.showSnackBar(
                 const SnackBar(
-                  content: Text('Peso atualizado e histÃ³rico registrado.'),
+                  content: Text('Peso atualizado e histórico registrado.'),
                   backgroundColor: _weightAccent,
                 ),
               );
@@ -135,7 +136,7 @@ void _showDogWeightDialog(
               messenger.showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Peso atualizado. HistÃ³rico mÃ©dico pendente: ${_cleanHealthError(e)}',
+                    'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
                   ),
                   backgroundColor: const Color(0xFFFBBF24),
                 ),
@@ -159,6 +160,6 @@ String _cleanHealthError(Object error) {
   return error
       .toString()
       .replaceFirst('Exception: ', '')
-      .replaceFirst('Falha ao salvar registro mÃ©dico: ', '')
+      .replaceFirst('Falha ao salvar registro médico: ', '')
       .trim();
 }

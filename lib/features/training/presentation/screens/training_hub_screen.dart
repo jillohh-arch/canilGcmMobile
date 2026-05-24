@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,8 +21,18 @@ import 'package:canil_gcm/features/training/presentation/screens/guard_protectio
 import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_triagem_screen.dart';
+import 'package:canil_gcm/features/dogs/data/dog_specialty_service.dart';
 
-part 'training_hub_header.dart';
+import 'package:canil_gcm/core/widgets/binomio_header.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
+
+// New training screens imports
+import 'package:canil_gcm/features/training/presentation/screens/busca_captura_formacao_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/busca_captura_manutencao_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_formation_screen.dart';
+import 'package:canil_gcm/features/training/presentation/widgets/add_specialty_modal.dart';
+
 part 'training_hub_categories.dart';
 
 class TrainingHubScreen extends StatefulWidget {
@@ -96,7 +107,7 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
                 );
 
                 return Scaffold(
-                  backgroundColor: _trainingBackground,
+                  backgroundColor: const Color(0xFF050D10),
                   body: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: SystemUiOverlayStyle.light.copyWith(
                       statusBarColor: Colors.transparent,
@@ -125,6 +136,7 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
                         category: category,
                         dog: dog,
                       ),
+                      onAddSpecialtyTap: () => _showAddSpecialtyModal(context, dog),
                     ),
                   ),
                 );
@@ -145,18 +157,68 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     );
   }
 
+  void _showAddSpecialtyModal(BuildContext context, Dog dog) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AddSpecialtyModal(dog: dog),
+    );
+  }
+
   void _openTrainingSheet(
     BuildContext context, {
     required String category,
     required Dog dog,
-  }) {
+  }) async {
     HapticFeedback.mediumImpact();
     final lowerCat = normalizeTrainingKey(category);
+    final specialtyService = DogSpecialtyService();
 
     if (lowerCat.contains('detec') || lowerCat.contains('faro')) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => DetectionMaintenanceScreen(dog: dog)),
-      );
+      final specialty = await specialtyService.getByType(dog.id, 'deteccao');
+      if (!context.mounted) return;
+
+      final isOperational = specialty != null &&
+          normalizeTrainingKey(specialty.status) == 'operational';
+
+      if (isOperational) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DetectionMaintenanceScreen(dog: dog),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DetectionFormationScreen(dog: dog),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (lowerCat.contains('busca') || lowerCat.contains('captura')) {
+      final specialty = await specialtyService.getByType(dog.id, 'busca_captura');
+      if (!context.mounted) return;
+
+      final isOperational = specialty != null &&
+          normalizeTrainingKey(specialty.status) == 'operational';
+
+      if (isOperational) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BuscaCapturaManutencaoScreen(dog: dog),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BuscaCapturaFormacaoScreen(dog: dog),
+          ),
+        );
+      }
       return;
     }
 
@@ -168,9 +230,9 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     }
 
     if (lowerCat.contains('condicionamento')) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => ConditioningScreen(dog: dog)));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ConditioningScreen(dog: dog)),
+      );
       return;
     }
 
@@ -205,6 +267,7 @@ class _TrainingHubBody extends StatelessWidget {
   final VoidCallback onOpenLog;
   final VoidCallback onNewSession;
   final ValueChanged<String> onTrainingTap;
+  final VoidCallback onAddSpecialtyTap;
 
   const _TrainingHubBody({
     required this.dog,
@@ -216,10 +279,13 @@ class _TrainingHubBody extends StatelessWidget {
     required this.onOpenLog,
     required this.onNewSession,
     required this.onTrainingTap,
+    required this.onAddSpecialtyTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final elapsedText = _getShiftElapsedTime(shiftStartTime);
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -230,42 +296,130 @@ class _TrainingHubBody extends StatelessWidget {
       ),
       child: SafeArea(
         top: true,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TrainingHeader(
+        child: Column(
+          children: [
+            // Universal Header Container
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              decoration: const BoxDecoration(
+                color: Color(0x0A4DD0E1), // rgba(77, 208, 225, 0.04)
+                border: Border(
+                  bottom: BorderSide(
+                    color: Color(0x1F4DD0E1), // rgba(77, 208, 225, 0.12)
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: BinomioHeader(
                 dog: dog,
-                handlerName: handlerName,
-                handlerPhotoUrl: handlerPhotoUrl,
-                shiftStartTime: shiftStartTime,
+                subtitle: 'Turno ativo$elapsedText',
+                subtitleColor: const Color(0xFF2ECC71),
+                showStatusDot: true,
+                statusDotColor: const Color(0xFF2ECC71),
+                withBackground: false,
+                showProfileButton: true,
+                trailing: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    showDogSwitcher(context);
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.primary.withAlpha(50)),
+                    ),
+                    child: const Center(
+                      child: Text('⇄', style: TextStyle(fontSize: 16, color: Colors.cyan)),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 14),
-              _TrainingWeekSummary(data: data),
-              const SizedBox(height: 14),
-              _TrainingSpecialtiesSection(
-                specialties: data.specialties,
-                loading: loading,
-                onTap: onTrainingTap,
+            ),
+            
+            // Scroll Area
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title section
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Treinos',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF7A8A92),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: '${data.trainingsThisWeek} sessões',
+                                  style: const TextStyle(
+                                    color: Color(0xFF4DD0E1),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const TextSpan(text: ' esta semana'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Specialties Section
+                    _TrainingSpecialtiesSection(
+                      specialties: data.specialties,
+                      sessions: data.recentSessions,
+                      loading: loading,
+                      onTap: onTrainingTap,
+                      onAddSpecialtyTap: onAddSpecialtyTap,
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // General Section
+                    _TrainingGeneralSection(
+                      trainings: data.generalTrainings,
+                      onTap: onTrainingTap,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              _TrainingGeneralSection(
-                trainings: data.generalTrainings,
-                onTap: onTrainingTap,
-              ),
-              const SizedBox(height: 14),
-              _TrainingRecentSessionsSection(
-                sessions: data.recentSessions,
-                onOpenLog: onOpenLog,
-              ),
-              const SizedBox(height: 16),
-              _NewTrainingSessionButton(onTap: onNewSession),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _getShiftElapsedTime(DateTime? shiftStartTime) {
+    if (shiftStartTime == null) return '';
+    final diff = DateTime.now().difference(shiftStartTime);
+    if (diff.inHours > 0) {
+      return ' · há ${diff.inHours}h';
+    } else if (diff.inMinutes > 0) {
+      return ' · há ${diff.inMinutes}m';
+    } else {
+      return ' · agora';
+    }
   }
 }
 
@@ -283,12 +437,12 @@ class _TrainingNoShift extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: _trainingBackground,
+      backgroundColor: Color(0xFF050D10),
       body: Center(
         child: Text(
           'Nenhum turno ativo.\nInicie um turno para acessar o hub de treinos.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: _trainingTextSecondary),
+          style: TextStyle(color: Color(0xFFA7B4BA)),
         ),
       ),
     );
@@ -301,11 +455,11 @@ class _TrainingMissingDog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: _trainingBackground,
+      backgroundColor: Color(0xFF050D10),
       body: Center(
         child: Text(
           'K9 do turno não encontrado.',
-          style: TextStyle(color: _trainingTextSecondary),
+          style: TextStyle(color: Color(0xFFA7B4BA)),
         ),
       ),
     );

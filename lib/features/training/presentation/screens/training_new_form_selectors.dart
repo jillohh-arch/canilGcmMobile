@@ -1,4 +1,4 @@
-﻿part of 'training_log_screen.dart';
+part of 'training_log_screen.dart';
 
 class _TrainingTypeSelector extends StatelessWidget {
   final List<String> trainingTypes;
@@ -80,7 +80,7 @@ class _SubstanceSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _TrainingSectionLabel('SubstÃ¢ncia Procurada'),
+        const _TrainingSectionLabel('Substância Procurada'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
