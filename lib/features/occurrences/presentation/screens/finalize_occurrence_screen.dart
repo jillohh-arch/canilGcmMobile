@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -48,6 +49,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   bool _isFinalizing = false;
   bool _draftLoaded = false;
   Timer? _draftDebounce;
+  Occurrence? _occurrence;
 
   // Passo 2
   final Set<OccurrenceResult> _selectedResults = {};
@@ -266,13 +268,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   }
 
   bool get _canAdvance {
-    if (_isFinalizing) return false;
-    return switch (_currentStep) {
-      0 => _reportController.text.trim().isNotEmpty,
-      1 => _selectedResults.isNotEmpty,
-      2 => _missingDetailMessage() == null,
-      _ => false,
-    };
+    return !_isFinalizing;
   }
 
   String? _missingDetailMessage() {
@@ -325,7 +321,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     required Map<String, dynamic>? details,
   }) {
     final vm = context.read<OccurrenceViewModel>();
-    final occ = vm.openOccurrence;
+    final occ = _occurrence ?? vm.openOccurrence;
     final eventPayload =
         vm.events
             .map(
@@ -381,6 +377,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   // ─── Finalize ───────────────────────────────────────────────────────
 
   Future<void> _finalize() async {
+    _draftDebounce?.cancel();
     final missing = _missingDetailMessage();
     if (missing != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -459,6 +456,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     final vm = context.read<OccurrenceViewModel>();
     final occurrence =
         vm.openOccurrence ?? await vm.getById(widget.occurrenceId);
+
+    if (mounted) {
+      setState(() {
+        _occurrence = occurrence;
+      });
+    }
+
     final draft = occurrence?.finalizationDraft;
     if (draft == null || draft.isEmpty || !mounted) return;
 
