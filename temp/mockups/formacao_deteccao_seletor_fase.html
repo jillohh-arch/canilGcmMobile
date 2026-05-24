@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formação Detecção · Selecionar fase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:20px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 26px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 14px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#4dd0e1;font-size:11px;font-weight:500;margin-top:2px;}
+  /* progresso geral */
+  .prog{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:13px 15px;margin-bottom:8px;}
+  .prog-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;}
+  .prog-t{color:#fff;font-size:12.5px;font-weight:600;}
+  .prog-n{color:#4dd0e1;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .prog-bar{height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+  .prog-fill{height:100%;width:50%;background:linear-gradient(90deg,#2ecc71,#f1c40f);border-radius:3px;}
+  /* trilha */
+  .trail{position:relative;padding-top:8px;}
+  .grp-lbl{color:#3d5560;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:14px 0 8px 38px;}
+  .ph{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:stretch;}
+  .rail{position:relative;display:flex;justify-content:center;}
+  .rail::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.08);}
+  .ph:first-of-type .rail::before{top:14px;}
+  .node{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;z-index:1;margin-top:9px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+  .n-done{background:#2ecc71;color:#04140a;}
+  .n-cur{background:#f1c40f;color:#1a1402;box-shadow:0 0 0 5px rgba(241,196,15,.16);}
+  .n-lock{background:#16242a;color:#5a7280;border:1.5px solid rgba(255,255,255,.1);}
+  .card{border-radius:12px;padding:12px 13px;margin-bottom:9px;border:1px solid rgba(255,255,255,.07);}
+  .card-done{background:rgba(46,204,113,.04);}
+  .card-cur{background:linear-gradient(135deg,rgba(241,196,15,.09),rgba(77,208,225,.02));border-color:rgba(241,196,15,.35);}
+  .card-lock{opacity:.5;}
+  .card-top{display:flex;align-items:center;gap:8px;}
+  .code{font-size:13px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .code-done{color:#2ecc71;} .code-cur{color:#f1c40f;} .code-lock{color:#7d8d99;}
+  .ph-name{color:#fff;font-size:13px;font-weight:600;}
+  .card-lock .ph-name{color:#8fa3ad;}
+  .lock-ico{margin-left:auto;color:#5a7280;}
+  .done-tag{margin-left:auto;font-size:9px;font-weight:700;color:#2ecc71;font-family:'IBM Plex Mono',monospace;}
+  .ph-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+  .m{font-size:9px;font-weight:600;color:#aebcc4;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:3px 7px;}
+  .m-crit{color:#f1c40f;background:rgba(241,196,15,.08);border-color:rgba(241,196,15,.25);}
+  .start-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#f1c40f;color:#1a1402;border:none;border-radius:11px;padding:13px;font-size:13px;font-weight:800;letter-spacing:.5px;font-family:inherit;margin-top:12px;width:100%;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:2px;}
+  .legend-side h3{color:#f1c40f;font-size:13px;letter-spacing:.5px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>15:02</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Formação · Detecção</div><div class="h-sub">Bono · Drogas · selecione a fase</div></div>
+      </div>
+
+      <div class="prog">
+        <div class="prog-top"><span class="prog-t">Progresso no protocolo</span><span class="prog-n">4 / 9 fases</span></div>
+        <div class="prog-bar"><div class="prog-fill"></div></div>
+      </div>
+
+      <div class="trail">
+        <div class="grp-lbl">1 caixa</div>
+        <div class="ph"><div class="rail"><div class="node n-done">✓</div></div><div class="card card-done"><div class="card-top"><span class="code code-done">1b</span><span class="ph-name">Resposta</span><span class="done-tag">3/3</span></div></div></div>
+
+        <div class="grp-lbl">2 caixas</div>
+        <div class="ph"><div class="rail"><div class="node n-done">✓</div></div><div class="card card-done"><div class="card-top"><span class="code code-done">2b</span><span class="ph-name">Processo de busca</span><span class="done-tag">3/3</span></div></div></div>
+        <div class="ph"><div class="rail"><div class="node n-done">✓</div></div><div class="card card-done"><div class="card-top"><span class="code code-done">2v</span><span class="ph-name">Busca · odor variável</span><span class="done-tag">3/3</span></div></div></div>
+
+        <div class="grp-lbl">3 caixas</div>
+        <div class="ph"><div class="rail"><div class="node n-done">✓</div></div><div class="card card-done"><div class="card-top"><span class="code code-done">3b</span><span class="ph-name">Independência · afastamento</span><span class="done-tag">3/3</span></div></div></div>
+        <div class="ph"><div class="rail"><div class="node n-cur">★</div></div>
+          <div class="card card-cur">
+            <div class="card-top"><span class="code code-cur">3v</span><span class="ph-name">Independência · odor variável</span></div>
+            <div class="ph-meta"><span class="m">3 caixas</span><span class="m">odor variável</span><span class="m">sem bola</span><span class="m m-crit">10 consecutivas</span></div>
+            <button class="start-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>INICIAR SESSÃO</button>
+          </div>
+        </div>
+
+        <div class="grp-lbl">4 caixas</div>
+        <div class="ph"><div class="rail"><div class="node n-lock">4</div></div><div class="card card-lock"><div class="card-top"><span class="code code-lock">4b</span><span class="ph-name">Distância + comando "Busca"</span><svg class="lock-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div></div></div>
+        <div class="ph"><div class="rail"><div class="node n-lock">4</div></div><div class="card card-lock"><div class="card-top"><span class="code code-lock">4v</span><span class="ph-name">Odor variável · 4 caixas</span><svg class="lock-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div></div></div>
+        <div class="ph"><div class="rail"><div class="node n-lock">4</div></div><div class="card card-lock"><div class="card-top"><span class="code code-lock">4c</span><span class="ph-name">Quadrado · horário/anti-horário</span><svg class="lock-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div></div></div>
+
+        <div class="grp-lbl">Ambientes reais</div>
+        <div class="ph"><div class="rail" style="background:transparent"><div class="node n-lock">★</div></div><div class="card card-lock"><div class="card-top"><span class="code code-lock">Final</span><span class="ph-name">Cenários reais · progressivo</span><svg class="lock-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend-side">
+    <h3>SELETOR DE FASE</h3>
+    <p>Antes de iniciar, a trilha inteira do protocolo: <b style="color:#2ecc71">concluídas</b> com check, a <b style="color:#f1c40f">atual</b> destacada e pronta pra iniciar, e as <b style="color:#8fa3ad">seguintes bloqueadas</b> (cadeado) até passar de fase. Agrupadas por número de caixas pra deixar a lógica do método visível.</p>
+    <p style="margin-top:10px;font-size:11px;color:#6f7d85">O instrutor normalmente inicia a fase atual, mas pode reabrir uma concluída pra revisão sem perder o progresso.</p>
+  </div>
+</div>
+</body>
+</html>

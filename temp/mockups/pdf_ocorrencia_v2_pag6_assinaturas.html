@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Ocorrência v2 · Pág. 6 Validação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-page: #eef1f4;
+    --paper: #ffffff;
+    --ink: #14202b;
+    --ink-soft: #46586a;
+    --ink-faint: #8493a1;
+    --line: #dde4ea;
+    --line-soft: #eaeff3;
+    --cyan: #0a8e9d;
+    --cyan-deep: #07707c;
+    --green: #1f9d52;
+    --green-bg: #f1faf4;
+    --green-line: #bfe6cf;
+    --amber: #b07d0a;
+    --amber-bg: #fdf8ec;
+    --amber-line: #ecdca8;
+    --header-bg: #0e1a24;
+    --header-accent: #2bb6c4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg-page);
+    font-family: 'IBM Plex Sans', sans-serif;
+    display: flex; justify-content: center; padding: 32px 20px;
+    color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 794px; min-height: 1123px; background: var(--paper);
+    box-shadow: 0 20px 60px rgba(14, 26, 36, 0.18);
+    display: flex; flex-direction: column; position: relative;
+  }
+
+  /* HEADER (igual capa) */
+  .header {
+    background: var(--header-bg); color: #fff; padding: 22px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; overflow: hidden;
+  }
+  .header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+    background: linear-gradient(90deg, var(--cyan) 0%, var(--green) 60%, transparent 100%);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .crest { width: 42px; height: 48px; flex-shrink: 0; }
+  .brand-title { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; line-height: 1.1; }
+  .brand-sub { font-size: 10.5px; font-weight: 500; letter-spacing: 2px; color: var(--header-accent); margin-top: 4px; text-transform: uppercase; }
+  .reg { text-align: right; }
+  .reg-id { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; }
+  .reg-page { font-size: 10px; letter-spacing: 1.5px; color: #8aa0ad; margin-top: 5px; text-transform: uppercase; }
+
+  .body { padding: 28px 40px 0 40px; flex: 1; }
+
+  /* Context bar */
+  .ctx {
+    display: grid; grid-template-columns: 2fr 1fr 1.2fr 1.3fr;
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    margin-bottom: 26px;
+  }
+  .ctx-cell { padding: 13px 16px; }
+  .ctx-cell + .ctx-cell { border-left: 1px solid var(--line); }
+  .ctx-label { font-size: 9px; font-weight: 600; letter-spacing: 1.3px; color: var(--ink-faint); text-transform: uppercase; margin-bottom: 5px; }
+  .ctx-val { font-size: 13px; font-weight: 600; }
+  .ctx-val.mono { font-family: 'IBM Plex Mono', monospace; }
+  .ctx-val .pend { color: var(--amber); font-size: 11px; font-weight: 600; display: block; margin-top: 2px; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 2px;
+    color: var(--ink-soft); text-transform: uppercase; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .section-hint { font-size: 11px; color: var(--ink-faint); margin-bottom: 16px; line-height: 1.5; }
+
+  /* Validation cards */
+  .val-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+  .person {
+    border: 1px solid var(--line); border-radius: 12px; padding: 18px; position: relative;
+  }
+  .person-top { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .avatar {
+    width: 58px; height: 58px; border-radius: 50%; flex-shrink: 0;
+    background: #eef2f5; border: 2px solid var(--cyan);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--cyan-deep); font-size: 8.5px; font-weight: 600; text-align: center; line-height: 1.2;
+  }
+  .role-tag {
+    font-size: 9px; font-weight: 600; letter-spacing: 1.3px; text-transform: uppercase;
+    color: var(--cyan-deep); margin-bottom: 3px;
+  }
+  .person-name { font-size: 17px; font-weight: 700; }
+  .person-meta { font-size: 11px; color: var(--ink-soft); line-height: 1.6; margin-top: 4px; }
+  .person-meta b { color: var(--ink); font-weight: 600; }
+
+  .confirm {
+    border-radius: 9px; padding: 11px 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .confirm.done { background: var(--green-bg); border: 1px solid var(--green-line); }
+  .confirm.wait { background: var(--amber-bg); border: 1px solid var(--amber-line); }
+  .confirm-ico { flex-shrink: 0; }
+  .confirm-txt .ct-status { font-size: 11.5px; font-weight: 700; letter-spacing: 0.4px; }
+  .confirm.done .ct-status { color: var(--green); }
+  .confirm.wait .ct-status { color: var(--amber); }
+  .confirm-txt .ct-detail { font-size: 10px; color: var(--ink-soft); margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
+  .confirm.wait .ct-detail { font-family: 'IBM Plex Sans', sans-serif; }
+
+  .legend {
+    font-size: 10px; color: var(--ink-faint); line-height: 1.6;
+    background: #f7f9fb; border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: 11px 14px; margin-bottom: 26px;
+  }
+  .legend b { color: var(--ink-soft); font-weight: 600; }
+
+  /* Integrity */
+  .integ-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .integ-box { border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .integ-title { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; color: var(--cyan-deep); text-transform: uppercase; margin-bottom: 14px; }
+  .hash-label { font-size: 9px; font-weight: 600; letter-spacing: 1.3px; color: var(--ink-faint); text-transform: uppercase; margin-bottom: 6px; }
+  .hash-val {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.5;
+    color: var(--ink); word-break: break-all; padding: 10px 12px;
+    background: #f6f8fa; border: 1px solid var(--line-soft); border-radius: 7px;
+  }
+  .integ-ok {
+    margin-top: 12px; display: flex; align-items: center; gap: 9px;
+    background: var(--green-bg); border: 1px solid var(--green-line); border-radius: 8px; padding: 10px 13px;
+  }
+  .integ-ok .io-txt b { font-size: 11.5px; color: var(--green); font-weight: 700; letter-spacing: 0.4px; }
+  .integ-ok .io-txt span { display: block; font-size: 10px; color: var(--ink-soft); margin-top: 1px; }
+
+  .verify { display: flex; gap: 14px; align-items: flex-start; }
+  .qr {
+    width: 88px; height: 88px; flex-shrink: 0; border-radius: 8px; padding: 6px;
+    background: #fff; border: 1px solid var(--line);
+  }
+  .verify-txt { font-size: 10.5px; color: var(--ink-soft); line-height: 1.5; }
+  .verify-code {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;
+    color: var(--cyan-deep); margin-top: 8px; letter-spacing: 0.5px;
+  }
+  .verify-warn {
+    font-size: 9.5px; color: var(--amber); margin-top: 8px; line-height: 1.4;
+    display: flex; gap: 5px; align-items: flex-start;
+  }
+
+  .docinfo { border-top: 1px solid var(--line); padding-top: 16px; }
+  .docinfo-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 28px; }
+  .di-item { font-size: 11px; }
+  .di-k { color: var(--ink-faint); font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+  .di-v { font-weight: 600; }
+  .di-v.mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .footer {
+    border-top: 1px solid var(--line); padding: 14px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10px; color: var(--ink-faint);
+  }
+  .footer .f-left { display: flex; align-items: center; gap: 8px; }
+  .footer b { color: var(--ink-soft); font-weight: 600; }
+  .ico { display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="brand">
+        <svg class="crest" viewBox="0 0 42 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 1L40 8v15c0 12-8 20-19 24C10 43 2 35 2 23V8L21 1z" fill="#13242f" stroke="#2bb6c4" stroke-width="1.5"/>
+          <path d="M21 12c-3 0-5 2-5 2l-3-1 1 4-2 2 3 1 1 4 3-2 2 2 2-2 3 2 1-4 3-1-2-2 1-4-3 1s-2-2-5-2z" fill="#2bb6c4"/>
+          <circle cx="21" cy="20" r="2.4" fill="#13242f"/>
+          <text x="21" y="40" text-anchor="middle" fill="#fff" font-family="IBM Plex Sans" font-size="8" font-weight="700">K9</text>
+        </svg>
+        <div>
+          <div class="brand-title">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div>
+          <div class="brand-sub">Canil K9 · Seção Operacional</div>
+        </div>
+      </div>
+      <div class="reg">
+        <div class="reg-id">REG 2026/05/4D68-K9</div>
+        <div class="reg-page">Página 6 de 6</div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <!-- Context bar -->
+      <div class="ctx">
+        <div class="ctx-cell">
+          <div class="ctx-label">Natureza</div>
+          <div class="ctx-val">Ocorrência com entorpecente</div>
+        </div>
+        <div class="ctx-cell">
+          <div class="ctx-label">Data</div>
+          <div class="ctx-val mono">20/05/2026</div>
+        </div>
+        <div class="ctx-cell">
+          <div class="ctx-label">Horário</div>
+          <div class="ctx-val mono">13:33 → 13:40</div>
+        </div>
+        <div class="ctx-cell">
+          <div class="ctx-label">Status</div>
+          <div class="ctx-val">Finalizado<span class="pend">1 de 2 confirmações</span></div>
+        </div>
+      </div>
+
+      <!-- Validation -->
+      <div class="section-label">Validação da equipe</div>
+      <div class="section-hint">
+        Cada integrante confirma a participação com seu próprio login no Sistema Canil K9.
+        A confirmação registra identidade, data e hora — não é assinatura digital com certificado,
+        e sim registro autenticado e rastreável.
+      </div>
+
+      <div class="val-grid">
+        <!-- Condutor -->
+        <div class="person">
+          <div class="person-top">
+            <div class="avatar">FOTO<br>GCM</div>
+            <div>
+              <div class="role-tag">Condutor responsável · autor</div>
+              <div class="person-name">GCM Ragonha</div>
+              <div class="person-meta">RA: <b>691755</b> · Função: <b>Condutor K9</b><br>Unidade: <b>GCM Limeira · Canil</b></div>
+            </div>
+          </div>
+          <div class="confirm done">
+            <svg class="confirm-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+            <div class="confirm-txt">
+              <div class="ct-status">CONFIRMADO NO APP</div>
+              <div class="ct-detail">20/05/2026 14:24 · login autenticado</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Testemunha -->
+        <div class="person">
+          <div class="person-top">
+            <div class="avatar" style="border-color:#c9d3db; color:#8493a1">FOTO<br>GCM</div>
+            <div>
+              <div class="role-tag" style="color:#8493a1">Testemunha</div>
+              <div class="person-name">GCM Silva</div>
+              <div class="person-meta">RA: <b>704418</b> · Função: <b>Patrulheiro</b><br>Unidade: <b>GCM Limeira</b></div>
+            </div>
+          </div>
+          <div class="confirm wait">
+            <svg class="confirm-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b07d0a" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg>
+            <div class="confirm-txt">
+              <div class="ct-status">AGUARDANDO CONFIRMAÇÃO</div>
+              <div class="ct-detail">Notificado em 20/05/2026 14:25</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <b>Sobre os estados:</b> quando a testemunha abrir a notificação e confirmar com seu login,
+        o cartão passa a <span style="color:var(--green); font-weight:600">CONFIRMADO NO APP</span> com data/hora,
+        e o status do documento muda para "2 de 2 confirmações". O documento nunca registra confirmação que não aconteceu.
+      </div>
+
+      <!-- Integrity -->
+      <div class="section-label">Integridade do documento</div>
+      <div class="integ-grid">
+        <div class="integ-box">
+          <div class="integ-title">Hash de integridade</div>
+          <div class="hash-label">SHA-256 · conteúdo operacional</div>
+          <div class="hash-val">9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff</div>
+          <div class="integ-ok">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+            <div class="io-txt">
+              <b>ÍNTEGRO</b>
+              <span>Conteúdo não alterado após a finalização.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="integ-box">
+          <div class="integ-title">Verificação online</div>
+          <div class="verify">
+            <svg class="qr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <rect width="100" height="100" fill="#fff"/>
+              <g fill="#14202b">
+                <rect x="6" y="6" width="26" height="26"/><rect x="12" y="12" width="14" height="14" fill="#fff"/><rect x="16" y="16" width="6" height="6" fill="#14202b"/>
+                <rect x="68" y="6" width="26" height="26"/><rect x="74" y="12" width="14" height="14" fill="#fff"/><rect x="78" y="16" width="6" height="6" fill="#14202b"/>
+                <rect x="6" y="68" width="26" height="26"/><rect x="12" y="74" width="14" height="14" fill="#fff"/><rect x="16" y="78" width="6" height="6" fill="#14202b"/>
+                <rect x="40" y="6" width="6" height="6"/><rect x="52" y="6" width="6" height="6"/><rect x="40" y="18" width="6" height="6"/><rect x="58" y="40" width="6" height="6"/>
+                <rect x="40" y="40" width="6" height="6"/><rect x="48" y="48" width="6" height="6"/><rect x="68" y="40" width="6" height="6"/><rect x="80" y="48" width="6" height="6"/>
+                <rect x="40" y="60" width="6" height="6"/><rect x="68" y="68" width="6" height="6"/><rect x="80" y="80" width="6" height="6"/><rect x="60" y="80" width="6" height="6"/>
+                <rect x="48" y="74" width="6" height="6"/><rect x="88" y="60" width="6" height="6"/><rect x="40" y="88" width="6" height="6"/>
+              </g>
+            </svg>
+            <div>
+              <div class="verify-txt">Escaneie para verificar a autenticidade no Sistema Canil K9.</div>
+              <div class="verify-code">4D68-K9-2026-05-20-1430</div>
+              <div class="verify-warn">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#b07d0a" stroke-width="2" style="margin-top:1px;flex-shrink:0"><path d="M12 9v4M12 17h.01M10.3 3.9L2 18a2 2 0 002 3h16a2 2 0 002-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+                <span>Página de verificação a implementar — não exibir QR até existir.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Doc info -->
+      <div class="docinfo">
+        <div class="docinfo-grid">
+          <div class="di-item"><div class="di-k">ID do documento</div><div class="di-v mono">REG 2026/05/4D68-K9</div></div>
+          <div class="di-item"><div class="di-k">Tipo</div><div class="di-v">Registro Operacional K9</div></div>
+          <div class="di-item"><div class="di-k">Versão</div><div class="di-v mono">1.0</div></div>
+          <div class="di-item"><div class="di-k">Criado em</div><div class="di-v mono">20/05/2026 · 14:24</div></div>
+          <div class="di-item"><div class="di-k">Sincronizado</div><div class="di-v mono">20/05/2026 · 14:24</div></div>
+          <div class="di-item"><div class="di-k">Sistema</div><div class="di-v">Canil K9 · GCM Limeira</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="f-left">
+        <svg class="ico" width="13" height="14" viewBox="0 0 24 26" fill="none" stroke="#8493a1" stroke-width="2"><path d="M12 1l10 4v8c0 6-4 10-10 12C6 23 2 19 2 13V5l10-4z"/></svg>
+        Documento gerado automaticamente pelo Sistema Canil K9 GCM
+      </div>
+      <div><b>DOCUMENTO DIGITAL</b> · não impresso</div>
+    </div>
+
+  </div>
+</body>
+</html>

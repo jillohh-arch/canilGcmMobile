@@ -10,22 +10,34 @@ class HealthService {
   final FirebaseFirestore _firestore;
 
   Future<HealthLogModel> addHealthLog(HealthLogModel log) async {
+    final entry = AuditService.buildInlineEntry(action: 'created');
+    final data = {
+      ...log.toJson(),
+      'audit_trail': [entry],
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
     final docRef = await _firestore
         .collection('dogs')
         .doc(log.dogId)
         .collection('health_events')
-        .add(log.toJson());
-    return HealthLogModel.fromJson(log.toJson(), docRef.id);
+        .add(data);
+    return HealthLogModel.fromJson(data, docRef.id);
   }
 
   Future<void> updateHealthLog(HealthLogModel log) async {
     if (log.id == null) return;
+    final entry = AuditService.buildInlineEntry(action: 'updated');
     await _firestore
         .collection('dogs')
         .doc(log.dogId)
         .collection('health_events')
         .doc(log.id)
-        .set(log.toJson(), SetOptions(merge: true));
+        .set({
+          ...log.toJson(),
+          'updated_at': FieldValue.serverTimestamp(),
+          'audit_trail': FieldValue.arrayUnion([entry]),
+        }, SetOptions(merge: true));
   }
 
   Future<void> deleteHealthLog({
@@ -49,6 +61,7 @@ class HealthService {
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': userId,
       'delete_reason': reason,
+      'deleted_reason': reason,
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
   }

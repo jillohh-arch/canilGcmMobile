@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Ocorrência v2 · Pág. 3 Timeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg-page:#eef1f4;--paper:#fff;--ink:#14202b;--ink-soft:#46586a;--ink-faint:#8493a1;--line:#dde4ea;--line-soft:#eaeff3;--cyan:#0a8e9d;--cyan-deep:#07707c;--green:#1f9d52;--amber:#b07d0a;--header-bg:#0e1a24;--header-accent:#2bb6c4;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg-page);font-family:'IBM Plex Sans',sans-serif;display:flex;justify-content:center;padding:32px 20px;color:var(--ink);-webkit-font-smoothing:antialiased;}
+  .page{width:794px;min-height:1123px;background:var(--paper);box-shadow:0 20px 60px rgba(14,26,36,.18);display:flex;flex-direction:column;}
+  .header{background:var(--header-bg);color:#fff;padding:22px 40px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;}
+  .header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--cyan) 0%,var(--green) 60%,transparent 100%);}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .crest{width:42px;height:48px;flex-shrink:0;}
+  .brand-title{font-size:18px;font-weight:700;letter-spacing:.5px;line-height:1.1;}
+  .brand-sub{font-size:10.5px;font-weight:500;letter-spacing:2px;color:var(--header-accent);margin-top:4px;text-transform:uppercase;}
+  .reg{text-align:right;}
+  .reg-id{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;letter-spacing:.5px;}
+  .reg-page{font-size:10px;letter-spacing:1.5px;color:#8aa0ad;margin-top:5px;text-transform:uppercase;}
+  .body{padding:28px 40px 0;flex:1;}
+  .pg-title{font-size:20px;font-weight:700;letter-spacing:-.3px;}
+  .pg-sub{font-size:11.5px;color:var(--ink-soft);margin:4px 0 20px;}
+  .tl-summary{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:26px;}
+  .tls-cell{padding:14px 18px;}
+  .tls-cell+.tls-cell{border-left:1px solid var(--line);}
+  .tls-k{font-size:9px;font-weight:600;letter-spacing:1.2px;color:var(--ink-faint);text-transform:uppercase;margin-bottom:6px;}
+  .tls-v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;}
+  .tls-v small{font-size:11px;color:var(--ink-soft);}
+  .timeline{position:relative;padding-left:8px;}
+  .ev{display:grid;grid-template-columns:64px 28px 1fr;gap:0;position:relative;}
+  .ev-time{text-align:right;padding-right:14px;padding-top:2px;}
+  .ev-hh{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;}
+  .ev-dd{font-size:9px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+  .ev-rail{position:relative;display:flex;justify-content:center;}
+  .ev-rail::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:var(--line);}
+  .ev:first-child .ev-rail::before{top:14px;}
+  .ev:last-child .ev-rail::before{bottom:auto;height:14px;}
+  .ev-node{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid;display:flex;align-items:center;justify-content:center;z-index:1;margin-top:2px;}
+  .ev-card{margin:0 0 18px 16px;border:1px solid var(--line);border-left-width:3px;border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:14px;}
+  .ev-title{font-size:13.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+  .ev-desc{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin:5px 0 8px;}
+  .ev-gps{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--cyan-deep);}
+  .ev-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:120px;}
+  .ev-photo{width:120px;height:74px;border-radius:7px;background:linear-gradient(135deg,#dde6eb,#c4d2da);display:flex;align-items:center;justify-content:center;color:#7d8d99;font-size:9px;border:1px solid var(--line);}
+  .ev-sync{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:600;color:var(--green);letter-spacing:.5px;}
+  .ev-sync .clk{font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);font-weight:400;}
+  /* category colors */
+  .c-search{border-left-color:var(--amber);} .c-search .ev-node{border-color:var(--amber);color:var(--amber);} .c-search .ev-title{color:var(--amber);}
+  .c-reg{border-left-color:var(--cyan);} .c-reg .ev-node{border-color:var(--cyan);color:var(--cyan);} .c-reg .ev-title{color:var(--cyan-deep);}
+  .c-result{border-left-color:var(--green);} .c-result .ev-node{border-color:var(--green);color:var(--green);} .c-result .ev-title{color:var(--green);}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px;margin-top:6px;}
+  .lg{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--ink-soft);}
+  .lg .dot{width:9px;height:9px;border-radius:50%;}
+  .footer{border-top:1px solid var(--line);padding:14px 40px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--ink-faint);}
+  .footer .f-left{display:flex;align-items:center;gap:8px;}
+  .footer b{color:var(--ink-soft);font-weight:600;}
+  .ico{display:inline-block;vertical-align:middle;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <svg class="crest" viewBox="0 0 42 48" fill="none"><path d="M21 1L40 8v15c0 12-8 20-19 24C10 43 2 35 2 23V8L21 1z" fill="#13242f" stroke="#2bb6c4" stroke-width="1.5"/><path d="M21 12c-3 0-5 2-5 2l-3-1 1 4-2 2 3 1 1 4 3-2 2 2 2-2 3 2 1-4 3-1-2-2 1-4-3 1s-2-2-5-2z" fill="#2bb6c4"/><circle cx="21" cy="20" r="2.4" fill="#13242f"/><text x="21" y="40" text-anchor="middle" fill="#fff" font-family="IBM Plex Sans" font-size="8" font-weight="700">K9</text></svg>
+        <div><div class="brand-title">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div><div class="brand-sub">Canil K9 · Seção Operacional</div></div>
+      </div>
+      <div class="reg"><div class="reg-id">REG 2026/05/4D68-K9</div><div class="reg-page">Página 3 de 6</div></div>
+    </div>
+    <div class="body">
+      <div class="pg-title">Linha do tempo operacional</div>
+      <div class="pg-sub">Sequência cronológica dos eventos registrados na ocorrência</div>
+      <div class="tl-summary">
+        <div class="tls-cell"><div class="tls-k">Início da atividade</div><div class="tls-v">13:33</div></div>
+        <div class="tls-cell"><div class="tls-k">Eventos registrados</div><div class="tls-v">5 <small>ações</small></div></div>
+        <div class="tls-cell"><div class="tls-k">Duração total</div><div class="tls-v">7 min <small>13:33 → 13:40</small></div></div>
+      </div>
+      <div class="timeline">
+        <div class="ev c-search">
+          <div class="ev-time"><div class="ev-hh">13:33</div><div class="ev-dd">20/05</div></div>
+          <div class="ev-rail"><div class="ev-node"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></div></div>
+          <div class="ev-card">
+            <div><div class="ev-title">Busca com cão</div><div class="ev-desc">Busca em área de mata conforme denúncia prévia. Varredura inicial do perímetro.</div><div class="ev-gps">GPS -22.58054, -47.41953</div></div>
+            <div class="ev-right"><div class="ev-photo">📷 1 foto</div><div class="ev-sync"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>SINC <span class="clk">13:33</span></div></div>
+          </div>
+        </div>
+        <div class="ev c-reg">
+          <div class="ev-time"><div class="ev-hh">13:38</div><div class="ev-dd">20/05</div></div>
+          <div class="ev-rail"><div class="ev-node"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div></div>
+          <div class="ev-card">
+            <div><div class="ev-title">Registro de ocorrência aberto</div><div class="ev-desc">Binômio em local. GPS capturado. Aguardando próxima ação.</div><div class="ev-gps">GPS -22.58164, -47.42070</div></div>
+            <div class="ev-right"><div class="ev-sync"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>SINC <span class="clk">13:38</span></div></div>
+          </div>
+        </div>
+        <div class="ev c-reg">
+          <div class="ev-time"><div class="ev-hh">13:38</div><div class="ev-dd">20/05</div></div>
+          <div class="ev-rail"><div class="ev-node"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg></div></div>
+          <div class="ev-card">
+            <div><div class="ev-title">Abordagem</div><div class="ev-desc">Abordagem de indivíduo(s) no local. Procedimentos de segurança adotados.</div><div class="ev-gps">GPS -22.58164, -47.42070</div></div>
+            <div class="ev-right"><div class="ev-photo">📷 1 foto</div><div class="ev-sync"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>SINC <span class="clk">13:38</span></div></div>
+          </div>
+        </div>
+        <div class="ev c-result">
+          <div class="ev-time"><div class="ev-hh">13:38</div><div class="ev-dd">20/05</div></div>
+          <div class="ev-rail"><div class="ev-node"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c2-1 4-1 6 1s4 2 6-1M14 8l3-2 3 4"/></svg></div></div>
+          <div class="ev-card">
+            <div><div class="ev-title">Emprego do cão</div><div class="ev-desc">K9 Bono empregado para busca específica. Indicação positiva para odor de entorpecente.</div><div class="ev-gps">GPS -22.58164, -47.42070</div></div>
+            <div class="ev-right"><div class="ev-photo">📷 1 foto</div><div class="ev-sync"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>SINC <span class="clk">13:38</span></div></div>
+          </div>
+        </div>
+        <div class="ev c-result">
+          <div class="ev-time"><div class="ev-hh">13:39</div><div class="ev-dd">20/05</div></div>
+          <div class="ev-rail"><div class="ev-node"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div></div>
+          <div class="ev-card">
+            <div><div class="ev-title">Material apreendido</div><div class="ev-desc">Localização e apreensão de substância análoga à maconha.</div><div class="ev-gps">GPS -22.58058, -47.41937</div></div>
+            <div class="ev-right"><div class="ev-photo">📷 1 foto</div><div class="ev-sync"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1f9d52" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>SINC <span class="clk">13:39</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="lg"><span class="dot" style="background:var(--amber)"></span>Busca / Investigação</div>
+        <div class="lg"><span class="dot" style="background:var(--cyan)"></span>Registro / Abordagem</div>
+        <div class="lg"><span class="dot" style="background:var(--green)"></span>Emprego / Resultado</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="f-left"><svg class="ico" width="13" height="14" viewBox="0 0 24 26" fill="none" stroke="#8493a1" stroke-width="2"><path d="M12 1l10 4v8c0 6-4 10-10 12C6 23 2 19 2 13V5l10-4z"/></svg>Documento gerado automaticamente pelo Sistema Canil K9 GCM</div>
+      <div><b>DOCUMENTO DIGITAL</b> · não impresso</div>
+    </div>
+  </div>
+</body>
+</html>

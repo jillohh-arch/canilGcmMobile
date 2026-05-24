@@ -15,6 +15,7 @@ class OccurrenceEventRepository {
           .collection('events');
 
   Future<OccurrenceEvent> create(OccurrenceEvent event) async {
+    await _ensureOccurrenceMutable(event.occurrenceId);
     final colRef = _events(event.occurrenceId);
     final docRef = colRef.doc(event.id);
     final now = DateTime.now();
@@ -41,6 +42,7 @@ class OccurrenceEventRepository {
     String eventId,
     Map<String, dynamic> updates,
   ) async {
+    await _ensureOccurrenceMutable(occurrenceId);
     final docRef = _events(occurrenceId).doc(eventId);
     final snap = await docRef.get();
     if (!snap.exists) return;
@@ -78,6 +80,7 @@ class OccurrenceEventRepository {
     String userId,
     String reason,
   ) async {
+    await _ensureOccurrenceMutable(occurrenceId);
     final docRef = _events(occurrenceId).doc(eventId);
 
     final entry = AuditService.buildInlineEntry(
@@ -89,6 +92,7 @@ class OccurrenceEventRepository {
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': userId,
       'delete_reason': reason,
+      'deleted_reason': reason,
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
@@ -153,5 +157,16 @@ class OccurrenceEventRepository {
     if (value is Timestamp) return value.toDate().toIso8601String();
     if (value is DateTime) return value.toIso8601String();
     return value;
+  }
+
+  Future<void> _ensureOccurrenceMutable(String occurrenceId) async {
+    final snap = await _firestore
+        .collection('occurrences')
+        .doc(occurrenceId)
+        .get();
+    final status = snap.data()?['status']?.toString();
+    if (status == 'finalized') {
+      throw StateError('Ocorrencia finalizada nao permite editar eventos.');
+    }
   }
 }

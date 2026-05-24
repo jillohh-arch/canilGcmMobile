@@ -69,6 +69,25 @@ service cloud.firestore {
         ]);
     }
 
+    function isFinalizedOccurrence() {
+      return resource.data.status == 'finalized';
+    }
+
+    function isAllowedFinalizedOccurrenceUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'pdf_export_url',
+        'pdf_generated_at',
+        'pdf_access_log',
+        'audit_trail',
+        'updated_at'
+      ]);
+    }
+
+    function parentOccurrenceMutable(occurrenceId) {
+      return get(/databases/$(database)/documents/occurrences/$(occurrenceId))
+        .data.status != 'finalized';
+    }
+
     // ─── Active Shifts ────────────────────────────────────────────────
     match /active_shifts/{ra} {
       allow read: if signedIn();
@@ -99,6 +118,12 @@ service cloud.firestore {
 
       // Histórico de peso
       match /weight_history/{recordId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      match /weight_records/{recordId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
@@ -180,8 +205,20 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /feeding_events/{feedingId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
       // Prescrições nutricionais
       match /nutrition_prescriptions/{prescriptionId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
+      }
+
+      match /nutritional_prescriptions/{prescriptionId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
@@ -191,12 +228,15 @@ service cloud.firestore {
     // ─── Ocorrências + Eventos ────────────────────────────────────────
     match /occurrences/{occurrenceId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && (!isFinalizedOccurrence() || isAllowedFinalizedOccurrenceUpdate());
       allow delete: if false;
 
       match /events/{eventId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create, update: if signedIn()
+          && parentOccurrenceMutable(occurrenceId);
         allow delete: if false;
       }
     }

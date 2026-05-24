@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 
 /// Prescrição nutricional vigente do cão.
 /// Subcoleção: /dogs/{dogId}/nutrition_prescriptions/{prescriptionId}
-class NutritionPrescription {
+class NutritionPrescription with SoftDeletable {
   final String? id;
   final int amountGramsPerDay;
   final String foodType; // ex: "ração premium"
@@ -14,6 +15,14 @@ class NutritionPrescription {
   final DateTime vigentFrom;
   final DateTime? vigentUntil;
   final String? notes;
+  final List<Map<String, dynamic>> auditTrail;
+
+  @override
+  final DateTime? deletedAt;
+  @override
+  final String? deletedBy;
+  @override
+  final String? deleteReason;
 
   NutritionPrescription({
     this.id,
@@ -27,11 +36,16 @@ class NutritionPrescription {
     required this.vigentFrom,
     this.vigentUntil,
     this.notes,
+    this.auditTrail = const [],
+    this.deletedAt,
+    this.deletedBy,
+    this.deleteReason,
   });
 
   /// Quantidade por refeição (gramas).
-  int get amountPerMeal =>
-      mealsPerDay > 0 ? (amountGramsPerDay / mealsPerDay).round() : amountGramsPerDay;
+  int get amountPerMeal => mealsPerDay > 0
+      ? (amountGramsPerDay / mealsPerDay).round()
+      : amountGramsPerDay;
 
   /// Verifica se a prescrição está vigente na data informada.
   bool isVigentAt(DateTime date) {
@@ -40,7 +54,10 @@ class NutritionPrescription {
     return true;
   }
 
-  factory NutritionPrescription.fromJson(Map<String, dynamic> json, {String? docId}) {
+  factory NutritionPrescription.fromJson(
+    Map<String, dynamic> json, {
+    String? docId,
+  }) {
     return NutritionPrescription(
       id: docId ?? json['id'] as String?,
       amountGramsPerDay: json['amount_grams_per_day'] as int? ?? 0,
@@ -53,6 +70,18 @@ class NutritionPrescription {
       vigentFrom: _toDateTime(json['vigent_from']) ?? DateTime.now(),
       vigentUntil: _toDateTime(json['vigent_until']),
       notes: json['notes'] as String?,
+      auditTrail:
+          (json['audit_trail'] as List<dynamic>?)
+              ?.whereType<Map>()
+              .map(
+                (e) => e.map((key, value) => MapEntry(key.toString(), value)),
+              )
+              .toList() ??
+          const [],
+      deletedAt: SoftDeletable.parseDeletedAt(json['deleted_at']),
+      deletedBy: json['deleted_by'] as String?,
+      deleteReason:
+          json['deleted_reason'] as String? ?? json['delete_reason'] as String?,
     );
   }
 
@@ -68,6 +97,8 @@ class NutritionPrescription {
       'vigent_from': Timestamp.fromDate(vigentFrom),
       if (vigentUntil != null) 'vigent_until': Timestamp.fromDate(vigentUntil!),
       if (notes != null) 'notes': notes,
+      'audit_trail': auditTrail,
+      ...softDeleteFields(),
     };
   }
 

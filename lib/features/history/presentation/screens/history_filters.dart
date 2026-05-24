@@ -25,6 +25,7 @@ extension _HistoryFilters on _HistoryScreenState {
     setState(() {
       _customRange = picked;
       _periodFilter = 'Personalizado';
+      _visibleCount = 30;
     });
   }
 
@@ -85,7 +86,10 @@ extension _HistoryFilters on _HistoryScreenState {
                         _openDateRangePicker();
                         return;
                       }
-                      setState(() => _periodFilter = value);
+                      setState(() {
+                        _periodFilter = value;
+                        _visibleCount = 30;
+                      });
                       setSheetState(() {});
                     },
                   ),
@@ -102,7 +106,10 @@ extension _HistoryFilters on _HistoryScreenState {
                     selected: _typeFilter,
                     onSelected: (value) {
                       HapticFeedback.selectionClick();
-                      setState(() => _typeFilter = value);
+                      setState(() {
+                        _typeFilter = value;
+                        _visibleCount = 30;
+                      });
                       setSheetState(() {});
                     },
                   ),

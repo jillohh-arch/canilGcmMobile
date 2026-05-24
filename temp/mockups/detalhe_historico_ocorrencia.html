@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe de Histórico · Ocorrência</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;gap:24px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:24px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 100px;}
+  /* ===== CASCA: header ===== */
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:11px;font-weight:500;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .h-share{margin-left:auto;color:#4dd0e1;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(77,208,225,.08);border-radius:10px;}
+  /* ===== CASCA: identificação ===== */
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:18px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;}
+  .ident-type{color:#4dd0e1;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:19px;font-weight:700;line-height:1.15;}
+  .badge-fin{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);border-radius:14px;padding:5px 10px;color:#2ecc71;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .ident-meta{display:flex;gap:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:13px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:30px;height:30px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11.5px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+  /* sections */
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:22px 0 12px;}
+  /* stats */
+  .stats{display:flex;gap:9px;margin-bottom:6px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px 8px;text-align:center;}
+  .stat-n{color:#fff;font-size:20px;font-weight:800;}
+  .stat-l{color:#5a7280;font-size:9px;font-weight:600;margin-top:3px;letter-spacing:.3px;}
+  /* resultados */
+  .res{display:flex;align-items:center;gap:11px;background:rgba(46,204,113,.05);border:1px solid rgba(46,204,113,.18);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
+  .res-ico{width:30px;height:30px;border-radius:8px;background:rgba(46,204,113,.12);display:flex;align-items:center;justify-content:center;color:#2ecc71;flex-shrink:0;}
+  .res-txt{color:#fff;font-size:13px;font-weight:600;}
+  .res-txt small{display:block;color:#7d8d99;font-size:11px;font-weight:400;margin-top:1px;}
+  .res-check{margin-left:auto;color:#2ecc71;}
+  /* mapa */
+  .map{height:130px;border-radius:13px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08);background:repeating-linear-gradient(0deg,#0e1c22 0 1px,transparent 1px 26px),repeating-linear-gradient(90deg,#0e1c22 0 1px,transparent 1px 30px),#0a161b;}
+  .map-pin{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);width:14px;height:14px;border-radius:50% 50% 50% 0;background:#4dd0e1;transform-origin:center;rotate:-45deg;border:2px solid #050d10;}
+  .map-addr{display:flex;align-items:center;gap:8px;margin-top:10px;color:#aebcc4;font-size:12px;}
+  .map-addr .gps{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4dd0e1;}
+  /* timeline */
+  .tl{position:relative;padding-left:6px;}
+  .tl-ev{display:grid;grid-template-columns:46px 22px 1fr;align-items:start;}
+  .tl-time{color:#7d8d99;font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;padding-right:10px;padding-top:1px;}
+  .tl-rail{position:relative;display:flex;justify-content:center;}
+  .tl-rail::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.08);}
+  .tl-ev:last-child .tl-rail::before{height:8px;}
+  .tl-node{width:10px;height:10px;border-radius:50%;z-index:1;margin-top:3px;border:2px solid #050d10;}
+  .tl-card{padding:0 0 16px 12px;}
+  .tl-title{color:#fff;font-size:12.5px;font-weight:600;}
+  .tl-desc{color:#7d8d99;font-size:11px;margin-top:2px;line-height:1.4;}
+  .tl-more{display:flex;align-items:center;justify-content:center;gap:6px;color:#4dd0e1;font-size:12px;font-weight:600;padding:11px;border:1px solid rgba(77,208,225,.2);border-radius:11px;margin-top:2px;}
+  /* relato */
+  .relato{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;}
+  .relato p{color:#aebcc4;font-size:12px;line-height:1.6;}
+  .relato .read{color:#4dd0e1;font-size:12px;font-weight:600;margin-top:8px;display:inline-block;}
+  /* midias */
+  .midias{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px;}
+  .mid{width:96px;height:96px;border-radius:11px;flex-shrink:0;background:linear-gradient(135deg,#16252b,#0e1b20);border:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-end;position:relative;}
+  .mid-tag{font-size:9px;color:#aebcc4;padding:6px;font-family:'IBM Plex Mono',monospace;}
+  .mid-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);}
+  /* ===== CASCA: integridade ===== */
+  .integ{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.16);border-radius:13px;padding:14px;margin-top:6px;}
+  .integ-head{display:flex;align-items:center;gap:8px;color:#2ecc71;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:9px;}
+  .integ-hash{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7d8d99;word-break:break-all;line-height:1.5;}
+  .audit-link{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);color:#aebcc4;font-size:12px;font-weight:500;}
+  .audit-link b{color:#fff;font-weight:600;}
+  /* CTA */
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 70%,transparent);display:flex;gap:10px;}
+  .cta{flex:1;border-radius:13px;padding:15px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;}
+  .cta-pdf{background:#4dd0e1;color:#050d10;}
+  .cta-share{background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.3);color:#4dd0e1;}
+  /* anotação casca/corpo */
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:4px;}
+  .legend-side h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:14px;}
+  .lg-shell,.lg-body{padding:8px 11px;border-radius:9px;margin-bottom:9px;}
+  .lg-shell{background:rgba(77,208,225,.07);border-left:3px solid #4dd0e1;}
+  .lg-body{background:rgba(241,196,15,.06);border-left:3px solid #f1c40f;}
+  .lg-shell b{color:#4dd0e1;} .lg-body b{color:#f1c40f;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>09:14</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <!-- CASCA -->
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Ocorrência</div><div class="h-sub">REG 2026/05/4D68-K9</div></div>
+        <div class="h-share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
+      </div>
+      <div class="ident">
+        <div class="ident-top">
+          <div><div class="ident-type">Registro de ocorrência</div><div class="ident-nature">Ocorrência com entorpecente</div></div>
+          <div class="badge-fin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>FINALIZADA</div>
+        </div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Data</span><span class="im-v">20/05/2026</span></div>
+          <div class="im"><span class="im-k">Operação</span><span class="im-v">13:33→13:40</span></div>
+          <div class="im"><span class="im-k">Duração</span><span class="im-v">7 min</span></div>
+        </div>
+        <div class="ident-bin">
+          <div class="bin-av dog"></div><div class="bin-av"></div>
+          <div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b> · Canil K9 Limeira</div>
+        </div>
+      </div>
+
+      <!-- CORPO -->
+      <div class="stats">
+        <div class="stat"><div class="stat-n">5</div><div class="stat-l">EVENTOS</div></div>
+        <div class="stat"><div class="stat-n">4</div><div class="stat-l">MÍDIAS</div></div>
+        <div class="stat"><div class="stat-n">3</div><div class="stat-l">RESULTADOS</div></div>
+      </div>
+
+      <div class="sec-label">Resultados</div>
+      <div class="res"><div class="res-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C9 6 7 9 7 13a5 5 0 0010 0c0-4-2-7-5-11z"/></svg></div><div class="res-txt">Entorpecente apreendido<small>Substância análoga à maconha · 3 invólucros</small></div><svg class="res-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div class="res"><div class="res-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="res-txt">BO registrado<small>Boletim lavrado na delegacia</small></div><svg class="res-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div class="res"><div class="res-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg></div><div class="res-txt">Suspeito detido<small>Conduzido à autoridade competente</small></div><svg class="res-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+
+      <div class="sec-label">Localização</div>
+      <div class="map"><div class="map-pin"></div></div>
+      <div class="map-addr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4dd0e1" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Rua Frederico Rótulo, Jd. Ouro Verde<span class="gps">-22.5816, -47.4207</span></div>
+
+      <div class="sec-label">Linha do tempo</div>
+      <div class="tl">
+        <div class="tl-ev"><div class="tl-time">13:33</div><div class="tl-rail"><div class="tl-node" style="background:#f1c40f"></div></div><div class="tl-card"><div class="tl-title">Busca com cão</div><div class="tl-desc">Varredura inicial do perímetro · 1 foto</div></div></div>
+        <div class="tl-ev"><div class="tl-time">13:38</div><div class="tl-rail"><div class="tl-node" style="background:#4dd0e1"></div></div><div class="tl-card"><div class="tl-title">Registro de ocorrência aberto</div><div class="tl-desc">Binômio em local · GPS capturado</div></div></div>
+        <div class="tl-ev"><div class="tl-time">13:38</div><div class="tl-rail"><div class="tl-node" style="background:#4dd0e1"></div></div><div class="tl-card"><div class="tl-title">Abordagem</div><div class="tl-desc">Procedimentos de segurança · 1 foto</div></div></div>
+        <div class="tl-ev"><div class="tl-time">13:39</div><div class="tl-rail"><div class="tl-node" style="background:#2ecc71"></div></div><div class="tl-card"><div class="tl-title">Material apreendido</div><div class="tl-desc">Substância análoga à maconha · 1 foto</div></div></div>
+      </div>
+      <div class="tl-more">Ver os 5 eventos completos<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+
+      <div class="sec-label">Relato institucional</div>
+      <div class="relato">
+        <p>Durante patrulhamento, a equipe recebeu informações referentes à possível existência de substâncias entorpecentes em área próxima ao local indicado. De imediato, deslocou-se ao endereço onde realizou varredura com o cão K9 Bono...</p>
+        <span class="read">Ler relato completo →</span>
+      </div>
+
+      <div class="sec-label">Mídias</div>
+      <div class="midias">
+        <div class="mid"><span class="mid-tag">13:33</span></div>
+        <div class="mid"><span class="mid-tag">13:38</span></div>
+        <div class="mid"><span class="mid-tag">13:39</span></div>
+        <div class="mid"><div class="mid-play"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div><span class="mid-tag">00:32</span></div>
+      </div>
+
+      <!-- CASCA -->
+      <div class="sec-label">Integridade e auditoria</div>
+      <div class="integ">
+        <div class="integ-head"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>DOCUMENTO ÍNTEGRO · SHA-256</div>
+        <div class="integ-hash">9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff</div>
+        <div class="audit-link"><span>Trilha de auditoria · <b>4 registros</b></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </div>
+    <div class="cta-bar">
+      <button class="cta cta-pdf"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Gerar PDF</button>
+      <button class="cta cta-share"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Compartilhar</button>
+    </div>
+  </div>
+
+  <div class="legend-side">
+    <h3>CASCA vs CORPO</h3>
+    <div class="lg-shell"><b>CASCA</b> (igual em todo histórico): header, card de identificação (tipo/data/binômio/status), integridade + auditoria, e a barra de ações (PDF/compartilhar).</div>
+    <div class="lg-body"><b>CORPO</b> (específico de ocorrência): stats, resultados, localização, linha do tempo, relato e mídias.</div>
+    <p style="margin-top:14px;font-size:11px;color:#6f7d85">Pra detecção, o corpo troca por: linha, fase, série do Protocolo Ragonha. Pra G&P: os 3 impulsos + figurante. A casca permanece idêntica.</p>
+  </div>
+</div>
+</body>
+</html>

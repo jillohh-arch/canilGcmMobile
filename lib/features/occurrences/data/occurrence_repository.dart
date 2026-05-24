@@ -50,12 +50,20 @@ class OccurrenceRepository {
     if (!snap.exists) return;
 
     final currentData = snap.data()!;
+    final normalizedUpdates = Map<String, dynamic>.from(updates);
+    if (_isFinalized(currentData) &&
+        !_isAllowedFinalizedUpdate(normalizedUpdates)) {
+      throw StateError(
+        'Ocorrencia finalizada permite apenas metadados de PDF e auditoria.',
+      );
+    }
+
     final entries = <Map<String, dynamic>>[];
 
-    for (final key in updates.keys) {
+    for (final key in normalizedUpdates.keys) {
       if (key == 'updated_at' || key == 'audit_trail') continue;
       final oldValue = currentData[key];
-      final newValue = updates[key];
+      final newValue = normalizedUpdates[key];
       if (oldValue != newValue) {
         entries.add(
           AuditService.buildInlineEntry(
@@ -68,12 +76,12 @@ class OccurrenceRepository {
       }
     }
 
-    updates['updated_at'] = FieldValue.serverTimestamp();
+    normalizedUpdates['updated_at'] = FieldValue.serverTimestamp();
     if (entries.isNotEmpty) {
-      updates['audit_trail'] = FieldValue.arrayUnion(entries);
+      normalizedUpdates['audit_trail'] = FieldValue.arrayUnion(entries);
     }
 
-    await docRef.update(updates);
+    await docRef.update(normalizedUpdates);
   }
 
   Future<void> softDelete(String id, String userId, String reason) async {
@@ -88,6 +96,7 @@ class OccurrenceRepository {
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': userId,
       'delete_reason': reason,
+      'deleted_reason': reason,
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
@@ -109,16 +118,28 @@ class OccurrenceRepository {
     required Map<String, dynamic>? details,
   }) async {
     final docRef = _collection.doc(id);
+    final snap = await docRef.get();
+    if (!snap.exists) return;
+    final currentData = snap.data()!;
+    if (_isFinalized(currentData)) {
+      throw StateError('Ocorrencia ja finalizada.');
+    }
+
+    final startedAt = Occurrence.fromMap(currentData, id).startedAt;
+    final durationMinutes = DateTime.now().difference(startedAt).inMinutes;
+    final durationTotal = durationMinutes < 1 ? 1 : durationMinutes;
 
     final entry = AuditService.buildInlineEntry(action: 'finalized');
 
     await docRef.update({
       'status': OccurrenceStatus.finalized.toMap(),
       'finalized_at': FieldValue.serverTimestamp(),
+      'duration_total': durationTotal,
       'integrity_hash': integrityHash,
       'final_report': finalReport,
       'results': results.map((r) => r.toMap()).toList(),
       'details': details,
+      'finalization_draft': FieldValue.delete(),
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
@@ -145,6 +166,8 @@ class OccurrenceRepository {
     final access = {
       'at': DateTime.now().toIso8601String(),
       'by': entry['performed_by'],
+      'by_name': entry['by_name'],
+      'by_ra': entry['by_ra'],
       'ip': 'client-unavailable',
       'action': action,
       if (pdfUrl?.trim().isNotEmpty == true) 'pdf_url': pdfUrl,
@@ -259,5 +282,21 @@ class OccurrenceRepository {
     if (value is Timestamp) return value.toDate().toIso8601String();
     if (value is DateTime) return value.toIso8601String();
     return value;
+  }
+
+  static bool _isFinalized(Map<String, dynamic> data) {
+    final status = data['status']?.toString();
+    return status == OccurrenceStatus.finalized.toMap();
+  }
+
+  static bool _isAllowedFinalizedUpdate(Map<String, dynamic> updates) {
+    const allowed = {
+      'pdf_export_url',
+      'pdf_generated_at',
+      'pdf_access_log',
+      'audit_trail',
+      'updated_at',
+    };
+    return updates.keys.every(allowed.contains);
   }
 }

@@ -457,6 +457,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
       if (url == null) return null;
       await occurrenceVM.updateOccurrence(occurrence.id, {
         'pdf_export_url': url,
+        'pdf_generated_at': DateTime.now().toIso8601String(),
       });
       await occurrenceVM.recordPdfAccess(
         occurrenceId: occurrence.id,

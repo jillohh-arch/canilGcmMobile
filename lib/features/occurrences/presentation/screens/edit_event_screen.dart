@@ -126,14 +126,20 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     final today = DateTime.now();
     final candidate = DateTime(
-      today.year, today.month, today.day, picked.hour, picked.minute,
+      today.year,
+      today.month,
+      today.day,
+      picked.hour,
+      picked.minute,
     );
 
     if (candidate.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Horário não pode ser no futuro',
-              style: GoogleFonts.inter()),
+          content: Text(
+            'Horário não pode ser no futuro',
+            style: GoogleFonts.inter(),
+          ),
           backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 2),
         ),
@@ -169,8 +175,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('GPS indisponível', style: GoogleFonts.inter()),
+            content: Text('GPS indisponível', style: GoogleFonts.inter()),
             backgroundColor: AppTheme.error,
             duration: const Duration(seconds: 2),
           ),
@@ -192,14 +197,20 @@ class _EditEventScreenState extends State<EditEventScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E1A1F),
-        title: Text('Remover foto?',
-            style: GoogleFonts.inter(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Remover foto?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('CANCELAR',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'CANCELAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -209,9 +220,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 _existingPhotoUrls.removeAt(index);
               });
             },
-            child: Text('REMOVER',
-                style: GoogleFonts.inter(
-                    color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'REMOVER',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -228,16 +243,22 @@ class _EditEventScreenState extends State<EditEventScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E1A1F),
-        title: Text('Excluir evento?',
-            style: GoogleFonts.inter(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Excluir evento?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Esta ação é registrada na auditoria.',
               style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(180), fontSize: 13),
+                color: Colors.white.withAlpha(180),
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -246,11 +267,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
               style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Motivo da exclusão',
-                hintStyle:
-                    GoogleFonts.inter(color: Colors.white.withAlpha(100)),
+                hintStyle: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(100),
+                ),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide:
-                      BorderSide(color: AppTheme.primary.withAlpha(100)),
+                  borderSide: BorderSide(
+                    color: AppTheme.primary.withAlpha(100),
+                  ),
                 ),
                 focusedBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: AppTheme.primary),
@@ -262,8 +285,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('CANCELAR',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'CANCELAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -272,9 +297,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
               Navigator.of(ctx).pop();
               await _deleteEvent(reason);
             },
-            child: Text('EXCLUIR',
-                style: GoogleFonts.inter(
-                    color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'EXCLUIR',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -286,7 +315,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final authVM = context.read<AuthViewModel>();
     final userId = authVM.user?.uid ?? '';
     await vm.deleteEvent(
-        widget.occurrenceId, widget.existingEvent!.id, userId, reason);
+      widget.occurrenceId,
+      widget.existingEvent!.id,
+      userId,
+      reason,
+    );
     if (mounted) Navigator.of(context).pop('deleted');
   }
 
@@ -335,7 +368,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final urls = <String>[];
     for (final file in _newPhotos) {
       final url = await _storageService.uploadImage(
-        file, 'occurrences/${widget.occurrenceId}/events');
+        file,
+        'occurrences/${widget.occurrenceId}/events',
+      );
       if (url != null) urls.add(url);
     }
     return urls;
@@ -364,6 +399,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ? _descriptionController.text.trim()
           : null,
       photoUrls: photoUrls,
+      mediaItems: _buildMediaItems(photoUrls),
       gpsLat: _gpsLat,
       gpsLng: _gpsLng,
       createdAt: now,
@@ -392,6 +428,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     if (photoUrls.join(',') != e.photoUrls.join(',')) {
       updates['photo_urls'] = photoUrls;
+      updates['media_items'] = _buildMediaItems(photoUrls);
     }
     if (_gpsLat != e.gpsLat || _gpsLng != e.gpsLng) {
       updates['gps_lat'] = _gpsLat;
@@ -403,31 +440,57 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
+  List<Map<String, dynamic>> _buildMediaItems(List<String> photoUrls) {
+    return photoUrls
+        .map(
+          (url) => {
+            'type': 'image',
+            'url': url,
+            'original_url': url,
+            'source': 'occurrence_event',
+            'preserved_original': true,
+          },
+        )
+        .toList();
+  }
+
   Future<bool> _onPopAttempt() async {
     if (!_hasChanges) return true;
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E1A1F),
-        title: Text('Descartar alterações?',
-            style: GoogleFonts.inter(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Descartar alterações?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           'Você tem dados não salvos que serão perdidos.',
           style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(200), fontSize: 14),
+            color: Colors.white.withAlpha(200),
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('CANCELAR',
-                style: GoogleFonts.inter(color: Colors.white.withAlpha(150))),
+            child: Text(
+              'CANCELAR',
+              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('DESCARTAR',
-                style: GoogleFonts.inter(
-                    color: AppTheme.error, fontWeight: FontWeight.w600)),
+            child: Text(
+              'DESCARTAR',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -479,12 +542,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   ],
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildCta(),
-              ),
+              Positioned(left: 0, right: 0, bottom: 0, child: _buildCta()),
             ],
           ),
         ),
@@ -506,8 +564,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 color: Colors.white.withAlpha(10),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 16),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 16,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -531,8 +592,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   color: AppTheme.error.withAlpha(20),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.delete_outline,
-                    color: AppTheme.error, size: 18),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: AppTheme.error,
+                  size: 18,
+                ),
               ),
             ),
         ],
@@ -600,8 +664,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             onTap: () => setState(() => _selectedCategory = cat),
             child: Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
                 color: selected
@@ -627,12 +690,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
                             : Colors.white.withAlpha(80),
                         width: 2,
                       ),
-                      color:
-                          selected ? AppTheme.primary : Colors.transparent,
+                      color: selected ? AppTheme.primary : Colors.transparent,
                     ),
                     child: selected
-                        ? const Icon(Icons.check,
-                            size: 12, color: Colors.white)
+                        ? const Icon(Icons.check, size: 12, color: Colors.white)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -643,8 +704,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           ? Colors.white
                           : Colors.white.withAlpha(180),
                       fontSize: 14,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ],
@@ -660,13 +720,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('TÍTULO',
-            style: GoogleFonts.inter(
-              color: AppTheme.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-            )),
+        Text(
+          'TÍTULO',
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: _titleController,
@@ -681,13 +743,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('DESCRIÇÃO',
-            style: GoogleFonts.inter(
-              color: AppTheme.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-            )),
+        Text(
+          'DESCRIÇÃO',
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: _descriptionController,
@@ -718,8 +782,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: AppTheme.primary),
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 
@@ -767,7 +830,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _gpsAddress ?? '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
+                          _gpsAddress ??
+                              '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
                           style: GoogleFonts.inter(
                             color: Colors.white.withAlpha(200),
                             fontSize: 12,
@@ -827,15 +891,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              ..._existingPhotoUrls.asMap().entries.map((entry) =>
-                  _PhotoThumb(
-                    child: Image.network(entry.value, fit: BoxFit.cover),
-                    onLongPress: () => _removeExistingPhoto(entry.key),
-                  )),
-              ..._newPhotos.asMap().entries.map((entry) => _PhotoThumb(
-                    child: Image.file(entry.value, fit: BoxFit.cover),
-                    onLongPress: () => _removeNewPhoto(entry.key),
-                  )),
+              ..._existingPhotoUrls.asMap().entries.map(
+                (entry) => _PhotoThumb(
+                  child: Image.network(entry.value, fit: BoxFit.cover),
+                  onLongPress: () => _removeExistingPhoto(entry.key),
+                ),
+              ),
+              ..._newPhotos.asMap().entries.map(
+                (entry) => _PhotoThumb(
+                  child: Image.file(entry.value, fit: BoxFit.cover),
+                  onLongPress: () => _removeNewPhoto(entry.key),
+                ),
+              ),
               _AddPhotoButton(onTap: _pickPhotos),
             ],
           ),
@@ -865,13 +932,15 @@ class _EditEventScreenState extends State<EditEventScreen> {
           onTap: () => setState(() => _auditExpanded = !_auditExpanded),
           child: Row(
             children: [
-              Text('TRILHA DE AUDITORIA',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  )),
+              Text(
+                'TRILHA DE AUDITORIA',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
+                ),
+              ),
               const SizedBox(width: 8),
               Icon(
                 _auditExpanded ? Icons.expand_less : Icons.expand_more,
@@ -906,11 +975,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 };
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(label,
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(150),
-                        fontSize: 12,
-                      )),
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: Colors.white.withAlpha(150),
+                      fontSize: 12,
+                    ),
+                  ),
                 );
               }).toList(),
             ),
@@ -936,14 +1007,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
             disabledBackgroundColor: AppTheme.primary.withAlpha(80),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
           child: _isSaving
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : Text(
                   'SALVAR EVENTO',
@@ -987,18 +1061,20 @@ class _TimeChip extends StatelessWidget {
               : Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color:
-                selected ? AppTheme.primary : Colors.white.withAlpha(20),
+            color: selected ? AppTheme.primary : Colors.white.withAlpha(20),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 12,
-                  color: selected
-                      ? AppTheme.primary
-                      : Colors.white.withAlpha(150)),
+              Icon(
+                icon,
+                size: 12,
+                color: selected
+                    ? AppTheme.primary
+                    : Colors.white.withAlpha(150),
+              ),
               const SizedBox(width: 4),
             ],
             Text(
@@ -1032,10 +1108,7 @@ class _PhotoThumb extends StatelessWidget {
         width: 80,
         height: 80,
         margin: const EdgeInsets.only(right: 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: child,
-        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(10), child: child),
       ),
     );
   }
@@ -1061,8 +1134,7 @@ class _AddPhotoButton extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add_a_photo_outlined,
-                color: AppTheme.primary, size: 22),
+            Icon(Icons.add_a_photo_outlined, color: AppTheme.primary, size: 22),
             const SizedBox(height: 4),
             Text(
               'Adicionar',

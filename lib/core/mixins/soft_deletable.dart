@@ -8,17 +8,15 @@ mixin SoftDeletable {
   bool get isDeleted => deletedAt != null;
 
   Map<String, dynamic> softDeleteFields() => {
-        'deleted_at': deletedAt != null
-            ? Timestamp.fromDate(deletedAt!)
-            : null,
-        'deleted_by': deletedBy,
-        'delete_reason': deleteReason,
-      };
+    'deleted_at': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
+    'deleted_by': deletedBy,
+    'delete_reason': deleteReason,
+    'deleted_reason': deleteReason,
+  };
 
   static Query<Map<String, dynamic>> activeOnly(
     Query<Map<String, dynamic>> query,
-  ) =>
-      query.where('deleted_at', isNull: true);
+  ) => query.where('deleted_at', isNull: true);
 
   static DateTime? parseDeletedAt(dynamic value) {
     if (value == null) return null;

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formação Detecção · Sessão com caixas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:20px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 22px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 12px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:15px;font-weight:700;}
+  .htitle .h-sub{color:#4dd0e1;font-size:11px;font-weight:500;margin-top:1px;}
+  /* faixa fase compacta */
+  .phase-bar{display:flex;align-items:center;gap:9px;background:rgba(241,196,15,.07);border:1px solid rgba(241,196,15,.22);border-radius:11px;padding:9px 12px;margin-bottom:13px;}
+  .phase-name{color:#f1c40f;font-size:12px;font-weight:800;letter-spacing:.5px;}
+  .phase-sep{color:rgba(241,196,15,.3);}
+  .phase-info{color:#aebcc4;font-size:10.5px;font-weight:500;}
+  .phase-crit{margin-left:auto;color:#7d8d99;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+  .phase-crit b{color:#f1c40f;}
+  /* caixas */
+  .boxes-wrap{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:15px 14px 14px;margin-bottom:13px;}
+  .boxes-prompt{display:flex;align-items:center;gap:7px;margin-bottom:14px;}
+  .bp-rep{font-size:10px;font-weight:800;color:#f1c40f;background:rgba(241,196,15,.12);border-radius:6px;padding:3px 8px;font-family:'IBM Plex Mono',monospace;}
+  .bp-txt{color:#aebcc4;font-size:11.5px;font-weight:500;}
+  .boxes{display:flex;gap:12px;justify-content:center;}
+  .box-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;max-width:96px;}
+  .box{width:100%;height:74px;border-radius:10px;position:relative;background:linear-gradient(180deg,#1c2a31 0%,#131f24 55%,#0e181c 100%);border:1.5px solid rgba(255,255,255,.1);display:flex;justify-content:center;align-items:flex-start;padding-top:12px;}
+  .hole{width:26px;height:14px;border-radius:50%;background:radial-gradient(ellipse at center,#04090b 40%,#0c151a 100%);box-shadow:inset 0 2px 4px rgba(0,0,0,.8);}
+  .box.odor{border-color:#f1c40f;background:linear-gradient(180deg,#2a2410 0%,#1c1a12 55%,#13130c 100%);box-shadow:0 0 0 3px rgba(241,196,15,.14);}
+  .box.odor .hole{background:radial-gradient(ellipse at center,#3a2e08 30%,#0c151a 100%);}
+  .waves{position:absolute;top:-9px;left:50%;transform:translateX(-50%);color:#f1c40f;}
+  .box-num{font-size:11px;font-weight:700;color:#7d8d99;font-family:'IBM Plex Mono',monospace;}
+  .box.odor + .box-num,.box-col.sel .box-num{color:#f1c40f;}
+  .odor-tag{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:12px;color:#f1c40f;font-size:10px;font-weight:600;}
+  /* contador */
+  .counter{display:flex;align-items:center;gap:14px;background:radial-gradient(circle at 0% 50%,rgba(46,204,113,.09),rgba(255,255,255,.02));border:1px solid rgba(46,204,113,.22);border-radius:15px;padding:13px 16px;margin-bottom:11px;}
+  .counter-num{font-size:42px;font-weight:900;line-height:1;color:#2ecc71;font-variant-numeric:tabular-nums;letter-spacing:-1px;}
+  .counter-num small{font-size:18px;color:#5a7280;font-weight:700;}
+  .counter-mid{flex:1;}
+  .counter-lbl{color:#aebcc4;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .pbar{height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin-top:7px;overflow:hidden;}
+  .pbar-fill{height:100%;width:60%;background:linear-gradient(90deg,#2ecc71,#4dd0e1);border-radius:3px;}
+  .counter-foot{color:#2ecc71;font-size:10.5px;font-weight:700;margin-top:6px;}
+  /* serie */
+  .serie{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 2px;}
+  .serie-lbl{color:#5a7280;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;flex-shrink:0;}
+  .serie-dots{display:flex;gap:5px;flex-wrap:wrap;}
+  .sd{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;}
+  .sd-hit{background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.4);color:#2ecc71;}
+  .sd-miss{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.45);color:#e74c3c;}
+  /* botoes */
+  .actions{display:flex;gap:11px;}
+  .act{flex:1;border-radius:15px;padding:19px 10px;border:none;font-family:inherit;font-size:15px;font-weight:800;letter-spacing:.5px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .act-miss{background:rgba(231,76,60,.12);border:1.5px solid rgba(231,76,60,.4);color:#e74c3c;}
+  .act-hit{flex:1.4;background:#2ecc71;color:#04140a;box-shadow:0 6px 20px rgba(46,204,113,.22);}
+  .end-session{text-align:center;color:#5a7280;font-size:11.5px;font-weight:600;margin-top:14px;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:2px;}
+  .legend-side h3{color:#2ecc71;font-size:13px;letter-spacing:.5px;margin-bottom:8px;}
+  .legend-side b.am{color:#f1c40f;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>15:07</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Formação · Detecção</div><div class="h-sub">Bono · Drogas · sessão em andamento</div></div>
+      </div>
+
+      <div class="phase-bar">
+        <span class="phase-name">3v</span><span class="phase-sep">·</span><span class="phase-info">3 caixas · odor variável · sem bola</span><span class="phase-crit">meta <b>10</b></span>
+      </div>
+
+      <div class="boxes-wrap">
+        <div class="boxes-prompt"><span class="bp-rep">REP 9</span><span class="bp-txt">Toque na caixa onde está o odor</span></div>
+        <div class="boxes">
+          <div class="box-col"><div class="box"><div class="hole"></div></div><div class="box-num">1</div></div>
+          <div class="box-col sel"><div class="box odor"><svg class="waves" width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 11c0-3 2-3 2-6M11 12c0-4 2-4 2-8M18 11c0-3 2-3 2-6"/></svg><div class="hole"></div></div><div class="box-num">2</div></div>
+          <div class="box-col"><div class="box"><div class="hole"></div></div><div class="box-num">3</div></div>
+        </div>
+        <div class="odor-tag"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C9 6 7 9 7 13a5 5 0 0010 0c0-4-2-7-5-11z"/></svg>Odor na caixa 2 · alterne a cada repetição</div>
+      </div>
+
+      <div class="counter">
+        <div class="counter-num">6<small>/10</small></div>
+        <div class="counter-mid">
+          <div class="counter-lbl">consecutivas sem erro</div>
+          <div class="pbar"><div class="pbar-fill"></div></div>
+          <div class="counter-foot">Faltam 4 pra avançar → 4 caixas</div>
+        </div>
+      </div>
+
+      <div class="serie">
+        <span class="serie-lbl">Série</span>
+        <div class="serie-dots">
+          <div class="sd sd-hit">✓</div><div class="sd sd-miss">✗</div><div class="sd sd-hit">✓</div><div class="sd sd-hit">✓</div><div class="sd sd-hit">✓</div><div class="sd sd-hit">✓</div><div class="sd sd-hit">✓</div><div class="sd sd-hit">✓</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="act act-miss"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>ERROU</button>
+        <button class="act act-hit"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>ACERTOU</button>
+      </div>
+      <div class="end-session">Encerrar e registrar sessão</div>
+    </div>
+  </div>
+
+  <div class="legend-side">
+    <h3>SESSÃO AO VIVO · COM CAIXAS</h3>
+    <p>A cada repetição, tu toca na caixa onde pôs o odor (modo <b class="am">v</b> = variável), depois registra <b style="color:#2ecc71">ACERTOU</b> / <b style="color:#e74c3c">ERROU</b>. O app guarda a <b style="color:#fff">posição do odor + o resultado</b> de cada repetição.</p>
+    <p style="margin-top:9px;font-size:11px;color:#6f7d85">Na fase <b class="am">b</b> (fixo), as caixas aparecem com a <b style="color:#aebcc4">última já marcada e travada</b> (odor sempre na última) — tu não precisa tocar, só registrar o resultado. O nº de caixas vem da fase (1 → 4). Sem temperatura/umidade aqui: isso é só da manutenção.</p>
+  </div>
+</div>
+</body>
+</html>

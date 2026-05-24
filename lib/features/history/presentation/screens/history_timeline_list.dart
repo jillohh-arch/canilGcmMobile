@@ -2,8 +2,14 @@ part of 'history_screen.dart';
 
 class _HistoryTimeline extends StatelessWidget {
   final List<HistoryDayGroup> groups;
+  final bool hasMore;
+  final VoidCallback onLoadMore;
 
-  const _HistoryTimeline({required this.groups});
+  const _HistoryTimeline({
+    required this.groups,
+    required this.hasMore,
+    required this.onLoadMore,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +21,31 @@ class _HistoryTimeline extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8, bottom: 100),
       itemCount: _itemCount(),
       itemBuilder: (context, index) {
+        if (hasMore && index == _itemCount() - 1) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 22),
+            child: OutlinedButton(
+              onPressed: onLoadMore,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _hCyan,
+                side: BorderSide(color: _hCyan.withAlpha(120)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'CARREGAR MAIS 30',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ),
+          );
+        }
+
         int offset = 0;
         for (final group in groups) {
           if (index == offset) {
@@ -41,7 +72,7 @@ class _HistoryTimeline extends StatelessWidget {
     for (final group in groups) {
       count += 1 + group.entries.length;
     }
-    return count;
+    return count + (hasMore ? 1 : 0);
   }
 }
 
@@ -167,10 +198,30 @@ extension _HistoryGrouping on _HistoryScreenState {
   }
 
   String _formatDayDateExtended(DateTime date) {
-    const weekdays = ['', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+    const weekdays = [
+      '',
+      'segunda',
+      'terça',
+      'quarta',
+      'quinta',
+      'sexta',
+      'sábado',
+      'domingo',
+    ];
     const months = [
-      '', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+      '',
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro',
     ];
     final day = date.day;
     final month = months[date.month];

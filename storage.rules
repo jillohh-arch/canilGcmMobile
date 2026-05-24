@@ -85,6 +85,12 @@ match /dogs/{dogId}/training_sessions/{sessionId}/media/{fileName} {
   allow delete: if signedIn();
 }
 
+match /occurrences/{occurrenceId}/{fileName} {
+  allow read: if signedIn();
+  allow create, update: if canWritePdf(20);
+  allow delete: if signedIn();
+}
+
 
     match /{allPaths=**} {
       allow read, write: if false;

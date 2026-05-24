@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -45,6 +46,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   int _currentStep = 0;
   bool _isListening = false;
   bool _isFinalizing = false;
+  bool _draftLoaded = false;
+  Timer? _draftDebounce;
 
   // Passo 2
   final Set<OccurrenceResult> _selectedResults = {};
@@ -62,7 +65,16 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _restoreDraftIfNeeded(),
+    );
+  }
+
+  @override
   void dispose() {
+    _draftDebounce?.cancel();
     _pageController.dispose();
     _reportController.dispose();
     _speechService.stop();
@@ -108,6 +120,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     }
     if (_currentStep < 2) {
       setState(() => _currentStep++);
+      _scheduleDraftSave();
       _pageController.animateToPage(
         _currentStep,
         duration: const Duration(milliseconds: 300),
@@ -119,6 +132,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   void _goBack() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
+      _scheduleDraftSave();
       _pageController.animateToPage(
         _currentStep,
         duration: const Duration(milliseconds: 300),
@@ -187,6 +201,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         }
       }
     });
+    _scheduleDraftSave();
   }
 
   // ─── Details ────────────────────────────────────────────────────────
@@ -204,6 +219,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     setState(() {
       _drugEntries.add(_DrugEntry());
     });
+    _scheduleDraftSave();
   }
 
   void _removeDrugEntry(int index) {
@@ -211,6 +227,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       _drugEntries[index].dispose();
       _drugEntries.removeAt(index);
     });
+    _scheduleDraftSave();
   }
 
   Map<String, dynamic>? _buildDetails() {
@@ -435,6 +452,109 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   // ─── Draft ──────────────────────────────────────────────────────────
 
+  Future<void> _restoreDraftIfNeeded() async {
+    if (_draftLoaded || !mounted) return;
+    _draftLoaded = true;
+
+    final vm = context.read<OccurrenceViewModel>();
+    final occurrence =
+        vm.openOccurrence ?? await vm.getById(widget.occurrenceId);
+    final draft = occurrence?.finalizationDraft;
+    if (draft == null || draft.isEmpty || !mounted) return;
+
+    _applyDraft(draft);
+  }
+
+  void _applyDraft(Map<String, dynamic> draft) {
+    final report = draft['final_report'];
+    if (report is String) {
+      _reportController.text = report;
+    }
+
+    final rawResults = draft['results'];
+    if (rawResults is List) {
+      _selectedResults
+        ..clear()
+        ..addAll(
+          rawResults
+              .map((value) => OccurrenceResult.fromMap(value?.toString()))
+              .where(
+                (result) => rawResults
+                    .map((value) => value?.toString())
+                    .contains(result.toMap()),
+              ),
+        );
+    }
+
+    final rawDetails = draft['details'];
+    if (rawDetails is Map) {
+      _restoreDetails(rawDetails);
+    }
+
+    final step = draft['current_step'];
+    final restoredStep = step is int ? step.clamp(0, 2) : 0;
+    setState(() => _currentStep = restoredStep);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pageController.hasClients) {
+        _pageController.jumpToPage(_currentStep);
+      }
+    });
+  }
+
+  void _restoreDetails(Map rawDetails) {
+    final details = rawDetails.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+    final drugs = details[OccurrenceResult.drugSeized.toMap()];
+    if (drugs is List) {
+      for (final entry in _drugEntries) {
+        entry.dispose();
+      }
+      _drugEntries.clear();
+      for (final raw in drugs.whereType<Map>()) {
+        final drug = _DrugEntry();
+        drug.type = raw['type']?.toString();
+        drug.weightController.text = raw['weight_grams']?.toString() ?? '';
+        _drugEntries.add(drug);
+      }
+    }
+
+    for (final result in OccurrenceResult.values) {
+      if (result == OccurrenceResult.drugSeized) continue;
+      final resultDetails = details[result.toMap()];
+      if (resultDetails is! Map) continue;
+      for (final entry in resultDetails.entries) {
+        _getDetailController(result.toMap(), entry.key.toString()).text =
+            entry.value?.toString() ?? '';
+      }
+    }
+  }
+
+  Map<String, dynamic> _buildDraft() {
+    return {
+      'current_step': _currentStep,
+      'final_report': _reportController.text.trim(),
+      'results': _selectedResults.map((r) => r.toMap()).toList()..sort(),
+      'details': _buildDetails(),
+      'saved_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  void _scheduleDraftSave() {
+    if (!_draftLoaded || _isFinalizing) return;
+    _draftDebounce?.cancel();
+    _draftDebounce = Timer(const Duration(milliseconds: 700), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    if (!mounted || _isFinalizing) return;
+    final vm = context.read<OccurrenceViewModel>();
+    await vm.updateOccurrence(widget.occurrenceId, {
+      'status': 'finalizing',
+      'finalization_draft': _buildDraft(),
+    });
+  }
+
   void _showExitDialog() {
     showDialog(
       context: context,
@@ -471,17 +591,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              final vm = context.read<OccurrenceViewModel>();
-              final updates = <String, dynamic>{'status': 'finalizing'};
-              if (_reportController.text.trim().isNotEmpty) {
-                updates['final_report'] = _reportController.text.trim();
-              }
-              if (_selectedResults.isNotEmpty) {
-                updates['results'] = _selectedResults
-                    .map((r) => r.toMap())
-                    .toList();
-              }
-              await vm.updateOccurrence(widget.occurrenceId, updates);
+              await _saveDraft();
               if (mounted) Navigator.of(context).pop();
             },
             child: Text(
@@ -797,7 +907,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             maxLines: 8,
             minLines: 5,
             style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) {
+              setState(() {});
+              _scheduleDraftSave();
+            },
             decoration: InputDecoration(
               hintText: 'Equipe foi acionada às... descreva o que aconteceu...',
               hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(60)),
@@ -1003,7 +1116,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 inputFormatters: field.numeric
                     ? [FilteringTextInputFormatter.digitsOnly]
                     : null,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) {
+                  setState(() {});
+                  _scheduleDraftSave();
+                },
                 style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 decoration: _detailFieldDecoration(field.label),
               ),
@@ -1126,7 +1242,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                     children: _drugTypes.map((type) {
                       final selected = drugEntry.type == type;
                       return GestureDetector(
-                        onTap: () => setState(() => drugEntry.type = type),
+                        onTap: () {
+                          setState(() => drugEntry.type = type);
+                          _scheduleDraftSave();
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -1165,7 +1284,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      setState(() {});
+                      _scheduleDraftSave();
+                    },
                     style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                     decoration: _detailFieldDecoration('Peso em gramas'),
                   ),

@@ -7,6 +7,9 @@ class WeightHistoryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> _collection(String dogId) =>
+      _firestore.collection('dogs').doc(dogId).collection('weight_records');
+
+  CollectionReference<Map<String, dynamic>> _legacyCollection(String dogId) =>
       _firestore.collection('dogs').doc(dogId).collection('weight_history');
 
   /// Stream do histórico de peso (mais recente primeiro).
@@ -15,9 +18,11 @@ class WeightHistoryService {
         .orderBy('measured_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => WeightRecord.fromJson(doc.data(), docId: doc.id))
-            .toList());
+        .map(
+          (snap) => snap.docs
+              .map((doc) => WeightRecord.fromJson(doc.data(), docId: doc.id))
+              .toList(),
+        );
   }
 
   /// Busca histórico por período.
@@ -27,12 +32,15 @@ class WeightHistoryService {
     DateTime? to,
     int? limit,
   }) async {
-    Query<Map<String, dynamic>> query =
-        _collection(dogId).orderBy('measured_at', descending: true);
+    Query<Map<String, dynamic>> query = _collection(
+      dogId,
+    ).orderBy('measured_at', descending: true);
 
     if (from != null) {
-      query = query.where('measured_at',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(from));
+      query = query.where(
+        'measured_at',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(from),
+      );
     }
     if (to != null) {
       query = query.where('measured_at', isLessThan: Timestamp.fromDate(to));
@@ -49,18 +57,21 @@ class WeightHistoryService {
 
   /// Último peso registrado.
   Future<WeightRecord?> getLatest(String dogId) async {
-    final snap = await _collection(dogId)
-        .orderBy('measured_at', descending: true)
-        .limit(1)
-        .get();
+    final snap = await _collection(
+      dogId,
+    ).orderBy('measured_at', descending: true).limit(1).get();
     if (snap.docs.isEmpty) return null;
-    return WeightRecord.fromJson(snap.docs.first.data(),
-        docId: snap.docs.first.id);
+    return WeightRecord.fromJson(
+      snap.docs.first.data(),
+      docId: snap.docs.first.id,
+    );
   }
 
   /// Registra nova pesagem.
   Future<String> addRecord(String dogId, WeightRecord record) async {
-    final docRef = await _collection(dogId).add(record.toJson());
+    final docRef = _collection(dogId).doc();
+    await docRef.set(record.toJson());
+    await _legacyCollection(dogId).doc(docRef.id).set(record.toJson());
 
     // Atualiza peso atual no documento principal do cão
     await _firestore.collection('dogs').doc(dogId).update({

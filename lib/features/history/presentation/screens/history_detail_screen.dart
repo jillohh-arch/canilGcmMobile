@@ -1,3 +1,4 @@
+
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import 'package:canil_gcm/features/history/presentation/screens/history_screen.d
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -55,9 +57,13 @@ class RegistroDetalhePage extends StatelessWidget {
     } else if (detail.type == HistoryEntryType.training) {
       if (lowerTitle.contains('detec') || lowerTitle.contains('faro')) {
         specificBody = HistoryDetectionBody(detail: detail);
-      } else if (lowerTitle.contains('guarda') || lowerTitle.contains('protec')) {
+      } else if (lowerTitle.contains('guarda') ||
+          lowerTitle.contains('protec')) {
         specificBody = HistoryGuardaProtecaoBody(detail: detail);
-      } else if (lowerTitle.contains('busca') || lowerTitle.contains('captura') || lowerTitle.contains('rastro') || lowerTitle.contains('rastreio')) {
+      } else if (lowerTitle.contains('busca') ||
+          lowerTitle.contains('captura') ||
+          lowerTitle.contains('rastro') ||
+          lowerTitle.contains('rastreio')) {
         specificBody = HistoryBuscaCapturaBody(detail: detail);
       } else {
         specificBody = HistoryObedienciaBody(detail: detail);
@@ -268,10 +274,7 @@ class HistoryDetailScaffold extends StatelessWidget {
               left: 0,
               right: 0,
               bottom: 0,
-              child: _CtaBar(
-                onPdfTap: onPdfTap,
-                onShareTap: onShareTap,
-              ),
+              child: _CtaBar(onPdfTap: onPdfTap, onShareTap: onShareTap),
             ),
           ],
         ),
@@ -371,7 +374,9 @@ class HistoryDetailScaffold extends StatelessWidget {
   }
 
   Widget _buildIdentificationCard(BuildContext context) {
-    final isFinalized = detail.status.toLowerCase().contains('final') || detail.status.toLowerCase().contains('progre');
+    final isFinalized =
+        detail.status.toLowerCase().contains('final') ||
+        detail.status.toLowerCase().contains('progre');
     final badgeColor = isFinalized ? _green : _amber;
     final badgeText = detail.status.toUpperCase();
 
@@ -380,7 +385,10 @@ class HistoryDetailScaffold extends StatelessWidget {
     String secondInfoValue = '13:33 → 13:40';
     if (detail.type == HistoryEntryType.training) {
       secondInfoLabel = 'LINHA';
-      secondInfoValue = detail.source.details['Linha'] ?? detail.source.details['Tipo'] ?? 'Geral';
+      secondInfoValue =
+          detail.source.details['Linha'] ??
+          detail.source.details['Tipo'] ??
+          'Geral';
     } else if (detail.type == HistoryEntryType.health) {
       secondInfoLabel = 'TIPO';
       secondInfoValue = detail.source.details['Tipo'] ?? 'Evento';
@@ -428,7 +436,10 @@ class HistoryDetailScaffold extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: badgeColor.withOpacity(0.12),
                   border: Border.all(color: badgeColor.withOpacity(0.4)),
@@ -437,7 +448,13 @@ class HistoryDetailScaffold extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(isFinalized ? Icons.check_rounded : Icons.info_outline_rounded, color: badgeColor, size: 10),
+                    Icon(
+                      isFinalized
+                          ? Icons.check_rounded
+                          : Icons.info_outline_rounded,
+                      color: badgeColor,
+                      size: 10,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       badgeText,
@@ -479,8 +496,14 @@ class HistoryDetailScaffold extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    detail.dogName.isNotEmpty ? detail.dogName[0].toUpperCase() : '🐕',
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    detail.dogName.isNotEmpty
+                        ? detail.dogName[0].toUpperCase()
+                        : '🐕',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -496,8 +519,14 @@ class HistoryDetailScaffold extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      detail.handlerName.isNotEmpty ? detail.handlerName[0].toUpperCase() : '👤',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      detail.handlerName.isNotEmpty
+                          ? detail.handlerName[0].toUpperCase()
+                          : '👤',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -506,16 +535,25 @@ class HistoryDetailScaffold extends StatelessWidget {
               Expanded(
                 child: RichText(
                   text: TextSpan(
-                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 11.5),
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 11.5,
+                    ),
                     children: [
                       TextSpan(
                         text: detail.dogName,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const TextSpan(text: ' · GCM '),
                       TextSpan(
                         text: detail.handlerName,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const TextSpan(text: ' · Canil K9 Limeira'),
                     ],
@@ -557,10 +595,13 @@ class HistoryDetailScaffold extends StatelessWidget {
 
   Widget _buildIntegrityBlock(BuildContext context) {
     final isOcc = detail.type == HistoryEntryType.occurrence;
-    final isFinalizedOcc = isOcc && (detail.status.toLowerCase().contains('final') || 
-        ((detail.source.originalModel is Occurrence) && 
-         ((detail.source.originalModel as Occurrence).integrityHash?.isNotEmpty ?? false)));
-    
+    final occurrenceHash = detail.source.originalModel is Occurrence
+        ? (detail.source.originalModel as Occurrence).integrityHash?.trim()
+        : null;
+    final isFinalizedOcc =
+        isOcc && detail.status.toLowerCase().contains('final');
+    final hasOccurrenceHash = occurrenceHash?.isNotEmpty == true;
+
     final count = detail.auditEvents.length;
 
     // Determine values based on status
@@ -570,22 +611,34 @@ class HistoryDetailScaffold extends StatelessWidget {
     final Widget blockBody;
 
     if (isOcc) {
-      if (isFinalizedOcc) {
+      if (isFinalizedOcc && hasOccurrenceHash) {
         blockColor = _green;
         blockIcon = Icons.verified_user_outlined;
         blockTitle = 'DOCUMENTO ÍNTEGRO · SHA-256';
-        
-        final occurrenceHash = (detail.source.originalModel is Occurrence)
-            ? (detail.source.originalModel as Occurrence).integrityHash ?? '9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff'
-            : '9ac09e48bd7551781e9184744108295848c4919cefc3b6be4cd8c27783e66dff';
+
         blockBody = Padding(
           padding: const EdgeInsets.only(top: 9),
           child: SelectableText(
-            occurrenceHash,
+            occurrenceHash!,
             style: GoogleFonts.ibmPlexMono(
               color: _textSecondary,
               fontSize: 10.5,
               height: 1.5,
+            ),
+          ),
+        );
+      } else if (isFinalizedOcc) {
+        blockColor = _amber;
+        blockIcon = Icons.warning_amber_rounded;
+        blockTitle = 'DOCUMENTO FINALIZADO SEM HASH';
+        blockBody = Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'O registro esta finalizado, mas o hash de integridade nao foi encontrado neste documento.',
+            style: GoogleFonts.inter(
+              color: _textSecondary,
+              fontSize: 11.5,
+              height: 1.4,
             ),
           ),
         );
@@ -635,11 +688,7 @@ class HistoryDetailScaffold extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                blockIcon,
-                color: blockColor,
-                size: 14,
-              ),
+              Icon(blockIcon, color: blockColor, size: 14),
               const SizedBox(width: 8),
               Text(
                 blockTitle,
@@ -663,17 +712,27 @@ class HistoryDetailScaffold extends StatelessWidget {
               children: [
                 RichText(
                   text: TextSpan(
-                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
                     children: [
                       const TextSpan(text: 'Trilha de auditoria · '),
                       TextSpan(
                         text: '$count ${count == 1 ? 'registro' : 'registros'}',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: _textSecondary, size: 16),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _textSecondary,
+                  size: 16,
+                ),
               ],
             ),
           ),
@@ -713,7 +772,11 @@ class HistoryDetailScaffold extends StatelessWidget {
             const SizedBox(height: 20),
             Row(
               children: [
-                const Icon(Icons.verified_user_outlined, color: _cyan, size: 18),
+                const Icon(
+                  Icons.verified_user_outlined,
+                  color: _cyan,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Trilha de Auditoria',
@@ -736,7 +799,11 @@ class HistoryDetailScaffold extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.check_circle_outline_rounded, color: _green, size: 14),
+                            const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: _green,
+                              size: 14,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
@@ -810,17 +877,20 @@ class HistoryOccurrenceBody extends StatelessWidget {
             const SizedBox(width: 8),
             _statItem('${outcomes.length}', 'RESULTADOS'),
           ],
-        ),
-        const SizedBox(height: 16),
-
-        // Resultados/Outcomes list
+        ),        // Resultados/Outcomes list
         if (outcomes.isNotEmpty) ...[
           const _SectionLabel('RESULTADOS'),
           const SizedBox(height: 8),
           ...outcomes.map((o) {
-            final map = o as Map;
-            final label = map['label']?.toString() ?? 'Resultado';
-            final desc = map['detail']?.toString() ?? '';
+            String label = 'Resultado';
+            String desc = '';
+            if (o is Map) {
+              label = o['label']?.toString() ?? 'Resultado';
+              desc = o['detail']?.toString() ?? '';
+            } else if (o is String) {
+              final res = OccurrenceResult.fromMap(o);
+              label = res.label;
+            }
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -876,53 +946,93 @@ class HistoryOccurrenceBody extends StatelessWidget {
         // Localização
         const _SectionLabel('LOCALIZAÇÃO'),
         const SizedBox(height: 8),
-        Container(
-          height: 130,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: Colors.white.withAlpha(20)),
-            color: const Color(0xFF0A161B),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _MapGridPainter(),
-                ),
-              ),
-              Center(
-                child: Container(
-                  width: 32,
-                  height: 32,
+        Builder(
+          builder: (context) {
+            final occ = detail.source.originalModel is Occurrence ? detail.source.originalModel as Occurrence : null;
+            final lat = occ?.gpsLat;
+            final lng = occ?.gpsLng;
+            final hasGps = lat != null && lng != null;
+
+            const googleMapsStaticApiKey = String.fromEnvironment('GOOGLE_MAPS_STATIC_API_KEY');
+            final hasApiKey = googleMapsStaticApiKey.trim().isNotEmpty;
+            final mapUrl = hasGps && hasApiKey
+                ? 'https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x260&scale=2&maptype=roadmap&markers=color:0x0A8E9D|$lat,$lng&key=$googleMapsStaticApiKey'
+                : null;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 130,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _cyan.withAlpha(40),
-                    border: Border.all(color: _cyan, width: 2),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: Colors.white.withAlpha(20)),
+                    color: const Color(0xFF0A161B),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.location_on, color: _cyan, size: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: mapUrl != null
+                              ? Image.network(
+                                  mapUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return CustomPaint(painter: _MapGridPainter());
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        color: _cyan,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : CustomPaint(painter: _MapGridPainter()),
+                        ),
+                        Center(
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _cyan.withAlpha(40),
+                              border: Border.all(color: _cyan, width: 2),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.location_on, color: _cyan, size: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            const Icon(Icons.location_on_outlined, color: _cyan, size: 14),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                detail.location,
-                style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
-              ),
-            ),
-            Text(
-              '-22.5816, -47.4207', // Default coordinate representation
-              style: GoogleFonts.ibmPlexMono(color: _cyan, fontSize: 10),
-            ),
-          ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, color: _cyan, size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        detail.location,
+                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                      ),
+                    ),
+                    Text(
+                      hasGps
+                          ? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}'
+                          : 'GPS N/I',
+                      style: GoogleFonts.ibmPlexMono(color: _cyan, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }
         ),
         const SizedBox(height: 16),
 
@@ -966,7 +1076,9 @@ class HistoryOccurrenceBody extends StatelessWidget {
                 final map = mediaList[idx] as Map;
                 final url = map['url']?.toString() ?? '';
                 final timestampStr = map['timestamp'] != null
-                    ? DateFormat('HH:mm').format((map['timestamp'] as Timestamp).toDate())
+                    ? DateFormat(
+                        'HH:mm',
+                      ).format((map['timestamp'] as Timestamp).toDate())
                     : '13:38';
                 return Container(
                   width: 96,
@@ -987,17 +1099,25 @@ class HistoryOccurrenceBody extends StatelessWidget {
                             fit: BoxFit.cover,
                             width: 96,
                             height: 96,
-                            placeholder: (context, url) => Container(color: Colors.white10),
-                            errorWidget: (context, url, error) => const Center(child: Icon(Icons.image, color: Colors.white24)),
+                            placeholder: (context, url) =>
+                                Container(color: Colors.white10),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.image, color: Colors.white24),
+                            ),
                           )
                         else
-                          const Center(child: Icon(Icons.image, color: Colors.white24)),
+                          const Center(
+                            child: Icon(Icons.image, color: Colors.white24),
+                          ),
                         Positioned(
                           left: 6,
                           bottom: 6,
                           child: Text(
                             timestampStr,
-                            style: GoogleFonts.ibmPlexMono(color: _textSecondary, fontSize: 9),
+                            style: GoogleFonts.ibmPlexMono(
+                              color: _textSecondary,
+                              fontSize: 9,
+                            ),
                           ),
                         ),
                       ],
@@ -1025,12 +1145,21 @@ class HistoryOccurrenceBody extends StatelessWidget {
           children: [
             Text(
               number,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 3),
             Text(
               label,
-              style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+              style: GoogleFonts.inter(
+                color: _textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
           ],
         ),
@@ -1072,10 +1201,18 @@ class HistoryDetectionBody extends StatelessWidget {
     final session = detail.source.originalModel as TrainingSessionModel?;
     final metadata = session?.metadata ?? const {};
 
-    final line = metadata['line']?.toString() ?? detail.source.details['Linha'] ?? 'Drogas';
-    final phase = metadata['phase']?.toString() ?? detail.source.details['current_phase'] ?? 'Fase 3';
+    final line =
+        metadata['line']?.toString() ??
+        detail.source.details['Linha'] ??
+        'Drogas';
+    final phase =
+        metadata['phase']?.toString() ??
+        detail.source.details['current_phase'] ??
+        'Fase 3';
     final consecutive = metadata['consecutiveHits'] ?? 10;
-    final attempts = metadata['attempts'] as List? ?? ['hit', 'hit', 'hit', 'hit', 'hit', 'hit', 'hit'];
+    final attempts =
+        metadata['attempts'] as List? ??
+        ['hit', 'hit', 'hit', 'hit', 'hit', 'hit', 'hit'];
 
     final requiredHits = _getRequiredHitsForPhase(phase);
     final hitsCount = attempts.where((e) => e == 'hit').length;
@@ -1112,23 +1249,42 @@ class HistoryDetectionBody extends StatelessWidget {
                       children: [
                         RichText(
                           text: TextSpan(
-                            style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800),
+                            style: GoogleFonts.inter(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
                             children: [
-                              TextSpan(text: '$consecutive', style: const TextStyle(color: Colors.white)),
-                              TextSpan(text: ' / $requiredHits', style: TextStyle(color: _textMuted, fontSize: 16)),
+                              TextSpan(
+                                text: '$consecutive',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              TextSpan(
+                                text: ' / $requiredHits',
+                                style: TextStyle(
+                                  color: _textMuted,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'acertos consecutivos sem erro',
-                          style: GoogleFonts.inter(color: _textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.inter(
+                            color: _textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: _green.withAlpha(30),
                       border: Border.all(color: _green.withAlpha(80)),
@@ -1139,11 +1295,18 @@ class HistoryDetectionBody extends StatelessWidget {
                       children: [
                         Text(
                           '✓ CRITÉRIO ATINGIDO',
-                          style: GoogleFonts.inter(color: _green, fontSize: 9, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.inter(
+                            color: _green,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           '99,99983% confiança',
-                          style: GoogleFonts.inter(color: _textSecondary, fontSize: 8),
+                          style: GoogleFonts.inter(
+                            color: _textSecondary,
+                            fontSize: 8,
+                          ),
                         ),
                       ],
                     ),
@@ -1175,11 +1338,18 @@ class HistoryDetectionBody extends StatelessWidget {
                 children: [
                   Text(
                     '${attempts.length} repetições',
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     '$hitsCount acertos · $missesCount erros',
-                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -1193,13 +1363,21 @@ class HistoryDetectionBody extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: item == 'hit' ? _green.withAlpha(40) : _red.withAlpha(40),
-                        border: Border.all(color: item == 'hit' ? _green : _red),
+                        color: item == 'hit'
+                            ? _green.withAlpha(40)
+                            : _red.withAlpha(40),
+                        border: Border.all(
+                          color: item == 'hit' ? _green : _red,
+                        ),
                       ),
                       child: Center(
                         child: Text(
                           item == 'hit' ? '✓' : '⊘',
-                          style: TextStyle(color: item == 'hit' ? _green : _red, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: item == 'hit' ? _green : _red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -1211,22 +1389,35 @@ class HistoryDetectionBody extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.arrow_forward_rounded, color: _cyan, size: 14),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: _cyan,
+                    size: 14,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 11.5),
+                        style: GoogleFonts.inter(
+                          color: _textSecondary,
+                          fontSize: 11.5,
+                        ),
                         children: [
                           const TextSpan(text: 'Sessão concluída com '),
                           TextSpan(
                             text: '$hitsCount acertos',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const TextSpan(text: ' consecutivos. '),
                           TextSpan(
                             text: 'Estágio $phase consolidado.',
-                            style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: _green,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -1263,7 +1454,11 @@ class HistoryDetectionBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -1281,7 +1476,9 @@ class HistoryDetectionBody extends StatelessWidget {
         final done = index < activeIndex;
         final current = index == activeIndex;
         final border = done ? _green : (current ? _amber : Colors.white24);
-        final bg = done ? _green.withAlpha(40) : (current ? _amber.withAlpha(40) : Colors.transparent);
+        final bg = done
+            ? _green.withAlpha(40)
+            : (current ? _amber.withAlpha(40) : Colors.transparent);
         final textColor = done ? _green : (current ? _amber : _textMuted);
 
         return Expanded(
@@ -1318,7 +1515,11 @@ class HistoryDetectionBody extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     phases[index],
-                    style: GoogleFonts.inter(color: textColor, fontSize: 9, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.inter(
+                      color: textColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1395,26 +1596,63 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
     final activeImpulse = metadata['impulse']?.toString() ?? 'Defesa';
     final figurante = metadata['figurante']?.toString() ?? 'GCM Souza';
     final equipment = metadata['equipment']?.toString() ?? 'Manga';
-    final cmdLarga = metadata['commands'] is List ? (metadata['commands'] as List).join(', ') : 'Parcial';
+    final cmdLarga = metadata['commands'] is List
+        ? (metadata['commands'] as List).join(', ')
+        : 'Parcial';
 
-    final capabilities = metadata['capabilities'] as List? ?? ['Mordida firme', 'Boca cheia', 'Estabilização'];
+    final capabilities =
+        metadata['capabilities'] as List? ??
+        ['Mordida firme', 'Boca cheia', 'Estabilização'];
 
     // Evaluation scores mapping
     final evaluation = metadata['evaluation'] as Map? ?? {};
-    final int biteQuality = (evaluation['biteQuality'] ?? evaluation['Qualidade da mordida'] ?? evaluation['Mordida (qualidade técnica)'] ?? 4) as int;
-    final int controlLarga = (evaluation['controlLarga'] ?? evaluation['Controle / comando "Larga"'] ?? evaluation['Controle (resposta a comandos)'] ?? 3) as int;
-    final int courageConfront = (evaluation['courageConfront'] ?? evaluation['Coragem no confronto'] ?? evaluation['Drive (intensidade)'] ?? 4) as int;
+    final int biteQuality =
+        (evaluation['biteQuality'] ??
+                evaluation['Qualidade da mordida'] ??
+                evaluation['Mordida (qualidade técnica)'] ??
+                4)
+            as int;
+    final int controlLarga =
+        (evaluation['controlLarga'] ??
+                evaluation['Controle / comando "Larga"'] ??
+                evaluation['Controle (resposta a comandos)'] ??
+                3)
+            as int;
+    final int courageConfront =
+        (evaluation['courageConfront'] ??
+                evaluation['Coragem no confronto'] ??
+                evaluation['Drive (intensidade)'] ??
+                4)
+            as int;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel('IMPULSOS · ESTADO ATUAL'),
         const SizedBox(height: 8),
-        _buildImpulseRow('Caça', '🦌', 'Consolidado', _green, activeImpulse.contains('Caça')),
+        _buildImpulseRow(
+          'Caça',
+          '🦌',
+          'Consolidado',
+          _green,
+          activeImpulse.contains('Caça'),
+        ),
         const SizedBox(height: 6),
-        _buildImpulseRow('Defesa', '🛡', 'Desenvolvendo', _amber, activeImpulse.contains('Defesa')),
+        _buildImpulseRow(
+          'Defesa',
+          '🛡',
+          'Desenvolvendo',
+          _amber,
+          activeImpulse.contains('Defesa'),
+        ),
         const SizedBox(height: 6),
-        _buildImpulseRow('Agressão', '⚔', 'Não iniciado', _textMuted, activeImpulse.contains('Agressão')),
+        _buildImpulseRow(
+          'Agressão',
+          '⚔',
+          'Não iniciado',
+          _textMuted,
+          activeImpulse.contains('Agressão'),
+        ),
         const SizedBox(height: 16),
 
         // Figurante evaluation
@@ -1438,7 +1676,9 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.white12,
                     ),
-                    child: const Center(child: Text('👤', style: TextStyle(fontSize: 16))),
+                    child: const Center(
+                      child: Text('👤', style: TextStyle(fontSize: 16)),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1447,11 +1687,18 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                       children: [
                         Text(
                           figurante,
-                          style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           'Figurante · veste a manga',
-                          style: GoogleFonts.inter(color: _textMuted, fontSize: 10),
+                          style: GoogleFonts.inter(
+                            color: _textMuted,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
@@ -1490,11 +1737,18 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                   if (isDone)
                     const Icon(Icons.check_rounded, color: _green, size: 10)
                   else
-                    const Text('◑', style: TextStyle(color: _amber, fontSize: 10)),
+                    const Text(
+                      '◑',
+                      style: TextStyle(color: _amber, fontSize: 10),
+                    ),
                   const SizedBox(width: 4),
                   Text(
                     name,
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1527,7 +1781,11 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -1535,12 +1793,22 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
     );
   }
 
-  Widget _buildImpulseRow(String name, String emoji, String stateText, Color stateColor, bool isActive) {
+  Widget _buildImpulseRow(
+    String name,
+    String emoji,
+    String stateText,
+    Color stateColor,
+    bool isActive,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isActive ? stateColor.withAlpha(15) : Colors.white.withAlpha(5),
-        border: Border.all(color: isActive ? stateColor.withAlpha(50) : Colors.white.withAlpha(12)),
+        border: Border.all(
+          color: isActive
+              ? stateColor.withAlpha(50)
+              : Colors.white.withAlpha(12),
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1563,11 +1831,19 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
                   stateText,
-                  style: GoogleFonts.inter(color: stateColor, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.inter(
+                    color: stateColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -1581,7 +1857,11 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
               ),
               child: Text(
                 'TRABALHADO HOJE',
-                style: GoogleFonts.inter(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
         ],
@@ -1590,7 +1870,9 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
   }
 
   Widget _buildRatingRow(String title, int value) {
-    final isControl = title.toLowerCase().contains('larga') || title.toLowerCase().contains('controle');
+    final isControl =
+        title.toLowerCase().contains('larga') ||
+        title.toLowerCase().contains('controle');
     final activeColor = isControl ? _amber : _green;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1635,20 +1917,29 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
     final session = detail.source.originalModel as TrainingSessionModel?;
     final metadata = session?.metadata ?? const {};
 
-    final distance = metadata['distance']?.toString() ?? detail.source.details['Distancia'] ?? '340m';
-    final age = metadata['trailAge']?.toString() ?? detail.source.details['Idade da Trilha'] ?? '30 min';
-    final searchDuration = metadata['searchDuration']?.toString() ?? detail.duration;
+    final distance =
+        metadata['distance']?.toString() ??
+        detail.source.details['Distancia'] ??
+        '340m';
+    final age =
+        metadata['trailAge']?.toString() ??
+        detail.source.details['Idade da Trilha'] ??
+        '30 min';
+    final searchDuration =
+        metadata['searchDuration']?.toString() ?? detail.duration;
 
     final odor = metadata['odor']?.toString() ?? 'Camiseta';
     final figurante = metadata['figurante']?.toString() ?? 'Souza';
     final env = metadata['environment']?.toString() ?? 'Urbano';
 
-    final skills = metadata['skills'] as Map? ?? {
-      'Rastreamento': 'FIRME',
-      'Indicação passiva': 'OK',
-      'Contenção': 'PARCIAL',
-      'Indicação em altura': 'NÃO TREINADO',
-    };
+    final skills =
+        metadata['skills'] as Map? ??
+        {
+          'Rastreamento': 'FIRME',
+          'Indicação passiva': 'OK',
+          'Contenção': 'PARCIAL',
+          'Indicação em altura': 'NÃO TREINADO',
+        };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1664,32 +1955,19 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _MapGridPainter(),
-                ),
-              ),
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _TrailLinePainter(),
-                ),
-              ),
-              Positioned(
-                left: 45,
-                top: 85,
-                child: _StartDot(),
-              ),
-              Positioned(
-                right: 70,
-                top: 25,
-                child: _EndPin(),
-              ),
+              Positioned.fill(child: CustomPaint(painter: _MapGridPainter())),
+              Positioned.fill(child: CustomPaint(painter: _TrailLinePainter())),
+              Positioned(left: 45, top: 85, child: _StartDot()),
+              Positioned(right: 70, top: 25, child: _EndPin()),
               Positioned(
                 left: 12,
                 bottom: 8,
                 child: Text(
                   'início → localização do figurante',
-                  style: GoogleFonts.ibmPlexMono(color: _textMuted, fontSize: 9),
+                  style: GoogleFonts.ibmPlexMono(
+                    color: _textMuted,
+                    fontSize: 9,
+                  ),
                 ),
               ),
             ],
@@ -1741,7 +2019,11 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -1762,12 +2044,21 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
           children: [
             Text(
               number,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 3),
             Text(
               label,
-              style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+              style: GoogleFonts.inter(
+                color: _textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
           ],
         ),
@@ -1778,10 +2069,11 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
   Widget _buildSkillRow(String name, String state) {
     Color color = _cyan;
     IconData icon = Icons.check_circle_outline_rounded;
-    
+
     if (name.toLowerCase().contains('rastre')) {
       icon = Icons.gesture_rounded;
-    } else if (name.toLowerCase().contains('indic') && name.toLowerCase().contains('passiv')) {
+    } else if (name.toLowerCase().contains('indic') &&
+        name.toLowerCase().contains('passiv')) {
       icon = Icons.radio_button_checked_rounded;
     } else if (name.toLowerCase().contains('cont')) {
       icon = Icons.front_hand_outlined;
@@ -1801,9 +2093,13 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isDone ? _green.withAlpha(10) : (isDev ? _amber.withAlpha(10) : Colors.white.withAlpha(8)),
+        color: isDone
+            ? _green.withAlpha(10)
+            : (isDev ? _amber.withAlpha(10) : Colors.white.withAlpha(8)),
         border: Border.all(
-          color: isDone ? _green.withAlpha(56) : (isDev ? _amber.withAlpha(56) : Colors.white.withAlpha(18)),
+          color: isDone
+              ? _green.withAlpha(56)
+              : (isDev ? _amber.withAlpha(56) : Colors.white.withAlpha(18)),
         ),
         borderRadius: BorderRadius.circular(11),
       ),
@@ -1816,9 +2112,7 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
               color: color.withAlpha(27),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Center(
-              child: Icon(icon, color: color, size: 15),
-            ),
+            child: Center(child: Icon(icon, color: color, size: 15)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1857,20 +2151,26 @@ class _TrailLinePainter extends CustomPainter {
     final path = Path();
     path.moveTo(size.width * 0.14, size.height * 0.70);
     path.cubicTo(
-      size.width * 0.35, size.height * 0.65,
-      size.width * 0.40, size.height * 0.40,
-      size.width * 0.50, size.height * 0.46,
+      size.width * 0.35,
+      size.height * 0.65,
+      size.width * 0.40,
+      size.height * 0.40,
+      size.width * 0.50,
+      size.height * 0.46,
     );
     path.cubicTo(
-      size.width * 0.60, size.height * 0.52,
-      size.width * 0.72, size.height * 0.33,
-      size.width * 0.80, size.height * 0.24,
+      size.width * 0.60,
+      size.height * 0.52,
+      size.width * 0.72,
+      size.height * 0.33,
+      size.width * 0.80,
+      size.height * 0.24,
     );
 
     final dashedPath = Path();
     const dashWidth = 6.0;
     const dashSpace = 4.0;
-    
+
     final metrics = path.computeMetrics();
     for (final metric in metrics) {
       double distance = 0.0;
@@ -1904,14 +2204,23 @@ class HistoryObedienciaBody extends StatelessWidget {
     final session = detail.source.originalModel as TrainingSessionModel?;
     final metadata = session?.metadata ?? const {};
 
-    final list = metadata['commands'] as List? ?? ['Junto', 'Senta', 'Fica', 'Deita', 'Vem (chamada)', 'Latir sob comando'];
+    final list =
+        metadata['commands'] as List? ??
+        [
+          'Junto',
+          'Senta',
+          'Fica',
+          'Deita',
+          'Vem (chamada)',
+          'Latir sob comando',
+        ];
     final commands = list.map((e) => e.toString()).toList();
-    
+
     final operacionais = commands.where((name) {
       final l = name.toLowerCase();
       return l.contains('junto') || l.contains('senta') || l.contains('fica');
     }).toList();
-    
+
     final posicionais = commands.where((name) {
       final l = name.toLowerCase();
       return l.contains('deita') || l.contains('vem') || l.contains('latir');
@@ -1967,7 +2276,11 @@ class HistoryObedienciaBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -2005,7 +2318,7 @@ class HistoryObedienciaBody extends StatelessWidget {
     final nameLower = name.toLowerCase();
     int level = 3;
     bool hasEvolved = false;
-    
+
     if (nameLower.contains('junto') || nameLower.contains('senta')) {
       level = 5;
     } else if (nameLower.contains('fica') || nameLower.contains('deita')) {
@@ -2018,7 +2331,7 @@ class HistoryObedienciaBody extends StatelessWidget {
 
     Color color = _cyan;
     String label = 'CONSOLIDANDO';
-    
+
     if (level == 5) {
       color = _green;
       label = 'OPERACIONAL';
@@ -2045,13 +2358,20 @@ class HistoryObedienciaBody extends StatelessWidget {
         children: [
           RichText(
             text: TextSpan(
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
               children: [
                 TextSpan(text: name),
                 if (hasEvolved)
                   const TextSpan(
                     text: ' ↑',
-                    style: TextStyle(color: _green, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: _green,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
               ],
             ),
@@ -2074,7 +2394,11 @@ class HistoryObedienciaBody extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: GoogleFonts.inter(color: color, fontSize: 9.5, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(
+              color: color,
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -2100,9 +2424,17 @@ class HistorySaudeBody extends StatelessWidget {
     }
 
     final type = log?.logType ?? detail.source.details['Tipo'] ?? 'Exame';
-    final lot = detail.source.details['Lote'] ?? detail.source.details['lote'] ?? 'LOTE: 22/045/Z';
-    final expiration = detail.source.details['Validade'] ?? detail.source.details['validade'] ?? 'VAL: 10/2026';
-    final nextBooster = log?.nextDueDate != null ? _fmtDate(log!.nextDueDate!) : '—';
+    final lot =
+        detail.source.details['Lote'] ??
+        detail.source.details['lote'] ??
+        'LOTE: 22/045/Z';
+    final expiration =
+        detail.source.details['Validade'] ??
+        detail.source.details['validade'] ??
+        'VAL: 10/2026';
+    final nextBooster = log?.nextDueDate != null
+        ? _fmtDate(log!.nextDueDate!)
+        : '—';
     final vetName = log?.vetName ?? detail.author;
     final crmv = log?.professionalCrmv ?? 'CRMV 4421';
 
@@ -2129,7 +2461,11 @@ class HistorySaudeBody extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, color: _amber, size: 18),
+                const Icon(
+                  Icons.calendar_month_outlined,
+                  color: _amber,
+                  size: 18,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -2137,11 +2473,18 @@ class HistorySaudeBody extends StatelessWidget {
                     children: [
                       Text(
                         'Reforço / Próxima dose agenda',
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'Agendado para $nextBooster',
-                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
+                        style: GoogleFonts.inter(
+                          color: _textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -2172,7 +2515,11 @@ class HistorySaudeBody extends StatelessWidget {
                   children: [
                     Text(
                       vetName,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       crmv,
@@ -2206,7 +2553,11 @@ class HistorySaudeBody extends StatelessWidget {
                   children: [
                     Text(
                       'comprovante_evento.pdf',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       'PDF · 245 KB',
@@ -2235,7 +2586,11 @@ class HistorySaudeBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -2265,8 +2620,10 @@ class HistoryNutricaoBody extends StatelessWidget {
     final prescribed = feeding?.prescriptionAtTime ?? 350;
     final conforms = feeding?.isConform ?? true;
     final divergenceVal = (served - prescribed).abs();
-    final divergenceText = '${divergenceVal}g (${conforms ? 'Sem divergência' : 'Divergência'})';
-    final racaoName = detail.source.details['Ração'] ?? 'Ração Premium K9 Adulto';
+    final divergenceText =
+        '${divergenceVal}g (${conforms ? 'Sem divergência' : 'Divergência'})';
+    final racaoName =
+        detail.source.details['Ração'] ?? 'Ração Premium K9 Adulto';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2291,12 +2648,20 @@ class HistoryNutricaoBody extends StatelessWidget {
                     children: [
                       Text(
                         'SERVIDO',
-                        style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: _textMuted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${served}g',
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -2305,12 +2670,20 @@ class HistoryNutricaoBody extends StatelessWidget {
                     children: [
                       Text(
                         'PRESCRITO',
-                        style: GoogleFonts.inter(color: _textMuted, fontSize: 9, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: _textMuted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${prescribed}g',
-                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: _textSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -2324,11 +2697,18 @@ class HistoryNutricaoBody extends StatelessWidget {
                 children: [
                   Text(
                     'Ração Utilizada',
-                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   Text(
                     racaoName,
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -2338,18 +2718,32 @@ class HistoryNutricaoBody extends StatelessWidget {
                 children: [
                   Text(
                     'Conformidade',
-                    style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: conforms ? _green.withAlpha(20) : _amber.withAlpha(20),
+                      color: conforms
+                          ? _green.withAlpha(20)
+                          : _amber.withAlpha(20),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: conforms ? _green : _amber),
                     ),
                     child: Text(
-                      conforms ? 'EM CONFORMIDADE' : 'DIVERGENTE ($divergenceText)',
-                      style: GoogleFonts.inter(color: conforms ? _green : _amber, fontSize: 9, fontWeight: FontWeight.bold),
+                      conforms
+                          ? 'EM CONFORMIDADE'
+                          : 'DIVERGENTE ($divergenceText)',
+                      style: GoogleFonts.inter(
+                        color: conforms ? _green : _amber,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -2371,7 +2765,11 @@ class HistoryNutricaoBody extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.assignment_turned_in_outlined, color: _cyan, size: 18),
+              const Icon(
+                Icons.assignment_turned_in_outlined,
+                color: _cyan,
+                size: 18,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -2379,11 +2777,18 @@ class HistoryNutricaoBody extends StatelessWidget {
                   children: [
                     Text(
                       'Laudo Nutricional Vigente',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       'Prescrição Dra. Patrícia Lima · CRMV 8812 · Ativo',
-                      style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
+                      style: GoogleFonts.inter(
+                        color: _textSecondary,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -2408,7 +2813,11 @@ class HistoryNutricaoBody extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.restaurant_rounded, color: _textMuted, size: 24),
+                const Icon(
+                  Icons.restaurant_rounded,
+                  color: _textMuted,
+                  size: 24,
+                ),
                 const SizedBox(height: 6),
                 Text(
                   'Foto da refeição registrada',
@@ -2434,7 +2843,11 @@ class HistoryNutricaoBody extends StatelessWidget {
             ),
             child: Text(
               detail.notes,
-              style: GoogleFonts.inter(color: _textSecondary, fontSize: 12, height: 1.6),
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -2456,7 +2869,9 @@ Widget _buildConfigGrid(Map<String, String> values) {
     crossAxisSpacing: 8,
     childAspectRatio: 1.8,
     children: values.entries.map((e) {
-      final isWarning = e.value.toLowerCase().contains('parcial') || e.value.toLowerCase().contains('alta');
+      final isWarning =
+          e.value.toLowerCase().contains('parcial') ||
+          e.value.toLowerCase().contains('alta');
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
@@ -2470,7 +2885,11 @@ Widget _buildConfigGrid(Map<String, String> values) {
           children: [
             Text(
               e.key.toUpperCase(),
-              style: GoogleFonts.inter(color: _textMuted, fontSize: 8, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(
+                color: _textMuted,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 3),
@@ -2549,11 +2968,7 @@ class _CtaBar extends StatelessWidget {
   final VoidCallback onPdfTap;
   final VoidCallback onShareTap;
 
-  const _CtaBar({
-    super.key,
-    required this.onPdfTap,
-    required this.onShareTap,
-  });
+  const _CtaBar({super.key, required this.onPdfTap, required this.onShareTap});
 
   @override
   Widget build(BuildContext context) {
@@ -2563,10 +2978,7 @@ class _CtaBar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [
-            _bg,
-            Colors.transparent,
-          ],
+          colors: [_bg, Colors.transparent],
         ),
       ),
       child: Row(
@@ -2664,25 +3076,33 @@ class _OccurrenceTimelineSection extends StatefulWidget {
   });
 
   @override
-  State<_OccurrenceTimelineSection> createState() => _OccurrenceTimelineSectionState();
+  State<_OccurrenceTimelineSection> createState() =>
+      _OccurrenceTimelineSectionState();
 }
 
-class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> {
+class _OccurrenceTimelineSectionState
+    extends State<_OccurrenceTimelineSection> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     if (widget.occurrenceId.isEmpty) {
-      return _buildTimelineList(widget.fallback.internalEvents.map((e) => OccurrenceEvent(
-        id: '',
-        occurrenceId: '',
-        category: OccurrenceEventCategory.other,
-        timestamp: e.time,
-        title: e.title,
-        description: e.subtitle,
-        createdAt: e.time,
-        updatedAt: e.time,
-      )).toList());
+      return _buildTimelineList(
+        widget.fallback.internalEvents
+            .map(
+              (e) => OccurrenceEvent(
+                id: '',
+                occurrenceId: '',
+                category: OccurrenceEventCategory.other,
+                timestamp: e.time,
+                title: e.title,
+                description: e.subtitle,
+                createdAt: e.time,
+                updatedAt: e.time,
+              ),
+            )
+            .toList(),
+      );
     }
 
     final occurrenceVM = context.read<OccurrenceViewModel>();
@@ -2696,16 +3116,22 @@ class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> 
 
         final events = snapshot.data ?? [];
         if (events.isEmpty) {
-          return _buildTimelineList(widget.fallback.internalEvents.map((e) => OccurrenceEvent(
-            id: '',
-            occurrenceId: '',
-            category: OccurrenceEventCategory.other,
-            timestamp: e.time,
-            title: e.title,
-            description: e.subtitle,
-            createdAt: e.time,
-            updatedAt: e.time,
-          )).toList());
+          return _buildTimelineList(
+            widget.fallback.internalEvents
+                .map(
+                  (e) => OccurrenceEvent(
+                    id: '',
+                    occurrenceId: '',
+                    category: OccurrenceEventCategory.other,
+                    timestamp: e.time,
+                    title: e.title,
+                    description: e.subtitle,
+                    createdAt: e.time,
+                    updatedAt: e.time,
+                  ),
+                )
+                .toList(),
+          );
         }
 
         events.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -2728,14 +3154,20 @@ class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> 
             children: List.generate(displayEvents.length, (idx) {
               final ev = displayEvents[idx];
               final isLast = idx == displayEvents.length - 1;
-              
+
               Color nodeColor = _cyan;
               final titleLower = (ev.title ?? '').toLowerCase();
               final descLower = (ev.description ?? '').toLowerCase();
-              
-              if (titleLower.contains('busca') || titleLower.contains('varredura') || titleLower.contains('inici')) {
+
+              if (titleLower.contains('busca') ||
+                  titleLower.contains('varredura') ||
+                  titleLower.contains('inici')) {
                 nodeColor = _amber;
-              } else if (titleLower.contains('apreend') || titleLower.contains('detido') || titleLower.contains('finaliz') || titleLower.contains('conclu') || descLower.contains('apreend')) {
+              } else if (titleLower.contains('apreend') ||
+                  titleLower.contains('detido') ||
+                  titleLower.contains('finaliz') ||
+                  titleLower.contains('conclu') ||
+                  descLower.contains('apreend')) {
                 nodeColor = _green;
               }
 
@@ -2790,7 +3222,8 @@ class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> 
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (ev.description != null && ev.description!.isNotEmpty) ...[
+                            if (ev.description != null &&
+                                ev.description!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
                                 ev.description!,
@@ -2837,7 +3270,11 @@ class _OccurrenceTimelineSectionState extends State<_OccurrenceTimelineSection> 
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded, color: _cyan, size: 14),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: _cyan,
+                    size: 14,
+                  ),
                 ],
               ),
             ),

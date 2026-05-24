@@ -15,7 +15,9 @@ extension _HistoryDataLoader on _HistoryScreenState {
       context,
       listen: false,
     ).fetchHealthLogsForDog(dogId);
-    Provider.of<NutritionViewModel>(context, listen: false).loadForDog(dogId);
+    final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
+    nutritionVM.loadForDog(dogId);
+    nutritionVM.loadFullHistory(dogId);
     Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
   }
 
@@ -41,7 +43,10 @@ extension _HistoryDataLoader on _HistoryScreenState {
       if (training.dogId == dogId) entries.add(_buildTrainingEntry(training));
     }
 
-    for (final feeding in nutritionVM.todayFeedings) {
+    final feedings = nutritionVM.historyFeedings.isNotEmpty
+        ? nutritionVM.historyFeedings
+        : nutritionVM.todayFeedings;
+    for (final feeding in feedings) {
       entries.add(
         HistoryEntry(
           id: feeding.id ?? 'nutrition_${feeding.fedAt.millisecondsSinceEpoch}',
@@ -54,6 +59,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
           tag: 'NUTRIÇÃO',
           icon: Icons.rice_bowl_rounded,
           color: _hYellow,
+          originalModel: feeding,
           details: {
             'Período': _periodLabel(feeding.period),
             'Quantidade': '${feeding.amountGrams}g',
@@ -326,11 +332,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         tag: 'SAÚDE',
         icon: Icons.vaccines_outlined,
         color: _hGreen,
-        details: const {
-          'Vacina': 'V8',
-          'Lote': '24521',
-          'Veterinário': 'João',
-        },
+        details: const {'Vacina': 'V8', 'Lote': '24521', 'Veterinário': 'João'},
       ),
       HistoryEntry(
         id: 'mock_training_2',

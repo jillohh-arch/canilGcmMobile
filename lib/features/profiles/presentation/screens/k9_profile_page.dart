@@ -112,7 +112,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                             const SizedBox(height: 10),
                             _buildVaccinationCard(context),
                             const SizedBox(height: 10),
-                            _buildLaudosCard(),
+                            _buildLaudosCard(context),
                             const SizedBox(height: 10),
                             _buildEventosCard(context),
                           ],
@@ -1099,6 +1099,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
 
   // ─── Carteira de Vacinação Card ────────────────────────────────────
   Widget _buildVaccinationCard(BuildContext context) {
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList();
+
+    final vaccineLogs = logs.where((l) => l.logType == 'Vacina' || l.vaccines.isNotEmpty).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1128,32 +1134,63 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            children: [
-              _buildVaccineCardRow(
-                name: 'V10 (Polivalente)',
-                applied: 'Aplicada em 28/06/2025',
-                next: '28/06/2026',
-                remaining: 'em 1 mês',
-                status: _CardStatus.ok,
-                showDivider: true,
-              ),
-              _buildVaccineCardRow(
-                name: 'Antirrábica',
-                applied: 'Aplicada em 15/09/2025',
-                next: '15/09/2026',
-                remaining: 'em 4 meses',
-                status: _CardStatus.ok,
-                showDivider: true,
-              ),
-              _buildVaccineCardRow(
-                name: 'Gripe Canina',
-                applied: 'Aplicada em 02/05/2025',
-                next: 'Vencendo',
-                remaining: 'em 11 dias',
-                status: _CardStatus.warn,
-                showDivider: false,
-              ),
-            ],
+            children: vaccineLogs.isEmpty
+                ? [
+                    _buildVaccineCardRow(
+                      name: 'V10 (Polivalente)',
+                      applied: 'Aplicada em 28/06/2025',
+                      next: '28/06/2026',
+                      remaining: 'em 1 mês',
+                      status: _CardStatus.ok,
+                      showDivider: true,
+                    ),
+                    _buildVaccineCardRow(
+                      name: 'Antirrábica',
+                      applied: 'Aplicada em 15/09/2025',
+                      next: '15/09/2026',
+                      remaining: 'em 4 meses',
+                      status: _CardStatus.ok,
+                      showDivider: true,
+                    ),
+                    _buildVaccineCardRow(
+                      name: 'Gripe Canina',
+                      applied: 'Aplicada em 02/05/2025',
+                      next: 'Vencendo',
+                      remaining: 'em 11 dias',
+                      status: _CardStatus.warn,
+                      showDivider: false,
+                    ),
+                  ]
+                : List.generate(vaccineLogs.length.clamp(0, 3), (idx) {
+                    final log = vaccineLogs[idx];
+                    final name = log.subtype ?? (log.vaccines.isNotEmpty ? log.vaccines.first : 'Vacina');
+                    final appliedDateStr = DateFormat('dd/MM/yyyy').format(log.date);
+                    
+                    // Próxima dose
+                    final nextDate = log.nextDueDate ?? log.date.add(const Duration(days: 365));
+                    final nextDateStr = DateFormat('dd/MM/yyyy').format(nextDate);
+                    
+                    final daysRemaining = nextDate.difference(DateTime.now()).inDays;
+                    final isOverdue = daysRemaining < 0;
+                    final isUpcoming = daysRemaining >= 0 && daysRemaining <= 30;
+                    
+                    final status = isOverdue 
+                        ? _CardStatus.critical 
+                        : (isUpcoming ? _CardStatus.warn : _CardStatus.ok);
+                    
+                    final remainingStr = isOverdue
+                        ? 'vencida há ${-daysRemaining}d'
+                        : (daysRemaining == 0 ? 'vence hoje' : 'em $daysRemaining dias');
+                    
+                    return _buildVaccineCardRow(
+                      name: name,
+                      applied: 'Aplicada em $appliedDateStr',
+                      next: isOverdue ? 'Atrasada' : nextDateStr,
+                      remaining: remainingStr,
+                      status: status,
+                      showDivider: idx < (vaccineLogs.length.clamp(0, 3) - 1),
+                    );
+                  }),
           ),
         ),
       ],
@@ -1233,7 +1270,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   }
 
   // ─── Laudos e Documentos Card (Unified 7 documents) ─────────────────
-  Widget _buildLaudosCard() {
+  Widget _buildLaudosCard(BuildContext context) {
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList();
+
+    // Filtra logs que contêm anexos (laudos) ou exames
+    final docLogs = logs.where((l) => l.attachmentUrl != null && l.attachmentUrl!.isNotEmpty).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1245,7 +1289,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: const Color(0xFF4DD0E1).withAlpha(25), borderRadius: BorderRadius.circular(10)),
               child: Text(
-                '7',
+                docLogs.isEmpty ? '7' : docLogs.length.toString(),
                 style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.bold),
               ),
             ),
@@ -1259,15 +1303,36 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            children: [
-              _buildDocRow('🩸', 'Laudo hepático · alta médica', 'Dra. Patrícia Lima · CRMV 9876', '02/2026', true),
-              _buildDocRow('🦴', 'Laudo ortopédico anual', 'Dr. Carlos Mendes · CRMV 7890', '11/2025', true),
-              _buildDocRow('🏅', 'Certificação em Detecção de Drogas', 'Ricardo Almeida · Belo Horizonte/MG', '08/2025', true),
-              _buildDocRow('🏛', 'Homenagem da Câmara Municipal', 'Câmara Municipal de Limeira', '09/2024', true),
-              _buildDocRow('🎓', 'Certificado Curso K9 Avançado', 'ANCC Brasil · 60h', '06/2024', true),
-              _buildDocRow('📋', 'Laudo nutricional', 'Dra. Ana Souza · CRMV 12345', '03/2024', true),
-              _buildDocRow('📄', 'Cadastro institucional GCM', 'RA 691755', '03/2022', false),
-            ],
+            children: docLogs.isEmpty
+                ? [
+                    _buildDocRow('🩸', 'Laudo hepático · alta médica', 'Dra. Patrícia Lima · CRMV 9876', '02/2026', true),
+                    _buildDocRow('🦴', 'Laudo ortopédico anual', 'Dr. Carlos Mendes · CRMV 7890', '11/2025', true),
+                    _buildDocRow('🏅', 'Certificação em Detecção de Drogas', 'Ricardo Almeida · Belo Horizonte/MG', '08/2025', true),
+                    _buildDocRow('🏛', 'Homenagem da Câmara Municipal', 'Câmara Municipal de Limeira', '09/2024', true),
+                    _buildDocRow('🎓', 'Certificado Curso K9 Avançado', 'ANCC Brasil · 60h', '06/2024', true),
+                    _buildDocRow('📋', 'Laudo nutricional', 'Dra. Ana Souza · CRMV 12345', '03/2024', true),
+                    _buildDocRow('📄', 'Cadastro institucional GCM', 'RA 691755', '03/2022', false),
+                  ]
+                : List.generate(docLogs.length, (idx) {
+                    final log = docLogs[idx];
+                    final name = log.subtype ?? log.logType;
+                    final subtitle = log.healthObservations.isNotEmpty 
+                        ? log.healthObservations 
+                        : (log.vetName != null ? 'Responsável: ${log.vetName}' : 'Documento anexado');
+                    final dateStr = DateFormat('MM/yyyy').format(log.date);
+                    
+                    String emoji = '📄';
+                    if (log.type == 'exam') emoji = '🦴';
+                    if (log.type == 'vaccination') emoji = '💉';
+                    
+                    return _buildDocRow(
+                      emoji,
+                      name,
+                      subtitle,
+                      dateStr,
+                      idx < (docLogs.length - 1),
+                    );
+                  }),
           ),
         ),
         const SizedBox(height: 8),
@@ -1357,6 +1422,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
 
   // ─── Eventos Médicos Recentes Card ─────────────────────────────────
   Widget _buildEventosCard(BuildContext context) {
+    final healthVM = Provider.of<HealthViewModel>(context);
+    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    final recentEvents = logs.where((l) => l.weight == null).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1367,7 +1438,6 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
-                // Vai para a aba histórico ou exibe
               },
               child: Text(
                 'Ver tudo →',
@@ -1385,11 +1455,35 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            children: [
-              _buildEventRow('10/04', '🪲', 'Antipulgas Bravecto', 'Aplicação trimestral', true),
-              _buildEventRow('15/03', '🩺', 'Consulta de rotina', 'Dra. Ana Souza · CRMV 12345', true),
-              _buildEventRow('28/02', '💊', 'Vermífugo Drontal', 'Aplicação trimestral', false),
-            ],
+            children: recentEvents.isEmpty
+                ? [
+                    _buildEventRow('10/04', '🪲', 'Antipulgas Bravecto', 'Aplicação trimestral', true),
+                    _buildEventRow('15/03', '🩺', 'Consulta de rotina', 'Dra. Ana Souza · CRMV 12345', true),
+                    _buildEventRow('28/02', '💊', 'Vermífugo Drontal', 'Aplicação trimestral', false),
+                  ]
+                : List.generate(recentEvents.length.clamp(0, 3), (idx) {
+                    final log = recentEvents[idx];
+                    final dateStr = DateFormat('dd/MM').format(log.date);
+                    
+                    String icon = '🩺';
+                    if (log.type == 'vaccination') icon = '💉';
+                    if (log.type == 'antiparasitic') icon = '🪲';
+                    if (log.type == 'medication') icon = '💊';
+                    if (log.type == 'surgery') icon = '🏥';
+
+                    final name = log.subtype ?? log.logType;
+                    final subtitle = log.healthObservations.isNotEmpty 
+                        ? log.healthObservations 
+                        : (log.vetName != null ? 'Responsável: ${log.vetName}' : 'Registro clínico');
+                    
+                    return _buildEventRow(
+                      dateStr,
+                      icon,
+                      name,
+                      subtitle,
+                      idx < (recentEvents.length.clamp(0, 3) - 1),
+                    );
+                  }),
           ),
         ),
       ],

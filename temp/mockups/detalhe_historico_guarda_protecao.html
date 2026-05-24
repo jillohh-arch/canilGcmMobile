@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe · Guarda & Proteção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:24px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 100px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:11px;font-weight:500;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .h-share{margin-left:auto;color:#4dd0e1;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(77,208,225,.08);border-radius:10px;}
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:18px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;}
+  .ident-type{color:#4dd0e1;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:19px;font-weight:700;line-height:1.15;}
+  .badge-fin{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);border-radius:14px;padding:5px 10px;color:#2ecc71;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .ident-meta{display:flex;gap:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:13px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:30px;height:30px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11.5px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:22px 0 12px;}
+  /* CORPO G&P */
+  .impulso{display:flex;align-items:center;gap:13px;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px;margin-bottom:9px;}
+  .impulso.active{border-color:rgba(230,126,34,.4);background:rgba(230,126,34,.05);}
+  .imp-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .imp-body{flex:1;}
+  .imp-name{color:#fff;font-size:13.5px;font-weight:700;letter-spacing:.3px;}
+  .imp-state{font-size:11px;margin-top:2px;}
+  .imp-sub{color:#7d8d99;font-size:10.5px;margin-top:3px;}
+  .tag-now{font-size:8.5px;font-weight:700;letter-spacing:.5px;color:#e67e22;background:rgba(230,126,34,.15);border:1px solid rgba(230,126,34,.35);border-radius:8px;padding:3px 7px;flex-shrink:0;}
+  .st-consolidated{color:#2ecc71;} .st-developing{color:#e67e22;} .st-notstarted{color:#5a7280;}
+  /* figurante */
+  .fig{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:15px;}
+  .fig-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
+  .fig-av{width:34px;height:34px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .fig-name{color:#fff;font-size:13px;font-weight:600;}
+  .fig-name small{display:block;color:#7d8d99;font-size:10px;font-weight:400;}
+  .rate{display:flex;justify-content:space-between;align-items:center;padding:8px 0;}
+  .rate+.rate{border-top:1px solid rgba(255,255,255,.05);}
+  .rate-k{color:#aebcc4;font-size:12px;}
+  .dots{display:flex;gap:4px;}
+  .d{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.1);}
+  .d.on{background:#2ecc71;} .d.on.amber{background:#e67e22;}
+  /* capacidades */
+  .caps{display:flex;flex-wrap:wrap;gap:7px;}
+  .cap{font-size:11px;font-weight:600;padding:7px 11px;border-radius:9px;display:flex;align-items:center;gap:5px;}
+  .cap-done{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.3);color:#2ecc71;}
+  .cap-dev{background:rgba(230,126,34,.1);border:1px solid rgba(230,126,34,.3);color:#e67e22;}
+  /* config */
+  .cfg{display:flex;gap:9px;}
+  .cfg-cell{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px;text-align:center;}
+  .cfg-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .cfg-v{color:#fff;font-size:14px;font-weight:700;margin-top:4px;}
+  .relato{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;}
+  .relato p{color:#aebcc4;font-size:12px;line-height:1.6;}
+  .integ{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.16);border-radius:13px;padding:14px;margin-top:6px;}
+  .integ-head{display:flex;align-items:center;gap:8px;color:#2ecc71;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:9px;}
+  .integ-hash{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7d8d99;word-break:break-all;line-height:1.5;}
+  .audit-link{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);color:#aebcc4;font-size:12px;font-weight:500;}
+  .audit-link b{color:#fff;font-weight:600;}
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 70%,transparent);display:flex;gap:10px;}
+  .cta{flex:1;border-radius:13px;padding:15px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;}
+  .cta-pdf{background:#4dd0e1;color:#050d10;}
+  .cta-share{background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.3);color:#4dd0e1;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:4px;}
+  .legend-side h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>09:14</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Treino · Guarda & Proteção</div><div class="h-sub">SESSÃO 2026/05/17-GP</div></div>
+        <div class="h-share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
+      </div>
+      <div class="ident">
+        <div class="ident-top">
+          <div><div class="ident-type">Guarda & Proteção · Formação</div><div class="ident-nature">Sessão com figurante</div></div>
+          <div class="badge-fin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>REGISTRADA</div>
+        </div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Data</span><span class="im-v">17/05/2026</span></div>
+          <div class="im"><span class="im-k">Duração</span><span class="im-v">35 min</span></div>
+          <div class="im"><span class="im-k">Impulso</span><span class="im-v">Defesa</span></div>
+        </div>
+        <div class="ident-bin"><div class="bin-av dog"></div><div class="bin-av"></div><div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b> · Canil K9 Limeira</div></div>
+      </div>
+
+      <div class="sec-label">Impulsos · estado atual</div>
+      <div class="impulso"><div class="imp-ico" style="background:rgba(46,204,113,.12)">🦌</div><div class="imp-body"><div class="imp-name">Caça</div><div class="imp-state st-consolidated">● Consolidado</div><div class="imp-sub">Base prazerosa · 12 sessões</div></div></div>
+      <div class="impulso active"><div class="imp-ico" style="background:rgba(230,126,34,.14)">🛡</div><div class="imp-body"><div class="imp-name">Defesa</div><div class="imp-state st-developing">◑ Desenvolvendo</div><div class="imp-sub">Confronto direto · 6 sessões</div></div><span class="tag-now">TRABALHADO HOJE</span></div>
+      <div class="impulso"><div class="imp-ico" style="background:rgba(255,255,255,.04)">⚔</div><div class="imp-body"><div class="imp-name">Agressão</div><div class="imp-state st-notstarted">○ Não iniciado</div><div class="imp-sub">Aguardando consolidação dos outros</div></div></div>
+
+      <div class="sec-label">Avaliação do figurante</div>
+      <div class="fig">
+        <div class="fig-head"><div class="fig-av"></div><div class="fig-name">GCM Souza<small>Figurante · veste a manga</small></div></div>
+        <div class="rate"><span class="rate-k">Qualidade da mordida</span><div class="dots"><i class="d on"></i><i class="d on"></i><i class="d on"></i><i class="d on"></i><i class="d"></i></div></div>
+        <div class="rate"><span class="rate-k">Controle / comando "Larga"</span><div class="dots"><i class="d on amber"></i><i class="d on amber"></i><i class="d on amber"></i><i class="d"></i><i class="d"></i></div></div>
+        <div class="rate"><span class="rate-k">Coragem no confronto</span><div class="dots"><i class="d on"></i><i class="d on"></i><i class="d on"></i><i class="d on"></i><i class="d"></i></div></div>
+      </div>
+
+      <div class="sec-label">Capacidades reforçadas</div>
+      <div class="caps">
+        <div class="cap cap-done"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Mordida firme</div>
+        <div class="cap cap-dev">◑ Boca cheia</div>
+        <div class="cap cap-dev">◑ Estabilização</div>
+      </div>
+
+      <div class="sec-label">Configuração</div>
+      <div class="cfg">
+        <div class="cfg-cell"><div class="cfg-k">Equipamento</div><div class="cfg-v">Manga</div></div>
+        <div class="cfg-cell"><div class="cfg-k">Ambiente</div><div class="cfg-v">Pátio</div></div>
+        <div class="cfg-cell"><div class="cfg-k">Comando larga</div><div class="cfg-v" style="color:#e67e22">Parcial</div></div>
+      </div>
+
+      <div class="sec-label">Observações</div>
+      <div class="relato"><p>Boa evolução na Defesa: confronto direto firme, mordida cheia. Comando "Larga" ainda inconsistente sob excitação — reforçar nas próximas sessões antes de abrir o impulso de Agressão.</p></div>
+
+      <div class="sec-label">Integridade e auditoria</div>
+      <div class="integ">
+        <div class="integ-head"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>REGISTRO ÍNTEGRO · SHA-256</div>
+        <div class="integ-hash">b2e7d4910c6a3f85d1b9472e0fa6c83d519e7b4a206f8c1d9e3a5b07f4c28d610</div>
+        <div class="audit-link"><span>Trilha de auditoria · <b>2 registros</b></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </div>
+    <div class="cta-bar">
+      <button class="cta cta-pdf"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Gerar PDF</button>
+      <button class="cta cta-share"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Compartilhar</button>
+    </div>
+  </div>
+  <div class="legend-side"><h3>CORPO: GUARDA & PROTEÇÃO</h3><p style="font-size:11.5px;color:#8b97a0">Casca idêntica. Corpo = os 3 impulsos (Caça/Defesa/Agressão) com estado e qual foi trabalhado hoje, avaliação subjetiva do figurante, capacidades reforçadas e comando "Larga".</p></div>
+</div>
+</body>
+</html>

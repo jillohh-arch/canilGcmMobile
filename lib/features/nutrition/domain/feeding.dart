@@ -1,18 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 
 /// Registro de alimentação do cão.
 /// Subcoleção: /dogs/{dogId}/feedings/{feedingId}
-class Feeding {
+class Feeding with SoftDeletable {
   final String? id;
   final String period; // 'manha' | 'noite' | 'almoco'
   final int amountGrams;
   final int prescriptionAtTime; // snapshot da prescrição vigente
-  final double divergencePercent; // calculado: (amount - prescription) / prescription * 100
+  final double
+  divergencePercent; // calculado: (amount - prescription) / prescription * 100
   final String? divergenceReason;
   final String? photoBalanceUrl;
   final String? observations;
   final DateTime fedAt;
   final String fedBy;
+  final List<Map<String, dynamic>> auditTrail;
+
+  @override
+  final DateTime? deletedAt;
+  @override
+  final String? deletedBy;
+  @override
+  final String? deleteReason;
 
   Feeding({
     this.id,
@@ -25,6 +35,10 @@ class Feeding {
     this.observations,
     required this.fedAt,
     required this.fedBy,
+    this.auditTrail = const [],
+    this.deletedAt,
+    this.deletedBy,
+    this.deleteReason,
   });
 
   factory Feeding.fromJson(Map<String, dynamic> json, {String? docId}) {
@@ -33,12 +47,25 @@ class Feeding {
       period: json['period'] as String? ?? 'manha',
       amountGrams: json['amount_grams'] as int? ?? 0,
       prescriptionAtTime: json['prescription_at_time'] as int? ?? 0,
-      divergencePercent: (json['divergence_percent'] as num?)?.toDouble() ?? 0.0,
+      divergencePercent:
+          (json['divergence_percent'] as num?)?.toDouble() ?? 0.0,
       divergenceReason: json['divergence_reason'] as String?,
       photoBalanceUrl: json['photo_balance_url'] as String?,
       observations: json['observations'] as String?,
       fedAt: _toDateTime(json['fed_at']) ?? DateTime.now(),
       fedBy: json['fed_by'] as String? ?? '',
+      auditTrail:
+          (json['audit_trail'] as List<dynamic>?)
+              ?.whereType<Map>()
+              .map(
+                (e) => e.map((key, value) => MapEntry(key.toString(), value)),
+              )
+              .toList() ??
+          const [],
+      deletedAt: SoftDeletable.parseDeletedAt(json['deleted_at']),
+      deletedBy: json['deleted_by'] as String?,
+      deleteReason:
+          json['deleted_reason'] as String? ?? json['delete_reason'] as String?,
     );
   }
 
@@ -53,6 +80,8 @@ class Feeding {
       if (observations != null) 'observations': observations,
       'fed_at': Timestamp.fromDate(fedAt),
       'fed_by': fedBy,
+      'audit_trail': auditTrail,
+      ...softDeleteFields(),
     };
   }
 

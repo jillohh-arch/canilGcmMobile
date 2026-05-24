@@ -117,6 +117,7 @@ class AuditService {
       'deleted_at': FieldValue.delete(),
       'deleted_by': FieldValue.delete(),
       'delete_reason': FieldValue.delete(),
+      'deleted_reason': FieldValue.delete(),
     });
 
     final entry = buildInlineEntry(action: 'restored');
@@ -153,6 +154,7 @@ class AuditService {
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': _auth?.currentUser?.uid,
       'delete_reason': reason,
+      'deleted_reason': reason,
     });
 
     await log(
@@ -222,11 +224,17 @@ class AuditService {
     String? reason,
   }) {
     final actor = _buildActor();
+    final timestamp = Timestamp.now();
     return {
       'action': action,
+      'at': timestamp,
+      'by': actor['uid'],
+      'by_name': actor['name'],
+      'by_ra': actor['ra'],
       'performed_by': actor['uid'],
-      'performed_at': DateTime.now().toIso8601String(),
+      'performed_at': timestamp.toDate().toIso8601String(),
       if (fieldName != null) 'field_name': fieldName,
+      if (fieldName != null) 'field': fieldName,
       if (oldValue != null) 'old_value': oldValue,
       if (newValue != null) 'new_value': newValue,
       if (reason != null) 'reason': reason,
@@ -315,8 +323,10 @@ class AuditEntry {
     return AuditEntry(
       id: docId,
       action: json['action'] as String? ?? '',
-      entityType: json['entity_type'] as String? ?? json['entityType'] as String? ?? '',
-      entityId: json['entity_id'] as String? ?? json['entityId'] as String? ?? '',
+      entityType:
+          json['entity_type'] as String? ?? json['entityType'] as String? ?? '',
+      entityId:
+          json['entity_id'] as String? ?? json['entityId'] as String? ?? '',
       summary: json['summary'] as String? ?? '',
       actor: json['actor'] as Map<String, dynamic>?,
       fieldName: json['field_name'] as String?,
@@ -336,8 +346,7 @@ class AuditEntry {
 
   /// Verifica se é uma regressão.
   bool get isRegression =>
-      action == 'updated' &&
-      (before?['stage'] != null || reason != null);
+      action == 'updated' && (before?['stage'] != null || reason != null);
 
   static DateTime? _toDateTime(dynamic value) {
     if (value == null) return null;

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Ocorrência v2 · Pág. 4 Mídias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg-page:#eef1f4;--paper:#fff;--ink:#14202b;--ink-soft:#46586a;--ink-faint:#8493a1;--line:#dde4ea;--line-soft:#eaeff3;--cyan:#0a8e9d;--cyan-deep:#07707c;--green:#1f9d52;--amber:#b07d0a;--header-bg:#0e1a24;--header-accent:#2bb6c4;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg-page);font-family:'IBM Plex Sans',sans-serif;display:flex;justify-content:center;padding:32px 20px;color:var(--ink);-webkit-font-smoothing:antialiased;}
+  .page{width:794px;min-height:1123px;background:var(--paper);box-shadow:0 20px 60px rgba(14,26,36,.18);display:flex;flex-direction:column;}
+  .header{background:var(--header-bg);color:#fff;padding:22px 40px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;}
+  .header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--cyan) 0%,var(--green) 60%,transparent 100%);}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .crest{width:42px;height:48px;flex-shrink:0;}
+  .brand-title{font-size:18px;font-weight:700;letter-spacing:.5px;line-height:1.1;}
+  .brand-sub{font-size:10.5px;font-weight:500;letter-spacing:2px;color:var(--header-accent);margin-top:4px;text-transform:uppercase;}
+  .reg{text-align:right;}
+  .reg-id{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;letter-spacing:.5px;}
+  .reg-page{font-size:10px;letter-spacing:1.5px;color:#8aa0ad;margin-top:5px;text-transform:uppercase;}
+  .body{padding:28px 40px 0;flex:1;}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:22px;}
+  .pg-title{font-size:20px;font-weight:700;letter-spacing:-.3px;}
+  .pg-sub{font-size:11.5px;color:var(--ink-soft);margin-top:4px;max-width:330px;line-height:1.5;}
+  .media-count{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .mc{padding:12px 16px;text-align:center;}
+  .mc+.mc{border-left:1px solid var(--line);}
+  .mc-ico{color:var(--cyan);margin-bottom:4px;}
+  .mc-n{font-size:18px;font-weight:700;line-height:1;}
+  .mc-l{font-size:8.5px;color:var(--ink-soft);letter-spacing:.5px;text-transform:uppercase;margin-top:3px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
+  .media{border:1px solid var(--line);border-radius:11px;overflow:hidden;}
+  .m-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;}
+  .m-head-l{display:flex;align-items:center;gap:10px;}
+  .m-num{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--cyan-deep);border:1px solid var(--line);border-radius:5px;padding:2px 6px;}
+  .m-title{font-size:13px;font-weight:600;}
+  .m-type{font-size:9px;color:var(--ink-faint);letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:4px;margin-top:2px;}
+  .m-time{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);}
+  .m-img{height:150px;background:linear-gradient(135deg,#d5e0e6,#bccdd6);display:flex;align-items:center;justify-content:center;color:#73838f;font-size:11px;position:relative;}
+  .m-play{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;}
+  .m-dur{position:absolute;bottom:8px;right:8px;background:rgba(20,32,43,.8);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 6px;border-radius:4px;}
+  .m-foot{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line-soft);}
+  .m-loc{font-size:10px;color:var(--ink-soft);line-height:1.4;}
+  .m-loc .gps{font-family:'IBM Plex Mono',monospace;color:var(--cyan-deep);font-size:9.5px;}
+  .m-acc{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink-faint);border:1px solid var(--line);border-radius:5px;padding:2px 6px;white-space:nowrap;}
+  .m-sync{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;background:rgba(31,157,82,.92);color:#fff;font-size:8px;font-weight:600;letter-spacing:.5px;padding:3px 7px;border-radius:5px;}
+  .section-label{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--ink-soft);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+  .section-label::after{content:"";flex:1;height:1px;background:var(--line);}
+  .attach{display:flex;align-items:center;gap:13px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .attach-ico{width:38px;height:38px;border-radius:8px;background:#eef2f5;display:flex;align-items:center;justify-content:center;color:var(--cyan-deep);}
+  .attach-name{font-size:13px;font-weight:600;}
+  .attach-meta{font-size:10px;color:var(--ink-faint);margin-top:2px;}
+  .attach-size{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);}
+  .footer{border-top:1px solid var(--line);padding:14px 40px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--ink-faint);margin-top:18px;}
+  .footer .f-left{display:flex;align-items:center;gap:8px;}
+  .footer b{color:var(--ink-soft);font-weight:600;}
+  .ico{display:inline-block;vertical-align:middle;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <svg class="crest" viewBox="0 0 42 48" fill="none"><path d="M21 1L40 8v15c0 12-8 20-19 24C10 43 2 35 2 23V8L21 1z" fill="#13242f" stroke="#2bb6c4" stroke-width="1.5"/><path d="M21 12c-3 0-5 2-5 2l-3-1 1 4-2 2 3 1 1 4 3-2 2 2 2-2 3 2 1-4 3-1-2-2 1-4-3 1s-2-2-5-2z" fill="#2bb6c4"/><circle cx="21" cy="20" r="2.4" fill="#13242f"/><text x="21" y="40" text-anchor="middle" fill="#fff" font-family="IBM Plex Sans" font-size="8" font-weight="700">K9</text></svg>
+        <div><div class="brand-title">GUARDA CIVIL MUNICIPAL DE LIMEIRA</div><div class="brand-sub">Canil K9 · Seção Operacional</div></div>
+      </div>
+      <div class="reg"><div class="reg-id">REG 2026/05/4D68-K9</div><div class="reg-page">Página 4 de 6</div></div>
+    </div>
+    <div class="body">
+      <div class="top">
+        <div><div class="pg-title">Mídias operacionais</div><div class="pg-sub">Registros fotográficos e de vídeo realizados durante a ocorrência, com geolocalização.</div></div>
+        <div class="media-count">
+          <div class="mc"><svg class="mc-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/></svg><div class="mc-n">2</div><div class="mc-l">Fotos</div></div>
+          <div class="mc"><svg class="mc-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg><div class="mc-n">1</div><div class="mc-l">Vídeo</div></div>
+          <div class="mc"><svg class="mc-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><div class="mc-n">0</div><div class="mc-l">Áudios</div></div>
+          <div class="mc"><svg class="mc-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><div class="mc-n">1</div><div class="mc-l">Outros</div></div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="media">
+          <div class="m-head"><div class="m-head-l"><span class="m-num">01</span><div><div class="m-title">Local da abordagem</div><div class="m-type"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/></svg>Foto</div></div></div><div class="m-time">13:33</div></div>
+          <div class="m-img">imagem real no PDF<div class="m-sync"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>SINC</div></div>
+          <div class="m-foot"><div class="m-loc">Rua Frederico Rótulo, Jd. Ouro Verde<br><span class="gps">-22.58054, -47.41953</span></div><div class="m-acc">±100m</div></div>
+        </div>
+        <div class="media">
+          <div class="m-head"><div class="m-head-l"><span class="m-num">02</span><div><div class="m-title">Emprego do cão</div><div class="m-type"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/></svg>Foto</div></div></div><div class="m-time">13:38</div></div>
+          <div class="m-img">imagem real no PDF<div class="m-sync"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>SINC</div></div>
+          <div class="m-foot"><div class="m-loc">Rua Frederico Rótulo, Jd. Ouro Verde<br><span class="gps">-22.58164, -47.41970</span></div><div class="m-acc">±100m</div></div>
+        </div>
+        <div class="media">
+          <div class="m-head"><div class="m-head-l"><span class="m-num">03</span><div><div class="m-title">Material localizado</div><div class="m-type"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/></svg>Foto</div></div></div><div class="m-time">13:39</div></div>
+          <div class="m-img">imagem real no PDF<div class="m-sync"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>SINC</div></div>
+          <div class="m-foot"><div class="m-loc">Rua Frederico Rótulo, Jd. Ouro Verde<br><span class="gps">-22.58058, -47.41937</span></div><div class="m-acc">±100m</div></div>
+        </div>
+        <div class="media">
+          <div class="m-head"><div class="m-head-l"><span class="m-num">04</span><div><div class="m-title">Vídeo operacional</div><div class="m-type"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>Vídeo</div></div></div><div class="m-time">13:39</div></div>
+          <div class="m-img"><div class="m-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="#14202b"><path d="M8 5v14l11-7z"/></svg></div><div class="m-dur">00:32</div><div class="m-sync"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>SINC</div></div>
+          <div class="m-foot"><div class="m-loc">Busca em área de mata<br><span class="gps">-22.58060, -47.41940</span></div><div class="m-acc">±100m</div></div>
+        </div>
+      </div>
+      <div class="section-label">Anexos</div>
+      <div class="attach">
+        <div class="attach-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div>
+        <div><div class="attach-name">BO_2026_05_4D68.pdf</div><div class="attach-meta">Boletim de Ocorrência · documento anexado</div></div>
+        <div class="attach-size">256 KB</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="f-left"><svg class="ico" width="13" height="14" viewBox="0 0 24 26" fill="none" stroke="#8493a1" stroke-width="2"><path d="M12 1l10 4v8c0 6-4 10-10 12C6 23 2 19 2 13V5l10-4z"/></svg>Documento gerado automaticamente pelo Sistema Canil K9 GCM</div>
+      <div><b>DOCUMENTO DIGITAL</b> · não impresso</div>
+    </div>
+  </div>
+</body>
+</html>

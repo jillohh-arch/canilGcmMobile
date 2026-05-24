@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe · Obediência</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:24px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 100px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:11px;font-weight:500;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .h-share{margin-left:auto;color:#4dd0e1;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(77,208,225,.08);border-radius:10px;}
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:18px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;}
+  .ident-type{color:#4dd0e1;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:19px;font-weight:700;line-height:1.15;}
+  .badge-fin{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);border-radius:14px;padding:5px 10px;color:#2ecc71;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .ident-meta{display:flex;gap:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:13px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:30px;height:30px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11.5px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:22px 0 12px;}
+  /* CORPO Obediência */
+  .mode{display:flex;gap:9px;margin-bottom:6px;}
+  .mode-cell{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px;text-align:center;}
+  .mode-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .mode-v{color:#fff;font-size:13px;font-weight:700;margin-top:4px;}
+  .mode-v.hi{color:#e67e22;}
+  .cmd{display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px 13px;margin-bottom:8px;}
+  .cmd-name{color:#fff;font-size:13px;font-weight:600;width:104px;flex-shrink:0;}
+  .cmd-name .up{color:#2ecc71;font-size:10px;font-weight:700;margin-left:4px;}
+  .stage{display:flex;gap:5px;flex:1;}
+  .sd{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.1);}
+  .sd.on{background:#4dd0e1;}
+  .sd.on.op{background:#2ecc71;}
+  .cmd-lbl{font-size:9.5px;font-weight:700;letter-spacing:.3px;width:78px;text-align:right;flex-shrink:0;}
+  .lbl-op{color:#2ecc71;} .lbl-cons{color:#4dd0e1;} .lbl-prat{color:#e67e22;}
+  .cat-label{color:#7d8d99;font-size:10px;font-weight:700;letter-spacing:.5px;margin:14px 0 9px;}
+  .relato{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;}
+  .relato p{color:#aebcc4;font-size:12px;line-height:1.6;}
+  .integ{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.16);border-radius:13px;padding:14px;margin-top:6px;}
+  .integ-head{display:flex;align-items:center;gap:8px;color:#2ecc71;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:9px;}
+  .integ-hash{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7d8d99;word-break:break-all;line-height:1.5;}
+  .audit-link{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);color:#aebcc4;font-size:12px;font-weight:500;}
+  .audit-link b{color:#fff;font-weight:600;}
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 70%,transparent);display:flex;gap:10px;}
+  .cta{flex:1;border-radius:13px;padding:15px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;}
+  .cta-pdf{background:#4dd0e1;color:#050d10;}
+  .cta-share{background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.3);color:#4dd0e1;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:4px;}
+  .legend-side h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:10px;}
+  .stage-legend{display:flex;gap:10px;font-size:9px;color:#5a7280;margin-bottom:2px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>09:14</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Treino · Obediência</div><div class="h-sub">SESSÃO 2026/05/19-OB</div></div>
+        <div class="h-share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
+      </div>
+      <div class="ident">
+        <div class="ident-top">
+          <div><div class="ident-type">Obediência · Treino contínuo</div><div class="ident-nature">6 comandos trabalhados</div></div>
+          <div class="badge-fin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>REGISTRADA</div>
+        </div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Data</span><span class="im-v">19/05/2026</span></div>
+          <div class="im"><span class="im-k">Duração</span><span class="im-v">18 min</span></div>
+          <div class="im"><span class="im-k">Comandos</span><span class="im-v">6 / 15</span></div>
+        </div>
+        <div class="ident-bin"><div class="bin-av dog"></div><div class="bin-av"></div><div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b> · Canil K9 Limeira</div></div>
+      </div>
+
+      <div class="sec-label">Modo da sessão</div>
+      <div class="mode">
+        <div class="mode-cell"><div class="mode-k">Guia</div><div class="mode-v">Sem guia</div></div>
+        <div class="mode-cell"><div class="mode-k">Distração</div><div class="mode-v hi">Alta</div></div>
+        <div class="mode-cell"><div class="mode-k">Distância</div><div class="mode-v">15 m</div></div>
+      </div>
+
+      <div class="sec-label">Comandos · estágio</div>
+      <div class="stage-legend"><span>● 1 Iniciante</span><span>● 3 Praticando</span><span>● 4 Consolidando</span><span style="color:#2ecc71">● 5 Operacional</span></div>
+      <div class="cat-label">OPERACIONAIS</div>
+      <div class="cmd"><div class="cmd-name">Junto</div><div class="stage"><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i></div><div class="cmd-lbl lbl-op">OPERACIONAL</div></div>
+      <div class="cmd"><div class="cmd-name">Senta</div><div class="stage"><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i><i class="sd on op"></i></div><div class="cmd-lbl lbl-op">OPERACIONAL</div></div>
+      <div class="cmd"><div class="cmd-name">Fica<span class="up">↑</span></div><div class="stage"><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd"></i></div><div class="cmd-lbl lbl-cons">CONSOLIDANDO</div></div>
+      <div class="cat-label">POSICIONAIS</div>
+      <div class="cmd"><div class="cmd-name">Deita</div><div class="stage"><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd"></i></div><div class="cmd-lbl lbl-cons">CONSOLIDANDO</div></div>
+      <div class="cmd"><div class="cmd-name">Vem (chamada)</div><div class="stage"><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd"></i><i class="sd"></i></div><div class="cmd-lbl lbl-prat">PRATICANDO</div></div>
+      <div class="cmd"><div class="cmd-name">Latir sob comando<span class="up">↑</span></div><div class="stage"><i class="sd on"></i><i class="sd on"></i><i class="sd on"></i><i class="sd"></i><i class="sd"></i></div><div class="cmd-lbl lbl-prat">PRATICANDO</div></div>
+
+      <div class="sec-label">Observações</div>
+      <div class="relato"><p>Sessão sem guia com distração alta (figurante caminhando, ruído). "Fica" e "Latir sob comando" evoluíram de estágio. "Vem" ainda hesitante com distração — manter reforço a distância antes de aumentar o nível.</p></div>
+
+      <div class="sec-label">Integridade e auditoria</div>
+      <div class="integ">
+        <div class="integ-head"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>REGISTRO ÍNTEGRO · SHA-256</div>
+        <div class="integ-hash">a4f7c2e9018b3d6594a2c8f1e7b3d05826c9a4f1e8b2d70394c6a8f2e5b1d9073</div>
+        <div class="audit-link"><span>Trilha de auditoria · <b>2 registros</b></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </div>
+    <div class="cta-bar">
+      <button class="cta cta-pdf"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Gerar PDF</button>
+      <button class="cta cta-share"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Compartilhar</button>
+    </div>
+  </div>
+  <div class="legend-side"><h3>CORPO: OBEDIÊNCIA</h3><p style="font-size:11.5px;color:#8b97a0">Casca idêntica. Corpo = modo da sessão (com/sem guia, distração, distância) e os comandos trabalhados agrupados por categoria, cada um com seu estágio em 5 níveis e marca ↑ quando evoluiu na sessão.</p></div>
+</div>
+</body>
+</html>

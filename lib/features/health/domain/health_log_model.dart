@@ -7,7 +7,8 @@ class HealthLogModel with SoftDeletable {
   final String dogId;
   final String dogName;
   final DateTime date;
-  final String type; // 'vaccination' | 'antiparasitic' | 'exam' | 'consultation' | 'medication' | 'symptom' | 'surgery' | 'other'
+  final String
+  type; // 'vaccination' | 'antiparasitic' | 'exam' | 'consultation' | 'medication' | 'symptom' | 'surgery' | 'other'
   final String? subtype; // e.g., "V10", "Bravecto", "Hemograma"
   final double? weight;
   final String healthObservations;
@@ -19,6 +20,7 @@ class HealthLogModel with SoftDeletable {
   final String? createdBy;
   final String? vetName; // backing vet name for legacy compatibility
   final List<Map<String, dynamic>>? mediaAttachments;
+  final List<Map<String, dynamic>> auditTrail;
 
   @override
   final DateTime? deletedAt;
@@ -44,6 +46,7 @@ class HealthLogModel with SoftDeletable {
     this.createdBy,
     this.vetName,
     this.mediaAttachments,
+    this.auditTrail = const [],
     this.deletedAt,
     this.deletedBy,
     this.deleteReason,
@@ -71,7 +74,8 @@ class HealthLogModel with SoftDeletable {
     }
   }
 
-  List<String> get vaccines => (type == 'vaccination' && subtype != null) ? [subtype!] : const [];
+  List<String> get vaccines =>
+      (type == 'vaccination' && subtype != null) ? [subtype!] : const [];
 
   factory HealthLogModel.fromJson(Map<String, dynamic> json, [String? docId]) {
     final typeVal = json['type'] ?? mapLegacyLogType(json['logType']);
@@ -87,14 +91,22 @@ class HealthLogModel with SoftDeletable {
       dogName: json['dogName'] ?? '',
       date: parseFirestoreDate(json['date']),
       type: typeVal,
-      subtype: json['subtype'] ?? (json['vaccines'] != null && (json['vaccines'] as List).isNotEmpty ? (json['vaccines'] as List).first.toString() : null),
-      weight: json['weight'] != null ? (json['weight'] as num).toDouble() : null,
+      subtype:
+          json['subtype'] ??
+          (json['vaccines'] != null && (json['vaccines'] as List).isNotEmpty
+              ? (json['vaccines'] as List).first.toString()
+              : null),
+      weight: json['weight'] != null
+          ? (json['weight'] as num).toDouble()
+          : null,
       healthObservations: json['healthObservations'] ?? '',
       nextDueDate: parsedNextDueDate,
       professionalCrmv: json['professionalCrmv'],
       professionalClinic: json['professionalClinic'],
       attachmentUrl: json['attachmentUrl'],
-      costBrl: json['costBrl'] != null ? (json['costBrl'] as num).toDouble() : null,
+      costBrl: json['costBrl'] != null
+          ? (json['costBrl'] as num).toDouble()
+          : null,
       createdBy: json['createdBy'],
       vetName: json['vetName'] ?? json['vetName'],
       mediaAttachments: json['mediaAttachments'] != null
@@ -104,9 +116,22 @@ class HealthLogModel with SoftDeletable {
               ),
             )
           : null,
-      deletedAt: SoftDeletable.parseDeletedAt(json['deleted_at'] ?? json['deletedAt']),
+      auditTrail:
+          (json['audit_trail'] as List<dynamic>?)
+              ?.whereType<Map>()
+              .map(
+                (e) => e.map((key, value) => MapEntry(key.toString(), value)),
+              )
+              .toList() ??
+          const [],
+      deletedAt: SoftDeletable.parseDeletedAt(
+        json['deleted_at'] ?? json['deletedAt'],
+      ),
       deletedBy: json['deleted_by'] ?? json['deletedBy'],
-      deleteReason: json['delete_reason'] ?? json['deleteReason'],
+      deleteReason:
+          json['deleted_reason'] ??
+          json['delete_reason'] ??
+          json['deleteReason'],
     );
   }
 
@@ -128,6 +153,7 @@ class HealthLogModel with SoftDeletable {
       if (createdBy != null) 'createdBy': createdBy,
       if (vetName != null) 'vetName': vetName,
       if (mediaAttachments != null) 'mediaAttachments': mediaAttachments,
+      'audit_trail': auditTrail,
       ...softDeleteFields(),
     };
   }
@@ -149,6 +175,7 @@ class HealthLogModel with SoftDeletable {
     String? createdBy,
     String? vetName,
     List<Map<String, dynamic>>? mediaAttachments,
+    List<Map<String, dynamic>>? auditTrail,
     DateTime? deletedAt,
     String? deletedBy,
     String? deleteReason,
@@ -170,6 +197,7 @@ class HealthLogModel with SoftDeletable {
       createdBy: createdBy ?? this.createdBy,
       vetName: vetName ?? this.vetName,
       mediaAttachments: mediaAttachments ?? this.mediaAttachments,
+      auditTrail: auditTrail ?? this.auditTrail,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,
       deleteReason: deleteReason ?? this.deleteReason,

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe · Busca & Captura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:24px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 100px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:11px;font-weight:500;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .h-share{margin-left:auto;color:#4dd0e1;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(77,208,225,.08);border-radius:10px;}
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:18px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;}
+  .ident-type{color:#4dd0e1;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:19px;font-weight:700;line-height:1.15;}
+  .badge-fin{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);border-radius:14px;padding:5px 10px;color:#2ecc71;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .ident-meta{display:flex;gap:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:13px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:30px;height:30px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11.5px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:22px 0 12px;}
+  /* CORPO B&C */
+  .track-map{height:150px;border-radius:13px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08);background:repeating-linear-gradient(0deg,#0e1c22 0 1px,transparent 1px 26px),repeating-linear-gradient(90deg,#0e1c22 0 1px,transparent 1px 30px),#0a161b;margin-bottom:11px;}
+  .track-path{position:absolute;inset:0;}
+  .tp-start{position:absolute;left:14%;top:70%;width:12px;height:12px;border-radius:50%;background:#f1c40f;border:2px solid #050d10;}
+  .tp-end{position:absolute;left:80%;top:24%;width:14px;height:14px;border-radius:50% 50% 50% 0;background:#2ecc71;rotate:-45deg;border:2px solid #050d10;}
+  .track-lbl{position:absolute;bottom:8px;left:12px;font-size:9px;color:#7d8d99;font-family:'IBM Plex Mono',monospace;}
+  .stats{display:flex;gap:9px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px 8px;text-align:center;}
+  .stat-n{color:#fff;font-size:19px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .stat-n small{font-size:12px;color:#5a7280;}
+  .stat-l{color:#5a7280;font-size:9px;font-weight:600;margin-top:3px;letter-spacing:.3px;}
+  .skill{display:flex;align-items:center;gap:11px;border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 13px;margin-bottom:8px;}
+  .skill.done{border-color:rgba(46,204,113,.22);background:rgba(46,204,113,.04);}
+  .skill-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .skill-name{flex:1;color:#fff;font-size:12.5px;font-weight:600;}
+  .skill-st{font-size:10px;font-weight:700;letter-spacing:.3px;}
+  .stt-ok{color:#2ecc71;} .stt-dev{color:#e67e22;} .stt-no{color:#5a7280;}
+  .cfg{display:flex;gap:9px;}
+  .cfg-cell{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px;text-align:center;}
+  .cfg-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .cfg-v{color:#fff;font-size:14px;font-weight:700;margin-top:4px;}
+  .relato{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;}
+  .relato p{color:#aebcc4;font-size:12px;line-height:1.6;}
+  .integ{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.16);border-radius:13px;padding:14px;margin-top:6px;}
+  .integ-head{display:flex;align-items:center;gap:8px;color:#2ecc71;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:9px;}
+  .integ-hash{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7d8d99;word-break:break-all;line-height:1.5;}
+  .audit-link{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);color:#aebcc4;font-size:12px;font-weight:500;}
+  .audit-link b{color:#fff;font-weight:600;}
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 70%,transparent);display:flex;gap:10px;}
+  .cta{flex:1;border-radius:13px;padding:15px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;}
+  .cta-pdf{background:#4dd0e1;color:#050d10;}
+  .cta-share{background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.3);color:#4dd0e1;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:4px;}
+  .legend-side h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>09:14</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Treino · Busca & Captura</div><div class="h-sub">SESSÃO 2026/05/16-BC</div></div>
+        <div class="h-share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
+      </div>
+      <div class="ident">
+        <div class="ident-top">
+          <div><div class="ident-type">Busca & Captura · Manutenção</div><div class="ident-nature">Rastreamento urbano</div></div>
+          <div class="badge-fin"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>REGISTRADA</div>
+        </div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Data</span><span class="im-v">16/05/2026</span></div>
+          <div class="im"><span class="im-k">Duração</span><span class="im-v">28 min</span></div>
+          <div class="im"><span class="im-k">Terreno</span><span class="im-v">Urbano</span></div>
+        </div>
+        <div class="ident-bin"><div class="bin-av dog"></div><div class="bin-av"></div><div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b> · Canil K9 Limeira</div></div>
+      </div>
+
+      <div class="sec-label">Rastro percorrido</div>
+      <div class="track-map">
+        <svg class="track-path" viewBox="0 0 360 150" preserveAspectRatio="none"><path d="M50 105 C 110 95, 130 60, 180 70 S 260 50, 290 36" fill="none" stroke="#4dd0e1" stroke-width="2.5" stroke-dasharray="5 5" opacity="0.85"/></svg>
+        <div class="tp-start"></div><div class="tp-end"></div>
+        <div class="track-lbl">início → localização do figurante</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-n">340<small>m</small></div><div class="stat-l">DISTÂNCIA</div></div>
+        <div class="stat"><div class="stat-n">30<small>min</small></div><div class="stat-l">IDADE DO RASTRO</div></div>
+        <div class="stat"><div class="stat-n">8<small>min</small></div><div class="stat-l">TEMPO DE BUSCA</div></div>
+      </div>
+
+      <div class="sec-label">Habilidades trabalhadas</div>
+      <div class="skill done"><div class="skill-ico" style="background:rgba(46,204,113,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2"><path d="M11 11l-7 9M14 4l6 6M9 13c4-3 8-6 11-3"/></svg></div><div class="skill-name">Rastreamento</div><span class="skill-st stt-ok">FIRME</span></div>
+      <div class="skill done"><div class="skill-ico" style="background:rgba(46,204,113,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="#2ecc71"/></svg></div><div class="skill-name">Indicação passiva</div><span class="skill-st stt-ok">OK</span></div>
+      <div class="skill"><div class="skill-ico" style="background:rgba(230,126,34,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div><div class="skill-name">Contenção</div><span class="skill-st stt-dev">PARCIAL</span></div>
+      <div class="skill"><div class="skill-ico" style="background:rgba(255,255,255,.04)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5a7280" stroke-width="2"><path d="M12 2v20M2 7l10 5 10-5"/></svg></div><div class="skill-name">Indicação em altura</div><span class="skill-st stt-no">NÃO TREINADO</span></div>
+
+      <div class="sec-label">Configuração</div>
+      <div class="cfg">
+        <div class="cfg-cell"><div class="cfg-k">Objeto de odor</div><div class="cfg-v">Camiseta</div></div>
+        <div class="cfg-cell"><div class="cfg-k">Figurante</div><div class="cfg-v">Souza</div></div>
+        <div class="cfg-cell"><div class="cfg-k">Ambiente</div><div class="cfg-v">Urbano</div></div>
+      </div>
+
+      <div class="sec-label">Observações</div>
+      <div class="relato"><p>Rastro urbano de 340m com idade de 30min concluído sem perda de pista, mesmo com cruzamentos. Indicação passiva firme ao localizar o figurante. Contenção ainda precisa de reforço — soltou antes do comando em uma das tentativas.</p></div>
+
+      <div class="sec-label">Integridade e auditoria</div>
+      <div class="integ">
+        <div class="integ-head"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>REGISTRO ÍNTEGRO · SHA-256</div>
+        <div class="integ-hash">d9c1a6f3b8e240759c1f3a6e8b2d04719f6c8a3e5b1d97042c8e6a3f5b9d72148</div>
+        <div class="audit-link"><span>Trilha de auditoria · <b>2 registros</b></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </div>
+    <div class="cta-bar">
+      <button class="cta cta-pdf"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Gerar PDF</button>
+      <button class="cta cta-share"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Compartilhar</button>
+    </div>
+  </div>
+  <div class="legend-side"><h3>CORPO: BUSCA & CAPTURA</h3><p style="font-size:11.5px;color:#8b97a0">Casca idêntica. Corpo = rastro percorrido (mapa do trajeto), métricas de rastreamento (distância, idade do rastro, tempo de busca), habilidades trabalhadas e configuração.</p></div>
+</div>
+</body>
+</html>

@@ -31,6 +31,8 @@ class Occurrence with SoftDeletable {
 
   final String? integrityHash;
   final String? pdfExportUrl;
+  final int? durationTotal;
+  final Map<String, dynamic>? finalizationDraft;
 
   final String? initialObservation;
 
@@ -64,6 +66,8 @@ class Occurrence with SoftDeletable {
     this.details,
     this.integrityHash,
     this.pdfExportUrl,
+    this.durationTotal,
+    this.finalizationDraft,
     this.initialObservation,
     this.auditTrail = const [],
     this.deletedAt,
@@ -93,11 +97,15 @@ class Occurrence with SoftDeletable {
       details: _parseStringMap(map['details']),
       integrityHash: _parseString(map['integrity_hash']),
       pdfExportUrl: _parseString(map['pdf_export_url']),
+      durationTotal: _parseInt(map['duration_total']),
+      finalizationDraft: _parseStringMap(map['finalization_draft']),
       initialObservation: _parseString(map['initial_observation']),
       auditTrail: _parseMapList(map['audit_trail']),
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
       deletedBy: _parseString(map['deleted_by']),
-      deleteReason: _parseString(map['delete_reason']),
+      deleteReason:
+          _parseString(map['deleted_reason']) ??
+          _parseString(map['delete_reason']),
     );
   }
 
@@ -124,6 +132,8 @@ class Occurrence with SoftDeletable {
       'details': details,
       'integrity_hash': integrityHash,
       'pdf_export_url': pdfExportUrl,
+      'duration_total': durationTotal,
+      'finalization_draft': finalizationDraft,
       'initial_observation': initialObservation,
       'audit_trail': auditTrail,
       ...softDeleteFields(),
@@ -151,6 +161,8 @@ class Occurrence with SoftDeletable {
     Map<String, dynamic>? details,
     String? integrityHash,
     String? pdfExportUrl,
+    int? durationTotal,
+    Map<String, dynamic>? finalizationDraft,
     String? initialObservation,
     List<Map<String, dynamic>>? auditTrail,
     DateTime? deletedAt,
@@ -178,6 +190,8 @@ class Occurrence with SoftDeletable {
       details: details ?? this.details,
       integrityHash: integrityHash ?? this.integrityHash,
       pdfExportUrl: pdfExportUrl ?? this.pdfExportUrl,
+      durationTotal: durationTotal ?? this.durationTotal,
+      finalizationDraft: finalizationDraft ?? this.finalizationDraft,
       initialObservation: initialObservation ?? this.initialObservation,
       auditTrail: auditTrail ?? this.auditTrail,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -203,6 +217,13 @@ class Occurrence with SoftDeletable {
   static double? _parseDouble(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value.replaceAll(',', '.'));
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value);
     return null;
   }
 

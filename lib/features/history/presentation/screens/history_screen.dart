@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -53,6 +58,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
   String? _lastLoadedDogId;
+  int _visibleCount = 30;
 
   @override
   void initState() {
@@ -103,7 +109,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final allEntries = _buildAllEntries(dogId);
     final filteredEntries = _filterEntries(allEntries);
-    final groupedEntries = _groupEntriesByDay(filteredEntries);
+    final visibleEntries = filteredEntries.take(_visibleCount).toList();
+    final groupedEntries = _groupEntriesByDay(visibleEntries);
     final daysCount = groupedEntries.length;
 
     return Scaffold(
@@ -123,7 +130,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 handlerImageUrl: handlerImageUrl,
                 shiftStartTime: shiftVM.shiftStartTime,
               ),
-              _PageTitleRow(onExport: _exportPdf),
+              _PageTitleRow(
+                onExport: () => _exportPdf(filteredEntries, dog, callsign),
+              ),
               _PeriodFilterChips(
                 selected: _periodFilter,
                 onSelected: (v) {
@@ -132,14 +141,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     _openDateRangePicker();
                     return;
                   }
-                  setState(() => _periodFilter = v);
+                  setState(() {
+                    _periodFilter = v;
+                    _visibleCount = 30;
+                  });
                 },
               ),
               _CategoryFilterChips(
                 selected: _typeFilter,
                 onSelected: (v) {
                   HapticFeedback.selectionClick();
-                  setState(() => _typeFilter = v);
+                  setState(() {
+                    _typeFilter = v;
+                    _visibleCount = 30;
+                  });
                 },
               ),
               _FilterSummaryRow(
@@ -147,7 +162,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 days: daysCount,
                 onMoreFilters: _openFilterSheet,
               ),
-              Expanded(child: _HistoryTimeline(groups: groupedEntries)),
+              Expanded(
+                child: _HistoryTimeline(
+                  groups: groupedEntries,
+                  hasMore: filteredEntries.length > visibleEntries.length,
+                  onLoadMore: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _visibleCount += 30);
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -168,16 +192,160 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
   }
 
-  void _exportPdf() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'PDF do histórico em desenvolvimento',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+  Future<void> _exportPdf(
+    List<HistoryEntry> entries,
+    Dog dog,
+    String handlerName,
+  ) async {
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Nao ha registros no periodo filtrado.',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: _hCyan.withAlpha(200),
+          behavior: SnackBarBehavior.floating,
         ),
-        backgroundColor: _hCyan.withAlpha(200),
-        behavior: SnackBarBehavior.floating,
+      );
+      return;
+    }
+
+    final bytes = await _buildHistoryPdf(entries, dog, handlerName);
+    await Printing.layoutPdf(
+      onLayout: (_) async => bytes,
+      name:
+          'historico_${dog.name}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+    );
+  }
+
+  Future<Uint8List> _buildHistoryPdf(
+    List<HistoryEntry> entries,
+    Dog dog,
+    String handlerName,
+  ) async {
+    final pdf = pw.Document();
+    final range = _periodDateRange();
+    final accent = PdfColor.fromHex('5A4080');
+    final rangeEnd = range.end.subtract(const Duration(days: 1));
+    final dateLabel =
+        '${DateFormat('dd/MM/yyyy').format(range.start)} a ${DateFormat('dd/MM/yyyy').format(rangeEnd)}';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        build: (context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'GUARDA CIVIL MUNICIPAL DE LIMEIRA',
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                      color: accent,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Historico operacional do cao K9',
+                    style: pw.TextStyle(
+                      fontSize: 22,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              pw.Text(
+                DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
+                style: const pw.TextStyle(fontSize: 9),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 14),
+          pw.Container(height: 2, color: accent),
+          pw.SizedBox(height: 14),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F6F2FA'),
+              border: pw.Border.all(color: accent, width: 0.6),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                _pdfMetric('Cao K9', dog.name),
+                _pdfMetric('Condutor', handlerName),
+                _pdfMetric('Periodo', dateLabel),
+                _pdfMetric('Registros', entries.length.toString()),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 18),
+          pw.TableHelper.fromTextArray(
+            headers: const ['Data', 'Categoria', 'Registro', 'Responsavel'],
+            data: entries
+                .map(
+                  (entry) => [
+                    DateFormat('dd/MM HH:mm').format(entry.time),
+                    entry.category,
+                    '${entry.title}\n${entry.subtitle}',
+                    entry.author,
+                  ],
+                )
+                .toList(),
+            headerDecoration: pw.BoxDecoration(color: accent),
+            headerStyle: pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellPadding: const pw.EdgeInsets.all(6),
+            oddRowDecoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F8FAFB'),
+            ),
+          ),
+        ],
+        footer: (context) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Canil K9 GCM Limeira',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
+            pw.Text(
+              'Pagina ${context.pageNumber} de ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
+          ],
+        ),
       ),
+    );
+
+    return pdf.save();
+  }
+
+  pw.Widget _pdfMetric(String label, String value) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          label.toUpperCase(),
+          style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          value,
+          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+        ),
+      ],
     );
   }
 }

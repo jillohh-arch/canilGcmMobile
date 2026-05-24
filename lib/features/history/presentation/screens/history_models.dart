@@ -495,8 +495,14 @@ class RecordDetail {
   ) {
     final action = _cleanText(raw['action']?.toString() ?? '');
     final fieldName = _cleanText(raw['field_name']?.toString() ?? '');
-    final user = _cleanText(raw['performed_by']?.toString() ?? fallbackUser);
+    final user = _cleanText(
+      raw['by_name']?.toString() ??
+          raw['by_ra']?.toString() ??
+          raw['performed_by']?.toString() ??
+          fallbackUser,
+    );
     final timestamp =
+        _parseAuditTimestamp(raw['at']) ??
         _parseAuditTimestamp(raw['performed_at']) ??
         _parseAuditTimestamp(raw['created_at']) ??
         fallbackTime;

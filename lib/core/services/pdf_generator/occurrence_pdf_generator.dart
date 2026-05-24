@@ -2231,7 +2231,11 @@ class OccurrencePdfGenerator {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _tinyLabel('Testemunha / apoio - presente', f, color: _amber),
+                    _tinyLabel(
+                      'Testemunha / apoio - presente',
+                      f,
+                      color: _amber,
+                    ),
                     pw.SizedBox(height: 2),
                     pw.Text('GCM Silva', style: _bodyBold(f, size: 12.5)),
                     pw.Text(
@@ -2401,7 +2405,10 @@ class OccurrencePdfGenerator {
               children: [
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(top: 1),
-                  child: pw.Text('!', style: _bodyBold(f, size: 7.5, color: _amber)),
+                  child: pw.Text(
+                    '!',
+                    style: _bodyBold(f, size: 7.5, color: _amber),
+                  ),
                 ),
                 pw.SizedBox(width: 6),
                 pw.Expanded(
@@ -2504,7 +2511,6 @@ class _PdfMediaItem {
     required this.event,
   });
 }
-
 
 class _KeyValue {
   final String label;

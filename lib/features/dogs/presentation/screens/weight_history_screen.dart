@@ -10,6 +10,8 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
+import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
+import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/core/services/pdf_generator/weight_history_pdf.dart';
 
 /// Tela 2.11 — Histórico de Peso Completo.
@@ -174,10 +176,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               color: AppTheme.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Text(
-              '⚖',
-              style: TextStyle(fontSize: 20),
-            ),
+            child: const Text('⚖', style: TextStyle(fontSize: 20)),
           ),
         ],
       ),
@@ -220,10 +219,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         ),
         child: Row(
           children: [
-            const Text(
-              '📄',
-              style: TextStyle(fontSize: 20),
-            ),
+            const Text('📄', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -286,9 +282,13 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primary.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+          color: selected
+              ? AppTheme.primary.withOpacity(0.12)
+              : Colors.white.withOpacity(0.04),
           border: Border.all(
-            color: selected ? AppTheme.primary.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            color: selected
+                ? AppTheme.primary.withOpacity(0.4)
+                : Colors.white.withOpacity(0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -312,8 +312,12 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
     // Get conductor name for last record
     final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    final weightLogs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id && l.weight != null).toList();
-    final author = weightLogs.isNotEmpty ? (weightLogs.first.createdBy ?? 'você') : 'você';
+    final weightLogs = healthVM.healthLogs
+        .where((l) => l.dogId == widget.dog.id && l.weight != null)
+        .toList();
+    final author = weightLogs.isNotEmpty
+        ? (weightLogs.first.createdBy ?? 'você')
+        : 'você';
     final dateStr = weightLogs.isNotEmpty
         ? DateFormat('dd/MM/yyyy').format(weightLogs.first.date)
         : DateFormat('dd/MM/yyyy').format(DateTime.now());
@@ -405,7 +409,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         child: Center(
           child: Text(
             'Dados insuficientes para exibir o gráfico',
-            style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 12,
+            ),
           ),
         ),
       );
@@ -413,7 +420,20 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
     // Generate month labels for the filter period
     final now = DateTime.now();
-    final months = ['NOV', 'DEZ', 'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT'];
+    final months = [
+      'NOV',
+      'DEZ',
+      'JAN',
+      'FEV',
+      'MAR',
+      'ABR',
+      'MAI',
+      'JUN',
+      'JUL',
+      'AGO',
+      'SET',
+      'OUT',
+    ];
     final chartMonths = <String>[];
     final count = _periodFilter == '30d' ? 4 : (_periodFilter == '6m' ? 6 : 7);
 
@@ -570,15 +590,23 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   Widget _buildWeightItem(_WeightEntry entry, List<_WeightEntry> allReversed) {
     final index = allReversed.indexOf(entry);
-    final prevWeight = index + 1 < allReversed.length ? allReversed[index + 1].weight : null;
-    final prevDate = index + 1 < allReversed.length ? allReversed[index + 1].date : null;
+    final prevWeight = index + 1 < allReversed.length
+        ? allReversed[index + 1].weight
+        : null;
+    final prevDate = index + 1 < allReversed.length
+        ? allReversed[index + 1].date
+        : null;
     final diff = prevWeight != null ? entry.weight - prevWeight : null;
     final days = prevDate != null ? entry.date.difference(prevDate).inDays : 0;
 
     // Get log observations/metadata for the weight row
     final healthVM = Provider.of<HealthViewModel>(context, listen: false);
     final log = healthVM.healthLogs.firstWhere(
-      (l) => l.dogId == widget.dog.id && l.weight == entry.weight && l.date.day == entry.date.day && l.date.month == entry.date.month,
+      (l) =>
+          l.dogId == widget.dog.id &&
+          l.weight == entry.weight &&
+          l.date.day == entry.date.day &&
+          l.date.month == entry.date.month,
       orElse: () => HealthLogModel(
         dogId: widget.dog.id,
         date: entry.date,
@@ -595,7 +623,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     String variationLabel = '→ Estável';
     Color variationColor = AppTheme.textTertiary;
     if (diff != null && diff.abs() >= 0.05) {
-      variationLabel = '${diff > 0 ? '↑ +' : '↓ '}${diff.toStringAsFixed(1)}kg em ${days}d';
+      variationLabel =
+          '${diff > 0 ? '↑ +' : '↓ '}${diff.toStringAsFixed(1)}kg em ${days}d';
       variationColor = diff > 0 ? AppTheme.warning : AppTheme.success;
     }
 
@@ -666,11 +695,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               ],
             ),
           ),
-          if (hasPhoto)
-            const Text(
-              '📷',
-              style: TextStyle(fontSize: 14),
-            ),
+          if (hasPhoto) const Text('📷', style: TextStyle(fontSize: 14)),
         ],
       ),
     );
@@ -712,7 +737,11 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.add_circle_outline, color: Color(0xFF050D10), size: 18),
+              const Icon(
+                Icons.add_circle_outline,
+                color: Color(0xFF050D10),
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 'REGISTRAR NOVA PESAGEM',
@@ -735,7 +764,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => _WeighFormSheet(dog: widget.dog, healthVM: Provider.of<HealthViewModel>(context, listen: false)),
+      builder: (ctx) => _WeighFormSheet(
+        dog: widget.dog,
+        healthVM: Provider.of<HealthViewModel>(context, listen: false),
+      ),
     );
   }
 
@@ -751,12 +783,16 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     }
 
     if (widget.dog.weight != null) {
-      final hasToday = entries.any((e) =>
-          e.date.year == DateTime.now().year &&
-          e.date.month == DateTime.now().month &&
-          e.date.day == DateTime.now().day);
+      final hasToday = entries.any(
+        (e) =>
+            e.date.year == DateTime.now().year &&
+            e.date.month == DateTime.now().month &&
+            e.date.day == DateTime.now().day,
+      );
       if (!hasToday) {
-        entries.add(_WeightEntry(date: DateTime.now(), weight: widget.dog.weight!));
+        entries.add(
+          _WeightEntry(date: DateTime.now(), weight: widget.dog.weight!),
+        );
       }
     }
 
@@ -825,7 +861,12 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
         color: Color(0xFF06131A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -873,7 +914,11 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   child: const Center(
                     child: Text(
                       '-',
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -935,7 +980,11 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   child: const Center(
                     child: Text(
                       '+',
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -990,7 +1039,9 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
               decoration: BoxDecoration(
                 color: _hasPhoto ? const Color(0xFF0F2624) : Colors.transparent,
                 border: Border.all(
-                  color: _hasPhoto ? AppTheme.success.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                  color: _hasPhoto
+                      ? AppTheme.success.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.1),
                   style: _hasPhoto ? BorderStyle.solid : BorderStyle.solid,
                 ),
                 borderRadius: BorderRadius.circular(10),
@@ -999,9 +1050,13 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _hasPhoto ? '✓ Foto da Balança Anexada' : '📷 Anexar foto da balança',
+                    _hasPhoto
+                        ? '✓ Foto da Balança Anexada'
+                        : '📷 Anexar foto da balança',
                     style: GoogleFonts.inter(
-                      color: _hasPhoto ? AppTheme.success : AppTheme.textSecondary,
+                      color: _hasPhoto
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1023,11 +1078,24 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                 subtype: 'Pesagem',
                 weight: _weight,
                 healthObservations: 'Pesagem efetuada em $_selectedLocation.',
-                attachmentUrl: _hasPhoto ? 'scale_photo_comprovante_balanca.jpg' : null,
+                attachmentUrl: _hasPhoto
+                    ? 'scale_photo_comprovante_balanca.jpg'
+                    : null,
               );
 
               try {
                 await widget.healthVM.addHealthLog(log);
+                await WeightHistoryService().addRecord(
+                  widget.dog.id,
+                  WeightRecord(
+                    weightKg: _weight,
+                    measuredAt: log.date,
+                    measuredBy: log.createdBy ?? 'app_mobile',
+                    context: _selectedLocation,
+                    photoUrl: log.attachmentUrl,
+                    notes: log.healthObservations,
+                  ),
+                );
                 if (mounted) Navigator.of(context).pop();
               } catch (e) {
                 if (mounted) {
@@ -1073,9 +1141,13 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primary.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+          color: selected
+              ? AppTheme.primary.withOpacity(0.12)
+              : Colors.white.withOpacity(0.04),
           border: Border.all(
-            color: selected ? AppTheme.primary.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            color: selected
+                ? AppTheme.primary.withOpacity(0.4)
+                : Colors.white.withOpacity(0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1124,11 +1196,14 @@ class _WeightFullChartPainter extends CustomPainter {
     final range = maxVal - minVal > 0 ? maxVal - minVal : 1.0;
 
     // Draw ideal weight shaded range band
-    final yMin = size.height - ((idealWeightMin - minVal) / range) * size.height;
-    final yMax = size.height - ((idealWeightMax - minVal) / range) * size.height;
+    final yMin =
+        size.height - ((idealWeightMin - minVal) / range) * size.height;
+    final yMax =
+        size.height - ((idealWeightMax - minVal) / range) * size.height;
 
     final rectPaint = Paint()
-      ..color = const Color(0x182ECC71) // Semi-transparent green
+      ..color =
+          const Color(0x182ECC71) // Semi-transparent green
       ..style = PaintingStyle.fill;
 
     canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
@@ -1143,7 +1218,8 @@ class _WeightFullChartPainter extends CustomPainter {
 
     // Draw IDEAL text label
     final textSpan = TextSpan(
-      text: 'IDEAL ${idealWeightMin.toStringAsFixed(0)}-${idealWeightMax.toStringAsFixed(0)}kg',
+      text:
+          'IDEAL ${idealWeightMin.toStringAsFixed(0)}-${idealWeightMax.toStringAsFixed(0)}kg',
       style: GoogleFonts.inter(
         color: const Color(0xFF2ECC71),
         fontSize: 8,

@@ -14,6 +14,7 @@ class OccurrenceEvent with SoftDeletable {
 
   final List<String> photoUrls;
   final List<Map<String, dynamic>> photoMetadata;
+  final List<Map<String, dynamic>> mediaItems;
 
   final double? gpsLat;
   final double? gpsLng;
@@ -39,6 +40,7 @@ class OccurrenceEvent with SoftDeletable {
     this.description,
     this.photoUrls = const [],
     this.photoMetadata = const [],
+    this.mediaItems = const [],
     this.gpsLat,
     this.gpsLng,
     required this.createdAt,
@@ -49,8 +51,11 @@ class OccurrenceEvent with SoftDeletable {
     this.deleteReason,
   });
 
-  factory OccurrenceEvent.fromMap(Map<String, dynamic> map, String id,
-      {required String occurrenceId}) {
+  factory OccurrenceEvent.fromMap(
+    Map<String, dynamic> map,
+    String id, {
+    required String occurrenceId,
+  }) {
     return OccurrenceEvent(
       id: id,
       occurrenceId: occurrenceId,
@@ -58,25 +63,30 @@ class OccurrenceEvent with SoftDeletable {
       timestamp: _parseDateTime(map['timestamp']) ?? DateTime.now(),
       title: map['title'] as String?,
       description: map['description'] as String?,
-      photoUrls: (map['photo_urls'] as List<dynamic>?)
+      photoUrls:
+          (map['photo_urls'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      photoMetadata: (map['photo_metadata'] as List<dynamic>?)
+      photoMetadata:
+          (map['photo_metadata'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           const [],
+      mediaItems: _parseMediaItems(map),
       gpsLat: (map['gps_lat'] as num?)?.toDouble(),
       gpsLng: (map['gps_lng'] as num?)?.toDouble(),
       createdAt: _parseDateTime(map['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(map['updated_at']) ?? DateTime.now(),
-      auditTrail: (map['audit_trail'] as List<dynamic>?)
+      auditTrail:
+          (map['audit_trail'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           const [],
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
       deletedBy: map['deleted_by'] as String?,
-      deleteReason: map['delete_reason'] as String?,
+      deleteReason:
+          map['deleted_reason'] as String? ?? map['delete_reason'] as String?,
     );
   }
 
@@ -89,6 +99,9 @@ class OccurrenceEvent with SoftDeletable {
       'description': description,
       'photo_urls': photoUrls,
       'photo_metadata': photoMetadata,
+      'media_items': mediaItems.isNotEmpty
+          ? mediaItems
+          : photoUrls.map((url) => {'type': 'image', 'url': url}).toList(),
       'gps_lat': gpsLat,
       'gps_lng': gpsLng,
       'created_at': Timestamp.fromDate(createdAt),
@@ -107,6 +120,7 @@ class OccurrenceEvent with SoftDeletable {
     String? description,
     List<String>? photoUrls,
     List<Map<String, dynamic>>? photoMetadata,
+    List<Map<String, dynamic>>? mediaItems,
     double? gpsLat,
     double? gpsLng,
     DateTime? createdAt,
@@ -125,6 +139,7 @@ class OccurrenceEvent with SoftDeletable {
       description: description ?? this.description,
       photoUrls: photoUrls ?? this.photoUrls,
       photoMetadata: photoMetadata ?? this.photoMetadata,
+      mediaItems: mediaItems ?? this.mediaItems,
       gpsLat: gpsLat ?? this.gpsLat,
       gpsLng: gpsLng ?? this.gpsLng,
       createdAt: createdAt ?? this.createdAt,
@@ -142,5 +157,22 @@ class OccurrenceEvent with SoftDeletable {
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
+  }
+
+  static List<Map<String, dynamic>> _parseMediaItems(Map<String, dynamic> map) {
+    final raw = map['media_items'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw
+          .whereType<Map>()
+          .map((e) => e.map((key, value) => MapEntry(key.toString(), value)))
+          .toList();
+    }
+    final urls =
+        (map['photo_urls'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .where((url) => url.trim().isNotEmpty)
+            .toList() ??
+        const <String>[];
+    return urls.map((url) => {'type': 'image', 'url': url}).toList();
   }
 }
