@@ -41,6 +41,21 @@ Implementacao da formacao de deteccao do Protocolo Ragonha no app Canil K9 GCM L
 - Sessao aparece no historico porque e gravada na subcolecao `dogs/{dogId}/training_sessions`, ja lida pelo fluxo existente.
 - Regras de Storage conferidas: path `dogs/{dogId}/training_sessions/{sessionId}/media/{fileName}` ja existe e nao cai no catchall.
 
+## PDF de ocorrencias - ajustes tratados na sessao
+
+Tambem ficaram registrados os pontos corrigidos/observados no PDF v2 de ocorrencias:
+
+- Usar somente os mockups novos `pdf_ocorrencia_v2_*.html` como referencia visual.
+- Ignorar completamente o mockup antigo `24_pdf_ocorrencia.html`.
+- Estrutura esperada do PDF v2: capa, localizacao, timeline, midias, relato/resultados e assinaturas/auditoria.
+- O mapa do PDF precisava reduzir o enquadramento porque o zoom estava muito fechado e nao mostrava o entorno.
+- O mapa do PDF tambem precisava usar o mesmo ponto real do app, evitando divergencia entre a localizacao exibida na tela e a localizacao impressa.
+- A regra operacional combinada foi centralizar o Static Maps nas coordenadas reais da ocorrencia (`gpsLat`/`gpsLng`) e usar o mesmo centro no marcador.
+- Hash/integridade do PDF deve reaproveitar o hash persistido na finalizacao da ocorrencia, sem recalcular um hash divergente.
+- QR/link de validacao deve usar linguagem honesta enquanto a pagina `/v/{id}` nao existir.
+- O PDF deve exibir trilha de auditoria real e registrar acesso/exportacao quando aplicavel.
+- Ponto de atencao para retomada: se o preview continuar parecendo fechado no dispositivo, revisar o valor efetivo de zoom no gerador e validar contra o app lado a lado.
+
 ## Arquivos principais
 
 - `lib/features/training/domain/detection/detection_phase_config.dart`
