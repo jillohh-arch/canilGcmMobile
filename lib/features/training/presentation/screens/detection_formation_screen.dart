@@ -8,6 +8,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/data/detection_service.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_formation_session.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_phase_config.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -45,9 +46,12 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   bool _liveMode = false;
   DetectionLine? _liveLine;
   DetectionPhaseConfig? _livePhase;
+  DetectionFormationSession? _liveSession;
   DetectionSessionRecorder? _recorder;
   DateTime? _startedAt;
   int? _selectedOdorBox;
+  String _odorMaterial = DetectionOdorMaterials.noseMp;
+  bool _completionDialogOpen = false;
 
   @override
   void initState() {
@@ -140,6 +144,8 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                     children: [
                       _buildDogProgressCard(),
                       const SizedBox(height: 12),
+                      _buildOdorMaterialSelector(),
+                      const SizedBox(height: 12),
                       _buildLineSelector(),
                       const SizedBox(height: 12),
                       if (_selectedLine != null)
@@ -181,7 +187,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
               const SizedBox(height: 13),
               _buildBoxesPanel(phase, recorder.totalReps + 1),
               const SizedBox(height: 13),
-              _buildCounterPanel(recorder, target, progress),
+              _buildCounterPanel(phase, recorder, target, progress),
               const SizedBox(height: 11),
               _buildSeries(recorder.repetitions),
               const SizedBox(height: 14),
@@ -301,8 +307,13 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
 
   Widget _buildDogProgressCard() {
     final line = _selectedLine;
-    final completed = line?.phasesCompleted.length ?? 0;
-    final total = DetectionPhaseCatalog.phases.length;
+    final implementedCodes = DetectionPhaseCatalog.phases
+        .where((phase) => phase.isImplemented)
+        .map((phase) => phase.code)
+        .toSet();
+    final completed =
+        line?.phasesCompleted.where(implementedCodes.contains).length ?? 0;
+    final total = implementedCodes.length;
     final ratio = total == 0 ? 0.0 : (completed / total).clamp(0.0, 1.0);
 
     return Container(
@@ -353,6 +364,46 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOdorMaterialSelector() {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: _boxDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('MATERIAL DE ODOR', style: _sectionStyle(_yellow)),
+          const SizedBox(height: 9),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: DetectionOdorMaterials.values.map((material) {
+              final selected = material == _odorMaterial;
+              return ChoiceChip(
+                selected: selected,
+                showCheckmark: false,
+                label: Text(DetectionOdorMaterials.label(material)),
+                labelStyle: GoogleFonts.inter(
+                  color: selected ? _bg : Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+                selectedColor: _yellow,
+                backgroundColor: Colors.white.withAlpha(9),
+                side: BorderSide(
+                  color: selected ? _yellow : Colors.white.withAlpha(18),
+                ),
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _odorMaterial = material);
+                },
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -633,7 +684,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
           ),
           Expanded(
             child: Text(
-              '${phase.boxCount} caixas · ${phase.modeLabel} · ${phase.ballLabel}',
+              '${phase.boxCount} caixas · ${phase.modeLabel} · ${phase.ballLabel} · ${DetectionOdorMaterials.label(_liveSession?.odorMaterial ?? _odorMaterial)}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
@@ -665,6 +716,10 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   }
 
   Widget _buildBoxesPanel(DetectionPhaseConfig phase, int repetitionNumber) {
+    if (phase.isSquare) {
+      return _buildSquareBoxesPanel(phase, repetitionNumber);
+    }
+
     final fixed = phase.isFixedLast;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 15, 14, 14),
@@ -719,6 +774,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                     number: number,
                     selected: selected,
                     enabled: !fixed,
+                    showBall: phase.usedBall && selected,
                     onTap: () {
                       if (fixed) return;
                       HapticFeedback.selectionClick();
@@ -757,10 +813,178 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
+  Widget _buildSquareBoxesPanel(
+    DetectionPhaseConfig phase,
+    int repetitionNumber,
+  ) {
+    final recorder = _recorder;
+    final direction =
+        recorder?.currentDirection ?? DetectionDirections.clockwise;
+    final directionLabel = DetectionDirections.label(direction);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 15, 14, 14),
+      decoration: _boxDecoration(radius: 16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _yellow.withAlpha(30),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'REP $repetitionNumber',
+                  style: GoogleFonts.robotoMono(
+                    color: _yellow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Quadrado · etapa $directionLabel · toque na caixa do odor',
+                  style: GoogleFonts.inter(
+                    color: _muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final boxWidth = (width * 0.23).clamp(58.0, 76.0);
+              final height = boxWidth * 2.9;
+              final centerX = width / 2 - boxWidth / 2;
+              final centerY = height / 2 - 46;
+              return SizedBox(
+                height: height,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _SquarePathPainter(
+                          color: _cyan.withAlpha(95),
+                          clockwise: direction == DetectionDirections.clockwise,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: centerX,
+                      top: 0,
+                      width: boxWidth,
+                      child: _buildBox(
+                        number: 1,
+                        selected: _selectedOdorBox == 1,
+                        enabled: true,
+                        onTap: () => _selectOdorBox(1),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: centerY,
+                      width: boxWidth,
+                      child: _buildBox(
+                        number: 2,
+                        selected: _selectedOdorBox == 2,
+                        enabled: true,
+                        onTap: () => _selectOdorBox(2),
+                      ),
+                    ),
+                    Positioned(
+                      left: centerX,
+                      bottom: 0,
+                      width: boxWidth,
+                      child: _buildBox(
+                        number: 3,
+                        selected: _selectedOdorBox == 3,
+                        enabled: true,
+                        onTap: () => _selectOdorBox(3),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: centerY,
+                      width: boxWidth,
+                      child: _buildBox(
+                        number: 4,
+                        selected: _selectedOdorBox == 4,
+                        enabled: true,
+                        onTap: () => _selectOdorBox(4),
+                      ),
+                    ),
+                    Center(
+                      child: Container(
+                        width: 76,
+                        height: 76,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _panel,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _cyan.withAlpha(120)),
+                        ),
+                        child: Text(
+                          'CONDUTOR',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            color: _cyan,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                direction == DetectionDirections.clockwise
+                    ? Icons.rotate_right_rounded
+                    : Icons.rotate_left_rounded,
+                color: _yellow,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  _selectedOdorBox == null
+                      ? 'Selecione a posição do odor antes de registrar'
+                      : 'Odor na caixa $_selectedOdorBox · sentido $directionLabel',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: _yellow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBox({
     required int number,
     required bool selected,
     required bool enabled,
+    bool showBall = false,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -790,17 +1014,39 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                     ]
                   : const [],
             ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                width: 28,
-                height: 16,
-                margin: const EdgeInsets.only(top: 12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF04090B),
-                  borderRadius: BorderRadius.all(Radius.elliptical(28, 16)),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    width: 28,
+                    height: 16,
+                    margin: const EdgeInsets.only(top: 12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF04090B),
+                      borderRadius: BorderRadius.all(Radius.elliptical(28, 16)),
+                    ),
+                  ),
                 ),
-              ),
+                if (showBall)
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _yellow,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _yellow.withAlpha(90),
+                            blurRadius: 12,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -817,13 +1063,25 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
+  void _selectOdorBox(int number) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedOdorBox = number);
+  }
+
   Widget _buildCounterPanel(
+    DetectionPhaseConfig phase,
     DetectionSessionRecorder recorder,
     int? target,
     double progress,
   ) {
     final missing = target == null ? null : target - recorder.currentStreak;
     final criterionMet = recorder.criterionMet;
+    final heading = phase.isSquare
+        ? 'ETAPA ${recorder.activeDirectionLabel.toUpperCase()}'
+        : 'CONSECUTIVAS SEM ERRO';
+    final detail = phase.isSquare && target != null
+        ? 'Horário ${recorder.clockwiseStreak.clamp(0, target)}/$target · anti-horário ${recorder.counterClockwiseStreak.clamp(0, target)}/$target'
+        : null;
 
     return Container(
       padding: const EdgeInsets.all(15),
@@ -861,7 +1119,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'CONSECUTIVAS SEM ERRO',
+                  heading,
                   style: GoogleFonts.inter(
                     color: _muted,
                     fontSize: 10,
@@ -870,6 +1128,17 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                   ),
                 ),
                 const SizedBox(height: 7),
+                if (detail != null) ...[
+                  Text(
+                    detail,
+                    style: GoogleFonts.robotoMono(
+                      color: _cyan,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                ],
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
@@ -882,10 +1151,12 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                 const SizedBox(height: 7),
                 Text(
                   criterionMet
-                      ? 'Critério atingido · confirme o avanço ao encerrar'
+                      ? 'Critério atingido · fase será concluída automaticamente'
                       : missing == null
                       ? 'Critério definido pelo instrutor'
-                      : 'Faltam $missing para sugerir avanço',
+                      : phase.isSquare
+                      ? 'Faltam $missing para concluir esta etapa'
+                      : 'Faltam $missing para concluir a fase',
                   style: GoogleFonts.inter(
                     color: criterionMet ? _green : _muted,
                     fontSize: 10.5,
@@ -957,11 +1228,12 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   Widget _buildLiveActions() {
     final canRecord =
         _livePhase?.isFixedLast == true || _selectedOdorBox != null;
+    final actionsDisabled = _saving || _completionDialogOpen || !canRecord;
     return Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _saving ? null : () => _recordResult(false),
+            onPressed: actionsDisabled ? null : () => _recordResult(false),
             style: OutlinedButton.styleFrom(
               foregroundColor: _red,
               side: BorderSide(
@@ -988,7 +1260,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         Expanded(
           flex: 2,
           child: FilledButton.icon(
-            onPressed: _saving ? null : () => _recordResult(true),
+            onPressed: actionsDisabled ? null : () => _recordResult(true),
             style: FilledButton.styleFrom(
               backgroundColor: canRecord ? _green : _mutedDark,
               foregroundColor: const Color(0xFF04140A),
@@ -1095,6 +1367,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     }
 
     try {
+      setState(() => _saving = true);
       final actor = _resolveActor();
       final startedLine = await _service.ensureLineStarted(
         dogId: widget.dog.id,
@@ -1102,25 +1375,59 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         handlerId: actor.ra,
         handlerName: actor.name,
       );
+      final lineDocId = startedLine.id ?? startedLine.normalizedType;
+      final openSession = await _service.getOpenFormationSession(
+        dogId: widget.dog.id,
+        lineId: lineDocId,
+        phase: phase.code,
+      );
+      final session =
+          openSession ??
+          await _service.startFormationSession(
+            dogId: widget.dog.id,
+            dogName: widget.dog.name,
+            line: startedLine,
+            phase: phase,
+            odorMaterial: _odorMaterial,
+            handlerId: actor.ra,
+            handlerName: actor.name,
+          );
+      final recorder = DetectionSessionRecorder(
+        phase: phase,
+        initialRepetitions: session.repetitions,
+      );
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       setState(() {
         _liveLine = startedLine;
         _livePhase = phase;
-        _recorder = DetectionSessionRecorder(phase: phase);
-        _startedAt = DateTime.now();
+        _liveSession = session;
+        _recorder = recorder;
+        _startedAt = session.startedAt;
+        _odorMaterial = session.odorMaterial;
         _selectedOdorBox = phase.isFixedLast ? phase.fixedOdorBox : null;
+        _completionDialogOpen = false;
         _liveMode = true;
+        _saving = false;
       });
+      if (openSession != null) {
+        _showMessage('Sessão em andamento retomada.');
+      }
     } catch (e) {
+      if (mounted) setState(() => _saving = false);
       _showMessage('Falha ao iniciar sessão: $e', error: true);
     }
   }
 
-  void _recordResult(bool hit) {
+  Future<void> _recordResult(bool hit) async {
+    if (_saving || _completionDialogOpen) return;
+    final session = _liveSession;
+    final line = _liveLine;
     final phase = _livePhase;
     final recorder = _recorder;
-    if (phase == null || recorder == null) return;
+    if (session == null || line == null || phase == null || recorder == null) {
+      return;
+    }
 
     final odorBox = phase.isFixedLast ? phase.fixedOdorBox : _selectedOdorBox;
     if (odorBox == null) {
@@ -1128,28 +1435,59 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
       return;
     }
 
+    final direction = phase.isSquare ? recorder.currentDirection : null;
     HapticFeedback.mediumImpact();
     setState(() {
-      recorder.record(odorBox: odorBox, hit: hit);
-      if (phase.isVariable) _selectedOdorBox = null;
+      recorder.record(odorBox: odorBox, hit: hit, direction: direction);
+      if (!phase.isFixedLast) _selectedOdorBox = null;
+      _saving = true;
     });
 
-    if (!hit) {
-      _showMessage('Erro registrado. Contador de consecutivas reiniciado.');
-    } else if (recorder.criterionMet) {
-      _showMessage(
-        'Critério atingido. O avanço será confirmado no encerramento.',
+    try {
+      final actor = _resolveActor();
+      if (recorder.criterionMet) {
+        await _completePhaseAutomatically(
+          session: session,
+          line: line,
+          phase: phase,
+          recorder: recorder,
+          handlerId: actor.ra,
+          handlerName: actor.name,
+        );
+        return;
+      }
+
+      final updated = await _service.autosaveFormationProgress(
+        session: session,
+        phase: phase,
+        recorder: recorder,
+        handlerId: actor.ra,
+        handlerName: actor.name,
       );
+      if (!mounted) return;
+      setState(() {
+        _liveSession = updated;
+        _saving = false;
+      });
+      if (!hit) {
+        _showMessage('Erro registrado. Contador de consecutivas reiniciado.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage('Falha ao salvar repetição: $e', error: true);
     }
   }
 
   Future<void> _finishLiveSession() async {
     final line = _liveLine;
     final phase = _livePhase;
+    final session = _liveSession;
     final recorder = _recorder;
     final startedAt = _startedAt;
     if (line == null ||
         phase == null ||
+        session == null ||
         recorder == null ||
         startedAt == null) {
       return;
@@ -1159,22 +1497,13 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
       return;
     }
 
-    final advance = recorder.criterionMet
-        ? await _confirmAdvance(phase)
-        : false;
-    if (!mounted) return;
-
     setState(() => _saving = true);
     try {
       final actor = _resolveActor();
-      await _service.saveFormationSession(
-        dogId: widget.dog.id,
-        dogName: widget.dog.name,
-        line: line,
+      await _service.endFormationWithoutCriterion(
+        session: session,
         phase: phase,
-        startedAt: startedAt,
         recorder: recorder,
-        advancePhase: advance,
         handlerId: actor.ra,
         handlerName: actor.name,
       );
@@ -1185,11 +1514,13 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         _saving = false;
         _liveLine = null;
         _livePhase = null;
+        _liveSession = null;
         _recorder = null;
         _startedAt = null;
         _selectedOdorBox = null;
+        _completionDialogOpen = false;
       });
-      _showMessage(advance ? 'Sessão salva e fase avançada.' : 'Sessão salva.');
+      _showMessage('Sessão encerrada sem conclusão de fase.');
       await _loadLines(keepLineType: keepLineType);
     } catch (e) {
       if (!mounted) return;
@@ -1198,65 +1529,131 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     }
   }
 
-  Future<bool> _confirmAdvance(DetectionPhaseConfig phase) async {
-    final next = DetectionPhaseCatalog.nextAfter(phase.code);
-    if (next == null) return false;
+  Future<void> _completePhaseAutomatically({
+    required DetectionFormationSession session,
+    required DetectionLine line,
+    required DetectionPhaseConfig phase,
+    required DetectionSessionRecorder recorder,
+    required String handlerId,
+    required String handlerName,
+  }) async {
+    if (!mounted) return;
+    setState(() => _completionDialogOpen = true);
 
-    final result = await showDialog<bool>(
+    try {
+      final completed = await _service.completeFormationByCriterion(
+        session: session,
+        line: line,
+        phase: phase,
+        recorder: recorder,
+        handlerId: handlerId,
+        handlerName: handlerName,
+      );
+      if (!mounted) return;
+      setState(() {
+        _liveSession = completed;
+        _saving = false;
+      });
+
+      await _showPhaseCompletedDialog(phase, recorder, completed);
+      if (!mounted) return;
+
+      final keepLineType = line.normalizedType;
+      setState(() {
+        _liveMode = false;
+        _liveLine = null;
+        _livePhase = null;
+        _liveSession = null;
+        _recorder = null;
+        _startedAt = null;
+        _selectedOdorBox = null;
+        _completionDialogOpen = false;
+      });
+      await _loadLines(keepLineType: keepLineType);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _completionDialogOpen = false;
+      });
+      _showMessage('Falha ao concluir fase: $e', error: true);
+    }
+  }
+
+  Future<void> _showPhaseCompletedDialog(
+    DetectionPhaseConfig phase,
+    DetectionSessionRecorder recorder,
+    DetectionFormationSession completed,
+  ) {
+    final next = completed.advancedTo == null
+        ? null
+        : DetectionPhaseCatalog.byCode(completed.advancedTo);
+    final summary = phase.isSquare
+        ? '${recorder.clockwiseStreak} acertos no sentido horário e ${recorder.counterClockwiseStreak} no anti-horário.'
+        : '${recorder.currentStreak} acertos consecutivos registrados.';
+    final advancementText = completed.phaseAdvanced && next != null
+        ? 'A linha foi avançada para a fase ${next.code}.'
+        : 'A sessão foi encerrada pelo critério objetivo.';
+
+    return showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: _panel,
         title: Text(
-          'Avançar fase?',
+          'Fase concluída',
           style: GoogleFonts.inter(
             color: Colors.white,
             fontWeight: FontWeight.w900,
           ),
         ),
         content: Text(
-          'O critério de ${phase.criterionLabel} foi atingido. Confirma o avanço manual para ${next.code}?',
-          style: GoogleFonts.inter(color: _muted, height: 1.35),
+          'Fase ${phase.code} concluída.\n$summary\n$advancementText',
+          style: GoogleFonts.inter(color: _muted, height: 1.4),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Salvar sem avanço', style: GoogleFonts.inter()),
-          ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(context).pop(),
             style: FilledButton.styleFrom(backgroundColor: _yellow),
             child: Text(
-              'Avançar',
+              'Concluir',
               style: GoogleFonts.inter(color: _bg, fontWeight: FontWeight.w900),
             ),
           ),
         ],
       ),
     );
-
-    return result ?? false;
   }
 
   Future<void> _leaveLiveSession() async {
     final hasReps = (_recorder?.totalReps ?? 0) != 0;
     if (!hasReps) {
-      setState(() => _liveMode = false);
+      setState(() {
+        _liveMode = false;
+        _liveLine = null;
+        _livePhase = null;
+        _liveSession = null;
+        _recorder = null;
+        _startedAt = null;
+        _selectedOdorBox = null;
+        _completionDialogOpen = false;
+      });
       return;
     }
 
-    final discard = await showDialog<bool>(
+    final leave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _panel,
         title: Text(
-          'Descartar sessão?',
+          'Sair da sessão?',
           style: GoogleFonts.inter(
             color: Colors.white,
             fontWeight: FontWeight.w900,
           ),
         ),
         content: Text(
-          'Há repetições registradas que ainda não foram salvas.',
+          'As repetições já registradas ficam salvas para retomada. Para encerrar a sessão sem concluir a fase, use o botão de encerramento.',
           style: GoogleFonts.inter(color: _muted),
         ),
         actions: [
@@ -1266,20 +1663,22 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Descartar'),
+            child: const Text('Sair'),
           ),
         ],
       ),
     );
 
-    if (discard == true && mounted) {
+    if (leave == true && mounted) {
       setState(() {
         _liveMode = false;
         _liveLine = null;
         _livePhase = null;
+        _liveSession = null;
         _recorder = null;
         _startedAt = null;
         _selectedOdorBox = null;
+        _completionDialogOpen = false;
       });
     }
   }
@@ -1331,4 +1730,57 @@ class _Actor {
   final String name;
 
   const _Actor({required this.ra, required this.name});
+}
+
+class _SquarePathPainter extends CustomPainter {
+  final Color color;
+  final bool clockwise;
+
+  const _SquarePathPainter({required this.color, required this.clockwise});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final padding = size.shortestSide * 0.16;
+    final rect = Rect.fromLTWH(
+      padding,
+      padding,
+      size.width - padding * 2,
+      size.height - padding * 2,
+    );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(18)),
+      paint,
+    );
+
+    final arrowPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final arrow = Path();
+    final top = Offset(size.width / 2, rect.top - 2);
+    if (clockwise) {
+      arrow
+        ..moveTo(top.dx + 15, top.dy)
+        ..lineTo(top.dx + 2, top.dy - 7)
+        ..lineTo(top.dx + 2, top.dy + 7)
+        ..close();
+    } else {
+      arrow
+        ..moveTo(top.dx - 15, top.dy)
+        ..lineTo(top.dx - 2, top.dy - 7)
+        ..lineTo(top.dx - 2, top.dy + 7)
+        ..close();
+    }
+    canvas.drawPath(arrow, arrowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SquarePathPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.clockwise != clockwise;
+  }
 }

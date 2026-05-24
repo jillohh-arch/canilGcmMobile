@@ -177,6 +177,264 @@ class DetectionService {
     return updated;
   }
 
+  Future<DetectionFormationSession?> getOpenFormationSession({
+    required String dogId,
+    required String lineId,
+    required String phase,
+  }) async {
+    final snap = await _sessionsCol(dogId)
+        .where('type', isEqualTo: 'detection_formation')
+        .where('status', isEqualTo: DetectionFormationStatus.inProgress)
+        .get();
+
+    final sessions =
+        snap.docs
+            .map(
+              (doc) =>
+                  DetectionFormationSession.fromJson(doc.data(), docId: doc.id),
+            )
+            .where(
+              (session) =>
+                  session.lineId == lineId &&
+                  session.phase == phase &&
+                  session.deletedAt == null,
+            )
+            .toList()
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+
+    return sessions.isEmpty ? null : sessions.first;
+  }
+
+  Future<DetectionFormationSession> startFormationSession({
+    required String dogId,
+    required String dogName,
+    required DetectionLine line,
+    required DetectionPhaseConfig phase,
+    required String odorMaterial,
+    required String handlerId,
+    required String handlerName,
+  }) async {
+    final lineDocId = line.id ?? line.normalizedType;
+    final open = await getOpenFormationSession(
+      dogId: dogId,
+      lineId: lineDocId,
+      phase: phase.code,
+    );
+    if (open != null) return open;
+
+    final sessionRef = _sessionsCol(dogId).doc();
+    final now = DateTime.now();
+    final auditTrail = [
+      _auditEntry(
+        action: 'created',
+        handlerId: handlerId,
+        handlerName: handlerName,
+        reason: 'Sessão de formação iniciada.',
+        metadata: {'phase': phase.code, 'line': line.displayName},
+      ),
+    ];
+    final session = DetectionFormationSession.fromRecorder(
+      id: sessionRef.id,
+      dogId: dogId,
+      dogName: dogName,
+      lineId: lineDocId,
+      lineName: line.displayName,
+      lineType: line.normalizedType,
+      phase: phase,
+      startedAt: now,
+      recorder: DetectionSessionRecorder(phase: phase),
+      status: DetectionFormationStatus.inProgress,
+      phaseAdvanced: false,
+      handlerId: handlerId,
+      handlerName: handlerName,
+      odorMaterial: odorMaterial,
+      auditTrail: auditTrail,
+    );
+
+    await sessionRef.set(session.toJson());
+    await AuditService.log(
+      action: 'created',
+      entityType: 'training_session',
+      entityId: sessionRef.id,
+      summary: 'Sessão de formação ${line.displayName} ${phase.code} iniciada',
+      after: session.toJson(),
+    );
+
+    return session;
+  }
+
+  Future<DetectionFormationSession> autosaveFormationProgress({
+    required DetectionFormationSession session,
+    required DetectionPhaseConfig phase,
+    required DetectionSessionRecorder recorder,
+    required String handlerId,
+    required String handlerName,
+  }) async {
+    final updated = _buildSessionFromRecorder(
+      session: session,
+      phase: phase,
+      recorder: recorder,
+      status: DetectionFormationStatus.inProgress,
+      phaseAdvanced: false,
+      auditTrail: session.auditTrail,
+    );
+
+    await _sessionsCol(
+      session.dogId,
+    ).doc(session.id).set(updated.toJson(), SetOptions(merge: true));
+    return updated;
+  }
+
+  Future<DetectionFormationSession> completeFormationByCriterion({
+    required DetectionFormationSession session,
+    required DetectionLine line,
+    required DetectionPhaseConfig phase,
+    required DetectionSessionRecorder recorder,
+    required String handlerId,
+    required String handlerName,
+  }) async {
+    final verifiedRecorder = DetectionSessionRecorder(
+      phase: phase,
+      initialRepetitions: recorder.repetitions,
+    );
+    if (!verifiedRecorder.criterionMet) {
+      throw StateError(
+        'Critério da fase ${phase.code} ainda não foi atingido.',
+      );
+    }
+
+    final nextPhase = DetectionPhaseCatalog.nextAfter(phase.code);
+    final canAdvanceLine =
+        line.normalizedCurrentPhase == phase.code &&
+        !line.phasesCompleted.contains(phase.code) &&
+        nextPhase != null;
+    final completedAuditEntry = _auditEntry(
+      action: 'completed_by_criterion',
+      handlerId: handlerId,
+      handlerName: handlerName,
+      reason: 'Critério objetivo atingido dentro da sessão.',
+      metadata: {
+        'phase': phase.code,
+        'total_reps': verifiedRecorder.totalReps,
+        'misses': verifiedRecorder.missCount,
+      },
+    );
+    final updatedTrail = [...session.auditTrail, completedAuditEntry];
+    final updated = _buildSessionFromRecorder(
+      session: session,
+      phase: phase,
+      recorder: verifiedRecorder,
+      status: DetectionFormationStatus.completedByCriterion,
+      phaseAdvanced: canAdvanceLine,
+      advancedTo: canAdvanceLine ? nextPhase.code : null,
+      auditTrail: updatedTrail,
+    );
+
+    final batch = _firestore.batch();
+    final sessionRef = _sessionsCol(session.dogId).doc(session.id);
+    batch.set(sessionRef, updated.toJson(), SetOptions(merge: true));
+
+    if (canAdvanceLine) {
+      final advancedPhase = nextPhase;
+      final completed = _mergeCompletedPhases(line.phasesCompleted, phase.code);
+      final lineRef = _linesCol(
+        session.dogId,
+      ).doc(line.id ?? line.normalizedType);
+      batch.set(lineRef, {
+        'current_phase': advancedPhase.code,
+        'phases_completed': completed,
+        'status': advancedPhase.code == 'final'
+            ? 'in_formation'
+            : 'in_formation',
+        'best_streak': verifiedRecorder.longestStreak > line.bestStreak
+            ? verifiedRecorder.longestStreak
+            : line.bestStreak,
+        'consecutive_hits': 0,
+        'updated_at': FieldValue.serverTimestamp(),
+        'phase_history': FieldValue.arrayUnion([
+          {
+            'phase': phase.code,
+            'completed_at': Timestamp.fromDate(DateTime.now()),
+            'session_id': session.id,
+            'to_phase': advancedPhase.code,
+          },
+        ]),
+        'audit_trail': FieldValue.arrayUnion([
+          _auditEntry(
+            action: 'phase_advanced',
+            handlerId: handlerId,
+            handlerName: handlerName,
+            reason: 'Critério da fase atingido automaticamente.',
+            metadata: {
+              'session_id': session.id,
+              'from_phase': phase.code,
+              'to_phase': advancedPhase.code,
+            },
+          ),
+        ]),
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
+
+    await AuditService.log(
+      action: 'updated',
+      entityType: 'training_session',
+      entityId: session.id ?? '',
+      summary:
+          'Fase ${phase.code} concluída por critério para ${session.dogName}',
+      after: updated.toJson(),
+    );
+
+    return updated;
+  }
+
+  Future<DetectionFormationSession> endFormationWithoutCriterion({
+    required DetectionFormationSession session,
+    required DetectionPhaseConfig phase,
+    required DetectionSessionRecorder recorder,
+    required String handlerId,
+    required String handlerName,
+  }) async {
+    final verifiedRecorder = DetectionSessionRecorder(
+      phase: phase,
+      initialRepetitions: recorder.repetitions,
+    );
+    final updatedTrail = [
+      ...session.auditTrail,
+      _auditEntry(
+        action: 'ended_without_criterion',
+        handlerId: handlerId,
+        handlerName: handlerName,
+        reason: 'Sessão encerrada antes de atingir o critério da fase.',
+        metadata: {
+          'phase': phase.code,
+          'total_reps': verifiedRecorder.totalReps,
+        },
+      ),
+    ];
+    final updated = _buildSessionFromRecorder(
+      session: session,
+      phase: phase,
+      recorder: verifiedRecorder,
+      status: DetectionFormationStatus.endedWithoutCriterion,
+      phaseAdvanced: false,
+      auditTrail: updatedTrail,
+    );
+
+    await _sessionsCol(
+      session.dogId,
+    ).doc(session.id).set(updated.toJson(), SetOptions(merge: true));
+    await AuditService.log(
+      action: 'updated',
+      entityType: 'training_session',
+      entityId: session.id ?? '',
+      summary: 'Sessão ${phase.code} encerrada sem critério',
+      after: updated.toJson(),
+    );
+    return updated;
+  }
+
   Future<DetectionFormationSession> saveFormationSession({
     required String dogId,
     required String dogName,
@@ -190,120 +448,46 @@ class DetectionService {
     String notes = '',
     String? odorMaterial,
   }) async {
-    final endedAt = DateTime.now();
-    final sessionRef = _sessionsCol(dogId).doc();
-    final lineDocId = line.id ?? line.normalizedType;
-    final nextPhase = advancePhase
-        ? DetectionPhaseCatalog.nextAfter(phase.code)
-        : null;
-
-    final createEntry = _auditEntry(
-      action: 'created',
-      handlerId: handlerId,
-      handlerName: handlerName,
-      reason: 'Sessão de formação registrada.',
-      metadata: {
-        'phase': phase.code,
-        'line': line.displayName,
-        'total_reps': recorder.totalReps,
-      },
-    );
-
-    final session = DetectionFormationSession.fromRecorder(
-      id: sessionRef.id,
+    final session = await startFormationSession(
       dogId: dogId,
       dogName: dogName,
-      lineId: lineDocId,
-      lineName: line.displayName,
-      lineType: line.normalizedType,
+      line: line,
       phase: phase,
-      startedAt: startedAt,
-      endedAt: endedAt,
-      recorder: recorder,
-      phaseAdvanced: advancePhase,
-      advancedTo: nextPhase?.code,
+      odorMaterial: odorMaterial ?? DetectionOdorMaterials.noseMp,
       handlerId: handlerId,
       handlerName: handlerName,
-      notes: notes,
-      odorMaterial: odorMaterial,
-      auditTrail: [createEntry],
     );
 
-    final batch = _firestore.batch();
-    batch.set(sessionRef, session.toJson());
-
-    final lineRef = _linesCol(dogId).doc(lineDocId);
-    final lineUpdates = <String, dynamic>{
-      'best_streak': recorder.longestStreak > line.bestStreak
-          ? recorder.longestStreak
-          : line.bestStreak,
-      'consecutive_hits': 0,
-      'updated_at': FieldValue.serverTimestamp(),
-      'audit_trail': FieldValue.arrayUnion([
+    final updated = session.copyWith(
+      auditTrail: [
+        ...session.auditTrail,
         _auditEntry(
-          action: advancePhase ? 'phase_advanced' : 'session_recorded',
+          action: 'created',
           handlerId: handlerId,
           handlerName: handlerName,
-          reason: advancePhase
-              ? 'Critério atingido e avanço manual confirmado.'
-              : 'Sessão registrada sem avanço de fase.',
-          metadata: {
-            'session_id': sessionRef.id,
-            'phase': phase.code,
-            'current_streak': recorder.currentStreak,
-            'longest_streak': recorder.longestStreak,
-          },
+          reason: 'Sessão de formação registrada.',
         ),
-      ]),
-    };
-
-    if (advancePhase && nextPhase != null) {
-      final completed = {...line.phasesCompleted, phase.code}.toList();
-      lineUpdates.addAll({
-        'current_phase': nextPhase.code,
-        'phases_completed': completed,
-        'status': nextPhase.code == 'final'
-            ? 'operational_ready'
-            : 'in_formation',
-        'phase_history': FieldValue.arrayUnion([
-          {
-            'from_phase': phase.code,
-            'to_phase': nextPhase.code,
-            'session_id': sessionRef.id,
-            'at': Timestamp.fromDate(DateTime.now()),
-            'by': handlerId,
-            'by_ra': handlerId,
-            'by_name': handlerName,
-          },
-        ]),
-      });
-    }
-
-    batch.set(lineRef, lineUpdates, SetOptions(merge: true));
-    await batch.commit();
-
-    await AuditService.log(
-      action: 'created',
-      entityType: 'training_session',
-      entityId: sessionRef.id,
-      summary:
-          'Sessão de formação ${line.displayName} ${phase.code} registrada para $dogName',
-      after: session.toJson(),
+      ],
     );
 
-    if (advancePhase && nextPhase != null) {
-      await AuditService.log(
-        action: 'updated',
-        entityType: 'detection_line',
-        entityId: lineDocId,
-        summary:
-            'Linha ${line.displayName} avançou de ${phase.code} para ${nextPhase.code}',
-        before: {'current_phase': phase.code},
-        after: {'current_phase': nextPhase.code, 'session_id': sessionRef.id},
+    if (advancePhase || recorder.criterionMet) {
+      return completeFormationByCriterion(
+        session: updated,
+        line: line,
+        phase: phase,
+        recorder: recorder,
+        handlerId: handlerId,
+        handlerName: handlerName,
       );
     }
 
-    return session;
+    return endFormationWithoutCriterion(
+      session: updated,
+      phase: phase,
+      recorder: recorder,
+      handlerId: handlerId,
+      handlerName: handlerName,
+    );
   }
 
   Future<void> softDeleteFormationSession({
@@ -395,6 +579,37 @@ class DetectionService {
         );
   }
 
+  DetectionFormationSession _buildSessionFromRecorder({
+    required DetectionFormationSession session,
+    required DetectionPhaseConfig phase,
+    required DetectionSessionRecorder recorder,
+    required String status,
+    required bool phaseAdvanced,
+    String? advancedTo,
+    required List<Map<String, dynamic>> auditTrail,
+  }) {
+    return DetectionFormationSession.fromRecorder(
+      id: session.id,
+      dogId: session.dogId,
+      dogName: session.dogName,
+      lineId: session.lineId,
+      lineName: session.lineName,
+      lineType: session.lineType,
+      phase: phase,
+      startedAt: session.startedAt,
+      endedAt: DateTime.now(),
+      recorder: recorder,
+      status: status,
+      phaseAdvanced: phaseAdvanced,
+      advancedTo: advancedTo,
+      handlerId: session.handlerId,
+      handlerName: session.handlerName,
+      odorMaterial: session.odorMaterial,
+      notes: session.notes,
+      auditTrail: auditTrail,
+    );
+  }
+
   Map<String, dynamic> _auditEntry({
     required String action,
     required String handlerId,
@@ -420,5 +635,16 @@ class DetectionService {
     final bOrder = order[b.normalizedType] ?? 99;
     if (aOrder != bOrder) return aOrder.compareTo(bOrder);
     return a.displayName.compareTo(b.displayName);
+  }
+
+  List<String> _mergeCompletedPhases(List<String> current, String completed) {
+    final normalized = {
+      ...current.map(DetectionPhaseCatalog.normalizePhaseCode),
+      DetectionPhaseCatalog.normalizePhaseCode(completed),
+    };
+    return DetectionPhaseCatalog.phases
+        .map((phase) => phase.code)
+        .where(normalized.contains)
+        .toList();
   }
 }

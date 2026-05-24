@@ -23,9 +23,11 @@ class DetectionPhaseConfig {
 
   bool get isVariable => odorPositionMode == 'variable';
   bool get isFixedLast => odorPositionMode == 'fixed_last';
+  bool get isSquare => odorPositionMode == 'square';
   int get fixedOdorBox => boxCount;
 
   String get modeLabel {
+    if (isSquare) return 'quadrado';
     if (isVariable) return 'odor variável';
     if (isFixedLast) return 'odor fixo na última';
     return 'layout especial';
@@ -35,6 +37,9 @@ class DetectionPhaseConfig {
 
   String get criterionLabel {
     final target = targetConsecutiveHits;
+    if (isSquare && target != null) {
+      return '$target horário + $target anti-horário';
+    }
     if (target == null) return 'critério operacional';
     return '$target consecutivas';
   }
@@ -85,8 +90,7 @@ class DetectionPhaseCatalog {
       usedBall: true,
       targetConsecutiveHits: 3,
       isImplemented: true,
-      description:
-          'Odor alternado entre caixas; critério confirmado em 3 acertos.',
+      description: 'Odor alternado entre caixas; critério em 3 acertos.',
     ),
     DetectionPhaseConfig(
       code: '3b',
@@ -132,8 +136,7 @@ class DetectionPhaseCatalog {
       usedBall: false,
       targetConsecutiveHits: 3,
       isImplemented: true,
-      description:
-          'Odor variável em quatro caixas; critério confirmado em 3 acertos.',
+      description: 'Odor variável em quatro caixas; critério em 3 acertos.',
     ),
     DetectionPhaseConfig(
       code: '4c',
@@ -143,9 +146,9 @@ class DetectionPhaseCatalog {
       odorPositionMode: 'square',
       usedBall: false,
       targetConsecutiveHits: 3,
-      isImplemented: false,
+      isImplemented: true,
       description:
-          'Fase prevista no protocolo; layout será implementado depois.',
+          'Busca circular: 3 acertos no sentido horário e 3 no anti-horário.',
     ),
     DetectionPhaseConfig(
       code: 'final',
@@ -220,31 +223,48 @@ class DetectionSessionRecorder {
   final DetectionPhaseConfig phase;
   final List<DetectionRepetition> _repetitions;
 
-  int currentStreak;
-  int longestStreak;
+  int currentStreak = 0;
+  int longestStreak = 0;
+  int clockwiseStreak = 0;
+  int counterClockwiseStreak = 0;
+  String currentDirection = DetectionDirections.clockwise;
 
   DetectionSessionRecorder({
     required this.phase,
     List<DetectionRepetition>? initialRepetitions,
   }) : _repetitions = List<DetectionRepetition>.from(
          initialRepetitions ?? const [],
-       ),
-       currentStreak = _calculateCurrentStreak(initialRepetitions ?? const []),
-       longestStreak = _calculateLongestStreak(initialRepetitions ?? const []);
+       ) {
+    _recalculate();
+  }
 
   List<DetectionRepetition> get repetitions => List.unmodifiable(_repetitions);
   int get totalReps => _repetitions.length;
+  int get missCount => _repetitions.where((rep) => !rep.isHit).length;
 
   bool get criterionMet {
     final target = phase.targetConsecutiveHits;
     if (target == null) return false;
+    if (phase.isSquare) {
+      return clockwiseStreak >= target && counterClockwiseStreak >= target;
+    }
     return currentStreak >= target;
+  }
+
+  int get activeTarget => phase.targetConsecutiveHits ?? 0;
+
+  String get activeDirectionLabel {
+    if (!phase.isSquare) return '';
+    return currentDirection == DetectionDirections.clockwise
+        ? 'horário'
+        : 'anti-horário';
   }
 
   DetectionRepetition record({
     required int odorBox,
     required bool hit,
     DateTime? at,
+    String? direction,
   }) {
     if (phase.boxCount > 0 && (odorBox < 1 || odorBox > phase.boxCount)) {
       throw ArgumentError.value(
@@ -261,39 +281,83 @@ class DetectionSessionRecorder {
           ? DetectionRepetitionResult.hit
           : DetectionRepetitionResult.miss,
       at: at ?? DateTime.now(),
+      direction: phase.isSquare ? direction ?? currentDirection : null,
     );
 
     _repetitions.add(repetition);
-    if (hit) {
-      currentStreak += 1;
-      if (currentStreak > longestStreak) longestStreak = currentStreak;
-    } else {
-      currentStreak = 0;
-    }
+    _recalculate();
     return repetition;
   }
 
-  static int _calculateCurrentStreak(List<DetectionRepetition> repetitions) {
-    var count = 0;
-    for (final repetition in repetitions.reversed) {
-      if (!repetition.isHit) break;
-      count += 1;
-    }
-    return count;
-  }
+  void _recalculate() {
+    currentStreak = 0;
+    longestStreak = 0;
+    clockwiseStreak = 0;
+    counterClockwiseStreak = 0;
+    currentDirection = DetectionDirections.clockwise;
 
-  static int _calculateLongestStreak(List<DetectionRepetition> repetitions) {
-    var longest = 0;
-    var current = 0;
-    for (final repetition in repetitions) {
+    if (phase.isSquare) {
+      _recalculateSquare();
+      return;
+    }
+
+    for (final repetition in _repetitions) {
       if (repetition.isHit) {
-        current += 1;
-        if (current > longest) longest = current;
+        currentStreak += 1;
+        if (currentStreak > longestStreak) longestStreak = currentStreak;
       } else {
-        current = 0;
+        currentStreak = 0;
       }
     }
-    return longest;
+  }
+
+  void _recalculateSquare() {
+    final target = phase.targetConsecutiveHits ?? 3;
+    var activeDirection = DetectionDirections.clockwise;
+
+    for (final repetition in _repetitions) {
+      final repDirection = repetition.direction ?? activeDirection;
+
+      if (activeDirection == DetectionDirections.clockwise) {
+        if (repDirection != DetectionDirections.clockwise) continue;
+        if (repetition.isHit) {
+          clockwiseStreak += 1;
+          if (clockwiseStreak > longestStreak) longestStreak = clockwiseStreak;
+          if (clockwiseStreak >= target) {
+            activeDirection = DetectionDirections.counterClockwise;
+          }
+        } else {
+          clockwiseStreak = 0;
+        }
+      } else {
+        if (repDirection != DetectionDirections.counterClockwise) continue;
+        if (repetition.isHit) {
+          counterClockwiseStreak += 1;
+          if (counterClockwiseStreak > longestStreak) {
+            longestStreak = counterClockwiseStreak;
+          }
+        } else {
+          counterClockwiseStreak = 0;
+        }
+      }
+    }
+
+    currentDirection = clockwiseStreak >= target
+        ? DetectionDirections.counterClockwise
+        : DetectionDirections.clockwise;
+    currentStreak = currentDirection == DetectionDirections.clockwise
+        ? clockwiseStreak
+        : counterClockwiseStreak;
+  }
+}
+
+class DetectionDirections {
+  static const clockwise = 'clockwise';
+  static const counterClockwise = 'counter_clockwise';
+
+  static String label(String? value) {
+    if (value == counterClockwise) return 'anti-horário';
+    return 'horário';
   }
 }
 
@@ -304,12 +368,14 @@ class DetectionRepetition {
   final int odorBox;
   final DetectionRepetitionResult result;
   final DateTime at;
+  final String? direction;
 
   const DetectionRepetition({
     required this.order,
     required this.odorBox,
     required this.result,
     required this.at,
+    this.direction,
   });
 
   bool get isHit => result == DetectionRepetitionResult.hit;
@@ -324,6 +390,7 @@ class DetectionRepetition {
           ? DetectionRepetitionResult.hit
           : DetectionRepetitionResult.miss,
       at: _readDate(json['ts'] ?? json['at']) ?? DateTime.now(),
+      direction: _readString(json['direction']),
     );
   }
 
@@ -333,6 +400,7 @@ class DetectionRepetition {
       'odor_box': odorBox,
       'result': resultValue,
       'ts': at,
+      if (direction != null) 'direction': direction,
     };
   }
 }
@@ -342,6 +410,11 @@ int? _readInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
   return null;
+}
+
+String? _readString(dynamic value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? null : text;
 }
 
 DateTime? _readDate(dynamic value) {

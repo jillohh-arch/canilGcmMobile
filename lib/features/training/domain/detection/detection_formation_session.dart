@@ -2,6 +2,32 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/features/training/domain/detection/detection_phase_config.dart';
 
+class DetectionFormationStatus {
+  static const inProgress = 'in_progress';
+  static const completedByCriterion = 'completed_by_criterion';
+  static const endedWithoutCriterion = 'ended_without_criterion';
+}
+
+class DetectionOdorMaterials {
+  static const noseMp = 'nose_mp';
+  static const real = 'real';
+  static const scentlogix = 'scentlogix';
+
+  static const values = [noseMp, real, scentlogix];
+
+  static String label(String value) {
+    switch (value) {
+      case real:
+        return 'Odor real';
+      case scentlogix:
+        return 'ScentLogix';
+      case noseMp:
+      default:
+        return 'Nose MP';
+    }
+  }
+}
+
 class DetectionFormationSession {
   final String? id;
   final String dogId;
@@ -14,14 +40,18 @@ class DetectionFormationSession {
   final int boxCount;
   final String odorPositionMode;
   final bool usedBall;
-  final String? odorMaterial;
+  final String odorMaterial;
+  final String status;
+  final String? direction;
   final DateTime startedAt;
-  final DateTime endedAt;
+  final DateTime? endedAt;
   final int durationSeconds;
   final List<DetectionRepetition> repetitions;
   final int totalReps;
   final int longestStreak;
   final int currentStreak;
+  final int clockwiseStreak;
+  final int counterClockwiseStreak;
   final bool criterionMet;
   final bool phaseAdvanced;
   final String? advancedTo;
@@ -46,14 +76,18 @@ class DetectionFormationSession {
     required this.boxCount,
     required this.odorPositionMode,
     required this.usedBall,
-    this.odorMaterial,
+    required this.odorMaterial,
+    required this.status,
+    this.direction,
     required this.startedAt,
-    required this.endedAt,
+    this.endedAt,
     required this.durationSeconds,
     required this.repetitions,
     required this.totalReps,
     required this.longestStreak,
     required this.currentStreak,
+    this.clockwiseStreak = 0,
+    this.counterClockwiseStreak = 0,
     required this.criterionMet,
     required this.phaseAdvanced,
     this.advancedTo,
@@ -98,10 +132,16 @@ class DetectionFormationSession {
           'fixed_last',
       usedBall:
           json['used_ball'] as bool? ?? json['usedBall'] as bool? ?? false,
-      odorMaterial: _readString(json, const ['odor_material', 'odorMaterial']),
+      odorMaterial:
+          _readString(json, const ['odor_material', 'odorMaterial']) ??
+          DetectionOdorMaterials.noseMp,
+      status:
+          _readString(json, const ['status']) ??
+          DetectionFormationStatus.endedWithoutCriterion,
+      direction: _readString(json, const ['direction']),
       startedAt:
           _readDate(json['started_at'] ?? json['startedAt']) ?? DateTime.now(),
-      endedAt: _readDate(json['ended_at'] ?? json['endedAt']) ?? DateTime.now(),
+      endedAt: _readDate(json['ended_at'] ?? json['endedAt']),
       durationSeconds:
           _readInt(json['duration_seconds'] ?? json['durationSeconds']) ?? 0,
       repetitions: repetitions,
@@ -112,6 +152,13 @@ class DetectionFormationSession {
           _readInt(json['longest_streak'] ?? json['longestStreak']) ?? 0,
       currentStreak:
           _readInt(json['current_streak'] ?? json['currentStreak']) ?? 0,
+      clockwiseStreak:
+          _readInt(json['clockwise_streak'] ?? json['clockwiseStreak']) ?? 0,
+      counterClockwiseStreak:
+          _readInt(
+            json['counter_clockwise_streak'] ?? json['counterClockwiseStreak'],
+          ) ??
+          0,
       criterionMet:
           json['criterion_met'] as bool? ??
           json['criterionMet'] as bool? ??
@@ -147,11 +194,15 @@ class DetectionFormationSession {
       'odor_position_mode': odorPositionMode,
       'used_ball': usedBall,
       'odor_material': odorMaterial,
+      'direction': direction,
       'total_reps': totalReps,
       'longest_streak': longestStreak,
       'current_streak': currentStreak,
+      'clockwise_streak': clockwiseStreak,
+      'counter_clockwise_streak': counterClockwiseStreak,
       'criterion_met': criterionMet,
       'phase_advanced': phaseAdvanced,
+      'status': status,
       if (advancedTo != null) 'advanced_to': advancedTo,
       'repetitions': repetitions.map((rep) => rep.toJson()).toList(),
     };
@@ -162,7 +213,7 @@ class DetectionFormationSession {
       'trainingType': 'Detecção',
       'specialty': 'Detecção',
       'subtype': 'Formação Ragonha',
-      'status': 'completed',
+      'status': status,
       'syncStatus': 'synced',
       'dogId': dogId,
       'dog_id': dogId,
@@ -181,10 +232,10 @@ class DetectionFormationSession {
       'box_count': boxCount,
       'odor_position_mode': odorPositionMode,
       'used_ball': usedBall,
-      if (odorMaterial != null && odorMaterial!.trim().isNotEmpty)
-        'odor_material': odorMaterial,
+      'odor_material': odorMaterial,
+      if (direction != null) 'direction': direction,
       'started_at': Timestamp.fromDate(startedAt),
-      'ended_at': Timestamp.fromDate(endedAt),
+      if (endedAt != null) 'ended_at': Timestamp.fromDate(endedAt!),
       'date': Timestamp.fromDate(startedAt),
       'createdAt': Timestamp.fromDate(startedAt),
       'created_at': Timestamp.fromDate(startedAt),
@@ -194,6 +245,8 @@ class DetectionFormationSession {
       'total_reps': totalReps,
       'longest_streak': longestStreak,
       'current_streak': currentStreak,
+      'clockwise_streak': clockwiseStreak,
+      'counter_clockwise_streak': counterClockwiseStreak,
       'criterion_met': criterionMet,
       'phase_advanced': phaseAdvanced,
       if (advancedTo != null) 'advanced_to': advancedTo,
@@ -213,6 +266,63 @@ class DetectionFormationSession {
     };
   }
 
+  DetectionFormationSession copyWith({
+    String? id,
+    String? status,
+    DateTime? endedAt,
+    int? durationSeconds,
+    List<DetectionRepetition>? repetitions,
+    int? totalReps,
+    int? longestStreak,
+    int? currentStreak,
+    int? clockwiseStreak,
+    int? counterClockwiseStreak,
+    bool? criterionMet,
+    bool? phaseAdvanced,
+    String? advancedTo,
+    String? direction,
+    String? notes,
+    List<Map<String, dynamic>>? auditTrail,
+  }) {
+    return DetectionFormationSession(
+      id: id ?? this.id,
+      dogId: dogId,
+      dogName: dogName,
+      lineId: lineId,
+      lineName: lineName,
+      lineType: lineType,
+      phase: phase,
+      phaseName: phaseName,
+      boxCount: boxCount,
+      odorPositionMode: odorPositionMode,
+      usedBall: usedBall,
+      odorMaterial: odorMaterial,
+      status: status ?? this.status,
+      direction: direction ?? this.direction,
+      startedAt: startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      repetitions: repetitions ?? this.repetitions,
+      totalReps: totalReps ?? this.totalReps,
+      longestStreak: longestStreak ?? this.longestStreak,
+      currentStreak: currentStreak ?? this.currentStreak,
+      clockwiseStreak: clockwiseStreak ?? this.clockwiseStreak,
+      counterClockwiseStreak:
+          counterClockwiseStreak ?? this.counterClockwiseStreak,
+      criterionMet: criterionMet ?? this.criterionMet,
+      phaseAdvanced: phaseAdvanced ?? this.phaseAdvanced,
+      advancedTo: advancedTo ?? this.advancedTo,
+      notes: notes ?? this.notes,
+      handlerId: handlerId,
+      handlerName: handlerName,
+      media: media,
+      auditTrail: auditTrail ?? this.auditTrail,
+      deletedAt: deletedAt,
+      deletedBy: deletedBy,
+      deletedReason: deletedReason,
+    );
+  }
+
   static DetectionFormationSession fromRecorder({
     String? id,
     required String dogId,
@@ -222,16 +332,21 @@ class DetectionFormationSession {
     required String lineType,
     required DetectionPhaseConfig phase,
     required DateTime startedAt,
-    required DateTime endedAt,
+    DateTime? endedAt,
     required DetectionSessionRecorder recorder,
+    required String status,
     required bool phaseAdvanced,
     String? advancedTo,
     required String handlerId,
     required String handlerName,
+    required String odorMaterial,
     String? notes,
-    String? odorMaterial,
     List<Map<String, dynamic>> auditTrail = const [],
   }) {
+    final effectiveEndedAt = status == DetectionFormationStatus.inProgress
+        ? null
+        : endedAt ?? DateTime.now();
+    final now = DateTime.now();
     return DetectionFormationSession(
       id: id,
       dogId: dogId,
@@ -245,13 +360,19 @@ class DetectionFormationSession {
       odorPositionMode: phase.odorPositionMode,
       usedBall: phase.usedBall,
       odorMaterial: odorMaterial,
+      status: status,
+      direction: phase.isSquare ? recorder.currentDirection : null,
       startedAt: startedAt,
-      endedAt: endedAt,
-      durationSeconds: endedAt.difference(startedAt).inSeconds,
+      endedAt: effectiveEndedAt,
+      durationSeconds: (effectiveEndedAt ?? now)
+          .difference(startedAt)
+          .inSeconds,
       repetitions: recorder.repetitions,
       totalReps: recorder.totalReps,
       longestStreak: recorder.longestStreak,
       currentStreak: recorder.currentStreak,
+      clockwiseStreak: recorder.clockwiseStreak,
+      counterClockwiseStreak: recorder.counterClockwiseStreak,
       criterionMet: recorder.criterionMet,
       phaseAdvanced: phaseAdvanced,
       advancedTo: advancedTo,
