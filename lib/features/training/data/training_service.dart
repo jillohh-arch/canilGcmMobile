@@ -36,14 +36,32 @@ class TrainingService {
   }
 
   Future<List<TrainingSessionModel>> getTrainingsForDog(String dogId) async {
-    final snapshot = await _firestore
+    final legacyTrainings = await _firestore
         .collection('trainings')
         .where('dogId', isEqualTo: dogId)
         .get();
+    final rootSessions = await _firestore
+        .collection('training_sessions')
+        .where('dogId', isEqualTo: dogId)
+        .get();
+    final dogSessions = await _firestore
+        .collection('dogs')
+        .doc(dogId)
+        .collection('training_sessions')
+        .get();
 
-    final trainings = snapshot.docs
-        .map((doc) => TrainingSessionModel.fromJson(doc.data(), doc.id))
-        .toList();
+    final byKey = <String, TrainingSessionModel>{};
+    for (final doc in [
+      ...legacyTrainings.docs,
+      ...rootSessions.docs,
+      ...dogSessions.docs,
+    ]) {
+      final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+      if (training.dogId != dogId) continue;
+      byKey['${doc.reference.path}:${doc.id}'] = training;
+    }
+
+    final trainings = byKey.values.toList();
     trainings.sort((a, b) => b.date.compareTo(a.date));
     return trainings;
   }
