@@ -953,7 +953,10 @@ class HistoryOccurrenceBody extends StatelessWidget {
             final lng = occ?.gpsLng;
             final hasGps = lat != null && lng != null;
 
-            const googleMapsStaticApiKey = String.fromEnvironment('GOOGLE_MAPS_STATIC_API_KEY');
+            const googleMapsStaticApiKey = String.fromEnvironment(
+              'GOOGLE_MAPS_STATIC_API_KEY',
+              defaultValue: 'AIzaSyCtpmcHWxkDCNp-a-7bjWPj7nExnI3ii2M',
+            );
             final hasApiKey = googleMapsStaticApiKey.trim().isNotEmpty;
             final mapUrl = hasGps && hasApiKey
                 ? 'https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x260&scale=2&maptype=roadmap&markers=color:0x0A8E9D|$lat,$lng&key=$googleMapsStaticApiKey'
@@ -3083,6 +3086,30 @@ class _OccurrenceTimelineSection extends StatefulWidget {
 class _OccurrenceTimelineSectionState
     extends State<_OccurrenceTimelineSection> {
   bool _expanded = false;
+  late Future<List<OccurrenceEvent>> _eventsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _eventsFuture = _loadEvents();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OccurrenceTimelineSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.occurrenceId != widget.occurrenceId) {
+      setState(() {
+        _eventsFuture = _loadEvents();
+      });
+    }
+  }
+
+  Future<List<OccurrenceEvent>> _loadEvents() {
+    if (widget.occurrenceId.isEmpty) {
+      return Future.value(<OccurrenceEvent>[]);
+    }
+    return context.read<OccurrenceViewModel>().getEvents(widget.occurrenceId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3105,10 +3132,8 @@ class _OccurrenceTimelineSectionState
       );
     }
 
-    final occurrenceVM = context.read<OccurrenceViewModel>();
-
     return FutureBuilder<List<OccurrenceEvent>>(
-      future: occurrenceVM.getEvents(widget.occurrenceId),
+      future: _eventsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: _cyan));

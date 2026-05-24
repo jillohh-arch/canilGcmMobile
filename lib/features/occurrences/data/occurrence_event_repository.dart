@@ -100,8 +100,6 @@ class OccurrenceEventRepository {
 
   Stream<List<OccurrenceEvent>> watchByOccurrence(String occurrenceId) {
     return _events(occurrenceId)
-        .where('deleted_at', isNull: true)
-        .orderBy('timestamp', descending: true)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -112,15 +110,14 @@ class OccurrenceEventRepository {
                   occurrenceId: occurrenceId,
                 ),
               )
-              .toList(),
+              .where((e) => !e.isDeleted)
+              .toList()
+              ..sort((a, b) => b.timestamp.compareTo(a.timestamp)),
         );
   }
 
   Future<List<OccurrenceEvent>> listByOccurrence(String occurrenceId) async {
-    final snap = await _events(occurrenceId)
-        .where('deleted_at', isNull: true)
-        .orderBy('timestamp', descending: true)
-        .get();
+    final snap = await _events(occurrenceId).get();
 
     return snap.docs
         .map(
@@ -130,7 +127,9 @@ class OccurrenceEventRepository {
             occurrenceId: occurrenceId,
           ),
         )
-        .toList();
+        .where((e) => !e.isDeleted)
+        .toList()
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
   Future<OccurrenceEvent?> getById(String occurrenceId, String eventId) async {

@@ -39,6 +39,7 @@ class OccurrencePdfGenerator {
   static const _systemName = 'Sistema Canil K9 GCM';
   static const _googleMapsStaticApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_STATIC_API_KEY',
+    defaultValue: 'AIzaSyCtpmcHWxkDCNp-a-7bjWPj7nExnI3ii2M',
   );
   static const _verificationBaseUrl = String.fromEnvironment(
     'K9_VERIFICATION_BASE_URL',
@@ -63,6 +64,15 @@ class OccurrencePdfGenerator {
     final docId = _buildDocId(occurrence);
     final sortedEvents = [...events]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    // Parallel download of media and static map image
+    final results = await Future.wait([
+      _buildMediaItems(sortedEvents),
+      _buildStaticMapImage(occurrence),
+    ]);
+    final media = results[0] as List<_PdfMediaItem>;
+    final staticMapImage = results[1] as pw.ImageProvider?;
+
     final context = _OccurrencePdfContext(
       occurrence: occurrence,
       events: sortedEvents,
@@ -71,8 +81,8 @@ class OccurrencePdfGenerator {
       handlerRa: handlerRa,
       docId: docId,
       fonts: fonts,
-      media: await _buildMediaItems(sortedEvents),
-      staticMapImage: await _buildStaticMapImage(occurrence),
+      media: media,
+      staticMapImage: staticMapImage,
     );
 
     pdf
@@ -120,22 +130,30 @@ class OccurrencePdfGenerator {
   Future<List<_PdfMediaItem>> _buildMediaItems(
     List<OccurrenceEvent> events,
   ) async {
-    final items = <_PdfMediaItem>[];
+    final rawItems = <({int index, String url, OccurrenceEvent event})>[];
     var index = 1;
     for (final event in events) {
       for (final url in event.photoUrls) {
-        pw.ImageProvider? image;
-        try {
-          image = await printing.networkImage(url);
-        } catch (_) {
-          image = null;
-        }
-        items.add(
-          _PdfMediaItem(number: index++, url: url, image: image, event: event),
-        );
+        rawItems.add((index: index++, url: url, event: event));
       }
     }
-    return items;
+
+    final futures = rawItems.map((item) async {
+      pw.ImageProvider? image;
+      try {
+        image = await printing.networkImage(item.url);
+      } catch (_) {
+        image = null;
+      }
+      return _PdfMediaItem(
+        number: item.index,
+        url: item.url,
+        image: image,
+        event: item.event,
+      );
+    }).toList();
+
+    return Future.wait(futures);
   }
 
   Future<pw.ImageProvider?> _buildStaticMapImage(Occurrence occurrence) async {
@@ -724,33 +742,34 @@ class OccurrencePdfGenerator {
                 ],
               ),
             ),
-          pw.Positioned(
-            left: 260,
-            top: height * .45,
-            child: pw.Column(
-              children: [
-                pw.Container(
-                  width: 16,
-                  height: 16,
-                  decoration: pw.BoxDecoration(
-                    color: _cyan,
-                    shape: pw.BoxShape.circle,
-                    border: pw.Border.all(color: PdfColors.white, width: 2),
-                  ),
-                ),
-                pw.Container(
-                  width: 36,
-                  height: 7,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColor.fromInt(0x330A8E9D),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(8),
+          if (ctx.staticMapImage == null)
+            pw.Positioned(
+              left: 260,
+              top: height * .45,
+              child: pw.Column(
+                children: [
+                  pw.Container(
+                    width: 16,
+                    height: 16,
+                    decoration: pw.BoxDecoration(
+                      color: _cyan,
+                      shape: pw.BoxShape.circle,
+                      border: pw.Border.all(color: PdfColors.white, width: 2),
                     ),
                   ),
-                ),
-              ],
+                  pw.Container(
+                    width: 36,
+                    height: 7,
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromInt(0x330A8E9D),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
