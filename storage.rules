@@ -79,6 +79,12 @@ match /dogs/{dogId}/feeding_photos/{fileName} {
   allow delete: if signedIn();
 }
 
+match /dogs/{dogId}/training_sessions/{sessionId}/media/{fileName} {
+  allow read: if signedIn();
+  allow create, update: if canWriteImage(20);
+  allow delete: if signedIn();
+}
+
 
     match /{allPaths=**} {
       allow read, write: if false;

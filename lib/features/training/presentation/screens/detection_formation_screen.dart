@@ -1,873 +1,203 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/training/data/detection_service.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_phase_config.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 class DetectionFormationScreen extends StatefulWidget {
   final Dog dog;
+  final DetectionService? service;
 
-  const DetectionFormationScreen({super.key, required this.dog});
+  const DetectionFormationScreen({super.key, required this.dog, this.service});
 
   @override
-  State<DetectionFormationScreen> createState() => _DetectionFormationScreenState();
+  State<DetectionFormationScreen> createState() =>
+      _DetectionFormationScreenState();
 }
 
 class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
-  bool _showLiveSession = false;
+  static const _bg = Color(0xFF050D10);
+  static const _panel = Color(0xFF0A1418);
+  static const _panelSoft = Color(0xFF0F1B20);
+  static const _cyan = Color(0xFF4DD0E1);
+  static const _yellow = Color(0xFFF1C40F);
+  static const _green = Color(0xFF2ECC71);
+  static const _red = Color(0xFFE74C3C);
+  static const _muted = Color(0xFF8FA3AD);
+  static const _mutedDark = Color(0xFF5A7280);
 
-  // Overview states
-  int _drugsPhase = 3;
-  int _drugsConsecutiveHits = 7;
-  int _weaponsPhase = 2;
-  int _weaponsConsecutiveHits = 1;
-  bool _corpseStarted = false;
+  late final DetectionService _service;
 
-  // Live session states
-  int _currentAttempt = 5;
-  String _selectedBoxPos = 'MEIO';
-  List<bool> _attemptHistory = [true, true, false, true]; // true = Hit, false = Miss
-  int _liveDrugsHits = 9; // 9/10
-  int _liveWeaponsHits = 2; // 2/3
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  List<DetectionLine> _lines = [];
+  DetectionLine? _selectedLine;
+
+  bool _liveMode = false;
+  DetectionLine? _liveLine;
+  DetectionPhaseConfig? _livePhase;
+  DetectionSessionRecorder? _recorder;
+  DateTime? _startedAt;
+  int? _selectedOdorBox;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = widget.service ?? DetectionService();
+    Future.microtask(_loadLines);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF050D10),
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: const Color(0xFF050D10),
-        ),
-        child: SafeArea(
-          child: _showLiveSession ? _buildLiveSession() : _buildOverview(),
+    return PopScope(
+      canPop: !_liveMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _liveMode) _leaveLiveSession();
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light.copyWith(
+            statusBarColor: Colors.transparent,
+            systemNavigationBarColor: _bg,
+          ),
+          child: SafeArea(
+            child: _liveMode ? _buildLiveSession() : _buildSelector(),
+          ),
         ),
       ),
     );
   }
 
-  // ====== TELA A: VISÃO GERAL DE DETECÇÃO ======
-  Widget _buildOverview() {
+  Future<void> _loadLines({String? keepLineType}) async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final actor = _resolveActor();
+      final lines = await _service.getOrCreateDefaultLines(
+        dogId: widget.dog.id,
+        handlerId: actor.ra,
+        handlerName: actor.name,
+      );
+      final selected = _resolveSelectedLine(lines, keepLineType);
+      if (!mounted) return;
+      setState(() {
+        _lines = lines;
+        _selectedLine = selected;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Falha ao carregar formação: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  DetectionLine? _resolveSelectedLine(List<DetectionLine> lines, String? type) {
+    if (lines.isEmpty) return null;
+    final wanted = type ?? _selectedLine?.normalizedType;
+    if (wanted != null) {
+      for (final line in lines) {
+        if (line.normalizedType == wanted) return line;
+      }
+    }
+    return lines.first;
+  }
+
+  Widget _buildSelector() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.centerLeft,
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ESPECIALIDADE',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Detecção',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0x1F4DD0E1),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                alignment: Alignment.center,
-                child: const Text('👃', style: TextStyle(fontSize: 18)),
-              ),
-            ],
-          ),
+        _buildHeader(
+          title: 'Formação · Detecção',
+          subtitle: '${widget.dog.name} · selecione a fase',
+          onBack: () => Navigator.of(context).pop(),
         ),
-
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              // Dog Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0x0A4DD0E1),
-                  border: Border.all(color: const Color(0x334DD0E1)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1A2A30),
-                        border: Border.all(color: const Color(0xFF4DD0E1), width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        widget.dog.name.toUpperCase().substring(0, math.min(widget.dog.name.length, 4)),
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF4DD0E1),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.dog.name,
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Conduzido por GCM Silva',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF4DD0E1),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Multi-session active shortcut card
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  setState(() {
-                    _showLiveSession = true;
-                    _currentAttempt = 5;
-                    _liveDrugsHits = 9;
-                    _liveWeaponsHits = 2;
-                    _attemptHistory = [true, true, false, true];
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0x1AF1C40F), Color(0x0AE74C3C)],
-                    ),
-                    border: Border.all(color: const Color(0x4DF1C40F)),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(color: _yellow))
+              : _error != null
+              ? _buildErrorState()
+              : RefreshIndicator(
+                  color: _yellow,
+                  onRefresh: () => _loadLines(),
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 26),
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0x26F1C40F),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text('⚡', style: TextStyle(fontSize: 16)),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sessão multi-linha disponível',
-                              style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              'Drogas + Armas em formação ativa — pode treinar junto',
-                              style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 10),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Text(
-                        '▶',
-                        style: TextStyle(color: Color(0xFFF1C40F), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
+                      _buildDogProgressCard(),
+                      const SizedBox(height: 12),
+                      _buildLineSelector(),
+                      const SizedBox(height: 12),
+                      if (_selectedLine != null)
+                        _buildPhaseTrail(_selectedLine!),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 18),
-
-              // Section label
-              Row(
-                children: [
-                  Text(
-                    'LINHAS DE DETECÇÃO',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF4DD0E1),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Divider(
-                      color: Color(0x264DD0E1),
-                      thickness: 1,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Card: Drogas (F3)
-              _buildLineCard(
-                emoji: '💊',
-                title: 'Drogas',
-                status: 'Em formação · Fase $_drugsPhase',
-                tags: ['maconha', 'cocaína', 'crack', 'LSD', 'ecstasy', '+ outros'],
-                phaseNum: _drugsPhase,
-                phaseHits: _drugsConsecutiveHits,
-                phaseGoal: 10,
-                sessionsLabel: '42 sessões · última: hoje',
-                color: const Color(0xFFF1C40F),
-                onTap: () {
-                  setState(() {
-                    _showLiveSession = true;
-                    _currentAttempt = 1;
-                    _liveDrugsHits = _drugsConsecutiveHits;
-                    _attemptHistory = [];
-                  });
-                },
-              ),
-
-              // Card: Armas (F2)
-              _buildLineCard(
-                emoji: '🔫',
-                title: 'Armas',
-                status: 'Em formação · Fase $_weaponsPhase',
-                tags: ['pólvora', 'munição', '+ derivados'],
-                phaseNum: _weaponsPhase,
-                phaseHits: _weaponsConsecutiveHits,
-                phaseGoal: 3,
-                sessionsLabel: '28 sessões · última: hoje',
-                color: const Color(0xFFF1C40F),
-                onTap: () {
-                  setState(() {
-                    _showLiveSession = true;
-                    _currentAttempt = 1;
-                    _liveWeaponsHits = _weaponsConsecutiveHits;
-                    _attemptHistory = [];
-                  });
-                },
-              ),
-
-              // Card: Cadáver (Não Iniciada)
-              _buildLineCard(
-                emoji: '🕯',
-                title: 'Cadáver',
-                status: _corpseStarted ? 'Em formação · Fase 1' : 'Não iniciada',
-                tags: [],
-                phaseNum: _corpseStarted ? 1 : 0,
-                phaseHits: 0,
-                phaseGoal: 10,
-                sessionsLabel: _corpseStarted ? '0 sessões' : 'Especialidade não iniciada com ${widget.dog.name}',
-                color: _corpseStarted ? const Color(0xFFF1C40F) : const Color(0xFF95A5A6),
-                showBtn: !_corpseStarted,
-                onBtnTap: () {
-                  setState(() {
-                    _corpseStarted = true;
-                  });
-                },
-                onTap: _corpseStarted ? () {
-                  setState(() {
-                    _showLiveSession = true;
-                    _currentAttempt = 1;
-                    _attemptHistory = [];
-                  });
-                } : null,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
         ),
       ],
     );
   }
 
-  Widget _buildLineCard({
-    required String emoji,
-    required String title,
-    required String status,
-    required List<String> tags,
-    required int phaseNum,
-    required int phaseHits,
-    required int phaseGoal,
-    required String sessionsLabel,
-    required Color color,
-    bool showBtn = false,
-    VoidCallback? onBtnTap,
-    VoidCallback? onTap,
-  }) {
-    final isNotStarted = phaseNum == 0;
-    final sideColor = isNotStarted ? const Color(0x4D95A5A6) : color;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isNotStarted ? const Color(0x06FFFFFF) : const Color(0x0DFFFFFF),
-          borderRadius: BorderRadius.circular(14),
-          border: Border(
-            left: BorderSide(color: sideColor, width: 3),
-            top: const BorderSide(color: Color(0x14FFFFFF)),
-            right: const BorderSide(color: Color(0x14FFFFFF)),
-            bottom: const BorderSide(color: Color(0x14FFFFFF)),
-          ),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: isNotStarted ? const Color(0x1495A5A6) : const Color(0x1FF1C40F),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        status,
-                        style: GoogleFonts.inter(
-                          color: isNotStarted ? const Color(0xFF95A5A6) : const Color(0xFFF1C40F),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (showBtn) ...[
-                  ElevatedButton(
-                    onPressed: onBtnTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0x144DD0E1),
-                      foregroundColor: const Color(0xFF4DD0E1),
-                      elevation: 0,
-                      side: const BorderSide(color: Color(0x4D4DD0E1)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      '+ Iniciar',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: tags.map((t) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0x0DFFFFFF),
-                    border: Border.all(color: const Color(0x0AFFFFFF)),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    t,
-                    style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 9, fontWeight: FontWeight.w500),
-                  ),
-                )).toList(),
-              ),
-            ],
-            if (!isNotStarted) ...[
-              const SizedBox(height: 12),
-              // Progress Section
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Protocolo Ragonha · Fase $phaseNum de 5',
-                        style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 11, fontWeight: FontWeight.w500),
-                      ),
-                      Text(
-                        '$phaseHits / $phaseGoal',
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: List.generate(5, (index) {
-                      final phaseIndex = index + 1;
-                      Widget segment;
-                      if (phaseIndex < phaseNum) {
-                        // Done phases
-                        segment = Expanded(
-                          child: Container(
-                            height: 6,
-                            margin: EdgeInsets.only(right: index == 4 ? 0 : 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1C40F),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        );
-                      } else if (phaseIndex == phaseNum) {
-                        // Active phase (partial progress based on hits)
-                        final ratio = phaseHits / phaseGoal;
-                        segment = Expanded(
-                          child: Container(
-                            height: 6,
-                            margin: EdgeInsets.only(right: index == 4 ? 0 : 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0x1FFFFFFF),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            alignment: Alignment.centerLeft,
-                            child: FractionallySizedBox(
-                              widthFactor: ratio.clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1C40F),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      } else {
-                        // Locked phases
-                        segment = Expanded(
-                          child: Container(
-                            height: 6,
-                            margin: EdgeInsets.only(right: index == 4 ? 0 : 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0x0DFFFFFF),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        );
-                      }
-                      return segment;
-                    }),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.only(top: 10),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0x0DFFFFFF))),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    sessionsLabel,
-                    style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
-                  ),
-                  if (!showBtn) ...[
-                    Text(
-                      'Continuar →',
-                      style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ====== TELA C: SESSÃO MULTI-LINHA AO VIVO ======
   Widget _buildLiveSession() {
+    final line = _liveLine;
+    final phase = _livePhase;
+    final recorder = _recorder;
+    if (line == null || phase == null || recorder == null) {
+      return _buildSelector();
+    }
+
+    final target = phase.targetConsecutiveHits;
+    final progress = target == null || target == 0
+        ? 0.0
+        : (recorder.currentStreak / target).clamp(0.0, 1.0);
+
     return Column(
       children: [
-        // Live Top Bar
-        Container(
-          color: const Color(0x14F1C40F),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0x33F1C40F))),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF1C40F),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SESSÃO EM ANDAMENTO',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFFF1C40F),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '${widget.dog.name} · GCM Silva',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFFB0C4CC),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+        _buildHeader(
+          title: 'Formação · Detecção',
+          subtitle:
+              '${widget.dog.name} · ${line.displayName} · sessão em andamento',
+          onBack: _leaveLiveSession,
         ),
-
-        // Multi-line banner
-        Container(
-          width: double.infinity,
-          color: const Color(0x0FF1C40F),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0x26F1C40F))),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'LINHAS SENDO TRABALHADAS NESTA SESSÃO',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFFF1C40F),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  _buildSubstanceChip('💊 Drogas · F3'),
-                  const SizedBox(width: 6),
-                  _buildSubstanceChip('🔫 Armas · F2'),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Live interactive content
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
             children: [
-              // Attempt Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0x0D4DD0E1),
-                  border: Border.all(color: const Color(0x4D4DD0E1)),
-                  borderRadius: BorderRadius.circular(14),
+              _buildPhaseLiveBar(phase, target),
+              const SizedBox(height: 13),
+              _buildBoxesPanel(phase, recorder.totalReps + 1),
+              const SizedBox(height: 13),
+              _buildCounterPanel(recorder, target, progress),
+              const SizedBox(height: 11),
+              _buildSeries(recorder.repetitions),
+              const SizedBox(height: 14),
+              _buildLiveActions(),
+              TextButton(
+                onPressed: _saving ? null : _finishLiveSession,
+                child: Text(
+                  _saving
+                      ? 'Salvando sessão...'
+                      : 'Encerrar e registrar sessão',
+                  style: GoogleFonts.inter(
+                    color: _mutedDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'TENTATIVA $_currentAttempt',
-                          style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.0),
-                        ),
-                        Text(
-                          'de até 15 nesta sessão',
-                          style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 10),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Posicionar caixa de odor',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Position Selector
-                    Column(
-                      children: [
-                        Text(
-                          'ONDE A CAIXA COM ODOR ESTÁ?',
-                          style: GoogleFonts.inter(color: const Color(0xFFF1C40F), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.0),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _buildPosBtn('ESQ', '◧'),
-                            const SizedBox(width: 8),
-                            _buildPosBtn('MEIO', '◨'),
-                            const SizedBox(width: 8),
-                            _buildPosBtn('DIR', '▣'),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Hit / Miss triggers
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _registerAttempt(true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2ECC71),
-                              foregroundColor: const Color(0xFF050D10),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: Column(
-                              children: [
-                                const Text('✓', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'ACERTO',
-                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.0),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _registerAttempt(false),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFE74C3C),
-                              side: const BorderSide(color: Color(0xFFE74C3C), width: 1.5),
-                              backgroundColor: const Color(0x26E74C3C),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: Column(
-                              children: [
-                                const Text('✗', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'ERRO',
-                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.0),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Progress counters per line
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'PROGRESSO POR LINHA · CONSECUTIVOS HISTÓRICOS',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF4DD0E1),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Line Counter 1: Drugs (F3)
-                  _buildLiveCounterCard(
-                    emoji: '💊',
-                    name: 'Drogas',
-                    subtext: 'Fase 3 · critério 10/10',
-                    hits: _liveDrugsHits,
-                    goal: 10,
-                    alert: _liveDrugsHits == 9 ? '⚠ 1 PARA AVANÇAR!' : null,
-                    isCritical: _liveDrugsHits == 9,
-                  ),
-
-                  // Line Counter 2: Weapons (F2)
-                  _buildLiveCounterCard(
-                    emoji: '🔫',
-                    name: 'Armas',
-                    subtext: 'Fase 2 · critério 3/3',
-                    hits: _liveWeaponsHits,
-                    goal: 3,
-                    alert: _liveWeaponsHits == 2 ? '⚠ 1 PARA AVANÇAR!' : null,
-                    isCritical: _liveWeaponsHits == 2,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Session History list
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'HISTÓRICO DE TENTATIVAS DESTA SESSÃO',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF4DD0E1),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: List.generate(_attemptHistory.length, (index) {
-                      final isHit = _attemptHistory[index];
-                      return Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: isHit ? const Color(0x1F2ECC71) : const Color(0x1FE74C3C),
-                          border: Border.all(
-                            color: isHit ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C),
-                            width: 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'T${index + 1}',
-                              style: GoogleFonts.inter(color: isHit ? const Color(0x992ECC71) : const Color(0x99E74C3C), fontSize: 7, fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              isHit ? '✓' : '✗',
-                              style: TextStyle(color: isHit ? const Color(0xFF2ECC71) : const Color(0xFFE74C3C), fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // End Buttons row
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        _showLiveSession = false;
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFF1C40F),
-                      side: const BorderSide(color: Color(0x4DF1C40F)),
-                      backgroundColor: const Color(0x14F1C40F),
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text(
-                      'PAUSAR',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _endLiveSession,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0x26E74C3C),
-                        foregroundColor: const Color(0xFFE74C3C),
-                        side: const BorderSide(color: Color(0xFFE74C3C), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        'ENCERRAR SESSÃO',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
@@ -876,101 +206,26 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
-  Widget _buildSubstanceChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0x1FF1C40F),
-        border: Border.all(color: const Color(0x4DF1C40F)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          color: const Color(0xFFF1C40F),
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPosBtn(String label, String icon) {
-    final isActive = _selectedBoxPos == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          setState(() {
-            _selectedBoxPos = label;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0x1FF1C40F) : const Color(0x0DFFFFFF),
-            border: Border.all(
-              color: isActive ? const Color(0xFFF1C40F) : const Color(0x1AFFFFFF),
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          alignment: Alignment.center,
-          child: Column(
-            children: [
-              Text(
-                icon,
-                style: TextStyle(
-                  color: isActive ? const Color(0xFFF1C40F) : const Color(0xFF7A8A92),
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  color: isActive ? const Color(0xFFF1C40F) : const Color(0xFF7A8A92),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLiveCounterCard({
-    required String emoji,
-    required String name,
-    required String subtext,
-    required int hits,
-    required int goal,
-    String? alert,
-    required bool isCritical,
+  Widget _buildHeader({
+    required String title,
+    required String subtitle,
+    required VoidCallback onBack,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isCritical ? const Color(0x0F2ECC71) : const Color(0x0DFFFFFF),
-        border: Border.all(
-          color: isCritical ? const Color(0x4D2ECC71) : const Color(0x14FFFFFF),
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: const Color(0x1FF1C40F),
-              borderRadius: BorderRadius.circular(8),
+          IconButton(
+            onPressed: onBack,
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white.withAlpha(10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            alignment: Alignment.center,
-            child: Text(emoji, style: const TextStyle(fontSize: 14)),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            color: Colors.white,
+            tooltip: 'Voltar',
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -978,39 +233,523 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
-                  subtext,
-                  style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 9),
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: _cyan,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(width: 8),
+          Icon(Icons.science_outlined, color: _cyan.withAlpha(210)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _boxDecoration(borderColor: _red.withAlpha(80)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+              Text(
+                'Não foi possível carregar a formação.',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error ?? '',
+                style: GoogleFonts.inter(color: _muted, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => _loadLines(),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDogProgressCard() {
+    final line = _selectedLine;
+    final completed = line?.phasesCompleted.length ?? 0;
+    final total = DetectionPhaseCatalog.phases.length;
+    final ratio = total == 0 ? 0.0 : (completed / total).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: _boxDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Progresso no protocolo',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '$completed / $total fases',
+                style: GoogleFonts.robotoMono(
+                  color: _cyan,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              value: ratio,
+              backgroundColor: Colors.white.withAlpha(18),
+              valueColor: const AlwaysStoppedAnimation(_green),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            line == null
+                ? 'Selecione uma linha de detecção.'
+                : '${line.displayName} · fase atual ${line.normalizedCurrentPhase} · melhor série ${line.bestStreak}',
+            style: GoogleFonts.inter(
+              color: _muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLineSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('LINHA DE DETECÇÃO', style: _sectionStyle(_cyan)),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _lines.map((line) {
+              final selected = line.id == _selectedLine?.id;
+              final color = line.status == 'not_started' ? _mutedDark : _yellow;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  selected: selected,
+                  showCheckmark: false,
+                  avatar: Icon(
+                    _lineIcon(line),
+                    color: selected ? _bg : color,
+                    size: 18,
+                  ),
+                  label: Text(line.displayName),
+                  labelStyle: GoogleFonts.inter(
+                    color: selected ? _bg : Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  selectedColor: _yellow,
+                  backgroundColor: Colors.white.withAlpha(9),
+                  side: BorderSide(
+                    color: selected ? _yellow : Colors.white.withAlpha(18),
+                  ),
+                  onSelected: (_) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedLine = line);
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhaseTrail(DetectionLine line) {
+    final widgets = <Widget>[];
+    String? lastGroup;
+    for (final phase in DetectionPhaseCatalog.phases) {
+      if (phase.groupLabel != lastGroup) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(38, 14, 0, 8),
+            child: Text(
+              phase.groupLabel.toUpperCase(),
+              style: GoogleFonts.inter(
+                color: _mutedDark,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+        );
+        lastGroup = phase.groupLabel;
+      }
+      widgets.add(_buildPhaseRow(line, phase));
+    }
+    return Column(children: widgets);
+  }
+
+  Widget _buildPhaseRow(DetectionLine line, DetectionPhaseConfig phase) {
+    final completed = line.phasesCompleted.contains(phase.code);
+    final current = line.normalizedCurrentPhase == phase.code;
+    final currentIndex = DetectionPhaseCatalog.indexOf(line.currentPhase);
+    final phaseIndex = DetectionPhaseCatalog.indexOf(phase.code);
+    final lineNotStarted = line.status == 'not_started';
+    final firstPhase = phaseIndex == 0;
+    final canStart =
+        phase.isImplemented &&
+        (completed || current || lineNotStarted && firstPhase);
+    final locked = !canStart && !completed;
+    final color = completed
+        ? _green
+        : current
+        ? _yellow
+        : _mutedDark;
+    final nodeIcon = completed
+        ? Icons.check_rounded
+        : locked
+        ? Icons.lock_rounded
+        : Icons.play_arrow_rounded;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 30,
+            child: Column(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  margin: const EdgeInsets.only(top: 9),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: completed
+                        ? _green
+                        : current
+                        ? _yellow
+                        : _panelSoft,
+                    border: Border.all(color: color.withAlpha(180)),
+                  ),
+                  child: Icon(
+                    nodeIcon,
+                    color: completed || current ? _bg : _mutedDark,
+                    size: 15,
+                  ),
+                ),
+                Expanded(
+                  child: Container(width: 2, color: Colors.white.withAlpha(18)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: canStart ? () => _startPhase(line, phase) : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                padding: const EdgeInsets.all(13),
+                decoration: _phaseDecoration(
+                  completed: completed,
+                  current: current || lineNotStarted && firstPhase,
+                  locked: locked,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextSpan(
-                      text: '$hits',
-                      style: TextStyle(color: isCritical ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F)),
+                    Row(
+                      children: [
+                        Text(
+                          phase.code,
+                          style: GoogleFonts.robotoMono(
+                            color: color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            phase.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: locked ? _muted : Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (completed)
+                          Text(
+                            'REVISAR',
+                            style: GoogleFonts.robotoMono(
+                              color: _green,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          )
+                        else if (!phase.isImplemented)
+                          Icon(
+                            Icons.construction_rounded,
+                            color: _mutedDark,
+                            size: 16,
+                          )
+                        else if (locked)
+                          Icon(Icons.lock_rounded, color: _mutedDark, size: 15),
+                      ],
                     ),
-                    const TextSpan(text: ' / '),
-                    TextSpan(text: '$goal', style: const TextStyle(color: Color(0xFF7A8A92))),
+                    if (canStart || current || phaseIndex <= currentIndex) ...[
+                      const SizedBox(height: 9),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _metaChip('${phase.boxCount} caixas'),
+                          _metaChip(phase.modeLabel),
+                          _metaChip(phase.ballLabel),
+                          _metaChip(phase.criterionLabel, accent: true),
+                        ],
+                      ),
+                      if (canStart) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () => _startPhase(line, phase),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _yellow,
+                              foregroundColor: const Color(0xFF1A1402),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              completed ? 'INICIAR REVISÃO' : 'INICIAR SESSÃO',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                    if (!phase.isImplemented) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        phase.description,
+                        style: GoogleFonts.inter(
+                          color: _mutedDark,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (alert != null) ...[
-                Text(
-                  alert,
-                  style: GoogleFonts.inter(color: const Color(0xFF2ECC71), fontSize: 9, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhaseLiveBar(DetectionPhaseConfig phase, int? target) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _yellow.withAlpha(18),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: _yellow.withAlpha(55)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            phase.code,
+            style: GoogleFonts.inter(
+              color: _yellow,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '·',
+              style: GoogleFonts.inter(color: _yellow.withAlpha(80)),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '${phase.boxCount} caixas · ${phase.modeLabel} · ${phase.ballLabel}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: _muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text.rich(
+            TextSpan(
+              text: 'meta ',
+              children: [
+                TextSpan(
+                  text: target?.toString() ?? '-',
+                  style: const TextStyle(color: _yellow),
                 ),
               ],
+            ),
+            style: GoogleFonts.robotoMono(
+              color: _mutedDark,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBoxesPanel(DetectionPhaseConfig phase, int repetitionNumber) {
+    final fixed = phase.isFixedLast;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 15, 14, 14),
+      decoration: _boxDecoration(radius: 16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _yellow.withAlpha(30),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'REP $repetitionNumber',
+                  style: GoogleFonts.robotoMono(
+                    color: _yellow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  fixed
+                      ? 'Odor fixo na última caixa'
+                      : 'Toque na caixa onde está o odor',
+                  style: GoogleFonts.inter(
+                    color: _muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(phase.boxCount, (index) {
+              final number = index + 1;
+              final selected = fixed
+                  ? number == phase.fixedOdorBox
+                  : number == _selectedOdorBox;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: index == phase.boxCount - 1 ? 0 : 12,
+                  ),
+                  child: _buildBox(
+                    number: number,
+                    selected: selected,
+                    enabled: !fixed,
+                    onTap: () {
+                      if (fixed) return;
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedOdorBox = number);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.air_rounded, color: _yellow, size: 14),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  fixed
+                      ? 'Odor travado na caixa ${phase.fixedOdorBox}'
+                      : _selectedOdorBox == null
+                      ? 'Selecione a posição do odor antes de registrar'
+                      : 'Odor na caixa $_selectedOdorBox · alterne a cada repetição',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: _yellow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -1018,74 +757,59 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
-  void _registerAttempt(bool isHit) {
-    HapticFeedback.mediumImpact();
-    setState(() {
-      _attemptHistory.add(isHit);
-      _currentAttempt++;
-
-      // In a real session, we can advance hits on consecutive successes
-      if (isHit) {
-        // Increase hits count
-        if (_liveDrugsHits < 10) {
-          _liveDrugsHits++;
-          if (_liveDrugsHits == 10) {
-            // Drugs phase passed! Show dialog later, promote to next phase in session
-            _drugsPhase = 4;
-            _drugsConsecutiveHits = 0;
-            _showPromotionDialog('Drogas', 4);
-          }
-        }
-        if (_liveWeaponsHits < 3) {
-          _liveWeaponsHits++;
-          if (_liveWeaponsHits == 3) {
-            _weaponsPhase = 3;
-            _weaponsConsecutiveHits = 0;
-            _showPromotionDialog('Armas', 3);
-          }
-        }
-      } else {
-        // Error resets consecutive count! (Protocolo Ragonha criterion)
-        _liveDrugsHits = 0;
-        _liveWeaponsHits = 0;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro registrado! Contador de acertos consecutivos reiniciado.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    });
-  }
-
-  void _showPromotionDialog(String line, int nextPhase) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0C1920),
-        title: Row(
-          children: const [
-            Text('🎉 ', style: TextStyle(fontSize: 20)),
-            Text(
-              'Avanço de Fase!',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+  Widget _buildBox({
+    required int number,
+    required bool selected,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            height: 74,
+            decoration: BoxDecoration(
+              color: selected
+                  ? const Color(0xFF2A2410)
+                  : const Color(0xFF132026),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected ? _yellow : Colors.white.withAlpha(25),
+                width: selected ? 1.6 : 1,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: _yellow.withAlpha(35),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : const [],
             ),
-          ],
-        ),
-        content: Text(
-          'Excelente desempenho! O K9 atingiu a meta de acertos consecutivos na linha de $line e avançou para a Fase $nextPhase do Protocolo Ragonha.',
-          style: GoogleFonts.inter(color: const Color(0xFFB0C4CC)),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4DD0E1)),
-            child: Text(
-              'Confirmar',
-              style: GoogleFonts.inter(color: const Color(0xFF050D10), fontWeight: FontWeight.bold),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                width: 28,
+                height: 16,
+                margin: const EdgeInsets.only(top: 12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF04090B),
+                  borderRadius: BorderRadius.all(Radius.elliptical(28, 16)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$number',
+            style: GoogleFonts.robotoMono(
+              color: selected ? _yellow : _mutedDark,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -1093,17 +817,518 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
-  void _endLiveSession() {
-    HapticFeedback.heavyImpact();
-    // Update local overview stats with current session state
-    setState(() {
-      _drugsConsecutiveHits = _liveDrugsHits;
-      _weaponsConsecutiveHits = _liveWeaponsHits;
-      _showLiveSession = false;
-    });
+  Widget _buildCounterPanel(
+    DetectionSessionRecorder recorder,
+    int? target,
+    double progress,
+  ) {
+    final missing = target == null ? null : target - recorder.currentStreak;
+    final criterionMet = recorder.criterionMet;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sessão encerrada e progresso salvo com sucesso!')),
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: _green.withAlpha(18),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: _green.withAlpha(55)),
+      ),
+      child: Row(
+        children: [
+          Text.rich(
+            TextSpan(
+              text: '${recorder.currentStreak}',
+              children: [
+                TextSpan(
+                  text: '/${target ?? '-'}',
+                  style: const TextStyle(
+                    color: _mutedDark,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            style: GoogleFonts.inter(
+              color: _green,
+              fontSize: 42,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CONSECUTIVAS SEM ERRO',
+                  style: GoogleFonts.inter(
+                    color: _muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: Colors.white.withAlpha(18),
+                    valueColor: const AlwaysStoppedAnimation(_green),
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  criterionMet
+                      ? 'Critério atingido · confirme o avanço ao encerrar'
+                      : missing == null
+                      ? 'Critério definido pelo instrutor'
+                      : 'Faltam $missing para sugerir avanço',
+                  style: GoogleFonts.inter(
+                    color: criterionMet ? _green : _muted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  Widget _buildSeries(List<DetectionRepetition> repetitions) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Text(
+            'SÉRIE',
+            style: GoogleFonts.inter(
+              color: _mutedDark,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: repetitions.isEmpty
+                ? [
+                    Text(
+                      'Nenhuma repetição registrada.',
+                      style: GoogleFonts.inter(color: _mutedDark, fontSize: 11),
+                    ),
+                  ]
+                : repetitions.map((rep) {
+                    final hit = rep.isHit;
+                    return Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: (hit ? _green : _red).withAlpha(32),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: (hit ? _green : _red).withAlpha(130),
+                        ),
+                      ),
+                      child: Icon(
+                        hit ? Icons.check_rounded : Icons.close_rounded,
+                        color: hit ? _green : _red,
+                        size: 15,
+                      ),
+                    );
+                  }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLiveActions() {
+    final canRecord =
+        _livePhase?.isFixedLast == true || _selectedOdorBox != null;
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _saving ? null : () => _recordResult(false),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _red,
+              side: BorderSide(
+                color: canRecord ? _red.withAlpha(150) : _mutedDark,
+              ),
+              backgroundColor: _red.withAlpha(28),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            icon: const Icon(Icons.close_rounded, size: 22),
+            label: Text(
+              'ERROU',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          flex: 2,
+          child: FilledButton.icon(
+            onPressed: _saving ? null : () => _recordResult(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: canRecord ? _green : _mutedDark,
+              foregroundColor: const Color(0xFF04140A),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            icon: const Icon(Icons.check_rounded, size: 23),
+            label: Text(
+              'ACERTOU',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _metaChip(String label, {bool accent = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: (accent ? _yellow : Colors.white).withAlpha(accent ? 22 : 10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: (accent ? _yellow : Colors.white).withAlpha(accent ? 65 : 18),
+        ),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: accent ? _yellow : _muted,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  TextStyle _sectionStyle(Color color) {
+    return GoogleFonts.inter(
+      color: color,
+      fontSize: 10,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 1.2,
+    );
+  }
+
+  BoxDecoration _boxDecoration({Color? borderColor, double radius = 13}) {
+    return BoxDecoration(
+      color: Colors.white.withAlpha(8),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: borderColor ?? Colors.white.withAlpha(20)),
+    );
+  }
+
+  BoxDecoration _phaseDecoration({
+    required bool completed,
+    required bool current,
+    required bool locked,
+  }) {
+    return BoxDecoration(
+      color: completed
+          ? _green.withAlpha(12)
+          : current
+          ? _yellow.withAlpha(18)
+          : Colors.white.withAlpha(8),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: current
+            ? _yellow.withAlpha(90)
+            : completed
+            ? _green.withAlpha(45)
+            : Colors.white.withAlpha(18),
+      ),
+    );
+  }
+
+  IconData _lineIcon(DetectionLine line) {
+    switch (line.normalizedType) {
+      case 'armas':
+        return Icons.gps_fixed_rounded;
+      case 'cadaver':
+        return Icons.landscape_outlined;
+      default:
+        return Icons.science_outlined;
+    }
+  }
+
+  Future<void> _startPhase(
+    DetectionLine line,
+    DetectionPhaseConfig phase,
+  ) async {
+    if (!phase.isImplemented) {
+      _showMessage(
+        'Esta fase está prevista, mas a tela ainda não foi liberada.',
+      );
+      return;
+    }
+
+    try {
+      final actor = _resolveActor();
+      final startedLine = await _service.ensureLineStarted(
+        dogId: widget.dog.id,
+        line: line,
+        handlerId: actor.ra,
+        handlerName: actor.name,
+      );
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _liveLine = startedLine;
+        _livePhase = phase;
+        _recorder = DetectionSessionRecorder(phase: phase);
+        _startedAt = DateTime.now();
+        _selectedOdorBox = phase.isFixedLast ? phase.fixedOdorBox : null;
+        _liveMode = true;
+      });
+    } catch (e) {
+      _showMessage('Falha ao iniciar sessão: $e', error: true);
+    }
+  }
+
+  void _recordResult(bool hit) {
+    final phase = _livePhase;
+    final recorder = _recorder;
+    if (phase == null || recorder == null) return;
+
+    final odorBox = phase.isFixedLast ? phase.fixedOdorBox : _selectedOdorBox;
+    if (odorBox == null) {
+      _showMessage('Selecione a caixa do odor antes de registrar.');
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      recorder.record(odorBox: odorBox, hit: hit);
+      if (phase.isVariable) _selectedOdorBox = null;
+    });
+
+    if (!hit) {
+      _showMessage('Erro registrado. Contador de consecutivas reiniciado.');
+    } else if (recorder.criterionMet) {
+      _showMessage(
+        'Critério atingido. O avanço será confirmado no encerramento.',
+      );
+    }
+  }
+
+  Future<void> _finishLiveSession() async {
+    final line = _liveLine;
+    final phase = _livePhase;
+    final recorder = _recorder;
+    final startedAt = _startedAt;
+    if (line == null ||
+        phase == null ||
+        recorder == null ||
+        startedAt == null) {
+      return;
+    }
+    if (recorder.totalReps == 0) {
+      _showMessage('Registre ao menos uma repetição antes de salvar.');
+      return;
+    }
+
+    final advance = recorder.criterionMet
+        ? await _confirmAdvance(phase)
+        : false;
+    if (!mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final actor = _resolveActor();
+      await _service.saveFormationSession(
+        dogId: widget.dog.id,
+        dogName: widget.dog.name,
+        line: line,
+        phase: phase,
+        startedAt: startedAt,
+        recorder: recorder,
+        advancePhase: advance,
+        handlerId: actor.ra,
+        handlerName: actor.name,
+      );
+      if (!mounted) return;
+      final keepLineType = line.normalizedType;
+      setState(() {
+        _liveMode = false;
+        _saving = false;
+        _liveLine = null;
+        _livePhase = null;
+        _recorder = null;
+        _startedAt = null;
+        _selectedOdorBox = null;
+      });
+      _showMessage(advance ? 'Sessão salva e fase avançada.' : 'Sessão salva.');
+      await _loadLines(keepLineType: keepLineType);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage('Falha ao salvar sessão: $e', error: true);
+    }
+  }
+
+  Future<bool> _confirmAdvance(DetectionPhaseConfig phase) async {
+    final next = DetectionPhaseCatalog.nextAfter(phase.code);
+    if (next == null) return false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _panel,
+        title: Text(
+          'Avançar fase?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'O critério de ${phase.criterionLabel} foi atingido. Confirma o avanço manual para ${next.code}?',
+          style: GoogleFonts.inter(color: _muted, height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Salvar sem avanço', style: GoogleFonts.inter()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: _yellow),
+            child: Text(
+              'Avançar',
+              style: GoogleFonts.inter(color: _bg, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
+  Future<void> _leaveLiveSession() async {
+    final hasReps = (_recorder?.totalReps ?? 0) != 0;
+    if (!hasReps) {
+      setState(() => _liveMode = false);
+      return;
+    }
+
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _panel,
+        title: Text(
+          'Descartar sessão?',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Há repetições registradas que ainda não foram salvas.',
+          style: GoogleFonts.inter(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Continuar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+
+    if (discard == true && mounted) {
+      setState(() {
+        _liveMode = false;
+        _liveLine = null;
+        _livePhase = null;
+        _recorder = null;
+        _startedAt = null;
+        _selectedOdorBox = null;
+      });
+    }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? _red : _panelSoft,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  _Actor _resolveActor() {
+    AuthViewModel? authVM;
+    UserViewModel? userVM;
+    ShiftViewModel? shiftVM;
+
+    try {
+      authVM = Provider.of<AuthViewModel>(context, listen: false);
+    } catch (_) {}
+    try {
+      userVM = Provider.of<UserViewModel>(context, listen: false);
+    } catch (_) {}
+    try {
+      shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    } catch (_) {}
+
+    final ra =
+        shiftVM?.handlerId ??
+        HandlerIdentityService.raFromUser(authVM?.user) ??
+        '';
+    final name =
+        userVM?.displayNameFor(
+          ra: ra,
+          firebaseUser: authVM?.user,
+          fallback: 'Condutor',
+        ) ??
+        (ra.isEmpty ? 'Condutor' : 'RA $ra');
+
+    return _Actor(ra: ra, name: name);
+  }
+}
+
+class _Actor {
+  final String ra;
+  final String name;
+
+  const _Actor({required this.ra, required this.name});
 }

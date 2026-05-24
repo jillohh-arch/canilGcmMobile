@@ -14,6 +14,7 @@ class TrainingRepository {
     final streams = [
       _watchSessionCollection('training_sessions', dogId),
       _watchSessionCollection('trainings', dogId),
+      _watchDogTrainingSessions(dogId),
     ];
 
     return _combineLatestLists<TrainingHubSession>(streams, (lists) {
@@ -58,6 +59,21 @@ class TrainingRepository {
     return _firestore
         .collection(collection)
         .where('dogId', isEqualTo: dogId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => TrainingHubSession.fromJson(doc.data(), doc.id))
+              .where((session) => session.dogId == dogId)
+              .toList(),
+        )
+        .handleError((_) => <TrainingHubSession>[]);
+  }
+
+  Stream<List<TrainingHubSession>> _watchDogTrainingSessions(String dogId) {
+    return _firestore
+        .collection('dogs')
+        .doc(dogId)
+        .collection('training_sessions')
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
