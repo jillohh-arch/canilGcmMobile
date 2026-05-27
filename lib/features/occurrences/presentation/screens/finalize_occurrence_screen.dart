@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/media_processing_service.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
+import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
@@ -57,6 +61,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   // Passo 3
   final Map<String, Map<String, TextEditingController>> _detailControllers = {};
   final List<_DrugEntry> _drugEntries = [];
+  final List<File> _finalizationPhotos = [];
+  final _imagePicker = ImagePicker();
+  final _mediaService = const MediaProcessingService();
+  final _storageService = StorageService();
 
   static const _drugTypes = [
     'Maconha',
@@ -399,6 +407,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final results = _selectedResults.toList();
       final details = _buildDetails();
 
+      // Upload fotos de finalização (se houver)
+      final photoUrls = await _uploadFinalizationPhotos();
+
       debugPrint('[Finalize] Construindo hash... events=${vm.events.length}');
 
       final hash = _buildIntegrityHash(
@@ -415,6 +426,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         finalReport: report,
         results: results,
         details: details,
+        finalizationPhotos: photoUrls,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -1034,37 +1046,37 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     );
 
     if (needsDetails.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.check_circle_outline,
-                color: const Color(0xFF2ECC71),
-                size: 48,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Nenhum detalhe adicional necessário',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(180),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: const Color(0xFF2ECC71),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nenhum detalhe adicional necessário',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withAlpha(180),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Toque em CONCLUIR para finalizar.',
-                style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(100),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+            ),
+            _buildFinalizationPhotosSection(),
+          ],
         ),
       );
     }
@@ -1085,9 +1097,192 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           ),
           const SizedBox(height: 16),
           ...needsDetails.map((result) => _buildDetailSection(result)),
+          const SizedBox(height: 8),
+          _buildFinalizationPhotosSection(),
         ],
       ),
     );
+  }
+
+  // ─── Fotos de finalização ───────────────────────────────────────────
+
+  Widget _buildFinalizationPhotosSection() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withAlpha(15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.photo_camera_outlined,
+                  size: 16, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'FOTOS DA FINALIZAÇÃO',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'opcional',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withAlpha(80),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Foto do B.O., apreensões ou documentos relevantes.',
+            style: GoogleFonts.inter(
+              color: Colors.white.withAlpha(120),
+              fontSize: 11.5,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_finalizationPhotos.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _finalizationPhotos.asMap().entries.map((entry) {
+                return _buildPhotoThumb(entry.key, entry.value);
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              _buildPhotoButton(
+                icon: Icons.camera_alt_outlined,
+                label: 'Câmera',
+                onTap: () => _pickFinalizationPhoto(ImageSource.camera),
+              ),
+              const SizedBox(width: 10),
+              _buildPhotoButton(
+                icon: Icons.photo_library_outlined,
+                label: 'Galeria',
+                onTap: () => _pickFinalizationPhoto(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoThumb(int index, File file) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            file,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _finalizationPhotos.removeAt(index));
+            },
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(180),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 12, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          color: AppTheme.primary.withAlpha(15),
+          border: Border.all(color: AppTheme.primary.withAlpha(50)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppTheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFinalizationPhoto(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      setState(() => _finalizationPhotos.add(File(picked.path)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao capturar foto: $e')),
+        );
+      }
+    }
+  }
+
+  Future<List<String>> _uploadFinalizationPhotos() async {
+    if (_finalizationPhotos.isEmpty) return [];
+
+    final urls = <String>[];
+    final folder = 'occurrences/${widget.occurrenceId}/finalization';
+
+    for (final file in _finalizationPhotos) {
+      final compressed = await _mediaService.compressImage(file);
+      final url = await _storageService.uploadImage(
+        compressed ?? file,
+        folder,
+      );
+      if (url != null) urls.add(url);
+    }
+    return urls;
   }
 
   Widget _buildDetailSection(OccurrenceResult result) {

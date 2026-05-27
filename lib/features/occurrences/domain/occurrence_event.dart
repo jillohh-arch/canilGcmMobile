@@ -18,6 +18,8 @@ class OccurrenceEvent with SoftDeletable {
 
   final double? gpsLat;
   final double? gpsLng;
+  final String? placeLabel;
+  final String? locationSource; // gps_atual | busca | ajuste_manual
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -43,6 +45,8 @@ class OccurrenceEvent with SoftDeletable {
     this.mediaItems = const [],
     this.gpsLat,
     this.gpsLng,
+    this.placeLabel,
+    this.locationSource,
     required this.createdAt,
     required this.updatedAt,
     this.auditTrail = const [],
@@ -76,6 +80,8 @@ class OccurrenceEvent with SoftDeletable {
       mediaItems: _parseMediaItems(map),
       gpsLat: (map['gps_lat'] as num?)?.toDouble(),
       gpsLng: (map['gps_lng'] as num?)?.toDouble(),
+      placeLabel: map['place_label'] as String?,
+      locationSource: map['location_source'] as String?,
       createdAt: _parseDateTime(map['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(map['updated_at']) ?? DateTime.now(),
       auditTrail:
@@ -104,6 +110,8 @@ class OccurrenceEvent with SoftDeletable {
           : photoUrls.map((url) => {'type': 'image', 'url': url}).toList(),
       'gps_lat': gpsLat,
       'gps_lng': gpsLng,
+      'place_label': placeLabel,
+      'location_source': locationSource,
       'created_at': Timestamp.fromDate(createdAt),
       'updated_at': Timestamp.fromDate(updatedAt),
       'audit_trail': auditTrail,
@@ -123,6 +131,8 @@ class OccurrenceEvent with SoftDeletable {
     List<Map<String, dynamic>>? mediaItems,
     double? gpsLat,
     double? gpsLng,
+    String? placeLabel,
+    String? locationSource,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<Map<String, dynamic>>? auditTrail,
@@ -142,6 +152,8 @@ class OccurrenceEvent with SoftDeletable {
       mediaItems: mediaItems ?? this.mediaItems,
       gpsLat: gpsLat ?? this.gpsLat,
       gpsLng: gpsLng ?? this.gpsLng,
+      placeLabel: placeLabel ?? this.placeLabel,
+      locationSource: locationSource ?? this.locationSource,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       auditTrail: auditTrail ?? this.auditTrail,

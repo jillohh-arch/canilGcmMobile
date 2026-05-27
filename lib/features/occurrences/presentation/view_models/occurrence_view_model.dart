@@ -245,6 +245,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     required String finalReport,
     required List<OccurrenceResult> results,
     Map<String, dynamic>? details,
+    List<String> finalizationPhotos = const [],
   }) async {
     // Proteção client-side contra dupla finalização
     if (_isLoading) return;
@@ -265,6 +266,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         finalReport: finalReport,
         results: results,
         details: details,
+        finalizationPhotos: finalizationPhotos,
       );
       // Cancelar o stream para evitar que re-emita o valor antigo
       _openSub?.cancel();
@@ -317,6 +319,24 @@ class OccurrenceViewModel extends ChangeNotifier {
       _error = 'Erro ao atualizar evento: $e';
       notifyListeners();
     }
+  }
+
+  /// Atualiza o local de um evento com auditoria automática (via repositório).
+  Future<void> updateEventLocation({
+    required String occurrenceId,
+    required String eventId,
+    required double lat,
+    required double lng,
+    String? placeLabel,
+    String? locationSource,
+  }) async {
+    final updates = <String, dynamic>{
+      'gps_lat': lat,
+      'gps_lng': lng,
+      'place_label': placeLabel,
+      'location_source': locationSource,
+    };
+    await updateEvent(occurrenceId, eventId, updates);
   }
 
   Future<void> deleteEvent(

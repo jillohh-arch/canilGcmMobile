@@ -36,6 +36,8 @@ class Occurrence with SoftDeletable {
 
   final String? initialObservation;
 
+  final List<String> finalizationPhotos;
+
   final List<Map<String, dynamic>> auditTrail;
 
   @override
@@ -69,6 +71,7 @@ class Occurrence with SoftDeletable {
     this.durationTotal,
     this.finalizationDraft,
     this.initialObservation,
+    this.finalizationPhotos = const [],
     this.auditTrail = const [],
     this.deletedAt,
     this.deletedBy,
@@ -100,6 +103,11 @@ class Occurrence with SoftDeletable {
       durationTotal: _parseInt(map['duration_total']),
       finalizationDraft: _parseStringMap(map['finalization_draft']),
       initialObservation: _parseString(map['initial_observation']),
+      finalizationPhotos:
+          (map['finalization_photos'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       auditTrail: _parseMapList(map['audit_trail']),
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
       deletedBy: _parseString(map['deleted_by']),
@@ -135,6 +143,7 @@ class Occurrence with SoftDeletable {
       'duration_total': durationTotal,
       'finalization_draft': finalizationDraft,
       'initial_observation': initialObservation,
+      'finalization_photos': finalizationPhotos,
       'audit_trail': auditTrail,
       ...softDeleteFields(),
     };
@@ -164,6 +173,7 @@ class Occurrence with SoftDeletable {
     int? durationTotal,
     Map<String, dynamic>? finalizationDraft,
     String? initialObservation,
+    List<String>? finalizationPhotos,
     List<Map<String, dynamic>>? auditTrail,
     DateTime? deletedAt,
     String? deletedBy,
@@ -193,6 +203,7 @@ class Occurrence with SoftDeletable {
       durationTotal: durationTotal ?? this.durationTotal,
       finalizationDraft: finalizationDraft ?? this.finalizationDraft,
       initialObservation: initialObservation ?? this.initialObservation,
+      finalizationPhotos: finalizationPhotos ?? this.finalizationPhotos,
       auditTrail: auditTrail ?? this.auditTrail,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,

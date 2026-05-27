@@ -191,45 +191,22 @@ class _PhotoThumbnails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayCount = photoUrls.length > 4 ? 4 : photoUrls.length;
-    final extraCount = photoUrls.length - 4;
-
-    return Row(
-      children: List.generate(displayCount, (i) {
-        final isLast = i == 3 && extraCount > 0;
-        return Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    photoUrls[i],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      color: Colors.white.withAlpha(10),
-                      child: Icon(Icons.broken_image_outlined,
-                          color: Colors.white.withAlpha(60), size: 20),
-                    ),
-                  ),
-                  if (isLast)
-                    Container(
-                      color: Colors.black.withAlpha(150),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '+$extraCount',
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                ],
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: List.generate(photoUrls.length, (i) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Image.network(
+              photoUrls[i],
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                color: Colors.white.withAlpha(10),
+                child: Icon(Icons.broken_image_outlined,
+                    color: Colors.white.withAlpha(60), size: 20),
               ),
             ),
           ),
