@@ -2,12 +2,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/live_tracking_viewmodel.dart';
 
-part 'live_tracking_map_style.dart';
 part 'live_tracking_widgets.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -20,7 +20,7 @@ class LiveTrackingScreen extends StatefulWidget {
 }
 
 class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   late final LiveTrackingViewModel _viewModel;
   LatLng? _lastAnimatedPoint;
 
@@ -35,6 +35,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     _viewModel
       ..removeListener(_handleViewModelChanged)
       ..dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -51,18 +52,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       final latestPoint = _routePoints.last;
       if (_lastAnimatedPoint != latestPoint) {
         _lastAnimatedPoint = latestPoint;
-        _mapController?.animateCamera(CameraUpdate.newLatLng(latestPoint));
+        _mapController.move(latestPoint, _mapController.camera.zoom);
       }
     }
   }
 
   Future<void> _centerToUserLocation() async {
     final currentLatLng = await _viewModel.getCurrentLatLng();
-    if (currentLatLng == null || _mapController == null) return;
-
-    await _mapController!.animateCamera(
-      CameraUpdate.newLatLngZoom(currentLatLng, 16.0),
-    );
+    if (currentLatLng == null) return;
+    _mapController.move(currentLatLng, 16.0);
   }
 
   Future<void> _startTracking() async {
@@ -78,13 +76,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       return;
     }
 
-    if (_mapController != null) {
-      _lastAnimatedPoint = result.initialPoint;
-      await _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(result.initialPoint!, 16.5),
-      );
-      HapticFeedback.lightImpact();
-    }
+    _lastAnimatedPoint = result.initialPoint;
+    _mapController.move(result.initialPoint!, 16.5);
+    HapticFeedback.lightImpact();
   }
 
   Future<void> _stopAndSave() async {
@@ -126,13 +120,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       body: Stack(
         children: [
           _TrackingMap(
+            mapController: _mapController,
             routePoints: _routePoints,
             isLightMode: widget.isLightMode,
-            mapStyle: _darkTrackingMapStyle,
-            onMapCreated: (controller) {
-              _mapController = controller;
-              _centerToUserLocation();
-            },
           ),
           _TrackingControlPanel(
             isTracking: _isTracking,
