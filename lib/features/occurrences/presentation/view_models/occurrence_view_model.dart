@@ -43,6 +43,7 @@ class OccurrenceViewModel extends ChangeNotifier {
   List<Occurrence> get occurrences => _occurrences;
   Occurrence? get openOccurrence => _openOccurrence;
   bool get hasOpen => _openOccurrence != null;
+  bool get isWatchingOpen => _openSub != null;
   List<OccurrenceEvent> get events => _events;
   List<OccurrenceNature> get natures => _natures;
   bool get isLoading => _isLoading;
@@ -227,6 +228,15 @@ class OccurrenceViewModel extends ChangeNotifier {
     }
   }
 
+  /// Salva draft de finalização de forma leve (sem ler o documento inteiro).
+  Future<void> saveDraft(String id, Map<String, dynamic> draft) async {
+    try {
+      await _repository.saveDraft(id, draft);
+    } catch (e) {
+      debugPrint('[OccurrenceVM] Erro ao salvar draft: $e');
+    }
+  }
+
   // ─── Finalização ───────────────────────────────────────────────────
 
   Future<void> finalizeOccurrence({
@@ -236,6 +246,14 @@ class OccurrenceViewModel extends ChangeNotifier {
     required List<OccurrenceResult> results,
     Map<String, dynamic>? details,
   }) async {
+    // Proteção client-side contra dupla finalização
+    if (_isLoading) return;
+    if (_openOccurrence != null && _openOccurrence!.status.isClosed) {
+      _error = 'Ocorrência já finalizada.';
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -248,6 +266,9 @@ class OccurrenceViewModel extends ChangeNotifier {
         results: results,
         details: details,
       );
+      // Cancelar o stream para evitar que re-emita o valor antigo
+      _openSub?.cancel();
+      _openSub = null;
       _openOccurrence = null;
       notifyListeners();
     } catch (e) {

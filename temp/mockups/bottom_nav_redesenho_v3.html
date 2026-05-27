@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bottom Nav · irmão do header</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:26px 18px;}
+  .wrap{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start;max-width:850px;}
+  .col{display:flex;flex-direction:column;align-items:center;gap:11px;}
+  .tag{color:#4dd0e1;font-size:11.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;}
+  .tag span{color:#5a7280;font-weight:500;letter-spacing:.2px;text-transform:none;font-size:10.5px;margin-left:6px;}
+  .phone{width:362px;height:700px;background:#050d10;border-radius:38px;border:8px solid #1a1a1a;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .sb{height:38px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;color:#fff;font-size:13px;font-weight:600;flex-shrink:0;}
+  .sb-i{font-size:11px;}
+  /* HEADER UNIVERSAL — tokens reais do app */
+  .uh{padding:8px 16px 14px;background:rgba(77,208,225,.04);border-bottom:1px solid rgba(77,208,225,.12);flex-shrink:0;}
+  .uh-row{display:flex;align-items:center;gap:10px;}
+  .av{display:flex;position:relative;flex-shrink:0;}
+  .av-c{width:36px;height:36px;border-radius:50%;background:#1a2a30;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:8.5px;font-weight:700;}
+  .av-c.cond{border-color:rgba(77,208,225,.5);margin-left:-10px;}
+  .uh-info{flex:1;min-width:0;}
+  .uh-bin{color:#fff;font-size:13px;font-weight:700;margin-bottom:2px;}
+  .uh-turno{display:flex;align-items:center;gap:6px;color:#2ecc71;font-size:10px;font-weight:600;}
+  .t-dot{width:6px;height:6px;background:#2ecc71;border-radius:50%;}
+  .uh-time{color:#b0c4cc;font-weight:500;}
+  .uh-act{display:flex;gap:6px;}
+  .uh-btn{width:32px;height:32px;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#4dd0e1;}
+  /* CONTEÚDO enxuto */
+  .body{flex:1;padding:14px 16px 0;overflow:hidden;}
+  .ptitle{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .ptitle h1{color:#fff;font-size:21px;font-weight:800;}
+  .pdf{display:flex;align-items:center;gap:5px;border:1px solid rgba(77,208,225,.3);color:#4dd0e1;font-size:11px;font-weight:600;padding:7px 11px;border-radius:9px;}
+  .chips{display:flex;gap:7px;margin-bottom:16px;}
+  .chip{font-size:11px;font-weight:600;color:#8696a0;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:6px 13px;}
+  .chip.on{color:#4dd0e1;border-color:#4dd0e1;}
+  .card{display:flex;gap:12px;align-items:flex-start;padding:13px 0;}
+  .c-time{color:#5a7280;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;padding-top:9px;width:38px;flex-shrink:0;}
+  .c-ico{width:38px;height:38px;border-radius:50%;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.18);display:flex;align-items:center;justify-content:center;color:#4dd0e1;flex-shrink:0;}
+  .c-body{flex:1;min-width:0;padding-top:1px;}
+  .c-title{color:#fff;font-size:13.5px;font-weight:700;line-height:1.3;margin-bottom:3px;}
+  .c-sub{color:#7d8d99;font-size:11.5px;}
+  .c-you{display:inline-block;margin-top:7px;font-size:9px;font-weight:700;color:#4dd0e1;background:rgba(77,208,225,.1);border-radius:5px;padding:2px 7px;letter-spacing:.4px;}
+  .div{height:1px;background:rgba(255,255,255,.05);}
+  /* ===== BOTTOM NAV — irmão do header ===== */
+  .nav{flex-shrink:0;background:rgba(77,208,225,.04);border-top:1px solid rgba(77,208,225,.12);display:flex;align-items:center;justify-content:space-around;padding:9px 10px 20px;}
+  .ni{height:42px;min-width:42px;display:flex;align-items:center;justify-content:center;color:#5a7280;border-radius:21px;gap:7px;}
+  .ni.active{background:rgba(77,208,225,.1);border:1px solid rgba(77,208,225,.22);padding:0 15px;color:#4dd0e1;}
+  .ni.active .l{font-size:12.5px;font-weight:700;white-space:nowrap;}
+  /* ação integrada */
+  .act-i{width:42px;height:42px;border-radius:50%;background:#4dd0e1;display:flex;align-items:center;justify-content:center;color:#04181c;box-shadow:0 3px 12px rgba(77,208,225,.28);}
+  /* ação FAB */
+  .fab{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;}
+  .fab-b{width:54px;height:54px;border-radius:50%;background:#4dd0e1;color:#04181c;display:flex;align-items:center;justify-content:center;margin-top:-30px;border:4px solid #050d10;box-shadow:0 4px 16px rgba(77,208,225,.32);}
+  .fab-l{font-size:8.5px;font-weight:700;color:#4dd0e1;letter-spacing:.2px;margin-top:3px;}
+  .notes{flex-basis:100%;color:#9aa7af;font-size:12.5px;line-height:1.6;border-top:1px solid rgba(255,255,255,.07);padding-top:16px;margin-top:8px;max-width:760px;margin-left:auto;margin-right:auto;}
+  .notes h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:9px;}
+  .notes p{margin-bottom:8px;}.notes b{color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ TRATAMENTO 1 ============ -->
+  <div class="col">
+    <div class="tag">Tratamento 1 <span>· ação integrada</span></div>
+    <div class="phone">
+      <div class="sb"><span>10:59</span><span class="sb-i">4G ⌃ 🔋</span></div>
+      <div class="uh">
+        <div class="uh-row">
+          <div class="av"><div class="av-c">BONO</div><div class="av-c cond">RAG</div></div>
+          <div class="uh-info"><div class="uh-bin">Bono · GCM Ragonha</div><div class="uh-turno"><span class="t-dot"></span>Turno ativo <span class="uh-time">· há 2h</span></div></div>
+          <div class="uh-act">
+            <div class="uh-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3L4 7l4 4"/><path d="M4 7h12"/><path d="M16 21l4-4-4-4"/><path d="M20 17H8"/></svg></div>
+            <div class="uh-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="ptitle"><h1>Histórico</h1><div class="pdf"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6v20h12V8z"/><path d="M14 2v6h6"/></svg>Exportar PDF</div></div>
+        <div class="chips"><span class="chip">Hoje</span><span class="chip on">Ontem</span><span class="chip">Esta semana</span></div>
+        <div class="card"><div class="c-time">22:39</div><div class="c-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/></svg></div><div class="c-body"><div class="c-title">Ocorrência · Averiguação de atitude suspeita</div><div class="c-sub">Rua Guido Orsi, Jardim Ouro Verde</div><span class="c-you">VOCÊ</span></div></div>
+        <div class="div"></div>
+        <div class="card"><div class="c-time">20:17</div><div class="c-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/></svg></div><div class="c-body"><div class="c-title">Ocorrência · Averiguação de atitude suspeita</div><div class="c-sub">Rua Onésimo Simões Silva, Jd. Nova Europa</div><span class="c-you">VOCÊ</span></div></div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></div>
+        <div class="ni active"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v6h6"/><path d="M3.5 9a9 9 0 11-.8 5"/><path d="M12 7v5l4 2"/></svg><span class="l">Histórico</span></div>
+        <div class="act-i"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/><path d="M12 8.5v5M9.5 11h5"/></svg></div>
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 6.5l11 11M4 9l-1.5-1.5M9 4L7.5 2.5M20 15l1.5 1.5M15 20l1.5 1.5M3 12l3-3 6 6-3 3zM21 12l-3 3-6-6 3-3z"/></svg></div>
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="10" r="1.7"/><circle cx="10.5" cy="6.5" r="1.7"/><circle cx="15.5" cy="6.5" r="1.7"/><circle cx="19" cy="10.5" r="1.7"/><path d="M8 16c0-2.5 1.8-4 4.5-4s4.5 1.5 4.5 4c0 2-1.5 3-4.5 3s-4.5-1-4.5-3z"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TRATAMENTO 2 ============ -->
+  <div class="col">
+    <div class="tag">Tratamento 2 <span>· ação central (FAB sólido)</span></div>
+    <div class="phone">
+      <div class="sb"><span>10:59</span><span class="sb-i">4G ⌃ 🔋</span></div>
+      <div class="uh">
+        <div class="uh-row">
+          <div class="av"><div class="av-c">BONO</div><div class="av-c cond">RAG</div></div>
+          <div class="uh-info"><div class="uh-bin">Bono · GCM Ragonha</div><div class="uh-turno"><span class="t-dot"></span>Turno ativo <span class="uh-time">· há 2h</span></div></div>
+          <div class="uh-act">
+            <div class="uh-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3L4 7l4 4"/><path d="M4 7h12"/><path d="M16 21l4-4-4-4"/><path d="M20 17H8"/></svg></div>
+            <div class="uh-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="ptitle"><h1>Histórico</h1><div class="pdf"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6v20h12V8z"/><path d="M14 2v6h6"/></svg>Exportar PDF</div></div>
+        <div class="chips"><span class="chip">Hoje</span><span class="chip on">Ontem</span><span class="chip">Esta semana</span></div>
+        <div class="card"><div class="c-time">22:39</div><div class="c-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/></svg></div><div class="c-body"><div class="c-title">Ocorrência · Averiguação de atitude suspeita</div><div class="c-sub">Rua Guido Orsi, Jardim Ouro Verde</div><span class="c-you">VOCÊ</span></div></div>
+        <div class="div"></div>
+        <div class="card"><div class="c-time">20:17</div><div class="c-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/></svg></div><div class="c-body"><div class="c-title">Ocorrência · Averiguação de atitude suspeita</div><div class="c-sub">Rua Onésimo Simões Silva, Jd. Nova Europa</div><span class="c-you">VOCÊ</span></div></div>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></div>
+        <div class="ni active"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v6h6"/><path d="M3.5 9a9 9 0 11-.8 5"/><path d="M12 7v5l4 2"/></svg><span class="l">Histórico</span></div>
+        <div class="fab"><div class="fab-b"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V5l8-3z"/><path d="M12 8.5v5M9.5 11h5"/></svg></div><div class="fab-l">Nova</div></div>
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 6.5l11 11M4 9l-1.5-1.5M9 4L7.5 2.5M20 15l1.5 1.5M15 20l1.5 1.5M3 12l3-3 6 6-3 3zM21 12l-3 3-6-6 3-3z"/></svg></div>
+        <div class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="10" r="1.7"/><circle cx="10.5" cy="6.5" r="1.7"/><circle cx="15.5" cy="6.5" r="1.7"/><circle cx="19" cy="10.5" r="1.7"/><path d="M8 16c0-2.5 1.8-4 4.5-4s4.5 1.5 4.5 4c0 2-1.5 3-4.5 3s-4.5-1-4.5-3z"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>POR QUE AGORA CONVERSA</h3>
+    <p><b>O nav virou espelho do header:</b> mesma faixa ancorada de ponta a ponta, mesmo véu ciano de fundo, e a <b>borda superior do nav é idêntica à borda inferior do header</b> — a tela fica "fechada" em cima e embaixo pela mesma linha.</p>
+    <p><b>Ciano sólido, nada de vidro nem gradiente:</b> o pill ativo (Histórico) usa o mesmíssimo tratamento dos botões de canto do header (fundo ciano 0.10, borda ciano 0.22). Vira parente deles, não um corpo estranho.</p>
+    <p><b>Expanding pill mantido</b> (você gostou): só a aba ativa mostra o nome. A ação é ciano sólido — no <b>1</b> discreta na linha, no <b>2</b> elevada como ponto focal. Sem caixa quadrada, sem dois "selecionados".</p>
+  </div>
+</div>
+</body>
+</html>

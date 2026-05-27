@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/features/training/presentation/screens/busca_captura_live_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_screen.dart';
+import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 
 class BuscaCapturaFormacaoScreen extends StatefulWidget {
   final Dog dog;
@@ -261,17 +266,45 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     ),
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       HapticFeedback.mediumImpact();
-                      Navigator.of(context).push(
+                      final trackingService = GpsTrackingService();
+                      String handlerId = 'Condutor';
+                      try {
+                        final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+                        handlerId = shiftVM.handlerId ?? 'Condutor';
+                      } catch (_) {}
+                      final result = await Navigator.of(context).push<GpsTrackResult?>(
                         MaterialPageRoute(
-                          builder: (_) => BuscaCapturaLiveScreen(
-                            dog: widget.dog,
-                            scenario: 'Formação Módulo 2',
-                            distanceGoal: 150,
+                          builder: (_) => GpsTrackingScreen(
+                            activityLabel: 'Busca & Captura · Formação',
+                            dogName: widget.dog.name,
+                            handlerName: handlerId,
+                            trackingService: trackingService,
                           ),
                         ),
                       );
+                      if (result != null && context.mounted) {
+                        final session = TrainingSessionModel(
+                          dogId: widget.dog.id,
+                          dogName: widget.dog.name,
+                          date: DateTime.now(),
+                          trainingType: 'Busca & Captura',
+                          location: '',
+                          weather: '',
+                          handlerNotes: '',
+                          metadata: {
+                            'specialty': 'busca_captura',
+                            'mode': 'formacao',
+                            'gps': true,
+                            'gps_track': result.toJson(),
+                          },
+                        );
+                        try {
+                          final vm = Provider.of<TrainingViewModel>(context, listen: false);
+                          await vm.addTrainingSession(session);
+                        } catch (_) {}
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4DD0E1),

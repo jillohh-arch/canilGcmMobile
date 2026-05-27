@@ -15,6 +15,7 @@ import 'package:canil_gcm/features/occurrences/presentation/view_models/occurren
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_hub_screen.dart';
+import 'package:canil_gcm/main.dart';
 
 part 'main_root_actions.dart';
 part 'main_root_action_sheet.dart';
@@ -31,6 +32,7 @@ class MainRootScreen extends StatefulWidget {
 class _MainRootScreenState extends State<MainRootScreen> {
   int _currentIndex = 0;
   String? _lastOccurrenceWatchDogId;
+  DateTime? _lastBackPress;
 
   @override
   void initState() {
@@ -61,7 +63,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
         openOccurrence != null && openOccurrence.dogId == activeDogId
         ? openOccurrence
         : null;
-    if (activeDogId != null && activeDogId != _lastOccurrenceWatchDogId) {
+    if (activeDogId != null &&
+        (activeDogId != _lastOccurrenceWatchDogId || !occurrenceVM.isWatchingOpen)) {
       _lastOccurrenceWatchDogId = activeDogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -80,6 +83,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
       },
       child: Scaffold(
         backgroundColor: AppTheme.background,
+        extendBody: true,
         body: Stack(
           children: [
             IndexedStack(index: _currentIndex, children: _screens),
@@ -87,7 +91,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
               Positioned(
                 left: 14,
                 right: 14,
-                bottom: 88,
+                bottom: 100,
                 child: _ActiveOccurrenceBanner(
                   occurrence: activeOccurrence,
                   dogName: _dogNameFor(context, activeDogId),

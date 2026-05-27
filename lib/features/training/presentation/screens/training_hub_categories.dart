@@ -143,8 +143,32 @@ class _SpecialtyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOperational = specialty.isOperational;
-    final Color sideColor = isOperational ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F);
+    final key = normalizeTrainingKey(specialty.name);
+    final isDetection = key.contains('detec') || key.contains('faro');
+
+    // Para detecção, derivar badge do estado real das linhas
+    if (isDetection && specialty.dogId.isNotEmpty) {
+      return _DetectionSpecialtyRow(
+        specialty: specialty,
+        sessions: sessions,
+        onTap: onTap,
+      );
+    }
+
+    return _buildCard(
+      context,
+      isOperational: specialty.isOperational,
+      lastTrainingLabel: specialty.lastTrainingLabel,
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context, {
+    required bool isOperational,
+    required String lastTrainingLabel,
+  }) {
+    final Color sideColor =
+        isOperational ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F);
     final String emoji = _specialtyEmojiFor(specialty.name);
 
     return Material(
@@ -155,11 +179,11 @@ class _SpecialtyRow extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: specialty.isInFormation
-                ? const Color(0x0AF1C40F) // rgba(241, 196, 15, 0.03)
-                : const Color(0x0DFFFFFF), // rgba(255, 255, 255, 0.03)
+                ? const Color(0x0AF1C40F)
+                : const Color(0x0DFFFFFF),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: const Color(0x14FFFFFF), // rgba(255, 255, 255, 0.08)
+              color: const Color(0x14FFFFFF),
               width: 1,
             ),
           ),
@@ -167,21 +191,19 @@ class _SpecialtyRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             child: Row(
               children: [
-                // Left border colored bar
                 Container(
                   width: 3,
                   height: 78,
                   color: sideColor,
                 ),
                 const SizedBox(width: 12),
-                // Icon box
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     color: isOperational
-                        ? const Color(0x1F2ECC71) // rgba(46, 204, 113, 0.12)
-                        : const Color(0x1FF1C40F), // rgba(241, 196, 15, 0.12)
+                        ? const Color(0x1F2ECC71)
+                        : const Color(0x1FF1C40F),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   alignment: Alignment.center,
@@ -191,7 +213,6 @@ class _SpecialtyRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Info column
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -209,9 +230,9 @@ class _SpecialtyRow extends StatelessWidget {
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            // Status badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isOperational
                                     ? const Color(0x1F2ECC71)
@@ -230,7 +251,9 @@ class _SpecialtyRow extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    isOperational ? 'OPERACIONAL' : 'EM FORMAÇÃO',
+                                    isOperational
+                                        ? 'OPERACIONAL'
+                                        : 'EM FORMAÇÃO',
                                     style: GoogleFonts.inter(
                                       color: sideColor,
                                       fontSize: 9,
@@ -244,7 +267,7 @@ class _SpecialtyRow extends StatelessWidget {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                '· última ${specialty.lastTrainingLabel}',
+                                '· última $lastTrainingLabel',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
@@ -276,6 +299,191 @@ class _SpecialtyRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Card de Detecção que deriva badge e meta dos estados reais das linhas.
+class _DetectionSpecialtyRow extends StatelessWidget {
+  final TrainingSpecialtyModel specialty;
+  final List<TrainingHubSession> sessions;
+  final VoidCallback onTap;
+
+  const _DetectionSpecialtyRow({
+    required this.specialty,
+    required this.sessions,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final detectionService = DetectionService();
+    return StreamBuilder<List<DetectionLine>>(
+      stream: detectionService.watchLines(specialty.dogId),
+      builder: (context, snapshot) {
+        final lines = snapshot.data ?? [];
+
+        // Derivar badge agregado (prioridade: in_formation > operational > not_started)
+        final hasFormation =
+            lines.any((l) => l.status == 'in_formation' || l.status == 'triagem');
+        final hasOperational = lines.any((l) => l.status == 'operational');
+
+        final bool isOperational;
+        final String badgeLabel;
+        final Color badgeColor;
+
+        if (hasFormation) {
+          isOperational = false;
+          badgeLabel = 'EM FORMAÇÃO';
+          badgeColor = const Color(0xFFF1C40F);
+        } else if (hasOperational) {
+          isOperational = true;
+          badgeLabel = 'OPERACIONAL';
+          badgeColor = const Color(0xFF2ECC71);
+        } else {
+          isOperational = false;
+          badgeLabel = 'NÃO INICIADA';
+          badgeColor = const Color(0xFF5A7280);
+        }
+
+        // Última sessão entre todas as linhas
+        DateTime? lastSession;
+        for (final line in lines) {
+          final ls = line.lastSessionAt ?? line.updatedAt;
+          if (ls != null && (lastSession == null || ls.isAfter(lastSession))) {
+            lastSession = ls;
+          }
+        }
+        final lastLabel = lastSession != null
+            ? formatRelativeTrainingDate(lastSession)
+            : specialty.lastTrainingLabel;
+
+        final String emoji = _specialtyEmojiFor(specialty.name);
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: hasFormation
+                    ? const Color(0x0AF1C40F)
+                    : const Color(0x0DFFFFFF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0x14FFFFFF),
+                  width: 1,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 78,
+                      color: badgeColor,
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: badgeColor.withAlpha(30),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              specialty.name,
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: badgeColor.withAlpha(30),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        isOperational ? '● ' : '◔ ',
+                                        style: TextStyle(
+                                          color: badgeColor,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        badgeLabel,
+                                        style: GoogleFonts.inter(
+                                          color: badgeColor,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '· última $lastLabel',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      color: const Color(0xFFB0C4CC),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            _DetectionMetaFromLines(dogId: specialty.dogId),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '›',
+                      style: TextStyle(
+                        color: Color(0xFF5A7280),
+                        fontSize: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -485,17 +693,11 @@ Widget _buildSpecialtyMeta(TrainingSpecialtyModel specialty, List<TrainingHubSes
     if (specialty.subAreas.isNotEmpty) {
       return _buildSubAreasText(specialty.subAreas);
     }
-    return RichText(
-      text: TextSpan(
-        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFFB0C4CC)),
-        children: const [
-          TextSpan(text: 'Drogas: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-          TextSpan(text: 'operacional · '),
-          TextSpan(text: 'Armas/Cadáver: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-          TextSpan(text: 'não iniciadas'),
-        ],
-      ),
-    );
+    // Derivar dos dados reais das detection_lines
+    if (specialty.dogId.isNotEmpty) {
+      return _DetectionMetaFromLines(dogId: specialty.dogId);
+    }
+    return const SizedBox.shrink();
   }
 
   if (key.contains('guarda') || key.contains('protec')) {
@@ -522,6 +724,100 @@ Widget _buildSpecialtyMeta(TrainingSpecialtyModel specialty, List<TrainingHubSes
       fontWeight: FontWeight.w500,
     ),
   );
+}
+
+/// Widget que lê as detection_lines reais do Firestore e monta o resumo
+/// derivado (ex: "Drogas: operacional · Armas/Cadáver: não iniciadas").
+class _DetectionMetaFromLines extends StatelessWidget {
+  final String dogId;
+
+  const _DetectionMetaFromLines({required this.dogId});
+
+  @override
+  Widget build(BuildContext context) {
+    final detectionService = DetectionService();
+    return StreamBuilder<List<DetectionLine>>(
+      stream: detectionService.watchLines(dogId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Text(
+            'Carregando linhas...',
+            style: GoogleFonts.inter(
+              color: const Color(0xFF7A8A92),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          );
+        }
+
+        final lines = snapshot.data!;
+        final operationalList = <String>[];
+        final inFormationList = <String>[];
+        final notStartedList = <String>[];
+
+        for (final line in lines) {
+          switch (line.status) {
+            case 'operational':
+              operationalList.add(line.displayName);
+              break;
+            case 'in_formation':
+              inFormationList.add(line.displayName);
+              break;
+            case 'triagem':
+              inFormationList.add(line.displayName);
+              break;
+            default:
+              notStartedList.add(line.displayName);
+          }
+        }
+
+        final List<TextSpan> spans = [];
+
+        void addGroup(List<String> list, String label) {
+          if (list.isEmpty) return;
+          if (spans.isNotEmpty) {
+            spans.add(const TextSpan(
+              text: ' · ',
+              style: TextStyle(color: Color(0xFFB0C4CC)),
+            ));
+          }
+          spans.add(TextSpan(
+            text: '${list.join("/")} ',
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.white),
+          ));
+          spans.add(TextSpan(
+            text: label,
+            style: const TextStyle(color: Color(0xFFB0C4CC)),
+          ));
+        }
+
+        addGroup(operationalList, 'operacional');
+        addGroup(inFormationList, 'em formação');
+        addGroup(notStartedList, 'não iniciada');
+
+        if (spans.isEmpty) {
+          return Text(
+            'Nenhuma linha configurada',
+            style: GoogleFonts.inter(
+              color: const Color(0xFF7A8A92),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          );
+        }
+
+        return RichText(
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          text: TextSpan(
+            style: GoogleFonts.inter(fontSize: 10, height: 1.3),
+            children: spans,
+          ),
+        );
+      },
+    );
+  }
 }
 
 Widget _buildSubAreasText(List<TrainingSubAreaModel> subAreas) {

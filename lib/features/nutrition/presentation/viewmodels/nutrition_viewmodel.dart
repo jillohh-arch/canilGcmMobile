@@ -65,8 +65,8 @@ class NutritionViewModel extends ChangeNotifier {
   // ─── Lifecycle ─────────────────────────────────────────────────────
 
   /// Inicializa o ViewModel para um cão específico.
-  Future<void> loadForDog(String dogId) async {
-    if (_activeDogId == dogId && !_loading) return;
+  Future<void> loadForDog(String dogId, {bool forceReload = false}) async {
+    if (_activeDogId == dogId && !_loading && !forceReload) return;
     _activeDogId = dogId;
     _loading = true;
     notifyListeners();

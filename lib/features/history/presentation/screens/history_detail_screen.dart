@@ -22,6 +22,7 @@ import 'package:canil_gcm/features/occurrences/presentation/view_models/occurren
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
+import 'package:canil_gcm/features/history/presentation/widgets/gps_track_detail_widget.dart';
 
 // --- Design tokens from mockup ---
 const Color _bg = Color(0xFF050D10);
@@ -1947,6 +1948,12 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // GPS Track (se presente)
+        if (metadata['gps_track'] is Map)
+          GpsTrackDetailWidget(
+            gpsTrack: Map<String, dynamic>.from(metadata['gps_track'] as Map),
+          ),
+
         const _SectionLabel('RASTRO PERCORRIDO'),
         const SizedBox(height: 8),
         Container(
@@ -2232,6 +2239,12 @@ class HistoryObedienciaBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // GPS Track (se presente)
+        if (metadata['gps_track'] is Map)
+          GpsTrackDetailWidget(
+            gpsTrack: Map<String, dynamic>.from(metadata['gps_track'] as Map),
+          ),
+
         const _SectionLabel('MODO DA SESSÃO'),
         const SizedBox(height: 8),
         _buildConfigGrid({

@@ -53,8 +53,8 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
-  String _periodFilter = 'Esta semana';
+class _HistoryScreenState extends State<HistoryScreen> with WidgetsBindingObserver {
+  String _periodFilter = 'Hoje';
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
   String? _lastLoadedDogId;
@@ -63,7 +63,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllData());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Recarregar dados quando o app volta do background
+    if (state == AppLifecycleState.resumed) {
+      _lastLoadedDogId = null; // Forçar reload
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _loadAllData(forceReload: true);
+      });
+    }
   }
 
   @override

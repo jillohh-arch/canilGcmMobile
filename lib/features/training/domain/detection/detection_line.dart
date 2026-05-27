@@ -21,6 +21,7 @@ class DetectionLine {
   final List<Map<String, dynamic>> phaseHistory;
   final List<Map<String, dynamic>> auditTrail;
   final DateTime? updatedAt;
+  final DateTime? lastSessionAt;
   final DateTime? deletedAt;
   final String? deletedBy;
   final String? deletedReason;
@@ -41,6 +42,7 @@ class DetectionLine {
     this.phaseHistory = const [],
     this.auditTrail = const [],
     this.updatedAt,
+    this.lastSessionAt,
     this.deletedAt,
     this.deletedBy,
     this.deletedReason,
@@ -67,6 +69,7 @@ class DetectionLine {
       phaseHistory: _readMapList(json['phase_history']),
       auditTrail: _readMapList(json['audit_trail']),
       updatedAt: _toDateTime(json['updated_at']),
+      lastSessionAt: _toDateTime(json['last_session_at']),
       deletedAt: _toDateTime(json['deleted_at']),
       deletedBy: json['deleted_by'] as String?,
       deletedReason:
@@ -92,6 +95,8 @@ class DetectionLine {
       if (phaseHistory.isNotEmpty) 'phase_history': phaseHistory,
       if (auditTrail.isNotEmpty) 'audit_trail': auditTrail,
       if (updatedAt != null) 'updated_at': Timestamp.fromDate(updatedAt!),
+      if (lastSessionAt != null)
+        'last_session_at': Timestamp.fromDate(lastSessionAt!),
       if (deletedAt != null) 'deleted_at': Timestamp.fromDate(deletedAt!),
       if (deletedBy != null) 'deleted_by': deletedBy,
       if (deletedReason != null) 'deleted_reason': deletedReason,
@@ -114,6 +119,7 @@ class DetectionLine {
     List<Map<String, dynamic>>? phaseHistory,
     List<Map<String, dynamic>>? auditTrail,
     DateTime? updatedAt,
+    DateTime? lastSessionAt,
     DateTime? deletedAt,
     String? deletedBy,
     String? deletedReason,
@@ -135,6 +141,7 @@ class DetectionLine {
       phaseHistory: phaseHistory ?? this.phaseHistory,
       auditTrail: auditTrail ?? this.auditTrail,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastSessionAt: lastSessionAt ?? this.lastSessionAt,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,
       deletedReason: deletedReason ?? this.deletedReason,
@@ -175,7 +182,6 @@ class DetectionLine {
     '4b',
     '4v',
     '4c',
-    'final',
   ];
 
   static DateTime? _toDateTime(dynamic value) {

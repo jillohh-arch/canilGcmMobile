@@ -1,145 +1,178 @@
 part of 'main_root_screen.dart';
 
 extension _MainRootActions on _MainRootScreenState {
+  // ─── Tokens espelhados do Header Universal ─────────────────────────
+  static const _navBg = Color(0x0A4DD0E1); // rgba(77,208,225,0.04)
+  static const _navBorder = Color(0x1F4DD0E1); // rgba(77,208,225,0.12)
+  static const _iconInactive = Color(0xFF5A7280);
+  static const _iconActive = Color(0xFF4DD0E1);
+  static const _pillBg = Color(0x1A4DD0E1); // rgba(77,208,225,0.10)
+  static const _pillBorder = Color(0x384DD0E1); // rgba(77,208,225,0.22)
+  static const _fabColor = Color(0xFF4DD0E1);
+  static const _fabIconColor = Color(0xFF04181C);
+  static const _fabRingColor = Color(0xFF050D10);
+  static const _fabSize = 54.0;
+  static const _fabElevation = 22.0; // how much FAB rises above bar
+
   Widget _buildBottomNavigation(BuildContext context, String? activeDogId) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF07141B),
-        border: Border(
-          top: BorderSide(color: AppTheme.primary.withAlpha(45), width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withAlpha(22),
-            blurRadius: 24,
-            offset: const Offset(0, -8),
+    return SizedBox(
+      // Total height = bar content + safe area padding handled by SafeArea
+      // The Stack allows the FAB to overflow upward
+      height: 76 + MediaQuery.of(context).padding.bottom,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // ─── Bar background ───────────────────────────────────────
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: _navBg,
+                border: Border(
+                  top: BorderSide(color: _navBorder, width: 1),
+                ),
+              ),
+            ),
+          ),
+
+          // ─── Nav items row ────────────────────────────────────────
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: MediaQuery.of(context).padding.bottom,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                children: [
+                  _buildNavItem(0, Icons.home_outlined, 'Turno'),
+                  _buildNavItem(1, Icons.history_rounded, 'Histórico'),
+                  // Spacer for FAB
+                  const SizedBox(width: 72),
+                  _buildNavItem(2, Icons.fitness_center_rounded, 'Treino'),
+                  _buildNavItem(3, Icons.pets_rounded, 'Cão'),
+                ],
+              ),
+            ),
+          ),
+
+          // ─── FAB (elevated above bar) ─────────────────────────────
+          Positioned(
+            top: -_fabElevation,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: _buildCenterFab(context, activeDogId),
+            ),
           ),
         ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 86,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(child: _buildNavItem(0, Icons.home_outlined, 'Turno')),
-              Expanded(
-                child: _buildNavItem(1, Icons.history_rounded, 'Histórico'),
-              ),
-              SizedBox(
-                width: 106,
-                child: _buildCenterOccurrenceAction(context, activeDogId),
-              ),
-              Expanded(
-                child: _buildNavItem(2, Icons.fitness_center_rounded, 'Treino'),
-              ),
-              Expanded(child: _buildNavItem(3, Icons.pets_rounded, 'Cão')),
-            ],
-          ),
-        ),
       ),
     );
   }
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? AppTheme.primary : const Color(0xFFB4BFC5);
 
-    return InkWell(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        _onTabTapped(index);
-      },
-      child: SizedBox(
-        height: 70,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 29),
-            const SizedBox(height: 5),
-            _RootAutoFitText(
-              label,
-              style: GoogleFonts.inter(
-                color: color,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                letterSpacing: 0,
+    return Expanded(
+      flex: isSelected ? 3 : 2,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _onTabTapped(index);
+        },
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.symmetric(
+              horizontal: isSelected ? 12 : 10,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected ? _pillBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(
+                color: isSelected ? _pillBorder : Colors.transparent,
+                width: 1,
               ),
             ),
-            const SizedBox(height: 6),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: isSelected ? 34 : 0,
-              height: 3,
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCenterOccurrenceAction(
-    BuildContext context,
-    String? activeDogId,
-  ) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () => _openOccurrenceFromRoot(context, activeDogId),
-      child: SizedBox(
-        height: 86,
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            Positioned(
-              top: 0,
-              child: Container(
-                width: 76,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A2430),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(6),
-                    bottom: Radius.circular(2),
-                  ),
-                  border: Border.all(color: AppTheme.primary, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withAlpha(58),
-                      blurRadius: 18,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? _iconActive : _iconInactive,
+                  size: 22,
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        color: _iconActive,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.shield_outlined,
-                  color: AppTheme.primary,
-                  size: 34,
-                ),
-              ),
+                  ),
+                ],
+              ],
             ),
-            Positioned(
-              left: 2,
-              right: 2,
-              top: 58,
-              child: _RootAutoFitText(
-                'Nova Ocorrência',
-                style: GoogleFonts.inter(
-                  color: AppTheme.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _buildCenterFab(BuildContext context, String? activeDogId) {
+    return GestureDetector(
+      onTap: () => _openOccurrenceFromRoot(context, activeDogId),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // FAB circle with ring
+          Container(
+            width: _fabSize,
+            height: _fabSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _fabColor,
+              border: Border.all(color: _fabRingColor, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: _fabColor.withAlpha(82), // ~0.32 opacity
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.shield_rounded,
+              color: _fabIconColor,
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: 3),
+          // Label "Nova"
+          Text(
+            'Nova',
+            style: GoogleFonts.inter(
+              color: _fabColor,
+              fontSize: 8.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Occurrence navigation logic ────────────────────────────────────
 
   Future<void> _openOccurrenceFromRoot(
     BuildContext context,
@@ -202,33 +235,4 @@ extension _MainRootActions on _MainRootScreenState {
   }
 }
 
-class _RootAutoFitText extends StatelessWidget {
-  final String text;
-  final TextStyle style;
 
-  const _RootAutoFitText(this.text, {required this.style});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fitted = FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
-            textAlign: TextAlign.center,
-            style: style,
-          ),
-        );
-
-        if (!constraints.maxWidth.isFinite) {
-          return fitted;
-        }
-
-        return SizedBox(width: constraints.maxWidth, child: fitted);
-      },
-    );
-  }
-}
