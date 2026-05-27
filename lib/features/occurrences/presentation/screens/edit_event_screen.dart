@@ -14,6 +14,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/edit_event_location_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 class EditEventScreen extends StatefulWidget {
@@ -98,6 +99,40 @@ class _EditEventScreenState extends State<EditEventScreen> {
       );
       if (mounted) setState(() => _gpsAddress = address);
     } catch (_) {}
+  }
+
+  Future<void> _openLocationEditor() async {
+    if (!_isEditing) return;
+    final e = widget.existingEvent!;
+    final vm = context.read<OccurrenceViewModel>();
+    final totalEvents = vm.events.length;
+    final eventIndex = vm.events.indexOf(e) + 1;
+
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditEventLocationScreen(
+          event: e.copyWith(
+            gpsLat: _gpsLat,
+            gpsLng: _gpsLng,
+          ),
+          eventIndex: eventIndex > 0 ? eventIndex : 1,
+          totalEvents: totalEvents > 0 ? totalEvents : 1,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Recarregar coordenadas atualizadas
+      final updated = await vm.getEvents(widget.occurrenceId);
+      final refreshed = updated.where((ev) => ev.id == e.id).firstOrNull;
+      if (refreshed != null) {
+        setState(() {
+          _gpsLat = refreshed.gpsLat;
+          _gpsLng = refreshed.gpsLng;
+        });
+        _resolveExistingGpsAddress();
+      }
+    }
   }
 
   @override
@@ -865,6 +900,20 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            if (_isEditing && !_isUpdatingGps) ...[
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _openLocationEditor,
+                child: Text(
+                  'MAPA',
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF4DD0E1),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
