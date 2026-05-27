@@ -20,44 +20,50 @@ class _CloseTrackingButton extends StatelessWidget {
 }
 
 class _TrackingMap extends StatelessWidget {
+  final MapController mapController;
   final List<LatLng> routePoints;
   final bool isLightMode;
-  final String mapStyle;
-  final ValueChanged<GoogleMapController> onMapCreated;
 
   const _TrackingMap({
+    required this.mapController,
     required this.routePoints,
     required this.isLightMode,
-    required this.mapStyle,
-    required this.onMapCreated,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      initialCameraPosition: const CameraPosition(
-        target: LatLng(-23.5505, -46.6333),
-        zoom: 12,
-      ),
-      style: mapStyle,
-      onMapCreated: onMapCreated,
-      myLocationEnabled: true,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      compassEnabled: false,
-      polylines: {
-        Polyline(
-          polylineId: const PolylineId('tracking_route'),
-          points: routePoints,
-          color: isLightMode
-              ? const Color(0xFF26C6DA)
-              : const Color(0xFFFBBF24),
-          width: 5,
-          jointType: JointType.round,
-          endCap: Cap.roundCap,
-          startCap: Cap.roundCap,
+    return FlutterMap(
+      mapController: mapController,
+      options: MapOptions(
+        initialCenter: const LatLng(-22.5647, -47.4013), // Limeira/SP
+        initialZoom: 14,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all,
         ),
-      },
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          subdomains: const ['a', 'b', 'c', 'd'],
+          userAgentPackageName: 'br.gov.sp.limeira.canil_gcm',
+          maxZoom: 19,
+        ),
+        if (routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: isLightMode
+                    ? const Color(0xFF26C6DA)
+                    : const Color(0xFFFBBF24),
+                strokeWidth: 5.0,
+                strokeJoin: StrokeJoin.round,
+                strokeCap: StrokeCap.round,
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
