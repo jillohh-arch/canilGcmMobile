@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/media_processing_service.dart';
@@ -1251,6 +1252,22 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   Future<void> _pickFinalizationPhoto(ImageSource source) async {
     try {
+      // Solicitar permissão de runtime antes de abrir o picker
+      final permission = source == ImageSource.camera
+          ? Permission.camera
+          : Permission.photos;
+      var status = await permission.request();
+      if (!status.isGranted) {
+        // Fallback para storage em Android < 13
+        status = await Permission.storage.request();
+      }
+      if (!status.isGranted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permissão negada para acessar mídia')),
+        );
+        return;
+      }
+
       final picked = await _imagePicker.pickImage(
         source: source,
         maxWidth: 1920,

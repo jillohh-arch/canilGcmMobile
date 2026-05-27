@@ -102,35 +102,69 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> _openLocationEditor() async {
-    if (!_isEditing) return;
-    final e = widget.existingEvent!;
     final vm = context.read<OccurrenceViewModel>();
-    final totalEvents = vm.events.length;
-    final eventIndex = vm.events.indexOf(e) + 1;
 
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => EditEventLocationScreen(
-          event: e.copyWith(
-            gpsLat: _gpsLat,
-            gpsLng: _gpsLng,
+    if (_isEditing) {
+      // Modo persistente: salva direto no Firestore
+      final e = widget.existingEvent!;
+      final totalEvents = vm.events.length;
+      final eventIndex = vm.events.indexOf(e) + 1;
+
+      final result = await Navigator.of(context).push<dynamic>(
+        MaterialPageRoute(
+          builder: (_) => EditEventLocationScreen(
+            event: e.copyWith(
+              gpsLat: _gpsLat,
+              gpsLng: _gpsLng,
+            ),
+            eventIndex: eventIndex > 0 ? eventIndex : 1,
+            totalEvents: totalEvents > 0 ? totalEvents : 1,
           ),
-          eventIndex: eventIndex > 0 ? eventIndex : 1,
-          totalEvents: totalEvents > 0 ? totalEvents : 1,
         ),
-      ),
-    );
+      );
 
-    if (result == true && mounted) {
-      // Recarregar coordenadas atualizadas
-      final updated = await vm.getEvents(widget.occurrenceId);
-      final refreshed = updated.where((ev) => ev.id == e.id).firstOrNull;
-      if (refreshed != null) {
+      if (result == true && mounted) {
+        final updated = await vm.getEvents(widget.occurrenceId);
+        final refreshed = updated.where((ev) => ev.id == e.id).firstOrNull;
+        if (refreshed != null) {
+          setState(() {
+            _gpsLat = refreshed.gpsLat;
+            _gpsLng = refreshed.gpsLng;
+          });
+          _resolveExistingGpsAddress();
+        }
+      }
+    } else {
+      // Modo pick-only: retorna coordenadas sem persistir
+      final tempEvent = OccurrenceEvent(
+        id: '',
+        occurrenceId: widget.occurrenceId,
+        category: _selectedCategory,
+        timestamp: _timestamp,
+        title: _titleController.text,
+        gpsLat: _gpsLat,
+        gpsLng: _gpsLng,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final result = await Navigator.of(context).push<dynamic>(
+        MaterialPageRoute(
+          builder: (_) => EditEventLocationScreen(
+            event: tempEvent,
+            eventIndex: vm.events.length + 1,
+            totalEvents: vm.events.length + 1,
+            pickOnly: true,
+          ),
+        ),
+      );
+
+      if (result is LocationPickResult && mounted) {
         setState(() {
-          _gpsLat = refreshed.gpsLat;
-          _gpsLng = refreshed.gpsLng;
+          _gpsLat = result.lat;
+          _gpsLng = result.lng;
+          _gpsAddress = result.label;
         });
-        _resolveExistingGpsAddress();
       }
     }
   }
@@ -900,7 +934,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (_isEditing && !_isUpdatingGps) ...[
+            if (!_isUpdatingGps) ...[
               const SizedBox(width: 12),
               GestureDetector(
                 onTap: _openLocationEditor,

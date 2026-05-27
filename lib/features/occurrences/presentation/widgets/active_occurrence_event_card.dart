@@ -9,6 +9,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
   final OccurrenceEvent event;
   final bool isRecent;
   final VoidCallback onTap;
+  final VoidCallback? onLocationTap;
   final String? handlerName;
   final String? locationLabel;
 
@@ -17,6 +18,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
     required this.event,
     this.isRecent = false,
     required this.onTap,
+    this.onLocationTap,
     this.handlerName,
     this.locationLabel,
   });
@@ -139,7 +141,10 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                         if (locationLabel != null)
                           _MetaChip(icon: '📍', label: 'Local'),
                         if (event.gpsLat != null)
-                          _MetaChip(icon: '⊙', label: 'GPS'),
+                          GestureDetector(
+                            onTap: onLocationTap,
+                            child: const _MetaChip(icon: '⊙', label: 'GPS'),
+                          ),
                       ],
                     ),
                   ],

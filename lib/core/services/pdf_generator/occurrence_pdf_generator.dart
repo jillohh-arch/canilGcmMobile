@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as printing;
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
+import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
@@ -38,10 +39,6 @@ class OccurrencePdfGenerator {
 
   static const _docType = 'Registro de Ocorrencia';
   static const _systemName = 'Sistema Canil K9 GCM';
-  static const _googleMapsStaticApiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_STATIC_API_KEY',
-    defaultValue: 'AIzaSyCtpmcHWxkDCNp-a-7bjWPj7nExnI3ii2M',
-  );
   static const _verificationBaseUrl = String.fromEnvironment(
     'K9_VERIFICATION_BASE_URL',
     defaultValue: 'https://canilk9.limeira.sp.gov.br/v',
@@ -207,72 +204,35 @@ class OccurrencePdfGenerator {
     return Future.wait(futures);
   }
 
+  /// Gera mapa estático OSM para a página de localização (ponto único).
   Future<pw.ImageProvider?> _buildStaticMapImage(Occurrence occurrence) async {
-    if (_googleMapsStaticApiKey.trim().isEmpty) return null;
     final lat = occurrence.gpsLat;
     final lng = occurrence.gpsLng;
     if (lat == null || lng == null) return null;
 
-    final center = '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
-    final uri = Uri.https('maps.googleapis.com', '/maps/api/staticmap', {
-      'center': center,
-      'zoom': '15',
-      'size': '800x420',
-      'scale': '2',
-      'maptype': 'roadmap',
-      'markers': 'color:0x0A8E9D|$center',
-      'key': _googleMapsStaticApiKey,
-    });
-
+    final generator = OsmStaticMapGenerator();
     try {
-      return await printing.networkImage(uri.toString());
-    } catch (_) {
-      return null;
+      final bytes = await generator.generateSinglePointMap(lat, lng);
+      if (bytes == null) return null;
+      return pw.MemoryImage(bytes);
+    } finally {
+      generator.dispose();
     }
   }
 
-  /// Gera mapa estático com múltiplos pinos numerados para o deslocamento.
+  /// Gera mapa estático OSM com múltiplos pinos numerados para o deslocamento.
   Future<pw.ImageProvider?> _buildDisplacementMapImage(
     List<OccurrenceLocation> locations,
   ) async {
-    if (_googleMapsStaticApiKey.trim().isEmpty) return null;
     if (locations.isEmpty) return null;
 
-    final markers = <String>[];
-    for (final loc in locations) {
-      final label = loc.index <= 9 ? '${loc.index}' : '';
-      final color = loc.index == 1 ? '0x2ECC71' : '0x4DD0E1';
-      markers.add(
-        'color:0x$color|label:$label|${loc.lat.toStringAsFixed(6)},${loc.lng.toStringAsFixed(6)}',
-      );
-    }
-
-    // Path entre os locais
-    final pathPoints = locations
-        .map((l) => '${l.lat.toStringAsFixed(6)},${l.lng.toStringAsFixed(6)}')
-        .join('|');
-
-    final params = <String, String>{
-      'size': '800x420',
-      'scale': '2',
-      'maptype': 'roadmap',
-      'key': _googleMapsStaticApiKey,
-    };
-
-    // Adicionar path se há mais de 1 local
-    if (locations.length > 1) {
-      params['path'] = 'color:0x4DD0E180|weight:3|$pathPoints';
-    }
-
-    // Construir URL com múltiplos markers
-    final baseUri = Uri.https('maps.googleapis.com', '/maps/api/staticmap', params);
-    final markerParams = markers.map((m) => 'markers=$m').join('&');
-    final fullUrl = '${baseUri.toString()}&$markerParams';
-
+    final generator = OsmStaticMapGenerator();
     try {
-      return await printing.networkImage(fullUrl);
-    } catch (_) {
-      return null;
+      final bytes = await generator.generateDisplacementMap(locations);
+      if (bytes == null) return null;
+      return pw.MemoryImage(bytes);
+    } finally {
+      generator.dispose();
     }
   }
 
@@ -1321,7 +1281,7 @@ class OccurrencePdfGenerator {
             ),
             alignment: pw.Alignment.center,
             child: pw.Text(
-              'Mapa indisponivel (sem chave de API configurada)',
+              'Mapa indisponivel (sem conexao ao gerar o PDF)',
               style: _body(f, size: 8, color: _inkSoft),
             ),
           ),
