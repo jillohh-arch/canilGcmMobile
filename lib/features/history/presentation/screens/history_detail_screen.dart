@@ -18,6 +18,8 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
+import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/create_amendment_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
@@ -266,6 +268,12 @@ class HistoryDetailScaffold extends StatelessWidget {
                         _buildIdentificationCard(context),
                         const SizedBox(height: 16),
                         body,
+                        if (detail.type == HistoryEntryType.occurrence &&
+                            detail.source.originalModel is Occurrence)
+                          _AmendmentsSection(
+                            occurrence:
+                                detail.source.originalModel as Occurrence,
+                          ),
                         const SizedBox(height: 16),
                         _buildIntegrityBlock(context),
                       ],
@@ -3337,5 +3345,253 @@ class _EndPin extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─── Seção de Retificações ──────────────────────────────────────────────────
+
+class _AmendmentsSection extends StatefulWidget {
+  final Occurrence occurrence;
+
+  const _AmendmentsSection({required this.occurrence});
+
+  @override
+  State<_AmendmentsSection> createState() => _AmendmentsSectionState();
+}
+
+class _AmendmentsSectionState extends State<_AmendmentsSection> {
+  final _repository = AmendmentRepository();
+  List<Amendment>? _amendments;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAmendments();
+  }
+
+  Future<void> _loadAmendments() async {
+    final amendments =
+        await _repository.listByOccurrence(widget.occurrence.id);
+    if (mounted) {
+      setState(() {
+        _amendments = amendments;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+    if (_amendments == null || _amendments!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_edu, color: _amber, size: 14),
+              const SizedBox(width: 8),
+              Text(
+                'RETIFICAÇÕES (${_amendments!.length})',
+                style: GoogleFonts.inter(
+                  color: _amber,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ..._amendments!.map((a) => _AmendmentCard(amendment: a)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmendmentCard extends StatelessWidget {
+  final Amendment amendment;
+
+  const _AmendmentCard({required this.amendment});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr =
+        '${amendment.createdAt.day.toString().padLeft(2, '0')}/'
+        '${amendment.createdAt.month.toString().padLeft(2, '0')}/'
+        '${amendment.createdAt.year} '
+        '${amendment.createdAt.hour.toString().padLeft(2, '0')}:'
+        '${amendment.createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _amber.withAlpha(8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _amber.withAlpha(30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _amber.withAlpha(25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '#${amendment.sequenceNumber}',
+                  style: GoogleFonts.inter(
+                    color: _amber,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  dateStr,
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withAlpha(120),
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${amendment.createdByName} (RA: ${amendment.createdByRa})',
+            style: GoogleFonts.inter(
+              color: Colors.white.withAlpha(160),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            amendment.reason,
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...amendment.corrections.entries.map((entry) {
+            final fieldLabel = _fieldLabel(entry.key);
+            final correction = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fieldLabel.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        color: _amber.withAlpha(180),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.remove_circle_outline,
+                            color: Colors.redAccent.withAlpha(150), size: 12),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${correction.oldValue ?? '(vazio)'}',
+                            style: GoogleFonts.inter(
+                              color: Colors.white.withAlpha(100),
+                              fontSize: 11,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.add_circle_outline,
+                            color: const Color(0xFF4CAF50).withAlpha(180),
+                            size: 12),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${correction.newValue}',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (correction.description != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        correction.description!,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withAlpha(80),
+                          fontSize: 10,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          Text(
+            'Hash: ${amendment.integrityHash.substring(0, 16)}...',
+            style: TextStyle(
+              color: _amber.withAlpha(100),
+              fontSize: 9,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fieldLabel(String key) {
+    const labels = {
+      'type_name': 'Natureza',
+      'location_address': 'Endereço',
+      'dog_name': 'Cão',
+      'handler_name': 'Condutor',
+      'final_report': 'Relatório final',
+      'initial_observation': 'Observação inicial',
+    };
+    return labels[key] ?? key;
   }
 }
