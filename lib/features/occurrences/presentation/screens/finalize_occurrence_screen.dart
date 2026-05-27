@@ -328,21 +328,34 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     required String report,
     required List<OccurrenceResult> results,
     required Map<String, dynamic>? details,
+    List<String> finalizationPhotoHashes = const [],
   }) {
     final vm = context.read<OccurrenceViewModel>();
     final occ = _occurrence ?? vm.openOccurrence;
+
+    // Extrair photo_hashes de cada evento (ordem estável por sha256)
     final eventPayload =
         vm.events
             .map(
-              (event) => {
-                'id': event.id,
-                'category': event.category.toMap(),
-                'timestamp': event.timestamp.toIso8601String(),
-                'title': event.title,
-                'description': event.description,
-                'photo_urls': event.photoUrls,
-                'gps_lat': event.gpsLat,
-                'gps_lng': event.gpsLng,
+              (event) {
+                // Coletar hashes das fotos do evento a partir do photoMetadata
+                final eventPhotoHashes = event.photoMetadata
+                    .where((m) => m['sha256'] != null)
+                    .map((m) => m['sha256'] as String)
+                    .toList()
+                  ..sort();
+
+                return {
+                  'id': event.id,
+                  'category': event.category.toMap(),
+                  'timestamp': event.timestamp.toIso8601String(),
+                  'title': event.title,
+                  'description': event.description,
+                  'photo_urls': event.photoUrls,
+                  'photo_hashes': eventPhotoHashes,
+                  'gps_lat': event.gpsLat,
+                  'gps_lng': event.gpsLng,
+                };
               },
             )
             .toList()
@@ -353,6 +366,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     final resultPayload = results.map((r) => r.toMap()).toList()..sort();
 
     final payload = {
+      'hash_version': 2,
       'occurrence_id': widget.occurrenceId,
       'type_name': widget.typeName,
       'dog_name': widget.dogName,
@@ -364,6 +378,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       'final_report': report,
       'results': resultPayload,
       'details': _stableJsonValue(details),
+      'finalization_photo_hashes': [...finalizationPhotoHashes]..sort(),
     };
 
     return sha256.convert(utf8.encode(jsonEncode(payload))).toString();
@@ -409,7 +424,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final details = _buildDetails();
 
       // Upload fotos de finalização (se houver)
-      final photoUrls = await _uploadFinalizationPhotos();
+      final photoUploadResults = await _uploadFinalizationPhotos();
+      final photoUrls = photoUploadResults.map((r) => r.url).toList();
+      final photoHashes = photoUploadResults.map((r) => r.sha256Hash).toList();
 
       debugPrint('[Finalize] Construindo hash... events=${vm.events.length}');
 
@@ -417,6 +434,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         report: report,
         results: results,
         details: details,
+        finalizationPhotoHashes: photoHashes,
       );
 
       debugPrint('[Finalize] Hash construído. Chamando finalizeOccurrence...');
@@ -428,6 +446,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         results: results,
         details: details,
         finalizationPhotos: photoUrls,
+        finalizationPhotoHashes: photoHashes,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
@@ -1285,21 +1304,21 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     }
   }
 
-  Future<List<String>> _uploadFinalizationPhotos() async {
+  Future<List<UploadResult>> _uploadFinalizationPhotos() async {
     if (_finalizationPhotos.isEmpty) return [];
 
-    final urls = <String>[];
+    final results = <UploadResult>[];
     final folder = 'occurrences/${widget.occurrenceId}/finalization';
 
     for (final file in _finalizationPhotos) {
       final compressed = await _mediaService.compressImage(file);
-      final url = await _storageService.uploadImage(
+      final result = await _storageService.uploadImageWithHash(
         compressed ?? file,
         folder,
       );
-      if (url != null) urls.add(url);
+      if (result != null) results.add(result);
     }
-    return urls;
+    return results;
   }
 
   Widget _buildDetailSection(OccurrenceResult result) {

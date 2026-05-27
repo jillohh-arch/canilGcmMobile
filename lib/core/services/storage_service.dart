@@ -1,7 +1,16 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:uuid/uuid.dart';
+
+/// Resultado de upload com hash do binário para integridade.
+class UploadResult {
+  final String url;
+  final String sha256Hash;
+
+  const UploadResult({required this.url, required this.sha256Hash});
+}
 
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -10,6 +19,17 @@ class StorageService {
   /// Faz upload de uma imagem JPEG e retorna a URL pública gerada pelo Storage.
   Future<String?> uploadImage(File file, String folder) async {
     return uploadFile(file, folder, mimeType: 'image/jpeg', extension: 'jpg');
+  }
+
+  /// Faz upload de uma imagem e retorna URL + SHA-256 do binário.
+  /// Usado para fotos que precisam de verificação de integridade.
+  Future<UploadResult?> uploadImageWithHash(File file, String folder) async {
+    return uploadFileWithHash(
+      file,
+      folder,
+      mimeType: 'image/jpeg',
+      extension: 'jpg',
+    );
   }
 
   /// Mantido para chamadas semânticas de foto de perfil.
@@ -44,6 +64,55 @@ class StorageService {
       if (snapshot.state == TaskState.success) {
         final String downloadUrl = await snapshot.ref.getDownloadURL();
         return downloadUrl;
+      } else {
+        throw Exception('O upload não foi concluído com sucesso.');
+      }
+    } on FirebaseException catch (e) {
+      if (e.code == 'object-not-found') {
+        debugPrint(
+          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
+        );
+        return null;
+      }
+      debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
+      throw Exception('Falha ao subir arquivo: ${e.message}');
+    } catch (e) {
+      debugPrint('[StorageService] Erro genérico: $e');
+      throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
+    }
+  }
+
+  /// Upload genérico que também retorna o SHA-256 do binário.
+  /// Calcula o hash sobre os bytes que efetivamente vão para o Storage.
+  Future<UploadResult?> uploadFileWithHash(
+    File file,
+    String folder, {
+    String? mimeType,
+    String? extension,
+  }) async {
+    try {
+      final String ext = extension ?? _extensionFromPath(file.path);
+      final String resolvedMime = mimeType ?? _mimeTypeFromExtension(ext);
+      final String fileName = '${_uuid.v4()}.$ext';
+
+      final String cleanFolder = folder.replaceAll(RegExp(r'^/+|/+$'), '');
+      final Reference ref = _storage.ref().child(cleanFolder).child(fileName);
+
+      final bytes = await file.readAsBytes();
+
+      // Calcular SHA-256 do binário antes do upload
+      final hash = sha256.convert(bytes).toString();
+
+      final UploadTask uploadTask = ref.putData(
+        bytes,
+        SettableMetadata(contentType: resolvedMime),
+      );
+
+      final TaskSnapshot snapshot = await uploadTask;
+
+      if (snapshot.state == TaskState.success) {
+        final String downloadUrl = await snapshot.ref.getDownloadURL();
+        return UploadResult(url: downloadUrl, sha256Hash: hash);
       } else {
         throw Exception('O upload não foi concluído com sucesso.');
       }
