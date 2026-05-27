@@ -18,6 +18,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/create_amendment_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -739,7 +740,49 @@ class HistoryDetailScaffold extends StatelessWidget {
               ],
             ),
           ),
+          if (isFinalizedOcc) ...[
+            const SizedBox(height: 11),
+            Container(height: 1, color: Colors.white.withAlpha(15)),
+            const SizedBox(height: 11),
+            InkWell(
+              onTap: () => _openCreateAmendment(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.post_add_rounded, color: _amber, size: 14),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Adicionar retificação',
+                        style: GoogleFonts.inter(
+                          color: _amber,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: _amber.withAlpha(150),
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  void _openCreateAmendment(BuildContext context) {
+    if (detail.source.originalModel is! Occurrence) return;
+    final occ = detail.source.originalModel as Occurrence;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateAmendmentScreen(occurrence: occ),
       ),
     );
   }
