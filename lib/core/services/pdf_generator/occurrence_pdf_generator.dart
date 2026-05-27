@@ -8,6 +8,8 @@ import 'package:printing/printing.dart' as printing;
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
+import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
@@ -73,6 +75,10 @@ class OccurrencePdfGenerator {
     final staticMapImage = await _buildStaticMapImage(occurrence);
     final displacementMapImage = await _buildDisplacementMapImage(locations);
 
+    // Carregar aditamentos (se houver)
+    final amendments =
+        await AmendmentRepository().listByOccurrence(occurrence.id);
+
     final context = _OccurrencePdfContext(
       occurrence: occurrence,
       events: sortedEvents,
@@ -85,6 +91,7 @@ class OccurrencePdfGenerator {
       staticMapImage: staticMapImage,
       displacementMapImage: displacementMapImage,
       locations: locations,
+      amendments: amendments,
     );
 
     pdf
@@ -134,6 +141,13 @@ class OccurrencePdfGenerator {
             ),
             child: _buildValidationPage(context),
           ),
+          if (context.amendments.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.fromLTRB(
+                _pagePadding, 21, _pagePadding, 0,
+              ),
+              child: _buildAmendmentsSection(context),
+            ),
         ],
       ),
     );
@@ -2651,6 +2665,296 @@ class OccurrencePdfGenerator {
       child: pw.Text(message, style: _body(fonts, size: 9, color: _inkSoft)),
     );
   }
+  // ─── Seção de Aditamentos / Retificações ─────────────────────────────────
+
+  pw.Widget _buildAmendmentsSection(_OccurrencePdfContext ctx) {
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Título da seção
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          decoration: pw.BoxDecoration(
+            color: _amberBg,
+            border: pw.Border.all(color: _amberLine),
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'ADITAMENTOS / RETIFICAÇÕES',
+                style: pw.TextStyle(
+                  font: ctx.fonts.bold,
+                  fontSize: 11,
+                  color: _amber,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'As retificações abaixo foram registradas após o selamento '
+                'do documento original. O registro original permanece íntegro '
+                'e inalterado — cada aditamento possui hash de integridade próprio.',
+                style: pw.TextStyle(
+                  font: ctx.fonts.regular,
+                  fontSize: 8.5,
+                  color: _amber,
+                  lineSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 14),
+
+        // Cada aditamento
+        ...ctx.amendments.map(
+          (amendment) => _buildAmendmentEntry(ctx, amendment, dateFmt),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildAmendmentEntry(
+    _OccurrencePdfContext ctx,
+    Amendment amendment,
+    DateFormat dateFmt,
+  ) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 14),
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _amberLine),
+        borderRadius: pw.BorderRadius.circular(6),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Header: número + data + autor
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Retificação #${amendment.sequenceNumber}',
+                style: pw.TextStyle(
+                  font: ctx.fonts.bold,
+                  fontSize: 10,
+                  color: _amber,
+                ),
+              ),
+              pw.Text(
+                dateFmt.format(amendment.createdAt),
+                style: pw.TextStyle(
+                  font: ctx.fonts.regular,
+                  fontSize: 8.5,
+                  color: PdfColors.grey700,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            '${amendment.createdByName} (RA: ${amendment.createdByRa})',
+            style: pw.TextStyle(
+              font: ctx.fonts.regular,
+              fontSize: 8.5,
+              color: PdfColors.grey700,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // Motivo
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F9F9F9'),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'MOTIVO',
+                  style: pw.TextStyle(
+                    font: ctx.fonts.bold,
+                    fontSize: 7.5,
+                    color: PdfColors.grey600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  amendment.reason,
+                  style: pw.TextStyle(
+                    font: ctx.fonts.regular,
+                    fontSize: 9,
+                    color: PdfColors.grey900,
+                    lineSpacing: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // Correções
+          ...amendment.corrections.entries.map(
+            (entry) => _buildCorrectionRow(ctx, entry.key, entry.value),
+          ),
+
+          // Hash do aditamento
+          pw.SizedBox(height: 8),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F5F5F5'),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  'HASH SHA-256: ',
+                  style: pw.TextStyle(
+                    font: ctx.fonts.bold,
+                    fontSize: 7,
+                    color: PdfColors.grey600,
+                  ),
+                ),
+                pw.Expanded(
+                  child: pw.Text(
+                    amendment.integrityHash,
+                    style: pw.TextStyle(
+                      font: ctx.fonts.monoRegular,
+                      fontSize: 6.5,
+                      color: PdfColors.grey800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // QR do aditamento
+          pw.SizedBox(height: 8),
+          pw.Center(
+            child: pw.BarcodeWidget(
+              barcode: pw.Barcode.qrCode(),
+              data: '${_verificationBaseUrl}/${amendment.occurrenceId}'
+                  '?a=${amendment.id}&h=${amendment.integrityHash.substring(0, 16)}',
+              width: 60,
+              height: 60,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildCorrectionRow(
+    _OccurrencePdfContext ctx,
+    String fieldKey,
+    AmendmentCorrection correction,
+  ) {
+    const fieldLabels = {
+      'type_name': 'Natureza',
+      'location_address': 'Endereço',
+      'dog_name': 'Cão',
+      'handler_name': 'Condutor',
+      'final_report': 'Relatório final',
+      'initial_observation': 'Observação inicial',
+    };
+    final label = fieldLabels[fieldKey] ?? fieldKey;
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 6),
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColor.fromHex('E0E0E0')),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            label.toUpperCase(),
+            style: pw.TextStyle(
+              font: ctx.fonts.bold,
+              fontSize: 7.5,
+              color: _amber,
+              letterSpacing: 0.5,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Antes: ',
+                style: pw.TextStyle(
+                  font: ctx.fonts.bold,
+                  fontSize: 8,
+                  color: PdfColors.grey600,
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  '${correction.oldValue ?? '(vazio)'}',
+                  style: pw.TextStyle(
+                    font: ctx.fonts.regular,
+                    fontSize: 8,
+                    color: PdfColors.grey700,
+                    decoration: pw.TextDecoration.lineThrough,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 2),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Depois: ',
+                style: pw.TextStyle(
+                  font: ctx.fonts.bold,
+                  fontSize: 8,
+                  color: PdfColors.grey600,
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  '${correction.newValue}',
+                  style: pw.TextStyle(
+                    font: ctx.fonts.bold,
+                    fontSize: 8,
+                    color: PdfColors.grey900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (correction.description != null) ...[
+            pw.SizedBox(height: 3),
+            pw.Text(
+              correction.description!,
+              style: pw.TextStyle(
+                font: ctx.fonts.regular,
+                fontSize: 7.5,
+                color: PdfColors.grey600,
+                fontStyle: pw.FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _OccurrencePdfContext {
@@ -2665,6 +2969,7 @@ class _OccurrencePdfContext {
   final pw.ImageProvider? staticMapImage;
   final pw.ImageProvider? displacementMapImage;
   final List<OccurrenceLocation> locations;
+  final List<Amendment> amendments;
 
   const _OccurrencePdfContext({
     required this.occurrence,
@@ -2678,6 +2983,7 @@ class _OccurrencePdfContext {
     required this.staticMapImage,
     required this.displacementMapImage,
     required this.locations,
+    this.amendments = const [],
   });
 }
 
