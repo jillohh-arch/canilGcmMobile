@@ -11,9 +11,10 @@ import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 /// Usado para embutir no PDF sem depender de Google Maps API key.
 class OsmStaticMapGenerator {
   static const _tileUrl =
-      'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png';
+      'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
   static const _userAgent = 'CanilK9GCM/1.0 (canil.k9.gcm@limeira.sp.gov.br)';
-  static const _tileSize = 512; // @2x tiles
+  static const _tileSize = 256; // tiles padrão (sem @2x) para economizar memória
+  static const _maxTiles = 9; // máximo de tiles para evitar OOM
 
   final http.Client _client;
 
@@ -26,8 +27,8 @@ class OsmStaticMapGenerator {
   /// Retorna bytes PNG ou null em caso de erro.
   Future<Uint8List?> generateDisplacementMap(
     List<OccurrenceLocation> locations, {
-    int width = 800,
-    int height = 420,
+    int width = 600,
+    int height = 320,
   }) async {
     if (locations.isEmpty) return null;
 
@@ -69,8 +70,8 @@ class OsmStaticMapGenerator {
   Future<Uint8List?> generateSinglePointMap(
     double lat,
     double lng, {
-    int width = 800,
-    int height = 420,
+    int width = 600,
+    int height = 320,
     int zoom = 15,
   }) async {
     try {
@@ -115,8 +116,14 @@ class OsmStaticMapGenerator {
     final centerX = _lngToTileX(center.lng, zoom);
     final centerY = _latToTileY(center.lat, zoom);
 
-    final tilesX = (width / _tileSize).ceil() + 1;
-    final tilesY = (height / _tileSize).ceil() + 1;
+    var tilesX = (width / _tileSize).ceil() + 1;
+    var tilesY = (height / _tileSize).ceil() + 1;
+
+    // Limitar para evitar OOM em dispositivos com pouca RAM
+    if (tilesX * tilesY > _maxTiles) {
+      tilesX = 3;
+      tilesY = 3;
+    }
 
     final startTileX = (centerX - tilesX / 2).floor();
     final startTileY = (centerY - tilesY / 2).floor();
@@ -277,6 +284,13 @@ class OsmStaticMapGenerator {
     final picture = recorder.endRecording();
     final img = await picture.toImage(width, height);
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+
+    // Liberar memória GPU
+    img.dispose();
+    for (final image in tileImages.values) {
+      image.dispose();
+    }
+
     return byteData?.buffer.asUint8List();
   }
 

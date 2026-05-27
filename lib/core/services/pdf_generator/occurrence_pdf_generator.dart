@@ -66,15 +66,12 @@ class OccurrencePdfGenerator {
     // Agrupar eventos por local
     final locations = OccurrenceLocationService.clusterEventsSync(sortedEvents);
 
-    // Parallel download of media, static map, and displacement map
-    final results = await Future.wait([
-      _buildMediaItems(sortedEvents),
-      _buildStaticMapImage(occurrence),
-      _buildDisplacementMapImage(locations),
-    ]);
-    final media = results[0] as List<_PdfMediaItem>;
-    final staticMapImage = results[1] as pw.ImageProvider?;
-    final displacementMapImage = results[2] as pw.ImageProvider?;
+    // Download de mídia em paralelo (fotos são leves individualmente)
+    final media = await _buildMediaItems(sortedEvents);
+
+    // Mapas sequenciais para evitar pico de memória (tiles + composição)
+    final staticMapImage = await _buildStaticMapImage(occurrence);
+    final displacementMapImage = await _buildDisplacementMapImage(locations);
 
     final context = _OccurrencePdfContext(
       occurrence: occurrence,
