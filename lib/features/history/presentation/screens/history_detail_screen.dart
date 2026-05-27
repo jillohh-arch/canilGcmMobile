@@ -23,6 +23,8 @@ import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/history/presentation/widgets/gps_track_detail_widget.dart';
+import 'package:canil_gcm/core/services/occurrence_location_service.dart';
+import 'package:canil_gcm/features/occurrences/presentation/widgets/occurrence_displacement_map.dart';
 
 // --- Design tokens from mockup ---
 const Color _bg = Color(0xFF050D10);
@@ -944,100 +946,8 @@ class HistoryOccurrenceBody extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Localização
-        const _SectionLabel('LOCALIZAÇÃO'),
-        const SizedBox(height: 8),
-        Builder(
-          builder: (context) {
-            final occ = detail.source.originalModel is Occurrence ? detail.source.originalModel as Occurrence : null;
-            final lat = occ?.gpsLat;
-            final lng = occ?.gpsLng;
-            final hasGps = lat != null && lng != null;
-
-            const googleMapsStaticApiKey = String.fromEnvironment(
-              'GOOGLE_MAPS_STATIC_API_KEY',
-              defaultValue: 'AIzaSyCtpmcHWxkDCNp-a-7bjWPj7nExnI3ii2M',
-            );
-            final hasApiKey = googleMapsStaticApiKey.trim().isNotEmpty;
-            final mapUrl = hasGps && hasApiKey
-                ? 'https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x260&scale=2&maptype=roadmap&markers=color:0x0A8E9D|$lat,$lng&key=$googleMapsStaticApiKey'
-                : null;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 130,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: Colors.white.withAlpha(20)),
-                    color: const Color(0xFF0A161B),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: mapUrl != null
-                              ? Image.network(
-                                  mapUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return CustomPaint(painter: _MapGridPainter());
-                                  },
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 1.5,
-                                        color: _cyan,
-                                      ),
-                                    );
-                                  },
-                                )
-                              : CustomPaint(painter: _MapGridPainter()),
-                        ),
-                        Center(
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _cyan.withAlpha(40),
-                              border: Border.all(color: _cyan, width: 2),
-                            ),
-                            child: const Center(
-                              child: Icon(Icons.location_on, color: _cyan, size: 16),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined, color: _cyan, size: 14),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        detail.location,
-                        style: GoogleFonts.inter(color: _textSecondary, fontSize: 12),
-                      ),
-                    ),
-                    Text(
-                      hasGps
-                          ? '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}'
-                          : 'GPS N/I',
-                      style: GoogleFonts.ibmPlexMono(color: _cyan, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          }
-        ),
+        // Mapa de deslocamento
+        _OccurrenceDisplacementSection(occurrenceId: detail.id),
         const SizedBox(height: 16),
 
         // Timeline
@@ -3082,6 +2992,58 @@ class _HeaderIconBtn extends StatelessWidget {
   }
 }
 
+class _OccurrenceDisplacementSection extends StatefulWidget {
+  final String occurrenceId;
+
+  const _OccurrenceDisplacementSection({required this.occurrenceId});
+
+  @override
+  State<_OccurrenceDisplacementSection> createState() =>
+      _OccurrenceDisplacementSectionState();
+}
+
+class _OccurrenceDisplacementSectionState
+    extends State<_OccurrenceDisplacementSection> {
+  late Future<List<OccurrenceLocation>> _locationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _locationsFuture = _loadLocations();
+  }
+
+  Future<List<OccurrenceLocation>> _loadLocations() async {
+    if (widget.occurrenceId.isEmpty) return [];
+    final events = await context
+        .read<OccurrenceViewModel>()
+        .getEvents(widget.occurrenceId);
+    return OccurrenceLocationService.clusterEvents(events);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<OccurrenceLocation>>(
+      future: _locationsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: _cyan,
+              ),
+            ),
+          );
+        }
+        final locations = snapshot.data ?? [];
+        if (locations.isEmpty) return const SizedBox.shrink();
+        return OccurrenceDisplacementMap(locations: locations);
+      },
+    );
+  }
+}
+
 class _OccurrenceTimelineSection extends StatefulWidget {
   final String occurrenceId;
   final RecordDetail fallback;
@@ -3098,7 +3060,6 @@ class _OccurrenceTimelineSection extends StatefulWidget {
 
 class _OccurrenceTimelineSectionState
     extends State<_OccurrenceTimelineSection> {
-  bool _expanded = false;
   late Future<List<OccurrenceEvent>> _eventsFuture;
 
   @override
@@ -3179,8 +3140,6 @@ class _OccurrenceTimelineSectionState
   }
 
   Widget _buildTimelineList(List<OccurrenceEvent> events) {
-    final displayEvents = _expanded ? events : events.take(4).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3189,9 +3148,9 @@ class _OccurrenceTimelineSectionState
         Container(
           padding: const EdgeInsets.only(left: 6),
           child: Column(
-            children: List.generate(displayEvents.length, (idx) {
-              final ev = displayEvents[idx];
-              final isLast = idx == displayEvents.length - 1;
+            children: List.generate(events.length, (idx) {
+              final ev = events[idx];
+              final isLast = idx == events.length - 1;
 
               Color nodeColor = _cyan;
               final titleLower = (ev.title ?? '').toLowerCase();
@@ -3282,41 +3241,7 @@ class _OccurrenceTimelineSectionState
             }),
           ),
         ),
-        if (events.length > 4 && !_expanded)
-          InkWell(
-            onTap: () {
-              setState(() {
-                _expanded = true;
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(top: 2),
-              padding: const EdgeInsets.all(11),
-              decoration: BoxDecoration(
-                border: Border.all(color: _cyan.withAlpha(51)),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Ver os ${events.length} eventos completos',
-                    style: GoogleFonts.inter(
-                      color: _cyan,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: _cyan,
-                    size: 14,
-                  ),
-                ],
-              ),
-            ),
-          ),
+
       ],
     );
   }

@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as printing;
 
+import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
@@ -65,13 +66,18 @@ class OccurrencePdfGenerator {
     final sortedEvents = [...events]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-    // Parallel download of media and static map image
+    // Agrupar eventos por local
+    final locations = OccurrenceLocationService.clusterEventsSync(sortedEvents);
+
+    // Parallel download of media, static map, and displacement map
     final results = await Future.wait([
       _buildMediaItems(sortedEvents),
       _buildStaticMapImage(occurrence),
+      _buildDisplacementMapImage(locations),
     ]);
     final media = results[0] as List<_PdfMediaItem>;
     final staticMapImage = results[1] as pw.ImageProvider?;
+    final displacementMapImage = results[2] as pw.ImageProvider?;
 
     final context = _OccurrencePdfContext(
       occurrence: occurrence,
@@ -83,15 +89,60 @@ class OccurrencePdfGenerator {
       fonts: fonts,
       media: media,
       staticMapImage: staticMapImage,
+      displacementMapImage: displacementMapImage,
+      locations: locations,
     );
 
     pdf
       ..addPage(_page(context, 1, _buildCoverPage))
-      ..addPage(_page(context, 2, _buildLocationPage))
-      ..addPage(_page(context, 3, _buildTimelinePage))
-      ..addPage(_page(context, 4, _buildMediaPage))
-      ..addPage(_page(context, 5, _buildReportPage))
-      ..addPage(_page(context, 6, _buildValidationPage));
+      ..addPage(_page(context, 2, _buildLocationPage));
+
+    // Conteúdo fluido — timeline, mídias, relatório e validação paginam automaticamente
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.only(
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        ),
+        header: (_) => _header(context, 0),
+        footer: (_) => _footer(false),
+        build: (_) => [
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(
+              _pagePadding, 21, _pagePadding, 0,
+            ),
+            child: _buildDisplacementSection(context),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(
+              _pagePadding, 21, _pagePadding, 0,
+            ),
+            child: _buildTimelinePage(context),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(
+              _pagePadding, 21, _pagePadding, 0,
+            ),
+            child: _buildMediaPage(context),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(
+              _pagePadding, 21, _pagePadding, 0,
+            ),
+            child: _buildReportPage(context),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(
+              _pagePadding, 21, _pagePadding, 0,
+            ),
+            child: _buildValidationPage(context),
+          ),
+        ],
+      ),
+    );
 
     return pdf.save();
   }
@@ -175,6 +226,51 @@ class OccurrencePdfGenerator {
 
     try {
       return await printing.networkImage(uri.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Gera mapa estático com múltiplos pinos numerados para o deslocamento.
+  Future<pw.ImageProvider?> _buildDisplacementMapImage(
+    List<OccurrenceLocation> locations,
+  ) async {
+    if (_googleMapsStaticApiKey.trim().isEmpty) return null;
+    if (locations.isEmpty) return null;
+
+    final markers = <String>[];
+    for (final loc in locations) {
+      final label = loc.index <= 9 ? '${loc.index}' : '';
+      final color = loc.index == 1 ? '0x2ECC71' : '0x4DD0E1';
+      markers.add(
+        'color:0x$color|label:$label|${loc.lat.toStringAsFixed(6)},${loc.lng.toStringAsFixed(6)}',
+      );
+    }
+
+    // Path entre os locais
+    final pathPoints = locations
+        .map((l) => '${l.lat.toStringAsFixed(6)},${l.lng.toStringAsFixed(6)}')
+        .join('|');
+
+    final params = <String, String>{
+      'size': '800x420',
+      'scale': '2',
+      'maptype': 'roadmap',
+      'key': _googleMapsStaticApiKey,
+    };
+
+    // Adicionar path se há mais de 1 local
+    if (locations.length > 1) {
+      params['path'] = 'color:0x4DD0E180|weight:3|$pathPoints';
+    }
+
+    // Construir URL com múltiplos markers
+    final baseUri = Uri.https('maps.googleapis.com', '/maps/api/staticmap', params);
+    final markerParams = markers.map((m) => 'markers=$m').join('&');
+    final fullUrl = '${baseUri.toString()}&$markerParams';
+
+    try {
+      return await printing.networkImage(fullUrl);
     } catch (_) {
       return null;
     }
@@ -329,7 +425,7 @@ class OccurrencePdfGenerator {
                   ),
                   pw.SizedBox(height: 4),
                   pw.Text(
-                    'PAGINA $pageNumber DE 6',
+                    pageNumber > 0 ? 'PAGINA $pageNumber' : '',
                     style: pw.TextStyle(
                       font: f.medium,
                       color: PdfColor.fromHex('8AA0AD'),
@@ -371,7 +467,7 @@ class OccurrencePdfGenerator {
           pw.Spacer(),
           pw.Text(
             cover
-                ? 'DOCUMENTO DIGITAL - assinatura e integridade na pag. 6'
+                ? 'DOCUMENTO DIGITAL - assinatura e integridade na ultima pagina'
                 : 'DOCUMENTO DIGITAL - nao impresso',
             style: pw.TextStyle(
               fontSize: 7.5,
@@ -1173,6 +1269,113 @@ class OccurrencePdfGenerator {
     );
   }
 
+  /// Seção de mapa de deslocamento com legenda numerada.
+  /// Se não houver imagem (sem API key ou sem coordenadas), retorna vazio.
+  pw.Widget _buildDisplacementSection(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final locations = ctx.locations;
+
+    // Se não há locais com coordenada, omitir seção
+    if (locations.isEmpty) return pw.SizedBox.shrink();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Header da seção
+        pw.Row(
+          children: [
+            _sectionLabel('Mapa de deslocamento', f),
+            pw.Spacer(),
+            pw.Text(
+              '${locations.length} ${locations.length == 1 ? 'local' : 'locais'}',
+              style: _body(f, size: 8, color: _inkSoft),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        // Mapa estático (se disponível)
+        if (ctx.displacementMapImage != null)
+          pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: _line),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            ),
+            child: pw.ClipRRect(
+              horizontalRadius: 8,
+              verticalRadius: 8,
+              child: pw.Image(
+                ctx.displacementMapImage!,
+                width: double.infinity,
+                height: 200,
+                fit: pw.BoxFit.cover,
+              ),
+            ),
+          ),
+        if (ctx.displacementMapImage == null)
+          pw.Container(
+            height: 60,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: _line),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+              color: PdfColor.fromHex('#0A1A20'),
+            ),
+            alignment: pw.Alignment.center,
+            child: pw.Text(
+              'Mapa indisponivel (sem chave de API configurada)',
+              style: _body(f, size: 8, color: _inkSoft),
+            ),
+          ),
+        pw.SizedBox(height: 12),
+        // Legenda numerada
+        ...locations.map((loc) {
+          final isFirst = loc.index == 1;
+          final pinColor = isFirst
+              ? PdfColor.fromHex('#2ECC71')
+              : PdfColor.fromHex('#4DD0E1');
+          return pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 6),
+            child: pw.Row(
+              children: [
+                // Pino numerado
+                pw.Container(
+                  width: 18,
+                  height: 18,
+                  decoration: pw.BoxDecoration(
+                    color: pinColor,
+                    shape: pw.BoxShape.circle,
+                  ),
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(
+                    '${loc.index}',
+                    style: _bodyBold(f, size: 8, color: PdfColor.fromHex('#04181D')),
+                  ),
+                ),
+                pw.SizedBox(width: 8),
+                // Label do local
+                pw.Expanded(
+                  child: pw.Text(
+                    loc.label,
+                    style: _bodyBold(f, size: 9, color: _ink),
+                  ),
+                ),
+                // Horário de chegada
+                pw.Text(
+                  _formatTime(loc.arrivedAt),
+                  style: _body(f, size: 8, color: _inkSoft),
+                ),
+              ],
+            ),
+          );
+        }),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          'Cada parada marca o local onde uma ou mais acoes foram registradas, na ordem em que aconteceram.',
+          style: _body(f, size: 7.5, color: _inkSoft),
+        ),
+      ],
+    );
+  }
+
   pw.Widget _infoBox(String title, List<String> lines, PdfFonts fonts) {
     return _roundedCard(
       padding: const pw.EdgeInsets.all(12),
@@ -1315,7 +1518,7 @@ class OccurrencePdfGenerator {
     final f = ctx.fonts;
     final start = _operationStart(ctx);
     final end = _operationEnd(ctx);
-    final entries = ctx.events.take(6).toList();
+    final entries = ctx.events;
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -1357,7 +1560,7 @@ class OccurrencePdfGenerator {
               last: entry.key == entries.length - 1,
             ),
           ),
-        pw.Spacer(),
+        pw.SizedBox(height: 12),
         _timelineLegend(f),
       ],
     );
@@ -1564,7 +1767,7 @@ class OccurrencePdfGenerator {
 
   pw.Widget _buildMediaPage(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
-    final visibleMedia = ctx.media.take(4).toList();
+    final visibleMedia = ctx.media;
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -2503,6 +2706,8 @@ class _OccurrencePdfContext {
   final PdfFonts fonts;
   final List<_PdfMediaItem> media;
   final pw.ImageProvider? staticMapImage;
+  final pw.ImageProvider? displacementMapImage;
+  final List<OccurrenceLocation> locations;
 
   const _OccurrencePdfContext({
     required this.occurrence,
@@ -2514,6 +2719,8 @@ class _OccurrencePdfContext {
     required this.fonts,
     required this.media,
     required this.staticMapImage,
+    required this.displacementMapImage,
+    required this.locations,
   });
 }
 

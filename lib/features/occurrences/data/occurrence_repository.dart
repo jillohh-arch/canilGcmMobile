@@ -138,6 +138,7 @@ class OccurrenceRepository {
     required String finalReport,
     required List<OccurrenceResult> results,
     required Map<String, dynamic>? details,
+    List<String> finalizationPhotos = const [],
   }) async {
     final docRef = _collection.doc(id);
     final entry = AuditService.buildInlineEntry(action: 'finalized');
@@ -151,6 +152,7 @@ class OccurrenceRepository {
       'final_report': finalReport,
       'results': results.map((r) => r.toMap()).toList(),
       'details': details,
+      'finalization_photos': finalizationPhotos,
       'finalization_draft': FieldValue.delete(),
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
