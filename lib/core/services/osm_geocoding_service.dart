@@ -56,7 +56,6 @@ class OsmGeocodingService {
     final params = <String, String>{
       'q': trimmed,
       'limit': '$limit',
-      'lang': 'pt',
       'lat': '${biasLat ?? _defaultBiasLat}',
       'lon': '${biasLng ?? _defaultBiasLng}',
     };
@@ -87,7 +86,6 @@ class OsmGeocodingService {
       queryParameters: {
         'lat': '${point.latitude}',
         'lon': '${point.longitude}',
-        'lang': 'pt',
       },
     );
 
