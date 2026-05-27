@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_context_card.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_finalize_cta.dart';
@@ -60,9 +61,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     _durationPersistTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_elapsed.inSeconds > 0) {
         context.read<OccurrenceViewModel>().updateDurationSoFar(
-          widget.occurrenceId,
-          _elapsed.inSeconds,
-        );
+              widget.occurrenceId,
+              _elapsed.inSeconds,
+            );
       }
     });
   }
@@ -465,6 +466,51 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     );
   }
 
+  void _showEditNatureSheet(OccurrenceViewModel vm, Occurrence? occ) {
+    if (occ == null) return;
+
+    final natures = vm.natures;
+    final searchCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0A1A20),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, scrollController) {
+            return _EditNatureSheetContent(
+              natures: natures,
+              currentTypeCode: occ.typeCode,
+              currentTypeName: occ.typeName,
+              searchController: searchCtrl,
+              scrollController: scrollController,
+              onSelected: (nature) async {
+                if (nature.code == occ.typeCode) {
+                  Navigator.of(ctx).pop();
+                  return;
+                }
+                Navigator.of(ctx).pop();
+                await vm.updateOccurrence(occ.id, {
+                  'type_code': nature.code,
+                  'type_name': nature.name,
+                });
+                if (mounted) _showSavedFeedback();
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDiscardDialog(OccurrenceViewModel vm) {
     final reasonController = TextEditingController();
     showDialog(
@@ -595,6 +641,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     eventCount: vm.events.length,
                     onBack: () => Navigator.of(context).pop(),
                     onEditData: () => _showEditOccurrenceDialog(vm, occ),
+                    onEditNature: () => _showEditNatureSheet(vm, occ),
                     onDiscard: () => _showDiscardDialog(vm),
                   ),
                   if (vm.error != null)
@@ -691,6 +738,7 @@ class _Header extends StatelessWidget {
   final int eventCount;
   final VoidCallback onBack;
   final VoidCallback? onEditData;
+  final VoidCallback? onEditNature;
   final VoidCallback? onDiscard;
 
   const _Header({
@@ -699,6 +747,7 @@ class _Header extends StatelessWidget {
     required this.eventCount,
     required this.onBack,
     this.onEditData,
+    this.onEditNature,
     this.onDiscard,
   });
 
@@ -746,14 +795,31 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  typeName,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        typeName,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                    if (onEditNature != null) ...[
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: onEditNature,
+                        child: Icon(
+                          Icons.edit_outlined,
+                          color: AppTheme.primary.withAlpha(180),
+                          size: 14,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -863,6 +929,173 @@ class _SyncErrorBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EditNatureSheetContent extends StatefulWidget {
+  final List<OccurrenceNature> natures;
+  final String currentTypeCode;
+  final String currentTypeName;
+  final TextEditingController searchController;
+  final ScrollController scrollController;
+  final ValueChanged<OccurrenceNature> onSelected;
+
+  const _EditNatureSheetContent({
+    required this.natures,
+    required this.currentTypeCode,
+    required this.currentTypeName,
+    required this.searchController,
+    required this.scrollController,
+    required this.onSelected,
+  });
+
+  @override
+  State<_EditNatureSheetContent> createState() =>
+      _EditNatureSheetContentState();
+}
+
+class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
+  String _query = '';
+
+  List<OccurrenceNature> get _filtered {
+    if (_query.isEmpty) return widget.natures;
+    return widget.natures.where((n) => n.matches(_query)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(40),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'ALTERAR NATUREZA',
+            style: GoogleFonts.inter(
+              color: AppTheme.primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Atual: ${widget.currentTypeName}',
+            style: GoogleFonts.inter(
+              color: Colors.white.withAlpha(120),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: widget.searchController,
+            onChanged: (v) => setState(() => _query = v),
+            style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Buscar natureza...',
+              hintStyle:
+                  GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+              prefixIcon: const Icon(Icons.search,
+                  color: Color(0xFF4DD0E1), size: 18),
+              filled: true,
+              fillColor: Colors.white.withAlpha(8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              controller: widget.scrollController,
+              itemCount: filtered.length,
+              itemBuilder: (_, i) {
+                final nature = filtered[i];
+                final isCurrent = nature.code == widget.currentTypeCode;
+                return GestureDetector(
+                  onTap: () => widget.onSelected(nature),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 11),
+                    margin: const EdgeInsets.only(bottom: 4),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? AppTheme.primary.withAlpha(20)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: isCurrent
+                          ? Border.all(color: AppTheme.primary.withAlpha(60))
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                nature.name,
+                                style: GoogleFonts.inter(
+                                  color: isCurrent
+                                      ? AppTheme.primary
+                                      : Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: isCurrent
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${nature.code} · ${nature.group}',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white.withAlpha(80),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isCurrent)
+                          Icon(
+                            Icons.check_circle,
+                            color: AppTheme.primary,
+                            size: 18,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
