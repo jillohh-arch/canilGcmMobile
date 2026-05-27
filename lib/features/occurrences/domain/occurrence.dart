@@ -30,6 +30,7 @@ class Occurrence with SoftDeletable {
   final Map<String, dynamic>? details;
 
   final String? integrityHash;
+  final int? hashVersion;
   final String? pdfExportUrl;
   final int? durationTotal;
   final Map<String, dynamic>? finalizationDraft;
@@ -67,6 +68,7 @@ class Occurrence with SoftDeletable {
     this.results = const [],
     this.details,
     this.integrityHash,
+    this.hashVersion,
     this.pdfExportUrl,
     this.durationTotal,
     this.finalizationDraft,
@@ -99,6 +101,7 @@ class Occurrence with SoftDeletable {
       results: _parseResults(map['results']),
       details: _parseStringMap(map['details']),
       integrityHash: _parseString(map['integrity_hash']),
+      hashVersion: _parseInt(map['hash_version']),
       pdfExportUrl: _parseString(map['pdf_export_url']),
       durationTotal: _parseInt(map['duration_total']),
       finalizationDraft: _parseStringMap(map['finalization_draft']),
@@ -139,6 +142,7 @@ class Occurrence with SoftDeletable {
       'results': results.map((r) => r.toMap()).toList(),
       'details': details,
       'integrity_hash': integrityHash,
+      'hash_version': hashVersion,
       'pdf_export_url': pdfExportUrl,
       'duration_total': durationTotal,
       'finalization_draft': finalizationDraft,
@@ -169,6 +173,7 @@ class Occurrence with SoftDeletable {
     List<OccurrenceResult>? results,
     Map<String, dynamic>? details,
     String? integrityHash,
+    int? hashVersion,
     String? pdfExportUrl,
     int? durationTotal,
     Map<String, dynamic>? finalizationDraft,
@@ -199,6 +204,7 @@ class Occurrence with SoftDeletable {
       results: results ?? this.results,
       details: details ?? this.details,
       integrityHash: integrityHash ?? this.integrityHash,
+      hashVersion: hashVersion ?? this.hashVersion,
       pdfExportUrl: pdfExportUrl ?? this.pdfExportUrl,
       durationTotal: durationTotal ?? this.durationTotal,
       finalizationDraft: finalizationDraft ?? this.finalizationDraft,

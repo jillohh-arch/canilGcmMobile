@@ -246,6 +246,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     required List<OccurrenceResult> results,
     Map<String, dynamic>? details,
     List<String> finalizationPhotos = const [],
+    List<String> finalizationPhotoHashes = const [],
   }) async {
     // Proteção client-side contra dupla finalização
     if (_isLoading) return;
@@ -267,6 +268,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         results: results,
         details: details,
         finalizationPhotos: finalizationPhotos,
+        finalizationPhotoHashes: finalizationPhotoHashes,
       );
       // Cancelar o stream para evitar que re-emita o valor antigo
       _openSub?.cancel();

@@ -43,6 +43,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   int _selectedTimeChip = 0;
 
   List<String> _existingPhotoUrls = [];
+  final Map<String, String> _photoHashMap = {}; // url → sha256
   final List<File> _newPhotos = [];
   final List<String> _removedPhotoUrls = [];
 
@@ -80,6 +81,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
       _titleController.text = e.title ?? '';
       _descriptionController.text = e.description ?? '';
       _existingPhotoUrls = List.from(e.photoUrls);
+      // Extrair hashes existentes do photoMetadata
+      for (final meta in e.photoMetadata) {
+        final url = meta['url'] as String?;
+        final hash = meta['sha256'] as String?;
+        if (url != null && hash != null) {
+          _photoHashMap[url] = hash;
+        }
+      }
       _gpsLat = e.gpsLat;
       _gpsLng = e.gpsLng;
       _selectedTimeChip = -1;
@@ -409,8 +418,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
     HapticFeedback.mediumImpact();
 
     try {
-      final uploadedUrls = await _uploadNewPhotos();
-      final allPhotoUrls = [..._existingPhotoUrls, ...uploadedUrls];
+      final uploadResults = await _uploadNewPhotos();
+      final newUrls = uploadResults.map((r) => r.url).toList();
+      // Adicionar novos hashes ao mapa
+      for (final r in uploadResults) {
+        _photoHashMap[r.url] = r.sha256Hash;
+      }
+      final allPhotoUrls = [..._existingPhotoUrls, ...newUrls];
 
       if (_isEditing) {
         await _updateEvent(allPhotoUrls);
@@ -433,16 +447,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
-  Future<List<String>> _uploadNewPhotos() async {
-    final urls = <String>[];
+  Future<List<UploadResult>> _uploadNewPhotos() async {
+    final results = <UploadResult>[];
     for (final file in _newPhotos) {
-      final url = await _storageService.uploadImage(
+      final result = await _storageService.uploadImageWithHash(
         file,
         'occurrences/${widget.occurrenceId}/events',
       );
-      if (url != null) urls.add(url);
+      if (result != null) results.add(result);
     }
-    return urls;
+    return results;
   }
 
   Future<void> _createEvent(List<String> photoUrls) async {
@@ -468,6 +482,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ? _descriptionController.text.trim()
           : null,
       photoUrls: photoUrls,
+      photoMetadata: _buildPhotoMetadata(photoUrls),
       mediaItems: _buildMediaItems(photoUrls),
       gpsLat: _gpsLat,
       gpsLng: _gpsLng,
@@ -497,6 +512,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
     if (photoUrls.join(',') != e.photoUrls.join(',')) {
       updates['photo_urls'] = photoUrls;
+      updates['photo_metadata'] = _buildPhotoMetadata(photoUrls);
       updates['media_items'] = _buildMediaItems(photoUrls);
     }
     if (_gpsLat != e.gpsLat || _gpsLng != e.gpsLng) {
@@ -507,6 +523,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (updates.isNotEmpty) {
       await vm.updateEvent(widget.occurrenceId, e.id, updates);
     }
+  }
+
+  List<Map<String, dynamic>> _buildPhotoMetadata(List<String> photoUrls) {
+    return photoUrls.map((url) {
+      final hash = _photoHashMap[url];
+      return {
+        'url': url,
+        'type': 'image',
+        if (hash != null) 'sha256': hash,
+      };
+    }).toList();
   }
 
   List<Map<String, dynamic>> _buildMediaItems(List<String> photoUrls) {
