@@ -150,19 +150,12 @@ class DetectionPhaseCatalog {
       description:
           'Busca circular: 3 acertos no sentido horário e 3 no anti-horário.',
     ),
-    DetectionPhaseConfig(
-      code: 'final',
-      title: 'Cenários reais progressivos',
-      groupLabel: 'Ambientes reais',
-      boxCount: 0,
-      odorPositionMode: 'real_environment',
-      usedBall: false,
-      targetConsecutiveHits: null,
-      isImplemented: false,
-      description:
-          'Treino em ambientes reais, fora do fluxo de caixas desta tela.',
-    ),
   ];
+
+  /// Fases de formação (sem a fase "final" que é apenas previsão futura).
+  /// Total: 8 fases (1b,2b,2v,3b,3v,4b,4v,4c).
+  /// Concluir a 4c = formação concluída → linha vira operational.
+  static const int totalFormationPhases = 8;
 
   static DetectionPhaseConfig byCode(String? rawCode) {
     final normalized = normalizePhaseCode(rawCode);
@@ -212,7 +205,8 @@ class DetectionPhaseCatalog {
       case 'fase_5':
       case 'fase 5':
       case '5':
-        return 'final';
+      case 'final':
+        return '4c';
       default:
         return value;
     }

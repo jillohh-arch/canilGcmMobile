@@ -1,24 +1,51 @@
 part of 'history_screen.dart';
 
 extension _HistoryDataLoader on _HistoryScreenState {
-  void _loadAllData() {
+  void _loadAllData({bool forceReload = false}) {
     if (!mounted) return;
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) return;
 
     final dogId = shiftVM.activeDogId!;
+
+    debugPrint('[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)');
+
+    // Buscar treinos
     Provider.of<TrainingViewModel>(
       context,
       listen: false,
-    ).fetchTrainingsForDog(dogId);
+    ).fetchTrainingsForDog(dogId).then((_) {
+      final count = Provider.of<TrainingViewModel>(context, listen: false).trainings.length;
+      debugPrint('[History] Treinos carregados: $count');
+    }).catchError((e) {
+      debugPrint('[History] ERRO ao carregar treinos: $e');
+    });
+
+    // Buscar registros de saúde
     Provider.of<HealthViewModel>(
       context,
       listen: false,
-    ).fetchHealthLogsForDog(dogId);
+    ).fetchHealthLogsForDog(dogId).then((_) {
+      final count = Provider.of<HealthViewModel>(context, listen: false).healthLogs.length;
+      debugPrint('[History] Saúde carregados: $count');
+    }).catchError((e) {
+      debugPrint('[History] ERRO ao carregar saúde: $e');
+    });
+
+    // Buscar nutrição
     final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
-    nutritionVM.loadForDog(dogId);
-    nutritionVM.loadFullHistory(dogId);
+    nutritionVM.loadForDog(dogId, forceReload: forceReload).catchError((e) {
+      debugPrint('[History] ERRO ao carregar nutrição: $e');
+    });
+    nutritionVM.loadFullHistory(dogId).then((_) {
+      debugPrint('[History] Nutrição carregados: ${nutritionVM.historyFeedings.length}');
+    }).catchError((e) {
+      debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
+    });
+
+    // Observar ocorrências (stream real-time)
     Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
+    debugPrint('[History] watchByDog iniciado para dogId=$dogId');
   }
 
   List<HistoryEntry> _buildAllEntries(String dogId) {
@@ -40,7 +67,9 @@ extension _HistoryDataLoader on _HistoryScreenState {
     }
 
     for (final training in trainingVM.trainings) {
-      if (training.dogId == dogId) entries.add(_buildTrainingEntry(training));
+      if (training.dogId == dogId || training.dogId.isEmpty) {
+        entries.add(_buildTrainingEntry(training));
+      }
     }
 
     final feedings = nutritionVM.historyFeedings.isNotEmpty

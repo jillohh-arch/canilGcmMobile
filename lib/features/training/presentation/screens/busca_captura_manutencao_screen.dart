@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/features/training/presentation/screens/busca_captura_live_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_screen.dart';
+import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 
 class BuscaCapturaManutencaoScreen extends StatefulWidget {
   final Dog dog;
@@ -642,18 +647,24 @@ class _BuscaCapturaManutencaoScreenState extends State<BuscaCapturaManutencaoScr
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.mediumImpact();
                             if (_useGpsTracker) {
-                              Navigator.of(context).push(
+                              final trackingService = GpsTrackingService();
+                              final handlerId = _resolveHandlerId();
+                              final result = await Navigator.of(context).push<GpsTrackResult?>(
                                 MaterialPageRoute(
-                                  builder: (_) => BuscaCapturaLiveScreen(
-                                    dog: widget.dog,
-                                    scenario: 'Manutenção $_ambiente',
-                                    distanceGoal: 500,
+                                  builder: (_) => GpsTrackingScreen(
+                                    activityLabel: 'Busca & Captura · Manutenção',
+                                    dogName: widget.dog.name,
+                                    handlerName: handlerId,
+                                    trackingService: trackingService,
                                   ),
                                 ),
                               );
+                              if (result != null && context.mounted) {
+                                await _persistBcSession(result);
+                              }
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Sessão registrada com sucesso!')),
@@ -880,5 +891,42 @@ class _BuscaCapturaManutencaoScreenState extends State<BuscaCapturaManutencaoScr
         );
       },
     );
+  }
+
+  String _resolveHandlerId() {
+    try {
+      final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+      return shiftVM.handlerId ?? 'Condutor';
+    } catch (_) {
+      return 'Condutor';
+    }
+  }
+
+  Future<void> _persistBcSession(GpsTrackResult result) async {
+    final session = TrainingSessionModel(
+      dogId: widget.dog.id,
+      dogName: widget.dog.name,
+      date: DateTime.now(),
+      trainingType: 'Busca & Captura',
+      location: '',
+      weather: '',
+      handlerNotes: '',
+      metadata: {
+        'specialty': 'busca_captura',
+        'mode': 'manutencao',
+        'ambiente': _ambiente,
+        'figurante': _figurante,
+        'odor_object': _odorObject,
+        'gps': true,
+        'gps_track': result.toJson(),
+      },
+    );
+
+    try {
+      final vm = Provider.of<TrainingViewModel>(context, listen: false);
+      await vm.addTrainingSession(session);
+    } catch (_) {
+      // Silently fail — data is saved locally via GPS service
+    }
   }
 }

@@ -122,6 +122,11 @@ class TrainingViewModel extends ChangeNotifier {
 
       _trainings = await _trainingService.getTrainingsForDog(dogId);
 
+      developer.log(
+        'Trainings loaded for dog $dogId: ${_trainings.length} sessions',
+        name: 'TrainingViewModel',
+      );
+
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
@@ -130,8 +135,7 @@ class TrainingViewModel extends ChangeNotifier {
         name: 'TrainingViewModel',
         error: e,
       );
-      // Depending on the use case, you might want to rethrow or just keep _trainings empty
-      throw Exception('Falha ao buscar treinos: $e');
+      // Não propagar exception — manter _trainings vazio em vez de quebrar o fluxo
     }
   }
 

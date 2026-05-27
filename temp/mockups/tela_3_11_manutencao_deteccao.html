@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manutenção · Detecção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 20px;}
+  .layout{display:flex;flex-direction:column;align-items:center;gap:24px;}
+  .phone{width:390px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 100px;}
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#4dd0e1;font-size:11px;font-weight:500;margin-top:2px;}
+  /* status */
+  .stat-card{background:linear-gradient(135deg,rgba(46,204,113,.08),rgba(77,208,225,.02));border:1px solid rgba(46,204,113,.22);border-radius:16px;padding:15px;margin-bottom:8px;}
+  .stat-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;}
+  .stat-dog{color:#fff;font-size:15px;font-weight:700;}
+  .stat-dog small{display:block;color:#7d8d99;font-size:11px;font-weight:400;margin-top:1px;}
+  .badge-op{display:inline-flex;align-items:center;gap:5px;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.4);border-radius:13px;padding:5px 11px;color:#2ecc71;font-size:10px;font-weight:700;letter-spacing:.5px;}
+  .stat-row{display:flex;gap:10px;padding-top:13px;border-top:1px solid rgba(255,255,255,.07);}
+  .st{flex:1;text-align:center;}
+  .st-n{color:#fff;font-size:16px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .st-l{color:#7d8d99;font-size:9px;font-weight:600;letter-spacing:.4px;margin-top:2px;text-transform:uppercase;}
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:20px 0 11px;}
+  .sec-label .opt{color:#3d5560;font-weight:500;letter-spacing:.3px;text-transform:none;}
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{font-size:12px;font-weight:600;padding:9px 14px;border-radius:11px;border:1px solid rgba(255,255,255,.1);color:#aebcc4;background:rgba(255,255,255,.02);}
+  .chip.sel{background:rgba(77,208,225,.12);border-color:#4dd0e1;color:#4dd0e1;}
+  .chip.dis{opacity:.4;}
+  .chip.dis small{display:block;font-size:8px;letter-spacing:.5px;color:#5a7280;}
+  /* CONDIÇÕES AMBIENTAIS (novo) */
+  .env{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.18);border-radius:14px;padding:14px;}
+  .env-cells{display:flex;gap:10px;}
+  .env-cell{flex:1;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px;}
+  .env-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .env-v{color:#fff;font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace;line-height:1;}
+  .env-k{color:#7d8d99;font-size:9px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-top:3px;}
+  .env-auto{display:flex;align-items:center;gap:7px;margin-top:11px;color:#7d8d99;font-size:10.5px;}
+  .env-auto b{color:#4dd0e1;font-weight:600;}
+  .env-note{color:#8a96a0;font-size:10.5px;line-height:1.5;margin-top:9px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);}
+  .env-note b{color:#aebcc4;font-weight:600;}
+  /* resultado */
+  .result{display:flex;gap:7px;}
+  .res-opt{flex:1;text-align:center;padding:11px 4px;border-radius:11px;border:1px solid rgba(255,255,255,.1);color:#8fa3ad;font-size:11.5px;font-weight:700;}
+  .res-opt.sel-good{background:rgba(46,204,113,.14);border-color:#2ecc71;color:#2ecc71;}
+  /* midias (novo) */
+  .midias{display:flex;gap:9px;}
+  .mid-add{width:74px;height:74px;border-radius:12px;border:1.5px dashed rgba(77,208,225,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#4dd0e1;font-size:9px;font-weight:600;flex-shrink:0;}
+  .mid{width:74px;height:74px;border-radius:12px;flex-shrink:0;background:linear-gradient(135deg,#16252b,#0e1b20);border:1px solid rgba(255,255,255,.08);position:relative;}
+  .mid span{position:absolute;bottom:5px;left:6px;font-size:8px;color:#aebcc4;font-family:'IBM Plex Mono',monospace;}
+  /* obs */
+  .obs{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px;color:#8fa3ad;font-size:12px;font-family:inherit;min-height:58px;resize:none;}
+  /* recentes */
+  .recent{display:flex;align-items:center;gap:12px;padding:12px 0;}
+  .recent+.recent{border-top:1px solid rgba(255,255,255,.05);}
+  .rec-date{font-family:'IBM Plex Mono',monospace;color:#7d8d99;font-size:11px;width:38px;flex-shrink:0;}
+  .rec-body{flex:1;}
+  .rec-t{color:#fff;font-size:12.5px;font-weight:600;}
+  .rec-s{color:#7d8d99;font-size:10.5px;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .rec-env{color:#8fa3ad;font-family:'IBM Plex Mono',monospace;}
+  .rec-cam{color:#4dd0e1;}
+  .rec-badge{font-size:9px;font-weight:700;letter-spacing:.3px;padding:4px 8px;border-radius:8px;flex-shrink:0;}
+  .rb-otimo{background:rgba(46,204,113,.13);color:#2ecc71;border:1px solid rgba(46,204,113,.3);}
+  .rb-bom{background:rgba(77,208,225,.1);color:#4dd0e1;border:1px solid rgba(77,208,225,.25);}
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 70%,transparent);}
+  .cta{width:100%;border-radius:13px;padding:16px;font-size:13px;font-weight:800;letter-spacing:.6px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;background:#4dd0e1;color:#050d10;}
+  .legend-side{width:390px;color:#9aa7af;font-size:12px;line-height:1.55;padding-top:4px;}
+  .legend-side h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:10px;}
+  .legend-side .tag{display:inline-block;background:rgba(46,204,113,.12);color:#2ecc71;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-right:6px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="phone">
+    <div class="status-bar"><span>14:32</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Manutenção operacional</div><div class="h-sub">Detecção · Bono · GCM Ragonha</div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-top">
+          <div class="stat-dog">Bono<small>Formado · Drogas</small></div>
+          <div class="badge-op"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>OPERACIONAL</div>
+        </div>
+        <div class="stat-row">
+          <div class="st"><div class="st-n">87</div><div class="st-l">Sessões</div></div>
+          <div class="st"><div class="st-n">3d</div><div class="st-l">Última</div></div>
+          <div class="st"><div class="st-n">11/26</div><div class="st-l">Certificado</div></div>
+        </div>
+      </div>
+
+      <div class="sec-label">Linha a treinar <span class="opt">· pode combinar</span></div>
+      <div class="chips">
+        <div class="chip sel">Drogas</div>
+        <div class="chip">Armas</div>
+        <div class="chip dis">Cadáver<small>NÃO INICIADA</small></div>
+      </div>
+
+      <div class="sec-label">Condições ambientais</div>
+      <div class="env">
+        <div class="env-cells">
+          <div class="env-cell">
+            <div class="env-ico" style="background:rgba(230,126,34,.13)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg></div>
+            <div><div class="env-v">28°</div><div class="env-k">Temperatura</div></div>
+          </div>
+          <div class="env-cell">
+            <div class="env-ico" style="background:rgba(77,208,225,.13)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4dd0e1" stroke-width="2"><path d="M12 2.7s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></div>
+            <div><div class="env-v">65%</div><div class="env-k">Umidade</div></div>
+          </div>
+        </div>
+        <div class="env-auto"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4dd0e1" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Capturado do clima local · <b>toque pra ajustar</b> se medir no ambiente</span></div>
+        <div class="env-note"><b>Por que registrar:</b> o odor dispersa diferente conforme calor e umidade. Esse dado explica variações de desempenho entre sessões de mesma dificuldade.</div>
+      </div>
+
+      <div class="sec-label">Tipo de cenário</div>
+      <div class="chips">
+        <div class="chip sel">Caixas (reforço)</div>
+        <div class="chip">Veículo</div>
+        <div class="chip">Ambiente fechado</div>
+        <div class="chip">Área aberta</div>
+        <div class="chip">Bagagem</div>
+      </div>
+
+      <div class="sec-label">Material de odor</div>
+      <div class="chips">
+        <div class="chip sel">Nose-MP Drogas</div>
+        <div class="chip">Droga real</div>
+        <div class="chip">Scentlogix</div>
+      </div>
+
+      <div class="sec-label">Resultado da sessão</div>
+      <div class="result">
+        <div class="res-opt">Falhou</div>
+        <div class="res-opt">Regular</div>
+        <div class="res-opt">Bom</div>
+        <div class="res-opt sel-good">Ótimo</div>
+      </div>
+
+      <div class="sec-label">Mídias <span class="opt">· opcional</span></div>
+      <div class="midias">
+        <div class="mid-add"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Adicionar</div>
+        <div class="mid"><span>14:21</span></div>
+        <div class="mid"><span>14:25</span></div>
+      </div>
+
+      <div class="sec-label">Observações <span class="opt">· opcional</span></div>
+      <textarea class="obs" placeholder="Notas da sessão...">Discriminação em caixas, odor variando. Vento fraco no galpão. Indicação passiva firme nas 12 tentativas.</textarea>
+
+      <div class="sec-label">Manutenções recentes</div>
+      <div class="recent">
+        <div class="rec-date">07/05</div>
+        <div class="rec-body"><div class="rec-t">Discriminação · caixas</div><div class="rec-s">Drogas · 12 tentativas <span class="rec-env">· 28° 65%</span> <span class="rec-cam">· 📷 2</span></div></div>
+        <div class="rec-badge rb-otimo">ÓTIMO</div>
+      </div>
+      <div class="recent">
+        <div class="rec-date">30/04</div>
+        <div class="rec-body"><div class="rec-t">Busca em veículo</div><div class="rec-s">Drogas · operacional <span class="rec-env">· 33° 41%</span></div></div>
+        <div class="rec-badge rb-bom">BOM</div>
+      </div>
+      <div class="recent">
+        <div class="rec-date">23/04</div>
+        <div class="rec-body"><div class="rec-t">Ambiente fechado</div><div class="rec-s">Drogas · escritório <span class="rec-env">· 26° 70%</span> <span class="rec-cam">· 📷 1</span></div></div>
+        <div class="rec-badge rb-bom">BOM</div>
+      </div>
+    </div>
+    <div class="cta-bar">
+      <button class="cta"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>REGISTRAR MANUTENÇÃO</button>
+    </div>
+  </div>
+
+  <div class="legend-side">
+    <h3>O QUE MUDOU</h3>
+    <p style="margin-bottom:10px"><span class="tag">NOVO</span> <b style="color:#fff">Condições ambientais</b> — temperatura e umidade capturadas do clima local (editáveis pra medição no ambiente). Aparecem também em cada sessão recente, pra revelar padrões de desempenho.</p>
+    <p><span class="tag">NOVO</span> <b style="color:#fff">Mídias</b> — fotos da sessão, com indicador 📷 nas manutenções recentes.</p>
+    <p style="margin-top:12px;font-size:11px;color:#6f7d85">Todo o resto do mockup 15 foi mantido: status operacional, linha a treinar (agora combinável), cenário, material de odor, resultado e recentes.</p>
+  </div>
+</div>
+</body>
+</html>

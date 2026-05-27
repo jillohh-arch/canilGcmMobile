@@ -68,6 +68,9 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   crypto: ^3.0.6
   package_info_plus: ^8.3.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  flutter_map_tile_caching: ^9.1.4
 
 dev_dependencies:
   flutter_test:

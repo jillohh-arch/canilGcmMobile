@@ -88,3 +88,11 @@ flutter_01.png
 
 # Diários de sessão locais
 temp/docs/SESSAO_*.md
+
+# Secrets and local environment configuration (NEVER commit these)
+.env
+.env.local
+.env.*.local
+*.env
+secrets.json
+local.settings.json

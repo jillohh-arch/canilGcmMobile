@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreamento GPS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;padding:26px 18px;}
+  .wrap{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start;max-width:840px;}
+  .col{display:flex;flex-direction:column;align-items:center;gap:11px;}
+  .tag{color:#4dd0e1;font-size:11.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+  .tag span{color:#5a7280;font-weight:500;letter-spacing:.2px;text-transform:none;font-size:10.5px;margin-left:6px;}
+  .phone{width:362px;height:740px;background:#050d10;border-radius:38px;border:8px solid #1a1a1a;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.5);position:relative;}
+  .sb{height:38px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;color:#fff;font-size:13px;font-weight:600;flex-shrink:0;z-index:5;}
+  /* header compacto */
+  .hd{display:flex;align-items:center;gap:11px;padding:6px 14px 12px;flex-shrink:0;z-index:5;}
+  .bk{width:32px;height:32px;border-radius:9px;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.2);display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:18px;}
+  .hd-t{flex:1;}
+  .hd-t .a{color:#fff;font-size:15px;font-weight:700;}
+  .hd-t .b{color:#7d8d99;font-size:11px;font-weight:500;}
+  .gps{display:flex;align-items:center;gap:5px;color:#4dd0e1;font-size:10px;font-weight:700;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.2);border-radius:7px;padding:5px 8px;}
+  /* mapa */
+  .map{flex:1;position:relative;background:linear-gradient(160deg,#0e1c22,#0a161b);overflow:hidden;}
+  .streets line{stroke:rgba(255,255,255,.05);stroke-width:1.4;}
+  .streets .big{stroke:rgba(255,255,255,.08);stroke-width:2.6;}
+  .route{fill:none;stroke:#4dd0e1;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(77,208,225,.6));}
+  .start{fill:#2ecc71;stroke:#04140a;stroke-width:2;}
+  .live{fill:#4dd0e1;stroke:#04181c;stroke-width:2.5;}
+  .halo{fill:rgba(77,208,225,.3);animation:pulse 1.8s ease-out infinite;transform-origin:center;}
+  @keyframes pulse{0%{opacity:.6;r:8px}100%{opacity:0;r:26px}}
+  .recording{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:7px;background:rgba(5,13,16,.82);backdrop-filter:blur(8px);border:1px solid rgba(46,204,113,.3);border-radius:18px;padding:7px 14px;color:#2ecc71;font-size:11px;font-weight:700;letter-spacing:.4px;}
+  .rec-dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;animation:blink 1.4s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  .recording.paused{border-color:rgba(241,196,15,.35);color:#f1c40f;}
+  .recording.paused .rec-dot{background:#f1c40f;animation:none;}
+  /* painel métricas */
+  .panel{flex-shrink:0;background:#050d10;border-top:1px solid rgba(77,208,225,.12);padding:16px 16px 18px;}
+  .hero{text-align:center;margin-bottom:14px;}
+  .hero-n{font-size:46px;font-weight:900;color:#fff;font-family:'IBM Plex Mono',monospace;line-height:1;letter-spacing:-1px;}
+  .hero-n small{font-size:18px;color:#5a7280;font-weight:700;margin-left:3px;}
+  .hero-l{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-top:5px;}
+  .grid{display:flex;gap:9px;margin-bottom:16px;}
+  .m{flex:1;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 8px;text-align:center;}
+  .m-n{color:#fff;font-size:16px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .m-l{color:#5a7280;font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-top:3px;}
+  .ctrls{display:flex;gap:11px;}
+  .ct{flex:1;border-radius:14px;padding:16px;border:none;font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .ct-pause{background:rgba(241,196,15,.14);border:1.5px solid rgba(241,196,15,.4);color:#f1c40f;}
+  .ct-stop{background:rgba(231,76,60,.14);border:1.5px solid rgba(231,76,60,.45);color:#e74c3c;}
+  .ct-resume{flex:1.3;background:#2ecc71;color:#04140a;}
+  /* resumo */
+  .sum-head{padding:14px 16px 8px;flex-shrink:0;}
+  .sum-kick{color:#2ecc71;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;}
+  .sum-title{color:#fff;font-size:20px;font-weight:800;margin-top:3px;}
+  .sum-meta{color:#7d8d99;font-size:11.5px;margin-top:3px;}
+  .sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:14px 16px;}
+  .sm{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px;}
+  .sm-l{color:#5a7280;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;}
+  .sm-n{color:#fff;font-size:22px;font-weight:800;font-family:'IBM Plex Mono',monospace;margin-top:4px;}
+  .sm-n small{font-size:13px;color:#5a7280;}
+  .sum-foot{padding:8px 16px 18px;display:flex;gap:11px;flex-shrink:0;}
+  .legend{flex-basis:100%;color:#9aa7af;font-size:12px;line-height:1.55;border-top:1px solid rgba(255,255,255,.07);padding-top:16px;margin-top:8px;max-width:760px;margin-left:auto;margin-right:auto;}
+  .legend h3{color:#4dd0e1;font-size:13px;letter-spacing:.5px;margin-bottom:8px;}
+  .legend p{margin-bottom:8px;}.legend b{color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== RASTREANDO ===== -->
+  <div class="col">
+    <div class="tag">Rastreando <span>· em andamento</span></div>
+    <div class="phone">
+      <div class="sb"><span>07:58</span><span style="font-size:11px">4G ⌃ 🔋</span></div>
+      <div class="hd">
+        <div class="bk">‹</div>
+        <div class="hd-t"><div class="a">Condicionamento</div><div class="b">Bono · Ragonha</div></div>
+        <div class="gps"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="4"/></svg>GPS forte</div>
+      </div>
+      <div class="map">
+        <div class="recording"><span class="rec-dot"></span>RASTREANDO</div>
+        <svg width="100%" height="100%" viewBox="0 0 362 360" preserveAspectRatio="xMidYMid slice">
+          <g class="streets">
+            <line x1="0" y1="80" x2="362" y2="60"/><line x1="0" y1="170" x2="362" y2="150" class="big"/><line x1="0" y1="260" x2="362" y2="240"/><line x1="60" y1="0" x2="40" y2="360"/><line x1="160" y1="0" x2="140" y2="360" class="big"/><line x1="270" y1="0" x2="250" y2="360"/>
+          </g>
+          <path class="route" d="M70 300 L72 245 Q73 230 90 228 L150 222 Q168 220 167 200 L162 130 Q161 112 180 110 L240 104"/>
+          <circle class="start" cx="70" cy="300" r="7"/>
+          <circle class="halo" cx="240" cy="104" r="8"/>
+          <circle class="live" cx="240" cy="104" r="7"/>
+        </svg>
+      </div>
+      <div class="panel">
+        <div class="hero"><div class="hero-n">2,84<small>km</small></div><div class="hero-l">distância</div></div>
+        <div class="grid">
+          <div class="m"><div class="m-n">18:42</div><div class="m-l">Tempo</div></div>
+          <div class="m"><div class="m-n">6'34"</div><div class="m-l">Ritmo /km</div></div>
+          <div class="m"><div class="m-n">9,1</div><div class="m-l">km/h</div></div>
+        </div>
+        <div class="ctrls">
+          <button class="ct ct-pause"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>Pausar</button>
+          <button class="ct ct-stop"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Finalizar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RESUMO ===== -->
+  <div class="col">
+    <div class="tag">Resumo <span>· ao finalizar</span></div>
+    <div class="phone">
+      <div class="sb"><span>08:05</span><span style="font-size:11px">4G ⌃ 🔋</span></div>
+      <div class="sum-head">
+        <div class="sum-kick">Sessão concluída</div>
+        <div class="sum-title">Condicionamento físico</div>
+        <div class="sum-meta">Bono · Ragonha · 26/05, 07:38 – 08:05</div>
+      </div>
+      <div class="map" style="flex:0 0 230px;border-radius:0">
+        <svg width="100%" height="100%" viewBox="0 0 362 230" preserveAspectRatio="xMidYMid slice">
+          <g class="streets">
+            <line x1="0" y1="60" x2="362" y2="44"/><line x1="0" y1="130" x2="362" y2="116" class="big"/><line x1="0" y1="195" x2="362" y2="180"/><line x1="80" y1="0" x2="64" y2="230"/><line x1="200" y1="0" x2="184" y2="230" class="big"/>
+          </g>
+          <path class="route" d="M55 190 L58 140 Q60 124 82 122 L150 116 Q172 114 170 92 L166 58 Q165 44 188 42 L270 38 Q292 36 290 60 L286 110"/>
+          <circle class="start" cx="55" cy="190" r="7"/>
+          <g transform="translate(286,110)"><circle r="8" fill="#e74c3c" stroke="#1a0606" stroke-width="2"/><path d="M-1 -4 h6 v3 h-6 z" fill="#fff"/></g>
+        </svg>
+      </div>
+      <div class="sum-grid">
+        <div class="sm"><div class="sm-l">Distância</div><div class="sm-n">4,12<small> km</small></div></div>
+        <div class="sm"><div class="sm-l">Tempo</div><div class="sm-n">27:05</div></div>
+        <div class="sm"><div class="sm-l">Ritmo médio</div><div class="sm-n">6'34"<small> /km</small></div></div>
+        <div class="sm"><div class="sm-l">Velocidade média</div><div class="sm-n">9,1<small> km/h</small></div></div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="sum-foot">
+        <button class="ct ct-stop" style="flex:.8">Descartar</button>
+        <button class="ct ct-resume" style="background:#4dd0e1;color:#04181c"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3h11l3 3v15H5z"/><path d="M9 3v5h6"/></svg>Salvar sessão</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h3>RASTREAMENTO GPS</h3>
+    <p><b>Rastreando:</b> mapa dark com a rota em ciano sendo desenhada ao vivo, ponto de início em verde e posição atual pulsando. Distância como número-herói, e tempo / ritmo / velocidade no grid. Selo "RASTREANDO" piscando reforça que está gravando — vira âmbar "PAUSADO" ao pausar.</p>
+    <p><b>Resumo:</b> ao finalizar, mostra a rota completa (início verde, fim com bandeira), as quatro métricas e a data/horário. Salvar grava a sessão no histórico; descartar pede confirmação.</p>
+    <p style="font-size:11px;color:#6f7d85">Continua rastreando com a tela apagada (selo "RASTREANDO" também na notificação). Tudo no idioma do app — header e bordas irmãos do resto.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/training/data/training_repository.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
@@ -36,29 +37,54 @@ class TrainingService {
   }
 
   Future<List<TrainingSessionModel>> getTrainingsForDog(String dogId) async {
-    final legacyTrainings = await _firestore
-        .collection('trainings')
-        .where('dogId', isEqualTo: dogId)
-        .get();
-    final rootSessions = await _firestore
-        .collection('training_sessions')
-        .where('dogId', isEqualTo: dogId)
-        .get();
-    final dogSessions = await _firestore
-        .collection('dogs')
-        .doc(dogId)
-        .collection('training_sessions')
-        .get();
-
     final byKey = <String, TrainingSessionModel>{};
-    for (final doc in [
-      ...legacyTrainings.docs,
-      ...rootSessions.docs,
-      ...dogSessions.docs,
-    ]) {
-      final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
-      if (training.dogId != dogId) continue;
-      byKey['${doc.reference.path}:${doc.id}'] = training;
+
+    // Buscar de cada collection independentemente para resiliência
+    try {
+      final legacyTrainings = await _firestore
+          .collection('trainings')
+          .where('dogId', isEqualTo: dogId)
+          .get();
+      for (final doc in legacyTrainings.docs) {
+        final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+        if (training.dogId == dogId) {
+          byKey['${doc.reference.path}:${doc.id}'] = training;
+        }
+      }
+    } catch (e) {
+      debugPrint('[TrainingService] Erro ao buscar trainings: $e');
+    }
+
+    try {
+      final rootSessions = await _firestore
+          .collection('training_sessions')
+          .where('dogId', isEqualTo: dogId)
+          .get();
+      for (final doc in rootSessions.docs) {
+        final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+        if (training.dogId == dogId) {
+          byKey['${doc.reference.path}:${doc.id}'] = training;
+        }
+      }
+    } catch (e) {
+      debugPrint('[TrainingService] Erro ao buscar training_sessions: $e');
+    }
+
+    try {
+      final dogSessions = await _firestore
+          .collection('dogs')
+          .doc(dogId)
+          .collection('training_sessions')
+          .get();
+      for (final doc in dogSessions.docs) {
+        final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+        if (training.dogId == dogId || training.dogId.isEmpty) {
+          // dogId pode estar vazio em subcollection (implícito pelo path)
+          byKey['${doc.reference.path}:${doc.id}'] = training;
+        }
+      }
+    } catch (e) {
+      debugPrint('[TrainingService] Erro ao buscar dogs/$dogId/training_sessions: $e');
     }
 
     final trainings = byKey.values.toList();

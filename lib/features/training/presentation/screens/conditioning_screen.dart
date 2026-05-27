@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_screen.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 
@@ -713,12 +716,14 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
 
   int? _selectedIntensity;
   int? _selectedCondition;
-  bool _gpsEnabled = false;
+  bool _isSaving = false;
+
+  /// Resultado do rastreamento GPS (preenchido ao voltar da tela de tracking)
+  GpsTrackResult? _gpsResult;
 
   @override
   void initState() {
     super.initState();
-    _gpsEnabled = widget.exercise.gpsDefault;
     for (final f in widget.exercise.fields) {
       _fieldControllers[f.key] = TextEditingController();
     }
@@ -734,6 +739,7 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
   }
 
   Future<void> _saveSession() async {
+    if (_isSaving) return; // Previne múltiplos cliques
     if (_selectedIntensity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -744,11 +750,13 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
       return;
     }
 
+    setState(() => _isSaving = true);
+
     final metadata = <String, dynamic>{
       'specialty': 'condicionamento',
       'exercise': widget.exercise.name,
       'intensity': _intensities[_selectedIntensity!],
-      'gps': _gpsEnabled,
+      'gps': _gpsResult != null,
     };
 
     if (_selectedCondition != null) {
@@ -762,6 +770,66 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
       }
     }
 
+    // Anexar dados do GPS se disponíveis
+    if (_gpsResult != null) {
+      metadata['gps_track'] = _gpsResult!.toJson();
+    }
+
+    await _persistSession(metadata);
+  }
+
+  Future<void> _openGpsTracking() async {
+    final trackingService = GpsTrackingService();
+    final handlerName = _resolveHandlerName();
+
+    final result = await Navigator.of(context).push<GpsTrackResult?>(
+      MaterialPageRoute(
+        builder: (_) => GpsTrackingScreen(
+          activityLabel: 'Condicionamento · ${widget.exercise.name}',
+          dogName: widget.dog.name,
+          handlerName: handlerName,
+          trackingService: trackingService,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (result != null) {
+      setState(() {
+        _gpsResult = result;
+        // Preencher campos de duração e distância com dados do GPS
+        final durationMin = (result.durationSeconds / 60).round();
+        if (_fieldControllers.containsKey('duration')) {
+          _fieldControllers['duration']!.text = durationMin.toString();
+        }
+        if (_fieldControllers.containsKey('distance')) {
+          // Verificar se o campo usa km ou m
+          final distField = widget.exercise.fields
+              .where((f) => f.key == 'distance')
+              .firstOrNull;
+          if (distField != null && distField.unit == 'km') {
+            _fieldControllers['distance']!.text =
+                (result.distanceMeters / 1000).toStringAsFixed(2);
+          } else {
+            _fieldControllers['distance']!.text =
+                result.distanceMeters.round().toString();
+          }
+        }
+      });
+    }
+  }
+
+  String _resolveHandlerName() {
+    try {
+      final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+      return shiftVM.handlerId ?? 'Condutor';
+    } catch (_) {
+      return 'Condutor';
+    }
+  }
+
+  Future<void> _persistSession(Map<String, dynamic> metadata) async {
     final session = TrainingSessionModel(
       dogId: widget.dog.id,
       dogName: widget.dog.name,
@@ -780,13 +848,15 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sessão de ${widget.exercise.name} salva!'),
+          content: Text('Sessão de ${widget.exercise.name} salva com sucesso!'),
           backgroundColor: AppTheme.success,
         ),
       );
+      // Volta para a tela anterior (overview de condicionamento)
       widget.onBack();
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
       );
@@ -815,7 +885,7 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                     const SizedBox(height: 14),
                     _buildIntensityRow(),
                     const SizedBox(height: 14),
-                    _buildGpsToggle(),
+                    _buildGpsSection(),
                     const SizedBox(height: 14),
                     _buildConditionRow(),
                     const SizedBox(height: 14),
@@ -1140,84 +1210,135 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
     );
   }
 
-  Widget _buildGpsToggle() {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _gpsEnabled = !_gpsEnabled);
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _gpsEnabled ? AppTheme.primary.withAlpha(20) : AppTheme.primary.withAlpha(10),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _gpsEnabled ? AppTheme.primary.withAlpha(100) : AppTheme.primary.withAlpha(50),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withAlpha(40),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text('📡', style: TextStyle(fontSize: 16)),
+  Widget _buildGpsSection() {
+    final hasResult = _gpsResult != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Botão para iniciar rastreamento
+        GestureDetector(
+          onTap: hasResult ? null : _openGpsTracking,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: hasResult
+                  ? AppTheme.success.withAlpha(15)
+                  : AppTheme.primary.withAlpha(15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasResult
+                    ? AppTheme.success.withAlpha(100)
+                    : AppTheme.primary.withAlpha(80),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Rastreador GPS',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: hasResult
+                        ? AppTheme.success.withAlpha(40)
+                        : AppTheme.primary.withAlpha(40),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  Text(
-                    widget.exercise.gpsDefault
-                        ? 'Recomendado para este exercício'
-                        : 'Não recomendado pra área pequena · ative se quiser',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 10,
+                  child: Center(
+                    child: Icon(
+                      hasResult ? Icons.check_rounded : Icons.gps_fixed_rounded,
+                      color: hasResult ? AppTheme.success : AppTheme.primary,
+                      size: 18,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 42,
-              height: 24,
-              decoration: BoxDecoration(
-                color: _gpsEnabled ? AppTheme.primary : Colors.white.withAlpha(25),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: AnimatedAlign(
-                duration: const Duration(milliseconds: 200),
-                alignment: _gpsEnabled ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.background,
-                    shape: BoxShape.circle,
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasResult ? 'Rota registrada' : 'Rastreamento GPS',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        hasResult
+                            ? '${(_gpsResult!.distanceMeters / 1000).toStringAsFixed(2)} km · ${_formatGpsDuration(_gpsResult!.durationSeconds)}'
+                            : widget.exercise.gpsDefault
+                                ? 'Recomendado para este exercício'
+                                : 'Opcional · toque para rastrear a rota',
+                        style: GoogleFonts.inter(
+                          color: hasResult
+                              ? AppTheme.success
+                              : AppTheme.textTertiary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!hasResult)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withAlpha(30),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'INICIAR',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                if (hasResult)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _gpsResult = null);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'LIMPAR',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.error,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
+  }
+
+  String _formatGpsDuration(int seconds) {
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final s = seconds % 60;
+    if (h > 0) return '${h}h${m.toString().padLeft(2, '0')}min';
+    return '${m}min${s.toString().padLeft(2, '0')}s';
   }
 
   Widget _buildConditionRow() {
@@ -1330,23 +1451,33 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _saveSession,
+            onPressed: _isSaving ? null : _saveSession,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: AppTheme.background,
+              disabledBackgroundColor: AppTheme.primary.withAlpha(100),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text(
-              '💾 SALVAR SESSÃO',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'SALVAR SESSÃO',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
           ),
         ),
       ),

@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,12 +15,11 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/data/training_service.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
 import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/detection_maintenance_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/detection_entry_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/guard_protection_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/features/training/presentation/screens/detection_triagem_screen.dart';
 import 'package:canil_gcm/features/dogs/data/dog_specialty_service.dart';
 
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
@@ -30,8 +28,9 @@ import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dash
 // New training screens imports
 import 'package:canil_gcm/features/training/presentation/screens/busca_captura_formacao_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/busca_captura_manutencao_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/detection_formation_screen.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/add_specialty_modal.dart';
+import 'package:canil_gcm/features/training/data/detection_service.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 
 part 'training_hub_categories.dart';
 
@@ -177,25 +176,12 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     final specialtyService = DogSpecialtyService();
 
     if (lowerCat.contains('detec') || lowerCat.contains('faro')) {
-      final specialty = await specialtyService.getByType(dog.id, 'deteccao');
       if (!context.mounted) return;
-
-      final isOperational = specialty != null &&
-          normalizeTrainingKey(specialty.status) == 'operational';
-
-      if (isOperational) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DetectionMaintenanceScreen(dog: dog),
-          ),
-        );
-      } else {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DetectionFormationScreen(dog: dog),
-          ),
-        );
-      }
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DetectionEntryScreen(dog: dog),
+        ),
+      );
       return;
     }
 

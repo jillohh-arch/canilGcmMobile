@@ -144,7 +144,7 @@ class HealthViewModel extends ChangeNotifier {
         name: 'HealthViewModel',
         error: e,
       );
-      throw Exception('Falha ao buscar registros médicos: $e');
+      // Não propagar exception — manter _healthLogs vazio
     }
   }
 

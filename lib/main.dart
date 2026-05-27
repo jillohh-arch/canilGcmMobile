@@ -75,39 +75,23 @@ class GcmK9App extends StatelessWidget {
               !userVM.hasUserForRa(currentRa) &&
               !userVM.hasLoadedInitialData;
 
-          return Navigator(
-            onDidRemovePage: (_) {},
-            pages: [
-              // Sem auth → Login
-              if (authVM.user == null)
-                const MaterialPage(
-                  key: ValueKey('Login'),
-                  child: LoginScreen(),
-                )
-              else ...[
-                // Carregando dados do usuário/turno → Splash
-                if (isLoadingCurrentUser || shiftVM.isLoading)
-                  const MaterialPage(
-                    key: ValueKey('Splash'),
-                    child: SplashScreen(),
-                  )
-                // Sem turno ativo → Seleção de cão
-                else if (!shiftVM.hasActiveShift)
-                  const MaterialPage(
-                    key: ValueKey('Assumption'),
-                    child: ShiftAssumptionScreen(),
-                  ),
-                // Turno ativo → Dashboard
-                if (!isLoadingCurrentUser &&
-                    !shiftVM.isLoading &&
-                    shiftVM.hasActiveShift)
-                  const MaterialPage(
-                    key: ValueKey('Dashboard'),
-                    child: MainRootScreen(),
-                  ),
-              ],
-            ],
-          );
+          // Sem auth → Login
+          if (authVM.user == null) {
+            return const LoginScreen();
+          }
+
+          // Carregando dados do usuário/turno → Splash
+          if (isLoadingCurrentUser || shiftVM.isLoading) {
+            return const SplashScreen();
+          }
+
+          // Sem turno ativo → Seleção de cão
+          if (!shiftVM.hasActiveShift) {
+            return const ShiftAssumptionScreen();
+          }
+
+          // Turno ativo → Dashboard
+          return const MainRootScreen();
         },
       ),
       debugShowCheckedModeBanner: false,

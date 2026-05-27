@@ -23,12 +23,15 @@ class DetectionService {
 
   Stream<List<DetectionLine>> watchLines(String dogId) {
     return _linesCol(dogId).snapshots().map(
-      (snap) =>
-          snap.docs
-              .map((doc) => DetectionLine.fromJson(doc.data(), docId: doc.id))
-              .where((line) => !line.isDeleted)
-              .toList()
-            ..sort(_sortLines),
+      (snap) {
+        final lines = snap.docs
+            .map((doc) => DetectionLine.fromJson(doc.data(), docId: doc.id))
+            .where((line) => !line.isDeleted)
+            .toList()
+          ..sort(_sortLines);
+        _healFormationCompleteLines(dogId, lines);
+        return lines.map(_healFormationCompleteLocal).toList();
+      },
     );
   }
 
@@ -40,7 +43,45 @@ class DetectionService {
             .where((line) => !line.isDeleted)
             .toList()
           ..sort(_sortLines);
-    return lines;
+    _healFormationCompleteLines(dogId, lines);
+    return lines.map(_healFormationCompleteLocal).toList();
+  }
+
+  /// Retorna o modelo corrigido localmente (UI mostra correto imediatamente).
+  DetectionLine _healFormationCompleteLocal(DetectionLine line) {
+    if (line.status != 'in_formation') return line;
+    final allPhases = DetectionLine.phases; // 8 fases
+    if (!allPhases.every((p) => line.phasesCompleted.contains(p))) return line;
+    return line.copyWith(
+      status: 'operational',
+      operationalSince: line.updatedAt ?? DateTime.now(),
+    );
+  }
+
+  /// Persiste a correção no Firestore (fire-and-forget) para linhas que
+  /// completaram todas as 8 fases mas ficaram presas em `in_formation`.
+  void _healFormationCompleteLines(String dogId, List<DetectionLine> lines) {
+    for (final line in lines) {
+      if (line.status != 'in_formation') continue;
+      final allPhases = DetectionLine.phases;
+      if (!allPhases.every((p) => line.phasesCompleted.contains(p))) continue;
+
+      // Corrigir no Firestore em background
+      final docId = line.id ?? line.normalizedType;
+      _linesCol(dogId).doc(docId).set({
+        'status': 'operational',
+        'operational_since': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+        'audit_trail': FieldValue.arrayUnion([
+          {
+            'action': 'formation_completed',
+            'at': Timestamp.fromDate(DateTime.now()),
+            'reason':
+                'Migração automática: 8/8 fases concluídas, status corrigido para operational.',
+          },
+        ]),
+      }, SetOptions(merge: true));
+    }
   }
 
   Future<List<DetectionLine>> getOrCreateDefaultLines({
@@ -304,10 +345,10 @@ class DetectionService {
     }
 
     final nextPhase = DetectionPhaseCatalog.nextAfter(phase.code);
+    final isLastPhase = nextPhase == null;
     final canAdvanceLine =
         line.normalizedCurrentPhase == phase.code &&
-        !line.phasesCompleted.contains(phase.code) &&
-        nextPhase != null;
+        !line.phasesCompleted.contains(phase.code);
     final completedAuditEntry = _auditEntry(
       action: 'completed_by_criterion',
       handlerId: handlerId,
@@ -326,7 +367,9 @@ class DetectionService {
       recorder: verifiedRecorder,
       status: DetectionFormationStatus.completedByCriterion,
       phaseAdvanced: canAdvanceLine,
-      advancedTo: canAdvanceLine ? nextPhase.code : null,
+      advancedTo: canAdvanceLine
+          ? (isLastPhase ? 'operational' : nextPhase.code)
+          : null,
       auditTrail: updatedTrail,
     );
 
@@ -335,44 +378,81 @@ class DetectionService {
     batch.set(sessionRef, updated.toJson(), SetOptions(merge: true));
 
     if (canAdvanceLine) {
-      final advancedPhase = nextPhase;
       final completed = _mergeCompletedPhases(line.phasesCompleted, phase.code);
       final lineRef = _linesCol(
         session.dogId,
       ).doc(line.id ?? line.normalizedType);
-      batch.set(lineRef, {
-        'current_phase': advancedPhase.code,
-        'phases_completed': completed,
-        'status': advancedPhase.code == 'final'
-            ? 'in_formation'
-            : 'in_formation',
-        'best_streak': verifiedRecorder.longestStreak > line.bestStreak
-            ? verifiedRecorder.longestStreak
-            : line.bestStreak,
-        'consecutive_hits': 0,
-        'updated_at': FieldValue.serverTimestamp(),
-        'phase_history': FieldValue.arrayUnion([
-          {
-            'phase': phase.code,
-            'completed_at': Timestamp.fromDate(DateTime.now()),
-            'session_id': session.id,
-            'to_phase': advancedPhase.code,
-          },
-        ]),
-        'audit_trail': FieldValue.arrayUnion([
-          _auditEntry(
-            action: 'phase_advanced',
-            handlerId: handlerId,
-            handlerName: handlerName,
-            reason: 'Critério da fase atingido automaticamente.',
-            metadata: {
+
+      if (isLastPhase) {
+        // 4c concluída = formação completa → linha vira operational
+        batch.set(lineRef, {
+          'current_phase': '4c',
+          'phases_completed': completed,
+          'status': 'operational',
+          'operational_since': FieldValue.serverTimestamp(),
+          'best_streak': verifiedRecorder.longestStreak > line.bestStreak
+              ? verifiedRecorder.longestStreak
+              : line.bestStreak,
+          'consecutive_hits': 0,
+          'updated_at': FieldValue.serverTimestamp(),
+          'last_session_at': FieldValue.serverTimestamp(),
+          'phase_history': FieldValue.arrayUnion([
+            {
+              'phase': phase.code,
+              'completed_at': Timestamp.fromDate(DateTime.now()),
               'session_id': session.id,
-              'from_phase': phase.code,
-              'to_phase': advancedPhase.code,
+              'to_phase': 'operational',
             },
-          ),
-        ]),
+          ]),
+          'audit_trail': FieldValue.arrayUnion([
+            _auditEntry(
+              action: 'formation_completed',
+              handlerId: handlerId,
+              handlerName: handlerName,
+              reason:
+                  'Formação concluída — todas as 8 fases do protocolo atingidas.',
+              metadata: {
+                'session_id': session.id,
+                'final_phase': phase.code,
+              },
+              ),
+          ]),
       }, SetOptions(merge: true));
+      } else {
+        // Avanço normal para a próxima fase
+        batch.set(lineRef, {
+          'current_phase': nextPhase.code,
+          'phases_completed': completed,
+          'status': 'in_formation',
+          'best_streak': verifiedRecorder.longestStreak > line.bestStreak
+              ? verifiedRecorder.longestStreak
+              : line.bestStreak,
+          'consecutive_hits': 0,
+          'updated_at': FieldValue.serverTimestamp(),
+          'last_session_at': FieldValue.serverTimestamp(),
+          'phase_history': FieldValue.arrayUnion([
+            {
+              'phase': phase.code,
+              'completed_at': Timestamp.fromDate(DateTime.now()),
+              'session_id': session.id,
+              'to_phase': nextPhase.code,
+            },
+          ]),
+          'audit_trail': FieldValue.arrayUnion([
+            _auditEntry(
+              action: 'phase_advanced',
+              handlerId: handlerId,
+              handlerName: handlerName,
+              reason: 'Critério da fase atingido automaticamente.',
+              metadata: {
+                'session_id': session.id,
+                'from_phase': phase.code,
+                'to_phase': nextPhase.code,
+              },
+            ),
+          ]),
+        }, SetOptions(merge: true));
+      }
     }
 
     await batch.commit();

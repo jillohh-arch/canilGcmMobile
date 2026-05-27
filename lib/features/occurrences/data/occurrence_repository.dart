@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -58,10 +61,18 @@ class OccurrenceRepository {
       );
     }
 
+    // Campos que não devem gerar entrada de auditoria (temporários/internos)
+    const _noAuditFields = {
+      'updated_at',
+      'audit_trail',
+      'finalization_draft',
+      'status',
+    };
+
     final entries = <Map<String, dynamic>>[];
 
     for (final key in normalizedUpdates.keys) {
-      if (key == 'updated_at' || key == 'audit_trail') continue;
+      if (_noAuditFields.contains(key)) continue;
       final oldValue = currentData[key];
       final newValue = normalizedUpdates[key];
       if (oldValue != newValue) {
@@ -82,6 +93,17 @@ class OccurrenceRepository {
     }
 
     await docRef.update(normalizedUpdates);
+  }
+
+  /// Salva draft de finalização de forma leve (sem ler o documento).
+  /// Usado pelo auto-save do wizard — não gera audit trail.
+  Future<void> saveDraft(String id, Map<String, dynamic> draft) async {
+    final docRef = _collection.doc(id);
+    await docRef.update({
+      'status': OccurrenceStatus.finalizing.toMap(),
+      'finalization_draft': draft,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> softDelete(String id, String userId, String reason) async {
@@ -118,23 +140,13 @@ class OccurrenceRepository {
     required Map<String, dynamic>? details,
   }) async {
     final docRef = _collection.doc(id);
-    final snap = await docRef.get();
-    if (!snap.exists) return;
-    final currentData = snap.data()!;
-    if (_isFinalized(currentData)) {
-      throw StateError('Ocorrencia ja finalizada.');
-    }
-
-    final startedAt = Occurrence.fromMap(currentData, id).startedAt;
-    final durationMinutes = DateTime.now().difference(startedAt).inMinutes;
-    final durationTotal = durationMinutes < 1 ? 1 : durationMinutes;
-
     final entry = AuditService.buildInlineEntry(action: 'finalized');
 
-    await docRef.update({
+    debugPrint('[OccurrenceRepo] finalize: iniciando para $id');
+
+    final updateData = <String, dynamic>{
       'status': OccurrenceStatus.finalized.toMap(),
       'finalized_at': FieldValue.serverTimestamp(),
-      'duration_total': durationTotal,
       'integrity_hash': integrityHash,
       'final_report': finalReport,
       'results': results.map((r) => r.toMap()).toList(),
@@ -142,7 +154,20 @@ class OccurrenceRepository {
       'finalization_draft': FieldValue.delete(),
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
-    });
+    };
+
+    // Usar update (não set/merge) para garantir que o documento existe
+    // e preservar campos existentes (incluindo audit_trail anterior via arrayUnion)
+    // Timeout de 15s para não travar em conexão instável
+    final future = docRef.update(updateData);
+
+    try {
+      await future.timeout(const Duration(seconds: 15));
+      debugPrint('[OccurrenceRepo] finalize: confirmado pelo servidor');
+    } on TimeoutException {
+      // O write foi enfileirado localmente — será sincronizado quando online
+      debugPrint('[OccurrenceRepo] finalize: timeout — write enfileirado localmente');
+    }
 
     AuditService.log(
       action: 'finalized',

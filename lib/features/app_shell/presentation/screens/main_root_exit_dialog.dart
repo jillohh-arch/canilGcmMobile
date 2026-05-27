@@ -2,74 +2,46 @@ part of 'main_root_screen.dart';
 
 extension _MainRootExitDialog on _MainRootScreenState {
   Future<void> _handleBackNavigation(BuildContext context) async {
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
-    if (rootNavigator.canPop()) {
-      rootNavigator.pop();
+    // 1. Se há rotas empilhadas acima do MainRootScreen, desempilhar
+    final nav = globalNavigatorKey.currentState ?? Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
       return;
     }
 
-    final localNavigator = Navigator.of(context);
-    if (localNavigator.canPop()) {
-      localNavigator.pop();
-      return;
-    }
-
-    // Se não estiver no dashboard ativo (aba 0), voltar para a aba 0
+    // 2. Se não estiver na aba Início, voltar para ela
     if (_currentIndex != 0) {
       _onTabTapped(0);
       return;
     }
 
-    // Se estiver na aba 0, pedir confirmação para fechar o app
-    final shouldExit = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-        ),
-        title: const Text(
-          'Encerrar Aplicativo?',
-          style: TextStyle(
+    // 3. Double-back para sair: primeiro toque mostra snackbar,
+    //    segundo toque dentro de 2s fecha o app.
+    final now = DateTime.now();
+    if (_lastBackPress != null &&
+        now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return;
+    }
+    _lastBackPress = now;
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Toque novamente para sair',
+          style: GoogleFonts.inter(
             color: Colors.white,
-            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        content: const Text(
-          'Tem certeza que deseja fechar o aplicativo e encerrar sua sessão no dispositivo?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE53935),
-            ),
-            child: const Text(
-              'Sair',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF1C2A30),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
-
-    if (shouldExit == true) {
-      SystemNavigator.pop();
-    }
   }
 }

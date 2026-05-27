@@ -399,11 +399,15 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final results = _selectedResults.toList();
       final details = _buildDetails();
 
+      debugPrint('[Finalize] Construindo hash... events=${vm.events.length}');
+
       final hash = _buildIntegrityHash(
         report: report,
         results: results,
         details: details,
       );
+
+      debugPrint('[Finalize] Hash construído. Chamando finalizeOccurrence...');
 
       await vm.finalizeOccurrence(
         id: widget.occurrenceId,
@@ -411,7 +415,15 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         finalReport: report,
         results: results,
         details: details,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('[Finalize] TIMEOUT após 30s');
+          throw TimeoutException('Tempo limite excedido ao finalizar. Verifique sua conexão.');
+        },
       );
+
+      debugPrint('[Finalize] Finalização concluída com sucesso!');
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -430,6 +442,16 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 integrityHash: hash,
               ),
             ),
+          ),
+        );
+      }
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Tempo limite excedido'),
+            backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -553,10 +575,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   Future<void> _saveDraft() async {
     if (!mounted || _isFinalizing) return;
     final vm = context.read<OccurrenceViewModel>();
-    await vm.updateOccurrence(widget.occurrenceId, {
-      'status': 'finalizing',
-      'finalization_draft': _buildDraft(),
-    });
+    await vm.saveDraft(widget.occurrenceId, _buildDraft());
   }
 
   void _showExitDialog() {
