@@ -73,6 +73,12 @@ service firebase.storage {
   allow delete: if signedIn();
 }
 
+match /occurrences/{occurrenceId}/finalization/{fileName} {
+  allow read: if signedIn();
+  allow create, update: if canWriteImage(10);
+  allow delete: if signedIn();
+}
+
 match /dogs/{dogId}/feeding_photos/{fileName} {
   allow read: if signedIn();
   allow create, update: if canWriteImage(10);

@@ -8,6 +8,7 @@ import 'active_occurrence_event_card.dart';
 class ActiveOccurrenceTimeline extends StatelessWidget {
   final List<OccurrenceEvent> events;
   final ValueChanged<OccurrenceEvent> onEventTap;
+  final ValueChanged<OccurrenceEvent>? onLocationTap;
   final String? handlerName;
   final String? locationLabel;
   final String? errorMessage;
@@ -17,6 +18,7 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
     super.key,
     required this.events,
     required this.onEventTap,
+    this.onLocationTap,
     this.handlerName,
     this.locationLabel,
     this.errorMessage,
@@ -84,6 +86,9 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
                       event: event,
                       isRecent: isFirst,
                       onTap: () => onEventTap(event),
+                      onLocationTap: onLocationTap != null
+                          ? () => onLocationTap!(event)
+                          : null,
                       handlerName: handlerName,
                       locationLabel: locationLabel,
                     ),

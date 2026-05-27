@@ -11,19 +11,37 @@ import 'package:canil_gcm/core/services/osm_geocoding_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
+/// Resultado retornado quando a tela opera em modo pickOnly.
+class LocationPickResult {
+  final double lat;
+  final double lng;
+  final String? label;
+  final String source;
+
+  const LocationPickResult({
+    required this.lat,
+    required this.lng,
+    this.label,
+    required this.source,
+  });
+}
+
 /// Tela para editar/definir o local de uma ação (evento) de ocorrência.
 /// Permite busca via Photon (OSM), usar GPS atual, ou arrastar pino no mapa.
-/// Retorna o evento atualizado via Navigator.pop.
+/// Se [pickOnly] é true, retorna um [LocationPickResult] via Navigator.pop
+/// sem persistir no Firestore (útil para novos eventos ainda não salvos).
 class EditEventLocationScreen extends StatefulWidget {
   final OccurrenceEvent event;
   final int eventIndex;
   final int totalEvents;
+  final bool pickOnly;
 
   const EditEventLocationScreen({
     super.key,
     required this.event,
     required this.eventIndex,
     required this.totalEvents,
+    this.pickOnly = false,
   });
 
   @override
@@ -182,6 +200,17 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
 
   Future<void> _save() async {
     if (_selectedPoint == null) return;
+
+    // Modo pick-only: retorna resultado sem persistir
+    if (widget.pickOnly) {
+      Navigator.of(context).pop(LocationPickResult(
+        lat: _selectedPoint!.latitude,
+        lng: _selectedPoint!.longitude,
+        label: _selectedLabel,
+        source: _locationSource,
+      ));
+      return;
+    }
 
     setState(() => _isSaving = true);
 

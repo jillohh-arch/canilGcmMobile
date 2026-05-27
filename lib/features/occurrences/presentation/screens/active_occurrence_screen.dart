@@ -21,6 +21,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occur
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 import 'edit_event_screen.dart';
+import 'edit_event_location_screen.dart';
 import 'finalize_occurrence_screen.dart';
 
 class ActiveOccurrenceScreen extends StatefulWidget {
@@ -189,6 +190,26 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     );
     if (result == 'saved' || result == 'deleted') {
       if (mounted) _showSavedFeedback();
+    }
+  }
+
+  void _onLocationTap(OccurrenceEvent event) async {
+    final vm = context.read<OccurrenceViewModel>();
+    final totalEvents = vm.events.length;
+    final eventIndex = vm.events.indexOf(event) + 1;
+
+    final result = await Navigator.of(context).push<dynamic>(
+      MaterialPageRoute(
+        builder: (_) => EditEventLocationScreen(
+          event: event,
+          eventIndex: eventIndex > 0 ? eventIndex : 1,
+          totalEvents: totalEvents > 0 ? totalEvents : 1,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _showSavedFeedback();
     }
   }
 
@@ -633,6 +654,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   ActiveOccurrenceTimeline(
                     events: vm.events,
                     onEventTap: _onEventTap,
+                    onLocationTap: _onLocationTap,
                     handlerName: handlerName,
                     locationLabel: locationAddress.isNotEmpty
                         ? locationAddress
