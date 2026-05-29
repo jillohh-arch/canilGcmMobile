@@ -13,6 +13,11 @@ class Occurrence with SoftDeletable {
   final String? primaryHandlerRa;
   final Map<String, dynamic>? createdBy;
   final String dogId;
+  final String? vehicleId;
+  final String? vehicleLabel;
+  final String? vehiclePrefix;
+  final String? vehicleModel;
+  final String? vehicleUnit;
 
   final String typeCode;
   final String typeName;
@@ -67,6 +72,11 @@ class Occurrence with SoftDeletable {
     this.primaryHandlerRa,
     this.createdBy,
     required this.dogId,
+    this.vehicleId,
+    this.vehicleLabel,
+    this.vehiclePrefix,
+    this.vehicleModel,
+    this.vehicleUnit,
     required this.typeCode,
     required this.typeName,
     this.locationAddress,
@@ -108,6 +118,11 @@ class Occurrence with SoftDeletable {
       primaryHandlerRa: _parseString(map['primary_handler_ra']),
       createdBy: _parseStringMap(map['created_by']),
       dogId: _parseString(map['dog_id']) ?? '',
+      vehicleId: _parseString(map['vehicle_id']),
+      vehicleLabel: _parseString(map['vehicle_label']),
+      vehiclePrefix: _parseString(map['vehicle_prefix']),
+      vehicleModel: _parseString(map['vehicle_model']),
+      vehicleUnit: _parseString(map['vehicle_unit']),
       typeCode: _parseString(map['type_code']) ?? '',
       typeName: _parseString(map['type_name']) ?? '',
       locationAddress: _parseString(map['location_address']),
@@ -159,6 +174,11 @@ class Occurrence with SoftDeletable {
       'primary_handler_ra': primaryHandlerRa,
       'created_by': createdBy,
       'dog_id': dogId,
+      'vehicle_id': vehicleId,
+      'vehicle_label': vehicleLabel,
+      'vehicle_prefix': vehiclePrefix,
+      'vehicle_model': vehicleModel,
+      'vehicle_unit': vehicleUnit,
       'type_code': typeCode,
       'type_name': typeName,
       'location_address': locationAddress,
@@ -205,6 +225,11 @@ class Occurrence with SoftDeletable {
     String? primaryHandlerRa,
     Map<String, dynamic>? createdBy,
     String? dogId,
+    String? vehicleId,
+    String? vehicleLabel,
+    String? vehiclePrefix,
+    String? vehicleModel,
+    String? vehicleUnit,
     String? typeCode,
     String? typeName,
     String? locationAddress,
@@ -244,6 +269,11 @@ class Occurrence with SoftDeletable {
       primaryHandlerRa: primaryHandlerRa ?? this.primaryHandlerRa,
       createdBy: createdBy ?? this.createdBy,
       dogId: dogId ?? this.dogId,
+      vehicleId: vehicleId ?? this.vehicleId,
+      vehicleLabel: vehicleLabel ?? this.vehicleLabel,
+      vehiclePrefix: vehiclePrefix ?? this.vehiclePrefix,
+      vehicleModel: vehicleModel ?? this.vehicleModel,
+      vehicleUnit: vehicleUnit ?? this.vehicleUnit,
       typeCode: typeCode ?? this.typeCode,
       typeName: typeName ?? this.typeName,
       locationAddress: locationAddress ?? this.locationAddress,
@@ -298,6 +328,8 @@ class Occurrence with SoftDeletable {
     }.toList()..sort();
     return emails;
   }
+
+  bool get hasVehicleCrew => vehicleId?.trim().isNotEmpty == true;
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
@@ -359,6 +391,23 @@ class Occurrence with SoftDeletable {
   }
 
   static List<OccurrenceTeamMember> _parseTeamMembers(dynamic value) {
+    if (value is Map) {
+      final conductors = value['conductors'];
+      final serviceDog = value['service_dog'];
+      if (conductors is! List) return const [];
+      final dogMap = serviceDog is Map ? serviceDog : const {};
+      return conductors.whereType<Map>().map((item) {
+        final merged = <String, dynamic>{
+          ...item.map((key, value) => MapEntry(key.toString(), value)),
+          if (dogMap['dog_id'] != null || dogMap['id'] != null)
+            'dog_id': dogMap['dog_id'] ?? dogMap['id'],
+          if (dogMap['name'] != null) 'dog_name': dogMap['name'],
+          if (dogMap['matricula'] != null) 'dog_matricula': dogMap['matricula'],
+          if (dogMap['breed'] != null) 'dog_breed': dogMap['breed'],
+        };
+        return OccurrenceTeamMember.fromJson(merged);
+      }).toList();
+    }
     if (value is! List) return const [];
     return value
         .whereType<Map>()

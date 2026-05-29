@@ -71,6 +71,10 @@ service cloud.firestore {
       return data.status in ['in_progress', 'finalizing'];
     }
 
+    function hasVehicleCrew(data) {
+      return data.vehicle_id is string && data.vehicle_id.size() > 0;
+    }
+
     function canUpdateEditableOccurrence() {
       let changed = changedKeys();
       return signedIn()
@@ -82,9 +86,24 @@ service cloud.firestore {
             'team',
             'team_handler_ids',
             'team_emails',
-            'team_auth_uids'
+            'team_auth_uids',
+            'vehicle_id',
+            'vehicle_label',
+            'vehicle_prefix',
+            'vehicle_model',
+            'vehicle_unit'
           ])
           || (
+            !hasVehicleCrew(resource.data)
+            &&
+            !changed.hasAny([
+              'vehicle_id',
+              'vehicle_label',
+              'vehicle_prefix',
+              'vehicle_model',
+              'vehicle_unit'
+            ])
+            &&
             isParticipant(resource.data)
             && request.resource.data.team is list
             && request.resource.data.team_handler_ids is list
@@ -176,7 +195,7 @@ service cloud.firestore {
         && resource.data.status in ['in_progress', 'finalizing']
         && !hasCoSigners(resource.data)
         && request.resource.data.status == 'finalized'
-        && request.resource.data.hash_version == 2
+        && request.resource.data.hash_version in [2, 3]
         && changedKeys().hasOnly(finalizationKeys());
     }
 
@@ -406,7 +425,13 @@ service cloud.firestore {
           'startedAt',
           'updatedAt',
           'lastDogSwitchAt',
-          'endedAt'
+          'endedAt',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at'
         ])
         && request.resource.data.handlerId == ra
         && request.resource.data.dogId is string
@@ -425,7 +450,13 @@ service cloud.firestore {
           'endedAt',
           'dogSwitches',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at'
         ])
         && request.resource.data.id is string
         && request.resource.data.handlerId is string
@@ -446,6 +477,12 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'currentDogId',
           'dogSwitches',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at',
           'status',
           'endedAt',
           'updatedAt'
@@ -465,6 +502,11 @@ service cloud.firestore {
         && emailMatchesRa(resource.data.handlerId)
         && isValidShiftLogUpdate();
       allow delete: if false;
+    }
+
+    match /vehicles/{vehicleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
     }
 
     match /users/{ra} {

@@ -38,13 +38,15 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
   bool get canAddTeamMember {
     final occurrence = _occurrence;
     if (occurrence == null) return false;
-    return occurrence.status == OccurrenceStatus.inProgress &&
+    return !occurrence.hasVehicleCrew &&
+        occurrence.status == OccurrenceStatus.inProgress &&
         _team.length < occurrence.teamSizeMax;
   }
 
   bool get canAddTeamMembers => canAddTeamMember;
 
   bool get canRemoveMembers =>
+      _occurrence?.hasVehicleCrew != true &&
       _occurrence?.status == OccurrenceStatus.inProgress &&
       _team.any((member) => member.role != TeamRole.titular);
 

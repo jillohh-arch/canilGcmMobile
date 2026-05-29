@@ -16,6 +16,8 @@ import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmod
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -49,6 +51,7 @@ class _ActiveShiftDashboardScreenState
     extends State<ActiveShiftDashboardScreen> {
   final DogService _dogService = DogService();
   final DashboardService _dashboardService = DashboardService();
+  final VehicleService _vehicleService = VehicleService();
   String? _lastFetchedDogId;
 
   // Dados dinâmicos carregados do Firestore

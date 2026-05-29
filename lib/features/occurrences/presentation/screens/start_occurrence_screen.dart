@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -19,6 +21,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_observation.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
+import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
@@ -399,6 +402,76 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     }
   }
 
+  Future<List<OccurrenceTeamMember>> _buildGuarnicaoSnapshot({
+    required ShiftViewModel shiftVM,
+    required UserViewModel userVM,
+    required DogViewModel dogVM,
+    required String? handlerRa,
+  }) async {
+    final vehicleId = shiftVM.vehicleId?.trim();
+    final now = DateTime.now();
+    final serviceDog = _dogForId(dogVM, shiftVM.activeDogId);
+    final crew = vehicleId == null || vehicleId.isEmpty
+        ? <ActiveShiftSession>[]
+        : await shiftVM.getActiveCrew(vehicleId);
+    final members = <OccurrenceTeamMember>[];
+    final seenHandlers = <String>{};
+
+    for (final session in crew) {
+      final ra = session.handlerId.trim();
+      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
+      members.add(
+        OccurrenceTeamMember(
+          handlerId: ra,
+          handlerEmail: HandlerIdentityService.emailFromRa(ra),
+          displayName: userVM.displayNameFor(ra: ra),
+          dogId: serviceDog?.id ?? session.dogId,
+          dogName: serviceDog?.name,
+          dogMatricula: serviceDog?.registrationNumber,
+          dogBreed: serviceDog?.breed,
+          role: ra == handlerRa ? TeamRole.titular : TeamRole.integrante,
+          addedAt: now,
+          addedBy: handlerRa ?? ra,
+        ),
+      );
+    }
+
+    final currentRa = handlerRa?.trim();
+    if (currentRa != null &&
+        currentRa.isNotEmpty &&
+        !seenHandlers.contains(currentRa)) {
+      members.insert(
+        0,
+        OccurrenceTeamMember(
+          handlerId: currentRa,
+          handlerEmail: HandlerIdentityService.emailFromRa(currentRa),
+          displayName: userVM.displayNameFor(ra: currentRa),
+          dogId: serviceDog?.id ?? shiftVM.activeDogId,
+          dogName: serviceDog?.name,
+          dogMatricula: serviceDog?.registrationNumber,
+          dogBreed: serviceDog?.breed,
+          role: TeamRole.titular,
+          addedAt: now,
+          addedBy: currentRa,
+        ),
+      );
+    }
+
+    members.sort((a, b) {
+      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
+      return a.handlerId.compareTo(b.handlerId);
+    });
+    return members;
+  }
+
+  Dog? _dogForId(DogViewModel dogVM, String? dogId) {
+    if (dogId == null || dogId.isEmpty) return null;
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog;
+    }
+    return null;
+  }
+
   // ─── Create ─────────────────────────────────────────────────────────
 
   Future<void> _createOccurrence() async {
@@ -409,12 +482,20 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       final shiftVM = context.read<ShiftViewModel>();
       final authVM = context.read<AuthViewModel>();
       final occVM = context.read<OccurrenceViewModel>();
+      final dogVM = context.read<DogViewModel>();
+      final userVM = context.read<UserViewModel>();
 
       final id = const Uuid().v4();
       final shiftId = shiftVM.activeShiftId ?? '';
       final dogId = shiftVM.activeDogId ?? '';
       final handlerId = authVM.user?.uid ?? '';
       final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+      final teamSnapshot = await _buildGuarnicaoSnapshot(
+        shiftVM: shiftVM,
+        userVM: userVM,
+        dogVM: dogVM,
+        handlerRa: handlerRa,
+      );
 
       final typeCode = _selectedNature?.code ?? 'GERAL';
       final typeName = _selectedNature?.name ?? 'Ocorrência Geral';
@@ -425,6 +506,13 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         dogId: dogId,
         primaryHandlerId: handlerId,
         primaryHandlerRa: handlerRa,
+        vehicleId: shiftVM.vehicleId,
+        vehicleLabel: shiftVM.vehicleLabel,
+        vehiclePrefix: shiftVM.vehiclePrefix,
+        vehicleModel: shiftVM.vehicleModel,
+        vehicleUnit: shiftVM.vehicleUnit,
+        teamSnapshot: teamSnapshot,
+        teamSizeMax: teamSnapshot.length > 1 ? teamSnapshot.length : 3,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: _locationAddress.isNotEmpty ? _locationAddress : null,

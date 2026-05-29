@@ -1713,6 +1713,14 @@ class OccurrencePdfGenerator {
                           style: _body(fonts, size: 8.7, color: _inkSoft),
                         ),
                       ],
+                      if (event.category == OccurrenceEventCategory.dogWork &&
+                          (event.dogHandlerId ?? '').trim().isNotEmpty) ...[
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Emprego do K9 conduzido por RA ${event.dogHandlerId!.trim()}',
+                          style: _bodyBold(fonts, size: 8, color: _green),
+                        ),
+                      ],
                       pw.SizedBox(height: 5),
                       pw.Text(
                         _gpsText(event.gpsLat, event.gpsLng, precision: 5),
@@ -2392,6 +2400,8 @@ class OccurrencePdfGenerator {
 
   bool _shouldShowTeamAndSignatures(_OccurrencePdfContext ctx) {
     return ctx.occurrence.team.length > 1 ||
+        ctx.occurrence.team.any((member) => member.hasServiceDog) ||
+        ctx.occurrence.hasVehicleCrew ||
         ctx.occurrence.signatures.isNotEmpty ||
         ctx.occurrence.status == OccurrenceStatus.finalizedWithPending;
   }
@@ -2411,11 +2421,19 @@ class OccurrencePdfGenerator {
         _sectionLabel('Equipe e assinaturas', f),
         pw.SizedBox(height: 5),
         pw.Text(
-          'Este registro foi co-assinado pelos integrantes abaixo, atestando presença no fato narrado.',
+          'Este registro identifica a guarnicao da viatura e as assinaturas dos condutores responsaveis.',
           style: _body(f, size: 8, color: _inkFaint),
         ),
+        if (ctx.occurrence.vehicleLabel?.trim().isNotEmpty == true) ...[
+          pw.SizedBox(height: 6),
+          _vehicleInfoLine(ctx),
+        ],
         pw.SizedBox(height: 10),
         _teamTable(ctx, team),
+        if (_serviceDogLabel(team).isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          _serviceDogPresenceBox(ctx, team),
+        ],
         pw.SizedBox(height: 10),
         if (signedSignatures.isEmpty)
           _emptyBox('Nenhuma co-assinatura registrada para esta ocorrência.', f)
@@ -2482,6 +2500,56 @@ class OccurrencePdfGenerator {
     return items;
   }
 
+  pw.Widget _vehicleInfoLine(_OccurrencePdfContext ctx) {
+    final f = ctx.fonts;
+    final parts = <String>[
+      ctx.occurrence.vehicleLabel?.trim() ?? '',
+      ctx.occurrence.vehicleModel?.trim() ?? '',
+      ctx.occurrence.vehicleUnit?.trim() ?? '',
+    ].where((part) => part.isNotEmpty).toList();
+    return _roundedCard(
+      background: _mapBg,
+      border: _line,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      child: pw.Text(
+        'Viatura: ${parts.join(' - ')}',
+        style: _bodyBold(f, size: 8, color: _cyanDeep),
+      ),
+    );
+  }
+
+  String _serviceDogLabel(List<OccurrenceTeamMember> team) {
+    for (final member in team) {
+      final dogName = member.dogName?.trim();
+      if (dogName == null || dogName.isEmpty) continue;
+      final matricula = member.dogMatricula?.trim();
+      final breed = member.dogBreed?.trim();
+      return [
+        'K9 $dogName',
+        if (matricula != null && matricula.isNotEmpty) 'matricula $matricula',
+        if (breed != null && breed.isNotEmpty) breed,
+      ].join(' - ');
+    }
+    return '';
+  }
+
+  pw.Widget _serviceDogPresenceBox(
+    _OccurrencePdfContext ctx,
+    List<OccurrenceTeamMember> team,
+  ) {
+    final f = ctx.fonts;
+    final serviceDog = _serviceDogLabel(team);
+    return _roundedCard(
+      background: _greenBg,
+      border: _greenLine,
+      padding: const pw.EdgeInsets.all(9),
+      child: pw.Text(
+        '$serviceDog - membro K9 com presenca atestada pela guarnicao. O cao nao assina; a presenca e atestada pelos condutores.',
+        style: _body(f, size: 7.8, color: _green),
+      ),
+    );
+  }
+
   pw.Widget _teamTable(
     _OccurrencePdfContext ctx,
     List<OccurrenceTeamMember> team,
@@ -2490,13 +2558,13 @@ class OccurrencePdfGenerator {
     return pw.Table(
       border: pw.TableBorder.all(color: _line),
       columnWidths: const {
-        0: pw.FlexColumnWidth(2.5),
+        0: pw.FlexColumnWidth(2.3),
         1: pw.FlexColumnWidth(1.3),
         2: pw.FlexColumnWidth(1.2),
-        3: pw.FlexColumnWidth(1.6),
+        3: pw.FlexColumnWidth(2.2),
       },
       children: [
-        _pdfTableHeader(ctx, ['Nome', 'Papel', 'RA', 'Incluído em']),
+        _pdfTableHeader(ctx, ['Condutor', 'Papel', 'RA', 'K9']),
         for (final member in team)
           pw.TableRow(
             children: [
@@ -2510,11 +2578,20 @@ class OccurrencePdfGenerator {
                 f,
               ),
               _pdfTableCell(member.handlerId, f, mono: true),
-              _pdfTableCell(_formatUtc(member.addedAt), f, mono: true),
+              _pdfTableCell(_memberDogLabel(member), f),
             ],
           ),
       ],
     );
+  }
+
+  String _memberDogLabel(OccurrenceTeamMember member) {
+    final dogName = member.dogName?.trim();
+    if (dogName == null || dogName.isEmpty) return 'Sem K9 vinculado';
+    final matricula = member.dogMatricula?.trim();
+    return matricula != null && matricula.isNotEmpty
+        ? 'K9 $dogName - mat. $matricula'
+        : 'K9 $dogName';
   }
 
   pw.Widget _signatureTable(

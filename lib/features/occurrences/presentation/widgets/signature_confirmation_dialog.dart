@@ -283,6 +283,8 @@ class _SignatureConfirmationDialogState
           ?.toUtc()
           .toIso8601String(),
       'status': widget.occurrence.status.toMap(),
+      'vehicle_id': widget.occurrence.vehicleId,
+      'vehicle_label': widget.occurrence.vehicleLabel,
       'team': orderedTeam.map((member) => member.toHashPayload()).toList(),
     };
     return sha256.convert(utf8.encode(_canonicalJson(payload))).toString();
@@ -408,11 +410,14 @@ class _SignatureConfirmationDialogState
                                         : null,
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    '${member.role == TeamRole.titular ? 'Titular' : 'Integrante'}: ${member.handlerId}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyMedium,
+                                  Expanded(
+                                    child: Text(
+                                      '${member.role == TeamRole.titular ? 'Relator' : 'Integrante'}: ${member.displayName?.trim().isNotEmpty == true ? member.displayName!.trim() : member.handlerId}'
+                                      '${member.dogName?.trim().isNotEmpty == true ? ' + K9 ${member.dogName!.trim()}' : ''}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                    ),
                                   ),
                                 ],
                               ),

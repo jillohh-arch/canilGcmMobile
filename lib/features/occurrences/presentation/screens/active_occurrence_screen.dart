@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -129,7 +130,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     HapticFeedback.lightImpact();
 
     final vm = context.read<OccurrenceViewModel>();
+    final authVM = context.read<AuthViewModel>();
     final now = DateTime.now();
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
 
     double? lat, lng;
     try {
@@ -146,6 +149,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
       category: item.category,
       timestamp: now,
       title: item.autoTitle,
+      dogHandlerId: item.category == OccurrenceEventCategory.dogWork
+          ? handlerRa
+          : null,
       gpsLat: lat,
       gpsLng: lng,
       createdAt: now,

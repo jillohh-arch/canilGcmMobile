@@ -34,12 +34,26 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Builder(
+          builder: (context) {
+            final hasServiceDog = widget.team.any((m) => m.hasServiceDog);
+            return _buildContent(context, hasServiceDog: hasServiceDog);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context, {required bool hasServiceDog}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         // Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Equipe',
+              hasServiceDog ? 'Guarnição' : 'Equipe',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -63,7 +77,9 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Nenhum integrante adicionado',
+              hasServiceDog
+                  ? 'Nenhuma guarnição vinculada'
+                  : 'Nenhum integrante adicionado',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -210,7 +226,7 @@ class _TeamMemberCard extends StatelessWidget {
                 radius: 20,
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 child: Text(
-                  member.handlerId.toUpperCase().substring(0, 2),
+                  _avatarText(member),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
@@ -227,7 +243,9 @@ class _TeamMemberCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          'RA ${member.handlerId}',
+                          member.displayName?.trim().isNotEmpty == true
+                              ? member.displayName!.trim()
+                              : 'RA ${member.handlerId}',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
@@ -264,6 +282,24 @@ class _TeamMemberCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'RA ${member.handlerId}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (member.dogName?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'K9 ${member.dogName!.trim()}'
+                        '${member.dogMatricula?.trim().isNotEmpty == true ? ' · matrícula ${member.dogMatricula!.trim()}' : ''}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       'Adicionado em ${DateFormat('dd/MM/yyyy HH:mm').format(member.addedAt)}',
@@ -320,6 +356,13 @@ class _TeamMemberCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _avatarText(OccurrenceTeamMember member) {
+    final name = member.displayName?.trim();
+    final source = name?.isNotEmpty == true ? name! : member.handlerId;
+    if (source.length <= 2) return source.toUpperCase();
+    return source.substring(0, 2).toUpperCase();
   }
 
   IconData _getSignatureIcon() {

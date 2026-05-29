@@ -13,11 +13,7 @@ class _SectionLabel extends StatelessWidget {
   final String text;
   final Widget? trailing;
 
-  const _SectionLabel({
-    required this.emoji,
-    required this.text,
-    this.trailing,
-  });
+  const _SectionLabel({required this.emoji, required this.text, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -36,21 +32,14 @@ class _SectionLabel extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Container(
-              height: 1,
-              color: AppTheme.primary.withAlpha(38),
-            ),
+            child: Container(height: 1, color: AppTheme.primary.withAlpha(38)),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 8),
-            trailing!,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         ],
       ),
     );
   }
 }
-
 
 /// Header compacto fiel ao mockup 10_dashboard.
 class _ShiftHeader extends StatelessWidget {
@@ -73,6 +62,7 @@ class _ShiftHeader extends StatelessWidget {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final elapsed = _formatElapsed(shiftVM.shiftStartTime);
     final conductorName = _shortName(callsign);
+    final vehicleLabel = shiftVM.vehicleLabel;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
@@ -93,7 +83,9 @@ class _ShiftHeader extends StatelessWidget {
                 _SmallAvatar(
                   imageUrl: dog.profileImageUrl,
                   fallbackText: dog.name.isNotEmpty
-                      ? dog.name.substring(0, dog.name.length.clamp(0, 4)).toUpperCase()
+                      ? dog.name
+                            .substring(0, dog.name.length.clamp(0, 4))
+                            .toUpperCase()
                       : 'K9',
                   borderColor: AppTheme.primary,
                 ),
@@ -157,6 +149,21 @@ class _ShiftHeader extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (vehicleLabel?.trim().isNotEmpty == true) ...[
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '· ${vehicleLabel!.trim()}',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],

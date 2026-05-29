@@ -20,6 +20,7 @@ class OccurrenceEvent with SoftDeletable {
   final double? gpsLng;
   final String? placeLabel;
   final String? locationSource; // gps_atual | busca | ajuste_manual
+  final String? dogHandlerId;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -47,6 +48,7 @@ class OccurrenceEvent with SoftDeletable {
     this.gpsLng,
     this.placeLabel,
     this.locationSource,
+    this.dogHandlerId,
     required this.createdAt,
     required this.updatedAt,
     this.auditTrail = const [],
@@ -82,6 +84,7 @@ class OccurrenceEvent with SoftDeletable {
       gpsLng: (map['gps_lng'] as num?)?.toDouble(),
       placeLabel: map['place_label'] as String?,
       locationSource: map['location_source'] as String?,
+      dogHandlerId: map['dog_handler_id'] as String?,
       createdAt: _parseDateTime(map['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(map['updated_at']) ?? DateTime.now(),
       auditTrail:
@@ -112,6 +115,7 @@ class OccurrenceEvent with SoftDeletable {
       'gps_lng': gpsLng,
       'place_label': placeLabel,
       'location_source': locationSource,
+      'dog_handler_id': dogHandlerId,
       'created_at': Timestamp.fromDate(createdAt),
       'updated_at': Timestamp.fromDate(updatedAt),
       'audit_trail': auditTrail,
@@ -133,6 +137,7 @@ class OccurrenceEvent with SoftDeletable {
     double? gpsLng,
     String? placeLabel,
     String? locationSource,
+    String? dogHandlerId,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<Map<String, dynamic>>? auditTrail,
@@ -154,6 +159,7 @@ class OccurrenceEvent with SoftDeletable {
       gpsLng: gpsLng ?? this.gpsLng,
       placeLabel: placeLabel ?? this.placeLabel,
       locationSource: locationSource ?? this.locationSource,
+      dogHandlerId: dogHandlerId ?? this.dogHandlerId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       auditTrail: auditTrail ?? this.auditTrail,

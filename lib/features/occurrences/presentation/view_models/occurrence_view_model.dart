@@ -130,6 +130,13 @@ class OccurrenceViewModel extends ChangeNotifier {
     required String dogId,
     required String primaryHandlerId,
     String? primaryHandlerRa,
+    String? vehicleId,
+    String? vehicleLabel,
+    String? vehiclePrefix,
+    String? vehicleModel,
+    String? vehicleUnit,
+    List<OccurrenceTeamMember>? teamSnapshot,
+    int? teamSizeMax,
     required String typeCode,
     required String typeName,
     String? locationAddress,
@@ -160,6 +167,9 @@ class OccurrenceViewModel extends ChangeNotifier {
                 addedByUid: primaryHandlerId.isEmpty ? null : primaryHandlerId,
               ),
             ];
+      final resolvedTeam = teamSnapshot
+          ?.where((member) => member.handlerId.isNotEmpty)
+          .toList();
       final occurrence = Occurrence(
         id: id,
         shiftId: shiftId,
@@ -170,6 +180,11 @@ class OccurrenceViewModel extends ChangeNotifier {
           if (primaryHandlerId.isNotEmpty) 'uid': primaryHandlerId,
         },
         dogId: dogId,
+        vehicleId: vehicleId,
+        vehicleLabel: vehicleLabel,
+        vehiclePrefix: vehiclePrefix,
+        vehicleModel: vehicleModel,
+        vehicleUnit: vehicleUnit,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: locationAddress,
@@ -181,7 +196,8 @@ class OccurrenceViewModel extends ChangeNotifier {
         updatedAt: now,
         status: OccurrenceStatus.inProgress,
         initialObservation: initialObservation,
-        team: titularTeam,
+        team: resolvedTeam?.isNotEmpty == true ? resolvedTeam! : titularTeam,
+        teamSizeMax: teamSizeMax ?? 3,
       );
 
       final created = await _repository.create(occurrence);
@@ -275,6 +291,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     Map<String, dynamic>? details,
     List<String> finalizationPhotos = const [],
     List<String> finalizationPhotoHashes = const [],
+    int hashVersion = 2,
   }) async {
     // Proteção client-side contra dupla finalização
     if (_isLoading) return;
@@ -297,6 +314,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         details: details,
         finalizationPhotos: finalizationPhotos,
         finalizationPhotoHashes: finalizationPhotoHashes,
+        hashVersion: hashVersion,
       );
       // Cancelar o stream para evitar que re-emita o valor antigo
       _openSub?.cancel();

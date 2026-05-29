@@ -249,6 +249,7 @@ class OccurrenceFinalizationService {
           return {
             'category': event.category.toMap(),
             'description': event.description,
+            'dog_handler_id': event.dogHandlerId,
             'gps_lat': event.gpsLat,
             'gps_lng': event.gpsLng,
             'id': event.id,
@@ -284,6 +285,11 @@ class OccurrenceFinalizationService {
       'primary_handler_ra': occurrence.primaryHandlerRa,
       'results': resultPayload,
       'shift_id': occurrence.shiftId,
+      'vehicle_id': occurrence.vehicleId,
+      'vehicle_label': occurrence.vehicleLabel,
+      'vehicle_model': occurrence.vehicleModel,
+      'vehicle_prefix': occurrence.vehiclePrefix,
+      'vehicle_unit': occurrence.vehicleUnit,
       'signatures': sortedSignatures
           .map((signature) => signature.toHashPayload())
           .toList(),

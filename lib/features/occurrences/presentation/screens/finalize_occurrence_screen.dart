@@ -351,6 +351,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             'timestamp': event.timestamp.toIso8601String(),
             'title': event.title,
             'description': event.description,
+            'dog_handler_id': event.dogHandlerId,
             'photo_urls': event.photoUrls,
             'photo_hashes': eventPhotoHashes,
             'gps_lat': event.gpsLat,
@@ -361,15 +362,30 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               (a['timestamp'] as String).compareTo(b['timestamp'] as String),
         );
     final resultPayload = results.map((r) => r.toMap()).toList()..sort();
+    final hashVersion = _directHashVersionFor(occ);
+    final teamPayload = List.of(occ?.team ?? const [])
+      ..sort((a, b) => a.handlerId.compareTo(b.handlerId));
 
     final payload = {
-      'hash_version': 2,
+      'hash_version': hashVersion,
       'occurrence_id': widget.occurrenceId,
       'type_name': widget.typeName,
       'dog_name': widget.dogName,
+      'dog_id': occ?.dogId,
       'handler_name': widget.handlerName,
+      'primary_handler_id': occ?.primaryHandlerId,
+      'primary_handler_ra': occ?.primaryHandlerRa,
       'location_address': widget.locationAddress,
       'started_at': occ?.startedAt.toIso8601String(),
+      if (hashVersion == 3) ...{
+        'vehicle_id': occ?.vehicleId,
+        'vehicle_label': occ?.vehicleLabel,
+        'vehicle_model': occ?.vehicleModel,
+        'vehicle_prefix': occ?.vehiclePrefix,
+        'vehicle_unit': occ?.vehicleUnit,
+        'team': teamPayload.map((member) => member.toHashPayload()).toList(),
+        'signatures': const [],
+      },
       'event_count': widget.eventCount,
       'events': eventPayload,
       'final_report': report,
@@ -379,6 +395,14 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     };
 
     return sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+  }
+
+  int _directHashVersionFor(Occurrence? occurrence) {
+    if (occurrence == null) return 2;
+    final hasGuarnicao =
+        occurrence.hasVehicleCrew ||
+        occurrence.team.any((member) => member.hasServiceDog);
+    return hasGuarnicao ? 3 : 2;
   }
 
   dynamic _stableJsonValue(dynamic value) {
@@ -489,6 +513,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             details: details,
             finalizationPhotos: photoUrls,
             finalizationPhotoHashes: photoHashes,
+            hashVersion: _directHashVersionFor(_occurrence),
           )
           .timeout(
             const Duration(seconds: 30),
