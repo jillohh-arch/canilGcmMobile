@@ -341,6 +341,7 @@ class OccurrenceRepository {
         normalizedMember.handlerEmail ??
             _emailForRa(normalizedMember.handlerId),
       ]),
+      'team_size_max': current.teamSizeMax,
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     };
@@ -409,6 +410,7 @@ class OccurrenceRepository {
       'team': updatedTeam.map((teamMember) => teamMember.toJson()).toList(),
       'team_handler_ids': updatedOccurrence.teamHandlerIds,
       'team_emails': updatedOccurrence.teamEmails,
+      'team_size_max': current.teamSizeMax,
       'team_auth_uids': updatedTeam
           .map((teamMember) => teamMember.authUid)
           .whereType<String>()

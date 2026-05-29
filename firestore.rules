@@ -19,7 +19,17 @@ service cloud.firestore {
       return signedIn()
         && (
           data.primary_handler_id == request.auth.uid
+          || emailMatchesRa(data.primary_handler_id)
           || emailMatchesRa(data.primary_handler_ra)
+          || emailMatchesRa(data.created_by)
+          || emailMatchesRa(data.created_by_ra)
+          || (
+            data.created_by is map
+            && (
+              data.created_by.uid == request.auth.uid
+              || emailMatchesRa(data.created_by.ra)
+            )
+          )
         );
     }
 
@@ -77,10 +87,19 @@ service cloud.firestore {
           || (
             isParticipant(resource.data)
             && request.resource.data.team is list
-            && request.resource.data.team_size_max is int
-            && request.resource.data.team.size() <= request.resource.data.team_size_max
             && request.resource.data.team_handler_ids is list
-            && request.resource.data.team_handler_ids.size() <= request.resource.data.team_size_max
+            && (
+              (
+                request.resource.data.team_size_max is int
+                && request.resource.data.team.size() <= request.resource.data.team_size_max
+                && request.resource.data.team_handler_ids.size() <= request.resource.data.team_size_max
+              )
+              || (
+                !(request.resource.data.team_size_max is int)
+                && request.resource.data.team.size() <= 3
+                && request.resource.data.team_handler_ids.size() <= 3
+              )
+            )
           )
         );
     }
