@@ -193,6 +193,8 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       final dog = dogVM.dogs.firstWhere((d) => d.id == widget.dogId);
       final dogName = dog.name;
 
+      final healthVM = Provider.of<HealthViewModel>(context, listen: false);
+
       String? attachmentUrl;
       if (_attachmentFile != null) {
         attachmentUrl = await _storageService.uploadFile(
@@ -234,7 +236,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         createdBy: uid,
       );
 
-      final healthVM = Provider.of<HealthViewModel>(context, listen: false);
       await healthVM.addHealthLog(log);
 
       if (!mounted) return;
@@ -432,7 +433,7 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
           labelText: label,
           prefixIcon: Icon(icon),
         ),
-        value: suggestions.contains(_subtypeController.text) ? _subtypeController.text : null,
+        initialValue: suggestions.contains(_subtypeController.text) ? _subtypeController.text : null,
         items: suggestions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList()
           ..add(const DropdownMenuItem(value: 'outros', child: Text('Outro...'))),
         onChanged: (val) {

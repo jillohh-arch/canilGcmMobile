@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/mixins/soft_deletable.dart';
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
+import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'occurrence_result.dart';
 import 'occurrence_status.dart';
 
@@ -8,6 +10,8 @@ class Occurrence with SoftDeletable {
   final String id;
   final String shiftId;
   final String primaryHandlerId;
+  final String? primaryHandlerRa;
+  final Map<String, dynamic>? createdBy;
   final String dogId;
 
   final String typeCode;
@@ -38,8 +42,16 @@ class Occurrence with SoftDeletable {
   final String? initialObservation;
 
   final List<String> finalizationPhotos;
+  final List<String> finalizationPhotoHashes;
 
   final List<Map<String, dynamic>> auditTrail;
+
+  // Campos da equipe e assinaturas
+  final List<OccurrenceTeamMember> team;
+  final int teamSizeMax;
+  final DateTime? signatureRequestAt;
+  final DateTime? signatureDeadline;
+  final List<OccurrenceSignature> signatures;
 
   @override
   final DateTime? deletedAt;
@@ -52,6 +64,8 @@ class Occurrence with SoftDeletable {
     required this.id,
     required this.shiftId,
     required this.primaryHandlerId,
+    this.primaryHandlerRa,
+    this.createdBy,
     required this.dogId,
     required this.typeCode,
     required this.typeName,
@@ -74,7 +88,13 @@ class Occurrence with SoftDeletable {
     this.finalizationDraft,
     this.initialObservation,
     this.finalizationPhotos = const [],
+    this.finalizationPhotoHashes = const [],
     this.auditTrail = const [],
+    this.team = const [],
+    this.signatures = const [],
+    this.teamSizeMax = 3,
+    this.signatureRequestAt,
+    this.signatureDeadline,
     this.deletedAt,
     this.deletedBy,
     this.deleteReason,
@@ -85,6 +105,8 @@ class Occurrence with SoftDeletable {
       id: id,
       shiftId: _parseString(map['shift_id']) ?? '',
       primaryHandlerId: _parseString(map['primary_handler_id']) ?? '',
+      primaryHandlerRa: _parseString(map['primary_handler_ra']),
+      createdBy: _parseStringMap(map['created_by']),
       dogId: _parseString(map['dog_id']) ?? '',
       typeCode: _parseString(map['type_code']) ?? '',
       typeName: _parseString(map['type_name']) ?? '',
@@ -111,7 +133,17 @@ class Occurrence with SoftDeletable {
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      finalizationPhotoHashes:
+          (map['finalization_photo_hashes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       auditTrail: _parseMapList(map['audit_trail']),
+      team: _parseTeamMembers(map['team']),
+      signatures: _parseSignatures(map['signatures']),
+      teamSizeMax: _parseInt(map['team_size_max']) ?? 3,
+      signatureRequestAt: _parseDateTime(map['signature_request_at']),
+      signatureDeadline: _parseDateTime(map['signature_deadline']),
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
       deletedBy: _parseString(map['deleted_by']),
       deleteReason:
@@ -124,6 +156,8 @@ class Occurrence with SoftDeletable {
     return {
       'shift_id': shiftId,
       'primary_handler_id': primaryHandlerId,
+      'primary_handler_ra': primaryHandlerRa,
+      'created_by': createdBy,
       'dog_id': dogId,
       'type_code': typeCode,
       'type_name': typeName,
@@ -148,7 +182,18 @@ class Occurrence with SoftDeletable {
       'finalization_draft': finalizationDraft,
       'initial_observation': initialObservation,
       'finalization_photos': finalizationPhotos,
+      'finalization_photo_hashes': finalizationPhotoHashes,
       'audit_trail': auditTrail,
+      'team': team.map((member) => member.toJson()).toList(),
+      'team_handler_ids': teamHandlerIds,
+      'team_emails': teamEmails,
+      'team_size_max': teamSizeMax,
+      'signature_request_at': signatureRequestAt != null
+          ? Timestamp.fromDate(signatureRequestAt!)
+          : null,
+      'signature_deadline': signatureDeadline != null
+          ? Timestamp.fromDate(signatureDeadline!)
+          : null,
       ...softDeleteFields(),
     };
   }
@@ -157,6 +202,8 @@ class Occurrence with SoftDeletable {
     String? id,
     String? shiftId,
     String? primaryHandlerId,
+    String? primaryHandlerRa,
+    Map<String, dynamic>? createdBy,
     String? dogId,
     String? typeCode,
     String? typeName,
@@ -179,7 +226,13 @@ class Occurrence with SoftDeletable {
     Map<String, dynamic>? finalizationDraft,
     String? initialObservation,
     List<String>? finalizationPhotos,
+    List<String>? finalizationPhotoHashes,
     List<Map<String, dynamic>>? auditTrail,
+    List<OccurrenceTeamMember>? team,
+    List<OccurrenceSignature>? signatures,
+    int? teamSizeMax,
+    DateTime? signatureRequestAt,
+    DateTime? signatureDeadline,
     DateTime? deletedAt,
     String? deletedBy,
     String? deleteReason,
@@ -188,6 +241,8 @@ class Occurrence with SoftDeletable {
       id: id ?? this.id,
       shiftId: shiftId ?? this.shiftId,
       primaryHandlerId: primaryHandlerId ?? this.primaryHandlerId,
+      primaryHandlerRa: primaryHandlerRa ?? this.primaryHandlerRa,
+      createdBy: createdBy ?? this.createdBy,
       dogId: dogId ?? this.dogId,
       typeCode: typeCode ?? this.typeCode,
       typeName: typeName ?? this.typeName,
@@ -210,11 +265,38 @@ class Occurrence with SoftDeletable {
       finalizationDraft: finalizationDraft ?? this.finalizationDraft,
       initialObservation: initialObservation ?? this.initialObservation,
       finalizationPhotos: finalizationPhotos ?? this.finalizationPhotos,
+      finalizationPhotoHashes:
+          finalizationPhotoHashes ?? this.finalizationPhotoHashes,
       auditTrail: auditTrail ?? this.auditTrail,
+      team: team ?? this.team,
+      signatures: signatures ?? this.signatures,
+      teamSizeMax: teamSizeMax ?? this.teamSizeMax,
+      signatureRequestAt: signatureRequestAt ?? this.signatureRequestAt,
+      signatureDeadline: signatureDeadline ?? this.signatureDeadline,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,
       deleteReason: deleteReason ?? this.deleteReason,
     );
+  }
+
+  List<String> get teamHandlerIds {
+    final ids = <String>{
+      if (primaryHandlerRa != null && primaryHandlerRa!.trim().isNotEmpty)
+        primaryHandlerRa!.trim(),
+      for (final member in team)
+        if (member.handlerId.trim().isNotEmpty) member.handlerId.trim(),
+    }.toList()..sort();
+    return ids;
+  }
+
+  List<String> get teamEmails {
+    final emails = <String>{
+      for (final member in team)
+        if (member.handlerEmail?.trim().isNotEmpty == true)
+          member.handlerEmail!.trim().toLowerCase(),
+      for (final ra in teamHandlerIds) _emailForRa(ra),
+    }.toList()..sort();
+    return emails;
   }
 
   static DateTime? _parseDateTime(dynamic value) {
@@ -274,5 +356,25 @@ class Occurrence with SoftDeletable {
       }
       return OccurrenceResult.fromMap(_parseString(item));
     }).toList();
+  }
+
+  static List<OccurrenceTeamMember> _parseTeamMembers(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) => OccurrenceTeamMember.fromJson(item))
+        .toList();
+  }
+
+  static List<OccurrenceSignature> _parseSignatures(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) => OccurrenceSignature.fromJson(item))
+        .toList();
+  }
+
+  static String _emailForRa(String ra) {
+    return '${ra.trim().toLowerCase()}@gcm.com.br';
   }
 }

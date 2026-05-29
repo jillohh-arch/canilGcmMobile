@@ -74,7 +74,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
     super.dispose();
   }
 
-  int get _totalScore => _scores.values.fold(0, (sum, val) => sum + val.round());
+  int get _totalScore => _scores.values.fold(0, (total, val) => total + val.round());
 
   String get _recommendation {
     final total = _totalScore;
@@ -638,7 +638,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

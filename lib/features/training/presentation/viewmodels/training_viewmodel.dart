@@ -92,17 +92,25 @@ class TrainingViewModel extends ChangeNotifier {
     }
   }
 
-  // Delete a training session
-  Future<void> deleteTrainingSession(String id) async {
+  // Soft delete a training session
+  Future<void> deleteTrainingSession(
+    String id, {
+    required String reason,
+    String collectionPath = 'trainings',
+  }) async {
     try {
       _setLoading(true);
 
-      await _trainingService.deleteTrainingSession(id);
+      await _trainingService.deleteTrainingSession(
+        id,
+        reason: reason,
+        collectionPath: collectionPath,
+      );
 
       // Update local state
       _trainings.removeWhere((t) => t.id == id);
 
-      developer.log('Training session deleted: $id', name: 'TrainingViewModel');
+      developer.log('Training session soft-deleted: $id', name: 'TrainingViewModel');
       _setLoading(false);
     } catch (e) {
       _setLoading(false);

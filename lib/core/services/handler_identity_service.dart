@@ -11,4 +11,8 @@ class HandlerIdentityService {
         .replaceAll('@gcm.com.br', '')
         .trim();
   }
+
+  static String emailFromRa(String ra) {
+    return '${ra.trim().toLowerCase()}@gcm.com.br';
+  }
 }

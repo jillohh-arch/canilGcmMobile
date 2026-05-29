@@ -110,8 +110,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.white.withValues(alpha: 0.08),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
@@ -166,7 +166,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.success.withOpacity(0.1),
+              color: AppTheme.success.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Text(
@@ -210,7 +210,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF0F2624),
-          border: Border.all(color: AppTheme.success.withOpacity(0.2)),
+          border: Border.all(color: AppTheme.success.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -275,8 +275,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -330,8 +330,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha: 0.04),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -361,9 +361,9 @@ class VaccinationHistoryScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.error.withOpacity(0.6),
-                          AppTheme.warning.withOpacity(0.6),
-                          AppTheme.success.withOpacity(0.6),
+                          AppTheme.error.withValues(alpha: 0.6),
+                          AppTheme.warning.withValues(alpha: 0.6),
+                          AppTheme.success.withValues(alpha: 0.6),
                         ],
                       ),
                     ),
@@ -413,7 +413,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: color.withOpacity(0.4),
+                                  color: color.withValues(alpha: 0.4),
                                   blurRadius: 6,
                                   spreadRadius: 1,
                                 ),
@@ -505,7 +505,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
             Expanded(
               child: Container(
                 height: 1,
-                color: AppTheme.success.withOpacity(0.15),
+                color: AppTheme.success.withValues(alpha: 0.15),
               ),
             ),
           ],
@@ -570,7 +570,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -606,7 +606,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                       '📄',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
@@ -677,7 +677,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withOpacity(0),
+            AppTheme.background.withValues(alpha: 0),
             AppTheme.background,
             AppTheme.background,
           ],
@@ -703,7 +703,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.success.withOpacity(0.2),
+                color: AppTheme.success.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),

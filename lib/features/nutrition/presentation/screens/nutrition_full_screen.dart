@@ -133,8 +133,8 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.white.withValues(alpha: 0.08),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
@@ -189,7 +189,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _nutritionColor.withOpacity(0.1),
+              color: _nutritionColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Text(
@@ -240,7 +240,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF261D15),
-          border: Border.all(color: _nutritionColor.withOpacity(0.2)),
+          border: Border.all(color: _nutritionColor.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -303,7 +303,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: const Color(0xFF0F1B22),
-            border: Border.all(color: Colors.white.withOpacity(0.04)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: prescription == null
@@ -415,9 +415,9 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(isActive ? 0.08 : 0.04),
+        color: Colors.white.withValues(alpha: isActive ? 0.08 : 0.04),
         border: Border.all(
-          color: isActive ? _nutritionColor.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+          color: isActive ? _nutritionColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -450,7 +450,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: AppTheme.success.withOpacity(0.15),
+                color: AppTheme.success.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -481,7 +481,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -564,8 +564,8 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -685,9 +685,9 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? _nutritionColor.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+          color: selected ? _nutritionColor.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
           border: Border.all(
-            color: selected ? _nutritionColor.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            color: selected ? _nutritionColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -748,7 +748,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                 Container(
                   height: 1,
                   width: 60,
-                  color: _nutritionColor.withOpacity(0.2),
+                  color: _nutritionColor.withValues(alpha: 0.2),
                 ),
               ],
             ),
@@ -782,7 +782,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       dayLabel = 'ONTEM';
     }
 
-    final author = f.fedBy != null ? (f.fedBy == 'unknown' ? 'sistema' : 'você') : 'você';
+    final author = f.fedBy == 'unknown' ? 'sistema' : 'você';
     final timeStr = DateFormat('HH:mm').format(f.fedAt);
 
     return Container(
@@ -791,7 +791,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
         border: Border.all(
-          color: isDivergent ? AppTheme.warning.withOpacity(0.2) : Colors.white.withOpacity(0.04),
+          color: isDivergent ? AppTheme.warning.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.04),
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -894,7 +894,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withOpacity(0),
+            AppTheme.background.withValues(alpha: 0),
             AppTheme.background,
             AppTheme.background,
           ],
@@ -921,7 +921,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: _nutritionColor.withOpacity(0.2),
+                color: _nutritionColor.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -995,7 +995,7 @@ class _NutritionBarChartPainter extends CustomPainter {
     // Linha pontilhada da prescrição
     final prescriptionY = size.height - (prescribedPerDay / ceiling) * size.height;
     final dashPaint = Paint()
-      ..color = Colors.white.withOpacity(0.25)
+      ..color = Colors.white.withValues(alpha: 0.25)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
@@ -1037,8 +1037,8 @@ class _NutritionBarChartPainter extends CustomPainter {
 
       final barPaint = Paint()
         ..color = d.isConform
-            ? nutritionColor.withOpacity(0.8)
-            : divergentColor.withOpacity(0.8)
+            ? nutritionColor.withValues(alpha: 0.8)
+            : divergentColor.withValues(alpha: 0.8)
         ..style = PaintingStyle.fill;
 
       final rect = RRect.fromRectAndRadius(

@@ -8,8 +8,6 @@ class _NewHealthLogForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

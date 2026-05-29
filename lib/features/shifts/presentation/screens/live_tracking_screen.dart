@@ -57,12 +57,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     }
   }
 
-  Future<void> _centerToUserLocation() async {
-    final currentLatLng = await _viewModel.getCurrentLatLng();
-    if (currentLatLng == null) return;
-    _mapController.move(currentLatLng, 16.0);
-  }
-
   Future<void> _startTracking() async {
     HapticFeedback.mediumImpact();
 

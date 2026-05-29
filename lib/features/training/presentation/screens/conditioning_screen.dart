@@ -218,7 +218,7 @@ class _ConditioningOverview extends StatelessWidget {
           const SizedBox(height: 12),
           // Dog status
           Consumer<TrainingViewModel>(
-            builder: (_, vm, __) {
+            builder: (_, vm, _) {
               final condSessions = vm.trainings
                   .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
                   .toList();
@@ -243,7 +243,7 @@ class _ConditioningOverview extends StatelessWidget {
 
   Widget _buildWeekSummary(BuildContext context) {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final now = DateTime.now();
         final weekStart = now.subtract(Duration(days: now.weekday - 1));
         final weekSessions = vm.trainings.where((t) {
@@ -459,7 +459,7 @@ class _ConditioningOverview extends StatelessWidget {
               ],
             ),
             Consumer<TrainingViewModel>(
-              builder: (_, vm, __) {
+              builder: (_, vm, _) {
                 final sessions = vm.trainings.where((t) =>
                     t.metadata?['exercise'] == ex.name &&
                     t.trainingType.toLowerCase().contains('condicionamento'));
@@ -561,7 +561,7 @@ class _ConditioningOverview extends StatelessWidget {
 
   Widget _buildRecentSessions(BuildContext context) {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final recent = vm.trainings
             .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
             .take(5)

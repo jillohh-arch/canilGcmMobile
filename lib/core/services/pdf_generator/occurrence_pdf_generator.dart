@@ -7,6 +7,8 @@ import 'package:printing/printing.dart' as printing;
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
+import 'package:canil_gcm/core/domain/occurrence_signature.dart';
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
 import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
@@ -14,6 +16,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
 import 'pdf_common_widgets.dart';
 
@@ -76,8 +79,9 @@ class OccurrencePdfGenerator {
     final displacementMapImage = await _buildDisplacementMapImage(locations);
 
     // Carregar aditamentos (se houver)
-    final amendments =
-        await AmendmentRepository().listByOccurrence(occurrence.id);
+    final amendments = await AmendmentRepository().listByOccurrence(
+      occurrence.id,
+    );
 
     final context = _OccurrencePdfContext(
       occurrence: occurrence,
@@ -102,49 +106,62 @@ class OccurrencePdfGenerator {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.only(
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-        ),
+        margin: const pw.EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
         header: (_) => _header(context, 0),
         footer: (_) => _footer(false),
         build: (_) => [
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
-              _pagePadding, 21, _pagePadding, 0,
+              _pagePadding,
+              21,
+              _pagePadding,
+              0,
             ),
             child: _buildDisplacementSection(context),
           ),
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
-              _pagePadding, 21, _pagePadding, 0,
+              _pagePadding,
+              21,
+              _pagePadding,
+              0,
             ),
             child: _buildTimelinePage(context),
           ),
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
-              _pagePadding, 21, _pagePadding, 0,
+              _pagePadding,
+              21,
+              _pagePadding,
+              0,
             ),
             child: _buildMediaPage(context),
           ),
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
-              _pagePadding, 21, _pagePadding, 0,
+              _pagePadding,
+              21,
+              _pagePadding,
+              0,
             ),
             child: _buildReportPage(context),
           ),
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
-              _pagePadding, 21, _pagePadding, 0,
+              _pagePadding,
+              21,
+              _pagePadding,
+              0,
             ),
             child: _buildValidationPage(context),
           ),
           if (context.amendments.isNotEmpty)
             pw.Padding(
               padding: const pw.EdgeInsets.fromLTRB(
-                _pagePadding, 21, _pagePadding, 0,
+                _pagePadding,
+                21,
+                _pagePadding,
+                0,
               ),
               child: _buildAmendmentsSection(context),
             ),
@@ -302,13 +319,15 @@ class OccurrencePdfGenerator {
     };
   }
 
-  String _statusLabel(Occurrence occurrence) =>
-      switch (occurrence.status.toMap()) {
-        'finalized' => 'Finalizado\n1 de 2 confirmações',
-        'finalizing' => 'Em finalização',
-        'canceled' => 'Cancelado',
-        _ => 'Em andamento',
-      };
+  String _statusLabel(Occurrence occurrence) => switch (occurrence.status) {
+    OccurrenceStatus.finalized =>
+      occurrence.team.length > 1 ? 'Finalizado\nco-assinado' : 'Finalizado',
+    OccurrenceStatus.finalizedWithPending => 'Finalizado\ncom pendência',
+    OccurrenceStatus.awaitingSignatures => 'Aguardando\nassinaturas',
+    OccurrenceStatus.finalizing => 'Em finalização',
+    OccurrenceStatus.canceled => 'Cancelado',
+    OccurrenceStatus.inProgress => 'Em andamento',
+  };
 
   int _boCount(Occurrence occurrence) =>
       occurrence.results.contains(OccurrenceResult.boCreated) ? 1 : 0;
@@ -1318,7 +1337,11 @@ class OccurrencePdfGenerator {
                   alignment: pw.Alignment.center,
                   child: pw.Text(
                     '${loc.index}',
-                    style: _bodyBold(f, size: 8, color: PdfColor.fromHex('#04181D')),
+                    style: _bodyBold(
+                      f,
+                      size: 8,
+                      color: PdfColor.fromHex('#04181D'),
+                    ),
                   ),
                 ),
                 pw.SizedBox(width: 8),
@@ -2268,42 +2291,6 @@ class OccurrencePdfGenerator {
       children: [
         _contextBar(ctx, status: true),
         pw.SizedBox(height: 14),
-        _sectionLabel('Validação e assinatura', f),
-        pw.SizedBox(height: 5),
-        pw.Text(
-          'Cada integrante confirma a participação com seu próprio login no Sistema Canil K9. A confirmação registra identidade, data e hora; não substitui assinatura digital com certificado.',
-          style: _body(f, size: 8, color: _inkFaint),
-        ),
-        pw.SizedBox(height: 10),
-        pw.Row(
-          children: [
-            pw.Expanded(child: _validationPerson(ctx, confirmed: true)),
-            pw.SizedBox(width: 12),
-            pw.Expanded(child: _supportPerson(ctx)),
-          ],
-        ),
-        pw.SizedBox(height: 10),
-        _roundedCard(
-          background: PdfColor.fromHex('F7F9FB'),
-          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: pw.Row(
-            children: [
-              pw.Container(
-                width: 4,
-                height: 16,
-                color: _cyan,
-                margin: const pw.EdgeInsets.only(right: 8),
-              ),
-              pw.Expanded(
-                child: pw.Text(
-                  'Legenda: O status verde indica confirmação eletrônica via senha pessoal. O status âmbar indica notificação pendente de confirmação pelo integrante.',
-                  style: _body(f, size: 7.8, color: _inkSoft),
-                ),
-              ),
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 14),
         _sectionLabel('Integridade do documento', f),
         pw.SizedBox(height: 10),
         pw.Row(
@@ -2314,6 +2301,10 @@ class OccurrencePdfGenerator {
             pw.Expanded(child: _verificationBox(ctx)),
           ],
         ),
+        if (_shouldShowTeamAndSignatures(ctx)) ...[
+          pw.SizedBox(height: 16),
+          _buildTeamAndSignaturesSection(ctx),
+        ],
         pw.SizedBox(height: 14),
         pw.Container(height: 1, color: _line),
         pw.SizedBox(height: 11),
@@ -2323,7 +2314,12 @@ class OccurrencePdfGenerator {
           children: [
             _docInfo('ID do documento', ctx.docId, f, mono: true),
             _docInfo('Tipo', 'Registro Operacional K9', f),
-            _docInfo('Versão', '1.0', f, mono: true),
+            _docInfo(
+              'Versão',
+              'hash v${ctx.occurrence.hashVersion ?? 2}',
+              f,
+              mono: true,
+            ),
             _docInfo('Criado em', _formatDateTime(createdAt), f, mono: true),
             _docInfo(
               'Sincronizado',
@@ -2338,139 +2334,279 @@ class OccurrencePdfGenerator {
     );
   }
 
-  pw.Widget _validationPerson(
-    _OccurrencePdfContext ctx, {
-    required bool confirmed,
-  }) {
+  bool _shouldShowTeamAndSignatures(_OccurrencePdfContext ctx) {
+    return ctx.occurrence.team.length > 1 ||
+        ctx.occurrence.signatures.isNotEmpty ||
+        ctx.occurrence.status == OccurrenceStatus.finalizedWithPending;
+  }
+
+  pw.Widget _buildTeamAndSignaturesSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
-    final when = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
+    final team = _orderedTeam(ctx);
+    final signedSignatures = _signedSignatures(ctx);
+    final pendingItems = _pendingSignatureItems(ctx, team);
+    final hasPending =
+        ctx.occurrence.status == OccurrenceStatus.finalizedWithPending &&
+        pendingItems.isNotEmpty;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('Equipe e assinaturas', f),
+        pw.SizedBox(height: 5),
+        pw.Text(
+          'Este registro foi co-assinado pelos integrantes abaixo, atestando presença no fato narrado.',
+          style: _body(f, size: 8, color: _inkFaint),
+        ),
+        pw.SizedBox(height: 10),
+        _teamTable(ctx, team),
+        pw.SizedBox(height: 10),
+        if (signedSignatures.isEmpty)
+          _emptyBox('Nenhuma co-assinatura registrada para esta ocorrência.', f)
+        else
+          _signatureTable(ctx, signedSignatures),
+        if (hasPending) ...[
+          pw.SizedBox(height: 10),
+          _pendingSignaturesBlock(ctx, pendingItems),
+        ],
+      ],
+    );
+  }
+
+  List<OccurrenceTeamMember> _orderedTeam(_OccurrencePdfContext ctx) {
+    final team = ctx.occurrence.team.isNotEmpty
+        ? List<OccurrenceTeamMember>.from(ctx.occurrence.team)
+        : <OccurrenceTeamMember>[
+            OccurrenceTeamMember(
+              handlerId: ctx.handlerRa,
+              displayName: ctx.handlerName,
+              role: TeamRole.titular,
+              addedAt: ctx.occurrence.startedAt,
+              addedBy: ctx.handlerRa,
+            ),
+          ];
+    team.sort((a, b) {
+      if (a.role != b.role) {
+        return a.role == TeamRole.titular ? -1 : 1;
+      }
+      return a.handlerId.compareTo(b.handlerId);
+    });
+    return team;
+  }
+
+  List<OccurrenceSignature> _signedSignatures(_OccurrencePdfContext ctx) {
+    final signatures = ctx.occurrence.signatures
+        .where((signature) => signature.status == SignatureStatus.signed)
+        .toList();
+    signatures.sort((a, b) => a.handlerId.compareTo(b.handlerId));
+    return signatures;
+  }
+
+  List<_PendingSignaturePdfItem> _pendingSignatureItems(
+    _OccurrencePdfContext ctx,
+    List<OccurrenceTeamMember> team,
+  ) {
+    final signaturesByHandler = {
+      for (final signature in ctx.occurrence.signatures)
+        signature.handlerId: signature,
+    };
+    final items = <_PendingSignaturePdfItem>[];
+    for (final member in team) {
+      if (member.role == TeamRole.titular) continue;
+      final signature = signaturesByHandler[member.handlerId];
+      if (signature?.status == SignatureStatus.signed) continue;
+      items.add(
+        _PendingSignaturePdfItem(
+          member: member,
+          signature: signature,
+          reason: _pendingSignatureReason(ctx),
+        ),
+      );
+    }
+    return items;
+  }
+
+  pw.Widget _teamTable(
+    _OccurrencePdfContext ctx,
+    List<OccurrenceTeamMember> team,
+  ) {
+    final f = ctx.fonts;
+    return pw.Table(
+      border: pw.TableBorder.all(color: _line),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(2.5),
+        1: pw.FlexColumnWidth(1.3),
+        2: pw.FlexColumnWidth(1.2),
+        3: pw.FlexColumnWidth(1.6),
+      },
+      children: [
+        _pdfTableHeader(ctx, ['Nome', 'Papel', 'RA', 'Incluído em']),
+        for (final member in team)
+          pw.TableRow(
+            children: [
+              _pdfTableCell(
+                _memberName(member, fallbackName: ctx.handlerName),
+                f,
+                bold: member.role == TeamRole.titular,
+              ),
+              _pdfTableCell(
+                member.role == TeamRole.titular ? 'Titular' : 'Integrante',
+                f,
+              ),
+              _pdfTableCell(member.handlerId, f, mono: true),
+              _pdfTableCell(_formatUtc(member.addedAt), f, mono: true),
+            ],
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _signatureTable(
+    _OccurrencePdfContext ctx,
+    List<OccurrenceSignature> signatures,
+  ) {
+    final f = ctx.fonts;
+    return pw.Table(
+      border: pw.TableBorder.all(color: _line),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(2.0),
+        1: pw.FlexColumnWidth(1.0),
+        2: pw.FlexColumnWidth(1.8),
+        3: pw.FlexColumnWidth(1.1),
+        4: pw.FlexColumnWidth(2.4),
+      },
+      children: [
+        _pdfTableHeader(ctx, [
+          'Nome',
+          'RA',
+          'Data/hora UTC',
+          'Método',
+          'Hash da assinatura',
+        ]),
+        for (final signature in signatures)
+          pw.TableRow(
+            children: [
+              _pdfTableCell(_signatureMemberName(ctx, signature), f),
+              _pdfTableCell(signature.handlerId, f, mono: true),
+              _pdfTableCell(_formatUtc(signature.signedAt), f, mono: true),
+              _pdfTableCell(
+                _signatureMethodLabel(signature.signatureMethod),
+                f,
+              ),
+              _pdfTableCell(signature.signatureHash, f, mono: true, size: 6.2),
+            ],
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _pendingSignaturesBlock(
+    _OccurrencePdfContext ctx,
+    List<_PendingSignaturePdfItem> items,
+  ) {
+    final f = ctx.fonts;
     return _roundedCard(
-      padding: const pw.EdgeInsets.all(13),
-      radius: 9,
+      background: _amberBg,
+      border: _amberLine,
+      padding: const pw.EdgeInsets.all(11),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Row(
-            children: [
-              _avatar('FOTO\nGCM', f, color: _green),
-              pw.SizedBox(width: 10),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    _tinyLabel(
-                      'Condutor responsavel - autor',
-                      f,
-                      color: _green,
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(ctx.handlerName, style: _bodyBold(f, size: 12.5)),
-                    pw.Text(
-                      'RA: ${ctx.handlerRa} - Funcao: Condutor K9\nUnidade: GCM Limeira - Canil',
-                      style: _body(f, size: 7.8, color: _inkSoft),
-                    ),
-                  ],
-                ),
+          pw.Text(
+            'PENDÊNCIAS DE ASSINATURA',
+            style: _bodyBold(f, size: 8.7, color: _amber),
+          ),
+          pw.SizedBox(height: 6),
+          for (final item in items) ...[
+            pw.Text(
+              '${_memberName(item.member)} (RA ${item.member.handlerId})',
+              style: _bodyBold(f, size: 8, color: _ink),
+            ),
+            pw.Text(item.reason, style: _body(f, size: 7.6, color: _amber)),
+            if (item.signature?.reason?.trim().isNotEmpty == true)
+              pw.Text(
+                'Registro: ${item.signature!.reason}',
+                style: _body(f, size: 7.2, color: _inkSoft),
               ),
-            ],
-          ),
-          pw.SizedBox(height: 11),
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: pw.BoxDecoration(
-              color: _greenBg,
-              border: pw.Border.all(color: _greenLine),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
-            ),
-            child: pw.Row(
-              children: [
-                pw.Text('OK', style: _bodyBold(f, size: 8, color: _green)),
-                pw.SizedBox(width: 8),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'CONFIRMADO NO APP',
-                      style: _bodyBold(f, size: 8.4, color: _green),
-                    ),
-                    pw.Text(
-                      '${_formatDateTime(when)} - login autenticado',
-                      style: _mono(f, size: 7.2, color: _inkSoft),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+            pw.SizedBox(height: 5),
+          ],
         ],
       ),
     );
   }
 
-  pw.Widget _supportPerson(_OccurrencePdfContext ctx) {
-    final f = ctx.fonts;
-    final when = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
-    return _roundedCard(
-      padding: const pw.EdgeInsets.all(13),
-      radius: 9,
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            children: [
-              _avatar('FOTO\nGCM', f, color: _amber),
-              pw.SizedBox(width: 10),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    _tinyLabel(
-                      'Testemunha / apoio - presente',
-                      f,
-                      color: _amber,
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text('GCM Silva', style: _bodyBold(f, size: 12.5)),
-                    pw.Text(
-                      'RA: 704418 - Função: Apoio / Testemunha\nUnidade: GCM Limeira - Canil',
-                      style: _body(f, size: 7.8, color: _inkSoft),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 11),
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: pw.BoxDecoration(
-              color: _amberBg,
-              border: pw.Border.all(color: _amberLine),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
-            ),
-            child: pw.Row(
-              children: [
-                pw.Text('!', style: _bodyBold(f, size: 8, color: _amber)),
-                pw.SizedBox(width: 8),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'AGUARDANDO CONFIRMAÇÃO',
-                      style: _bodyBold(f, size: 8.1, color: _amber),
-                    ),
-                    pw.Text(
-                      'Notificado em ${_formatDateTime(when)} via app',
-                      style: _mono(f, size: 7.2, color: _inkSoft),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+  pw.TableRow _pdfTableHeader(_OccurrencePdfContext ctx, List<String> labels) {
+    return pw.TableRow(
+      decoration: pw.BoxDecoration(color: PdfColor.fromHex('F7F9FB')),
+      children: labels
+          .map(
+            (label) =>
+                _pdfTableCell(label, ctx.fonts, bold: true, color: _inkSoft),
+          )
+          .toList(),
+    );
+  }
+
+  pw.Widget _pdfTableCell(
+    String text,
+    PdfFonts fonts, {
+    bool bold = false,
+    bool mono = false,
+    double size = 7.4,
+    PdfColor? color,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          font: mono ? fonts.monoRegular : (bold ? fonts.bold : fonts.regular),
+          fontSize: size,
+          color: color ?? _ink,
+          lineSpacing: 1.4,
+        ),
       ),
     );
+  }
+
+  String _memberName(OccurrenceTeamMember member, {String? fallbackName}) {
+    final displayName = member.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    if (member.role == TeamRole.titular &&
+        fallbackName != null &&
+        fallbackName.trim().isNotEmpty) {
+      return fallbackName.trim();
+    }
+    return 'Condutor ${member.handlerId}';
+  }
+
+  String _signatureMemberName(
+    _OccurrencePdfContext ctx,
+    OccurrenceSignature signature,
+  ) {
+    for (final member in ctx.occurrence.team) {
+      if (member.handlerId == signature.handlerId) {
+        return _memberName(member);
+      }
+    }
+    return 'Condutor ${signature.handlerId}';
+  }
+
+  String _signatureMethodLabel(SignatureMethod method) {
+    return switch (method) {
+      SignatureMethod.biometric => 'Biometria',
+      SignatureMethod.password => 'Senha',
+    };
+  }
+
+  String _pendingSignatureReason(_OccurrencePdfContext ctx) {
+    return 'Convidado em ${_formatUtc(ctx.occurrence.signatureRequestAt)}; '
+        'não assinou no prazo de ${_formatUtc(ctx.occurrence.signatureDeadline)}.';
+  }
+
+  String _formatUtc(DateTime? value) {
+    if (value == null) return 'data não registrada';
+    return '${DateFormat('dd/MM/yyyy HH:mm').format(value.toUtc())} UTC';
   }
 
   pw.Widget _hashBox(_OccurrencePdfContext ctx) {
@@ -2845,7 +2981,8 @@ class OccurrencePdfGenerator {
           pw.Center(
             child: pw.BarcodeWidget(
               barcode: pw.Barcode.qrCode(),
-              data: '${_verificationBaseUrl}/${amendment.occurrenceId}'
+              data:
+                  '$_verificationBaseUrl/${amendment.occurrenceId}'
                   '?a=${amendment.id}&h=${amendment.integrityHash.substring(0, 16)}',
               width: 60,
               height: 60,
@@ -2998,6 +3135,18 @@ class _PdfMediaItem {
     required this.url,
     required this.image,
     required this.event,
+  });
+}
+
+class _PendingSignaturePdfItem {
+  final OccurrenceTeamMember member;
+  final OccurrenceSignature? signature;
+  final String reason;
+
+  const _PendingSignaturePdfItem({
+    required this.member,
+    required this.signature,
+    required this.reason,
   });
 }
 

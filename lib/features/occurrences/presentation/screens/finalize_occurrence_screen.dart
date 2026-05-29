@@ -17,6 +17,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 class FinalizeOccurrenceScreen extends StatefulWidget {
@@ -335,34 +336,30 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
     // Extrair photo_hashes de cada evento (ordem estável por sha256)
     final eventPayload =
-        vm.events
-            .map(
-              (event) {
-                // Coletar hashes das fotos do evento a partir do photoMetadata
-                final eventPhotoHashes = event.photoMetadata
-                    .where((m) => m['sha256'] != null)
-                    .map((m) => m['sha256'] as String)
-                    .toList()
-                  ..sort();
+        vm.events.map((event) {
+          // Coletar hashes das fotos do evento a partir do photoMetadata
+          final eventPhotoHashes =
+              event.photoMetadata
+                  .where((m) => m['sha256'] != null)
+                  .map((m) => m['sha256'] as String)
+                  .toList()
+                ..sort();
 
-                return {
-                  'id': event.id,
-                  'category': event.category.toMap(),
-                  'timestamp': event.timestamp.toIso8601String(),
-                  'title': event.title,
-                  'description': event.description,
-                  'photo_urls': event.photoUrls,
-                  'photo_hashes': eventPhotoHashes,
-                  'gps_lat': event.gpsLat,
-                  'gps_lng': event.gpsLng,
-                };
-              },
-            )
-            .toList()
-          ..sort(
-            (a, b) =>
-                (a['timestamp'] as String).compareTo(b['timestamp'] as String),
-          );
+          return {
+            'id': event.id,
+            'category': event.category.toMap(),
+            'timestamp': event.timestamp.toIso8601String(),
+            'title': event.title,
+            'description': event.description,
+            'photo_urls': event.photoUrls,
+            'photo_hashes': eventPhotoHashes,
+            'gps_lat': event.gpsLat,
+            'gps_lng': event.gpsLng,
+          };
+        }).toList()..sort(
+          (a, b) =>
+              (a['timestamp'] as String).compareTo(b['timestamp'] as String),
+        );
     final resultPayload = results.map((r) => r.toMap()).toList()..sort();
 
     final payload = {
@@ -400,6 +397,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   // ─── Finalize ───────────────────────────────────────────────────────
 
+  bool get _hasCoSigners {
+    final occurrence =
+        _occurrence ?? context.read<OccurrenceViewModel>().openOccurrence;
+    return occurrence?.team.any((member) => member.role.name != 'titular') ??
+        false;
+  }
+
   Future<void> _finalize() async {
     _draftDebounce?.cancel();
     final missing = _missingDetailMessage();
@@ -427,6 +431,43 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final photoUploadResults = await _uploadFinalizationPhotos();
       final photoUrls = photoUploadResults.map((r) => r.url).toList();
       final photoHashes = photoUploadResults.map((r) => r.sha256Hash).toList();
+      _occurrence ??= await vm.getById(widget.occurrenceId);
+
+      if (_hasCoSigners) {
+        await vm
+            .closeForSignatures(
+              id: widget.occurrenceId,
+              finalReport: report,
+              results: results,
+              details: details,
+              finalizationPhotos: photoUrls,
+              finalizationPhotoHashes: photoHashes,
+            )
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                debugPrint('[Finalize] TIMEOUT após 30s ao fechar assinatura');
+                throw TimeoutException(
+                  'Tempo limite excedido ao fechar para assinaturas. Verifique sua conexão.',
+                );
+              },
+            );
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) =>
+                  OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
+            ),
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ocorrência fechada para assinaturas.'),
+            ),
+          );
+        }
+        return;
+      }
 
       debugPrint('[Finalize] Construindo hash... events=${vm.events.length}');
 
@@ -439,21 +480,25 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
       debugPrint('[Finalize] Hash construído. Chamando finalizeOccurrence...');
 
-      await vm.finalizeOccurrence(
-        id: widget.occurrenceId,
-        integrityHash: hash,
-        finalReport: report,
-        results: results,
-        details: details,
-        finalizationPhotos: photoUrls,
-        finalizationPhotoHashes: photoHashes,
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          debugPrint('[Finalize] TIMEOUT após 30s');
-          throw TimeoutException('Tempo limite excedido ao finalizar. Verifique sua conexão.');
-        },
-      );
+      await vm
+          .finalizeOccurrence(
+            id: widget.occurrenceId,
+            integrityHash: hash,
+            finalReport: report,
+            results: results,
+            details: details,
+            finalizationPhotos: photoUrls,
+            finalizationPhotoHashes: photoHashes,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              debugPrint('[Finalize] TIMEOUT após 30s');
+              throw TimeoutException(
+                'Tempo limite excedido ao finalizar. Verifique sua conexão.',
+              );
+            },
+          );
 
       debugPrint('[Finalize] Finalização concluída com sucesso!');
 
@@ -1140,8 +1185,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.photo_camera_outlined,
-                  size: 16, color: AppTheme.primary),
+              Icon(
+                Icons.photo_camera_outlined,
+                size: 16,
+                color: AppTheme.primary,
+              ),
               const SizedBox(width: 8),
               Text(
                 'FOTOS DA FINALIZAÇÃO',
@@ -1207,12 +1255,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            file,
-            width: 64,
-            height: 64,
-            fit: BoxFit.cover,
-          ),
+          child: Image.file(file, width: 64, height: 64, fit: BoxFit.cover),
         ),
         Positioned(
           top: 2,
@@ -1297,9 +1340,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       setState(() => _finalizationPhotos.add(File(picked.path)));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao capturar foto: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao capturar foto: $e')));
       }
     }
   }

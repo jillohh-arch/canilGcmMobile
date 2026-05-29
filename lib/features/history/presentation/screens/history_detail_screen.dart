@@ -313,8 +313,8 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -366,8 +366,8 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -413,7 +413,7 @@ class HistoryDetailScaffold extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -453,8 +453,8 @@ class HistoryDetailScaffold extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: badgeColor.withOpacity(0.12),
-                  border: Border.all(color: badgeColor.withOpacity(0.4)),
+                  color: badgeColor.withValues(alpha: 0.12),
+                  border: Border.all(color: badgeColor.withValues(alpha: 0.4)),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -482,7 +482,7 @@ class HistoryDetailScaffold extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withOpacity(0.06)),
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -493,7 +493,7 @@ class HistoryDetailScaffold extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withOpacity(0.06)),
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -2115,7 +2115,7 @@ class _TrailLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = _cyan.withOpacity(0.85)
+      ..color = _cyan.withValues(alpha: 0.85)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
@@ -2892,7 +2892,7 @@ Widget _buildConfigGrid(Map<String, String> values) {
 
 class _SectionLabel extends StatelessWidget {
   final String text;
-  const _SectionLabel(this.text, {super.key});
+  const _SectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) {
@@ -2917,7 +2917,6 @@ class _MenuRow extends StatelessWidget {
   final VoidCallback onTap;
 
   const _MenuRow({
-    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -2945,7 +2944,7 @@ class _CtaBar extends StatelessWidget {
   final VoidCallback onPdfTap;
   final VoidCallback onShareTap;
 
-  const _CtaBar({super.key, required this.onPdfTap, required this.onShareTap});
+  const _CtaBar({required this.onPdfTap, required this.onShareTap});
 
   @override
   Widget build(BuildContext context) {
@@ -3000,44 +2999,6 @@ class _CtaBar extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HeaderIconBtn extends StatelessWidget {
-  final String text;
-  final double size;
-  final VoidCallback onTap;
-
-  const _HeaderIconBtn({
-    super.key,
-    required this.text,
-    required this.size,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 34,
-        height: 34,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          text,
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: size,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
       ),
     );
   }

@@ -11,7 +11,7 @@ class Amendment {
   final String occurrenceId;
   final String reason;
   final Map<String, AmendmentCorrection> corrections;
-  final String createdBy; // UID do autor
+  final String createdBy; // RA/handlerId canônico do autor
   final String createdByName;
   final String createdByRa;
   final DateTime createdAt;
@@ -72,7 +72,7 @@ class Amendment {
 
   /// Calcula o hash de integridade do aditamento.
   /// Baseado no conteúdo determinístico: occurrence_id, reason, corrections,
-  /// created_by, created_at, sequence_number.
+  /// created_by (RA/handlerId), created_at, sequence_number.
   static String computeHash({
     required String occurrenceId,
     required String reason,

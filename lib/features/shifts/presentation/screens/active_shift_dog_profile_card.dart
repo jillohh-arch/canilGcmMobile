@@ -14,7 +14,7 @@ class _DogSummarySection extends StatelessWidget {
     final metaParts = <String>[
       if (dog.breed.isNotEmpty) dog.breed,
       '${dog.age} anos',
-      if (weightStr != null) weightStr,
+      ?weightStr,
     ];
 
     return Column(
@@ -61,8 +61,8 @@ class _DogSummarySection extends StatelessWidget {
                                 width: 48,
                                 height: 48,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => _dogFallback(),
-                                errorWidget: (_, __, ___) => _dogFallback(),
+                                placeholder: (_, _) => _dogFallback(),
+                                errorWidget: (_, _, _) => _dogFallback(),
                               )
                             : _dogFallback(),
                       ),

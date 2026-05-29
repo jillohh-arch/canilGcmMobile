@@ -33,7 +33,6 @@ part 'active_shift_quick_actions.dart';
 part 'active_shift_alerts_section.dart';
 part 'active_shift_today_section.dart';
 part 'active_shift_dog_profile_card.dart';
-part 'active_shift_conditions_card.dart';
 part 'active_shift_cockpit.dart';
 part 'active_shift_readiness.dart';
 part 'active_shift_dog_switcher.dart';

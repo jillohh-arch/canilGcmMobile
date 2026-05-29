@@ -11,22 +11,18 @@ extension _HistoryDataLoader on _HistoryScreenState {
     debugPrint('[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)');
 
     // Buscar treinos
-    Provider.of<TrainingViewModel>(
-      context,
-      listen: false,
-    ).fetchTrainingsForDog(dogId).then((_) {
-      final count = Provider.of<TrainingViewModel>(context, listen: false).trainings.length;
+    final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
+    trainingVM.fetchTrainingsForDog(dogId).then((_) {
+      final count = trainingVM.trainings.length;
       debugPrint('[History] Treinos carregados: $count');
     }).catchError((e) {
       debugPrint('[History] ERRO ao carregar treinos: $e');
     });
 
     // Buscar registros de saúde
-    Provider.of<HealthViewModel>(
-      context,
-      listen: false,
-    ).fetchHealthLogsForDog(dogId).then((_) {
-      final count = Provider.of<HealthViewModel>(context, listen: false).healthLogs.length;
+    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
+    healthVM.fetchHealthLogsForDog(dogId).then((_) {
+      final count = healthVM.healthLogs.length;
       debugPrint('[History] Saúde carregados: $count');
     }).catchError((e) {
       debugPrint('[History] ERRO ao carregar saúde: $e');

@@ -233,11 +233,11 @@ class AuditService {
       'by_ra': actor['ra'],
       'performed_by': actor['uid'],
       'performed_at': timestamp.toDate().toIso8601String(),
-      if (fieldName != null) 'field_name': fieldName,
-      if (fieldName != null) 'field': fieldName,
-      if (oldValue != null) 'old_value': oldValue,
-      if (newValue != null) 'new_value': newValue,
-      if (reason != null) 'reason': reason,
+      'field_name': ?fieldName,
+      'field': ?fieldName,
+      'old_value': ?oldValue,
+      'new_value': ?newValue,
+      'reason': ?reason,
     };
   }
 

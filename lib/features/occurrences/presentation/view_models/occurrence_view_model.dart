@@ -3,11 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:canil_gcm/core/domain/notification_item.dart';
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
+import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
@@ -18,12 +23,15 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 class OccurrenceViewModel extends ChangeNotifier {
   final OccurrenceRepository _repository;
   final OccurrenceEventRepository _eventRepository;
+  final SignatureRepository _signatureRepository;
 
   OccurrenceViewModel({
     required OccurrenceRepository repository,
     required OccurrenceEventRepository eventRepository,
+    SignatureRepository? signatureRepository,
   }) : _repository = repository,
-       _eventRepository = eventRepository;
+       _eventRepository = eventRepository,
+       _signatureRepository = signatureRepository ?? SignatureRepository();
 
   // ─── Estado ─────────────────────────────────────────────────────────
 
@@ -121,6 +129,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     required String shiftId,
     required String dogId,
     required String primaryHandlerId,
+    String? primaryHandlerRa,
     required String typeCode,
     required String typeName,
     String? locationAddress,
@@ -137,10 +146,29 @@ class OccurrenceViewModel extends ChangeNotifier {
     try {
       final now = DateTime.now();
       final resolvedStartedAt = startedAt ?? now;
+      final titularRa = primaryHandlerRa?.trim();
+      final titularTeam = titularRa == null || titularRa.isEmpty
+          ? <OccurrenceTeamMember>[]
+          : [
+              OccurrenceTeamMember(
+                handlerId: titularRa,
+                authUid: primaryHandlerId.isEmpty ? null : primaryHandlerId,
+                handlerEmail: HandlerIdentityService.emailFromRa(titularRa),
+                role: TeamRole.titular,
+                addedAt: now,
+                addedBy: titularRa,
+                addedByUid: primaryHandlerId.isEmpty ? null : primaryHandlerId,
+              ),
+            ];
       final occurrence = Occurrence(
         id: id,
         shiftId: shiftId,
         primaryHandlerId: primaryHandlerId,
+        primaryHandlerRa: titularRa,
+        createdBy: {
+          if (titularRa != null && titularRa.isNotEmpty) 'ra': titularRa,
+          if (primaryHandlerId.isNotEmpty) 'uid': primaryHandlerId,
+        },
         dogId: dogId,
         typeCode: typeCode,
         typeName: typeName,
@@ -153,6 +181,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         updatedAt: now,
         status: OccurrenceStatus.inProgress,
         initialObservation: initialObservation,
+        team: titularTeam,
       );
 
       final created = await _repository.create(occurrence);
@@ -188,11 +217,8 @@ class OccurrenceViewModel extends ChangeNotifier {
     double? gpsLng,
   }) async {
     try {
-      final parts = <String>['Binômio em local'];
-      if (gpsLat != null && gpsLng != null) {
-        parts.add('GPS capturado');
-      }
-      parts.add('Aguardando próxima ação');
+      final hasGps = gpsLat != null && gpsLng != null;
+      final address = locationAddress ?? 'não informado';
 
       final entry = AuditService.buildInlineEntry(action: 'created');
       entry['automatic'] = true;
@@ -202,10 +228,12 @@ class OccurrenceViewModel extends ChangeNotifier {
         occurrenceId: occurrenceId,
         category: OccurrenceEventCategory.opening,
         timestamp: startedAt,
-        title: 'Registro de ocorrência aberto',
-        description: parts.join(' · '),
+        title: 'Início da ocorrência',
+        description: 'Ocorrência iniciada no endereço: $address.',
         gpsLat: gpsLat,
         gpsLng: gpsLng,
+        placeLabel: locationAddress,
+        locationSource: hasGps ? 'gps_atual' : null,
         createdAt: startedAt,
         updatedAt: startedAt,
         auditTrail: [entry],
@@ -286,6 +314,65 @@ class OccurrenceViewModel extends ChangeNotifier {
   }
 
   // ─── Cancelamento ──────────────────────────────────────────────────
+
+  Future<void> closeForSignatures({
+    required String id,
+    required String finalReport,
+    required List<OccurrenceResult> results,
+    Map<String, dynamic>? details,
+    List<String> finalizationPhotos = const [],
+    List<String> finalizationPhotoHashes = const [],
+    Duration signatureDeadline = const Duration(hours: 48),
+  }) async {
+    if (_isLoading) return;
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final occurrence = await _repository.getById(id);
+      if (occurrence == null) {
+        throw StateError('Ocorrencia nao encontrada.');
+      }
+
+      await _repository.closeForSignatures(
+        occurrenceId: id,
+        signatureDeadline: signatureDeadline,
+        finalReport: finalReport,
+        results: results,
+        details: details,
+        finalizationPhotos: finalizationPhotos,
+        finalizationPhotoHashes: finalizationPhotoHashes,
+      );
+
+      final notificationService = NotificationService();
+      final coSigners = occurrence.team.where(
+        (member) => member.role != TeamRole.titular,
+      );
+      for (final member in coSigners) {
+        await notificationService.createNotification(
+          userId: member.handlerId,
+          type: NotificationType.signatureRequested,
+          occurrenceId: occurrence.id,
+          occurrenceTitle: occurrence.typeName,
+          additionalData: member.handlerId,
+        );
+      }
+
+      _openSub?.cancel();
+      _openSub = null;
+      _openOccurrence = null;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Erro ao fechar ocorrencia para assinaturas: $e';
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> cancelOccurrence(String id, String userId, String reason) async {
     try {
@@ -391,9 +478,13 @@ class OccurrenceViewModel extends ChangeNotifier {
     required String handlerName,
     required String handlerRa,
   }) async {
+    final signatures = occurrence.signatures.isNotEmpty
+        ? occurrence.signatures
+        : await _signatureRepository.getSignatures(occurrence.id);
+    final enrichedOccurrence = occurrence.copyWith(signatures: signatures);
     final generator = OccurrencePdfGenerator();
     return generator.generate(
-      occurrence: occurrence,
+      occurrence: enrichedOccurrence,
       events: events,
       dog: dog,
       handlerName: handlerName,

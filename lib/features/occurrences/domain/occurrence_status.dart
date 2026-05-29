@@ -1,13 +1,17 @@
 enum OccurrenceStatus {
   inProgress,
   finalizing,
+  awaitingSignatures,
   finalized,
+  finalizedWithPending,
   canceled;
 
   String toMap() => switch (this) {
     inProgress => 'in_progress',
     finalizing => 'finalizing',
+    awaitingSignatures => 'awaiting_signatures',
     finalized => 'finalized',
+    finalizedWithPending => 'finalized_with_pending',
     canceled => 'canceled',
   };
 
@@ -25,6 +29,15 @@ enum OccurrenceStatus {
     if (normalized == 'finalizing' || normalized.contains('finalizando')) {
       return OccurrenceStatus.finalizing;
     }
+    if (normalized == 'awaiting_signatures' ||
+        normalized.contains('aguardando assinatura')) {
+      return OccurrenceStatus.awaitingSignatures;
+    }
+    if (normalized == 'finalized_with_pending' ||
+        normalized.contains('finalizado com pendencia') ||
+        normalized.contains('finalizado com pendência')) {
+      return OccurrenceStatus.finalizedWithPending;
+    }
     if (normalized == 'finalized' ||
         normalized.contains('finaliz') ||
         normalized.contains('conclu')) {
@@ -39,5 +52,6 @@ enum OccurrenceStatus {
   }
 
   bool get isOpen => this == inProgress || this == finalizing;
-  bool get isClosed => this == finalized || this == canceled;
+  bool get isClosed =>
+      this == finalized || this == finalizedWithPending || this == canceled;
 }

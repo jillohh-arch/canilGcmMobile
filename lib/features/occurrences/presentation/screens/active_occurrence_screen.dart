@@ -14,6 +14,7 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_context_card.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_finalize_cta.dart';
@@ -24,6 +25,7 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 import 'edit_event_screen.dart';
 import 'edit_event_location_screen.dart';
 import 'finalize_occurrence_screen.dart';
+import 'occurrence_team_screen.dart';
 
 class ActiveOccurrenceScreen extends StatefulWidget {
   final String occurrenceId;
@@ -61,9 +63,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     _durationPersistTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_elapsed.inSeconds > 0) {
         context.read<OccurrenceViewModel>().updateDurationSoFar(
-              widget.occurrenceId,
-              _elapsed.inSeconds,
-            );
+          widget.occurrenceId,
+          _elapsed.inSeconds,
+        );
       }
     });
   }
@@ -255,6 +257,16 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     if (result == 'finalized' && mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  void _openTeamManagement() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
+      ),
+    );
+    if (!mounted) return;
+    await _loadOccurrence();
   }
 
   String _translateError(String raw) {
@@ -595,6 +607,16 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     );
   }
 
+  void _showLockedForSignaturesMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Ocorrência fechada para assinaturas. Use a tela de equipe.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<OccurrenceViewModel>();
@@ -620,6 +642,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     final handlerImageUrl = handlerUser?.photoUrl ?? authVM.user?.photoURL;
 
     final typeName = occ?.typeName ?? 'Ocorrência';
+    final isAwaitingSignatures =
+        occ?.status == OccurrenceStatus.awaitingSignatures;
     final locationAddress = occ?.locationAddress ?? '';
     final startedAtLabel = _startedAt != null
         ? '${_startedAt!.hour.toString().padLeft(2, '0')}:${_startedAt!.minute.toString().padLeft(2, '0')}'
@@ -640,9 +664,15 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     durationLabel: _durationLabel,
                     eventCount: vm.events.length,
                     onBack: () => Navigator.of(context).pop(),
-                    onEditData: () => _showEditOccurrenceDialog(vm, occ),
-                    onEditNature: () => _showEditNatureSheet(vm, occ),
-                    onDiscard: () => _showDiscardDialog(vm),
+                    onEditData: isAwaitingSignatures
+                        ? null
+                        : () => _showEditOccurrenceDialog(vm, occ),
+                    onEditNature: isAwaitingSignatures
+                        ? null
+                        : () => _showEditNatureSheet(vm, occ),
+                    onDiscard: isAwaitingSignatures
+                        ? null
+                        : () => _showDiscardDialog(vm),
                   ),
                   if (vm.error != null)
                     _SyncErrorBanner(
@@ -690,18 +720,26 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     startedAtLabel: startedAtLabel,
                     durationLabel: _durationLabel,
                     eventCount: vm.events.length,
+                    team: occ?.team ?? const [],
+                    teamSizeMax: occ?.teamSizeMax ?? 3,
+                    onTeamTap: occ == null ? null : _openTeamManagement,
                   ),
                   const SizedBox(height: 24),
-                  ActiveOccurrenceQuickGrid(
-                    onQuickEvent: _addQuickEvent,
-                    onOtherEvent: _openOtherEventSheet,
-                    isLoading: _isAddingEvent,
-                  ),
+                  if (isAwaitingSignatures)
+                    _AwaitingSignaturesNotice(onOpenTeam: _openTeamManagement)
+                  else
+                    ActiveOccurrenceQuickGrid(
+                      onQuickEvent: _addQuickEvent,
+                      onOtherEvent: _openOtherEventSheet,
+                      isLoading: _isAddingEvent,
+                    ),
                   const SizedBox(height: 24),
                   ActiveOccurrenceTimeline(
                     events: vm.events,
-                    onEventTap: _onEventTap,
-                    onLocationTap: _onLocationTap,
+                    onEventTap: isAwaitingSignatures
+                        ? (_) => _showLockedForSignaturesMessage()
+                        : _onEventTap,
+                    onLocationTap: isAwaitingSignatures ? null : _onLocationTap,
                     handlerName: handlerName,
                     locationLabel: locationAddress.isNotEmpty
                         ? locationAddress
@@ -723,7 +761,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: ActiveOccurrenceFinalizeCta(onFinalize: _onFinalize),
+              child: isAwaitingSignatures
+                  ? const SizedBox.shrink()
+                  : ActiveOccurrenceFinalizeCta(onFinalize: _onFinalize),
             ),
           ],
         ),
@@ -824,62 +864,69 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              color: Colors.white.withAlpha(180),
-              size: 22,
-            ),
-            color: const Color(0xFF0F2027),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            onSelected: (value) {
-              if (value == 'edit') {
-                onEditData?.call();
-              } else if (value == 'discard') {
-                onDiscard?.call();
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.edit_outlined,
-                      color: AppTheme.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Editar dados',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+          if (onEditData != null || onDiscard != null)
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color: Colors.white.withAlpha(180),
+                size: 22,
               ),
-              PopupMenuItem(
-                value: 'discard',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Descartar ocorrência',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.error,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+              color: const Color(0xFF0F2027),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  onEditData?.call();
+                } else if (value == 'discard') {
+                  onDiscard?.call();
+                }
+              },
+              itemBuilder: (_) => [
+                if (onEditData != null)
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          color: AppTheme.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Editar dados',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (onDiscard != null)
+                  PopupMenuItem(
+                    value: 'discard',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: AppTheme.error,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Descartar ocorrência',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.error,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     );
@@ -929,6 +976,68 @@ class _SyncErrorBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AwaitingSignaturesNotice extends StatelessWidget {
+  final VoidCallback onOpenTeam;
+
+  const _AwaitingSignaturesNotice({required this.onOpenTeam});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(70)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lock_clock_rounded,
+                color: AppTheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Aguardando assinaturas',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'O registro está travado para edição até a conclusão das assinaturas.',
+            style: GoogleFonts.inter(
+              color: Colors.white.withAlpha(170),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: onOpenTeam,
+              icon: const Icon(Icons.groups_rounded, size: 18),
+              label: const Text('Ver equipe'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1008,10 +1117,12 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
             style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Buscar natureza...',
-              hintStyle:
-                  GoogleFonts.inter(color: Colors.white38, fontSize: 14),
-              prefixIcon: const Icon(Icons.search,
-                  color: Color(0xFF4DD0E1), size: 18),
+              hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: Color(0xFF4DD0E1),
+                size: 18,
+              ),
               filled: true,
               fillColor: Colors.white.withAlpha(8),
               border: OutlineInputBorder(
@@ -1026,8 +1137,10 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -1042,7 +1155,9 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
                   onTap: () => widget.onSelected(nature),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 11),
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
                     margin: const EdgeInsets.only(bottom: 4),
                     decoration: BoxDecoration(
                       color: isCurrent

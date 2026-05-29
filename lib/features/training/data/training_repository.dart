@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
 
 class TrainingRepository {
@@ -56,9 +57,10 @@ class TrainingRepository {
     String collection,
     String dogId,
   ) {
-    return _firestore
-        .collection(collection)
-        .where('dogId', isEqualTo: dogId)
+    final query = SoftDeletable.activeOnly(
+      _firestore.collection(collection).where('dogId', isEqualTo: dogId),
+    );
+    return query
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -70,10 +72,10 @@ class TrainingRepository {
   }
 
   Stream<List<TrainingHubSession>> _watchDogTrainingSessions(String dogId) {
-    return _firestore
-        .collection('dogs')
-        .doc(dogId)
-        .collection('training_sessions')
+    final query = SoftDeletable.activeOnly(
+      _firestore.collection('dogs').doc(dogId).collection('training_sessions'),
+    );
+    return query
         .snapshots()
         .map(
           (snapshot) => snapshot.docs

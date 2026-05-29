@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 
 class ActiveOccurrenceContextCard extends StatelessWidget {
@@ -13,6 +14,9 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
   final String startedAtLabel;
   final String durationLabel;
   final int eventCount;
+  final List<OccurrenceTeamMember> team;
+  final int teamSizeMax;
+  final VoidCallback? onTeamTap;
 
   const ActiveOccurrenceContextCard({
     super.key,
@@ -25,6 +29,9 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
     required this.startedAtLabel,
     required this.durationLabel,
     required this.eventCount,
+    this.team = const [],
+    this.teamSizeMax = 3,
+    this.onTeamTap,
   });
 
   @override
@@ -94,24 +101,19 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Info rows
-          _InfoRow(label: 'Local:', value: locationAddress.isNotEmpty ? locationAddress : '—'),
+          _InfoRow(
+            label: 'Local:',
+            value: locationAddress.isNotEmpty ? locationAddress : '—',
+          ),
           const SizedBox(height: 4),
           _InfoRow(
             label: 'Equipe:',
             value: '',
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withAlpha(20),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '+ Definir equipe',
-                style: GoogleFonts.inter(
-                  color: AppTheme.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
+            trailing: Expanded(
+              child: _TeamSummaryAction(
+                team: team,
+                teamSizeMax: teamSizeMax,
+                onTap: onTeamTap,
               ),
             ),
           ),
@@ -139,7 +141,11 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.cloud_done_outlined, color: AppTheme.success, size: 12),
+                Icon(
+                  Icons.cloud_done_outlined,
+                  color: AppTheme.success,
+                  size: 12,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'Sincronizado · em andamento',
@@ -154,6 +160,159 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TeamSummaryAction extends StatelessWidget {
+  final List<OccurrenceTeamMember> team;
+  final int teamSizeMax;
+  final VoidCallback? onTap;
+
+  const _TeamSummaryAction({
+    required this.team,
+    required this.teamSizeMax,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTeam = team.isNotEmpty;
+    final label = hasTeam
+        ? '${team.length}/$teamSizeMax condutores'
+        : 'Definir equipe';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasTeam) ...[
+                _TeamAvatarStack(team: team),
+                const SizedBox(width: 8),
+              ] else ...[
+                Icon(
+                  Icons.group_add_outlined,
+                  color: AppTheme.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.primary.withAlpha(180),
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamAvatarStack extends StatelessWidget {
+  final List<OccurrenceTeamMember> team;
+
+  const _TeamAvatarStack({required this.team});
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = team.take(3).toList();
+    return SizedBox(
+      width: 18.0 + (visible.length - 1).clamp(0, 2) * 14.0,
+      height: 22,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (final entry in visible.asMap().entries)
+            Positioned(
+              left: entry.key * 14.0,
+              child: _TeamMiniAvatar(member: entry.value),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamMiniAvatar extends StatelessWidget {
+  final OccurrenceTeamMember member;
+
+  const _TeamMiniAvatar({required this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = member.displayName?.trim().isNotEmpty == true
+        ? member.displayName!.trim()
+        : member.handlerId;
+    final initials = label.length >= 2
+        ? label.substring(0, 2).toUpperCase()
+        : label.toUpperCase();
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: member.role == TeamRole.titular
+                ? AppTheme.primary
+                : const Color(0xFF1A2A30),
+            border: Border.all(color: const Color(0xFF050D10), width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            initials,
+            style: GoogleFonts.inter(
+              color: member.role == TeamRole.titular
+                  ? const Color(0xFF050D10)
+                  : AppTheme.primary,
+              fontSize: 7,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        if (member.role == TeamRole.titular)
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF050D10),
+                border: Border.all(color: AppTheme.primary, width: 1),
+              ),
+              child: Icon(
+                Icons.workspace_premium_rounded,
+                color: AppTheme.primary,
+                size: 7,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -216,7 +375,9 @@ class _MiniAvatar extends StatelessWidget {
             ? Image.network(imageUrl!, fit: BoxFit.cover, width: 28, height: 28)
             : Center(
                 child: Text(
-                  label.length > 3 ? label.substring(0, 3).toUpperCase() : label.toUpperCase(),
+                  label.length > 3
+                      ? label.substring(0, 3).toUpperCase()
+                      : label.toUpperCase(),
                   style: GoogleFonts.inter(
                     color: AppTheme.primary,
                     fontSize: 8,

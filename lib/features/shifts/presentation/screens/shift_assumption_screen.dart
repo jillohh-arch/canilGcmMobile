@@ -39,6 +39,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
   Future<void> _startShift(Dog dog) async {
     if (_startingDogId != null) return;
 
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     final fitness = _fitnessService.evaluate(dog);
 
     // Se não apto, pedir confirmação
@@ -50,7 +51,6 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _startingDogId = dog.id);
 
-    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     await shiftVM.startShift(dog.id);
 
     if (!mounted) return;
@@ -179,7 +179,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: dogVM.dogs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final dog = dogVM.dogs[index];
         final isSelected = _selectedDogId == dog.id;

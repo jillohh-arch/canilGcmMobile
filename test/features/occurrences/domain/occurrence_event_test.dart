@@ -7,7 +7,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.
 void main() {
   final now = DateTime(2026, 5, 18, 14, 45);
 
-  OccurrenceEvent _buildEvent({DateTime? deletedAt}) {
+  OccurrenceEvent buildEvent({DateTime? deletedAt}) {
     return OccurrenceEvent(
       id: 'evt-001',
       occurrenceId: 'occ-001',
@@ -30,7 +30,7 @@ void main() {
   group('OccurrenceEvent', () {
     group('fromMap/toMap roundtrip', () {
       test('preserva todos os campos', () {
-        final original = _buildEvent();
+        final original = buildEvent();
         final map = original.toMap();
         final restored = OccurrenceEvent.fromMap(
           map,
@@ -50,7 +50,7 @@ void main() {
       });
 
       test('toMap usa snake_case', () {
-        final map = _buildEvent().toMap();
+        final map = buildEvent().toMap();
 
         expect(map.containsKey('occurrence_id'), isTrue);
         expect(map.containsKey('category'), isTrue);
@@ -65,7 +65,7 @@ void main() {
       });
 
       test('toMap serializa Timestamps', () {
-        final map = _buildEvent().toMap();
+        final map = buildEvent().toMap();
 
         expect(map['timestamp'], isA<Timestamp>());
         expect(map['created_at'], isA<Timestamp>());
@@ -118,7 +118,7 @@ void main() {
 
     group('copyWith', () {
       test('altera campo específico mantendo outros', () {
-        final original = _buildEvent();
+        final original = buildEvent();
         final updated = original.copyWith(
           title: 'Título atualizado',
           category: OccurrenceEventCategory.seizure,
@@ -134,17 +134,17 @@ void main() {
 
     group('SoftDeletable', () {
       test('isDeleted retorna false quando deletedAt é null', () {
-        final event = _buildEvent();
+        final event = buildEvent();
         expect(event.isDeleted, isFalse);
       });
 
       test('isDeleted retorna true quando deletedAt está presente', () {
-        final event = _buildEvent(deletedAt: now);
+        final event = buildEvent(deletedAt: now);
         expect(event.isDeleted, isTrue);
       });
 
       test('softDeleteFields inclui campos no toMap', () {
-        final event = _buildEvent(deletedAt: now);
+        final event = buildEvent(deletedAt: now);
         final map = event.toMap();
 
         expect(map.containsKey('deleted_at'), isTrue);

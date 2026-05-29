@@ -574,7 +574,7 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
 
   Widget _buildRecentSessions() {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final recent = vm.trainings
             .where((t) => t.trainingType.toLowerCase().contains('obediência') ||
                 t.trainingType.toLowerCase().contains('obediencia'))

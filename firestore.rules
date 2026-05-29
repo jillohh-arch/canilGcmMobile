@@ -8,9 +8,373 @@ service cloud.firestore {
 
     function emailMatchesRa(ra) {
       return signedIn()
+        && ra is string
         && (
           request.auth.token.email == ra + '@gcm.com.br'
           || request.auth.token.email == ra + '@canilgcm.com'
+        );
+    }
+
+    function isPrimaryHandler(data) {
+      return signedIn()
+        && (
+          data.primary_handler_id == request.auth.uid
+          || emailMatchesRa(data.primary_handler_ra)
+        );
+    }
+
+    function isTeamMember(data) {
+      return signedIn()
+        && (
+          (data.team_auth_uids is list && request.auth.uid in data.team_auth_uids)
+          || (
+            data.team_emails is list
+            && request.auth.token.email in data.team_emails
+          )
+        );
+    }
+
+    function isParticipant(data) {
+      return isPrimaryHandler(data) || isTeamMember(data);
+    }
+
+    function isCoSignerTarget(occ, signatureId) {
+      return occ.team_handler_ids is list
+        && signatureId in occ.team_handler_ids
+        && signatureId != occ.primary_handler_ra
+        && signatureId != occ.primary_handler_id;
+    }
+
+    function occurrenceData(occurrenceId) {
+      return get(/databases/$(database)/documents/occurrences/$(occurrenceId)).data;
+    }
+
+    function occurrenceDataAfter(occurrenceId) {
+      return getAfter(/databases/$(database)/documents/occurrences/$(occurrenceId)).data;
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isEditableStatus(data) {
+      return data.status in ['in_progress', 'finalizing'];
+    }
+
+    function canUpdateEditableOccurrence() {
+      let changed = changedKeys();
+      return signedIn()
+        && isEditableStatus(resource.data)
+        && request.resource.data.status in ['in_progress', 'finalizing']
+        && isParticipant(resource.data)
+        && (
+          !changed.hasAny([
+            'team',
+            'team_handler_ids',
+            'team_emails',
+            'team_auth_uids'
+          ])
+          || (
+            isParticipant(resource.data)
+            && request.resource.data.team is list
+            && request.resource.data.team_size_max is int
+            && request.resource.data.team.size() <= request.resource.data.team_size_max
+            && request.resource.data.team_handler_ids is list
+            && request.resource.data.team_handler_ids.size() <= request.resource.data.team_size_max
+          )
+        );
+    }
+
+    function canCloseForSignatures() {
+      return signedIn()
+        && isPrimaryHandler(resource.data)
+        && resource.data.status in ['in_progress', 'finalizing']
+        && request.resource.data.status == 'awaiting_signatures'
+        && changedKeys().hasOnly([
+          'status',
+          'signature_request_at',
+          'signature_deadline',
+          'final_report',
+          'results',
+          'details',
+          'finalization_photos',
+          'finalization_photo_hashes',
+          'finalization_draft',
+          'signed_handler_ids',
+          'signed_emails',
+          'updated_at',
+          'audit_trail'
+        ]);
+    }
+
+    function canRevertToDraft() {
+      return signedIn()
+        && isPrimaryHandler(resource.data)
+        && resource.data.status == 'awaiting_signatures'
+        && request.resource.data.status == 'in_progress'
+        && changedKeys().hasOnly([
+          'status',
+          'signature_request_at',
+          'signature_deadline',
+          'signed_handler_ids',
+          'signed_emails',
+          'updated_at',
+          'audit_trail'
+        ]);
+    }
+
+    function finalizationKeys() {
+      return [
+        'status',
+        'finalized_at',
+        'integrity_hash',
+        'hash_version',
+        'final_report',
+        'results',
+        'details',
+        'finalization_photos',
+        'finalization_photo_hashes',
+        'finalization_draft',
+        'updated_at',
+        'audit_trail'
+      ];
+    }
+
+    function hasCoSigners(data) {
+      return data.team_handler_ids is list
+        && data.team_handler_ids.size() > 1;
+    }
+
+    function allCoSignersSigned(data) {
+      return data.team_handler_ids is list
+        && data.signed_handler_ids is list
+        && data.signed_handler_ids.size() >= data.team_handler_ids.size() - 1;
+    }
+
+    function canFinalizeDirectly() {
+      return signedIn()
+        && isPrimaryHandler(resource.data)
+        && resource.data.status in ['in_progress', 'finalizing']
+        && !hasCoSigners(resource.data)
+        && request.resource.data.status == 'finalized'
+        && request.resource.data.hash_version == 2
+        && changedKeys().hasOnly(finalizationKeys());
+    }
+
+    function canSealSignedOccurrence() {
+      return signedIn()
+        && isParticipant(resource.data)
+        && resource.data.status == 'awaiting_signatures'
+        && request.resource.data.status == 'finalized'
+        && request.resource.data.hash_version == 3
+        && allCoSignersSigned(resource.data)
+        && changedKeys().hasOnly(finalizationKeys());
+    }
+
+    function canFinalizeWithPending() {
+      return signedIn()
+        && isPrimaryHandler(resource.data)
+        && resource.data.status == 'awaiting_signatures'
+        && request.resource.data.status == 'finalized_with_pending'
+        && request.resource.data.hash_version == 3
+        && resource.data.signature_deadline is timestamp
+        && request.time > resource.data.signature_deadline
+        && changedKeys().hasOnly(finalizationKeys());
+    }
+
+    function canExtendSignatureDeadline() {
+      return signedIn()
+        && isPrimaryHandler(resource.data)
+        && resource.data.status == 'awaiting_signatures'
+        && request.resource.data.status == 'awaiting_signatures'
+        && changedKeys().hasOnly([
+          'signature_deadline',
+          'updated_at',
+          'audit_trail'
+        ]);
+    }
+
+    function canUpdateSignatureSideEffects() {
+      return signedIn()
+        && resource.data.status == 'awaiting_signatures'
+        && isTeamMember(resource.data)
+        && changedKeys().hasOnly([
+          'updated_at',
+          'audit_trail',
+          'signed_handler_ids',
+          'signed_emails',
+          'signed_auth_uids'
+        ]);
+    }
+
+    function canUpdateLockedOccurrenceMetadata() {
+      return signedIn()
+        && resource.data.status in [
+          'awaiting_signatures',
+          'finalized',
+          'finalized_with_pending'
+        ]
+        && changedKeys().hasOnly([
+          'pdf_export_url',
+          'pdf_generated_at',
+          'pdf_access_log',
+          'audit_trail',
+          'updated_at'
+        ]);
+    }
+
+    function canCreateSignature(occurrenceId, signatureId) {
+      let occ = occurrenceDataAfter(occurrenceId);
+      return signedIn()
+        && occ.status == 'awaiting_signatures'
+        && isCoSignerTarget(occ, signatureId)
+        && request.resource.data.handler_id == signatureId
+        && (
+          (
+            isPrimaryHandler(occ)
+            && request.resource.data.status == 'pending'
+          )
+          || (
+            emailMatchesRa(signatureId)
+            && request.resource.data.status in ['signed', 'expired']
+          )
+        );
+    }
+
+    function canUpdateSignature(occurrenceId, signatureId) {
+      let occ = occurrenceDataAfter(occurrenceId);
+      return signedIn()
+        && occ.status == 'awaiting_signatures'
+        && isCoSignerTarget(occ, signatureId)
+        && request.resource.data.handler_id == signatureId
+        && (
+          (
+            emailMatchesRa(signatureId)
+            && request.resource.data.status in ['signed', 'expired']
+          )
+          || (
+            isPrimaryHandler(occ)
+            && request.resource.data.status == 'expired'
+          )
+        );
+    }
+
+    function signedSignatureData(occurrenceId, handlerId) {
+      return get(
+        /databases/$(database)/documents/occurrences/$(occurrenceId)/signatures/$(handlerId)
+      ).data;
+    }
+
+    function hasSignedSignature(occurrenceId, handlerId) {
+      return exists(
+        /databases/$(database)/documents/occurrences/$(occurrenceId)/signatures/$(handlerId)
+      )
+        && signedSignatureData(occurrenceId, handlerId).status == 'signed';
+    }
+
+    function isSignedAmendmentMember(occurrenceId, occ, handlerId) {
+      return handlerId is string
+        && occ.team_handler_ids is list
+        && handlerId in occ.team_handler_ids
+        && emailMatchesRa(handlerId)
+        && hasSignedSignature(occurrenceId, handlerId);
+    }
+
+    function isOriginalAmendmentAuthor(occ, handlerId) {
+      return handlerId is string
+        && isPrimaryHandler(occ)
+        && (
+          handlerId == occ.primary_handler_ra
+          || handlerId == occ.primary_handler_id
+        );
+    }
+
+    function validAmendmentPayload(occurrenceId) {
+      return request.resource.data.keys().hasAll([
+          'occurrence_id',
+          'reason',
+          'corrections',
+          'created_by',
+          'created_by_name',
+          'created_by_ra',
+          'created_at',
+          'integrity_hash',
+          'sequence_number'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'occurrence_id',
+          'reason',
+          'corrections',
+          'created_by',
+          'created_by_name',
+          'created_by_ra',
+          'created_at',
+          'integrity_hash',
+          'sequence_number'
+        ])
+        && request.resource.data.occurrence_id == occurrenceId
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.corrections is map
+        && request.resource.data.created_by is string
+        && request.resource.data.created_by_name is string
+        && request.resource.data.created_by_ra == request.resource.data.created_by
+        && request.resource.data.created_at is timestamp
+        && request.resource.data.integrity_hash is string
+        && request.resource.data.integrity_hash.size() == 64
+        && request.resource.data.sequence_number is int
+        && request.resource.data.sequence_number >= 1;
+    }
+
+    function canCreateAmendment(occurrenceId) {
+      let occ = occurrenceData(occurrenceId);
+      let author = request.resource.data.created_by;
+      return signedIn()
+        && occ.status in ['finalized', 'finalized_with_pending']
+        && validAmendmentPayload(occurrenceId)
+        && (
+          isOriginalAmendmentAuthor(occ, author)
+          || isSignedAmendmentMember(occurrenceId, occ, author)
+        );
+    }
+
+    function canCreateNotification(userId) {
+      let occ = occurrenceData(request.resource.data.occurrence_id);
+      return signedIn()
+        && request.resource.data.keys().hasAll([
+          'type',
+          'occurrence_id',
+          'occurrence_title',
+          'created_at',
+          'read_at'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'type',
+          'occurrence_id',
+          'occurrence_title',
+          'created_at',
+          'read_at',
+          'additional_data'
+        ])
+        && request.resource.data.type in [
+          'signature_requested',
+          'signature_completed',
+          'deadline_warning',
+          'occurrence_finalized',
+          'amendment_created'
+        ]
+        && request.resource.data.occurrence_id is string
+        && request.resource.data.occurrence_title is string
+        && request.resource.data.created_at is timestamp
+        && request.resource.data.read_at == null
+        && isParticipant(occ)
+        && (
+          userId == occ.primary_handler_ra
+          || userId == occ.primary_handler_id
+          || (
+            occ.team_handler_ids is list
+            && userId in occ.team_handler_ids
+          )
         );
     }
 
@@ -69,33 +433,12 @@ service cloud.firestore {
         ]);
     }
 
-    function isFinalizedOccurrence() {
-      return resource.data.status == 'finalized';
-    }
-
-    function isAllowedFinalizedOccurrenceUpdate() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'pdf_export_url',
-        'pdf_generated_at',
-        'pdf_access_log',
-        'audit_trail',
-        'updated_at'
-      ]);
-    }
-
-    function parentOccurrenceMutable(occurrenceId) {
-      return get(/databases/$(database)/documents/occurrences/$(occurrenceId))
-        .data.status != 'finalized';
-    }
-
-    // ─── Active Shifts ────────────────────────────────────────────────
     match /active_shifts/{ra} {
       allow read: if signedIn();
       allow create, update: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
       allow delete: if false;
     }
 
-    // ─── Shift Logs ───────────────────────────────────────────────────
     match /shift_logs/{shiftId} {
       allow read: if signedIn();
       allow create: if isValidShiftLogCreate();
@@ -105,18 +448,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ─── Users ────────────────────────────────────────────────────────
     match /users/{ra} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if emailMatchesRa(ra);
+      allow delete: if false;
     }
 
-    // ─── Dogs + Subcoleções ───────────────────────────────────────────
     match /dogs/{dogId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
 
-      // Histórico de peso
       match /weight_history/{recordId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
@@ -129,76 +471,66 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // Especialidades
       match /specialties/{specialtyId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Linhas de detecção
       match /detection_lines/{lineId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Estado de Guarda & Proteção
       match /guard_protection_state/{stateId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Biblioteca de comandos
       match /commands/{commandId} {
         allow read: if signedIn();
-        allow create, update, delete: if signedIn();
+        allow create, update: if signedIn();
+        allow delete: if false;
       }
 
-      // Eventos de saúde
       match /health_events/{eventId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Documentos e laudos
       match /documents/{docId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Certificações externas
       match /external_certifications/{certId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Sessões de treino
       match /training_sessions/{sessionId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Tentativas de treino (detecção granular)
       match /training_attempts/{attemptId} {
         allow read: if signedIn();
         allow create: if signedIn();
         allow update, delete: if false;
       }
 
-      // Sessões de condicionamento
       match /conditioning_sessions/{sessionId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
         allow delete: if false;
       }
 
-      // Alimentação
       match /feedings/{feedingId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
@@ -211,7 +543,6 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // Prescrições nutricionais
       match /nutrition_prescriptions/{prescriptionId} {
         allow read: if signedIn();
         allow create, update: if signedIn();
@@ -225,36 +556,69 @@ service cloud.firestore {
       }
     }
 
-    // ─── Ocorrências + Eventos ────────────────────────────────────────
     match /occurrences/{occurrenceId} {
       allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn()
-        && (!isFinalizedOccurrence() || isAllowedFinalizedOccurrenceUpdate());
+      allow create: if signedIn()
+        && request.resource.data.status in ['in_progress', 'finalizing']
+        && (
+          request.resource.data.primary_handler_id == request.auth.uid
+          || emailMatchesRa(request.resource.data.primary_handler_ra)
+        );
+      allow update: if canUpdateEditableOccurrence()
+        || canFinalizeDirectly()
+        || canCloseForSignatures()
+        || canRevertToDraft()
+        || canExtendSignatureDeadline()
+        || canSealSignedOccurrence()
+        || canFinalizeWithPending()
+        || canUpdateSignatureSideEffects()
+        || canUpdateLockedOccurrenceMetadata();
       allow delete: if false;
+
+      match /amendments/{amendmentId} {
+        allow read: if signedIn();
+        allow create: if canCreateAmendment(occurrenceId);
+        allow update, delete: if false;
+      }
 
       match /events/{eventId} {
         allow read: if signedIn();
         allow create, update: if signedIn()
-          && parentOccurrenceMutable(occurrenceId);
+          && isEditableStatus(occurrenceData(occurrenceId))
+          && isParticipant(occurrenceData(occurrenceId));
+        allow delete: if false;
+      }
+
+      match /signatures/{signatureId} {
+        allow read: if signedIn() && isParticipant(occurrenceData(occurrenceId));
+        allow create: if canCreateSignature(occurrenceId, signatureId);
+        allow update: if canUpdateSignature(occurrenceId, signatureId);
         allow delete: if false;
       }
     }
 
-    // ─── Coleções legadas (compatibilidade) ───────────────────────────
     match /trainings/{trainingId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /training_sessions/{sessionId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
     }
 
     match /health_logs/{healthLogId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
     }
 
     match /incidents/{incidentId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
     }
 
     match /occurrence_natures/{natureId} {
@@ -264,45 +628,50 @@ service cloud.firestore {
 
     match /routines/{routineId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
     }
 
-    // ─── Audit Logs ───────────────────────────────────────────────────
     match /auditLogs/{logId} {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update, delete: if false;
     }
 
-    // ─── GPS Tracks ───────────────────────────────────────────────────
     match /gps_tracks/{trackId} {
       allow read: if signedIn();
       allow create, update: if signedIn();
       allow delete: if false;
     }
 
-    // ─── PDFs Gerados ─────────────────────────────────────────────────
     match /generated_pdfs/{pdfId} {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update, delete: if false;
     }
 
-    // ─── Estado de Selos ──────────────────────────────────────────────
     match /badges_state/{userId}/{badgeId} {
       allow read: if signedIn();
       allow create, update: if signedIn();
       allow delete: if false;
     }
 
-    // ─── Documentos / Laudos (coleção raiz legada) ────────────────────
     match /documentos/{docId} {
       allow read: if signedIn();
       allow create, update: if signedIn();
       allow delete: if false;
     }
 
-    // ─── Catch-all: nega tudo não coberto ─────────────────────────────
+    match /notifications/{userId}/items/{notificationId} {
+      allow read: if emailMatchesRa(userId);
+      allow create: if canCreateNotification(userId);
+      allow update: if emailMatchesRa(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'read_at'
+        ]);
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

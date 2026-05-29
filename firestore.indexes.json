@@ -1,17 +1,19 @@
 {
   "indexes": [
     {
-      "collectionGroup": "nutrition_prescriptions",
+      "collectionGroup": "trainings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "vigent_from", "order": "DESCENDING" }
+        { "fieldPath": "dogId", "order": "ASCENDING" },
+        { "fieldPath": "deleted_at", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "feedings",
+      "collectionGroup": "training_sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fed_at", "order": "DESCENDING" }
+        { "fieldPath": "dogId", "order": "ASCENDING" },
+        { "fieldPath": "deleted_at", "order": "ASCENDING" }
       ]
     }
   ],

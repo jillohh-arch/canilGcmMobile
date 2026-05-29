@@ -136,6 +136,7 @@ void _showDogSwitcher(BuildContext context) {
                             final confirm = await _showFitnessConfirmation(context, dog, fitness);
                             if (!confirm) return;
                           }
+                          if (!ctx.mounted) return;
                           Navigator.of(ctx).pop();
                           await shiftVM.switchDog(dog.id);
                         },
@@ -193,7 +194,7 @@ class _DogSwitchTile extends StatelessWidget {
                         width: 56,
                         height: 56,
                         fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Icon(
+                        errorWidget: (_, _, _) => Icon(
                           Icons.pets_rounded,
                           color: AppTheme.primary.withAlpha(128),
                           size: 24,
