@@ -464,7 +464,7 @@ class _FormationViewState extends State<_FormationView> {
           ),
           const SizedBox(height: 12),
           Consumer<TrainingViewModel>(
-            builder: (_, vm, __) {
+            builder: (_, vm, _) {
               final sessions = vm.trainings
                   .where((t) => t.trainingType.toLowerCase().contains('guarda') ||
                       t.trainingType.toLowerCase().contains('proteção'))
@@ -1474,7 +1474,7 @@ class _FormationViewState extends State<_FormationView> {
 
   Widget _buildRecentSessionsSection() {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final recent = vm.trainings
             .where((t) =>
                 t.trainingType.toLowerCase().contains('guarda') ||
@@ -1766,7 +1766,7 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
           ),
           const SizedBox(height: 12),
           Consumer<TrainingViewModel>(
-            builder: (_, vm, __) {
+            builder: (_, vm, _) {
               final sessions = vm.trainings
                   .where((t) => t.trainingType.toLowerCase().contains('guarda') ||
                       t.trainingType.toLowerCase().contains('proteção'))
@@ -1976,7 +1976,7 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
 
   Widget _buildRecentSessions() {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final recent = vm.trainings
             .where((t) =>
                 t.trainingType.toLowerCase().contains('guarda') ||

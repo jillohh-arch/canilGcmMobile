@@ -414,6 +414,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       final shiftId = shiftVM.activeShiftId ?? '';
       final dogId = shiftVM.activeDogId ?? '';
       final handlerId = authVM.user?.uid ?? '';
+      final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
 
       final typeCode = _selectedNature?.code ?? 'GERAL';
       final typeName = _selectedNature?.name ?? 'Ocorrência Geral';
@@ -423,6 +424,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         shiftId: shiftId,
         dogId: dogId,
         primaryHandlerId: handlerId,
+        primaryHandlerRa: handlerRa,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: _locationAddress.isNotEmpty ? _locationAddress : null,

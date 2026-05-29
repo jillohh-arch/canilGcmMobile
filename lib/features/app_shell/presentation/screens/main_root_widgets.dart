@@ -1,5 +1,65 @@
 part of 'main_root_screen.dart';
 
+class _PendingShortcut extends StatelessWidget {
+  final String userId;
+
+  const _PendingShortcut({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: NotificationService().getUnreadCount(userId: userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+
+        return Tooltip(
+          message: 'Pendências',
+          child: Material(
+            color: Colors.transparent,
+            child: Badge(
+              isLabelVisible: count > 0,
+              label: Text(count > 99 ? '99+' : '$count'),
+              backgroundColor: AppTheme.warning,
+              textColor: AppTheme.background,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => PendingScreen(userId: userId),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF050D10).withAlpha(230),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.primary.withAlpha(120)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(80),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ActiveOccurrenceBanner extends StatelessWidget {
   final Occurrence occurrence;
   final String dogName;

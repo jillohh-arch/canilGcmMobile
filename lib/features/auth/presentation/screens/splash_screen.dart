@@ -78,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
                     width: 80,
                     height: 80,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.shield_rounded,
                       size: 56,
                       color: AppTheme.primary.withAlpha(180),

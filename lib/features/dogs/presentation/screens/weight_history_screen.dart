@@ -117,8 +117,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                color: Colors.white.withValues(alpha: 0.08),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
@@ -173,7 +173,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Text('⚖', style: TextStyle(fontSize: 20)),
@@ -214,7 +214,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF0F1E26),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -283,12 +283,12 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primary.withOpacity(0.12)
-              : Colors.white.withOpacity(0.04),
+              ? AppTheme.primary.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
           border: Border.all(
             color: selected
-                ? AppTheme.primary.withOpacity(0.4)
-                : Colors.white.withOpacity(0.1),
+                ? AppTheme.primary.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -327,7 +327,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -402,8 +402,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         height: 160,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -446,8 +446,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha: 0.04),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -509,8 +509,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -569,7 +569,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 Container(
                   height: 1,
                   width: 60,
-                  color: AppTheme.primary.withOpacity(0.2),
+                  color: AppTheme.primary.withValues(alpha: 0.2),
                 ),
               ],
             ),
@@ -633,7 +633,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -711,7 +711,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withOpacity(0),
+            AppTheme.background.withValues(alpha: 0),
             AppTheme.background,
             AppTheme.background,
           ],
@@ -728,7 +728,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withOpacity(0.2),
+                color: AppTheme.primary.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -907,9 +907,9 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                   ),
                   child: const Center(
                     child: Text(
@@ -973,9 +973,9 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                   ),
                   child: const Center(
                     child: Text(
@@ -1040,8 +1040,8 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                 color: _hasPhoto ? const Color(0xFF0F2624) : Colors.transparent,
                 border: Border.all(
                   color: _hasPhoto
-                      ? AppTheme.success.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.1),
+                      ? AppTheme.success.withValues(alpha: 0.3)
+                      : Colors.white.withValues(alpha: 0.1),
                   style: _hasPhoto ? BorderStyle.solid : BorderStyle.solid,
                 ),
                 borderRadius: BorderRadius.circular(10),
@@ -1096,9 +1096,9 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                     notes: log.healthObservations,
                   ),
                 );
-                if (mounted) Navigator.of(context).pop();
+                if (context.mounted) Navigator.of(context).pop();
               } catch (e) {
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Erro ao salvar pesagem: $e'),
@@ -1142,12 +1142,12 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primary.withOpacity(0.12)
-              : Colors.white.withOpacity(0.04),
+              ? AppTheme.primary.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
           border: Border.all(
             color: selected
-                ? AppTheme.primary.withOpacity(0.4)
-                : Colors.white.withOpacity(0.1),
+                ? AppTheme.primary.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),

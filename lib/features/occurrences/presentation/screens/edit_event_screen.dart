@@ -531,7 +531,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       return {
         'url': url,
         'type': 'image',
-        if (hash != null) 'sha256': hash,
+        'sha256': ?hash,
       };
     }).toList();
   }

@@ -54,11 +54,15 @@ void main() {
 
         final eventData = eventsSnap.docs.first.data();
         expect(eventData['category'], 'opening');
-        expect(eventData['title'], 'Registro de ocorrência aberto');
-        expect(eventData['description'], contains('Binômio em local'));
-        expect(eventData['description'], contains('GPS capturado'));
+        expect(eventData['title'], 'Início da ocorrência');
+        expect(
+          eventData['description'],
+          'Ocorrência iniciada no endereço: Rua Teste, 123.',
+        );
         expect(eventData['gps_lat'], -22.5642);
         expect(eventData['gps_lng'], -47.4019);
+        expect(eventData['place_label'], 'Rua Teste, 123');
+        expect(eventData['location_source'], 'gps_atual');
       },
     );
 
@@ -114,8 +118,12 @@ void main() {
       final eventData = eventsSnap.docs.first.data();
       expect(eventData['gps_lat'], isNull);
       expect(eventData['gps_lng'], isNull);
-      expect(eventData['description'], isNot(contains('GPS capturado')));
-      expect(eventData['description'], contains('Binômio em local'));
+      expect(eventData['place_label'], isNull);
+      expect(eventData['location_source'], isNull);
+      expect(
+        eventData['description'],
+        'Ocorrência iniciada no endereço: não informado.',
+      );
     });
 
     test('audit_trail do evento marca automatic: true', () async {

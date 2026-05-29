@@ -15,7 +15,6 @@ class WeightHistoryPdf {
   static final _textSecondary = PdfInstitutionalColors.textSecondary;
   static final _textTertiary = PdfInstitutionalColors.textTertiary;
   static final _lightGray = PdfInstitutionalColors.lightGray;
-  static final _divider = PdfInstitutionalColors.divider;
   static final _cardBorder = PdfInstitutionalColors.cardBorder;
 
   /// Gera os bytes do PDF de histórico de peso.

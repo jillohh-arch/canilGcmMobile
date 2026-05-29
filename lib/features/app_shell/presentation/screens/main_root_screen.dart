@@ -3,13 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/dog_prontuario_tab_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/pending_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
@@ -56,6 +60,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
     final activeDogId = shiftVM.activeDogId;
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final openOccurrence = occurrenceVM.openOccurrence;
@@ -64,7 +70,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
         ? openOccurrence
         : null;
     if (activeDogId != null &&
-        (activeDogId != _lastOccurrenceWatchDogId || !occurrenceVM.isWatchingOpen)) {
+        (activeDogId != _lastOccurrenceWatchDogId ||
+            !occurrenceVM.isWatchingOpen)) {
       _lastOccurrenceWatchDogId = activeDogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -100,7 +107,13 @@ class _MainRootScreenState extends State<MainRootScreen> {
                     occurrence: activeOccurrence,
                   ),
                 ),
-              )
+              ),
+            if (currentRa != null)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                right: 12,
+                child: _PendingShortcut(userId: currentRa),
+              ),
           ],
         ),
         bottomNavigationBar: _buildBottomNavigation(context, activeDogId),

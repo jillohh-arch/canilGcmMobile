@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:canil_gcm/core/mixins/soft_deletable.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/training/data/training_repository.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
@@ -32,8 +35,51 @@ class TrainingService {
         .set(session.toJson(), SetOptions(merge: true));
   }
 
-  Future<void> deleteTrainingSession(String id) {
-    return _firestore.collection('trainings').doc(id).delete();
+  /// Soft delete: marca o treino como excluído sem removê-lo fisicamente.
+  /// Grava `deleted_at`, `deleted_by`, `delete_reason` e registra no audit trail.
+  ///
+  /// [id] — ID do documento.
+  /// [reason] — motivo obrigatório da exclusão.
+  /// [collectionPath] — path da collection onde o documento reside.
+  ///   Valores possíveis: 'trainings', 'training_sessions',
+  ///   ou 'dogs/{dogId}/training_sessions'. Default: 'trainings'.
+  Future<void> deleteTrainingSession(
+    String id, {
+    required String reason,
+    String collectionPath = 'trainings',
+  }) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      throw StateError('Usuário deve estar autenticado para excluir treino');
+    }
+    if (reason.trim().isEmpty) {
+      throw ArgumentError('Motivo da exclusão não pode ser vazio');
+    }
+
+    final docRef = _firestore.collection(collectionPath).doc(id);
+
+    final entry = AuditService.buildInlineEntry(
+      action: 'deleted',
+      reason: reason,
+    );
+
+    await docRef.update({
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by': userId,
+      'delete_reason': reason,
+      'deleted_reason': reason,
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    });
+
+    AuditService.log(
+      action: 'deleted',
+      entityType: 'training',
+      entityId: id,
+      summary: 'Sessão de treino excluída: $reason',
+      reason: reason,
+      metadata: {'collection': collectionPath},
+    );
   }
 
   Future<List<TrainingSessionModel>> getTrainingsForDog(String dogId) async {
@@ -41,10 +87,10 @@ class TrainingService {
 
     // Buscar de cada collection independentemente para resiliência
     try {
-      final legacyTrainings = await _firestore
-          .collection('trainings')
-          .where('dogId', isEqualTo: dogId)
-          .get();
+      final query = SoftDeletable.activeOnly(
+        _firestore.collection('trainings').where('dogId', isEqualTo: dogId),
+      );
+      final legacyTrainings = await query.get();
       for (final doc in legacyTrainings.docs) {
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
@@ -56,10 +102,10 @@ class TrainingService {
     }
 
     try {
-      final rootSessions = await _firestore
-          .collection('training_sessions')
-          .where('dogId', isEqualTo: dogId)
-          .get();
+      final query = SoftDeletable.activeOnly(
+        _firestore.collection('training_sessions').where('dogId', isEqualTo: dogId),
+      );
+      final rootSessions = await query.get();
       for (final doc in rootSessions.docs) {
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
@@ -71,11 +117,10 @@ class TrainingService {
     }
 
     try {
-      final dogSessions = await _firestore
-          .collection('dogs')
-          .doc(dogId)
-          .collection('training_sessions')
-          .get();
+      final query = SoftDeletable.activeOnly(
+        _firestore.collection('dogs').doc(dogId).collection('training_sessions'),
+      );
+      final dogSessions = await query.get();
       for (final doc in dogSessions.docs) {
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId || training.dogId.isEmpty) {
@@ -93,7 +138,10 @@ class TrainingService {
   }
 
   Future<List<TrainingSessionModel>> getAllTrainings() async {
-    final snapshot = await _firestore.collection('trainings').get();
+    final query = SoftDeletable.activeOnly(
+      _firestore.collection('trainings'),
+    );
+    final snapshot = await query.get();
     final trainings = snapshot.docs
         .map((doc) => TrainingSessionModel.fromJson(doc.data(), doc.id))
         .toList();

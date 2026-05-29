@@ -14,9 +14,6 @@ part 'health_log_timeline_item_body.dart';
 part 'health_log_expanded_details.dart';
 part 'health_log_empty_state.dart';
 part 'health_log_new_form.dart';
-part 'health_log_type_selector.dart';
-part 'health_log_form_fields.dart';
-part 'health_log_save_button.dart';
 part 'health_log_helpers.dart';
 
 class HealthLogScreen extends StatefulWidget {

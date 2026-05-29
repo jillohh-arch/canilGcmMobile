@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-const _hudPanel = const Color(0xFF0E1A1F);
+const _hudPanel = Color(0xFF0E1A1F);
 
 class HudPanel extends StatelessWidget {
   final Widget child;

@@ -261,8 +261,8 @@ class _IdentityCard extends StatelessWidget {
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => _avatarFallback(),
-                      errorWidget: (_, __, ___) => _avatarFallback(),
+                      placeholder: (_, _) => _avatarFallback(),
+                      errorWidget: (_, _, _) => _avatarFallback(),
                     )
                   : _avatarFallback(),
             ),
@@ -402,8 +402,8 @@ class _DogSection extends StatelessWidget {
                               width: 44,
                               height: 44,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => _dogFallback(),
-                              errorWidget: (_, __, ___) => _dogFallback(),
+                              placeholder: (_, _) => _dogFallback(),
+                              errorWidget: (_, _, _) => _dogFallback(),
                             )
                           : _dogFallback(),
                     ),

@@ -285,7 +285,7 @@ class _DetectionMaintenanceScreenState
                     ),
                   ),
                   child: Consumer<TrainingViewModel>(
-                    builder: (_, vm, __) {
+                    builder: (_, vm, _) {
                       final detSessions = vm.trainings
                           .where((t) => t.trainingType.toLowerCase().contains('detec'))
                           .toList();
@@ -660,7 +660,7 @@ class _DetectionMaintenanceScreenState
 
   Widget _buildRecentSessions() {
     return Consumer<TrainingViewModel>(
-      builder: (_, vm, __) {
+      builder: (_, vm, _) {
         final recent = vm.trainings
             .where((t) => t.trainingType.toLowerCase().contains('detec'))
             .take(3)
@@ -731,7 +731,7 @@ class _DetectionMaintenanceScreenState
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${session.substanceUsed ?? 'Detecção'}',
+                  session.substanceUsed ?? 'Detecção',
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,

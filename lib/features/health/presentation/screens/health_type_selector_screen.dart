@@ -247,8 +247,8 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                         ),
                         onPressed: _selectedType == null
                             ? null
-                            : () {
-                                Navigator.push(
+                            : () async {
+                                final saved = await Navigator.push<bool>(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => HealthEventFormScreen(
@@ -256,11 +256,11 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                                       type: _selectedType!,
                                     ),
                                   ),
-                                ).then((saved) {
-                                  if (saved == true) {
-                                    Navigator.pop(context, true);
-                                  }
-                                });
+                                );
+                                if (!context.mounted) return;
+                                if (saved == true) {
+                                  Navigator.pop(context, true);
+                                }
                               },
                         child: Text(
                           'Continuar',

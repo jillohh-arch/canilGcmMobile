@@ -25,7 +25,7 @@ class _LoginBrand extends StatelessWidget {
                 width: 44,
                 height: 44,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Icon(
+                errorBuilder: (_, _, _) => Icon(
                   Icons.shield_rounded,
                   size: 32,
                   color: AppTheme.primary.withAlpha(180),

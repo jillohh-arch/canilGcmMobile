@@ -1,7 +1,6 @@
 part of 'active_shift_dashboard_screen.dart';
 
 // ── Design tokens (mockup 10_dashboard) ──────────────────────────────────────
-const Color _kSurface = Color(0xFF0E1A1F);
 const Color _kBorder = Color(0x14FFFFFF); // white 8%
 const Color _kBorderSubtle = Color(0x0FFFFFFF); // white 6%
 const Color _kTextPrimary = Color(0xFFFFFFFF);
@@ -261,8 +260,8 @@ class _SmallAvatar extends StatelessWidget {
                 width: 44,
                 height: 44,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => _fallbackWidget(),
-                errorWidget: (_, __, ___) => _fallbackWidget(),
+                placeholder: (_, _) => _fallbackWidget(),
+                errorWidget: (_, _, _) => _fallbackWidget(),
               )
             : _fallbackWidget(),
       ),

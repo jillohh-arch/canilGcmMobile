@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
-import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Tela de resumo após finalizar o rastreamento GPS.
 ///
@@ -94,7 +93,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                   children: [
                     _buildMetricTile(
                       'Distância',
-                      '${(widget.result.distanceMeters / 1000).toStringAsFixed(2)}',
+                      (widget.result.distanceMeters / 1000).toStringAsFixed(2),
                       'km',
                     ),
                     const SizedBox(width: 9),

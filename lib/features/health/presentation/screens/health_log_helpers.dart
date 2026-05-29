@@ -1,23 +1,5 @@
 part of 'health_log_screen.dart';
 
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: GoogleFonts.inter(
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        color: Colors.white70,
-        letterSpacing: 1.2,
-      ),
-    );
-  }
-}
-
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 (IconData, Color) _iconAndColor(String logType) {
   switch (logType) {

@@ -5,15 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
-import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
-import 'package:canil_gcm/features/profiles/domain/operational_profile_models.dart';
 import 'package:canil_gcm/features/profiles/presentation/widgets/operational_profile_widgets.dart';
-import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
@@ -364,8 +360,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       ? CachedNetworkImage(
                           imageUrl: widget.dog.profileImageUrl!,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => _dogInitialsFallback(),
-                          errorWidget: (_, __, ___) => _dogInitialsFallback(),
+                          placeholder: (_, _) => _dogInitialsFallback(),
+                          errorWidget: (_, _, _) => _dogInitialsFallback(),
                         )
                       : _dogInitialsFallback(),
                 ),
@@ -684,7 +680,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: actualSpecialties.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
             itemBuilder: (context, idx) {
               final spec = actualSpecialties[idx];
               String emoji = '🛡';
@@ -1549,13 +1545,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
+        final healthVM = Provider.of<HealthViewModel>(context, listen: false);
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => HealthTypeSelectorScreen(dogId: widget.dog.id),
           ),
         ).then((_) {
-          Provider.of<HealthViewModel>(context, listen: false)
-              .fetchHealthLogsForDog(widget.dog.id);
+          healthVM.fetchHealthLogsForDog(widget.dog.id);
         });
       },
       child: Container(

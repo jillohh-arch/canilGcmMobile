@@ -159,8 +159,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha: 0.04),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -231,8 +231,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: color.withOpacity(bgAlpha / 255.0),
-            border: Border.all(color: color.withOpacity(borderAlpha / 255.0)),
+            color: color.withValues(alpha: bgAlpha / 255.0),
+            border: Border.all(color: color.withValues(alpha: borderAlpha / 255.0)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -272,9 +272,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             decoration: BoxDecoration(
-              color: _isCompliant ? AppTheme.success.withOpacity(0.08) : Colors.white.withOpacity(0.04),
+              color: _isCompliant ? AppTheme.success.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
               border: Border.all(
-                color: _isCompliant ? AppTheme.success.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                color: _isCompliant ? AppTheme.success.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1),
               ),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -338,8 +338,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: _isCompliant ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.06),
-            border: Border.all(color: _isCompliant ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15)),
+            color: _isCompliant ? Colors.white.withValues(alpha: 0.02) : Colors.white.withValues(alpha: 0.06),
+            border: Border.all(color: _isCompliant ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -355,7 +355,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             decoration: InputDecoration(
               hintText: '0',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withOpacity(0.4),
+                color: AppTheme.textTertiary.withValues(alpha: 0.4),
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -394,8 +394,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           padding: const EdgeInsets.all(10),
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: AppTheme.warning.withOpacity(0.06),
-            border: Border.all(color: AppTheme.warning.withOpacity(0.24)),
+            color: AppTheme.warning.withValues(alpha: 0.06),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.24)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -427,8 +427,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            border: Border.all(color: AppTheme.warning.withOpacity(0.15)),
+            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -441,7 +441,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             decoration: InputDecoration(
               hintText: 'Ex: pós-treino intenso, orientação veterinária...',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withOpacity(0.4),
+                color: AppTheme.textTertiary.withValues(alpha: 0.4),
                 fontSize: 12,
               ),
               contentPadding:
@@ -525,8 +525,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(selected ? 0.12 : 0.04),
-          border: Border.all(color: color.withOpacity(selected ? 0.4 : 0.1)),
+          color: color.withValues(alpha: selected ? 0.12 : 0.04),
+          border: Border.all(color: color.withValues(alpha: selected ? 0.4 : 0.1)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -564,8 +564,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             width: double.infinity,
             height: _photoFile != null ? 120 : 60,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              color: Colors.white.withValues(alpha: 0.04),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               borderRadius: BorderRadius.circular(10),
             ),
             child: _photoFile != null
@@ -588,7 +588,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppTheme.error.withOpacity(0.8),
+                              color: AppTheme.error.withValues(alpha: 0.8),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.close,
@@ -681,8 +681,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -695,7 +695,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             decoration: InputDecoration(
               hintText: 'Ex: cão comeu com apetite normal...',
               hintStyle: GoogleFonts.inter(
-                color: AppTheme.textTertiary.withOpacity(0.4),
+                color: AppTheme.textTertiary.withValues(alpha: 0.4),
                 fontSize: 13,
               ),
               contentPadding:
@@ -713,8 +713,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _nutritionColor.withOpacity(0.08),
-        border: Border.all(color: _nutritionColor.withOpacity(0.24)),
+        color: _nutritionColor.withValues(alpha: 0.08),
+        border: Border.all(color: _nutritionColor.withValues(alpha: 0.24)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -743,7 +743,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.background.withOpacity(0),
+            AppTheme.background.withValues(alpha: 0),
             AppTheme.background,
           ],
         ),
@@ -754,11 +754,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: _saving ? _nutritionColor.withOpacity(0.4) : _nutritionColor,
+            color: _saving ? _nutritionColor.withValues(alpha: 0.4) : _nutritionColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: _nutritionColor.withOpacity(0.2),
+                color: _nutritionColor.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),

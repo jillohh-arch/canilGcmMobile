@@ -12,9 +12,7 @@ import 'pdf_common_widgets.dart';
 /// Gerador do PDF do Relatório Nutricional do Cão.
 class NutritionPdf {
   static final _orange = PdfInstitutionalColors.orange;
-  static final _textPrimary = PdfInstitutionalColors.textPrimary;
   static final _textSecondary = PdfInstitutionalColors.textSecondary;
-  static final _textTertiary = PdfInstitutionalColors.textTertiary;
   static final _divider = PdfInstitutionalColors.divider;
 
   /// Gera os bytes do PDF de histórico nutricional.

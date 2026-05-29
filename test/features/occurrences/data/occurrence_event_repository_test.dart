@@ -11,7 +11,7 @@ void main() {
 
   final now = DateTime(2026, 5, 18, 14, 45);
 
-  OccurrenceEvent _buildEvent({
+  OccurrenceEvent buildEvent({
     String id = 'evt-001',
     String occurrenceId = 'occ-001',
     OccurrenceEventCategory category = OccurrenceEventCategory.approach,
@@ -44,7 +44,7 @@ void main() {
   group('OccurrenceEventRepository', () {
     group('create', () {
       test('salva evento na subcoleção events', () async {
-        final event = _buildEvent();
+        final event = buildEvent();
         final created = await repository.create(event);
 
         final snap = await fakeFirestore
@@ -64,7 +64,7 @@ void main() {
 
     group('getById', () {
       test('retorna evento existente', () async {
-        await repository.create(_buildEvent());
+        await repository.create(buildEvent());
         final result = await repository.getById('occ-001', 'evt-001');
 
         expect(result, isNotNull);
@@ -78,7 +78,7 @@ void main() {
       });
 
       test('retorna null se soft-deleted', () async {
-        await repository.create(_buildEvent());
+        await repository.create(buildEvent());
         await repository.softDelete('occ-001', 'evt-001', 'user-001', 'Erro');
 
         final result = await repository.getById('occ-001', 'evt-001');
@@ -88,7 +88,7 @@ void main() {
 
     group('update', () {
       test('atualiza campos e registra audit entry', () async {
-        await repository.create(_buildEvent());
+        await repository.create(buildEvent());
         await repository.update('occ-001', 'evt-001', {
           'title': 'Abordagem atualizada',
         });
@@ -112,7 +112,7 @@ void main() {
 
     group('softDelete', () {
       test('marca campos de deleção', () async {
-        await repository.create(_buildEvent());
+        await repository.create(buildEvent());
         await repository.softDelete(
             'occ-001', 'evt-001', 'user-001', 'Duplicado');
 
@@ -132,9 +132,9 @@ void main() {
 
     group('countByOccurrence', () {
       test('conta apenas eventos não deletados', () async {
-        await repository.create(_buildEvent(id: 'evt-001'));
-        await repository.create(_buildEvent(id: 'evt-002'));
-        await repository.create(_buildEvent(id: 'evt-003'));
+        await repository.create(buildEvent(id: 'evt-001'));
+        await repository.create(buildEvent(id: 'evt-002'));
+        await repository.create(buildEvent(id: 'evt-003'));
         await repository.softDelete(
             'occ-001', 'evt-003', 'user-001', 'Removido');
 
