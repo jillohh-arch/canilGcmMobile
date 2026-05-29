@@ -1,9 +1,10 @@
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart' as printing;
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
@@ -22,6 +23,10 @@ import 'pdf_common_widgets.dart';
 
 /// Gerador do PDF institucional de ocorrencia baseado nos mockups V2.
 class OccurrencePdfGenerator {
+  static const _photoRequestTimeout = Duration(seconds: 12);
+  static const _pdfPhotoMaxDimension = 960;
+  static const _pdfPhotoJpegQuality = 72;
+
   static final _paper = PdfColors.white;
   static final _ink = PdfColor.fromHex('14202B');
   static final _inkSoft = PdfColor.fromHex('46586A');
@@ -214,22 +219,73 @@ class OccurrencePdfGenerator {
       }
     }
 
-    final futures = rawItems.map((item) async {
-      pw.ImageProvider? image;
-      try {
-        image = await printing.networkImage(item.url);
-      } catch (_) {
-        image = null;
+    final client = http.Client();
+    final media = <_PdfMediaItem>[];
+    try {
+      for (final item in rawItems) {
+        media.add(
+          _PdfMediaItem(
+            number: item.index,
+            url: item.url,
+            image: await _loadOptimizedPhoto(client, item.url),
+            event: item.event,
+          ),
+        );
       }
-      return _PdfMediaItem(
-        number: item.index,
-        url: item.url,
-        image: image,
-        event: item.event,
-      );
-    }).toList();
+    } finally {
+      client.close();
+    }
 
-    return Future.wait(futures);
+    return media;
+  }
+
+  Future<pw.ImageProvider?> _loadOptimizedPhoto(
+    http.Client client,
+    String url,
+  ) async {
+    final trimmedUrl = url.trim();
+    if (trimmedUrl.isEmpty || !trimmedUrl.startsWith('http')) return null;
+
+    try {
+      final response = await client
+          .get(Uri.parse(trimmedUrl))
+          .timeout(_photoRequestTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+
+      final optimized = _optimizePhotoForPdf(response.bodyBytes);
+      if (optimized == null) return null;
+      return pw.MemoryImage(optimized);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Uint8List? _optimizePhotoForPdf(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    final oriented = img.bakeOrientation(decoded);
+    final longestSide = oriented.width > oriented.height
+        ? oriented.width
+        : oriented.height;
+    final output = longestSide > _pdfPhotoMaxDimension
+        ? img.copyResize(
+            oriented,
+            width: oriented.width >= oriented.height
+                ? _pdfPhotoMaxDimension
+                : null,
+            height: oriented.height > oriented.width
+                ? _pdfPhotoMaxDimension
+                : null,
+            interpolation: img.Interpolation.average,
+          )
+        : oriented;
+
+    return Uint8List.fromList(
+      img.encodeJpg(output, quality: _pdfPhotoJpegQuality),
+    );
   }
 
   /// Gera mapa estático OSM para a página de localização (ponto único).

@@ -19,7 +19,6 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
   final UserService _userService = UserService();
   Stream<List<Map<String, dynamic>>>? _handlersStream;
-  final List<Map<String, dynamic>> _selectedHandlers = [];
 
   @override
   void initState() {
@@ -39,29 +38,13 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
     });
   }
 
-  bool _isHandlerSelected(String ra) {
-    return _selectedHandlers.any((h) => h['ra'] == ra);
-  }
-
   bool _isHandlerInTeam(String ra) {
     return widget.currentTeam.any((member) => member['handler_id'] == ra);
   }
 
-  void _toggleHandlerSelection(Map<String, dynamic> handler) {
-    setState(() {
-      if (_isHandlerSelected(handler['ra'])) {
-        _selectedHandlers.removeWhere((h) => h['ra'] == handler['ra']);
-      } else {
-        _selectedHandlers.add(handler);
-      }
-    });
-  }
-
-  void _confirmSelection() {
-    if (_selectedHandlers.isNotEmpty) {
-      widget.onSelected(_selectedHandlers.first);
-      Navigator.pop(context);
-    }
+  void _addHandler(Map<String, dynamic> handler) {
+    widget.onSelected(handler);
+    Navigator.pop(context);
   }
 
   @override
@@ -88,7 +71,7 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Selecione um condutor para adicionar à equipe',
+                    'Toque no + ao lado do condutor para adicionar a equipe',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -137,9 +120,8 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                     itemCount: handlers.length,
                     itemBuilder: (context, index) {
                       final handler = handlers[index];
-                      final isSelected = _isHandlerSelected(handler['ra']);
                       final isInTeam = _isHandlerInTeam(handler['ra']);
-                      final isDisabled = isInTeam && !isSelected;
+                      final isDisabled = isInTeam;
                       final imageUrl = handler['imageUrl']?.toString().trim();
                       final displayName = handler['name']?.toString().trim();
                       final fallbackLabel = displayName?.isNotEmpty == true
@@ -154,9 +136,7 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: InkWell(
-                          onTap: isDisabled
-                              ? null
-                              : () => _toggleHandlerSelection(handler),
+                          onTap: isDisabled ? null : () => _addHandler(handler),
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -165,18 +145,12 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                                   ? Theme.of(
                                       context,
                                     ).colorScheme.surfaceContainerHighest
-                                  : isSelected
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer
                                   : Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.outlineVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
                               ),
                             ),
                             child: Row(
@@ -241,11 +215,15 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                                       ).colorScheme.primary,
                                       size: 20,
                                     ),
-                                  ),
-                                if (isSelected)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.white,
+                                  )
+                                else
+                                  IconButton.filledTonal(
+                                    tooltip: 'Adicionar integrante',
+                                    onPressed: () => _addHandler(handler),
+                                    icon: const Icon(
+                                      Icons.person_add_alt_1,
+                                      size: 20,
+                                    ),
                                   ),
                               ],
                             ),
@@ -267,13 +245,6 @@ class _HandlerSearchDialogState extends State<HandlerSearchDialog> {
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Cancelar'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _selectedHandlers.isNotEmpty
-                        ? _confirmSelection
-                        : null,
-                    child: const Text('Adicionar'),
                   ),
                 ],
               ),
