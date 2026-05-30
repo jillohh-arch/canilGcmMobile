@@ -3,13 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum SignatureStatus {
   pending,
   signed,
-  expired;
+  expired,
+  obsolete;
 
   String toMap() => switch (this) {
-        pending => 'pending',
-        signed => 'signed',
-        expired => 'expired',
-      };
+    pending => 'pending',
+    signed => 'signed',
+    expired => 'expired',
+    obsolete => 'obsolete',
+  };
 
   static SignatureStatus fromMap(String? value) {
     final normalized = value?.trim().toLowerCase();
@@ -18,6 +20,9 @@ enum SignatureStatus {
     }
     if (normalized == 'expired') {
       return SignatureStatus.expired;
+    }
+    if (normalized == 'obsolete' || normalized == 'invalidated') {
+      return SignatureStatus.obsolete;
     }
     return SignatureStatus.pending;
   }
@@ -28,9 +33,9 @@ enum SignatureMethod {
   password;
 
   String toMap() => switch (this) {
-        biometric => 'biometric',
-        password => 'password',
-      };
+    biometric => 'biometric',
+    password => 'password',
+  };
 
   static SignatureMethod fromMap(String? value) {
     final normalized = value?.trim().toLowerCase();
@@ -49,6 +54,10 @@ class OccurrenceSignature {
   final SignatureMethod signatureMethod;
   final String signatureHash;
   final String? reason;
+  final int round;
+  final DateTime? invalidatedAt;
+  final String? invalidatedBy;
+  final String? invalidationReason;
 
   const OccurrenceSignature({
     required this.handlerId,
@@ -57,6 +66,10 @@ class OccurrenceSignature {
     this.signatureMethod = SignatureMethod.biometric,
     this.signatureHash = '',
     this.reason,
+    this.round = 1,
+    this.invalidatedAt,
+    this.invalidatedBy,
+    this.invalidationReason,
   });
 
   factory OccurrenceSignature.fromJson(Map<dynamic, dynamic> json) {
@@ -70,6 +83,16 @@ class OccurrenceSignature {
       signatureHash:
           _parseString(json['signature_hash'] ?? json['signatureHash']) ?? '',
       reason: _parseString(json['reason']),
+      round: _parseInt(json['round'] ?? json['signature_round']) ?? 1,
+      invalidatedAt: _parseDateTime(
+        json['invalidated_at'] ?? json['invalidatedAt'],
+      ),
+      invalidatedBy: _parseString(
+        json['invalidated_by'] ?? json['invalidatedBy'],
+      ),
+      invalidationReason: _parseString(
+        json['invalidation_reason'] ?? json['invalidationReason'],
+      ),
     );
   }
 
@@ -81,6 +104,13 @@ class OccurrenceSignature {
       'signature_method': signatureMethod.toMap(),
       'signature_hash': signatureHash,
       if (reason != null) 'reason': reason,
+      'round': round,
+      'signature_round': round,
+      'invalidated_at': invalidatedAt != null
+          ? Timestamp.fromDate(invalidatedAt!)
+          : null,
+      if (invalidatedBy != null) 'invalidated_by': invalidatedBy,
+      if (invalidationReason != null) 'invalidation_reason': invalidationReason,
     };
   }
 
@@ -88,10 +118,14 @@ class OccurrenceSignature {
   Map<String, dynamic> toHashPayload() {
     return {
       'handler_id': handlerId,
+      'round': round,
       'status': status.toMap(),
       'signed_at': signedAt?.toUtc().toIso8601String(),
       'signature_method': signatureMethod.toMap(),
       if (reason != null) 'reason': reason,
+      'invalidated_at': invalidatedAt?.toUtc().toIso8601String(),
+      if (invalidatedBy != null) 'invalidated_by': invalidatedBy,
+      if (invalidationReason != null) 'invalidation_reason': invalidationReason,
     };
   }
 
@@ -102,6 +136,10 @@ class OccurrenceSignature {
     SignatureMethod? signatureMethod,
     String? signatureHash,
     String? reason,
+    int? round,
+    DateTime? invalidatedAt,
+    String? invalidatedBy,
+    String? invalidationReason,
   }) {
     return OccurrenceSignature(
       handlerId: handlerId ?? this.handlerId,
@@ -110,6 +148,10 @@ class OccurrenceSignature {
       signatureMethod: signatureMethod ?? this.signatureMethod,
       signatureHash: signatureHash ?? this.signatureHash,
       reason: reason ?? this.reason,
+      round: round ?? this.round,
+      invalidatedAt: invalidatedAt ?? this.invalidatedAt,
+      invalidatedBy: invalidatedBy ?? this.invalidatedBy,
+      invalidationReason: invalidationReason ?? this.invalidationReason,
     );
   }
 
@@ -125,5 +167,12 @@ class OccurrenceSignature {
     if (value == null) return null;
     final text = value.toString().trim();
     return text.isEmpty ? null : text;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }

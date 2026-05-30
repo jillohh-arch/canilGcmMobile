@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telas novas — equipe, aceite e assinatura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;flex-wrap:wrap;padding:24px 20px;gap:26px;}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;}
+  .phone-label{color:#4dd0e1;font-size:11px;font-weight:600;letter-spacing:1.2px;margin-bottom:10px;text-align:center;max-width:390px;}
+  .phone-label small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .phone{width:390px;height:844px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;flex-shrink:0;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .content{padding:0 18px 110px;overflow-y:auto;}
+  .content::-webkit-scrollbar{width:0;}
+
+  /* header (casca) */
+  .header{display:flex;align-items:center;gap:12px;padding:6px 0 16px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle .h-main{color:#fff;font-size:16px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:11px;font-weight:500;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+
+  /* ident card (casca) */
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:16px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .ident-type{color:#4dd0e1;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:19px;font-weight:700;line-height:1.15;}
+  .badge{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;border-radius:14px;padding:5px 10px;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .b-amber{background:rgba(241,196,15,.14);border:1px solid rgba(241,196,15,.38);color:#f1c40f;}
+  .b-green{background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);color:#2ecc71;}
+  .b-cyan{background:rgba(77,208,225,.12);border:1px solid rgba(77,208,225,.35);color:#4dd0e1;}
+  .ident-meta{display:flex;gap:18px;padding-top:12px;margin-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:13px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:30px;height:30px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11.5px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+
+  .sec-label{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:20px 0 11px;}
+
+  .stats{display:flex;gap:9px;margin-bottom:6px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px 8px;text-align:center;}
+  .stat-n{color:#fff;font-size:20px;font-weight:800;}
+  .stat-l{color:#5a7280;font-size:9px;font-weight:600;margin-top:3px;letter-spacing:.3px;}
+
+  /* membros / guarnição */
+  .member{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+  .m-av{width:34px;height:34px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;}
+  .m-av.dog{border-color:#2ecc71;}
+  .m-name{color:#fff;font-size:13px;font-weight:600;}
+  .m-meta{color:#7a8a92;font-size:10px;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+  .m-right{margin-left:auto;}
+  .mini{font-size:9px;color:#7a8a92;text-align:right;line-height:1.4;}
+
+  /* notificação acionável (lockscreen) */
+  .lock{flex:1;display:flex;flex-direction:column;align-items:center;padding-top:90px;background:radial-gradient(circle at 50% 18%,rgba(77,208,225,.06),transparent 55%),#050d10;}
+  .lock-time{color:#fff;font-size:64px;font-weight:300;letter-spacing:1px;}
+  .lock-date{color:#aebcc4;font-size:14px;margin-top:2px;margin-bottom:42px;}
+  .notif{width:340px;background:rgba(28,40,46,.92);backdrop-filter:blur(8px);border:1px solid rgba(77,208,225,.18);border-radius:18px;padding:14px;}
+  .notif-head{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+  .notif-ic{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,rgba(77,208,225,.25),rgba(77,208,225,.08));border:1px solid rgba(77,208,225,.3);display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:14px;}
+  .notif-app{color:#aebcc4;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
+  .notif-when{margin-left:auto;color:#5a7280;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+  .notif-title{color:#fff;font-size:14px;font-weight:700;margin-bottom:3px;}
+  .notif-body{color:#b0c4cc;font-size:12px;line-height:1.45;}
+  .notif-actions{display:flex;gap:8px;margin-top:12px;}
+  .na{flex:1;border-radius:10px;padding:10px;font-size:12px;font-weight:700;text-align:center;border:none;font-family:inherit;}
+  .na-yes{background:#2ecc71;color:#04140a;}
+  .na-no{background:rgba(255,255,255,.06);color:#e74c3c;border:1px solid rgba(231,76,60,.3);}
+
+  /* botões grandes / cta */
+  .stack{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+  .big{width:100%;border-radius:13px;padding:15px;font-size:14px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;border:none;}
+  .big-green{background:#2ecc71;color:#04140a;}
+  .big-cyan{background:#4dd0e1;color:#050d10;}
+  .big-amber{background:rgba(241,196,15,.12);border:1px solid rgba(241,196,15,.4);color:#f1c40f;}
+  .big-ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#b0c4cc;}
+
+  .note{color:#7a8a92;font-size:11px;line-height:1.55;margin-top:10px;}
+  .note b{color:#b0c4cc;}
+
+  /* textarea mock */
+  .ta{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:13px;color:#7a8a92;font-size:13px;line-height:1.5;min-height:84px;}
+  .ta.amber{border-color:rgba(241,196,15,.3);}
+
+  /* fingerprint */
+  .fp{width:72px;height:72px;border-radius:50%;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;margin:6px auto 0;color:#4dd0e1;}
+
+  /* cta bar fixa */
+  .cta-bar{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 72%,transparent);display:flex;flex-direction:column;gap:10px;}
+
+  .design-notes{width:100%;max-width:1280px;margin:8px auto 0;color:#9aa7af;font-size:13px;line-height:1.6;}
+  .design-notes h3{color:#4dd0e1;font-size:14px;margin:18px 0 10px;letter-spacing:.5px;}
+  .design-notes ul{list-style:none;padding-left:0;}
+  .design-notes li{padding:4px 0 4px 20px;position:relative;}
+  .design-notes li:before{content:"→";position:absolute;left:0;color:#4dd0e1;}
+  .design-notes b{color:#b0c4cc;}
+  .lesson{background:rgba(77,208,225,.04);border-left:3px solid #4dd0e1;border-radius:8px;padding:12px 14px;margin:6px 0 4px;color:#b0c4cc;font-size:12px;line-height:1.55;}
+  .lesson b{color:#4dd0e1;}
+</style>
+</head>
+<body>
+
+<!-- ===== A1 — NOTIFICAÇÃO ACIONÁVEL (abertura) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">A1 — NOTIFICAÇÃO DE ABERTURA<small>chega no celular do integrante · aceita/recusa sem abrir o app</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>10:02</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="lock">
+      <div class="lock-time">10:02</div>
+      <div class="lock-date">terça, 26 de maio</div>
+      <div class="notif">
+        <div class="notif-head">
+          <div class="notif-ic">🛡</div>
+          <div class="notif-app">Canil K9 · Canil 1075</div>
+          <div class="notif-when">agora</div>
+        </div>
+        <div class="notif-title">Ocorrência aberta — você está envolvido</div>
+        <div class="notif-body">Tráfico de drogas · relator GCM Ragonha. Confirme sua participação na guarnição.</div>
+        <div class="notif-actions">
+          <button class="na na-yes">✓ Aceitar</button>
+          <button class="na na-no">Recusar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== A2 — TELA DE ACEITE (abriu o app) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">A2 — CONFIRMAR PARTICIPAÇÃO<small>se tocar na notificação · vê o essencial e decide</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>10:02</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Participação na ocorrência</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+
+      <div class="ident">
+        <div class="ident-top"><div><div class="ident-type">Convite à guarnição</div><div class="ident-nature">Tráfico de drogas</div></div><div class="badge b-amber">ABERTA</div></div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div>
+          <div class="im"><span class="im-k">Aberta</span><span class="im-v">10:02</span></div>
+          <div class="im"><span class="im-k">Relator</span><span class="im-v">Ragonha</span></div>
+        </div>
+        <div class="ident-bin"><div class="bin-av dog"></div><div class="bin-av"></div><div class="bin-txt"><b>Bono</b> (cão de serviço) · GCM <b>Ragonha</b> (relator)</div></div>
+      </div>
+
+      <div class="sec-label">Você nesta ocorrência</div>
+      <div class="member"><div class="m-av"></div><div><div class="m-name">GCM Silva</div><div class="m-meta">RA 702318 · integrante</div></div></div>
+      <div class="note">Ao <b>aceitar</b>, você passa a integrar a guarnição e poderá editar os dados enquanto a ocorrência estiver aberta. No fim, será chamado a assinar. A <b>recusa</b> exige justificativa (ausência registrada).</div>
+
+      <div class="cta-bar">
+        <button class="big big-green">✓ Aceitar participação</button>
+        <button class="big big-ghost">Recusar e justificar ausência</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== A3 — RECUSA COM JUSTIFICATIVA ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">A3 — RECUSA JUSTIFICADA<small>raro · exige motivo · fica auditado</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>10:03</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Justificar ausência</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+
+      <div class="ident">
+        <div class="ident-top"><div><div class="ident-type">Tráfico de drogas</div><div class="ident-nature">Por que você não participou?</div></div></div>
+        <div class="note" style="margin-top:10px">Sua ausência será registrada na ocorrência de forma transparente. Você não precisará assinar.</div>
+      </div>
+
+      <div class="sec-label">Motivo da ausência</div>
+      <div class="ta amber">Saí da viatura às 09:40 para consulta médica agendada (atestado anexo). Não estive presente nesta ocorrência.</div>
+
+      <div class="cta-bar">
+        <button class="big big-amber">Confirmar recusa justificada</button>
+        <button class="big big-ghost">Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== B1 — REVISÃO PARA ASSINAR ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">B1 — REVISAR PARA ASSINAR<small>após finalizar · vê a ocorrência até o fechamento</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>11:31</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Revisar para assinar</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+
+      <div class="ident">
+        <div class="ident-top"><div><div class="ident-type">Aguardando sua assinatura</div><div class="ident-nature">Tráfico de drogas</div></div><div class="badge b-amber">PENDENTE</div></div>
+        <div class="ident-meta">
+          <div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div>
+          <div class="im"><span class="im-k">Operação</span><span class="im-v">10:02→11:30</span></div>
+          <div class="im"><span class="im-k">Prazo</span><span class="im-v">48h</span></div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-n">8</div><div class="stat-l">EVENTOS</div></div>
+        <div class="stat"><div class="stat-n">10</div><div class="stat-l">MÍDIAS</div></div>
+        <div class="stat"><div class="stat-n">3</div><div class="stat-l">RESULTADOS</div></div>
+      </div>
+
+      <div class="sec-label">Guarnição</div>
+      <div class="member"><div class="m-av"></div><div><div class="m-name">GCM Ragonha</div><div class="m-meta">RA 691755 · relator · assinou ✓</div></div><div class="m-right badge b-green">✓</div></div>
+      <div class="member"><div class="m-av dog"></div><div><div class="m-name">K9 Bono</div><div class="m-meta">matrícula 0042 · presença atestada</div></div></div>
+
+      <div class="note">Revise os eventos e resultados até o fechamento. Se estiver tudo correto, <b>concorde e assine</b>. Se faltar algo, <b>devolva para correção</b>.</div>
+
+      <div class="cta-bar">
+        <button class="big big-cyan">Concordar e assinar</button>
+        <button class="big big-amber">Devolver para correção</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== B2 — DEVOLVER PARA CORREÇÃO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">B2 — DEVOLVER PARA CORREÇÃO<small>o caso da moto · reabre a ocorrência antes de selar</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>11:33</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="content">
+      <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Devolver para correção</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+
+      <div class="ident">
+        <div class="ident-top"><div><div class="ident-type">Tráfico de drogas</div><div class="ident-nature">O que precisa ser corrigido?</div></div></div>
+        <div class="note" style="margin-top:10px">A ocorrência <b>reabre</b> para ajuste. Assinaturas já coletadas são refeitas, porque o conteúdo vai mudar. Tudo fica na trilha de auditoria.</div>
+      </div>
+
+      <div class="sec-label">Descreva a correção</div>
+      <div class="ta amber">Faltou constar a apreensão de uma motocicleta (Honda CG, placa XYZ-0000) por estar em situação de produto de furto. Incluir na lista de apreensões.</div>
+
+      <div class="sec-label">Depois da devolução</div>
+      <div class="member"><div class="m-av"></div><div><div class="m-name">Ocorrência volta a EM ANDAMENTO</div><div class="m-meta">quem aceitou corrige → re-finaliza → re-assina</div></div></div>
+
+      <div class="cta-bar">
+        <button class="big big-amber">Devolver com esta justificativa</button>
+        <button class="big big-ghost">Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="design-notes">
+  <div class="lesson"><b>Validação de estilo.</b> Estas telas espelham o <b>detalhe_historico</b>: Inter + IBM Plex Mono (mono em REG, RA, matrícula, horas, prazo), header com back-btn arredondado, card de identificação em gradiente ciano, badges com a mesma linguagem, e barra de ação fixa no rodapé. Se o estilo estiver certo, replico em todo o storyboard do fluxo.</div>
+
+  <h3>O que estas telas resolvem (modelo novo)</h3>
+  <ul>
+    <li><b>A equipe saiu da ocorrência.</b> Aqui ela só é <b>referenciada</b> — a guarnição vem do turno/viatura.</li>
+    <li><b>Dois consentimentos:</b> aceite na abertura (A1–A3) e assinatura no fim (B1).</li>
+    <li><b>Notificação acionável (A1):</b> chega no celular do integrante; aceita/recusa sem abrir o app (precisa de FCM — push real, que o app ainda não tem).</li>
+    <li><b>Recusa = ausência justificada (A3):</b> rara, exige motivo, fica auditada; quem recusa não assina.</li>
+    <li><b>Devolver para correção (B2):</b> o caso da moto — antes do selo, corrige no próprio registro; assinaturas anteriores são refeitas; auditado. Depois do selo seria aditamento.</li>
+    <li><b>Cão de serviço único</b> aparece como membro (matrícula, presença atestada), não pareado a um condutor.</li>
+  </ul>
+</div>
+
+</body>
+</html>

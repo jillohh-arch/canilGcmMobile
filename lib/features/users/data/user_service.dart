@@ -11,7 +11,7 @@ class UserService {
   Stream<List<UserModel>> getUsers() {
     return _db.collection('users').snapshots().map((snapshot) {
       return snapshot.docs
-          .map((doc) => UserModel.fromJson(doc.data()))
+          .map((doc) => UserModel.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     });
   }
@@ -30,6 +30,6 @@ class UserService {
   Future<UserModel?> getUser(String ra) async {
     final doc = await _db.collection('users').doc(ra).get();
     if (!doc.exists) return null;
-    return UserModel.fromJson(doc.data()!);
+    return UserModel.fromJson({...doc.data()!, 'id': doc.id});
   }
 }

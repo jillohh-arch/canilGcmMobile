@@ -1,30 +1,70 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum NotificationType {
+  vehicleCrewInvitation,
+  vehicleCrewInvitationAccepted,
+  vehicleCrewInvitationDeclined,
+  occurrenceParticipationRequested,
+  occurrenceParticipationAccepted,
+  occurrenceParticipationDeclined,
   signatureRequested,
   signatureCompleted,
+  signatureDeclined,
+  correctionRequested,
   deadlineWarning,
   occurrenceFinalized,
   amendmentCreated;
 
   String toMap() => switch (this) {
-        signatureRequested => 'signature_requested',
-        signatureCompleted => 'signature_completed',
-        deadlineWarning => 'deadline_warning',
-        occurrenceFinalized => 'occurrence_finalized',
-        amendmentCreated => 'amendment_created',
-      };
+    vehicleCrewInvitation => 'vehicle_crew_invitation',
+    vehicleCrewInvitationAccepted => 'vehicle_crew_invitation_accepted',
+    vehicleCrewInvitationDeclined => 'vehicle_crew_invitation_declined',
+    occurrenceParticipationRequested => 'occurrence_participation_requested',
+    occurrenceParticipationAccepted => 'occurrence_participation_accepted',
+    occurrenceParticipationDeclined => 'occurrence_participation_declined',
+    signatureRequested => 'signature_requested',
+    signatureCompleted => 'signature_completed',
+    signatureDeclined => 'signature_declined',
+    correctionRequested => 'correction_requested',
+    deadlineWarning => 'deadline_warning',
+    occurrenceFinalized => 'occurrence_finalized',
+    amendmentCreated => 'amendment_created',
+  };
 
   static NotificationType fromMap(String? value) {
     final normalized = value?.trim().toLowerCase();
     if (normalized == null || normalized.isEmpty) {
       return NotificationType.signatureRequested;
     }
+    if (normalized == 'vehicle_crew_invitation') {
+      return NotificationType.vehicleCrewInvitation;
+    }
+    if (normalized == 'vehicle_crew_invitation_accepted') {
+      return NotificationType.vehicleCrewInvitationAccepted;
+    }
+    if (normalized == 'vehicle_crew_invitation_declined') {
+      return NotificationType.vehicleCrewInvitationDeclined;
+    }
+    if (normalized == 'occurrence_participation_requested') {
+      return NotificationType.occurrenceParticipationRequested;
+    }
+    if (normalized == 'occurrence_participation_accepted') {
+      return NotificationType.occurrenceParticipationAccepted;
+    }
+    if (normalized == 'occurrence_participation_declined') {
+      return NotificationType.occurrenceParticipationDeclined;
+    }
     if (normalized == 'signature_requested') {
       return NotificationType.signatureRequested;
     }
     if (normalized == 'signature_completed') {
       return NotificationType.signatureCompleted;
+    }
+    if (normalized == 'signature_declined') {
+      return NotificationType.signatureDeclined;
+    }
+    if (normalized == 'correction_requested') {
+      return NotificationType.correctionRequested;
     }
     if (normalized == 'deadline_warning') {
       return NotificationType.deadlineWarning;
@@ -94,4 +134,10 @@ class NotificationItem {
   }
 
   bool get isUnread => readAt == null;
+  bool get isVehicleCrewNotification => switch (type) {
+    NotificationType.vehicleCrewInvitation ||
+    NotificationType.vehicleCrewInvitationAccepted ||
+    NotificationType.vehicleCrewInvitationDeclined => true,
+    _ => false,
+  };
 }

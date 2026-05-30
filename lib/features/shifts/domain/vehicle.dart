@@ -38,7 +38,7 @@ class Vehicle {
       crewSize:
           _parseInt(json['crew_size']) ?? _parseInt(json['crewSize']) ?? 1,
       unit: _parseString(json['unit']) ?? 'Limeira/SP',
-      active: json['active'] != false,
+      active: _parseBool(json['active']) ?? true,
     );
   }
 
@@ -63,6 +63,20 @@ class Vehicle {
     if (value is int) return value;
     if (value is num) return value.round();
     if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static bool? _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1' || normalized == 'sim') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'nao') {
+        return false;
+      }
+    }
     return null;
   }
 

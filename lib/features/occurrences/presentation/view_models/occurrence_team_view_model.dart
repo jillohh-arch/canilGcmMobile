@@ -36,23 +36,22 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
   String? get error => _error;
 
   bool get canAddTeamMember {
-    final occurrence = _occurrence;
-    if (occurrence == null) return false;
-    return !occurrence.hasVehicleCrew &&
-        occurrence.status == OccurrenceStatus.inProgress &&
-        _team.length < occurrence.teamSizeMax;
+    // Parte 11: a equipe operacional e derivada da guarnicao da viatura.
+    // O autocomplete manual fica fora do fluxo de ocorrencia.
+    return false;
   }
 
   bool get canAddTeamMembers => canAddTeamMember;
 
-  bool get canRemoveMembers =>
-      _occurrence?.hasVehicleCrew != true &&
-      _occurrence?.status == OccurrenceStatus.inProgress &&
-      _team.any((member) => member.role != TeamRole.titular);
+  bool get canRemoveMembers => false;
 
   bool get canCloseForSignatures =>
       _occurrence?.status == OccurrenceStatus.inProgress &&
-      _team.any((member) => member.role != TeamRole.titular);
+      _team.any(
+        (member) =>
+            member.role != TeamRole.titular &&
+            _isParticipationActive(_occurrence!, member.handlerId),
+      );
 
   bool get canSign =>
       _occurrence?.status == OccurrenceStatus.awaitingSignatures;
@@ -79,7 +78,11 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
     }
 
     final coSignerIds = _team
-        .where((member) => member.role != TeamRole.titular)
+        .where(
+          (member) =>
+              member.role != TeamRole.titular &&
+              _isParticipationActive(occurrence, member.handlerId),
+        )
         .map((member) => member.handlerId)
         .toSet();
     if (coSignerIds.isEmpty) return false;
@@ -208,7 +211,11 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
       );
 
       final coSigners = _team
-          .where((member) => member.role != TeamRole.titular)
+          .where(
+            (member) =>
+                member.role != TeamRole.titular &&
+                _isParticipationActive(occurrence, member.handlerId),
+          )
           .toList();
       for (final member in coSigners) {
         await _notificationService.createNotification(
@@ -217,6 +224,8 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
           occurrenceId: occurrence.id,
           occurrenceTitle: occurrence.typeName,
           additionalData: member.handlerId,
+          targetScreen: 'occurrence_review',
+          actionRequired: true,
         );
       }
 
@@ -243,7 +252,9 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
     try {
       await _occurrenceRepository.addSignature(
         occurrenceId: occurrence.id,
-        signature: signature,
+        signature: signature.copyWith(
+          round: occurrence.signatureRound <= 0 ? 1 : occurrence.signatureRound,
+        ),
       );
 
       _signatures = await _signatureRepository.getSignatures(occurrence.id);
@@ -322,6 +333,18 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  bool _isParticipationActive(Occurrence occurrence, String handlerId) {
+    final id = handlerId.trim();
+    if (id.isEmpty || occurrence.declinedHandlerIds.contains(id)) {
+      return false;
+    }
+    if (occurrence.acceptedHandlerIds.isEmpty &&
+        occurrence.participationRevision == 0) {
+      return true;
+    }
+    return occurrence.acceptedHandlerIds.contains(id);
   }
 
   void _setLoading(bool value) {

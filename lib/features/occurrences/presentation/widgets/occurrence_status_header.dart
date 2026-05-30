@@ -34,7 +34,8 @@ class OccurrenceStatusHeader extends StatelessWidget {
         ],
 
         // Prazo vencendo
-        if (showDeadlineWarning && status == OccurrenceStatus.awaitingSignatures)
+        if (showDeadlineWarning &&
+            status == OccurrenceStatus.awaitingSignatures)
           Container(
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.all(8),
@@ -133,7 +134,10 @@ class OccurrenceStatusHeader extends StatelessWidget {
   }
 
   Widget _buildSignatureInfo(BuildContext context) {
-    final remaining = teamSize - 1 - signedCount;
+    final coSignerCount = (teamSize - 1).clamp(0, teamSize).toInt();
+    final remaining = (coSignerCount - signedCount)
+        .clamp(0, coSignerCount)
+        .toInt();
 
     return Row(
       children: [
@@ -144,7 +148,7 @@ class OccurrenceStatusHeader extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          '$signedCount assinatura(s) de ${teamSize - 1} integrante(s)',
+          '$signedCount assinatura(s) de $coSignerCount integrante(s)',
           style: TextStyle(
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

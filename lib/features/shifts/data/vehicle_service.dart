@@ -12,9 +12,7 @@ class VehicleService {
       _db.collection('vehicles');
 
   Stream<List<Vehicle>> watchActiveVehicles() {
-    return _vehicles.where('active', isEqualTo: true).snapshots().map((
-      snapshot,
-    ) {
+    return _vehicles.snapshots().map((snapshot) {
       final vehicles = snapshot.docs
           .map((doc) => Vehicle.fromJson(doc.data(), doc.id))
           .where((vehicle) => vehicle.active)

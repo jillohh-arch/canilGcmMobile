@@ -1,4 +1,3 @@
-
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
@@ -314,7 +314,9 @@ class HistoryDetailScaffold extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -367,7 +369,9 @@ class HistoryDetailScaffold extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -614,6 +618,68 @@ class HistoryDetailScaffold extends StatelessWidget {
         isOcc && detail.status.toLowerCase().contains('final');
     final hasOccurrenceHash = occurrenceHash?.isNotEmpty == true;
 
+    if (isOcc && isFinalizedOcc && hasOccurrenceHash) {
+      return FutureBuilder<IntegrityVerdict>(
+        future: IntegrityVerificationService().verifyById(detail.id),
+        builder: (context, snapshot) {
+          final verdict = snapshot.data;
+          final verifying = snapshot.connectionState == ConnectionState.waiting;
+          final color = verifying
+              ? _cyan
+              : verdict?.status == IntegrityStatus.broken
+              ? _red
+              : verdict?.status == IntegrityStatus.legacy
+              ? _amber
+              : _green;
+          final icon = verifying
+              ? Icons.hourglass_top_rounded
+              : verdict?.status == IntegrityStatus.broken
+              ? Icons.gpp_bad_outlined
+              : verdict?.status == IntegrityStatus.legacy
+              ? Icons.history_edu_outlined
+              : Icons.verified_user_outlined;
+          final title = verifying
+              ? 'VERIFICANDO SELO SHA-256'
+              : '${(verdict?.label ?? 'Documento integro').toUpperCase()} - HASH V${verdict?.hashVersion ?? '?'}';
+
+          return _buildIntegrityCard(
+            context: context,
+            color: color,
+            icon: icon,
+            title: title,
+            body: Padding(
+              padding: const EdgeInsets.only(top: 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SelectableText(
+                    occurrenceHash!,
+                    style: GoogleFonts.ibmPlexMono(
+                      color: _textSecondary,
+                      fontSize: 10.5,
+                      height: 1.5,
+                    ),
+                  ),
+                  if (verdict?.recomputedHash != null &&
+                      verdict!.recomputedHash != verdict.storedHash) ...[
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      'Recalculado: ${verdict.recomputedHash}',
+                      style: GoogleFonts.ibmPlexMono(
+                        color: _red,
+                        fontSize: 10.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     final count = detail.auditEvents.length;
 
     // Determine values based on status
@@ -785,13 +851,116 @@ class HistoryDetailScaffold extends StatelessWidget {
     );
   }
 
+  Widget _buildIntegrityCard({
+    required BuildContext context,
+    required Color color,
+    required IconData icon,
+    required String title,
+    required Widget body,
+  }) {
+    final count = detail.auditEvents.length;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(10),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: color.withAlpha(38)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body,
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.white.withAlpha(15)),
+          const SizedBox(height: 11),
+          InkWell(
+            onTap: () => _showAuditTrail(context),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Trilha de auditoria · '),
+                      TextSpan(
+                        text: '$count ${count == 1 ? 'registro' : 'registros'}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _textSecondary,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 11),
+          Container(height: 1, color: Colors.white.withAlpha(15)),
+          const SizedBox(height: 11),
+          InkWell(
+            onTap: () => _openCreateAmendment(context),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.post_add_rounded, color: _amber, size: 14),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Adicionar retificacao',
+                      style: GoogleFonts.inter(
+                        color: _amber,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: _amber.withAlpha(150),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openCreateAmendment(BuildContext context) {
     if (detail.source.originalModel is! Occurrence) return;
     final occ = detail.source.originalModel as Occurrence;
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CreateAmendmentScreen(occurrence: occ),
-      ),
+      MaterialPageRoute(builder: (_) => CreateAmendmentScreen(occurrence: occ)),
     );
   }
 
@@ -931,7 +1100,7 @@ class HistoryOccurrenceBody extends StatelessWidget {
             const SizedBox(width: 8),
             _statItem('${outcomes.length}', 'RESULTADOS'),
           ],
-        ),        // Resultados/Outcomes list
+        ), // Resultados/Outcomes list
         if (outcomes.isNotEmpty) ...[
           const _SectionLabel('RESULTADOS'),
           const SizedBox(height: 8),
@@ -3026,9 +3195,9 @@ class _OccurrenceDisplacementSectionState
 
   Future<List<OccurrenceLocation>> _loadLocations() async {
     if (widget.occurrenceId.isEmpty) return [];
-    final events = await context
-        .read<OccurrenceViewModel>()
-        .getEvents(widget.occurrenceId);
+    final events = await context.read<OccurrenceViewModel>().getEvents(
+      widget.occurrenceId,
+    );
     return OccurrenceLocationService.clusterEvents(events);
   }
 
@@ -3041,10 +3210,7 @@ class _OccurrenceDisplacementSectionState
           return const SizedBox(
             height: 200,
             child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: _cyan,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: _cyan),
             ),
           );
         }
@@ -3253,7 +3419,6 @@ class _OccurrenceTimelineSectionState
             }),
           ),
         ),
-
       ],
     );
   }
@@ -3332,8 +3497,7 @@ class _AmendmentsSectionState extends State<_AmendmentsSection> {
   }
 
   Future<void> _loadAmendments() async {
-    final amendments =
-        await _repository.listByOccurrence(widget.occurrence.id);
+    final amendments = await _repository.listByOccurrence(widget.occurrence.id);
     if (mounted) {
       setState(() {
         _amendments = amendments;
@@ -3405,8 +3569,7 @@ class _AmendmentCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: _amber.withAlpha(25),
                   borderRadius: BorderRadius.circular(4),
@@ -3479,8 +3642,11 @@ class _AmendmentCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.remove_circle_outline,
-                            color: Colors.redAccent.withAlpha(150), size: 12),
+                        Icon(
+                          Icons.remove_circle_outline,
+                          color: Colors.redAccent.withAlpha(150),
+                          size: 12,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -3498,9 +3664,11 @@ class _AmendmentCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.add_circle_outline,
-                            color: const Color(0xFF4CAF50).withAlpha(180),
-                            size: 12),
+                        Icon(
+                          Icons.add_circle_outline,
+                          color: const Color(0xFF4CAF50).withAlpha(180),
+                          size: 12,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 
 class PendingScreen extends StatefulWidget {
   final String userId;
@@ -172,12 +175,49 @@ class _PendingScreenState extends State<PendingScreen> {
     }
 
     if (!mounted) return;
+    if (notification.isVehicleCrewNotification) {
+      final crewId = notification.additionalData?.trim();
+      if (crewId == null || crewId.isEmpty) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VehicleCrewProfileScreen(crewId: crewId),
+        ),
+      );
+      return;
+    }
+    if (_opensActiveOccurrence(notification.type)) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              ActiveOccurrenceScreen(occurrenceId: notification.occurrenceId),
+        ),
+      );
+      return;
+    }
+    if (_opensReview(notification.type)) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              OccurrenceReviewScreen(occurrenceId: notification.occurrenceId),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
             OccurrenceTeamScreen(occurrenceId: notification.occurrenceId),
       ),
     );
+  }
+
+  bool _opensActiveOccurrence(NotificationType type) {
+    return type == NotificationType.occurrenceParticipationRequested ||
+        type == NotificationType.correctionRequested;
+  }
+
+  bool _opensReview(NotificationType type) {
+    return type == NotificationType.signatureRequested;
   }
 }
 
@@ -265,7 +305,8 @@ class _NotificationCard extends StatelessWidget {
               ),
 
               // Dados adicionais
-              if (notification.additionalData != null)
+              if (notification.additionalData != null &&
+                  !notification.isVehicleCrewNotification)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
@@ -285,10 +326,26 @@ class _NotificationCard extends StatelessWidget {
 
   IconData _getIcon() {
     switch (notification.type) {
+      case NotificationType.vehicleCrewInvitation:
+        return Icons.group_add;
+      case NotificationType.vehicleCrewInvitationAccepted:
+        return Icons.how_to_reg;
+      case NotificationType.vehicleCrewInvitationDeclined:
+        return Icons.person_off;
+      case NotificationType.occurrenceParticipationRequested:
+        return Icons.groups;
+      case NotificationType.occurrenceParticipationAccepted:
+        return Icons.how_to_reg;
+      case NotificationType.occurrenceParticipationDeclined:
+        return Icons.person_off;
       case NotificationType.signatureRequested:
         return Icons.request_quote;
       case NotificationType.signatureCompleted:
         return Icons.check_circle;
+      case NotificationType.signatureDeclined:
+        return Icons.cancel_presentation;
+      case NotificationType.correctionRequested:
+        return Icons.rule;
       case NotificationType.deadlineWarning:
         return Icons.warning;
       case NotificationType.occurrenceFinalized:
@@ -300,10 +357,26 @@ class _NotificationCard extends StatelessWidget {
 
   Color _getIconColor(BuildContext context) {
     switch (notification.type) {
+      case NotificationType.vehicleCrewInvitation:
+        return Theme.of(context).colorScheme.primary;
+      case NotificationType.vehicleCrewInvitationAccepted:
+        return Colors.green;
+      case NotificationType.vehicleCrewInvitationDeclined:
+        return Theme.of(context).colorScheme.error;
+      case NotificationType.occurrenceParticipationRequested:
+        return Theme.of(context).colorScheme.primary;
+      case NotificationType.occurrenceParticipationAccepted:
+        return Colors.green;
+      case NotificationType.occurrenceParticipationDeclined:
+        return Theme.of(context).colorScheme.error;
       case NotificationType.signatureRequested:
         return Theme.of(context).colorScheme.primary;
       case NotificationType.signatureCompleted:
         return Colors.green;
+      case NotificationType.signatureDeclined:
+        return Theme.of(context).colorScheme.error;
+      case NotificationType.correctionRequested:
+        return Theme.of(context).colorScheme.tertiary;
       case NotificationType.deadlineWarning:
         return Colors.amber.shade800;
       case NotificationType.occurrenceFinalized:
@@ -315,10 +388,26 @@ class _NotificationCard extends StatelessWidget {
 
   String _getTitle() {
     switch (notification.type) {
+      case NotificationType.vehicleCrewInvitation:
+        return 'Convite para a Guarnição';
+      case NotificationType.vehicleCrewInvitationAccepted:
+        return 'Convite Aceito';
+      case NotificationType.vehicleCrewInvitationDeclined:
+        return 'Convite Recusado';
+      case NotificationType.occurrenceParticipationRequested:
+        return 'Ocorrência Aberta';
+      case NotificationType.occurrenceParticipationAccepted:
+        return 'Participação Confirmada';
+      case NotificationType.occurrenceParticipationDeclined:
+        return 'Participação Recusada';
       case NotificationType.signatureRequested:
         return 'Solicitação de Assinatura';
       case NotificationType.signatureCompleted:
         return 'Assinatura Realizada';
+      case NotificationType.signatureDeclined:
+        return 'Assinatura Recusada';
+      case NotificationType.correctionRequested:
+        return 'Correção Solicitada';
       case NotificationType.deadlineWarning:
         return 'Prazo de Assinatura Vencendo';
       case NotificationType.occurrenceFinalized:
@@ -330,10 +419,26 @@ class _NotificationCard extends StatelessWidget {
 
   String _getMessage() {
     switch (notification.type) {
+      case NotificationType.vehicleCrewInvitation:
+        return 'Você recebeu um convite para compor a guarnição "${notification.occurrenceTitle}".';
+      case NotificationType.vehicleCrewInvitationAccepted:
+        return 'Um condutor aceitou o convite para a guarnição "${notification.occurrenceTitle}".';
+      case NotificationType.vehicleCrewInvitationDeclined:
+        return 'Um condutor recusou o convite para a guarnição "${notification.occurrenceTitle}".';
+      case NotificationType.occurrenceParticipationRequested:
+        return 'Você foi incluído na ocorrência "${notification.occurrenceTitle}"';
+      case NotificationType.occurrenceParticipationAccepted:
+        return 'Um integrante confirmou ciência da ocorrência "${notification.occurrenceTitle}"';
+      case NotificationType.occurrenceParticipationDeclined:
+        return 'Um integrante recusou participação na ocorrência "${notification.occurrenceTitle}"';
       case NotificationType.signatureRequested:
         return 'Você foi convidado a assinar a ocorrência "${notification.occurrenceTitle}"';
       case NotificationType.signatureCompleted:
         return 'O integrante "${notification.additionalData}" assinou a ocorrência "${notification.occurrenceTitle}"';
+      case NotificationType.signatureDeclined:
+        return 'Um integrante recusou assinar a ocorrência "${notification.occurrenceTitle}"';
+      case NotificationType.correctionRequested:
+        return 'Foi solicitada correção na ocorrência "${notification.occurrenceTitle}"';
       case NotificationType.deadlineWarning:
         return 'O prazo para assinar a ocorrência "${notification.occurrenceTitle}" está expirando';
       case NotificationType.occurrenceFinalized:

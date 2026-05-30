@@ -5,7 +5,7 @@ import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 
 class SignatureRepository {
   SignatureRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -20,6 +20,21 @@ class SignatureRepository {
     return _firestore.collection('occurrences').doc(occurrenceId);
   }
 
+  String _signatureDocId(OccurrenceSignature signature) {
+    return signature.round <= 1
+        ? signature.handlerId
+        : 'round_${signature.round}_${signature.handlerId}';
+  }
+
+  Future<int> _currentRound(String occurrenceId) async {
+    final snapshot = await _occurrence(occurrenceId).get();
+    final raw = snapshot.data()?['signature_round'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.round();
+    if (raw is String) return int.tryParse(raw) ?? 1;
+    return 1;
+  }
+
   /// Adiciona ou atualiza a assinatura canonica em
   /// occurrences/{occurrenceId}/signatures/{ra}.
   Future<void> addSignature({
@@ -30,15 +45,15 @@ class SignatureRepository {
       '[SignatureRepository] Salvando assinatura de ${signature.handlerId} em $occurrenceId',
     );
 
-    await _signatures(occurrenceId).doc(signature.handlerId).set({
+    await _signatures(occurrenceId).doc(_signatureDocId(signature)).set({
       ...signature.toJson(),
       'updated_at': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await _occurrence(occurrenceId).update({
-      'updated_at': FieldValue.serverTimestamp(),
-    });
+    await _occurrence(
+      occurrenceId,
+    ).update({'updated_at': FieldValue.serverTimestamp()});
   }
 
   Future<void> updateSignature({
@@ -52,19 +67,43 @@ class SignatureRepository {
     );
   }
 
-  Future<List<OccurrenceSignature>> getSignatures(String occurrenceId) async {
-    final snapshot = await _signatures(occurrenceId).orderBy('handler_id').get();
-    return snapshot.docs
+  Future<List<OccurrenceSignature>> getSignatures(
+    String occurrenceId, {
+    bool activeRoundOnly = true,
+  }) async {
+    final snapshot = await _signatures(
+      occurrenceId,
+    ).orderBy('handler_id').get();
+    final signatures = snapshot.docs
         .map((doc) => OccurrenceSignature.fromJson(doc.data()))
         .toList();
+    if (!activeRoundOnly) return signatures;
+    final round = await _currentRound(occurrenceId);
+    return signatures
+        .where(
+          (signature) =>
+              signature.round == round &&
+              signature.status != SignatureStatus.obsolete,
+        )
+        .toList();
+  }
+
+  Future<List<OccurrenceSignature>> getAllSignatures(String occurrenceId) {
+    return getSignatures(occurrenceId, activeRoundOnly: false);
   }
 
   Stream<List<OccurrenceSignature>> watchSignatures({
     required String occurrenceId,
   }) {
-    return _signatures(occurrenceId).orderBy('handler_id').snapshots().map(
+    return _signatures(occurrenceId)
+        .orderBy('handler_id')
+        .snapshots()
+        .map(
           (snapshot) => snapshot.docs
               .map((doc) => OccurrenceSignature.fromJson(doc.data()))
+              .where(
+                (signature) => signature.status != SignatureStatus.obsolete,
+              )
               .toList(),
         );
   }
@@ -76,7 +115,8 @@ class SignatureRepository {
     return _signatures(occurrenceId).doc(handlerId).snapshots().map((snapshot) {
       final data = snapshot.data();
       if (data == null) return false;
-      return OccurrenceSignature.fromJson(data).status == SignatureStatus.signed;
+      final signature = OccurrenceSignature.fromJson(data);
+      return signature.status == SignatureStatus.signed;
     });
   }
 
@@ -113,31 +153,55 @@ class SignatureRepository {
       '[SignatureRepository] Marcando assinatura expirada para $handlerId em $occurrenceId',
     );
 
-    await _signatures(occurrenceId).doc(handlerId).set({
+    final round = await _currentRound(occurrenceId);
+    final signature = OccurrenceSignature(
+      handlerId: handlerId,
+      status: SignatureStatus.expired,
+      reason: reason,
+      round: round,
+    );
+
+    await _signatures(occurrenceId).doc(_signatureDocId(signature)).set({
       ...OccurrenceSignature(
         handlerId: handlerId,
         status: SignatureStatus.expired,
         reason: reason,
+        round: round,
       ).toJson(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await _occurrence(occurrenceId).update({
-      'updated_at': FieldValue.serverTimestamp(),
-    });
+    await _occurrence(
+      occurrenceId,
+    ).update({'updated_at': FieldValue.serverTimestamp()});
   }
 
-  Future<void> clearAllSignatures({required String occurrenceId}) async {
-    debugPrint('[SignatureRepository] Limpando assinaturas de $occurrenceId');
+  Future<void> invalidateCurrentRound({
+    required String occurrenceId,
+    required String invalidatedBy,
+    required String reason,
+  }) async {
+    debugPrint('[SignatureRepository] Invalidando rodada de $occurrenceId');
 
-    final snapshot = await _signatures(occurrenceId).get();
+    final round = await _currentRound(occurrenceId);
+    final snapshot = await _signatures(
+      occurrenceId,
+    ).where('round', isEqualTo: round).get();
     final batch = _firestore.batch();
+    final invalidatedAt = FieldValue.serverTimestamp();
     for (final doc in snapshot.docs) {
-      batch.delete(doc.reference);
+      batch.set(doc.reference, {
+        'status': SignatureStatus.obsolete.toMap(),
+        'invalidated_at': invalidatedAt,
+        'invalidated_by': invalidatedBy,
+        'invalidation_reason': reason,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
     batch.update(_occurrence(occurrenceId), {
       'signature_request_at': null,
       'signature_deadline': null,
+      'signature_round': round + 1,
       'updated_at': FieldValue.serverTimestamp(),
     });
     await batch.commit();

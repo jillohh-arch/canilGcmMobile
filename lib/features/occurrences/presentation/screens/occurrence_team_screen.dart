@@ -6,17 +6,18 @@ import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
+import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_finalization_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_team_view_model.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/deadline_expired_dialog.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/team_header_widget.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/team_management_widget.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/occurrence_status_header.dart';
-import 'package:canil_gcm/features/occurrences/presentation/widgets/handler_search_dialog.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/signature_confirmation_dialog.dart';
 
 class OccurrenceTeamScreen extends StatefulWidget {
@@ -58,7 +59,6 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canManageTeam = _canCurrentUserManageTeam();
     final canCloseForSignatures = _canCurrentUserCloseForSignatures();
 
     return Scaffold(
@@ -66,12 +66,6 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
         title: const Text('Gerenciar Equipe'),
         actions: [
           // Botão para adicionar membro
-          if (canManageTeam && _viewModel.canAddTeamMembers)
-            IconButton(
-              onPressed: _showAddMemberDialog,
-              icon: const Icon(Icons.person_add),
-              tooltip: 'Adicionar integrante',
-            ),
           // Botão para fechar para assinaturas
           if (canCloseForSignatures)
             IconButton(
@@ -131,6 +125,15 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
             final canSignOccurrence = _canCurrentUserSign(viewModel);
             final canControlSignatures = _isCurrentUserTitular(occurrence);
             final canEditTeam = _canCurrentUserManageTeam();
+            final canDeclineParticipation = _canCurrentUserDeclineParticipation(
+              occurrence,
+            );
+            final showActions =
+                canDeclineParticipation ||
+                (occurrence.status == OccurrenceStatus.awaitingSignatures &&
+                    (canSignOccurrence ||
+                        (canControlSignatures &&
+                            _viewModel.isDeadlineExpired)));
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +145,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
                     status: occurrence.status,
                     signatureRequestAt: occurrence.signatureRequestAt,
                     signatureDeadline: occurrence.signatureDeadline,
-                    teamSize: occurrence.teamSizeMax,
+                    teamSize: occurrence.team.length,
                     signedCount: viewModel.signatures
                         .where((s) => s.status == SignatureStatus.signed)
                         .length,
@@ -168,6 +171,8 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
                         TeamManagementWidget(
                           team: occurrence.team,
                           signatures: viewModel.signatures,
+                          declinedHandlerIds: occurrence.declinedHandlerIds
+                              .toSet(),
                           canAddMembers:
                               canEditTeam && viewModel.canAddTeamMembers,
                           canRemoveMembers:
@@ -180,9 +185,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
                         ),
 
                         // Botões de ação
-                        if (occurrence.status ==
-                                OccurrenceStatus.awaitingSignatures &&
-                            (canSignOccurrence || canControlSignatures))
+                        if (showActions)
                           Container(
                             padding: const EdgeInsets.all(16),
                             child: Column(
@@ -194,13 +197,27 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 12),
+                                if (canDeclineParticipation) ...[
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed:
+                                          _showDeclineParticipationDialog,
+                                      icon: const Icon(
+                                        Icons.person_off_outlined,
+                                      ),
+                                      label: const Text('Recusar participação'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 if (canSignOccurrence) ...[
                                   SizedBox(
                                     width: double.infinity,
                                     child: FilledButton.icon(
-                                      onPressed: _showSignatureDialog,
+                                      onPressed: _openReviewScreen,
                                       icon: const Icon(Icons.draw_rounded),
-                                      label: const Text('Assinar ocorrência'),
+                                      label: const Text('Revisar e assinar'),
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -219,46 +236,6 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                 ],
-                                if (canControlSignatures)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: _showRevertToDraftDialog,
-                                          icon: const Icon(Icons.undo),
-                                          label: const Text(
-                                            'Voltar para draft',
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Theme.of(context)
-                                                .colorScheme
-                                                .surfaceContainerHighest,
-                                            foregroundColor: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: _showMarkExpiredDialog,
-                                          icon: const Icon(Icons.warning_amber),
-                                          label: const Text(
-                                            'Marcar como expirado',
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Theme.of(
-                                              context,
-                                            ).colorScheme.errorContainer,
-                                            foregroundColor: Theme.of(
-                                              context,
-                                            ).colorScheme.onErrorContainer,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                               ],
                             ),
                           ),
@@ -270,26 +247,6 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
             );
           },
         ),
-      ),
-    );
-  }
-
-  void _showAddMemberDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => HandlerSearchDialog(
-        currentTeam: _viewModel.team
-            .map(
-              (m) => {
-                'handler_id': m.handlerId,
-                'name': 'Handler ${m.handlerId}',
-                'image_url': '',
-              },
-            )
-            .toList(),
-        onSelected: (handler) {
-          _handleSelectedMember(handler);
-        },
       ),
     );
   }
@@ -325,6 +282,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showSignatureDialog() {
     final occurrence = _viewModel.occurrence;
     if (occurrence == null || !_canCurrentUserSign(_viewModel)) {
@@ -348,6 +306,70 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     );
   }
 
+  void _openReviewScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            OccurrenceReviewScreen(occurrenceId: widget.occurrenceId),
+      ),
+    );
+  }
+
+  void _showDeclineParticipationDialog() {
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Recusar participação'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Justificativa',
+            hintText: 'Informe o motivo da recusa',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                _showSnackMessage(
+                  'Informe uma justificativa para recusar.',
+                  isError: true,
+                );
+                return;
+              }
+              Navigator.pop(dialogContext);
+              _declineParticipation(reason);
+            },
+            child: const Text('Recusar'),
+          ),
+        ],
+      ),
+    ).whenComplete(reasonController.dispose);
+  }
+
+  Future<void> _declineParticipation(String reason) async {
+    try {
+      await OccurrenceTransitionService().declineParticipation(
+        occurrenceId: widget.occurrenceId,
+        reason: reason,
+      );
+      await _viewModel.initialize(occurrenceId: widget.occurrenceId);
+      _showSnackMessage('Participação recusada com justificativa.');
+    } catch (error) {
+      _showSnackMessage('Erro ao recusar participação: $error', isError: true);
+    }
+  }
+
   void _showDeadlineExpiredDialog() {
     showDialog(
       context: context,
@@ -356,6 +378,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showRevertToDraftDialog() {
     showDialog(
       context: context,
@@ -386,6 +409,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showMarkExpiredDialog() {
     showDialog(
       context: context,
@@ -515,6 +539,21 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
         (occurrence.team.any((member) => member.handlerId == currentRa) ||
             occurrence.primaryHandlerRa == currentRa ||
             occurrence.primaryHandlerId == currentRa);
+  }
+
+  bool _canCurrentUserDeclineParticipation(Occurrence occurrence) {
+    final currentRa = _currentRaOrNull();
+    if (currentRa == null) return false;
+    if (occurrence.primaryHandlerRa == currentRa ||
+        occurrence.primaryHandlerId == currentRa) {
+      return false;
+    }
+    if (occurrence.status != OccurrenceStatus.inProgress &&
+        occurrence.status != OccurrenceStatus.finalizing) {
+      return false;
+    }
+    if (occurrence.declinedHandlerIds.contains(currentRa)) return false;
+    return occurrence.team.any((member) => member.handlerId == currentRa);
   }
 
   bool _canCurrentUserCloseForSignatures() {

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/mixins/soft_deletable.dart';
+import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'occurrence_result.dart';
@@ -13,6 +14,8 @@ class Occurrence with SoftDeletable {
   final String? primaryHandlerRa;
   final Map<String, dynamic>? createdBy;
   final String dogId;
+  final String? serviceDogId;
+  final String? crewId;
   final String? vehicleId;
   final String? vehicleLabel;
   final String? vehiclePrefix;
@@ -56,7 +59,16 @@ class Occurrence with SoftDeletable {
   final int teamSizeMax;
   final DateTime? signatureRequestAt;
   final DateTime? signatureDeadline;
+  final int signatureRound;
   final List<OccurrenceSignature> signatures;
+  final List<OccurrenceParticipation> participations;
+  final List<Map<String, dynamic>> correctionRequests;
+  final String? participationStatus;
+  final List<String> acceptedHandlerIds;
+  final List<String> declinedHandlerIds;
+  final List<String> pendingHandlerIds;
+  final List<String> editAuthorizedHandlerIds;
+  final int participationRevision;
 
   @override
   final DateTime? deletedAt;
@@ -72,6 +84,8 @@ class Occurrence with SoftDeletable {
     this.primaryHandlerRa,
     this.createdBy,
     required this.dogId,
+    this.serviceDogId,
+    this.crewId,
     this.vehicleId,
     this.vehicleLabel,
     this.vehiclePrefix,
@@ -102,12 +116,21 @@ class Occurrence with SoftDeletable {
     this.auditTrail = const [],
     this.team = const [],
     this.signatures = const [],
+    this.participations = const [],
+    this.correctionRequests = const [],
     this.teamSizeMax = 3,
     this.signatureRequestAt,
     this.signatureDeadline,
+    this.signatureRound = 0,
     this.deletedAt,
     this.deletedBy,
     this.deleteReason,
+    this.participationStatus,
+    this.acceptedHandlerIds = const [],
+    this.declinedHandlerIds = const [],
+    this.pendingHandlerIds = const [],
+    this.editAuthorizedHandlerIds = const [],
+    this.participationRevision = 0,
   });
 
   factory Occurrence.fromMap(Map<String, dynamic> map, String id) {
@@ -118,6 +141,9 @@ class Occurrence with SoftDeletable {
       primaryHandlerRa: _parseString(map['primary_handler_ra']),
       createdBy: _parseStringMap(map['created_by']),
       dogId: _parseString(map['dog_id']) ?? '',
+      serviceDogId:
+          _parseString(map['service_dog_id']) ?? _parseString(map['dog_id']),
+      crewId: _parseString(map['crew_id']),
       vehicleId: _parseString(map['vehicle_id']),
       vehicleLabel: _parseString(map['vehicle_label']),
       vehiclePrefix: _parseString(map['vehicle_prefix']),
@@ -156,9 +182,20 @@ class Occurrence with SoftDeletable {
       auditTrail: _parseMapList(map['audit_trail']),
       team: _parseTeamMembers(map['team']),
       signatures: _parseSignatures(map['signatures']),
+      participations: _parseParticipations(map['participations']),
+      correctionRequests: _parseMapList(map['correction_requests']),
       teamSizeMax: _parseInt(map['team_size_max']) ?? 3,
       signatureRequestAt: _parseDateTime(map['signature_request_at']),
       signatureDeadline: _parseDateTime(map['signature_deadline']),
+      signatureRound: _parseInt(map['signature_round']) ?? 0,
+      participationStatus: _parseString(map['participation_status']),
+      acceptedHandlerIds: _parseStringList(map['accepted_handler_ids']),
+      declinedHandlerIds: _parseStringList(map['declined_handler_ids']),
+      pendingHandlerIds: _parseStringList(map['pending_handler_ids']),
+      editAuthorizedHandlerIds: _parseStringList(
+        map['edit_authorized_handler_ids'],
+      ),
+      participationRevision: _parseInt(map['participation_revision']) ?? 0,
       deletedAt: SoftDeletable.parseDeletedAt(map['deleted_at']),
       deletedBy: _parseString(map['deleted_by']),
       deleteReason:
@@ -174,6 +211,8 @@ class Occurrence with SoftDeletable {
       'primary_handler_ra': primaryHandlerRa,
       'created_by': createdBy,
       'dog_id': dogId,
+      'service_dog_id': serviceDogId ?? dogId,
+      'crew_id': crewId,
       'vehicle_id': vehicleId,
       'vehicle_label': vehicleLabel,
       'vehicle_prefix': vehiclePrefix,
@@ -207,13 +246,23 @@ class Occurrence with SoftDeletable {
       'team': team.map((member) => member.toJson()).toList(),
       'team_handler_ids': teamHandlerIds,
       'team_emails': teamEmails,
+      'team_auth_uids': teamAuthUids,
+      'team_auth_keys': teamAuthKeys,
       'team_size_max': teamSizeMax,
+      'signature_round': signatureRound,
       'signature_request_at': signatureRequestAt != null
           ? Timestamp.fromDate(signatureRequestAt!)
           : null,
       'signature_deadline': signatureDeadline != null
           ? Timestamp.fromDate(signatureDeadline!)
           : null,
+      'participation_status': participationStatus,
+      'accepted_handler_ids': acceptedHandlerIds,
+      'declined_handler_ids': declinedHandlerIds,
+      'pending_handler_ids': pendingHandlerIds,
+      'edit_authorized_handler_ids': editAuthorizedHandlerIds,
+      'edit_authorized_emails': editAuthorizedEmails,
+      'participation_revision': participationRevision,
       ...softDeleteFields(),
     };
   }
@@ -225,6 +274,8 @@ class Occurrence with SoftDeletable {
     String? primaryHandlerRa,
     Map<String, dynamic>? createdBy,
     String? dogId,
+    String? serviceDogId,
+    String? crewId,
     String? vehicleId,
     String? vehicleLabel,
     String? vehiclePrefix,
@@ -255,9 +306,18 @@ class Occurrence with SoftDeletable {
     List<Map<String, dynamic>>? auditTrail,
     List<OccurrenceTeamMember>? team,
     List<OccurrenceSignature>? signatures,
+    List<OccurrenceParticipation>? participations,
+    List<Map<String, dynamic>>? correctionRequests,
     int? teamSizeMax,
     DateTime? signatureRequestAt,
     DateTime? signatureDeadline,
+    int? signatureRound,
+    String? participationStatus,
+    List<String>? acceptedHandlerIds,
+    List<String>? declinedHandlerIds,
+    List<String>? pendingHandlerIds,
+    List<String>? editAuthorizedHandlerIds,
+    int? participationRevision,
     DateTime? deletedAt,
     String? deletedBy,
     String? deleteReason,
@@ -269,6 +329,8 @@ class Occurrence with SoftDeletable {
       primaryHandlerRa: primaryHandlerRa ?? this.primaryHandlerRa,
       createdBy: createdBy ?? this.createdBy,
       dogId: dogId ?? this.dogId,
+      serviceDogId: serviceDogId ?? this.serviceDogId,
+      crewId: crewId ?? this.crewId,
       vehicleId: vehicleId ?? this.vehicleId,
       vehicleLabel: vehicleLabel ?? this.vehicleLabel,
       vehiclePrefix: vehiclePrefix ?? this.vehiclePrefix,
@@ -300,9 +362,20 @@ class Occurrence with SoftDeletable {
       auditTrail: auditTrail ?? this.auditTrail,
       team: team ?? this.team,
       signatures: signatures ?? this.signatures,
+      participations: participations ?? this.participations,
+      correctionRequests: correctionRequests ?? this.correctionRequests,
       teamSizeMax: teamSizeMax ?? this.teamSizeMax,
       signatureRequestAt: signatureRequestAt ?? this.signatureRequestAt,
       signatureDeadline: signatureDeadline ?? this.signatureDeadline,
+      signatureRound: signatureRound ?? this.signatureRound,
+      participationStatus: participationStatus ?? this.participationStatus,
+      acceptedHandlerIds: acceptedHandlerIds ?? this.acceptedHandlerIds,
+      declinedHandlerIds: declinedHandlerIds ?? this.declinedHandlerIds,
+      pendingHandlerIds: pendingHandlerIds ?? this.pendingHandlerIds,
+      editAuthorizedHandlerIds:
+          editAuthorizedHandlerIds ?? this.editAuthorizedHandlerIds,
+      participationRevision:
+          participationRevision ?? this.participationRevision,
       deletedAt: deletedAt ?? this.deletedAt,
       deletedBy: deletedBy ?? this.deletedBy,
       deleteReason: deleteReason ?? this.deleteReason,
@@ -329,7 +402,41 @@ class Occurrence with SoftDeletable {
     return emails;
   }
 
+  List<String> get editAuthorizedEmails {
+    final authorized = editAuthorizedHandlerIds.isNotEmpty
+        ? editAuthorizedHandlerIds
+        : teamHandlerIds;
+    final emails = <String>{
+      for (final member in team)
+        if (authorized.contains(member.handlerId) &&
+            member.handlerEmail?.trim().isNotEmpty == true)
+          member.handlerEmail!.trim().toLowerCase(),
+      for (final ra in authorized) _emailForRa(ra),
+    }.toList()..sort();
+    return emails;
+  }
+
+  List<String> get teamAuthUids {
+    final uids = <String>{
+      for (final member in team)
+        if (member.authUid?.trim().isNotEmpty == true) member.authUid!.trim(),
+    }.toList()..sort();
+    return uids;
+  }
+
+  List<String> get teamAuthKeys {
+    final keys = <String>{
+      for (final member in team)
+        if (member.handlerId.trim().isNotEmpty &&
+            member.authUid?.trim().isNotEmpty == true)
+          '${member.handlerId.trim()}:${member.authUid!.trim()}',
+    }.toList()..sort();
+    return keys;
+  }
+
   bool get hasVehicleCrew => vehicleId?.trim().isNotEmpty == true;
+  String get effectiveServiceDogId =>
+      serviceDogId?.trim().isNotEmpty == true ? serviceDogId!.trim() : dogId;
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
@@ -425,5 +532,27 @@ class Occurrence with SoftDeletable {
 
   static String _emailForRa(String ra) {
     return '${ra.trim().toLowerCase()}@gcm.com.br';
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value is! List) return const [];
+    final parsed =
+        value
+            .map(_parseString)
+            .whereType<String>()
+            .where((item) => item.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return parsed;
+  }
+
+  static List<OccurrenceParticipation> _parseParticipations(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map(OccurrenceParticipation.fromJson)
+        .where((participation) => participation.handlerId.isNotEmpty)
+        .toList();
   }
 }

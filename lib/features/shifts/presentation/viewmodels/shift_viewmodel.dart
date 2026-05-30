@@ -16,6 +16,7 @@ class ShiftViewModel extends ChangeNotifier {
 
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<ActiveShiftSession?>? _shiftSubscription;
+  Timer? _initialShiftTimer;
   String? _boundRa;
 
   ActiveShiftSession? _session;
@@ -23,12 +24,17 @@ class ShiftViewModel extends ChangeNotifier {
   String? _error;
 
   ActiveShiftSession? get session => _session;
-  String? get activeDogId => _session?.dogId;
+  String? get activeDogId => _session?.effectiveServiceDogId;
+  String? get legacyDogId => _session?.dogId;
+  String? get serviceDogId => _session?.serviceDogId ?? _session?.dogId;
   String? get vehicleId => _session?.vehicleId;
   String? get vehicleLabel => _session?.vehicleLabel;
   String? get vehiclePrefix => _session?.vehiclePrefix;
   String? get vehicleModel => _session?.vehicleModel;
   String? get vehicleUnit => _session?.vehicleUnit;
+  String? get vehicleCrewId => _session?.vehicleCrewId;
+  String? get crewRole => _session?.crewRole;
+  String? get crewStatus => _session?.crewStatus;
   DateTime? get shiftStartTime => _session?.startedAt;
   String? get activeShiftId => _session?.shiftId;
   String? get handlerId => _session?.handlerId ?? _boundRa;
@@ -45,6 +51,7 @@ class ShiftViewModel extends ChangeNotifier {
 
   Future<void> startShift(String dogId, {Vehicle? vehicle}) async {
     final resolvedHandlerId = _resolveHandlerId();
+    final currentUser = _authService.currentUser;
     final startedAt = DateTime.now();
 
     _error = null;
@@ -59,13 +66,18 @@ class ShiftViewModel extends ChangeNotifier {
     try {
       await _shiftService.startShift(
         handlerId: resolvedHandlerId,
+        handlerAuthUid: currentUser?.uid,
+        handlerEmail: currentUser?.email,
         dogId: dogId,
         startedAt: startedAt,
         vehicle: vehicle,
       );
       _session = ActiveShiftSession(
         handlerId: resolvedHandlerId,
+        authUid: currentUser?.uid,
+        handlerEmail: currentUser?.email,
         dogId: dogId,
+        serviceDogId: dogId,
         startedAt: startedAt,
         vehicleId: vehicle?.id,
         vehicleLabel: vehicle?.label,
@@ -73,6 +85,9 @@ class ShiftViewModel extends ChangeNotifier {
         vehicleModel: vehicle?.modelName,
         vehicleUnit: vehicle?.unit,
         vehicleJoinedAt: vehicle == null ? null : startedAt,
+        vehicleCrewId: vehicle?.id,
+        crewRole: vehicle == null ? null : 'titular',
+        crewStatus: vehicle == null ? null : 'titular',
       );
 
       AuditService.log(
@@ -105,6 +120,7 @@ class ShiftViewModel extends ChangeNotifier {
     if (_session != null) {
       _session = _session!.copyWith(
         dogId: dogId,
+        serviceDogId: dogId,
         lastDogSwitchAt: DateTime.now(),
       );
       notifyListeners();
@@ -126,6 +142,7 @@ class ShiftViewModel extends ChangeNotifier {
 
   Future<void> assumeVehicle(Vehicle vehicle) async {
     final resolvedHandlerId = _resolveHandlerId();
+    final currentUser = _authService.currentUser;
     final activeDogId = _session?.dogId;
 
     _error = null;
@@ -140,16 +157,23 @@ class ShiftViewModel extends ChangeNotifier {
     try {
       await _shiftService.assumeVehicle(
         handlerId: resolvedHandlerId,
+        handlerAuthUid: currentUser?.uid,
+        handlerEmail: currentUser?.email,
         dogId: activeDogId,
         vehicle: vehicle,
       );
       _session = _session?.copyWith(
+        authUid: currentUser?.uid,
+        handlerEmail: currentUser?.email,
         vehicleId: vehicle.id,
         vehicleLabel: vehicle.label,
         vehiclePrefix: vehicle.prefix,
         vehicleModel: vehicle.modelName,
         vehicleUnit: vehicle.unit,
         vehicleJoinedAt: DateTime.now(),
+        vehicleCrewId: vehicle.id,
+        crewRole: 'titular',
+        crewStatus: 'titular',
       );
 
       AuditService.log(
@@ -209,6 +233,8 @@ class ShiftViewModel extends ChangeNotifier {
     _boundRa = ra;
     _shiftSubscription?.cancel();
     _shiftSubscription = null;
+    _initialShiftTimer?.cancel();
+    _initialShiftTimer = null;
 
     if (ra == null) {
       _clearSession(notify: false);
@@ -222,16 +248,28 @@ class ShiftViewModel extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    _initialShiftTimer?.cancel();
+    _initialShiftTimer = Timer(const Duration(seconds: 8), () {
+      if (!_isLoading) return;
+      _isLoading = false;
+      _error = 'Tempo excedido ao carregar turno ativo.';
+      notifyListeners();
+    });
+
     _shiftSubscription = _shiftService
         .watchActiveShift(ra)
         .listen(
           (session) {
+            _initialShiftTimer?.cancel();
+            _initialShiftTimer = null;
             _session = session;
             _isLoading = false;
             _error = null;
             notifyListeners();
           },
           onError: (e) {
+            _initialShiftTimer?.cancel();
+            _initialShiftTimer = null;
             _clearSession(notify: false);
             _isLoading = false;
             _error = 'Falha ao carregar turno ativo: $e';
@@ -261,6 +299,7 @@ class ShiftViewModel extends ChangeNotifier {
   void dispose() {
     _authSubscription?.cancel();
     _shiftSubscription?.cancel();
+    _initialShiftTimer?.cancel();
     super.dispose();
   }
 }

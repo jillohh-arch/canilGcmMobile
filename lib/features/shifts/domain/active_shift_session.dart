@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ActiveShiftSession {
   final String? shiftId;
   final String handlerId;
+  final String? authUid;
+  final String? handlerEmail;
   final String dogId;
+  final String? serviceDogId;
   final DateTime startedAt;
   final DateTime? updatedAt;
   final DateTime? endedAt;
@@ -14,12 +17,18 @@ class ActiveShiftSession {
   final String? vehicleModel;
   final String? vehicleUnit;
   final DateTime? vehicleJoinedAt;
+  final String? vehicleCrewId;
+  final String? crewRole;
+  final String? crewStatus;
   final String status;
 
   const ActiveShiftSession({
     this.shiftId,
     required this.handlerId,
+    this.authUid,
+    this.handlerEmail,
     required this.dogId,
+    this.serviceDogId,
     required this.startedAt,
     this.updatedAt,
     this.endedAt,
@@ -30,6 +39,9 @@ class ActiveShiftSession {
     this.vehicleModel,
     this.vehicleUnit,
     this.vehicleJoinedAt,
+    this.vehicleCrewId,
+    this.crewRole,
+    this.crewStatus,
     this.status = 'active',
   });
 
@@ -37,7 +49,10 @@ class ActiveShiftSession {
     return ActiveShiftSession(
       shiftId: json['shiftId'] as String?,
       handlerId: json['handlerId'] as String? ?? '',
+      authUid: _parseString(json['auth_uid'] ?? json['authUid']),
+      handlerEmail: _parseString(json['handler_email'] ?? json['handlerEmail']),
       dogId: json['dogId'] as String? ?? '',
+      serviceDogId: _parseString(json['service_dog_id'] ?? json['serviceDogId']),
       startedAt: _parseDate(json['startedAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']),
       endedAt: _parseDate(json['endedAt']),
@@ -52,6 +67,11 @@ class ActiveShiftSession {
       vehicleJoinedAt: _parseDate(
         json['vehicle_joined_at'] ?? json['vehicleJoinedAt'],
       ),
+      vehicleCrewId: _parseString(
+        json['vehicle_crew_id'] ?? json['vehicleCrewId'] ?? json['crew_id'],
+      ),
+      crewRole: _parseString(json['crew_role'] ?? json['crewRole']),
+      crewStatus: _parseString(json['crew_status'] ?? json['crewStatus']),
       status: json['status'] as String? ?? 'active',
     );
   }
@@ -59,7 +79,10 @@ class ActiveShiftSession {
   ActiveShiftSession copyWith({
     String? shiftId,
     String? handlerId,
+    String? authUid,
+    String? handlerEmail,
     String? dogId,
+    String? serviceDogId,
     DateTime? startedAt,
     DateTime? updatedAt,
     DateTime? endedAt,
@@ -70,12 +93,18 @@ class ActiveShiftSession {
     String? vehicleModel,
     String? vehicleUnit,
     DateTime? vehicleJoinedAt,
+    String? vehicleCrewId,
+    String? crewRole,
+    String? crewStatus,
     String? status,
   }) {
     return ActiveShiftSession(
       shiftId: shiftId ?? this.shiftId,
       handlerId: handlerId ?? this.handlerId,
+      authUid: authUid ?? this.authUid,
+      handlerEmail: handlerEmail ?? this.handlerEmail,
       dogId: dogId ?? this.dogId,
+      serviceDogId: serviceDogId ?? this.serviceDogId,
       startedAt: startedAt ?? this.startedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       endedAt: endedAt ?? this.endedAt,
@@ -86,12 +115,17 @@ class ActiveShiftSession {
       vehicleModel: vehicleModel ?? this.vehicleModel,
       vehicleUnit: vehicleUnit ?? this.vehicleUnit,
       vehicleJoinedAt: vehicleJoinedAt ?? this.vehicleJoinedAt,
+      vehicleCrewId: vehicleCrewId ?? this.vehicleCrewId,
+      crewRole: crewRole ?? this.crewRole,
+      crewStatus: crewStatus ?? this.crewStatus,
       status: status ?? this.status,
     );
   }
 
   bool get isActive => status == 'active' && dogId.isNotEmpty;
   bool get hasVehicle => vehicleId?.trim().isNotEmpty == true;
+  String get effectiveServiceDogId =>
+      serviceDogId?.trim().isNotEmpty == true ? serviceDogId!.trim() : dogId;
 
   static DateTime? _parseDate(dynamic value) {
     if (value is Timestamp) return value.toDate();

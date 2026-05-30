@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turno · cards e perfil da equipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;flex-wrap:wrap;padding:24px 20px;gap:26px;}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;}
+  .phone-label{color:#4dd0e1;font-size:11px;font-weight:600;letter-spacing:1.2px;margin-bottom:10px;text-align:center;max-width:390px;}
+  .phone-label small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .phone{width:390px;height:844px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;flex-shrink:0;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .scroll{flex:1;overflow-y:auto;padding:0 18px 24px;}
+  .scroll::-webkit-scrollbar{width:0;}
+
+  /* dash header */
+  .dash-header{padding:6px 0 14px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:16px;}
+  .hrow{display:flex;align-items:center;gap:11px;}
+  .av-stack{display:flex;}
+  .av-s{width:40px;height:40px;border-radius:50%;background:#16242a;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#4dd0e1;}
+  .av-s.dog{border-color:#2ecc71;color:#2ecc71;margin-right:-12px;z-index:1;}
+  .hinfo{flex:1;}
+  .hbin{color:#fff;font-size:15px;font-weight:700;}
+  .hturno{display:flex;align-items:center;gap:6px;color:#2ecc71;font-size:11px;margin-top:2px;}
+  .hturno .d{width:6px;height:6px;border-radius:50%;background:#2ecc71;}
+  .hturno .t{color:#7a8a92;}
+  .hbtn{width:36px;height:36px;border-radius:9px;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.2);color:#4dd0e1;display:flex;align-items:center;justify-content:center;font-size:16px;}
+
+  .sec-label{display:flex;align-items:center;gap:9px;margin:18px 1px 11px;}
+  .sec-label .t{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;}
+  .sec-label .ln{flex:1;height:1px;background:rgba(255,255,255,.07);}
+  .sec-label .c{color:#5a7280;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+
+  /* profile cards (3) */
+  .pcard{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px;margin-bottom:9px;}
+  .pcard.team{background:rgba(77,208,225,.05);border-color:rgba(77,208,225,.25);}
+  .pc-ph{width:46px;height:46px;border-radius:50%;background:#16242a;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#4dd0e1;flex-shrink:0;}
+  .pc-ph.dog{border-color:#2ecc71;color:#2ecc71;}
+  .pc-ph.team{border-radius:13px;font-size:20px;}
+  .pc-info{flex:1;min-width:0;}
+  .pc-k{color:#5a7280;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+  .pc-name{color:#fff;font-size:15px;font-weight:700;margin-top:2px;}
+  .pc-meta{color:#7a8a92;font-size:11px;margin-top:2px;}
+  .pc-meta .ok{color:#2ecc71;}
+  .pc-arrow{color:#5a7280;font-size:18px;}
+
+  /* alerts mini */
+  .alert{display:flex;align-items:center;gap:10px;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.18);border-radius:11px;padding:11px;margin-bottom:8px;}
+  .alert .i{font-size:16px;}
+  .alert .tx{color:#fff;font-size:12px;font-weight:600;}
+  .alert .tx small{display:block;color:#7d8d99;font-weight:400;font-size:10.5px;margin-top:1px;}
+
+  /* perfil equipe */
+  .profile-header{display:flex;align-items:center;padding:10px 0 16px;}
+  .close-btn{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.04);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .ph-title{flex:1;text-align:center;color:#fff;font-size:15px;font-weight:700;}
+  .ph-spacer{width:34px;}
+
+  .vcard{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:16px;padding:16px;margin-bottom:6px;}
+  .vtop{display:flex;align-items:center;gap:13px;}
+  .vicon{width:48px;height:48px;border-radius:13px;background:rgba(77,208,225,.1);border:1px solid rgba(77,208,225,.25);display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;}
+  .vname{color:#fff;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .vmodel{color:#7a8a92;font-size:11px;margin-top:2px;}
+  .vchips{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px;padding-top:13px;border-top:1px solid rgba(255,255,255,.06);}
+  .vchip{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#aebcc4;background:rgba(77,208,225,.06);border:1px solid rgba(255,255,255,.08);padding:5px 9px;border-radius:7px;}
+  .vchip b{color:#4dd0e1;}
+
+  .member{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+  .member.you{border-left:3px solid #4dd0e1;background:rgba(77,208,225,.04);}
+  .member.dog{border-color:rgba(46,204,113,.2);}
+  .member.pending{border-style:dashed;border-color:rgba(241,196,15,.35);}
+  .m-av{width:36px;height:36px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#4dd0e1;flex-shrink:0;}
+  .m-av.dog{border-color:#2ecc71;color:#2ecc71;}
+  .m-name{color:#fff;font-size:13px;font-weight:600;}
+  .m-meta{color:#7a8a92;font-size:10px;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+  .m-right{margin-left:auto;}
+  .badge{display:inline-flex;align-items:center;gap:4px;border-radius:11px;padding:4px 9px;font-size:9px;font-weight:700;letter-spacing:.3px;}
+  .b-cyan{background:rgba(77,208,225,.12);border:1px solid rgba(77,208,225,.35);color:#4dd0e1;}
+  .b-green{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.35);color:#2ecc71;}
+  .b-amber{background:rgba(241,196,15,.1);border:1px solid rgba(241,196,15,.35);color:#f1c40f;}
+
+  .add-btn{width:100%;border:1px dashed rgba(77,208,225,.4);background:rgba(77,208,225,.04);color:#4dd0e1;border-radius:12px;padding:13px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;font-family:inherit;}
+  .note{color:#7a8a92;font-size:10.5px;line-height:1.55;margin-top:10px;}
+  .note b{color:#b0c4cc;}
+
+  /* lista plantão */
+  .pick{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+  .pick.sel{background:rgba(77,208,225,.07);border-color:#4dd0e1;border-width:2px;}
+  .pick.off{opacity:.5;}
+  .radio{width:20px;height:20px;border-radius:50%;border:2px solid #5a7280;margin-left:auto;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .pick.sel .radio{border-color:#4dd0e1;}
+  .pick.sel .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:#4dd0e1;}
+  .cta{position:absolute;bottom:0;left:0;right:0;padding:14px 18px 24px;background:linear-gradient(to top,#050d10 72%,transparent);}
+  .big{width:100%;border-radius:13px;padding:15px;font-size:14px;font-weight:800;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;background:#4dd0e1;color:#050d10;}
+
+  /* notif */
+  .lock{flex:1;display:flex;flex-direction:column;align-items:center;padding-top:80px;background:radial-gradient(circle at 50% 16%,rgba(77,208,225,.06),transparent 55%),#050d10;}
+  .lock-time{color:#fff;font-size:58px;font-weight:300;}
+  .lock-date{color:#aebcc4;font-size:13px;margin-top:2px;margin-bottom:36px;}
+  .notif{width:330px;background:rgba(28,40,46,.92);border:1px solid rgba(77,208,225,.18);border-radius:17px;padding:13px;}
+  .notif-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .notif-ic{width:24px;height:24px;border-radius:6px;background:rgba(77,208,225,.18);border:1px solid rgba(77,208,225,.3);display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:12px;}
+  .notif-app{color:#aebcc4;font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+  .notif-when{margin-left:auto;color:#5a7280;font-size:9px;font-family:'IBM Plex Mono',monospace;}
+  .notif-title{color:#fff;font-size:13px;font-weight:700;margin-bottom:3px;}
+  .notif-body{color:#b0c4cc;font-size:11px;line-height:1.45;}
+  .notif-actions{display:flex;gap:7px;margin-top:11px;}
+  .na{flex:1;border-radius:9px;padding:9px;font-size:11px;font-weight:700;text-align:center;border:none;font-family:inherit;}
+  .na-yes{background:#2ecc71;color:#04140a;}
+  .na-no{background:rgba(255,255,255,.06);color:#e74c3c;border:1px solid rgba(231,76,60,.3);}
+
+  .design-notes{width:100%;max-width:1280px;margin:8px auto 0;color:#9aa7af;font-size:13px;line-height:1.6;}
+  .design-notes h3{color:#4dd0e1;font-size:14px;margin:16px 0 9px;letter-spacing:.5px;}
+  .design-notes ul{list-style:none;padding-left:0;}
+  .design-notes li{padding:4px 0 4px 20px;position:relative;}
+  .design-notes li:before{content:"→";position:absolute;left:0;color:#4dd0e1;}
+  .design-notes b{color:#b0c4cc;}
+  .lesson{background:rgba(77,208,225,.04);border-left:3px solid #4dd0e1;border-radius:8px;padding:12px 14px;margin:6px 0 4px;color:#b0c4cc;font-size:12px;line-height:1.55;}
+  .lesson b{color:#4dd0e1;}
+</style>
+</head>
+<body>
+
+<!-- ===== T1 — DASHBOARD COM 3 CARDS ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T1 — DASHBOARD (TURNO)<small>3 cards simétricos: cão · condutor · equipe</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:40</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="dash-header">
+        <div class="hrow">
+          <div class="av-stack"><div class="av-s dog">BONO</div><div class="av-s">RAG</div></div>
+          <div class="hinfo"><div class="hbin">Bono · GCM Ragonha</div><div class="hturno"><span class="d"></span>Turno ativo<span class="t">· há 2h22</span></div></div>
+          <div class="hbtn">⇄</div>
+        </div>
+      </div>
+
+      <div class="sec-label"><span class="t">Binômio &amp; equipe</span><span class="ln"></span></div>
+
+      <div class="pcard">
+        <div class="pc-ph dog">BONO</div>
+        <div class="pc-info"><div class="pc-k">Cão de serviço</div><div class="pc-name">Bono</div><div class="pc-meta"><span class="ok">●</span> Operacional · 3 especialidades</div></div>
+        <span class="pc-arrow">›</span>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-ph">RAG</div>
+        <div class="pc-info"><div class="pc-k">Condutor</div><div class="pc-name">GCM Ragonha</div><div class="pc-meta">Titular · RA 691755</div></div>
+        <span class="pc-arrow">›</span>
+      </div>
+
+      <div class="pcard team">
+        <div class="pc-ph team">🚓</div>
+        <div class="pc-info"><div class="pc-k">Equipe · guarnição</div><div class="pc-name">Canil 1075</div><div class="pc-meta">2 condutores + K9 · 1 convite pendente</div></div>
+        <span class="pc-arrow">›</span>
+      </div>
+
+      <div class="sec-label"><span class="t">⚠ Alertas</span><span class="ln"></span></div>
+      <div class="alert"><span class="i">💉</span><div class="tx">Vacina V10 do Bono vencida há 3 dias<small>Agendar revacinação</small></div></div>
+
+      <div class="sec-label"><span class="t">⚡ Registrar</span><span class="ln"></span></div>
+      <div class="alert" style="background:rgba(77,208,225,.05);border-color:rgba(77,208,225,.18)"><span class="i">🛡</span><div class="tx">Nova ocorrência<small>a guarnição da Canil 1075 será notificada</small></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T2 — PERFIL DA EQUIPE ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T2 — PERFIL DA EQUIPE<small>guarnição da viatura · membros + convites</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:41</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll" style="padding-bottom:0">
+      <div class="profile-header"><div class="close-btn">✕</div><div class="ph-title">Equipe</div><div class="ph-spacer"></div></div>
+
+      <div class="vcard">
+        <div class="vtop"><div class="vicon">🚓</div><div><div class="vname">Canil 1075</div><div class="vmodel">Chevrolet Trailblazer</div></div></div>
+        <div class="vchips"><span class="vchip">cap. <b>2 + K9</b></span><span class="vchip">cão serviço: <b>Bono</b></span><span class="vchip">turno desde <b>07:18</b></span></div>
+      </div>
+
+      <div class="sec-label"><span class="t">Condutores</span><span class="ln"></span><span class="c">2 de 2</span></div>
+      <div class="member you"><div class="m-av">RAG</div><div><div class="m-name">GCM Ragonha</div><div class="m-meta">RA 691755</div></div><div class="m-right"><span class="badge b-cyan">VOCÊ</span></div></div>
+      <div class="member"><div class="m-av">SIL</div><div><div class="m-name">GCM Silva</div><div class="m-meta">RA 702318</div></div><div class="m-right"><span class="badge b-green">✓ na equipe</span></div></div>
+      <div class="member pending"><div class="m-av" style="border-color:#f1c40f;color:#f1c40f">PER</div><div><div class="m-name">GCM Pereira</div><div class="m-meta">RA 688204</div></div><div class="m-right"><span class="badge b-amber">convite enviado</span></div></div>
+
+      <div class="sec-label"><span class="t">Cão de serviço</span><span class="ln"></span></div>
+      <div class="member dog"><div class="m-av dog">BONO</div><div><div class="m-name">Bono <span style="font-size:8px;color:#2ecc71;font-weight:700">K9</span></div><div class="m-meta">matrícula 0042 · Malinois</div></div></div>
+
+      <div style="height:14px"></div>
+      <button class="add-btn">＋ Adicionar parceiro à guarnição</button>
+      <div class="note">A viatura comporta <b>2 condutores + K9</b> (capacidade do cadastro). Cheia → não aceita mais. Trocar o cão de serviço é feito aqui também, sem encerrar o turno.</div>
+      <div style="height:24px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T3 — ADICIONAR PARCEIRO + CONVITE ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T3 — ADICIONAR + CONVITE<small>escolhe entre quem está de plantão · ele só dá o aceite</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:42</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="profile-header"><div class="close-btn">‹</div><div class="ph-title">Adicionar à guarnição</div><div class="ph-spacer"></div></div>
+
+      <div class="sec-label"><span class="t">Condutores de plantão</span><span class="ln"></span></div>
+      <div class="pick sel"><div class="m-av">PER</div><div><div class="m-name">GCM Pereira</div><div class="m-meta">RA 688204 · cão: Tor</div></div><div class="radio"></div></div>
+      <div class="pick"><div class="m-av">SOU</div><div><div class="m-name">GCM Souza</div><div class="m-meta">RA 715092 · sem cão hoje</div></div><div class="radio"></div></div>
+      <div class="pick off"><div class="m-av">SIL</div><div><div class="m-name">GCM Silva</div><div class="m-meta">já está na guarnição</div></div></div>
+
+      <div class="note">Aparecem só condutores <b>de plantão hoje</b> que não estão em outra viatura. Ao convidar, ele recebe a notificação e <b>só precisa aceitar</b> — entra na guarnição na hora.</div>
+
+      <div class="sec-label" style="margin-top:22px"><span class="t">O que ele recebe</span><span class="ln"></span></div>
+      <div class="notif" style="width:100%;background:rgba(20,30,35,.9)">
+        <div class="notif-head"><div class="notif-ic">🛡</div><div class="notif-app">Canil K9 · Canil 1075</div><div class="notif-when">agora</div></div>
+        <div class="notif-title">Convite para a guarnição</div>
+        <div class="notif-body">GCM Ragonha convidou você para a viatura Canil 1075 neste turno.</div>
+        <div class="notif-actions"><button class="na na-yes">✓ Aceitar</button><button class="na na-no">Recusar</button></div>
+      </div>
+    </div>
+    <div class="cta"><button class="big">Convidar GCM Pereira →</button></div>
+  </div>
+</div>
+
+<div class="design-notes">
+  <div class="lesson"><b>Três cards simétricos.</b> Cão, condutor e equipe — cada um leva ao seu perfil. O da equipe (T2) é o "lar" da guarnição: viatura, cão de serviço, membros e convites — tudo fora da ocorrência, como você pediu.</div>
+  <h3>Como a guarnição se forma</h3>
+  <ul>
+    <li><b>Convite + aceite</b> (mesmo padrão da ocorrência): adiciona o parceiro → ele recebe a notificação → aceita → entra. (T3)</li>
+    <li>Lista mostra só <b>condutores de plantão</b> hoje, não alocados em outra viatura.</li>
+    <li><b>Capacidade do cadastro</b> manda: Canil 1075 = 2 + K9; cheia bloqueia novos.</li>
+    <li>Trocar o cão de serviço também vive aqui (sem encerrar o turno).</li>
+    <li>Estados do membro: <b>você</b> · <b>na equipe</b> (aceito) · <b>convite enviado</b> (pendente).</li>
+  </ul>
+  <h3>Ponto a decidir — os dois aceites</h3>
+  <ul>
+    <li>Aceite de <b>guarnição</b> (aqui, 1x no turno) define quem roda junto.</li>
+    <li>Na <b>ocorrência</b>: como já é da guarnição, sugiro inclusão automática + só recusar se ausente — evita aceitar a mesma coisa o dia todo.</li>
+  </ul>
+</div>
+
+</body>
+</html>

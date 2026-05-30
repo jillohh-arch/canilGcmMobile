@@ -21,7 +21,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_observation.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
-import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
@@ -34,6 +34,7 @@ class StartOccurrenceScreen extends StatefulWidget {
 
 class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
+  final _crewService = VehicleCrewService();
   final _natureController = TextEditingController();
   final _natureFocusNode = FocusNode();
   final _observationController = TextEditingController();
@@ -407,50 +408,61 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     required UserViewModel userVM,
     required DogViewModel dogVM,
     required String? handlerRa,
+    required String? handlerAuthUid,
+    required String? handlerEmail,
   }) async {
-    final vehicleId = shiftVM.vehicleId?.trim();
-    final now = DateTime.now();
-    final serviceDog = _dogForId(dogVM, shiftVM.activeDogId);
-    final crew = vehicleId == null || vehicleId.isEmpty
-        ? <ActiveShiftSession>[]
-        : await shiftVM.getActiveCrew(vehicleId);
-    final members = <OccurrenceTeamMember>[];
-    final seenHandlers = <String>{};
+    final currentRa = handlerRa?.trim();
+    if (currentRa == null || currentRa.isEmpty) {
+      throw StateError('Condutor autenticado sem RA para abrir ocorrência.');
+    }
 
-    for (final session in crew) {
-      final ra = session.handlerId.trim();
-      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
-      members.add(
-        OccurrenceTeamMember(
-          handlerId: ra,
-          handlerEmail: HandlerIdentityService.emailFromRa(ra),
-          displayName: userVM.displayNameFor(ra: ra),
-          dogId: serviceDog?.id ?? session.dogId,
-          dogName: serviceDog?.name,
-          dogMatricula: serviceDog?.registrationNumber,
-          dogBreed: serviceDog?.breed,
-          role: ra == handlerRa ? TeamRole.titular : TeamRole.integrante,
-          addedAt: now,
-          addedBy: handlerRa ?? ra,
-        ),
+    final crewId = shiftVM.vehicleCrewId?.trim();
+    if (crewId == null || crewId.isEmpty) {
+      throw StateError(
+        'Assuma uma viatura antes de abrir ocorrência operacional.',
       );
     }
 
-    final currentRa = handlerRa?.trim();
-    if (currentRa != null &&
-        currentRa.isNotEmpty &&
-        !seenHandlers.contains(currentRa)) {
-      members.insert(
-        0,
+    final crew = await _crewService.getCrew(crewId);
+    if (crew == null || !crew.active) {
+      throw StateError('Guarnição ativa não encontrada para esta viatura.');
+    }
+
+    final now = DateTime.now();
+    final activeMembers = (await _crewService.getMembers(
+      crewId,
+    )).where((member) => member.isActive).toList();
+    if (!activeMembers.any((member) => member.handlerId == currentRa)) {
+      throw StateError(
+        'Seu condutor não está confirmado na guarnição desta viatura.',
+      );
+    }
+
+    final serviceDog =
+        _dogForId(dogVM, crew.serviceDogId) ??
+        _dogForId(dogVM, shiftVM.serviceDogId) ??
+        _dogForId(dogVM, shiftVM.activeDogId);
+    final members = <OccurrenceTeamMember>[];
+    final seenHandlers = <String>{};
+
+    for (final member in activeMembers) {
+      final ra = member.handlerId.trim();
+      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
+      final isCurrentHandler = ra == currentRa;
+      members.add(
         OccurrenceTeamMember(
-          handlerId: currentRa,
-          handlerEmail: HandlerIdentityService.emailFromRa(currentRa),
-          displayName: userVM.displayNameFor(ra: currentRa),
-          dogId: serviceDog?.id ?? shiftVM.activeDogId,
+          handlerId: ra,
+          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
+          handlerEmail:
+              member.handlerEmail ??
+              (isCurrentHandler ? handlerEmail : null) ??
+              HandlerIdentityService.emailFromRa(ra),
+          displayName: userVM.displayNameFor(ra: ra),
+          dogId: serviceDog?.id ?? crew.serviceDogId,
           dogName: serviceDog?.name,
           dogMatricula: serviceDog?.registrationNumber,
           dogBreed: serviceDog?.breed,
-          role: TeamRole.titular,
+          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
           addedAt: now,
           addedBy: currentRa,
         ),
@@ -495,6 +507,8 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         userVM: userVM,
         dogVM: dogVM,
         handlerRa: handlerRa,
+        handlerAuthUid: authVM.user?.uid,
+        handlerEmail: authVM.user?.email,
       );
 
       final typeCode = _selectedNature?.code ?? 'GERAL';
@@ -504,6 +518,8 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         id: id,
         shiftId: shiftId,
         dogId: dogId,
+        serviceDogId: shiftVM.serviceDogId,
+        crewId: shiftVM.vehicleCrewId,
         primaryHandlerId: handlerId,
         primaryHandlerRa: handlerRa,
         vehicleId: shiftVM.vehicleId,
@@ -512,7 +528,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         vehicleModel: shiftVM.vehicleModel,
         vehicleUnit: shiftVM.vehicleUnit,
         teamSnapshot: teamSnapshot,
-        teamSizeMax: teamSnapshot.length > 1 ? teamSnapshot.length : 3,
+        teamSizeMax: teamSnapshot.length,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: _locationAddress.isNotEmpty ? _locationAddress : null,

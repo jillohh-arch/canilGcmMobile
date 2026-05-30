@@ -394,6 +394,7 @@ class _VehicleSelectionSection extends StatelessWidget {
           builder: (context, occupancySnapshot) {
             final vehicles = vehicleSnapshot.data ?? const <Vehicle>[];
             final occupancies = occupancySnapshot.data ?? const <String, int>{};
+            final vehicleError = vehicleSnapshot.error;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,7 +446,19 @@ class _VehicleSelectionSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (vehicleSnapshot.connectionState ==
+                if (vehicleError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      'Nao foi possivel carregar viaturas: $vehicleError',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.error,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  )
+                else if (vehicleSnapshot.connectionState ==
                         ConnectionState.waiting &&
                     vehicles.isEmpty)
                   const Padding(

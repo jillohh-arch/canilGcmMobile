@@ -108,7 +108,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
                   ),
                 ),
               ),
-            if (currentRa != null)
+            if (currentRa != null && _currentIndex != 0)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 8,
                 right: 12,

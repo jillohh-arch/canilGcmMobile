@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
+import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
@@ -78,21 +79,64 @@ class OccurrenceFinalizationService {
     return calculateIntegrityHashV3For(occurrence, events: events);
   }
 
+  String calculateIntegrityHashV4(
+    Occurrence occurrence, {
+    List<OccurrenceEvent> events = const [],
+  }) {
+    return calculateIntegrityHashV4For(occurrence, events: events);
+  }
+
+  static String calculateIntegrityHashFor(
+    Occurrence occurrence, {
+    required int version,
+    List<OccurrenceEvent> events = const [],
+  }) {
+    final payload = _buildHashPayload(
+      occurrence,
+      events: events,
+      version: version,
+    );
+    final canonicalJson = _canonicalJson(payload);
+    return sha256.convert(utf8.encode(canonicalJson)).toString();
+  }
+
+  static String calculateIntegrityHashV1For(
+    Occurrence occurrence, {
+    List<OccurrenceEvent> events = const [],
+  }) {
+    return calculateIntegrityHashFor(occurrence, version: 1, events: events);
+  }
+
+  static String calculateIntegrityHashV2For(
+    Occurrence occurrence, {
+    List<OccurrenceEvent> events = const [],
+  }) {
+    return calculateIntegrityHashFor(occurrence, version: 2, events: events);
+  }
+
   static String calculateIntegrityHashV3For(
     Occurrence occurrence, {
     List<OccurrenceEvent> events = const [],
   }) {
-    final payload = _buildHashPayloadV3(occurrence, events: events);
-    final canonicalJson = _canonicalJson(payload);
-    return sha256.convert(utf8.encode(canonicalJson)).toString();
+    return calculateIntegrityHashFor(occurrence, version: 3, events: events);
+  }
+
+  static String calculateIntegrityHashV4For(
+    Occurrence occurrence, {
+    List<OccurrenceEvent> events = const [],
+  }) {
+    return calculateIntegrityHashFor(occurrence, version: 4, events: events);
   }
 
   Future<void> _finalizeOccurrence(Occurrence occurrence) async {
     try {
       final signatures = await _signatureRepository.getSignatures(
         occurrence.id,
+        activeRoundOnly: false,
       );
       final events = await _eventRepository.listByOccurrence(occurrence.id);
+      final participations = await _loadParticipations(occurrence.id);
+      final correctionRequests = await _loadCorrectionRequests(occurrence.id);
       final finalReport = _finalReportFor(occurrence);
       if (finalReport == null) {
         throw StateError(
@@ -105,8 +149,10 @@ class OccurrenceFinalizationService {
         finalReport: finalReport,
         results: _resultsFor(occurrence),
         details: _detailsFor(occurrence),
+        participations: participations,
+        correctionRequests: correctionRequests,
       );
-      final integrityHash = calculateIntegrityHashV3(
+      final integrityHash = calculateIntegrityHashV4(
         enrichedOccurrence,
         events: events,
       );
@@ -119,12 +165,7 @@ class OccurrenceFinalizationService {
         details: enrichedOccurrence.details,
         finalizationPhotos: occurrence.finalizationPhotos,
         finalizationPhotoHashes: occurrence.finalizationPhotoHashes,
-        hashVersion: 3,
-      );
-
-      await _notifyOccurrenceFinalized(
-        enrichedOccurrence,
-        status: OccurrenceStatus.finalized,
+        hashVersion: 4,
       );
 
       debugPrint(
@@ -158,6 +199,7 @@ class OccurrenceFinalizationService {
 
     final signaturesBefore = await _signatureRepository.getSignatures(
       occurrence.id,
+      activeRoundOnly: false,
     );
     final signedIds = signaturesBefore
         .where((signature) => signature.status == SignatureStatus.signed)
@@ -166,6 +208,7 @@ class OccurrenceFinalizationService {
     final pendingCoSigners = occurrence.team.where(
       (member) =>
           member.role != TeamRole.titular &&
+          _isAcceptedForSignature(occurrence, member.handlerId) &&
           !signedIds.contains(member.handlerId),
     );
 
@@ -177,15 +220,22 @@ class OccurrenceFinalizationService {
       );
     }
 
-    final signatures = await _signatureRepository.getSignatures(occurrence.id);
+    final signatures = await _signatureRepository.getSignatures(
+      occurrence.id,
+      activeRoundOnly: false,
+    );
     final events = await _eventRepository.listByOccurrence(occurrence.id);
+    final participations = await _loadParticipations(occurrence.id);
+    final correctionRequests = await _loadCorrectionRequests(occurrence.id);
     final enrichedOccurrence = occurrence.copyWith(
       signatures: signatures,
       finalReport: finalReport,
       results: _resultsFor(occurrence),
       details: _detailsFor(occurrence),
+      participations: participations,
+      correctionRequests: correctionRequests,
     );
-    final integrityHash = calculateIntegrityHashV3(
+    final integrityHash = calculateIntegrityHashV4(
       enrichedOccurrence,
       events: events,
     );
@@ -198,13 +248,9 @@ class OccurrenceFinalizationService {
       details: enrichedOccurrence.details,
       finalizationPhotos: occurrence.finalizationPhotos,
       finalizationPhotoHashes: occurrence.finalizationPhotoHashes,
-      hashVersion: 3,
+      hashVersion: 4,
     );
 
-    await _notifyOccurrenceFinalized(
-      enrichedOccurrence,
-      status: OccurrenceStatus.finalizedWithPending,
-    );
     return true;
   }
 
@@ -229,15 +275,27 @@ class OccurrenceFinalizationService {
     );
   }
 
-  static Map<String, dynamic> _buildHashPayloadV3(
+  static Map<String, dynamic> _buildHashPayload(
     Occurrence occurrence, {
     List<OccurrenceEvent> events = const [],
+    required int version,
   }) {
+    final includePhotoHashes = version >= 2;
+    final includeTeamAndSignatures = version >= 3;
+    final includeCrewReview = version >= 4;
     final sortedTeam = List.of(occurrence.team)
       ..sort((a, b) => a.handlerId.compareTo(b.handlerId));
-    final sortedSignatures = List<OccurrenceSignature>.from(
-      occurrence.signatures,
-    )..sort((a, b) => a.handlerId.compareTo(b.handlerId));
+    final sortedSignatures =
+        List<OccurrenceSignature>.from(occurrence.signatures)..sort((a, b) {
+          final byRound = a.round.compareTo(b.round);
+          if (byRound != 0) return byRound;
+          return a.handlerId.compareTo(b.handlerId);
+        });
+    final sortedParticipations = List.of(occurrence.participations)
+      ..sort((a, b) => a.handlerId.compareTo(b.handlerId));
+    final correctionPayload =
+        occurrence.correctionRequests.map(_normalizeForHash).toList()
+          ..sort((a, b) => _canonicalJson(a).compareTo(_canonicalJson(b)));
     final eventPayload =
         events.map((event) {
           final photoHashes =
@@ -246,19 +304,22 @@ class OccurrenceFinalizationService {
                   .map((metadata) => metadata['sha256'].toString())
                   .toList()
                 ..sort();
-          return {
+          final payload = {
             'category': event.category.toMap(),
             'description': event.description,
             'dog_handler_id': event.dogHandlerId,
             'gps_lat': event.gpsLat,
             'gps_lng': event.gpsLng,
             'id': event.id,
-            'photo_hashes': photoHashes,
             'photo_urls': [...event.photoUrls]..sort(),
             'place_label': event.placeLabel,
             'timestamp': event.timestamp.toUtc().toIso8601String(),
             'title': event.title,
           };
+          if (includePhotoHashes) {
+            payload['photo_hashes'] = photoHashes;
+          }
+          return payload;
         }).toList()..sort((a, b) {
           final byTimestamp = (a['timestamp'] as String).compareTo(
             b['timestamp'] as String,
@@ -269,36 +330,89 @@ class OccurrenceFinalizationService {
     final resultPayload =
         occurrence.results.map((result) => result.toMap()).toList()..sort();
 
-    return {
+    final payload = {
       'details': _normalizeForHash(occurrence.details),
       'dog_id': occurrence.dogId,
       'final_report': occurrence.finalReport,
-      'finalization_photo_hashes': [...occurrence.finalizationPhotoHashes]
-        ..sort(),
       'finalization_photos': [...occurrence.finalizationPhotos]..sort(),
       'gps_accuracy': occurrence.gpsAccuracy,
       'gps_lat': occurrence.gpsLat,
       'gps_lng': occurrence.gpsLng,
-      'hash_version': 3,
+      'hash_version': version,
       'location_address': occurrence.locationAddress,
       'primary_handler_id': occurrence.primaryHandlerId,
       'primary_handler_ra': occurrence.primaryHandlerRa,
       'results': resultPayload,
       'shift_id': occurrence.shiftId,
+      if (includeCrewReview) 'crew_id': occurrence.crewId,
+      if (includeCrewReview) 'service_dog_id': occurrence.effectiveServiceDogId,
       'vehicle_id': occurrence.vehicleId,
       'vehicle_label': occurrence.vehicleLabel,
       'vehicle_model': occurrence.vehicleModel,
       'vehicle_prefix': occurrence.vehiclePrefix,
       'vehicle_unit': occurrence.vehicleUnit,
-      'signatures': sortedSignatures
-          .map((signature) => signature.toHashPayload())
-          .toList(),
       'started_at': occurrence.startedAt.toUtc().toIso8601String(),
-      'team': sortedTeam.map((member) => member.toHashPayload()).toList(),
       'events': eventPayload,
       'type_code': occurrence.typeCode,
       'type_name': occurrence.typeName,
     };
+    if (includePhotoHashes) {
+      payload['finalization_photo_hashes'] = [
+        ...occurrence.finalizationPhotoHashes,
+      ]..sort();
+    }
+    if (includeTeamAndSignatures) {
+      payload['team'] = sortedTeam
+          .map((member) => member.toHashPayload())
+          .toList();
+      payload['signatures'] = sortedSignatures
+          .map((signature) => signature.toHashPayload())
+          .toList();
+    }
+    if (includeCrewReview) {
+      payload['accepted_handler_ids'] = [...occurrence.acceptedHandlerIds]
+        ..sort();
+      payload['declined_handler_ids'] = [...occurrence.declinedHandlerIds]
+        ..sort();
+      payload['edit_authorized_handler_ids'] = [
+        ...occurrence.editAuthorizedHandlerIds,
+      ]..sort();
+      payload['participation_revision'] = occurrence.participationRevision;
+      payload['participation_status'] = occurrence.participationStatus;
+      payload['pending_handler_ids'] = [...occurrence.pendingHandlerIds]
+        ..sort();
+      payload['signature_round'] = occurrence.signatureRound;
+      payload['participations'] = sortedParticipations
+          .map((participation) => participation.toHashPayload())
+          .toList();
+      payload['correction_requests'] = correctionPayload;
+    }
+    return payload;
+  }
+
+  Future<List<OccurrenceParticipation>> _loadParticipations(
+    String occurrenceId,
+  ) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('occurrences')
+        .doc(occurrenceId)
+        .collection('participations')
+        .get();
+    return snapshot.docs
+        .map((doc) => OccurrenceParticipation.fromJson(doc.data()))
+        .where((participation) => participation.handlerId.isNotEmpty)
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCorrectionRequests(
+    String occurrenceId,
+  ) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('occurrences')
+        .doc(occurrenceId)
+        .collection('correction_requests')
+        .get();
+    return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
   }
 
   static String _canonicalJson(dynamic value) {
@@ -363,19 +477,11 @@ class OccurrenceFinalizationService {
     return 'Convidado em ${invitedAt ?? 'data nao registrada'}; nao assinou no prazo de ${deadline ?? 'prazo nao registrado'}';
   }
 
-  Future<void> _notifyOccurrenceFinalized(
-    Occurrence occurrence, {
-    required OccurrenceStatus status,
-  }) async {
-    for (final member in occurrence.team) {
-      if (member.handlerId.trim().isEmpty) continue;
-      await _notificationService.createNotification(
-        userId: member.handlerId,
-        type: NotificationType.occurrenceFinalized,
-        occurrenceId: occurrence.id,
-        occurrenceTitle: occurrence.typeName,
-        additionalData: status.toMap(),
-      );
+  static bool _isAcceptedForSignature(Occurrence occurrence, String handlerId) {
+    if (occurrence.acceptedHandlerIds.isEmpty &&
+        occurrence.participationRevision == 0) {
+      return true;
     }
+    return occurrence.acceptedHandlerIds.contains(handlerId);
   }
 }

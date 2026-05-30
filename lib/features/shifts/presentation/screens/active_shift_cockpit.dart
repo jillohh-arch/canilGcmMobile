@@ -38,14 +38,6 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Alertas (condicional)
-                if (state._alerts.isNotEmpty) ...[
-                  _AlertsSection(
-                    alerts: state._alerts,
-                    totalAlerts: state._totalAlerts,
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 if (!Provider.of<ShiftViewModel>(context).hasVehicle) ...[
                   _VehicleAssumptionPrompt(
                     vehicleService: state._vehicleService,
@@ -54,14 +46,25 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
                   ),
                   const SizedBox(height: 16),
                 ],
+                _ShiftProfileCardsSection(
+                  dog: dog,
+                  callsign: callsign,
+                  conductorPhotoUrl: conductorPhoto,
+                ),
+                const SizedBox(height: 18),
+                // Alertas (condicional)
+                if (state._alerts.isNotEmpty) ...[
+                  _AlertsSection(
+                    alerts: state._alerts,
+                    totalAlerts: state._totalAlerts,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 // Atividades de Hoje
                 _TodayActivitiesSection(dogId: dog.id, dogName: dog.name),
                 const SizedBox(height: 18),
                 // Registrar (quick actions)
                 _QuickActionsSection(dog: dog, actions: state._quickActions),
-                const SizedBox(height: 18),
-                // Resumo do Cão
-                _DogSummarySection(dog: dog),
               ],
             ),
           ),
@@ -108,6 +111,7 @@ class _VehicleAssumptionPrompt extends StatelessWidget {
       stream: vehicleService.watchActiveVehicles(),
       builder: (context, snapshot) {
         final vehicles = snapshot.data ?? const <Vehicle>[];
+        final error = snapshot.error;
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -148,7 +152,12 @@ class _VehicleAssumptionPrompt extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              if (vehicles.isEmpty)
+              if (error != null)
+                Text(
+                  'Nao foi possivel carregar viaturas: $error',
+                  style: GoogleFonts.inter(color: AppTheme.error, fontSize: 11),
+                )
+              else if (vehicles.isEmpty)
                 Text(
                   'Nenhuma viatura ativa cadastrada.',
                   style: GoogleFonts.inter(

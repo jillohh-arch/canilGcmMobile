@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/occurrence_finalization_service.dart';
@@ -89,6 +90,77 @@ void main() {
           );
 
       expect(reorderedHash, hash);
+    });
+
+    test('hash v4 inclui participacoes sem alterar v3 legado', () {
+      final occurrence =
+          _occurrence(
+            signatures: [
+              OccurrenceSignature(
+                handlerId: '456',
+                status: SignatureStatus.signed,
+                signedAt: DateTime.utc(2026, 5, 29, 12),
+                signatureMethod: SignatureMethod.biometric,
+              ),
+            ],
+          ).copyWith(
+            crewId: 'crew-1075',
+            serviceDogId: 'dog-1',
+            signatureRound: 1,
+            participationStatus: 'accepted',
+            acceptedHandlerIds: const ['123', '456'],
+            declinedHandlerIds: const [],
+            pendingHandlerIds: const [],
+            editAuthorizedHandlerIds: const ['123', '456'],
+            participationRevision: 1,
+            participations: [
+              OccurrenceParticipation(
+                handlerId: '123',
+                status: OccurrenceParticipationStatus.included,
+                at: DateTime.utc(2026, 5, 29, 10),
+                updatedBy: '123',
+              ),
+              OccurrenceParticipation(
+                handlerId: '456',
+                status: OccurrenceParticipationStatus.included,
+                at: DateTime.utc(2026, 5, 29, 10),
+                updatedBy: '123',
+              ),
+            ],
+          );
+      final events = [_event(photoHash: 'foto-a')];
+
+      final hashV3 = OccurrenceFinalizationService.calculateIntegrityHashV3For(
+        occurrence,
+        events: events,
+      );
+      final hashV4 = OccurrenceFinalizationService.calculateIntegrityHashV4For(
+        occurrence,
+        events: events,
+      );
+      final declined = occurrence.copyWith(
+        declinedHandlerIds: const ['456'],
+        acceptedHandlerIds: const ['123'],
+        participations: [
+          occurrence.participations.first,
+          OccurrenceParticipation(
+            handlerId: '456',
+            status: OccurrenceParticipationStatus.declined,
+            declineReason: 'Nao estava no local',
+            at: DateTime.utc(2026, 5, 29, 10),
+            updatedBy: '456',
+          ),
+        ],
+      );
+      final declinedHash =
+          OccurrenceFinalizationService.calculateIntegrityHashV4For(
+            declined,
+            events: events,
+          );
+
+      expect(hashV4, hasLength(64));
+      expect(hashV4, isNot(hashV3));
+      expect(declinedHash, isNot(hashV4));
     });
   });
 }

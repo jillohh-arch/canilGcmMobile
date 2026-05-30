@@ -14,6 +14,9 @@ class OccurrenceEventRepository {
           .doc(occurrenceId)
           .collection('events');
 
+  DocumentReference<Map<String, dynamic>> _occurrence(String occurrenceId) =>
+      _firestore.collection('occurrences').doc(occurrenceId);
+
   Future<OccurrenceEvent> create(OccurrenceEvent event) async {
     await _ensureOccurrenceMutable(event.occurrenceId);
     final colRef = _events(event.occurrenceId);
@@ -27,8 +30,23 @@ class OccurrenceEventRepository {
     final data = event
         .copyWith(createdAt: now, updatedAt: now, auditTrail: auditTrail)
         .toMap();
+    final occurrenceEntry = AuditService.buildInlineEntry(
+      action: 'event_created',
+      fieldName: 'events.${event.id}',
+      newValue: {
+        'title': event.title,
+        'category': event.category.toMap(),
+        'timestamp': event.timestamp.toIso8601String(),
+      },
+    );
 
-    await docRef.set(data);
+    final batch = _firestore.batch();
+    batch.set(docRef, data);
+    batch.update(_occurrence(event.occurrenceId), {
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([occurrenceEntry]),
+    });
+    await batch.commit();
 
     return event.copyWith(
       createdAt: now,
@@ -49,18 +67,29 @@ class OccurrenceEventRepository {
 
     final currentData = snap.data()!;
     final entries = <Map<String, dynamic>>[];
+    final occurrenceEntries = <Map<String, dynamic>>[];
 
     for (final key in updates.keys) {
       if (key == 'updated_at' || key == 'audit_trail') continue;
       final oldValue = currentData[key];
       final newValue = updates[key];
       if (oldValue != newValue) {
+        final oldAuditValue = _serializeForAudit(oldValue);
+        final newAuditValue = _serializeForAudit(newValue);
         entries.add(
           AuditService.buildInlineEntry(
             action: 'updated',
             fieldName: key,
-            oldValue: _serializeForAudit(oldValue),
-            newValue: _serializeForAudit(newValue),
+            oldValue: oldAuditValue,
+            newValue: newAuditValue,
+          ),
+        );
+        occurrenceEntries.add(
+          AuditService.buildInlineEntry(
+            action: 'event_updated',
+            fieldName: 'events.$eventId.$key',
+            oldValue: oldAuditValue,
+            newValue: newAuditValue,
           ),
         );
       }
@@ -71,7 +100,15 @@ class OccurrenceEventRepository {
       updates['audit_trail'] = FieldValue.arrayUnion(entries);
     }
 
-    await docRef.update(updates);
+    final batch = _firestore.batch();
+    batch.update(docRef, updates);
+    if (occurrenceEntries.isNotEmpty) {
+      batch.update(_occurrence(occurrenceId), {
+        'updated_at': FieldValue.serverTimestamp(),
+        'audit_trail': FieldValue.arrayUnion(occurrenceEntries),
+      });
+    }
+    await batch.commit();
   }
 
   Future<void> softDelete(
@@ -88,7 +125,8 @@ class OccurrenceEventRepository {
       reason: reason,
     );
 
-    await docRef.update({
+    final batch = _firestore.batch();
+    batch.update(docRef, {
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': userId,
       'delete_reason': reason,
@@ -96,13 +134,23 @@ class OccurrenceEventRepository {
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
+    batch.update(_occurrence(occurrenceId), {
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([
+        AuditService.buildInlineEntry(
+          action: 'event_deleted',
+          fieldName: 'events.$eventId',
+          reason: reason,
+        ),
+      ]),
+    });
+    await batch.commit();
   }
 
   Stream<List<OccurrenceEvent>> watchByOccurrence(String occurrenceId) {
-    return _events(occurrenceId)
-        .snapshots()
-        .map(
-          (snap) => snap.docs
+    return _events(occurrenceId).snapshots().map(
+      (snap) =>
+          snap.docs
               .map(
                 (doc) => OccurrenceEvent.fromMap(
                   doc.data(),
@@ -112,8 +160,8 @@ class OccurrenceEventRepository {
               )
               .where((e) => !e.isDeleted)
               .toList()
-              ..sort((a, b) => b.timestamp.compareTo(a.timestamp)),
-        );
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp)),
+    );
   }
 
   Future<List<OccurrenceEvent>> listByOccurrence(String occurrenceId) async {
@@ -129,7 +177,7 @@ class OccurrenceEventRepository {
         )
         .where((e) => !e.isDeleted)
         .toList()
-        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
   Future<OccurrenceEvent?> getById(String occurrenceId, String eventId) async {
@@ -159,13 +207,16 @@ class OccurrenceEventRepository {
   }
 
   Future<void> _ensureOccurrenceMutable(String occurrenceId) async {
-    final snap = await _firestore
-        .collection('occurrences')
-        .doc(occurrenceId)
-        .get();
+    final snap = await _occurrence(occurrenceId).get();
     final status = snap.data()?['status']?.toString();
-    if (status == 'finalized') {
-      throw StateError('Ocorrencia finalizada nao permite editar eventos.');
+    if (status == null) {
+      throw StateError('Ocorrencia nao encontrada.');
+    }
+    if (status == 'awaiting_signatures' ||
+        status == 'finalized' ||
+        status == 'finalized_with_pending' ||
+        status == 'canceled') {
+      throw StateError('Ocorrencia bloqueada nao permite editar eventos.');
     }
   }
 }
