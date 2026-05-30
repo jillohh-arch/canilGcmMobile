@@ -96,3 +96,9 @@ temp/docs/SESSAO_*.md
 *.env
 secrets.json
 local.settings.json
+
+# Local agent settings and generated Firebase Functions artifacts
+.claude/settings.local.json
+functions/node_modules/
+functions/.npm-cache/
+functions/lib/

@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'package:canil_gcm/core/services/media_processing_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
@@ -122,10 +123,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
       final result = await Navigator.of(context).push<dynamic>(
         MaterialPageRoute(
           builder: (_) => EditEventLocationScreen(
-            event: e.copyWith(
-              gpsLat: _gpsLat,
-              gpsLng: _gpsLng,
-            ),
+            event: e.copyWith(gpsLat: _gpsLat, gpsLng: _gpsLng),
             eventIndex: eventIndex > 0 ? eventIndex : 1,
             totalEvents: totalEvents > 0 ? totalEvents : 1,
           ),
@@ -461,7 +459,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   Future<void> _createEvent(List<String> photoUrls) async {
     final vm = context.read<OccurrenceViewModel>();
+    final authVM = context.read<AuthViewModel>();
     final now = DateTime.now();
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
 
     // Se não tem GPS ainda, tenta capturar agora
     if (_gpsLat == null) {
@@ -484,6 +484,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
       photoUrls: photoUrls,
       photoMetadata: _buildPhotoMetadata(photoUrls),
       mediaItems: _buildMediaItems(photoUrls),
+      dogHandlerId: _selectedCategory == OccurrenceEventCategory.dogWork
+          ? handlerRa
+          : null,
       gpsLat: _gpsLat,
       gpsLng: _gpsLng,
       createdAt: now,
@@ -499,6 +502,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     if (_selectedCategory != e.category) {
       updates['category'] = _selectedCategory.toMap();
+      updates['dog_handler_id'] =
+          _selectedCategory == OccurrenceEventCategory.dogWork
+          ? HandlerIdentityService.raFromUser(
+              context.read<AuthViewModel>().user,
+            )
+          : null;
     }
     if (_timestamp != e.timestamp) {
       updates['timestamp'] = _timestamp;
@@ -528,11 +537,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   List<Map<String, dynamic>> _buildPhotoMetadata(List<String> photoUrls) {
     return photoUrls.map((url) {
       final hash = _photoHashMap[url];
-      return {
-        'url': url,
-        'type': 'image',
-        'sha256': ?hash,
-      };
+      return {'url': url, 'type': 'image', 'sha256': ?hash};
     }).toList();
   }
 

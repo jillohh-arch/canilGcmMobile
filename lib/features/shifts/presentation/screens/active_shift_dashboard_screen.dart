@@ -16,6 +16,11 @@ import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmod
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -33,6 +38,7 @@ part 'active_shift_quick_actions.dart';
 part 'active_shift_alerts_section.dart';
 part 'active_shift_today_section.dart';
 part 'active_shift_dog_profile_card.dart';
+part 'active_shift_profile_cards.dart';
 part 'active_shift_cockpit.dart';
 part 'active_shift_readiness.dart';
 part 'active_shift_dog_switcher.dart';
@@ -49,6 +55,7 @@ class _ActiveShiftDashboardScreenState
     extends State<ActiveShiftDashboardScreen> {
   final DogService _dogService = DogService();
   final DashboardService _dashboardService = DashboardService();
+  final VehicleService _vehicleService = VehicleService();
   String? _lastFetchedDogId;
 
   // Dados dinâmicos carregados do Firestore

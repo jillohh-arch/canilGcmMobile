@@ -21,6 +21,8 @@ class NotificationService {
     String? additionalData,
     String? notificationId,
     bool deduplicate = false,
+    String? targetScreen,
+    bool actionRequired = false,
   }) async {
     final resolvedNotificationId =
         notificationId ?? _notificationsCollection.doc().id;
@@ -37,14 +39,22 @@ class NotificationService {
         .doc(userId)
         .collection('items')
         .doc(resolvedNotificationId);
+    final data = notification.toJson();
+    final resolvedTarget = targetScreen?.trim();
+    if (resolvedTarget != null && resolvedTarget.isNotEmpty) {
+      data['target_screen'] = resolvedTarget;
+    }
+    if (actionRequired) {
+      data['action_required'] = true;
+    }
 
     if (deduplicate) {
       final existing = await docRef.get();
       if (!existing.exists) {
-        await docRef.set(notification.toJson());
+        await docRef.set(data);
       }
     } else {
-      await docRef.set(notification.toJson());
+      await docRef.set(data);
     }
 
     debugPrint('[NotificationService] Notificação criada: $type para $userId');

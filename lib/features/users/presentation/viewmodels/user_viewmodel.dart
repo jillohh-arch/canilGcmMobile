@@ -13,6 +13,7 @@ class UserViewModel extends ChangeNotifier {
 
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<List<UserModel>>? _usersSubscription;
+  Timer? _initialLoadTimer;
   String? _boundRa;
 
   List<UserModel> _users = [];
@@ -37,6 +38,8 @@ class UserViewModel extends ChangeNotifier {
     _boundRa = ra;
     _usersSubscription?.cancel();
     _usersSubscription = null;
+    _initialLoadTimer?.cancel();
+    _initialLoadTimer = null;
     _users = [];
     _error = null;
     _hasLoadedInitialData = false;
@@ -51,13 +54,25 @@ class UserViewModel extends ChangeNotifier {
 
   void _listenToUsers() {
     _setLoading(true);
+    _initialLoadTimer?.cancel();
+    _initialLoadTimer = Timer(const Duration(seconds: 8), () {
+      if (_hasLoadedInitialData) return;
+      _error = 'Tempo excedido ao carregar usuarios.';
+      _hasLoadedInitialData = true;
+      _setLoading(false);
+    });
+
     _usersSubscription = _userService.getUsers().listen(
       (usersData) {
+        _initialLoadTimer?.cancel();
+        _initialLoadTimer = null;
         _users = usersData;
         _hasLoadedInitialData = true;
         _setLoading(false);
       },
       onError: (e) {
+        _initialLoadTimer?.cancel();
+        _initialLoadTimer = null;
         _error = e.toString();
         _hasLoadedInitialData = true;
         _setLoading(false);
@@ -121,6 +136,7 @@ class UserViewModel extends ChangeNotifier {
   void dispose() {
     _authSubscription?.cancel();
     _usersSubscription?.cancel();
+    _initialLoadTimer?.cancel();
     super.dispose();
   }
 }

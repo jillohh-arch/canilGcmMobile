@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
+import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
@@ -23,18 +25,47 @@ class OccurrenceRepository {
     return _collection.doc(occurrenceId).collection('signatures');
   }
 
+  String _signatureDocId(OccurrenceSignature signature) {
+    return signature.round <= 1
+        ? signature.handlerId
+        : 'round_${signature.round}_${signature.handlerId}';
+  }
+
   Future<Occurrence> create(Occurrence occurrence) async {
     final docRef = _collection.doc(occurrence.id);
     final now = DateTime.now();
 
     final entry = AuditService.buildInlineEntry(action: 'created');
+    final acceptedHandlerIds = occurrence.teamHandlerIds;
     final created = occurrence.copyWith(
       createdAt: now,
       updatedAt: now,
       auditTrail: [entry],
+      participationStatus: acceptedHandlerIds.isEmpty ? null : 'accepted',
+      acceptedHandlerIds: acceptedHandlerIds,
+      declinedHandlerIds: const [],
+      pendingHandlerIds: const [],
+      editAuthorizedHandlerIds: acceptedHandlerIds,
+      participationRevision: acceptedHandlerIds.isEmpty ? 0 : 1,
     );
 
-    await docRef.set(created.toMap());
+    final batch = _firestore.batch();
+    batch.set(docRef, created.toMap());
+    final participationAt = DateTime.now();
+    for (final member in created.team) {
+      if (member.handlerId.trim().isEmpty) continue;
+      final participation = OccurrenceParticipation(
+        handlerId: member.handlerId.trim(),
+        status: OccurrenceParticipationStatus.included,
+        at: participationAt,
+        updatedBy: created.primaryHandlerRa,
+      );
+      batch.set(
+        docRef.collection('participations').doc(member.handlerId.trim()),
+        participation.toJson(),
+      );
+    }
+    await batch.commit();
 
     unawaited(
       AuditService.log(
@@ -46,6 +77,9 @@ class OccurrenceRepository {
           'type_code': occurrence.typeCode,
           'status': occurrence.status.toMap(),
           'dog_id': occurrence.dogId,
+          'vehicle_id': occurrence.vehicleId,
+          'vehicle_label': occurrence.vehicleLabel,
+          'team_handler_ids': occurrence.teamHandlerIds,
           'primary_handler_ra': occurrence.primaryHandlerRa,
         },
       ),
@@ -149,6 +183,18 @@ class OccurrenceRepository {
     List<String> finalizationPhotoHashes = const [],
     int hashVersion = 2,
   }) async {
+    if (hashVersion >= 4) {
+      await OccurrenceTransitionService().sealOccurrenceV4(
+        occurrenceId: id,
+        finalReport: finalReport,
+        results: results,
+        details: details,
+        finalizationPhotos: finalizationPhotos,
+        finalizationPhotoHashes: finalizationPhotoHashes,
+      );
+      return;
+    }
+
     final docRef = _collection.doc(id);
     final entry = AuditService.buildInlineEntry(action: 'finalized');
 
@@ -205,6 +251,19 @@ class OccurrenceRepository {
     List<String> finalizationPhotoHashes = const [],
     int hashVersion = 2,
   }) async {
+    if (hashVersion >= 4) {
+      await OccurrenceTransitionService().sealOccurrenceV4(
+        occurrenceId: id,
+        finalReport: finalReport,
+        results: results,
+        details: details,
+        finalizationPhotos: finalizationPhotos,
+        finalizationPhotoHashes: finalizationPhotoHashes,
+        withPending: true,
+      );
+      return;
+    }
+
     final docRef = _collection.doc(id);
     final current = await getById(id);
     if (current == null) {
@@ -349,6 +408,9 @@ class OccurrenceRepository {
       updates['team_auth_uids'] = FieldValue.arrayUnion([
         normalizedMember.authUid,
       ]);
+      updates['team_auth_keys'] = FieldValue.arrayUnion([
+        '${normalizedMember.handlerId}:${normalizedMember.authUid}',
+      ]);
     }
 
     await docRef.update(updates);
@@ -410,6 +472,7 @@ class OccurrenceRepository {
       'team': updatedTeam.map((teamMember) => teamMember.toJson()).toList(),
       'team_handler_ids': updatedOccurrence.teamHandlerIds,
       'team_emails': updatedOccurrence.teamEmails,
+      'team_auth_keys': updatedOccurrence.teamAuthKeys,
       'team_size_max': current.teamSizeMax,
       'team_auth_uids': updatedTeam
           .map((teamMember) => teamMember.authUid)
@@ -466,6 +529,7 @@ class OccurrenceRepository {
 
     final coSigners = current.team
         .where((member) => member.role != TeamRole.titular)
+        .where((member) => _canRequestSignatureFor(current, member.handlerId))
         .toList();
     if (coSigners.isEmpty) {
       throw StateError('Adicione pelo menos um integrante para co-assinatura');
@@ -498,6 +562,9 @@ class OccurrenceRepository {
     final resolvedDeadline =
         deadline ??
         DateTime.now().add(signatureDeadline ?? const Duration(hours: 48));
+    final signatureRound = current.signatureRound <= 0
+        ? 1
+        : current.signatureRound;
     final entry = AuditService.buildInlineEntry(
       action: 'closed_for_signatures',
     );
@@ -514,21 +581,33 @@ class OccurrenceRepository {
       'finalization_photos': resolvedPhotos,
       'finalization_photo_hashes': resolvedPhotoHashes,
       'finalization_draft': FieldValue.delete(),
+      'signature_round': signatureRound,
       'signed_handler_ids': [],
       'signed_emails': [],
+      'signed_auth_uids': [],
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
 
     for (final member in coSigners) {
-      batch.set(_signatures(resolvedId).doc(member.handlerId), {
-        ...OccurrenceSignature(
-          handlerId: member.handlerId,
-          status: SignatureStatus.pending,
-        ).toJson(),
-        'created_at': FieldValue.serverTimestamp(),
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final signature = OccurrenceSignature(
+        handlerId: member.handlerId,
+        status: SignatureStatus.pending,
+        round: signatureRound,
+      );
+      batch.set(
+        _signatures(resolvedId).doc(_signatureDocId(signature)),
+        {
+          ...OccurrenceSignature(
+            handlerId: member.handlerId,
+            status: SignatureStatus.pending,
+            round: signatureRound,
+          ).toJson(),
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     }
 
     await batch.commit();
@@ -542,6 +621,7 @@ class OccurrenceRepository {
         after: {
           'status': OccurrenceStatus.awaitingSignatures.toMap(),
           'signature_deadline': resolvedDeadline.toIso8601String(),
+          'signature_round': signatureRound,
           'has_final_report': true,
           'pending_signatures': coSigners.map((m) => m.handlerId).toList(),
         },
@@ -575,6 +655,9 @@ class OccurrenceRepository {
     if (signingMember.role == TeamRole.titular) {
       throw StateError('O titular nao assina como integrante da equipe');
     }
+    if (!_canRequestSignatureFor(current, signingMember.handlerId)) {
+      throw StateError('Integrante sem participacao ativa nao pode assinar');
+    }
 
     final entry = AuditService.buildInlineEntry(
       action: 'signature_added',
@@ -582,25 +665,41 @@ class OccurrenceRepository {
       newValue: signature.toJson(),
     );
 
-    final batch = _firestore.batch();
-    batch.set(_signatures(occurrenceId).doc(signature.handlerId), {
-      ...signature.toJson(),
+    final round = current.signatureRound <= 0 ? 1 : current.signatureRound;
+    final roundedSignature = signature.copyWith(round: round);
+
+    await _signatures(occurrenceId).doc(_signatureDocId(roundedSignature)).set({
+      ...roundedSignature.toJson(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
     final occurrenceUpdates = <String, dynamic>{
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     };
-    if (signature.status == SignatureStatus.signed) {
+    if (roundedSignature.status == SignatureStatus.signed) {
       occurrenceUpdates['signed_handler_ids'] = FieldValue.arrayUnion([
         signature.handlerId,
       ]);
       occurrenceUpdates['signed_emails'] = FieldValue.arrayUnion([
         _emailForRa(signature.handlerId),
       ]);
+      if (signingMember.authUid?.trim().isNotEmpty == true) {
+        occurrenceUpdates['signed_auth_uids'] = FieldValue.arrayUnion([
+          signingMember.authUid!.trim(),
+        ]);
+      }
     }
-    batch.update(_collection.doc(occurrenceId), occurrenceUpdates);
-    await batch.commit();
+
+    try {
+      await _collection.doc(occurrenceId).update(occurrenceUpdates);
+    } on FirebaseException catch (error) {
+      debugPrint(
+        '[OccurrenceRepository] Assinatura gravada; '
+        'metadados da ocorrencia nao foram atualizados: '
+        '${error.code} ${error.message ?? ''}',
+      );
+    }
 
     unawaited(
       AuditService.log(
@@ -609,8 +708,9 @@ class OccurrenceRepository {
         entityId: occurrenceId,
         summary: 'Assinatura adicionada: ${signature.handlerId}',
         after: {
-          'signature_status': signature.status.toMap(),
-          'signature_method': signature.signatureMethod.toMap(),
+          'signature_status': roundedSignature.status.toMap(),
+          'signature_method': roundedSignature.signatureMethod.toMap(),
+          'signature_round': roundedSignature.round,
         },
       ),
     );
@@ -645,15 +745,22 @@ class OccurrenceRepository {
 
     final coSigners = occurrence.team
         .where((member) => member.role != TeamRole.titular)
+        .where(
+          (member) => _canRequestSignatureFor(occurrence, member.handlerId),
+        )
         .map((member) => member.handlerId)
         .toSet();
     if (coSigners.isEmpty) return false;
 
     final signatures = await getSignatures(occurrenceId);
+    final round = occurrence.signatureRound <= 0
+        ? 1
+        : occurrence.signatureRound;
     final signed = signatures
         .where(
           (signature) =>
               signature.status == SignatureStatus.signed &&
+              signature.round == round &&
               coSigners.contains(signature.handlerId),
         )
         .map((signature) => signature.handlerId)
@@ -663,6 +770,24 @@ class OccurrenceRepository {
   }
 
   Future<void> revertToDraft({required String occurrenceId}) async {
+    await OccurrenceTransitionService().requestCorrection(
+      occurrenceId: occurrenceId,
+      reason: 'Reabertura para correcao antes do selo',
+    );
+    unawaited(
+      AuditService.log(
+        action: 'reverted_to_draft',
+        entityType: 'occurrence',
+        entityId: occurrenceId,
+        summary: 'Ocorrencia revertida para rascunho',
+      ),
+    );
+    return;
+  }
+
+  Future<void> revertToDraftLocallyForLegacy({
+    required String occurrenceId,
+  }) async {
     final occurrence = await getById(occurrenceId);
     if (occurrence == null) {
       throw StateError('Ocorrencia nao encontrada');
@@ -676,17 +801,45 @@ class OccurrenceRepository {
     final entry = AuditService.buildInlineEntry(action: 'reverted_to_draft');
     final signaturesSnapshot = await _signatures(occurrenceId).get();
     final batch = _firestore.batch();
+    final currentRound = occurrence.signatureRound <= 0
+        ? 1
+        : occurrence.signatureRound;
+    final correctionRef = _collection
+        .doc(occurrenceId)
+        .collection('correction_requests')
+        .doc();
     batch.update(_collection.doc(occurrenceId), {
       'status': OccurrenceStatus.inProgress.toMap(),
       'signature_request_at': null,
       'signature_deadline': null,
+      'signature_round': currentRound + 1,
       'signed_handler_ids': [],
       'signed_emails': [],
+      'signed_auth_uids': [],
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
+    batch.set(correctionRef, {
+      'id': correctionRef.id,
+      'round': currentRound,
+      'requested_at': FieldValue.serverTimestamp(),
+      'requested_by': entry['by_ra'] ?? entry['performed_by'],
+      'reason': 'Reabertura para correcao antes do selo',
+      'status': 'open',
+    });
     for (final doc in signaturesSnapshot.docs) {
-      batch.delete(doc.reference);
+      final signature = OccurrenceSignature.fromJson(doc.data());
+      if (signature.round != currentRound ||
+          signature.status == SignatureStatus.obsolete) {
+        continue;
+      }
+      batch.set(doc.reference, {
+        'status': SignatureStatus.obsolete.toMap(),
+        'invalidated_at': FieldValue.serverTimestamp(),
+        'invalidated_by': entry['by_ra'] ?? entry['performed_by'],
+        'invalidation_reason': 'Reabertura para correcao antes do selo',
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
     await batch.commit();
 
@@ -890,6 +1043,14 @@ class OccurrenceRepository {
       'updated_at',
     };
     return updates.keys.every(allowed.contains);
+  }
+
+  static bool _canRequestSignatureFor(Occurrence occurrence, String handlerId) {
+    final accepted = occurrence.acceptedHandlerIds;
+    if (accepted.isEmpty && occurrence.participationRevision == 0) {
+      return true;
+    }
+    return accepted.contains(handlerId);
   }
 }
 

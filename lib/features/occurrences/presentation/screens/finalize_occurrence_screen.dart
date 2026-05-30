@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,11 +9,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/media_processing_service.dart';
+import 'package:canil_gcm/core/services/occurrence_finalization_service.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -325,74 +325,51 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     };
   }
 
-  String _buildIntegrityHash({
+  /// Monta a ocorrência enriquecida (relato, resultados, detalhes e fotos de
+  /// finalização) usada como entrada única do cálculo de hash. Mantém o estado
+  /// que será efetivamente selado idêntico ao que o serviço serializa.
+  Occurrence? _enrichedOccurrenceForHash({
     required String report,
     required List<OccurrenceResult> results,
     required Map<String, dynamic>? details,
-    List<String> finalizationPhotoHashes = const [],
+    required List<String> finalizationPhotoHashes,
+    required List<String> finalizationPhotos,
   }) {
     final vm = context.read<OccurrenceViewModel>();
     final occ = _occurrence ?? vm.openOccurrence;
-
-    // Extrair photo_hashes de cada evento (ordem estável por sha256)
-    final eventPayload =
-        vm.events.map((event) {
-          // Coletar hashes das fotos do evento a partir do photoMetadata
-          final eventPhotoHashes =
-              event.photoMetadata
-                  .where((m) => m['sha256'] != null)
-                  .map((m) => m['sha256'] as String)
-                  .toList()
-                ..sort();
-
-          return {
-            'id': event.id,
-            'category': event.category.toMap(),
-            'timestamp': event.timestamp.toIso8601String(),
-            'title': event.title,
-            'description': event.description,
-            'photo_urls': event.photoUrls,
-            'photo_hashes': eventPhotoHashes,
-            'gps_lat': event.gpsLat,
-            'gps_lng': event.gpsLng,
-          };
-        }).toList()..sort(
-          (a, b) =>
-              (a['timestamp'] as String).compareTo(b['timestamp'] as String),
-        );
-    final resultPayload = results.map((r) => r.toMap()).toList()..sort();
-
-    final payload = {
-      'hash_version': 2,
-      'occurrence_id': widget.occurrenceId,
-      'type_name': widget.typeName,
-      'dog_name': widget.dogName,
-      'handler_name': widget.handlerName,
-      'location_address': widget.locationAddress,
-      'started_at': occ?.startedAt.toIso8601String(),
-      'event_count': widget.eventCount,
-      'events': eventPayload,
-      'final_report': report,
-      'results': resultPayload,
-      'details': _stableJsonValue(details),
-      'finalization_photo_hashes': [...finalizationPhotoHashes]..sort(),
-    };
-
-    return sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+    if (occ == null) return null;
+    return occ.copyWith(
+      finalReport: report,
+      results: results,
+      details: details,
+      finalizationPhotos: finalizationPhotos,
+      finalizationPhotoHashes: finalizationPhotoHashes,
+    );
   }
 
-  dynamic _stableJsonValue(dynamic value) {
-    if (value is Map) {
-      final keys = value.keys.map((k) => k.toString()).toList()..sort();
-      return {for (final key in keys) key: _stableJsonValue(value[key])};
-    }
-    if (value is Iterable) {
-      return value.map(_stableJsonValue).toList();
-    }
-    if (value is DateTime) {
-      return value.toIso8601String();
-    }
-    return value;
+  /// Fonte única do selo: delega ao [OccurrenceFinalizationService] (hash v4),
+  /// garantindo que a finalização direta produza o mesmo hash que a verificação
+  /// e a co-assinatura. Não reimplementar a serialização aqui.
+  String? _buildIntegrityHash({
+    required String report,
+    required List<OccurrenceResult> results,
+    required Map<String, dynamic>? details,
+    required List<String> finalizationPhotos,
+    List<String> finalizationPhotoHashes = const [],
+  }) {
+    final occ = _enrichedOccurrenceForHash(
+      report: report,
+      results: results,
+      details: details,
+      finalizationPhotoHashes: finalizationPhotoHashes,
+      finalizationPhotos: finalizationPhotos,
+    );
+    if (occ == null) return null;
+    final vm = context.read<OccurrenceViewModel>();
+    return OccurrenceFinalizationService.calculateIntegrityHashV4For(
+      occ,
+      events: vm.events,
+    );
   }
 
   // ─── Finalize ───────────────────────────────────────────────────────
@@ -426,12 +403,28 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final report = _reportController.text.trim();
       final results = _selectedResults.toList();
       final details = _buildDetails();
+      _occurrence ??= await vm.getById(widget.occurrenceId);
+
+      if (_occurrence?.status == OccurrenceStatus.awaitingSignatures) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ocorrencia ja esta aguardando assinaturas.'),
+          ),
+        );
+        return;
+      }
 
       // Upload fotos de finalização (se houver)
       final photoUploadResults = await _uploadFinalizationPhotos();
       final photoUrls = photoUploadResults.map((r) => r.url).toList();
       final photoHashes = photoUploadResults.map((r) => r.sha256Hash).toList();
-      _occurrence ??= await vm.getById(widget.occurrenceId);
 
       if (_hasCoSigners) {
         await vm
@@ -475,8 +468,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         report: report,
         results: results,
         details: details,
+        finalizationPhotos: photoUrls,
         finalizationPhotoHashes: photoHashes,
       );
+
+      if (hash == null) {
+        throw StateError('Ocorrência indisponível para selar o hash.');
+      }
 
       debugPrint('[Finalize] Hash construído. Chamando finalizeOccurrence...');
 
@@ -489,6 +487,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             details: details,
             finalizationPhotos: photoUrls,
             finalizationPhotoHashes: photoHashes,
+            hashVersion: 4,
           )
           .timeout(
             const Duration(seconds: 30),
@@ -501,6 +500,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           );
 
       debugPrint('[Finalize] Finalização concluída com sucesso!');
+      final sealedOccurrence = await vm.getById(widget.occurrenceId);
+      final confirmedHash =
+          sealedOccurrence?.integrityHash?.trim().isNotEmpty == true
+          ? sealedOccurrence!.integrityHash!
+          : hash;
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -516,7 +520,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 eventCount: widget.eventCount,
                 results: results,
                 details: details,
-                integrityHash: hash,
+                integrityHash: confirmedHash,
               ),
             ),
           ),

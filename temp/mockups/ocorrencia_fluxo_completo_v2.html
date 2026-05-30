@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluxo completo da Ocorrência — Canil K9 GCM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#02080a;font-family:'Inter',sans-serif;color:#fff;padding:30px 24px 80px;}
+  .doc-head{max-width:1100px;margin:0 auto 28px;}
+  .doc-head h1{font-size:23px;font-weight:800;}
+  .doc-head h1 .k{color:#4dd0e1;}
+  .doc-head p{color:#aebcc4;font-size:13.5px;margin-top:7px;line-height:1.55;max-width:760px;}
+  .macro{max-width:1100px;margin:0 auto 36px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:15px;border:1px solid rgba(77,208,225,.14);border-radius:13px;background:rgba(77,208,225,.04);}
+  .macro span.m{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4dd0e1;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.2);padding:6px 11px;border-radius:8px;}
+  .macro span.s{color:#5a7280;}
+
+  .phase{margin:0 auto 16px;padding:24px 0 8px;border-top:1px solid rgba(77,208,225,.12);}
+  .phase-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;max-width:1100px;margin-left:auto;margin-right:auto;}
+  .phase-head .n{font-family:'IBM Plex Mono',monospace;font-size:13px;color:#04181d;background:#4dd0e1;padding:5px 11px;border-radius:7px;font-weight:700;}
+  .phase-head .t{font-size:18px;font-weight:800;}
+  .phase-head .d{font-size:13px;color:#7a8a92;}
+  .track{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;padding:4px 4px 18px;}
+  .track::-webkit-scrollbar{height:8px;}
+  .track::-webkit-scrollbar-thumb{background:rgba(77,208,225,.2);border-radius:4px;}
+  .swrap{flex-shrink:0;display:flex;flex-direction:column;align-items:center;width:360px;}
+  .plabel{color:#4dd0e1;font-size:11px;font-weight:700;letter-spacing:.6px;margin-bottom:9px;text-align:center;}
+  .plabel small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .arrow{flex-shrink:0;align-self:center;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 2px;}
+  .arrow .a{color:#4dd0e1;font-size:22px;}
+  .arrow .l{font-size:9px;color:#7a8a92;font-family:'IBM Plex Mono',monospace;max-width:78px;text-align:center;line-height:1.3;}
+  .arrow.alt .a{color:#f1c40f;}
+  .arrow.alt .l{color:#b08a1a;}
+
+  .phone{width:360px;background:#050d10;border-radius:34px;overflow:hidden;position:relative;border:7px solid #161616;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+  .status-bar{height:40px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;color:#fff;font-size:13px;font-weight:600;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:11px;}
+  .content{padding:0 16px 22px;}
+
+  .header{display:flex;align-items:center;gap:11px;padding:5px 0 14px;}
+  .back-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px;background:rgba(255,255,255,.04);border-radius:9px;flex-shrink:0;}
+  .htitle .h-sub-top{color:#4dd0e1;font-size:9px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:2px;}
+  .htitle .h-main{color:#fff;font-size:15px;font-weight:700;}
+  .htitle .h-sub{color:#5a7280;font-size:10.5px;font-weight:500;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+  .h-right{margin-left:auto;color:#4dd0e1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(77,208,225,.08);border-radius:9px;font-size:15px;}
+
+  .ident{background:linear-gradient(135deg,rgba(77,208,225,.07),rgba(77,208,225,.02));border:1px solid rgba(77,208,225,.18);border-radius:15px;padding:15px;margin-bottom:14px;}
+  .ident-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .ident-type{color:#4dd0e1;font-size:9.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:5px;}
+  .ident-nature{color:#fff;font-size:18px;font-weight:700;line-height:1.15;}
+  .badge{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;border-radius:13px;padding:5px 9px;font-size:9.5px;font-weight:700;letter-spacing:.4px;}
+  .b-amber{background:rgba(241,196,15,.14);border:1px solid rgba(241,196,15,.38);color:#f1c40f;}
+  .b-green{background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.38);color:#2ecc71;}
+  .b-cyan{background:rgba(77,208,225,.12);border:1px solid rgba(77,208,225,.35);color:#4dd0e1;}
+  .b-grey{background:rgba(90,114,128,.15);border:1px solid rgba(90,114,128,.35);color:#8aa0aa;}
+  .ident-meta{display:flex;gap:16px;padding-top:11px;margin-top:11px;border-top:1px solid rgba(255,255,255,.06);}
+  .im{display:flex;flex-direction:column;}
+  .im-k{color:#5a7280;font-size:8.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;}
+  .im-v{color:#fff;font-size:12.5px;font-weight:600;margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+  .ident-bin{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);}
+  .bin-av{width:28px;height:28px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .bin-av.dog{border-color:#2ecc71;}
+  .bin-txt{color:#aebcc4;font-size:11px;}
+  .bin-txt b{color:#fff;font-weight:600;}
+
+  .sec-label{color:#5a7280;font-size:9.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;margin:18px 0 10px;}
+
+  .stats{display:flex;gap:8px;margin-bottom:4px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 6px;text-align:center;}
+  .stat-n{color:#fff;font-size:19px;font-weight:800;}
+  .stat-l{color:#5a7280;font-size:8.5px;font-weight:600;margin-top:2px;letter-spacing:.3px;}
+
+  .member{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:10px 12px;margin-bottom:7px;}
+  .member.cy{background:rgba(77,208,225,.04);border-color:rgba(77,208,225,.25);border-left:3px solid #4dd0e1;}
+  .member.dog{border-color:rgba(46,204,113,.2);}
+  .m-av{width:32px;height:32px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .m-av.dog{border-color:#2ecc71;}
+  .m-name{color:#fff;font-size:12.5px;font-weight:600;}
+  .m-meta{color:#7a8a92;font-size:9.5px;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+  .m-right{margin-left:auto;}
+
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;}
+  .info-card{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.2);border-radius:11px;padding:12px;}
+  .info-label{display:flex;align-items:center;gap:5px;color:#4dd0e1;font-size:9px;font-weight:600;letter-spacing:1px;margin-bottom:7px;}
+  .info-value{color:#fff;font-size:12px;font-weight:600;line-height:1.4;}
+  .gps-ok{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:9px;color:#2ecc71;font-weight:500;}
+  .gps-ok::before{content:"";width:5px;height:5px;border-radius:50%;background:#2ecc71;}
+
+  .binomio-big{display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0 12px;}
+  .av-big{width:70px;height:70px;border-radius:50%;background:#1a2a30;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:10px;font-weight:700;text-align:center;line-height:1.3;}
+  .av-big.dog{border-color:#2ecc71;color:#2ecc71;}
+  .binomio-info{text-align:center;margin-bottom:14px;}
+  .binomio-names{color:#fff;font-size:15px;font-weight:600;}
+  .binomio-roles{color:#4dd0e1;font-size:10px;letter-spacing:1px;margin-top:3px;}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.3);border-radius:20px;color:#2ecc71;font-size:10px;font-weight:600;letter-spacing:.6px;}
+  .status-pill::before{content:"";width:6px;height:6px;background:#2ecc71;border-radius:50%;}
+  .center{text-align:center;}
+
+  /* dog/viatura select */
+  .pick{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:12px;margin-bottom:9px;}
+  .pick.sel{background:rgba(77,208,225,.07);border-color:#4dd0e1;border-width:2px;}
+  .pick-row{display:flex;align-items:center;gap:11px;}
+  .pick-ph{width:44px;height:44px;border-radius:50%;background:#1a2a30;border:2px solid #2ecc71;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#2ecc71;flex-shrink:0;}
+  .pick-ph.veh{border-radius:11px;border-color:#4dd0e1;color:#4dd0e1;font-size:18px;}
+  .pick-name{color:#fff;font-size:15px;font-weight:800;}
+  .pick-sub{color:#aebcc4;font-size:10.5px;margin-top:2px;}
+  .tag{background:rgba(77,208,225,.15);color:#4dd0e1;padding:2px 7px;border-radius:7px;font-size:8px;font-weight:700;letter-spacing:.4px;margin-left:7px;}
+  .pick-badge{margin-top:9px;display:flex;align-items:center;justify-content:center;gap:5px;border-radius:8px;padding:6px;font-size:9.5px;font-weight:700;background:rgba(46,204,113,.1);color:#2ecc71;border:1px solid rgba(46,204,113,.3);}
+  .vchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+  .vchip{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#aebcc4;background:rgba(77,208,225,.06);border:1px solid rgba(255,255,255,.08);padding:4px 8px;border-radius:7px;}
+  .vchip b{color:#4dd0e1;}
+  .opt-tag{font-size:8.5px;font-weight:700;letter-spacing:.6px;color:#7a8a92;background:rgba(90,114,128,.14);border:1px solid rgba(90,114,128,.3);padding:3px 8px;border-radius:10px;text-transform:uppercase;}
+
+  /* quick grid (andamento) */
+  .quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .qcard{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:12px 6px;text-align:center;}
+  .qcard .qi{font-size:18px;}
+  .qcard .ql{color:#b0c4cc;font-size:9.5px;margin-top:5px;font-weight:500;}
+  .qcard.k9{border-color:rgba(46,204,113,.25);background:rgba(46,204,113,.05);}
+
+  /* timeline */
+  .tl{position:relative;}
+  .tl-ev{display:grid;grid-template-columns:42px 20px 1fr;align-items:start;}
+  .tl-time{color:#7d8d99;font-size:10px;font-family:'IBM Plex Mono',monospace;text-align:right;padding-right:9px;padding-top:1px;}
+  .tl-rail{position:relative;display:flex;justify-content:center;}
+  .tl-rail::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.08);}
+  .tl-ev:last-child .tl-rail::before{height:8px;}
+  .tl-node{width:9px;height:9px;border-radius:50%;z-index:1;margin-top:3px;border:2px solid #050d10;}
+  .tl-card{padding:0 0 14px 11px;}
+  .tl-title{color:#fff;font-size:12px;font-weight:600;}
+  .tl-desc{color:#7d8d99;font-size:10.5px;margin-top:2px;line-height:1.4;}
+
+  /* map */
+  .map{height:110px;border-radius:12px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08);background:repeating-linear-gradient(0deg,#0e1c22 0 1px,transparent 1px 24px),repeating-linear-gradient(90deg,#0e1c22 0 1px,transparent 1px 28px),#0a161b;margin-bottom:9px;}
+  .map svg{width:100%;height:100%;}
+  .map-addr{display:flex;align-items:center;gap:7px;color:#aebcc4;font-size:11px;}
+  .map-addr .gps{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#4dd0e1;}
+
+  /* resultados */
+  .res{display:flex;align-items:center;gap:10px;background:rgba(46,204,113,.05);border:1px solid rgba(46,204,113,.18);border-radius:10px;padding:10px 12px;margin-bottom:7px;}
+  .res-ico{width:28px;height:28px;border-radius:7px;background:rgba(46,204,113,.12);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+  .res-txt{color:#fff;font-size:12px;font-weight:600;}
+  .res-txt small{display:block;color:#7d8d99;font-size:10px;font-weight:400;margin-top:1px;}
+  .res-check{margin-left:auto;color:#2ecc71;font-weight:700;}
+
+  /* integridade */
+  .integ{background:rgba(77,208,225,.04);border:1px solid rgba(77,208,225,.16);border-radius:12px;padding:13px;}
+  .integ-head{display:flex;align-items:center;gap:7px;color:#2ecc71;font-size:10.5px;font-weight:700;letter-spacing:.4px;margin-bottom:8px;}
+  .integ-hash{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7d8d99;word-break:break-all;line-height:1.5;}
+  .integ-foot{display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);color:#aebcc4;font-size:11px;}
+  .integ-foot b{color:#fff;}
+
+  /* sync */
+  .sync{display:flex;align-items:center;gap:7px;color:#7a8a92;font-size:10.5px;margin-top:11px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);}
+  .sync .d{width:6px;height:6px;border-radius:50%;background:#2ecc71;}
+
+  /* notif lock */
+  .lock{padding:70px 16px 30px;display:flex;flex-direction:column;align-items:center;background:radial-gradient(circle at 50% 16%,rgba(77,208,225,.06),transparent 55%),#050d10;min-height:560px;}
+  .lock-time{color:#fff;font-size:58px;font-weight:300;}
+  .lock-date{color:#aebcc4;font-size:13px;margin-top:2px;margin-bottom:36px;}
+  .notif{width:100%;background:rgba(28,40,46,.92);border:1px solid rgba(77,208,225,.18);border-radius:17px;padding:13px;}
+  .notif-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .notif-ic{width:24px;height:24px;border-radius:6px;background:rgba(77,208,225,.18);border:1px solid rgba(77,208,225,.3);display:flex;align-items:center;justify-content:center;color:#4dd0e1;font-size:12px;}
+  .notif-app{color:#aebcc4;font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+  .notif-when{margin-left:auto;color:#5a7280;font-size:9px;font-family:'IBM Plex Mono',monospace;}
+  .notif-title{color:#fff;font-size:13px;font-weight:700;margin-bottom:3px;}
+  .notif-body{color:#b0c4cc;font-size:11px;line-height:1.45;}
+  .notif-actions{display:flex;gap:7px;margin-top:11px;}
+  .na{flex:1;border-radius:9px;padding:9px;font-size:11px;font-weight:700;text-align:center;border:none;font-family:inherit;}
+  .na-yes{background:#2ecc71;color:#04140a;}
+  .na-no{background:rgba(255,255,255,.06);color:#e74c3c;border:1px solid rgba(231,76,60,.3);}
+
+  /* buttons */
+  .big{width:100%;border-radius:12px;padding:14px;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;border:none;margin-top:9px;}
+  .big-cyan{background:#4dd0e1;color:#050d10;}
+  .big-green{background:#2ecc71;color:#04140a;}
+  .big-amber{background:rgba(241,196,15,.12);border:1px solid rgba(241,196,15,.4);color:#f1c40f;}
+  .big-red{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.4);color:#e74c3c;}
+  .big-ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#b0c4cc;}
+  .note{color:#7a8a92;font-size:10.5px;line-height:1.55;margin-top:9px;}
+  .note b{color:#b0c4cc;}
+  .ta{background:rgba(255,255,255,.03);border:1px solid rgba(241,196,15,.3);border-radius:11px;padding:12px;color:#9aa7af;font-size:12px;line-height:1.5;}
+  .fp{width:64px;height:64px;border-radius:50%;border:2px solid #4dd0e1;display:flex;align-items:center;justify-content:center;margin:8px auto;color:#4dd0e1;font-size:28px;}
+  .photos{display:flex;gap:8px;}
+  .photo{width:58px;height:58px;border-radius:9px;background:linear-gradient(135deg,#16252b,#0e1b20);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .photo.add{border:1px dashed rgba(77,208,225,.4);color:#4dd0e1;}
+
+  .endnote{max-width:1100px;margin:26px auto 0;background:rgba(77,208,225,.04);border-left:3px solid #4dd0e1;border-radius:10px;padding:15px 18px;color:#b0c4cc;font-size:12.5px;line-height:1.6;}
+  .endnote b{color:#4dd0e1;}
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <h1>Fluxo completo da <span class="k">Ocorrência</span> — Canil K9 GCM</h1>
+  <p>Modelo novo: a equipe vive no turno (não na ocorrência), com dois consentimentos — aceite na abertura e assinatura no fim. Cada tela no padrão do app; as setas mostram a navegação; as setas amarelas são ramos alternativos.</p>
+</div>
+
+<div class="macro">
+  <span class="m">0 · Turno</span><span class="s">→</span>
+  <span class="m">1 · Abertura + aceite</span><span class="s">→</span>
+  <span class="m">2 · Em andamento</span><span class="s">→</span>
+  <span class="m">3 · Finalização</span><span class="s">→</span>
+  <span class="m">4 · Assinatura</span><span class="s">→</span>
+  <span class="m">5 · Pós-selo</span>
+</div>
+
+<!-- ===================== FASE 0 ===================== -->
+<section class="phase" style="border-top:none;">
+  <div class="phase-head"><span class="n">0</span><span class="t">Turno</span><span class="d">a equipe vive aqui — viatura, cão de serviço, guarnição</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T1 — ASSUMIR PLANTÃO<small>cão + viatura (opcional)</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>07:18</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-sub-top">Canil GCM Limeira</div><div class="h-main">Assumir plantão</div></div></div>
+          <div class="sec-label">Boa tarde · GCM Ragonha · RA 691755</div>
+          <div class="pick sel">
+            <div class="pick-row"><div class="pick-ph">BONO</div><div><div class="pick-name">Bono<span class="tag">SEU CÃO</span></div><div class="pick-sub">Malinois · 6 anos · operacional</div></div></div>
+            <div class="pick-badge">✓ APTO PARA PLANTÃO</div>
+          </div>
+          <div class="sec-label">Viatura <span class="opt-tag" style="margin-left:6px">opcional</span></div>
+          <div class="pick sel">
+            <div class="pick-row"><div class="pick-ph veh">🚓</div><div><div class="pick-name" style="font-family:'IBM Plex Mono',monospace;font-size:15px">Canil 1075</div><div class="pick-sub">Chevrolet Trailblazer</div></div></div>
+            <div class="vchips"><span class="vchip">cap. <b>2 + K9</b></span><span class="vchip">ocup. <b>1/2</b></span><span class="vchip">cão serviço: <b>Bono</b></span></div>
+          </div>
+          <button class="big big-cyan">Assumir plantão →</button>
+          <button class="big big-ghost">Iniciar só com o cão (treino)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">turno ativo</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T2 — TURNO ATIVO / GUARNIÇÃO<small>equipe gerida aqui · troca de cão</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>09:40</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-sub-top">Turno ativo</div><div class="h-main">Canil 1075</div></div><div class="h-right">⚙</div></div>
+          <div class="ident">
+            <div class="ident-bin" style="border:none;margin:0;padding:0"><div class="bin-av dog">🐕</div><div class="bin-av">👮</div><div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b></div><span class="badge b-green" style="margin-left:auto"><span style="width:6px;height:6px;background:#2ecc71;border-radius:50%;display:inline-block"></span>ATIVO</span></div>
+            <div class="ident-meta"><div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div><div class="im"><span class="im-k">Início</span><span class="im-v">07:18</span></div><div class="im"><span class="im-k">Duração</span><span class="im-v">2h22</span></div></div>
+          </div>
+          <div class="sec-label">Guarnição · indivisível</div>
+          <div class="member cy"><div class="m-av">👮</div><div><div class="m-name">GCM Ragonha</div><div class="m-meta">RA 691755 · você</div></div></div>
+          <div class="member"><div class="m-av">👮</div><div><div class="m-name">GCM Silva</div><div class="m-meta">RA 702318</div></div></div>
+          <div class="member dog"><div class="m-av dog">🐾</div><div><div class="m-name">K9 Bono <span style="font-size:8px;color:#2ecc71;font-weight:700">SERVIÇO</span></div><div class="m-meta">matrícula 0042</div></div></div>
+          <button class="big big-ghost">↺ Trocar cão de serviço</button>
+          <div class="note">O cão pode ser trocado durante o turno (ex: lesão) sem encerrar o plantão — fica auditado.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">nova ocorrência</div></div>
+  </div>
+</section>
+
+<!-- ===================== FASE 1 ===================== -->
+<section class="phase">
+  <div class="phase-head"><span class="n">1</span><span class="t">Abertura + aceite</span><span class="d">iniciar → notifica a guarnição → cada um aceita ou recusa</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T3 — INICIAR OCORRÊNCIA<small>local e hora automáticos</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>10:01</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-sub-top">Canil GCM Limeira</div><div class="h-main">Nova ocorrência</div></div></div>
+          <div class="binomio-big"><div class="av-big dog">FOTO<br>BONO</div><div class="av-big">FOTO<br>RAGONHA</div></div>
+          <div class="binomio-info"><div class="binomio-names">Bono · GCM Ragonha</div><div class="binomio-roles">K9 · CONDUTOR · CANIL 1075</div></div>
+          <div class="center" style="margin-bottom:14px"><span class="status-pill">TURNO ATIVO</span></div>
+          <div class="info-grid">
+            <div class="info-card"><div class="info-label">📍 LOCAL ATUAL</div><div class="info-value">Rua Ernesto de Gaspari, Jd. Colina Verde</div><div class="gps-ok">GPS preciso</div></div>
+            <div class="info-card"><div class="info-label">🕐 HORA</div><div class="info-value">10:01<br>26/05/2026</div></div>
+          </div>
+          <div class="center" style="color:#4dd0e1;font-size:13px;padding:14px 0">+ Ajustar tipo de ocorrência</div>
+          <button class="big big-cyan">▶ INICIAR OCORRÊNCIA</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">notifica guarnição</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T4 — NOTIFICAÇÃO DE ABERTURA<small>chega no cel de cada integrante</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>10:02</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="lock">
+          <div class="lock-time">10:02</div><div class="lock-date">terça, 26 de maio</div>
+          <div class="notif">
+            <div class="notif-head"><div class="notif-ic">🛡</div><div class="notif-app">Canil K9 · Canil 1075</div><div class="notif-when">agora</div></div>
+            <div class="notif-title">Ocorrência aberta — você está envolvido</div>
+            <div class="notif-body">Tráfico de drogas · relator GCM Ragonha. Confirme sua participação.</div>
+            <div class="notif-actions"><button class="na na-yes">✓ Aceitar</button><button class="na na-no">Recusar</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">aceitar</div></div>
+    <div class="arrow alt"><div class="a">↘</div><div class="l">recusar c/ motivo</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T5 — CONFIRMAR / RECUSAR<small>vê o essencial e decide</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>10:02</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Participação na ocorrência</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="ident">
+            <div class="ident-top"><div><div class="ident-type">Convite à guarnição</div><div class="ident-nature">Tráfico de drogas</div></div><div class="badge b-amber">ABERTA</div></div>
+            <div class="ident-meta"><div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div><div class="im"><span class="im-k">Aberta</span><span class="im-v">10:02</span></div><div class="im"><span class="im-k">Relator</span><span class="im-v">Ragonha</span></div></div>
+          </div>
+          <div class="sec-label">Você nesta ocorrência</div>
+          <div class="member"><div class="m-av">👮</div><div><div class="m-name">GCM Silva</div><div class="m-meta">RA 702318 · integrante</div></div></div>
+          <div class="note">Ao <b>aceitar</b>, você integra a guarnição e pode editar enquanto aberta. No fim, vai assinar. A <b>recusa</b> exige justificativa de ausência.</div>
+          <button class="big big-green">✓ Aceitar participação</button>
+          <button class="big big-ghost">Recusar e justificar ausência</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">registro</div></div>
+  </div>
+</section>
+
+<!-- ===================== FASE 2 ===================== -->
+<section class="phase">
+  <div class="phase-head"><span class="n">2</span><span class="t">Em andamento</span><span class="d">edição colaborativa — quem aceitou registra · equipe só referenciada</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T6 — OCORRÊNCIA EM ANDAMENTO<small>sem "definir equipe" · guarnição vem do turno</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>10:15</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-sub-top">Ocorrência em andamento</div><div class="h-main">Tráfico de drogas</div></div></div>
+          <div class="ident">
+            <div class="ident-top"><div><div class="ident-type">Em andamento</div><div class="ident-nature" style="font-size:16px">Tráfico de drogas</div></div><div class="badge b-amber">ABERTA</div></div>
+            <div class="ident-meta"><div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div><div class="im"><span class="im-k">Guarnição</span><span class="im-v">2 aceitos</span></div><div class="im"><span class="im-k">Início</span><span class="im-v">10:02</span></div></div>
+            <div class="sync"><span class="d"></span>Sincronizado · edição colaborativa</div>
+          </div>
+          <div class="sec-label">⚡ Registros rápidos</div>
+          <div class="quick-grid">
+            <div class="qcard"><div class="qi">👤</div><div class="ql">Abordagem</div></div>
+            <div class="qcard k9"><div class="qi">🐾</div><div class="ql">Emprego K9</div></div>
+            <div class="qcard"><div class="qi">🔍</div><div class="ql">Busca K9</div></div>
+            <div class="qcard"><div class="qi">📦</div><div class="ql">Material</div></div>
+            <div class="qcard"><div class="qi">⛓</div><div class="ql">Parte conduzida</div></div>
+            <div class="qcard"><div class="qi">○</div><div class="ql">Sem alteração</div></div>
+          </div>
+          <div class="sec-label">Registro operacional · 3 eventos</div>
+          <div class="tl">
+            <div class="tl-ev"><div class="tl-time">10:02</div><div class="tl-rail"><div class="tl-node" style="background:#4dd0e1"></div></div><div class="tl-card"><div class="tl-title">Início da ocorrência</div><div class="tl-desc">Ragonha · GPS capturado</div></div></div>
+            <div class="tl-ev"><div class="tl-time">10:09</div><div class="tl-rail"><div class="tl-node" style="background:#2ecc71"></div></div><div class="tl-card"><div class="tl-title">K9 Bono localizou entorpecente</div><div class="tl-desc">registrado por Silva · 1 foto</div></div></div>
+            <div class="tl-ev"><div class="tl-time">10:14</div><div class="tl-rail"><div class="tl-node" style="background:#f1c40f"></div></div><div class="tl-card"><div class="tl-title">Material apreendido</div><div class="tl-desc">3 invólucros · 2 fotos</div></div></div>
+          </div>
+          <button class="big big-red">🏁 Finalizar ocorrência</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">finalizar</div></div>
+  </div>
+</section>
+
+<!-- ===================== FASE 3 ===================== -->
+<section class="phase">
+  <div class="phase-head"><span class="n">3</span><span class="t">Finalização</span><span class="d">encerra · gera PDF · notifica a guarnição para assinar</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T7 — FINALIZAR<small>fotos de finalização · trava a edição</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>11:30</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Finalizar ocorrência</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="stats">
+            <div class="stat"><div class="stat-n">8</div><div class="stat-l">EVENTOS</div></div>
+            <div class="stat"><div class="stat-n">4</div><div class="stat-l">LOCAIS</div></div>
+            <div class="stat"><div class="stat-n">3</div><div class="stat-l">RESULTADOS</div></div>
+          </div>
+          <div class="sec-label">Fotos de finalização</div>
+          <div class="photos"><div class="photo">📷</div><div class="photo">📷</div><div class="photo add">＋</div></div>
+          <div class="note">As fotos de finalização entram no selo. Ao fechar, a ocorrência passa a <b>aguardando assinaturas</b> e a edição é travada.</div>
+          <button class="big big-cyan">Fechar e enviar para assinaturas</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">notifica p/ assinar</div></div>
+  </div>
+</section>
+
+<!-- ===================== FASE 4 ===================== -->
+<section class="phase">
+  <div class="phase-head"><span class="n">4</span><span class="t">Assinatura</span><span class="d">cada condutor revisa e concorda — ou devolve para correção</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T8 — NOTIFICAÇÃO DE ASSINATURA<small>abre o app direto na revisão</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>11:31</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="lock">
+          <div class="lock-time">11:31</div><div class="lock-date">terça, 26 de maio</div>
+          <div class="notif">
+            <div class="notif-head"><div class="notif-ic">🛡</div><div class="notif-app">Canil K9 · Assinatura</div><div class="notif-when">agora</div></div>
+            <div class="notif-title">Assinatura necessária</div>
+            <div class="notif-body">Tráfico de drogas · Canil 1075. Revise e assine. Prazo 48h.</div>
+            <div class="notif-actions"><button class="na na-yes" style="background:#4dd0e1;color:#04181d">Revisar e assinar</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">abre revisão</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T9 — REVISAR PARA ASSINAR<small>vê a ocorrência até o fechamento</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>11:32</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Revisar para assinar</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="ident">
+            <div class="ident-top"><div><div class="ident-type">Aguardando sua assinatura</div><div class="ident-nature">Tráfico de drogas</div></div><div class="badge b-amber">PENDENTE</div></div>
+            <div class="ident-meta"><div class="im"><span class="im-k">Viatura</span><span class="im-v">Canil 1075</span></div><div class="im"><span class="im-k">Operação</span><span class="im-v">10:02→11:30</span></div><div class="im"><span class="im-k">Prazo</span><span class="im-v">48h</span></div></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="stat-n">8</div><div class="stat-l">EVENTOS</div></div>
+            <div class="stat"><div class="stat-n">10</div><div class="stat-l">MÍDIAS</div></div>
+            <div class="stat"><div class="stat-n">3</div><div class="stat-l">RESULTADOS</div></div>
+          </div>
+          <div class="sec-label">Guarnição</div>
+          <div class="member"><div class="m-av">👮</div><div><div class="m-name">GCM Ragonha</div><div class="m-meta">relator · assinou ✓</div></div><div class="m-right badge b-green">✓</div></div>
+          <div class="member dog"><div class="m-av dog">🐾</div><div><div class="m-name">K9 Bono</div><div class="m-meta">matrícula 0042 · presença atestada</div></div></div>
+          <div class="note">Revise os eventos até o fechamento. Tudo certo → <b>concorde e assine</b>. Faltou algo → <b>devolva para correção</b>.</div>
+          <button class="big big-cyan">Concordar e assinar</button>
+          <button class="big big-amber">Devolver para correção</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">concordar</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T10a — ASSINAR (BIOMETRIA)<small>todos assinaram → selo</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>11:33</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Assinatura</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="ident"><div class="ident-nature" style="font-size:16px">Tráfico de drogas</div><div class="note" style="margin-top:6px">Ao assinar, você atesta que integrou a guarnição e presenciou a ocorrência do início ao fim.</div></div>
+          <div class="fp">☝</div>
+          <div class="center" style="color:#7a8a92;font-size:11px">Toque para autenticar</div>
+          <button class="big big-cyan">Assinar com biometria</button>
+          <button class="big big-ghost">Usar senha</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow alt"><div class="a">↘</div><div class="l">devolver</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T10b — DEVOLVER PARA CORREÇÃO<small>ramo · o caso da moto · reabre antes de selar</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>11:33</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Devolver para correção</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="ident"><div class="ident-type">Tráfico de drogas</div><div class="ident-nature" style="font-size:16px">O que precisa ser corrigido?</div><div class="note" style="margin-top:9px">A ocorrência <b>reabre</b>. As assinaturas já coletadas são refeitas — o conteúdo vai mudar. Tudo na trilha de auditoria.</div></div>
+          <div class="sec-label">Descreva a correção</div>
+          <div class="ta">Faltou constar a apreensão de uma motocicleta (Honda CG, placa XYZ-0000) como produto de furto.</div>
+          <button class="big big-amber">Devolver com esta justificativa</button>
+          <button class="big big-ghost">Voltar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="a">→</div><div class="l">selo</div></div>
+  </div>
+</section>
+
+<!-- ===================== FASE 5 ===================== -->
+<section class="phase">
+  <div class="phase-head"><span class="n">5</span><span class="t">Pós-selo</span><span class="d">documento íntegro · guarnição assinada · retificação por aditamento</span></div>
+  <div class="track">
+
+    <div class="swrap">
+      <div class="plabel">T11 — DETALHE SELADO<small>casca + corpo + selo v3</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>14:20</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Ocorrência</div><div class="h-sub">REG 2026/05/0517-K9</div></div><div class="h-right">⤴</div></div>
+          <div class="ident">
+            <div class="ident-top"><div><div class="ident-type">Registro de ocorrência</div><div class="ident-nature">Tráfico + associação</div></div><div class="badge b-green">✓ FINALIZADA</div></div>
+            <div class="ident-meta"><div class="im"><span class="im-k">Data</span><span class="im-v">26/05/2026</span></div><div class="im"><span class="im-k">Operação</span><span class="im-v">10:02→11:30</span></div><div class="im"><span class="im-k">Locais</span><span class="im-v">4</span></div></div>
+            <div class="ident-bin"><div class="bin-av dog">🐕</div><div class="bin-av">👮</div><div class="bin-txt"><b>Bono</b> · GCM <b>Ragonha</b> · Canil 1075</div></div>
+          </div>
+          <div class="sec-label">Resultados</div>
+          <div class="res"><div class="res-ico">🌿</div><div class="res-txt">Entorpecente apreendido<small>análogo à maconha · 3 invólucros</small></div><span class="res-check">✓</span></div>
+          <div class="res"><div class="res-ico">🏍</div><div class="res-txt">Motocicleta apreendida<small>Honda CG · produto de furto</small></div><span class="res-check">✓</span></div>
+          <div class="res"><div class="res-ico">👤</div><div class="res-txt">Suspeito detido<small>conduzido à autoridade</small></div><span class="res-check">✓</span></div>
+          <div class="sec-label">Deslocamento · 4 locais</div>
+          <div class="map"><svg viewBox="0 0 330 110"><polyline points="30,82 110,38 200,68 290,30" fill="none" stroke="#4dd0e1" stroke-width="1.5" stroke-dasharray="5 4"/><g fill="#4dd0e1"><circle cx="30" cy="82" r="7"/><circle cx="110" cy="38" r="7"/><circle cx="200" cy="68" r="7"/><circle cx="290" cy="30" r="7"/></g><g fill="#04181d" font-size="8" font-family="monospace" text-anchor="middle"><text x="30" y="85">1</text><text x="110" y="41">2</text><text x="200" y="71">3</text><text x="290" y="33">4</text></g></svg></div>
+          <div class="map-addr">① Abordagem → ④ 1º DP<span class="gps">trilha completa</span></div>
+          <div class="sec-label">Guarnição · assinada</div>
+          <div class="member"><div class="m-av">👮</div><div><div class="m-name">GCM Ragonha</div><div class="m-meta">relator</div></div><div class="m-right badge b-green">✓</div></div>
+          <div class="member"><div class="m-av">👮</div><div><div class="m-name">GCM Silva</div><div class="m-meta">integrante</div></div><div class="m-right badge b-green">✓</div></div>
+          <div class="member dog"><div class="m-av dog">🐾</div><div><div class="m-name">K9 Bono</div><div class="m-meta">matrícula 0042</div></div><div class="m-right badge b-grey">atestada</div></div>
+          <div class="sec-label">Integridade e auditoria</div>
+          <div class="integ">
+            <div class="integ-head">🛡 DOCUMENTO ÍNTEGRO · SHA-256 · v3</div>
+            <div class="integ-hash">a7f3c9e2b1d8f046aa215c0938e7b4c1d2e8f3a9b7c6014f60</div>
+            <div class="integ-foot"><span>Trilha de auditoria · <b>9 registros</b></span><span>›</span></div>
+          </div>
+          <button class="big big-cyan">Gerar PDF</button>
+          <button class="big big-ghost">Registrar retificação</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow alt"><div class="a">→</div><div class="l">retificar</div></div>
+
+    <div class="swrap">
+      <div class="plabel">T12 — ADITAMENTO<small>original preservado · selo próprio</small></div>
+      <div class="phone">
+        <div class="status-bar"><span>14:22</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+        <div class="content">
+          <div class="header"><div class="back-btn">‹</div><div class="htitle"><div class="h-main">Retificação</div><div class="h-sub">REG 2026/05/0517-K9</div></div></div>
+          <div class="ident"><div class="ident-type">⚠ Ocorrência selada</div><div class="ident-nature" style="font-size:16px">O original é preservado</div><div class="note" style="margin-top:9px">A retificação é um <b>aditamento</b> com selo próprio, anexado ao fim. O registro original nunca é regenerado.</div></div>
+          <div class="sec-label">O que retificar</div>
+          <div class="member cy"><div class="m-av" style="border-radius:8px">📍</div><div class="m-name">Local de uma ação</div></div>
+          <div class="member"><div class="m-av" style="border-radius:8px">📷</div><div class="m-name">Foto / anexo</div></div>
+          <div class="member"><div class="m-av" style="border-radius:8px">🏷</div><div class="m-name">Natureza</div></div>
+          <div class="sec-label">Selo do aditamento</div>
+          <div class="integ"><div class="integ-head">🛡 ADITAMENTO · hash próprio</div><div class="integ-hash">9b21e0a4c7f3...</div></div>
+          <div class="note">Só o relator ou condutores que assinaram podem aditar — regra imposta no servidor.</div>
+          <button class="big big-cyan">Registrar aditamento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="endnote">
+  <b>Modelo aplicado.</b> A equipe vive no turno (fase 0), não na ocorrência. Dois consentimentos: <b>aceite na abertura</b> (fase 1, notificação acionável + recusa justificada) e <b>assinatura no fim</b> (fase 4, com devolver-para-correção antes do selo). Edição colaborativa entre quem aceitou (fase 2). Cão de serviço único, trocável no turno. Selo v3 com guarnição + assinaturas; pós-selo só por aditamento (fase 5). Notificações entre dispositivos exigem FCM (push real) — ainda a implementar.
+</div>
+
+</body>
+</html>

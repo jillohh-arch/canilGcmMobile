@@ -80,7 +80,9 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                       if (isRecent)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primary.withAlpha(38),
                             borderRadius: BorderRadius.circular(8),
@@ -129,6 +131,8 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
 
                   // Meta chips
                   if (handlerName != null ||
+                      (event.category == OccurrenceEventCategory.dogWork &&
+                          (event.dogHandlerId ?? '').trim().isNotEmpty) ||
                       locationLabel != null ||
                       event.gpsLat != null) ...[
                     const SizedBox(height: 8),
@@ -138,6 +142,12 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                       children: [
                         if (handlerName != null)
                           _MetaChip(icon: '👤', label: handlerName!),
+                        if (event.category == OccurrenceEventCategory.dogWork &&
+                            (event.dogHandlerId ?? '').trim().isNotEmpty)
+                          _MetaChip(
+                            icon: 'K9',
+                            label: 'RA ${event.dogHandlerId!.trim()}',
+                          ),
                         if (locationLabel != null)
                           _MetaChip(icon: '📍', label: 'Local'),
                         if (event.gpsLat != null)
@@ -164,8 +174,11 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.edit_outlined,
-                              color: AppTheme.primary, size: 12),
+                          Icon(
+                            Icons.edit_outlined,
+                            color: AppTheme.primary,
+                            size: 12,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'editar',
@@ -210,8 +223,11 @@ class _PhotoThumbnails extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
                 color: Colors.white.withAlpha(10),
-                child: Icon(Icons.broken_image_outlined,
-                    color: Colors.white.withAlpha(60), size: 20),
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white.withAlpha(60),
+                  size: 20,
+                ),
               ),
             ),
           ),
@@ -233,8 +249,10 @@ class _CategoryIcon extends StatelessWidget {
       OccurrenceEventCategory.arrival => ('▶', AppTheme.primary),
       OccurrenceEventCategory.approach => ('👤', const Color(0xFFF1C40F)),
       OccurrenceEventCategory.dogWork => ('🐾', const Color(0xFF2ECC71)),
-      OccurrenceEventCategory.positiveIndication =>
-        ('✓', const Color(0xFF2ECC71)),
+      OccurrenceEventCategory.positiveIndication => (
+        '✓',
+        const Color(0xFF2ECC71),
+      ),
       OccurrenceEventCategory.seizure => ('📦', const Color(0xFF9B59B6)),
       OccurrenceEventCategory.closure => ('■', const Color(0xFF95A5A6)),
       OccurrenceEventCategory.other => ('●', const Color(0xFFE67E22)),

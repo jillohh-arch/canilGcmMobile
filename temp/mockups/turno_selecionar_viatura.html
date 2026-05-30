@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abrir turno — viatura (opcional)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050d10;--veil:rgba(77,208,225,0.04);--divider:rgba(77,208,225,0.12);
+    --chip-bg:rgba(77,208,225,0.08);--chip-bd:rgba(77,208,225,0.2);
+    --cyan:#4dd0e1;--green:#2ecc71;--amber:#f1c40f;--muted:#5a7280;
+    --txt:#fff;--txt2:#b0c4cc;--mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;color:var(--txt);gap:22px}
+  .phone{width:390px;background:var(--bg);border:8px solid #1a1a1a;border-radius:40px;overflow:hidden}
+  .scroll{height:780px;overflow-y:auto}
+  .scroll::-webkit-scrollbar{width:0}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 6px;font-size:14px;font-weight:600}
+  .statusbar .right{font-size:12px}
+  .appbar{display:flex;align-items:center;gap:14px;padding:10px 18px 14px;border-bottom:1px solid var(--divider)}
+  .iconbtn{width:38px;height:38px;border-radius:8px;background:var(--chip-bg);border:1px solid var(--chip-bd);display:flex;align-items:center;justify-content:center;color:var(--cyan);font-size:18px}
+  .appbar .title{font-size:13px;letter-spacing:.14em;color:var(--cyan);font-weight:700;text-transform:uppercase}
+  .appbar .step{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .body{padding:18px}
+  .binomio{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--divider);border-radius:13px;background:var(--veil);margin-bottom:6px}
+  .avs{display:flex}
+  .av{width:38px;height:38px;border-radius:50%;border:2px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-size:15px;background:#0c1a1f}
+  .av.dog{margin-left:-12px;background:#0e2127}
+  .binomio .bt{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em}
+  .binomio .bn{font-size:15px;font-weight:700;margin-top:2px}
+  .binomio .chk{margin-left:auto;color:var(--green);font-size:18px}
+  .flabel{display:flex;align-items:center;gap:9px;margin:20px 2px 6px}
+  .flabel .t{font-size:12px;letter-spacing:.12em;color:var(--cyan);font-weight:700;text-transform:uppercase}
+  .opt{font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--muted);background:rgba(90,114,128,0.14);border:1px solid rgba(90,114,128,0.3);padding:3px 8px;border-radius:11px;text-transform:uppercase}
+  .sub{font-size:12px;color:var(--txt2);line-height:1.5;margin:0 2px 13px}
+  .viatura{display:flex;flex-direction:column;gap:9px;padding:14px;border:1px solid var(--divider);border-radius:13px;margin-bottom:10px;background:var(--veil)}
+  .viatura.sel{border-color:var(--cyan);background:rgba(77,208,225,0.07)}
+  .vtop{display:flex;align-items:center;gap:13px}
+  .vicon{width:44px;height:44px;border-radius:11px;background:var(--chip-bg);border:1px solid var(--chip-bd);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .viatura.sel .vicon{background:rgba(77,208,225,0.14);border-color:var(--cyan)}
+  .vlabel{font-size:16px;font-weight:700;font-family:var(--mono);letter-spacing:.02em}
+  .vmodel{font-size:11px;color:var(--muted);margin-top:2px}
+  .vradio{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);flex-shrink:0;margin-left:auto;display:flex;align-items:center;justify-content:center}
+  .viatura.sel .vradio{border-color:var(--cyan)}
+  .viatura.sel .vradio::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--cyan)}
+  .vmeta{display:flex;gap:8px;flex-wrap:wrap}
+  .mchip{font-family:var(--mono);font-size:10.5px;color:var(--txt2);background:rgba(77,208,225,0.06);border:1px solid var(--divider);padding:4px 9px;border-radius:7px}
+  .mchip b{color:var(--cyan);font-weight:600}
+  .mchip.full{color:var(--amber)}
+  .cta{margin-top:16px;width:100%;padding:15px;border-radius:12px;background:var(--cyan);color:#04181d;font-weight:800;font-size:15px;border:none;letter-spacing:.01em}
+  .ghost{margin-top:11px;width:100%;padding:13px;border-radius:12px;background:transparent;color:var(--txt2);font-weight:600;font-size:13px;border:1px solid var(--divider)}
+  .skipnote{font-size:11px;color:var(--muted);text-align:center;margin-top:11px;line-height:1.5}
+  .doc{width:440px;background:#07151a;border:1px solid var(--divider);border-radius:18px;padding:22px;font-size:13px;line-height:1.6;color:var(--txt2)}
+  .doc h2{font-size:12px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase;font-weight:800;margin-bottom:4px}
+  .doc .lead{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .doc h3{font-size:11px;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase;font-weight:700;margin:18px 0 9px;padding-top:14px;border-top:1px solid var(--divider)}
+  .doc h3:first-of-type{border-top:none;padding-top:0}
+  .doc code,.doc pre{font-family:var(--mono);font-size:11.5px}
+  .doc pre{background:#040e12;border:1px solid var(--divider);border-radius:10px;padding:13px;overflow-x:auto;color:#cfe9ee;margin:6px 0}
+  .doc pre .k{color:var(--cyan)}
+  .doc pre .s{color:var(--green)}
+  .doc pre .c{color:var(--muted)}
+  .doc ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .doc li{padding-left:16px;position:relative}
+  .doc li::before{content:"\203A";position:absolute;left:0;color:var(--cyan);font-weight:700}
+  .doc b{color:var(--txt)}
+  .flow{display:flex;flex-direction:column;gap:0}
+  .fstep{display:flex;gap:11px;align-items:flex-start;padding:9px 0}
+  .fstep:not(:last-child){border-bottom:1px solid var(--divider)}
+  .fn{font-family:var(--mono);font-size:11px;color:#04181d;background:var(--cyan);min-width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+  .fn.optn{background:rgba(90,114,128,0.3);color:var(--txt2)}
+  .ft b{color:var(--txt)}
+  .ft span{color:var(--muted);font-size:11.5px}
+  .notif{margin-top:10px;background:#040e12;border:1px solid rgba(241,196,15,0.3);border-radius:12px;padding:13px 14px;display:flex;gap:11px;align-items:flex-start}
+  .notif .ic{font-size:18px}
+  .notif .nt{font-size:12px;color:var(--txt);font-weight:600}
+  .notif .nd{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .notif .nb{margin-top:9px;display:flex;gap:8px}
+  .notif .nb span{font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:8px}
+  .notif .nb .y{background:var(--amber);color:#1a1400}
+  .notif .nb .n{background:transparent;border:1px solid var(--divider);color:var(--txt2)}
+</style>
+</head>
+<body>
+<div class="phone">
+ <div class="scroll">
+  <div class="statusbar"><span>07:18</span><span class="right">&#9679;&#9679;&#9679;&#9679; &#128246; &#128267;</span></div>
+  <div class="appbar">
+    <div class="iconbtn">&lsaquo;</div>
+    <div class="title">Abrir turno</div>
+    <div class="step">passo 2 de 2</div>
+  </div>
+  <div class="body">
+    <div class="binomio">
+      <div class="avs"><div class="av">&#128110;</div><div class="av dog">&#128021;</div></div>
+      <div>
+        <div class="bt">SEU BIN&Ocirc;MIO</div>
+        <div class="bn">GCM Ragonha + K9 Bono</div>
+      </div>
+      <div class="chk">&#10003;</div>
+    </div>
+    <div class="flabel">
+      <span class="t">Assumir viatura</span>
+      <span class="opt">Opcional</span>
+    </div>
+    <div class="sub">Vai treinar antes de entrar em opera&ccedil;&atilde;o? Pode iniciar o turno s&oacute; com o c&atilde;o e assumir uma viatura depois, quando entrar em servi&ccedil;o.</div>
+    <div class="viatura sel">
+      <div class="vtop">
+        <div class="vicon">&#128660;</div>
+        <div>
+          <div class="vlabel">Canil 1075</div>
+          <div class="vmodel">Chevrolet Trailblazer</div>
+        </div>
+        <div class="vradio"></div>
+      </div>
+      <div class="vmeta">
+        <span class="mchip">Capacidade <b>2 + K9</b></span>
+        <span class="mchip">Ocupa&ccedil;&atilde;o <b>1 de 2</b></span>
+        <span class="mchip">Limeira/SP</span>
+      </div>
+    </div>
+    <div class="viatura">
+      <div class="vtop">
+        <div class="vicon">&#128660;</div>
+        <div>
+          <div class="vlabel">Canil 1076</div>
+          <div class="vmodel">Mitsubishi L200</div>
+        </div>
+        <div class="vradio"></div>
+      </div>
+      <div class="vmeta">
+        <span class="mchip">Capacidade <b>3 + K9</b></span>
+        <span class="mchip full">Ocupa&ccedil;&atilde;o 3 de 3 &middot; cheia</span>
+      </div>
+    </div>
+    <button class="cta">Assumir Canil 1075 e iniciar turno</button>
+    <button class="ghost">Iniciar s&oacute; com o c&atilde;o (treino)</button>
+    <div class="skipnote">Voc&ecirc; pode assumir uma viatura a qualquer momento depois, durante o turno.</div>
+  </div>
+ </div>
+</div>
+<div class="doc">
+  <h2>Detalhamento &mdash; Viatura &amp; turno</h2>
+  <div class="lead">Sele&ccedil;&atilde;o de viatura no abrir turno &middot; viatura opcional &middot; capacidade do cadastro &middot; notifica&ccedil;&atilde;o 12h</div>
+  <h3>Modelo de dados</h3>
+  <pre><span class="c">// viaturas pre-cadastradas no Firebase</span>
+<span class="k">vehicles/{vehicleId}</span> {
+  name:    <span class="s">"Canil"</span>          <span class="c">// nome</span>
+  prefix:  <span class="s">"1075"</span>           <span class="c">// prefixo</span>
+  model:   <span class="s">"Chevrolet Trailblazer"</span>
+  crew_size: <span class="s">2</span>              <span class="c">// no de CONDUTORES; cao e +1</span>
+  unit:    <span class="s">"Limeira/SP"</span>     <span class="c">// abre p/ multi-cidade</span>
+  active:  <span class="s">true</span>
+}
+
+<span class="c">// turno ganha vinculo OPCIONAL com a viatura</span>
+<span class="k">shifts/{shiftId}</span> {
+  handler_id, dog_id,             <span class="c">// binomio (sempre)</span>
+  vehicle_id: <span class="s">"1075" | null</span>   <span class="c">// null = so treino</span>
+  started_at, vehicle_joined_at
+}</pre>
+  <h3>Fluxo</h3>
+  <div class="flow">
+    <div class="fstep"><div class="fn">1</div><div class="ft"><b>Login</b> <span>&mdash; autentica o GCM</span></div></div>
+    <div class="fstep"><div class="fn">2</div><div class="ft"><b>Escolhe o c&atilde;o</b> <span>&mdash; forma o bin&ocirc;mio</span></div></div>
+    <div class="fstep"><div class="fn optn">3</div><div class="ft"><b>Assume viatura (opcional)</b> <span>&mdash; lista vinda do Firebase; ou pula pra treinar</span></div></div>
+    <div class="fstep"><div class="fn">4</div><div class="ft"><b>Turno ativo</b> <span>&mdash; com ou sem viatura</span></div></div>
+    <div class="fstep"><div class="fn optn">+</div><div class="ft"><b>Assumir viatura depois</b> <span>&mdash; a qualquer momento no turno</span></div></div>
+  </div>
+  <h3>Comportamento &amp; regras</h3>
+  <ul>
+    <li><b>Viatura &eacute; opcional.</b> Turno pode existir s&oacute; com o bin&ocirc;mio (treino/plant&atilde;o sem opera&ccedil;&atilde;o).</li>
+    <li><b>Capacidade vem do cadastro.</b> <code>crew_size</code> limita quantos condutores assumem a viatura. Cheia &rarr; n&atilde;o aceita mais.</li>
+    <li><b>Guarni&ccedil;&atilde;o derivada.</b> Equipe = bin&ocirc;mios com turno ativo na mesma <code>vehicle_id</code>. Ningu&eacute;m adiciona ningu&eacute;m &agrave; m&atilde;o.</li>
+    <li><b>Capacidade exibida como "N + K9"</b> porque o c&atilde;o conta como membro da guarni&ccedil;&atilde;o.</li>
+  </ul>
+  <h3>Notifica&ccedil;&atilde;o de turno longo (12h)</h3>
+  <ul>
+    <li>Ap&oacute;s <b>12h</b> de turno ativo, o app envia uma notifica&ccedil;&atilde;o <b>sugerindo encerrar</b> &mdash; n&atilde;o fecha sozinho.</li>
+    <li>Reusa o <code>flutter_local_notifications</code> j&aacute; presente no projeto (hoje usado no GPS).</li>
+  </ul>
+  <div class="notif">
+    <span class="ic">&#9200;</span>
+    <div>
+      <div class="nt">Turno ativo h&aacute; 12 horas</div>
+      <div class="nd">Voc&ecirc; abriu o turno &agrave;s 19:18 de ontem. Deseja encerrar?</div>
+      <div class="nb"><span class="y">Encerrar turno</span><span class="n">Continuar</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

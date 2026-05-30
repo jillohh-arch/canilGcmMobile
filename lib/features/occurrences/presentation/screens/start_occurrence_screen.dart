@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -19,6 +21,7 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_observation.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
@@ -31,6 +34,7 @@ class StartOccurrenceScreen extends StatefulWidget {
 
 class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
+  final _crewService = VehicleCrewService();
   final _natureController = TextEditingController();
   final _natureFocusNode = FocusNode();
   final _observationController = TextEditingController();
@@ -399,6 +403,87 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     }
   }
 
+  Future<List<OccurrenceTeamMember>> _buildGuarnicaoSnapshot({
+    required ShiftViewModel shiftVM,
+    required UserViewModel userVM,
+    required DogViewModel dogVM,
+    required String? handlerRa,
+    required String? handlerAuthUid,
+    required String? handlerEmail,
+  }) async {
+    final currentRa = handlerRa?.trim();
+    if (currentRa == null || currentRa.isEmpty) {
+      throw StateError('Condutor autenticado sem RA para abrir ocorrência.');
+    }
+
+    final crewId = shiftVM.vehicleCrewId?.trim();
+    if (crewId == null || crewId.isEmpty) {
+      throw StateError(
+        'Assuma uma viatura antes de abrir ocorrência operacional.',
+      );
+    }
+
+    final crew = await _crewService.getCrew(crewId);
+    if (crew == null || !crew.active) {
+      throw StateError('Guarnição ativa não encontrada para esta viatura.');
+    }
+
+    final now = DateTime.now();
+    final activeMembers = (await _crewService.getMembers(
+      crewId,
+    )).where((member) => member.isActive).toList();
+    if (!activeMembers.any((member) => member.handlerId == currentRa)) {
+      throw StateError(
+        'Seu condutor não está confirmado na guarnição desta viatura.',
+      );
+    }
+
+    final serviceDog =
+        _dogForId(dogVM, crew.serviceDogId) ??
+        _dogForId(dogVM, shiftVM.serviceDogId) ??
+        _dogForId(dogVM, shiftVM.activeDogId);
+    final members = <OccurrenceTeamMember>[];
+    final seenHandlers = <String>{};
+
+    for (final member in activeMembers) {
+      final ra = member.handlerId.trim();
+      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
+      final isCurrentHandler = ra == currentRa;
+      members.add(
+        OccurrenceTeamMember(
+          handlerId: ra,
+          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
+          handlerEmail:
+              member.handlerEmail ??
+              (isCurrentHandler ? handlerEmail : null) ??
+              HandlerIdentityService.emailFromRa(ra),
+          displayName: userVM.displayNameFor(ra: ra),
+          dogId: serviceDog?.id ?? crew.serviceDogId,
+          dogName: serviceDog?.name,
+          dogMatricula: serviceDog?.registrationNumber,
+          dogBreed: serviceDog?.breed,
+          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
+          addedAt: now,
+          addedBy: currentRa,
+        ),
+      );
+    }
+
+    members.sort((a, b) {
+      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
+      return a.handlerId.compareTo(b.handlerId);
+    });
+    return members;
+  }
+
+  Dog? _dogForId(DogViewModel dogVM, String? dogId) {
+    if (dogId == null || dogId.isEmpty) return null;
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog;
+    }
+    return null;
+  }
+
   // ─── Create ─────────────────────────────────────────────────────────
 
   Future<void> _createOccurrence() async {
@@ -409,12 +494,22 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       final shiftVM = context.read<ShiftViewModel>();
       final authVM = context.read<AuthViewModel>();
       final occVM = context.read<OccurrenceViewModel>();
+      final dogVM = context.read<DogViewModel>();
+      final userVM = context.read<UserViewModel>();
 
       final id = const Uuid().v4();
       final shiftId = shiftVM.activeShiftId ?? '';
       final dogId = shiftVM.activeDogId ?? '';
       final handlerId = authVM.user?.uid ?? '';
       final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+      final teamSnapshot = await _buildGuarnicaoSnapshot(
+        shiftVM: shiftVM,
+        userVM: userVM,
+        dogVM: dogVM,
+        handlerRa: handlerRa,
+        handlerAuthUid: authVM.user?.uid,
+        handlerEmail: authVM.user?.email,
+      );
 
       final typeCode = _selectedNature?.code ?? 'GERAL';
       final typeName = _selectedNature?.name ?? 'Ocorrência Geral';
@@ -423,8 +518,17 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         id: id,
         shiftId: shiftId,
         dogId: dogId,
+        serviceDogId: shiftVM.serviceDogId,
+        crewId: shiftVM.vehicleCrewId,
         primaryHandlerId: handlerId,
         primaryHandlerRa: handlerRa,
+        vehicleId: shiftVM.vehicleId,
+        vehicleLabel: shiftVM.vehicleLabel,
+        vehiclePrefix: shiftVM.vehiclePrefix,
+        vehicleModel: shiftVM.vehicleModel,
+        vehicleUnit: shiftVM.vehicleUnit,
+        teamSnapshot: teamSnapshot,
+        teamSizeMax: teamSnapshot.length,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: _locationAddress.isNotEmpty ? _locationAddress : null,

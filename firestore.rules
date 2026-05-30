@@ -44,8 +44,38 @@ service cloud.firestore {
         );
     }
 
+    function isTeamMemberAs(data, ra) {
+      return signedIn()
+        && ra is string
+        && (
+          emailMatchesRa(ra)
+          || (
+            data.team_auth_keys is list
+            && ra + ':' + request.auth.uid in data.team_auth_keys
+          )
+        );
+    }
+
     function isParticipant(data) {
       return isPrimaryHandler(data) || isTeamMember(data);
+    }
+
+    function canEditAsAcceptedMember(data) {
+      return signedIn()
+        && data.edit_authorized_emails is list
+        && request.auth.token.email in data.edit_authorized_emails;
+    }
+
+    function isAuthorizedOccurrenceEditor(data) {
+      return isPrimaryHandler(data)
+        || (
+          data.edit_authorized_handler_ids is list
+          && canEditAsAcceptedMember(data)
+        )
+        || (
+          !(data.edit_authorized_handler_ids is list)
+          && isParticipant(data)
+        );
     }
 
     function isCoSignerTarget(occ, signatureId) {
@@ -53,6 +83,18 @@ service cloud.firestore {
         && signatureId in occ.team_handler_ids
         && signatureId != occ.primary_handler_ra
         && signatureId != occ.primary_handler_id;
+    }
+
+    function hasAcceptedParticipation(occ, handlerId) {
+      return !(
+          occ.accepted_handler_ids is list
+          || occ.declined_handler_ids is list
+          || occ.pending_handler_ids is list
+        )
+        || (
+          occ.accepted_handler_ids is list
+          && handlerId in occ.accepted_handler_ids
+        );
     }
 
     function occurrenceData(occurrenceId) {
@@ -71,21 +113,54 @@ service cloud.firestore {
       return data.status in ['in_progress', 'finalizing'];
     }
 
+    function hasVehicleCrew(data) {
+      return data.vehicle_id is string && data.vehicle_id.size() > 0;
+    }
+
     function canUpdateEditableOccurrence() {
       let changed = changedKeys();
       return signedIn()
         && isEditableStatus(resource.data)
         && request.resource.data.status in ['in_progress', 'finalizing']
-        && isParticipant(resource.data)
+        && isAuthorizedOccurrenceEditor(resource.data)
+        && !changed.hasAny([
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason'
+        ])
         && (
           !changed.hasAny([
             'team',
             'team_handler_ids',
             'team_emails',
-            'team_auth_uids'
+            'team_auth_uids',
+            'team_auth_keys',
+            'vehicle_id',
+            'vehicle_label',
+            'vehicle_prefix',
+            'vehicle_model',
+            'vehicle_unit',
+            'participation_status',
+            'accepted_handler_ids',
+            'declined_handler_ids',
+            'pending_handler_ids',
+            'edit_authorized_handler_ids',
+            'edit_authorized_emails',
+            'participation_revision'
           ])
           || (
-            isParticipant(resource.data)
+            !hasVehicleCrew(resource.data)
+            &&
+            !changed.hasAny([
+              'vehicle_id',
+              'vehicle_label',
+              'vehicle_prefix',
+              'vehicle_model',
+              'vehicle_unit'
+            ])
+            &&
+            isAuthorizedOccurrenceEditor(resource.data)
             && request.resource.data.team is list
             && request.resource.data.team_handler_ids is list
             && (
@@ -104,6 +179,26 @@ service cloud.firestore {
         );
     }
 
+    function canSoftDeleteOccurrence() {
+      let changed = changedKeys();
+      return signedIn()
+        && isEditableStatus(resource.data)
+        && request.resource.data.status == resource.data.status
+        && isPrimaryHandler(resource.data)
+        && changed.hasOnly([
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.deleted_at is timestamp
+        && request.resource.data.deleted_by is string
+        && request.resource.data.delete_reason is string
+        && request.resource.data.delete_reason.size() > 0;
+    }
+
     function canCloseForSignatures() {
       return signedIn()
         && isPrimaryHandler(resource.data)
@@ -119,86 +214,29 @@ service cloud.firestore {
           'finalization_photos',
           'finalization_photo_hashes',
           'finalization_draft',
+          'signature_round',
           'signed_handler_ids',
           'signed_emails',
+          'signed_auth_uids',
           'updated_at',
           'audit_trail'
         ]);
     }
 
     function canRevertToDraft() {
-      return signedIn()
-        && isPrimaryHandler(resource.data)
-        && resource.data.status == 'awaiting_signatures'
-        && request.resource.data.status == 'in_progress'
-        && changedKeys().hasOnly([
-          'status',
-          'signature_request_at',
-          'signature_deadline',
-          'signed_handler_ids',
-          'signed_emails',
-          'updated_at',
-          'audit_trail'
-        ]);
-    }
-
-    function finalizationKeys() {
-      return [
-        'status',
-        'finalized_at',
-        'integrity_hash',
-        'hash_version',
-        'final_report',
-        'results',
-        'details',
-        'finalization_photos',
-        'finalization_photo_hashes',
-        'finalization_draft',
-        'updated_at',
-        'audit_trail'
-      ];
-    }
-
-    function hasCoSigners(data) {
-      return data.team_handler_ids is list
-        && data.team_handler_ids.size() > 1;
-    }
-
-    function allCoSignersSigned(data) {
-      return data.team_handler_ids is list
-        && data.signed_handler_ids is list
-        && data.signed_handler_ids.size() >= data.team_handler_ids.size() - 1;
+      return false;
     }
 
     function canFinalizeDirectly() {
-      return signedIn()
-        && isPrimaryHandler(resource.data)
-        && resource.data.status in ['in_progress', 'finalizing']
-        && !hasCoSigners(resource.data)
-        && request.resource.data.status == 'finalized'
-        && request.resource.data.hash_version == 2
-        && changedKeys().hasOnly(finalizationKeys());
+      return false;
     }
 
     function canSealSignedOccurrence() {
-      return signedIn()
-        && isParticipant(resource.data)
-        && resource.data.status == 'awaiting_signatures'
-        && request.resource.data.status == 'finalized'
-        && request.resource.data.hash_version == 3
-        && allCoSignersSigned(resource.data)
-        && changedKeys().hasOnly(finalizationKeys());
+      return false;
     }
 
     function canFinalizeWithPending() {
-      return signedIn()
-        && isPrimaryHandler(resource.data)
-        && resource.data.status == 'awaiting_signatures'
-        && request.resource.data.status == 'finalized_with_pending'
-        && request.resource.data.hash_version == 3
-        && resource.data.signature_deadline is timestamp
-        && request.time > resource.data.signature_deadline
-        && changedKeys().hasOnly(finalizationKeys());
+      return false;
     }
 
     function canExtendSignatureDeadline() {
@@ -242,34 +280,45 @@ service cloud.firestore {
         ]);
     }
 
-    function canCreateSignature(occurrenceId, signatureId) {
+    function canCreateSignature(occurrenceId) {
       let occ = occurrenceDataAfter(occurrenceId);
+      let handlerId = request.resource.data.handler_id;
       return signedIn()
         && occ.status == 'awaiting_signatures'
-        && isCoSignerTarget(occ, signatureId)
-        && request.resource.data.handler_id == signatureId
+        && isCoSignerTarget(occ, handlerId)
+        && hasAcceptedParticipation(occ, handlerId)
+        && (
+          !(request.resource.data.signature_round is int)
+          || request.resource.data.signature_round == occ.signature_round
+        )
         && (
           (
             isPrimaryHandler(occ)
             && request.resource.data.status == 'pending'
           )
           || (
-            emailMatchesRa(signatureId)
-            && request.resource.data.status in ['signed', 'expired']
+            isTeamMemberAs(occ, handlerId)
+            && request.resource.data.status in ['signed', 'expired', 'declined']
           )
         );
     }
 
-    function canUpdateSignature(occurrenceId, signatureId) {
+    function canUpdateSignature(occurrenceId) {
       let occ = occurrenceDataAfter(occurrenceId);
+      let handlerId = request.resource.data.handler_id;
       return signedIn()
         && occ.status == 'awaiting_signatures'
-        && isCoSignerTarget(occ, signatureId)
-        && request.resource.data.handler_id == signatureId
+        && isCoSignerTarget(occ, handlerId)
+        && hasAcceptedParticipation(occ, handlerId)
+        && request.resource.data.handler_id == resource.data.handler_id
+        && (
+          !(request.resource.data.signature_round is int)
+          || request.resource.data.signature_round == occ.signature_round
+        )
         && (
           (
-            emailMatchesRa(signatureId)
-            && request.resource.data.status in ['signed', 'expired']
+            isTeamMemberAs(occ, handlerId)
+            && request.resource.data.status in ['signed', 'expired', 'declined']
           )
           || (
             isPrimaryHandler(occ)
@@ -295,8 +344,14 @@ service cloud.firestore {
       return handlerId is string
         && occ.team_handler_ids is list
         && handlerId in occ.team_handler_ids
-        && emailMatchesRa(handlerId)
-        && hasSignedSignature(occurrenceId, handlerId);
+        && isTeamMemberAs(occ, handlerId)
+        && (
+          (
+            occ.signed_handler_ids is list
+            && handlerId in occ.signed_handler_ids
+          )
+          || hasSignedSignature(occurrenceId, handlerId)
+        );
     }
 
     function isOriginalAmendmentAuthor(occ, handlerId) {
@@ -373,11 +428,22 @@ service cloud.firestore {
           'occurrence_title',
           'created_at',
           'read_at',
+          'resolved_at',
+          'target_screen',
+          'action_required',
           'additional_data'
         ])
         && request.resource.data.type in [
+          'occurrence_participation_requested',
+          'occurrence_participation_accepted',
+          'occurrence_participation_declined',
+          'vehicle_crew_invitation',
+          'vehicle_crew_invitation_accepted',
+          'vehicle_crew_invitation_declined',
           'signature_requested',
           'signature_completed',
+          'signature_declined',
+          'correction_requested',
           'deadline_warning',
           'occurrence_finalized',
           'amendment_created'
@@ -397,16 +463,66 @@ service cloud.firestore {
         );
     }
 
+    function canCreateParticipation(occurrenceId, handlerId) {
+      let occ = occurrenceDataAfter(occurrenceId);
+      return signedIn()
+        && isPrimaryHandler(occ)
+        && request.resource.data.handler_id == handlerId
+        && occ.team_handler_ids is list
+        && handlerId in occ.team_handler_ids
+        && request.resource.data.status in ['included', 'accepted', 'pending']
+        && request.resource.data.keys().hasOnly([
+          'handler_id',
+          'auth_uid',
+          'role',
+          'status',
+          'created_at',
+          'responded_at',
+          'response_method',
+          'decline_reason',
+          'correction_reason',
+          'device_info',
+          'at',
+          'updated_at',
+          'updated_by'
+        ]);
+    }
+
+    function canDeclineParticipation(occurrenceId, handlerId) {
+      let occ = occurrenceData(occurrenceId);
+      return signedIn()
+        && isEditableStatus(occ)
+        && request.resource.data.handler_id == handlerId
+        && isTeamMemberAs(occ, handlerId)
+        && resource.data.status in ['included', 'accepted', 'pending']
+        && request.resource.data.status == 'declined'
+        && request.resource.data.decline_reason is string
+        && request.resource.data.decline_reason.size() > 0;
+    }
+
     function isValidActiveShiftFor(ra) {
       return request.resource.data.keys().hasOnly([
           'shiftId',
           'handlerId',
+          'auth_uid',
+          'handler_email',
           'dogId',
+          'service_dog_id',
           'status',
           'startedAt',
           'updatedAt',
           'lastDogSwitchAt',
-          'endedAt'
+          'endedAt',
+          'vehicle_id',
+          'vehicle_crew_id',
+          'crew_id',
+          'crew_role',
+          'crew_status',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at'
         ])
         && request.resource.data.handlerId == ra
         && request.resource.data.dogId is string
@@ -418,14 +534,27 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'id',
           'handlerId',
+          'auth_uid',
+          'handler_email',
           'initialDogId',
           'currentDogId',
+          'service_dog_id',
           'status',
           'startedAt',
           'endedAt',
           'dogSwitches',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'vehicle_id',
+          'vehicle_crew_id',
+          'crew_id',
+          'crew_role',
+          'crew_status',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at'
         ])
         && request.resource.data.id is string
         && request.resource.data.handlerId is string
@@ -446,6 +575,20 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'currentDogId',
           'dogSwitches',
+          'dog_changes',
+          'auth_uid',
+          'handler_email',
+          'service_dog_id',
+          'vehicle_id',
+          'vehicle_crew_id',
+          'crew_id',
+          'crew_role',
+          'crew_status',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at',
           'status',
           'endedAt',
           'updatedAt'
@@ -467,10 +610,133 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /vehicles/{vehicleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /vehicle_crews/{crewId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && emailMatchesRa(request.resource.data.titular_handler_id)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'crew_size',
+          'service_dog_id',
+          'titular_handler_id',
+          'active',
+          'created_at',
+          'updated_at',
+          'dog_changes'
+        ]);
+      allow update: if signedIn()
+        && (
+          (
+            resource.data.active == true
+            && emailMatchesRa(resource.data.titular_handler_id)
+            && request.resource.data.titular_handler_id
+              == resource.data.titular_handler_id
+          )
+          || (
+            resource.data.active == false
+            && emailMatchesRa(request.resource.data.titular_handler_id)
+          )
+        )
+        && request.resource.data.vehicle_id == resource.data.vehicle_id
+        && request.resource.data.crew_size == resource.data.crew_size
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'crew_size',
+          'service_dog_id',
+          'titular_handler_id',
+          'active',
+          'created_at',
+          'updated_at',
+          'dog_changes',
+          'ended_at'
+        ]);
+      allow delete: if false;
+
+      match /members/{ra} {
+        allow read: if signedIn();
+        allow create: if emailMatchesRa(ra)
+          && request.resource.data.keys().hasOnly([
+            'handler_id',
+            'auth_uid',
+            'handler_email',
+            'role',
+            'status',
+            'joined_at',
+            'responded_at',
+            'decline_reason',
+            'updated_at'
+          ])
+          && request.resource.data.handler_id == ra
+          && request.resource.data.role == 'titular'
+          && request.resource.data.status == 'titular';
+        allow update: if emailMatchesRa(ra)
+          && request.resource.data.handler_id == resource.data.handler_id
+          && (
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'left_at',
+                'updated_at'
+              ])
+              && request.resource.data.status == 'ended'
+            )
+            || (
+              request.resource.data.role == 'titular'
+              && request.resource.data.status == 'titular'
+              && request.resource.data.keys().hasOnly([
+                'handler_id',
+                'auth_uid',
+                'handler_email',
+                'role',
+                'status',
+                'joined_at',
+                'responded_at',
+                'decline_reason',
+                'left_at',
+                'updated_at'
+              ])
+            )
+          );
+        allow delete: if false;
+      }
+    }
+
     match /users/{ra} {
       allow read: if signedIn();
       allow create, update: if emailMatchesRa(ra);
       allow delete: if false;
+
+      match /devices/{deviceId} {
+        allow read: if emailMatchesRa(ra);
+        allow create, update: if emailMatchesRa(ra)
+          && request.resource.data.keys().hasOnly([
+            'token',
+            'token_hash',
+            'platform',
+            'auth_uid',
+            'handler_email',
+            'created_at',
+            'updated_at'
+          ])
+          && request.resource.data.token is string
+          && request.resource.data.token_hash == deviceId;
+        allow delete: if emailMatchesRa(ra);
+      }
     }
 
     match /dogs/{dogId} {
@@ -584,6 +850,7 @@ service cloud.firestore {
           || emailMatchesRa(request.resource.data.primary_handler_ra)
         );
       allow update: if canUpdateEditableOccurrence()
+        || canSoftDeleteOccurrence()
         || canFinalizeDirectly()
         || canCloseForSignatures()
         || canRevertToDraft()
@@ -604,14 +871,26 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create, update: if signedIn()
           && isEditableStatus(occurrenceData(occurrenceId))
-          && isParticipant(occurrenceData(occurrenceId));
+          && isAuthorizedOccurrenceEditor(occurrenceData(occurrenceId));
         allow delete: if false;
+      }
+
+      match /participations/{handlerId} {
+        allow read: if signedIn() && isParticipant(occurrenceData(occurrenceId));
+        allow create: if canCreateParticipation(occurrenceId, handlerId);
+        allow update: if canDeclineParticipation(occurrenceId, handlerId);
+        allow delete: if false;
+      }
+
+      match /correction_requests/{requestId} {
+        allow read: if signedIn() && isParticipant(occurrenceData(occurrenceId));
+        allow create, update, delete: if false;
       }
 
       match /signatures/{signatureId} {
         allow read: if signedIn() && isParticipant(occurrenceData(occurrenceId));
-        allow create: if canCreateSignature(occurrenceId, signatureId);
-        allow update: if canUpdateSignature(occurrenceId, signatureId);
+        allow create: if canCreateSignature(occurrenceId);
+        allow update: if canUpdateSignature(occurrenceId);
         allow delete: if false;
       }
     }

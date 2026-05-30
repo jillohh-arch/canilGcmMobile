@@ -65,7 +65,11 @@ class AmendmentRepository {
     final userIsSignedMember =
         !userIsHandlerOriginal &&
         teamHandlerIds.contains(authorRa) &&
-        await _hasSignedOccurrence(occurrenceId, authorRa);
+        await _hasSignedOccurrence(
+          occurrenceId: occurrenceId,
+          handlerId: authorRa,
+          occurrenceData: occData,
+        );
 
     if (!userIsHandlerOriginal && !userIsSignedMember) {
       throw StateError(
@@ -171,10 +175,17 @@ class AmendmentRepository {
         );
   }
 
-  Future<bool> _hasSignedOccurrence(
-    String occurrenceId,
-    String handlerId,
-  ) async {
+  Future<bool> _hasSignedOccurrence({
+    required String occurrenceId,
+    required String handlerId,
+    required Map<String, dynamic> occurrenceData,
+  }) async {
+    final signedHandlerIds = occurrenceData['signed_handler_ids'];
+    if (signedHandlerIds is List &&
+        signedHandlerIds.map((value) => value.toString()).contains(handlerId)) {
+      return true;
+    }
+
     final doc = await _firestore
         .collection('occurrences')
         .doc(occurrenceId)
@@ -182,8 +193,20 @@ class AmendmentRepository {
         .doc(handlerId)
         .get();
     final data = doc.data();
-    if (data == null) return false;
-    return OccurrenceSignature.fromJson(data).status == SignatureStatus.signed;
+    if (data != null &&
+        OccurrenceSignature.fromJson(data).status == SignatureStatus.signed) {
+      return true;
+    }
+
+    final query = await _firestore
+        .collection('occurrences')
+        .doc(occurrenceId)
+        .collection('signatures')
+        .where('handler_id', isEqualTo: handlerId)
+        .where('status', isEqualTo: SignatureStatus.signed.toMap())
+        .limit(1)
+        .get();
+    return query.docs.isNotEmpty;
   }
 
   static Set<String> _teamHandlerIdsFrom(Map<String, dynamic> occData) {

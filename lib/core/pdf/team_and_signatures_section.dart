@@ -30,7 +30,7 @@ class TeamAndSignaturesSection {
         _sectionTitle('ASSINATURAS'),
         pw.SizedBox(height: 8),
         pw.Text(
-          'Este registro foi co-assinado pelos integrantes abaixo, atestando presença no fato narrado.',
+          'Este registro foi co-assinado pelos condutores abaixo. O K9 tem presenca atestada pela guarnicao.',
           style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
         ),
         pw.SizedBox(height: 8),
@@ -72,7 +72,7 @@ class TeamAndSignaturesSection {
         2: pw.FlexColumnWidth(2),
       },
       children: [
-        _headerRow(['Nome', 'Funcao', 'RA']),
+        _headerRow(['Nome', 'Funcao', 'RA/K9']),
         for (final member in team)
           pw.TableRow(
             children: [
@@ -81,7 +81,7 @@ class TeamAndSignaturesSection {
                 member.role == TeamRole.titular ? 'Titular' : 'Integrante',
                 bold: member.role == TeamRole.titular,
               ),
-              _cell(member.handlerId, bold: true),
+              _cell(_memberRaAndDog(member), bold: true),
             ],
           ),
       ],
@@ -119,6 +119,18 @@ class TeamAndSignaturesSection {
           ),
       ],
     );
+  }
+
+  static String _memberRaAndDog(OccurrenceTeamMember member) {
+    final dogName = member.dogName?.trim();
+    final dogMatricula = member.dogMatricula?.trim();
+    return [
+      'RA ${member.handlerId}',
+      if (dogName != null && dogName.isNotEmpty)
+        dogMatricula != null && dogMatricula.isNotEmpty
+            ? 'K9 $dogName mat. $dogMatricula'
+            : 'K9 $dogName',
+    ].join('\n');
   }
 
   static pw.TableRow _headerRow(List<String> labels) {

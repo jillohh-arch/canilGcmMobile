@@ -10,6 +10,8 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -28,7 +30,9 @@ class ShiftAssumptionScreen extends StatefulWidget {
 class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
   String? _selectedDogId;
   String? _startingDogId;
+  Vehicle? _selectedVehicle;
   final DogFitnessService _fitnessService = const DogFitnessService();
+  final VehicleService _vehicleService = VehicleService();
 
   @override
   void initState() {
@@ -36,7 +40,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     PermissionService.requestInitialPermissions();
   }
 
-  Future<void> _startShift(Dog dog) async {
+  Future<void> _startShift(Dog dog, {Vehicle? vehicle}) async {
     if (_startingDogId != null) return;
 
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
@@ -51,7 +55,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _startingDogId = dog.id);
 
-    await shiftVM.startShift(dog.id);
+    await shiftVM.startShift(dog.id, vehicle: vehicle);
 
     if (!mounted) return;
     setState(() => _startingDogId = null);
@@ -82,10 +86,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
         ),
         content: Text(
           'Este cão possui pendências críticas. O plantão será registrado com aviso.',
-          style: GoogleFonts.inter(
-            color: AppTheme.textSecondary,
-            fontSize: 13,
-          ),
+          style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
@@ -153,9 +154,14 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
                 if (selectedDog != null && selectedFitness != null)
                   _AssumptionCta(
                     dog: selectedDog,
+                    vehicle: _selectedVehicle,
                     fitness: selectedFitness,
                     isLoading: _startingDogId == selectedDog.id,
-                    onPressed: () => _startShift(selectedDog),
+                    onPressed: () =>
+                        _startShift(selectedDog, vehicle: _selectedVehicle),
+                    onStartWithoutVehicle: _selectedVehicle == null
+                        ? null
+                        : () => _startShift(selectedDog),
                   ),
               ],
             ),
@@ -165,7 +171,11 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     );
   }
 
-  Widget _buildBody(DogViewModel dogVM, UserViewModel userVM, String? currentRa) {
+  Widget _buildBody(
+    DogViewModel dogVM,
+    UserViewModel userVM,
+    String? currentRa,
+  ) {
     if (dogVM.isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppTheme.primary),
@@ -176,11 +186,23 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
       return const _EmptyDogState();
     }
 
+    final hasSelectedDog = _selectedDogId != null;
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: dogVM.dogs.length,
+      itemCount: dogVM.dogs.length + (hasSelectedDog ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
+        if (index >= dogVM.dogs.length) {
+          return _VehicleSelectionSection(
+            vehicleService: _vehicleService,
+            selectedVehicle: _selectedVehicle,
+            onSelected: (vehicle) {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedVehicle = vehicle);
+            },
+          );
+        }
+
         final dog = dogVM.dogs[index];
         final isSelected = _selectedDogId == dog.id;
         final isTitular = dog.conductorRa == currentRa;
@@ -200,7 +222,10 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
           fitness: fitness,
           onTap: () {
             HapticFeedback.selectionClick();
-            setState(() => _selectedDogId = dog.id);
+            setState(() {
+              _selectedDogId = dog.id;
+              _selectedVehicle = null;
+            });
           },
         );
       },

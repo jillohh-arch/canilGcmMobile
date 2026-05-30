@@ -26,10 +26,10 @@ class TeamHeaderWidget extends StatelessWidget {
         children: [
           // Label
           Text(
-            'Equipe',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            team.any((member) => member.hasServiceDog) ? 'Guarnição' : 'Equipe',
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
 
@@ -80,7 +80,7 @@ class _TeamAvatarMember extends StatelessWidget {
               radius: size / 2,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: Text(
-                member.handlerId.toUpperCase().substring(0, 2),
+                _avatarText(member),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.bold,
@@ -118,14 +118,26 @@ class _TeamAvatarMember extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              member.role == TeamRole.titular ? 'Titular' : 'Integrante',
+              member.dogName?.trim().isNotEmpty == true
+                  ? '${member.role == TeamRole.titular ? 'Relator' : 'Integrante'} + K9'
+                  : member.role == TeamRole.titular
+                  ? 'Titular'
+                  : 'Integrante',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
       ],
     );
+  }
+
+  String _avatarText(OccurrenceTeamMember member) {
+    final source = member.displayName?.trim().isNotEmpty == true
+        ? member.displayName!.trim()
+        : member.handlerId;
+    if (source.length <= 2) return source.toUpperCase();
+    return source.substring(0, 2).toUpperCase();
   }
 }

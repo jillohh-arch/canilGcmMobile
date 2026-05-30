@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -61,12 +62,20 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     });
 
     _durationPersistTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-      if (_elapsed.inSeconds > 0) {
-        context.read<OccurrenceViewModel>().updateDurationSoFar(
-          widget.occurrenceId,
-          _elapsed.inSeconds,
-        );
+      if (_elapsed.inSeconds <= 0 || !mounted) return;
+      final vm = context.read<OccurrenceViewModel>();
+      final authVM = context.read<AuthViewModel>();
+      final occurrence = _currentOccurrence(vm);
+      final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+      if (!_canCurrentUserEditOccurrence(
+        occurrence,
+        currentRa: currentRa,
+        currentUid: authVM.user?.uid,
+        currentEmail: authVM.user?.email,
+      )) {
+        return;
       }
+      vm.updateDurationSoFar(widget.occurrenceId, _elapsed.inSeconds);
     });
   }
 
@@ -129,7 +138,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     HapticFeedback.lightImpact();
 
     final vm = context.read<OccurrenceViewModel>();
+    final authVM = context.read<AuthViewModel>();
     final now = DateTime.now();
+    final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
 
     double? lat, lng;
     try {
@@ -146,6 +157,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
       category: item.category,
       timestamp: now,
       title: item.autoTitle,
+      dogHandlerId: item.category == OccurrenceEventCategory.dogWork
+          ? handlerRa
+          : null,
       gpsLat: lat,
       gpsLng: lng,
       createdAt: now,
@@ -218,6 +232,17 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
 
   void _onFinalize() {
     final vm = context.read<OccurrenceViewModel>();
+    final authVM = context.read<AuthViewModel>();
+    final occurrence = _currentOccurrence(vm);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+    if (!_canCurrentUserFinalizeOccurrence(
+      occurrence,
+      currentRa: currentRa,
+      currentUid: authVM.user?.uid,
+    )) {
+      _showNotEditableMessage();
+      return;
+    }
     if (vm.events.isEmpty) {
       _showEmptyFinalizeDialog();
     } else {
@@ -617,6 +642,82 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     );
   }
 
+  void _showNotEditableMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sem permissão de edição para esta ocorrência.'),
+      ),
+    );
+  }
+
+  bool _canCurrentUserEditOccurrence(
+    Occurrence? occurrence, {
+    required String? currentRa,
+    required String? currentUid,
+    required String? currentEmail,
+  }) {
+    if (occurrence == null || !occurrence.status.isOpen) return false;
+    if (_isCurrentUserPrimary(
+      occurrence,
+      currentRa: currentRa,
+      currentUid: currentUid,
+    )) {
+      return true;
+    }
+
+    final ra = currentRa?.trim();
+    final email = currentEmail?.trim().toLowerCase();
+    final uid = currentUid?.trim();
+    if (ra == null && email == null && uid == null) return false;
+    if (ra != null && occurrence.declinedHandlerIds.contains(ra)) {
+      return false;
+    }
+
+    final authorizedIds = occurrence.editAuthorizedHandlerIds;
+    final authorizedEmails = occurrence.editAuthorizedEmails;
+    if (authorizedIds.isNotEmpty || authorizedEmails.isNotEmpty) {
+      return (ra != null && authorizedIds.contains(ra)) ||
+          (email != null && authorizedEmails.contains(email));
+    }
+
+    return occurrence.team.any((member) {
+      return (ra != null && member.handlerId == ra) ||
+          (uid != null && member.authUid == uid) ||
+          (email != null && member.handlerEmail?.trim().toLowerCase() == email);
+    });
+  }
+
+  bool _canCurrentUserFinalizeOccurrence(
+    Occurrence? occurrence, {
+    required String? currentRa,
+    required String? currentUid,
+  }) {
+    if (occurrence == null || !occurrence.status.isOpen) return false;
+    return _isCurrentUserPrimary(
+      occurrence,
+      currentRa: currentRa,
+      currentUid: currentUid,
+    );
+  }
+
+  bool _isCurrentUserPrimary(
+    Occurrence occurrence, {
+    required String? currentRa,
+    required String? currentUid,
+  }) {
+    final ra = currentRa?.trim();
+    final uid = currentUid?.trim();
+    final createdBy = occurrence.createdBy ?? const <String, dynamic>{};
+    return (uid != null &&
+            uid.isNotEmpty &&
+            (occurrence.primaryHandlerId == uid || createdBy['uid'] == uid)) ||
+        (ra != null &&
+            ra.isNotEmpty &&
+            (occurrence.primaryHandlerRa == ra ||
+                occurrence.primaryHandlerId == ra ||
+                createdBy['ra'] == ra));
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<OccurrenceViewModel>();
@@ -634,6 +735,17 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
 
     // Resolve handler name and photo from primaryHandlerId (Firebase UID → RA → UserModel)
     final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
+    final canEditOccurrence = _canCurrentUserEditOccurrence(
+      occ,
+      currentRa: handlerRa,
+      currentUid: authVM.user?.uid,
+      currentEmail: authVM.user?.email,
+    );
+    final canFinalizeOccurrence = _canCurrentUserFinalizeOccurrence(
+      occ,
+      currentRa: handlerRa,
+      currentUid: authVM.user?.uid,
+    );
     final handlerUser = userVM.findByRa(handlerRa);
     final handlerName = userVM.displayNameFor(
       ra: handlerRa,
@@ -664,13 +776,13 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     durationLabel: _durationLabel,
                     eventCount: vm.events.length,
                     onBack: () => Navigator.of(context).pop(),
-                    onEditData: isAwaitingSignatures
+                    onEditData: !canEditOccurrence
                         ? null
                         : () => _showEditOccurrenceDialog(vm, occ),
-                    onEditNature: isAwaitingSignatures
+                    onEditNature: !canEditOccurrence
                         ? null
                         : () => _showEditNatureSheet(vm, occ),
-                    onDiscard: isAwaitingSignatures
+                    onDiscard: !canFinalizeOccurrence
                         ? null
                         : () => _showDiscardDialog(vm),
                   ),
@@ -727,6 +839,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   const SizedBox(height: 24),
                   if (isAwaitingSignatures)
                     _AwaitingSignaturesNotice(onOpenTeam: _openTeamManagement)
+                  else if (!canEditOccurrence)
+                    _ReadOnlyOccurrenceNotice(onOpenTeam: _openTeamManagement)
                   else
                     ActiveOccurrenceQuickGrid(
                       onQuickEvent: _addQuickEvent,
@@ -738,8 +852,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                     events: vm.events,
                     onEventTap: isAwaitingSignatures
                         ? (_) => _showLockedForSignaturesMessage()
-                        : _onEventTap,
-                    onLocationTap: isAwaitingSignatures ? null : _onLocationTap,
+                        : canEditOccurrence
+                        ? _onEventTap
+                        : (_) => _showNotEditableMessage(),
+                    onLocationTap: canEditOccurrence ? _onLocationTap : null,
                     handlerName: handlerName,
                     locationLabel: locationAddress.isNotEmpty
                         ? locationAddress
@@ -761,7 +877,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: isAwaitingSignatures
+              child: isAwaitingSignatures || !canFinalizeOccurrence
                   ? const SizedBox.shrink()
                   : ActiveOccurrenceFinalizeCta(onFinalize: _onFinalize),
             ),
@@ -1037,6 +1153,46 @@ class _AwaitingSignaturesNotice extends StatelessWidget {
               label: const Text('Ver equipe'),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadOnlyOccurrenceNotice extends StatelessWidget {
+  final VoidCallback onOpenTeam;
+
+  const _ReadOnlyOccurrenceNotice({required this.onOpenTeam});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withAlpha(18)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.visibility_outlined,
+            color: AppTheme.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Visualização sem edição para este condutor.',
+              style: GoogleFonts.inter(
+                color: Colors.white.withAlpha(180),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onOpenTeam, child: const Text('Equipe')),
         ],
       ),
     );

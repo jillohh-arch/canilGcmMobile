@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
-import 'package:canil_gcm/features/occurrences/presentation/widgets/handler_search_dialog.dart';
 
 class TeamManagementWidget extends StatefulWidget {
   final List<OccurrenceTeamMember> team;
   final List<OccurrenceSignature> signatures;
+  final Set<String> declinedHandlerIds;
   final bool canAddMembers;
   final bool canRemoveMembers;
   final ValueChanged<Map<String, dynamic>> onAddMember;
@@ -17,6 +17,7 @@ class TeamManagementWidget extends StatefulWidget {
     super.key,
     required this.team,
     required this.signatures,
+    this.declinedHandlerIds = const <String>{},
     required this.canAddMembers,
     required this.canRemoveMembers,
     required this.onAddMember,
@@ -34,21 +35,35 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Builder(
+          builder: (context) {
+            final hasServiceDog = widget.team.any((m) => m.hasServiceDog);
+            return _buildContent(context, hasServiceDog: hasServiceDog);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context, {required bool hasServiceDog}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         // Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Equipe',
+              hasServiceDog ? 'Guarnição' : 'Equipe',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             if (widget.canAddMembers)
               IconButton(
-                onPressed: () => _showAddMemberDialog(),
-                icon: const Icon(Icons.add),
-                tooltip: 'Adicionar integrante',
+                onPressed: widget.onRefresh,
+                icon: const Icon(Icons.sync),
+                tooltip: 'Atualizar guarnição',
               ),
           ],
         ),
@@ -63,7 +78,9 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Nenhum integrante adicionado',
+              hasServiceDog
+                  ? 'Nenhuma guarnição vinculada'
+                  : 'Nenhum integrante adicionado',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -90,6 +107,9 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
               return _TeamMemberCard(
                 member: member,
                 signature: signature,
+                participationDeclined: widget.declinedHandlerIds.contains(
+                  member.handlerId,
+                ),
                 canRemove:
                     widget.canRemoveMembers && member.role != TeamRole.titular,
                 onRemove: () => widget.onRemoveMember(member.handlerId),
@@ -105,34 +125,25 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
     );
   }
 
-  void _showAddMemberDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => HandlerSearchDialog(
-        currentTeam: widget.team
-            .map(
-              (m) => {
-                'handler_id': m.handlerId,
-                'name': 'Handler ${m.handlerId}', // Nome temporário
-                'image_url': '',
-              },
-            )
-            .toList(),
-        onSelected: (handler) {
-          widget.onAddMember(handler);
-        },
-      ),
-    );
-  }
-
   Widget _buildStatusSummary() {
     if (widget.team.isEmpty) return const SizedBox.shrink();
 
+    final activeCoSignerIds = widget.team
+        .where(
+          (member) =>
+              member.role != TeamRole.titular &&
+              !widget.declinedHandlerIds.contains(member.handlerId),
+        )
+        .map((member) => member.handlerId)
+        .toSet();
     final signedCount = widget.signatures
+        .where((s) => activeCoSignerIds.contains(s.handlerId))
         .where((s) => s.status == SignatureStatus.signed)
         .length;
-    final pendingCount =
-        widget.team.length - 1 - signedCount; // Descontando o titular
+    final coSignerCount = activeCoSignerIds.length;
+    final pendingCount = (coSignerCount - signedCount)
+        .clamp(0, coSignerCount)
+        .toInt();
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -149,7 +160,7 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '$signedCount assinatura(s) coletada(s) de ${widget.team.length - 1} integrante(s)',
+              '$signedCount assinatura(s) coletada(s) de $coSignerCount integrante(s)',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -180,12 +191,14 @@ class _TeamManagementWidgetState extends State<TeamManagementWidget> {
 class _TeamMemberCard extends StatelessWidget {
   final OccurrenceTeamMember member;
   final OccurrenceSignature signature;
+  final bool participationDeclined;
   final bool canRemove;
   final VoidCallback onRemove;
 
   const _TeamMemberCard({
     required this.member,
     required this.signature,
+    required this.participationDeclined,
     required this.canRemove,
     required this.onRemove,
   });
@@ -210,7 +223,7 @@ class _TeamMemberCard extends StatelessWidget {
                 radius: 20,
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 child: Text(
-                  member.handlerId.toUpperCase().substring(0, 2),
+                  _avatarText(member),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
@@ -227,7 +240,9 @@ class _TeamMemberCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          'RA ${member.handlerId}',
+                          member.displayName?.trim().isNotEmpty == true
+                              ? member.displayName!.trim()
+                              : 'RA ${member.handlerId}',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
@@ -264,6 +279,24 @@ class _TeamMemberCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'RA ${member.handlerId}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (member.dogName?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'K9 ${member.dogName!.trim()}'
+                        '${member.dogMatricula?.trim().isNotEmpty == true ? ' · matrícula ${member.dogMatricula!.trim()}' : ''}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       'Adicionado em ${DateFormat('dd/MM/yyyy HH:mm').format(member.addedAt)}',
@@ -322,29 +355,45 @@ class _TeamMemberCard extends StatelessWidget {
     );
   }
 
+  String _avatarText(OccurrenceTeamMember member) {
+    final name = member.displayName?.trim();
+    final source = name?.isNotEmpty == true ? name! : member.handlerId;
+    if (source.length <= 2) return source.toUpperCase();
+    return source.substring(0, 2).toUpperCase();
+  }
+
   IconData _getSignatureIcon() {
+    if (participationDeclined) return Icons.person_off;
     switch (signature.status) {
       case SignatureStatus.signed:
         return Icons.check_circle;
       case SignatureStatus.expired:
         return Icons.cancel;
+      case SignatureStatus.obsolete:
+        return Icons.history_toggle_off;
       case SignatureStatus.pending:
         return Icons.schedule;
     }
   }
 
   Color _getSignatureColor(BuildContext context) {
+    if (participationDeclined) {
+      return Theme.of(context).colorScheme.error;
+    }
     switch (signature.status) {
       case SignatureStatus.signed:
         return Theme.of(context).colorScheme.primary;
       case SignatureStatus.expired:
         return Theme.of(context).colorScheme.error;
+      case SignatureStatus.obsolete:
+        return Theme.of(context).colorScheme.onSurfaceVariant;
       case SignatureStatus.pending:
         return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 
   String _getSignatureText() {
+    if (participationDeclined) return 'Participação recusada';
     switch (signature.status) {
       case SignatureStatus.signed:
         return 'Assinado em ${DateFormat('dd/MM/yyyy HH:mm').format(signature.signedAt!)}';
@@ -352,6 +401,10 @@ class _TeamMemberCard extends StatelessWidget {
         return signature.reason != null
             ? 'Não assinou: ${signature.reason}'
             : 'Assinatura expirada';
+      case SignatureStatus.obsolete:
+        return signature.invalidationReason != null
+            ? 'Assinatura obsoleta: ${signature.invalidationReason}'
+            : 'Assinatura obsoleta';
       case SignatureStatus.pending:
         return 'Aguardando assinatura';
     }

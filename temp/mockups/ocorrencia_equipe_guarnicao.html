@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipe da ocorrência — guarnição</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050d10;--veil:rgba(77,208,225,0.04);--divider:rgba(77,208,225,0.12);
+    --chip-bg:rgba(77,208,225,0.08);--chip-bd:rgba(77,208,225,0.2);
+    --cyan:#4dd0e1;--green:#2ecc71;--amber:#f1c40f;--red:#e74c3c;--muted:#5a7280;
+    --txt:#fff;--txt2:#b0c4cc;--mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;color:var(--txt);gap:22px}
+  .phone{width:390px;background:var(--bg);border:8px solid #1a1a1a;border-radius:40px;overflow:hidden}
+  .scroll{height:780px;overflow-y:auto}
+  .scroll::-webkit-scrollbar{width:0}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 6px;font-size:14px;font-weight:600}
+  .statusbar .right{font-size:12px}
+  .appbar{display:flex;align-items:center;gap:14px;padding:10px 18px 14px;border-bottom:1px solid var(--divider)}
+  .iconbtn{width:38px;height:38px;border-radius:8px;background:var(--chip-bg);border:1px solid var(--chip-bd);display:flex;align-items:center;justify-content:center;color:var(--cyan);font-size:18px}
+  .appbar .title{font-size:13px;letter-spacing:.14em;color:var(--cyan);font-weight:700;text-transform:uppercase}
+  .body{padding:18px}
+  .occ{padding:15px;border:1px solid var(--divider);border-radius:14px;background:var(--veil);margin-bottom:8px}
+  .occ .nat{font-size:18px;font-weight:800}
+  .occ .row{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .vchip{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--cyan);background:var(--chip-bg);border:1px solid var(--chip-bd);padding:5px 10px;border-radius:8px}
+  .badge{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.08em;padding:5px 10px;border-radius:20px;text-transform:uppercase;color:var(--amber);background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.3)}
+  .flabel{display:flex;align-items:baseline;gap:8px;margin:20px 2px 12px}
+  .flabel .t{font-size:12px;letter-spacing:.12em;color:var(--cyan);font-weight:700;text-transform:uppercase}
+  .flabel .c{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+  .sec{font-size:10px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;font-weight:700;margin:0 2px 10px}
+  /* condutor */
+  .cond{display:flex;align-items:center;gap:12px;border:1px solid var(--divider);border-radius:13px;background:var(--veil);padding:13px 14px;margin-bottom:9px}
+  .av{width:40px;height:40px;border-radius:50%;border:2px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-size:16px;background:#0c1a1f;flex-shrink:0}
+  .cmain{flex:1;min-width:0}
+  .role{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:11px;display:inline-block;margin-bottom:4px}
+  .role.rel{color:var(--cyan);background:var(--chip-bg);border:1px solid var(--chip-bd)}
+  .role.int{color:var(--muted);background:rgba(90,114,128,0.12);border:1px solid rgba(90,114,128,0.3)}
+  .cname{font-size:14px;font-weight:700}
+  .cra{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .sigstat{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+  .sigstat .dot{font-size:11px;font-weight:700}
+  .sigstat .signed{color:var(--green)}
+  .sigstat .pending{color:var(--amber)}
+  .sigstat .when{font-family:var(--mono);font-size:9px;color:var(--muted)}
+  /* cão de serviço */
+  .dog{display:flex;align-items:center;gap:13px;border:1px solid rgba(46,204,113,0.3);border-radius:13px;background:rgba(46,204,113,0.06);padding:14px;margin-bottom:9px}
+  .davatar{width:44px;height:44px;border-radius:50%;border:2px solid var(--green);background:#0e2127;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .dmain{flex:1}
+  .dtag{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.28);padding:3px 8px;border-radius:11px;display:inline-block;margin-bottom:4px}
+  .dname{font-size:15px;font-weight:700}
+  .dname .k9{font-size:9px;font-weight:700;color:var(--green);letter-spacing:.06em;margin-left:6px}
+  .dmeta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .dright{margin-left:auto;font-size:10px;color:var(--txt2);text-align:right;line-height:1.4;flex-shrink:0}
+  .summary{margin-top:8px;padding:13px 14px;border:1px solid var(--divider);border-radius:12px;background:var(--veil);display:flex;align-items:center;gap:11px}
+  .summary .pie{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--amber)}
+  .summary .st{font-size:12px;color:var(--txt2);line-height:1.45}
+  .note{font-size:11px;color:var(--muted);line-height:1.55;margin-top:12px;padding:0 2px;display:flex;gap:8px}
+  .note .i{color:var(--cyan);flex-shrink:0}
+  /* detalhamento */
+  .doc{width:440px;background:#07151a;border:1px solid var(--divider);border-radius:18px;padding:22px;font-size:13px;line-height:1.6;color:var(--txt2)}
+  .doc h2{font-size:12px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase;font-weight:800;margin-bottom:4px}
+  .doc .lead{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .doc h3{font-size:11px;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase;font-weight:700;margin:18px 0 9px;padding-top:14px;border-top:1px solid var(--divider)}
+  .doc h3:first-of-type{border-top:none;padding-top:0}
+  .doc code,.doc pre{font-family:var(--mono);font-size:11.5px}
+  .doc pre{background:#040e12;border:1px solid var(--divider);border-radius:10px;padding:13px;overflow-x:auto;color:#cfe9ee;margin:6px 0}
+  .doc pre .k{color:var(--cyan)}
+  .doc pre .s{color:var(--green)}
+  .doc pre .c{color:var(--muted)}
+  .doc ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .doc li{padding-left:16px;position:relative}
+  .doc li::before{content:"\203A";position:absolute;left:0;color:var(--cyan);font-weight:700}
+  .doc b{color:var(--txt)}
+  .flow{display:flex;flex-direction:column}
+  .fstep{display:flex;gap:11px;align-items:flex-start;padding:9px 0}
+  .fstep:not(:last-child){border-bottom:1px solid var(--divider)}
+  .fn{font-family:var(--mono);font-size:11px;color:#04181d;background:var(--cyan);min-width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+  .ft b{color:var(--txt)}
+  .ft span{color:var(--muted);font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="phone">
+ <div class="scroll">
+  <div class="statusbar"><span>12:48</span><span class="right">&#9679;&#9679;&#9679;&#9679; &#128246; &#128267;</span></div>
+  <div class="appbar">
+    <div class="iconbtn">&lsaquo;</div>
+    <div class="title">Equipe da ocorr&ecirc;ncia</div>
+  </div>
+  <div class="body">
+    <div class="occ">
+      <div class="nat">Tr&aacute;fico de drogas</div>
+      <div class="row">
+        <span class="vchip">&#128660; Canil 1075</span>
+        <span class="badge">Aguardando assinaturas</span>
+      </div>
+    </div>
+
+    <div class="flabel">
+      <span class="t">Guarni&ccedil;&atilde;o</span>
+      <span class="c">2 condutores + 1 K9 &middot; indivis&iacute;vel</span>
+    </div>
+
+    <div class="sec">Condutores</div>
+
+    <div class="cond">
+      <div class="av">&#128110;</div>
+      <div class="cmain">
+        <span class="role rel">Relator</span>
+        <div class="cname">GCM Ragonha</div>
+        <div class="cra">RA 691755</div>
+      </div>
+      <div class="sigstat">
+        <span class="dot signed">&#10003; Assinou</span>
+        <span class="when">12:44 &middot; biometria</span>
+      </div>
+    </div>
+
+    <div class="cond">
+      <div class="av">&#128110;</div>
+      <div class="cmain">
+        <span class="role int">Integrante</span>
+        <div class="cname">GCM Silva</div>
+        <div class="cra">RA 702318</div>
+      </div>
+      <div class="sigstat">
+        <span class="dot pending">&#9203; Pendente</span>
+        <span class="when">notificado 12:45</span>
+      </div>
+    </div>
+
+    <div class="sec" style="margin-top:18px">C&atilde;o de servi&ccedil;o do turno</div>
+
+    <div class="dog">
+      <div class="davatar">&#128062;</div>
+      <div class="dmain">
+        <span class="dtag">Membro K9</span>
+        <div class="dname">Bono <span class="k9">K9</span></div>
+        <div class="dmeta">matr&iacute;cula 0042 &middot; Malinois</div>
+      </div>
+      <div class="dright">presen&ccedil;a atestada<br>pela guarni&ccedil;&atilde;o</div>
+    </div>
+
+    <div class="summary">
+      <span class="pie">1/2</span>
+      <span class="st">Uma assinatura coletada. O registro vira resultado final quando os 2 condutores assinarem.</span>
+    </div>
+
+    <div class="note">
+      <span class="i">&#128274;</span>
+      <span>Guarni&ccedil;&atilde;o indivis&iacute;vel: todos permaneceram juntos do in&iacute;cio ao fim da ocorr&ecirc;ncia. Por isso todos os condutores co-assinam. Qualquer um pode conduzir o c&atilde;o &mdash; o emprego &eacute; registrado por a&ccedil;&atilde;o.</span>
+    </div>
+  </div>
+ </div>
+</div>
+
+<div class="doc">
+  <h2>Detalhamento &mdash; Equipe / guarni&ccedil;&atilde;o</h2>
+  <div class="lead">Condutores iguais + 1 c&atilde;o de servi&ccedil;o &middot; herdada da viatura &middot; co-assinatura</div>
+
+  <h3>Modelo de dados</h3>
+  <pre><span class="c">// snapshot capturado ao CRIAR a ocorrencia</span>
+<span class="k">occurrence</span> {
+  vehicle_id: <span class="s">"1075"</span>, vehicle_label: <span class="s">"Canil 1075"</span>,
+  team: {
+    conductors: [
+      { handler_id, name, ra, role: <span class="s">"relator"</span> },
+      { handler_id, name, ra, role: <span class="s">"integrante"</span> }
+    ],
+    service_dog: { dog_id, name, <span class="k">matricula</span>, breed }  <span class="c">// 1 so</span>
+  }
+}
+
+<span class="k">occurrence/{id}/signatures</span>   <span class="c">// so condutores assinam</span>
+  { handler_id, signed_at, method: <span class="s">"biometria"</span> }
+
+<span class="k">occurrence.actions[]</span>
+  { ..., dog_handler_id }   <span class="c">// quem conduziu o cao NAQUELA acao</span></pre>
+
+  <h3>Fluxo</h3>
+  <div class="flow">
+    <div class="fstep"><div class="fn">1</div><div class="ft"><b>Guarni&ccedil;&atilde;o ativa</b> <span>&mdash; condutores na viatura + c&atilde;o de servi&ccedil;o do turno</span></div></div>
+    <div class="fstep"><div class="fn">2</div><div class="ft"><b>Cria ocorr&ecirc;ncia</b> <span>&mdash; captura a guarni&ccedil;&atilde;o inteira (snapshot)</span></div></div>
+    <div class="fstep"><div class="fn">3</div><div class="ft"><b>Fecha p/ assinaturas</b> <span>&mdash; trava edi&ccedil;&atilde;o; condutores notificados</span></div></div>
+    <div class="fstep"><div class="fn">4</div><div class="ft"><b>Todos assinam</b> <span>&mdash; vira resultado final + selo (hash v3)</span></div></div>
+  </div>
+
+  <h3>Comportamento &amp; regras</h3>
+  <ul>
+    <li><b>Um &uacute;nico c&atilde;o</b> por viatura/turno. App s&oacute; registra qual c&atilde;o saiu &mdash; sem burocratizar a escolha (que &eacute; informal).</li>
+    <li><b>Condutores s&atilde;o iguais.</b> Qualquer um pode conduzir o c&atilde;o; n&atilde;o h&aacute; "dono" fixo na viatura.</li>
+    <li><b>Emprego do c&atilde;o por a&ccedil;&atilde;o.</b> Quando o c&atilde;o trabalha (faro/captura), registra-se o condutor daquele momento &mdash; e o cr&eacute;dito vai ao K9 ("K9 Bono localizou o entorpecente").</li>
+    <li><b>Guarni&ccedil;&atilde;o indivis&iacute;vel.</b> Equipe = guarni&ccedil;&atilde;o inteira, sem ajuste/remo&ccedil;&atilde;o.</li>
+    <li><b>Assinatura:</b> todos os condutores assinam (biometria). O c&atilde;o &eacute; membro com <b>presen&ccedil;a atestada pela guarni&ccedil;&atilde;o</b> &mdash; n&atilde;o assina.</li>
+    <li><b>Hash v3</b> inclui <code>conductors</code>, <code>service_dog</code> e <code>signatures</code> no payload (mantido da Parte 10).</li>
+  </ul>
+</div>
+</body>
+</html>

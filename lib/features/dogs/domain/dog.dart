@@ -64,7 +64,7 @@ class Dog {
       weight: json['weight'] != null
           ? (json['weight'] as num).toDouble()
           : null,
-      registrationNumber: json['registrationNumber'],
+      registrationNumber: json['matricula'] ?? json['registrationNumber'],
       idealWeightMin: json['idealWeightMin'] != null
           ? (json['idealWeightMin'] as num).toDouble()
           : null,
@@ -101,6 +101,7 @@ class Dog {
         'lastVaccineDate': lastVaccineDate!.toIso8601String(),
       if (weight != null) 'weight': weight,
       if (registrationNumber != null) 'registrationNumber': registrationNumber,
+      if (registrationNumber != null) 'matricula': registrationNumber,
       if (idealWeightMin != null) 'idealWeightMin': idealWeightMin,
       if (idealWeightMax != null) 'idealWeightMax': idealWeightMax,
       if (lastBathDate != null) 'lastBathDate': lastBathDate!.toIso8601String(),

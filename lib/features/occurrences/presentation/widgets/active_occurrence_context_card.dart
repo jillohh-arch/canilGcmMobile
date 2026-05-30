@@ -178,8 +178,11 @@ class _TeamSummaryAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasTeam = team.isNotEmpty;
+    final hasServiceDog = team.any((member) => member.hasServiceDog);
     final label = hasTeam
-        ? '${team.length}/$teamSizeMax condutores'
+        ? hasServiceDog
+              ? '${team.length} condutor${team.length == 1 ? '' : 'es'} + K9'
+              : '${team.length}/$teamSizeMax condutores'
         : 'Definir equipe';
 
     return Material(

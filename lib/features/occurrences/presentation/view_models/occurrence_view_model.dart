@@ -128,8 +128,17 @@ class OccurrenceViewModel extends ChangeNotifier {
     required String id,
     required String shiftId,
     required String dogId,
+    String? serviceDogId,
+    String? crewId,
     required String primaryHandlerId,
     String? primaryHandlerRa,
+    String? vehicleId,
+    String? vehicleLabel,
+    String? vehiclePrefix,
+    String? vehicleModel,
+    String? vehicleUnit,
+    List<OccurrenceTeamMember>? teamSnapshot,
+    int? teamSizeMax,
     required String typeCode,
     required String typeName,
     String? locationAddress,
@@ -160,6 +169,9 @@ class OccurrenceViewModel extends ChangeNotifier {
                 addedByUid: primaryHandlerId.isEmpty ? null : primaryHandlerId,
               ),
             ];
+      final resolvedTeam = teamSnapshot
+          ?.where((member) => member.handlerId.isNotEmpty)
+          .toList();
       final occurrence = Occurrence(
         id: id,
         shiftId: shiftId,
@@ -170,6 +182,13 @@ class OccurrenceViewModel extends ChangeNotifier {
           if (primaryHandlerId.isNotEmpty) 'uid': primaryHandlerId,
         },
         dogId: dogId,
+        serviceDogId: serviceDogId ?? dogId,
+        crewId: crewId,
+        vehicleId: vehicleId,
+        vehicleLabel: vehicleLabel,
+        vehiclePrefix: vehiclePrefix,
+        vehicleModel: vehicleModel,
+        vehicleUnit: vehicleUnit,
         typeCode: typeCode,
         typeName: typeName,
         locationAddress: locationAddress,
@@ -181,7 +200,8 @@ class OccurrenceViewModel extends ChangeNotifier {
         updatedAt: now,
         status: OccurrenceStatus.inProgress,
         initialObservation: initialObservation,
-        team: titularTeam,
+        team: resolvedTeam?.isNotEmpty == true ? resolvedTeam! : titularTeam,
+        teamSizeMax: teamSizeMax ?? 3,
       );
 
       final created = await _repository.create(occurrence);
@@ -196,6 +216,8 @@ class OccurrenceViewModel extends ChangeNotifier {
         gpsLng: gpsLng,
       );
 
+      await _notifyTeamOccurrenceOpened(created);
+
       return created;
     } catch (e) {
       _error = 'Erro ao criar ocorrência: $e';
@@ -208,6 +230,36 @@ class OccurrenceViewModel extends ChangeNotifier {
   }
 
   // ─── Evento Inicial ─────────────────────────────────────────────────
+
+  Future<void> _notifyTeamOccurrenceOpened(Occurrence occurrence) async {
+    final notificationService = NotificationService();
+    final primaryRa = occurrence.primaryHandlerRa?.trim();
+    final recipients = occurrence.team.where((member) {
+      final handlerId = member.handlerId.trim();
+      return handlerId.isNotEmpty && handlerId != primaryRa;
+    });
+
+    for (final member in recipients) {
+      try {
+        final handlerId = member.handlerId.trim();
+        await notificationService.createNotification(
+          userId: handlerId,
+          type: NotificationType.occurrenceParticipationRequested,
+          occurrenceId: occurrence.id,
+          occurrenceTitle: occurrence.typeName,
+          additionalData: primaryRa,
+          notificationId: 'opened_${occurrence.id}_$handlerId',
+          deduplicate: true,
+          targetScreen: 'occurrence_active',
+          actionRequired: true,
+        );
+      } catch (error) {
+        debugPrint(
+          '[OccurrenceViewModel] Falha ao notificar integrante ${member.handlerId}: $error',
+        );
+      }
+    }
+  }
 
   Future<void> _createInitialArrivalEvent({
     required String occurrenceId,
@@ -275,6 +327,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     Map<String, dynamic>? details,
     List<String> finalizationPhotos = const [],
     List<String> finalizationPhotoHashes = const [],
+    int hashVersion = 2,
   }) async {
     // Proteção client-side contra dupla finalização
     if (_isLoading) return;
@@ -297,6 +350,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         details: details,
         finalizationPhotos: finalizationPhotos,
         finalizationPhotoHashes: finalizationPhotoHashes,
+        hashVersion: hashVersion,
       );
       // Cancelar o stream para evitar que re-emita o valor antigo
       _openSub?.cancel();
@@ -357,6 +411,8 @@ class OccurrenceViewModel extends ChangeNotifier {
           occurrenceId: occurrence.id,
           occurrenceTitle: occurrence.typeName,
           additionalData: member.handlerId,
+          targetScreen: 'occurrence_review',
+          actionRequired: true,
         );
       }
 

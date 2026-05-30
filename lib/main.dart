@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -15,6 +18,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/push_notification_service.dart';
 import 'package:canil_gcm/features/app_shell/presentation/screens/main_root_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/login_screen.dart';
@@ -26,10 +30,11 @@ final GlobalKey<NavigatorState> globalNavigatorKey =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-
-  await FirebaseAppCheck.instance.activate(
-    providerAndroid: const AndroidDebugProvider(),
+  FirebaseMessaging.onBackgroundMessage(
+    canilK9FirebaseMessagingBackgroundHandler,
   );
+
+  await _activateAppCheckSafely();
 
   runApp(
     MultiProvider(
@@ -39,19 +44,45 @@ void main() async {
         ChangeNotifierProvider(create: (_) => DogViewModel()),
         ChangeNotifierProvider(create: (_) => TrainingViewModel()),
         ChangeNotifierProvider(create: (_) => HealthViewModel()),
-        ChangeNotifierProvider(create: (_) {
-          final firestore = FirebaseFirestore.instance;
-          return OccurrenceViewModel(
-            repository: OccurrenceRepository(firestore),
-            eventRepository: OccurrenceEventRepository(firestore),
-          );
-        }),
+        ChangeNotifierProvider(
+          create: (_) {
+            final firestore = FirebaseFirestore.instance;
+            return OccurrenceViewModel(
+              repository: OccurrenceRepository(firestore),
+              eventRepository: OccurrenceEventRepository(firestore),
+            );
+          },
+        ),
         ChangeNotifierProvider(create: (_) => ShiftViewModel()),
         ChangeNotifierProvider(create: (_) => NutritionViewModel()),
       ],
       child: const GcmK9App(),
     ),
   );
+
+  unawaited(_initializePushNotificationsSafely());
+}
+
+Future<void> _activateAppCheckSafely() async {
+  try {
+    await FirebaseAppCheck.instance
+        .activate(providerAndroid: const AndroidDebugProvider())
+        .timeout(const Duration(seconds: 6));
+  } catch (e, stack) {
+    debugPrint('[Bootstrap] App Check nao bloqueou a inicializacao: $e');
+    debugPrintStack(stackTrace: stack);
+  }
+}
+
+Future<void> _initializePushNotificationsSafely() async {
+  try {
+    await PushNotificationService()
+        .initialize(navigatorKey: globalNavigatorKey)
+        .timeout(const Duration(seconds: 8));
+  } catch (e, stack) {
+    debugPrint('[Bootstrap] Push/FCM nao bloqueou a inicializacao: $e');
+    debugPrintStack(stackTrace: stack);
+  }
 }
 
 class GcmK9App extends StatelessWidget {
