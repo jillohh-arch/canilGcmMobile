@@ -135,7 +135,8 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
                         category: category,
                         dog: dog,
                       ),
-                      onAddSpecialtyTap: () => _showAddSpecialtyModal(context, dog),
+                      onAddSpecialtyTap: () =>
+                          _showAddSpecialtyModal(context, dog),
                     ),
                   ),
                 );
@@ -177,19 +178,21 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
 
     if (lowerCat.contains('detec') || lowerCat.contains('faro')) {
       if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DetectionEntryScreen(dog: dog),
-        ),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => DetectionEntryScreen(dog: dog)));
       return;
     }
 
     if (lowerCat.contains('busca') || lowerCat.contains('captura')) {
-      final specialty = await specialtyService.getByType(dog.id, 'busca_captura');
+      final specialty = await specialtyService.getByType(
+        dog.id,
+        'busca_captura',
+      );
       if (!context.mounted) return;
 
-      final isOperational = specialty != null &&
+      final isOperational =
+          specialty != null &&
           normalizeTrainingKey(specialty.status) == 'operational';
 
       if (isOperational) {
@@ -216,9 +219,9 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     }
 
     if (lowerCat.contains('condicionamento')) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ConditioningScreen(dog: dog)),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => ConditioningScreen(dog: dog)));
       return;
     }
 
@@ -304,27 +307,10 @@ class _TrainingHubBody extends StatelessWidget {
                 statusDotColor: const Color(0xFF2ECC71),
                 withBackground: false,
                 showProfileButton: true,
-                trailing: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    showDogSwitcher(context);
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.primary.withAlpha(50)),
-                    ),
-                    child: const Center(
-                      child: Text('⇄', style: TextStyle(fontSize: 16, color: Colors.cyan)),
-                    ),
-                  ),
-                ),
+                onSwitchDog: () => showDogSwitcher(context),
               ),
             ),
-            
+
             // Scroll Area
             Expanded(
               child: SingleChildScrollView(
@@ -369,7 +355,7 @@ class _TrainingHubBody extends StatelessWidget {
                         ],
                       ),
                     ),
-                    
+
                     // Specialties Section
                     _TrainingSpecialtiesSection(
                       specialties: data.specialties,
@@ -378,9 +364,9 @@ class _TrainingHubBody extends StatelessWidget {
                       onTap: onTrainingTap,
                       onAddSpecialtyTap: onAddSpecialtyTap,
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // General Section
                     _TrainingGeneralSection(
                       trainings: data.generalTrainings,

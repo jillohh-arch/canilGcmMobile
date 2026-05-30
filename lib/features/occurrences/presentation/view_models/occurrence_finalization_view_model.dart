@@ -10,7 +10,6 @@ class OccurrenceFinalizationViewModel extends OccurrenceTeamViewModel {
   OccurrenceFinalizationViewModel({
     required super.occurrenceRepository,
     required super.signatureRepository,
-    required super.notificationService,
     OccurrenceFinalizationService? finalizationService,
   }) : _occurrenceRepository = occurrenceRepository,
        _finalizationService =

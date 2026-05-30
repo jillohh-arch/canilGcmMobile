@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';

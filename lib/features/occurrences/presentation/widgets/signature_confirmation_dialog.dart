@@ -314,11 +314,18 @@ class _SignatureConfirmationDialogState
     final signerError = _signatureGuardMessage(handlerRa);
     final isSubmitting =
         _isBiometricAuthenticating || _isPasswordAuthenticating;
+    final media = MediaQuery.of(context);
+    final availableHeight =
+        media.size.height -
+        media.viewInsets.vertical -
+        media.padding.vertical -
+        40;
+    final dialogMaxHeight = availableHeight.clamp(360.0, 680.0);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: BoxConstraints(maxWidth: 600, maxHeight: dialogMaxHeight),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -519,44 +526,34 @@ class _SignatureConfirmationDialogState
                   : null,
             ),
             const SizedBox(height: 12),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
-                ),
-                const SizedBox(width: 8),
-                const Spacer(),
-                if (_isBiometricAvailable)
-                  Flexible(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilledButton.tonalIcon(
-                        onPressed: signerError != null || isSubmitting
-                            ? null
-                            : _handleBiometricSignature,
-                        icon: _isBiometricAuthenticating
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.fingerprint),
-                        label: Text(
-                          _isBiometricAuthenticating
-                              ? 'Autenticando...'
-                              : 'Biometria',
-                        ),
-                      ),
+                if (_isBiometricAvailable) ...[
+                  FilledButton.tonalIcon(
+                    onPressed: signerError != null || isSubmitting
+                        ? null
+                        : _handleBiometricSignature,
+                    icon: _isBiometricAuthenticating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.fingerprint),
+                    label: Text(
+                      _isBiometricAuthenticating
+                          ? 'Autenticando...'
+                          : 'Assinar com biometria',
                     ),
                   ),
-                FilledButton(
+                  const SizedBox(height: 8),
+                ],
+                FilledButton.icon(
                   onPressed: signerError != null || isSubmitting
                       ? null
                       : _handlePasswordSignature,
-                  child: _isPasswordAuthenticating
+                  icon: _isPasswordAuthenticating
                       ? const SizedBox(
                           width: 16,
                           height: 16,
@@ -565,7 +562,16 @@ class _SignatureConfirmationDialogState
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Confirmar'),
+                      : const Icon(Icons.draw_rounded),
+                  label: Text(
+                    _isPasswordAuthenticating
+                        ? 'Assinando...'
+                        : 'Assinar ocorrência',
+                  ),
+                ),
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
                 ),
               ],
             ),

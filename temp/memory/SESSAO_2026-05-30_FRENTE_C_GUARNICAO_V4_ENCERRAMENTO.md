@@ -239,6 +239,108 @@ Resultado confirmado no fechamento:
 - `test/core/services/integrity_verification_service_test.dart`
 - `test/core/services/occurrence_finalization_service_test.dart`
 
+## Atualizacao complementar da sessao - 30/05/2026
+
+Depois dos testes no celular, foram feitos ajustes adicionais importantes na Frente C e em telas transversais do app.
+
+### Headers padronizados fora de ocorrencias
+
+- O header que estava visualmente melhor na aba Treinos foi usado como referencia.
+- O componente `BinomioHeader` passou a concentrar os atalhos padronizados: trocar K9, notificacoes/pendencias com badge e perfil do condutor.
+- Foram alinhados os headers de Turno/Dashboard, Treinos, Historico e Prontuario K9.
+- O header das telas de ocorrencia foi mantido fora dessa padronizacao, conforme solicitado.
+- A navegacao para perfil voltou a abrir a tela completa do condutor, preservando o botao de encerrar expediente.
+
+### Devolucao para retificacao
+
+Problema observado no celular:
+
+- O GCM Silva abriu a notificacao de assinatura.
+- Ao revisar, devolveu a ocorrencia para retificacao.
+- Na conta do relator, a ocorrencia voltou para `in_progress`, mas a tela de finalizacao nao vinha com todos os dados preenchidos.
+- Ao tentar finalizar novamente, houve erro de permissao do Firestore.
+
+Correcoes aplicadas:
+
+- A Function `requestOccurrenceCorrection` passou a restaurar `finalization_draft` a partir dos campos finais ja gravados na ocorrencia.
+- As assinaturas da rodada continuam sendo invalidadas como `obsolete`, sem apagar o historico probatorio.
+- A tela `FinalizeOccurrenceScreen` passou a reconstruir o rascunho com uma estrategia mais segura:
+  - usa o draft salvo quando ele tem conteudo;
+  - se o draft estiver vazio ou parcial, recupera `final_report`, `results` e `details` da ocorrencia;
+  - mescla draft parcial com dados finais preservados, evitando perder edicoes feitas apos a devolucao.
+
+### Fechamento para assinaturas no servidor
+
+Problema identificado:
+
+- O fechamento para nova rodada de assinaturas ainda dependia de escrita direta do client no documento da ocorrencia e nas subcolecoes.
+- Isso deixava a transicao sensivel vulneravel a `permission-denied` e contrariava a decisao da Frente C de mover transicoes criticas para Firebase Functions.
+
+Correcoes aplicadas:
+
+- Criada a Cloud Function `closeOccurrenceForSignatures`.
+- O app passou a chamar essa Function via `OccurrenceTransitionService`.
+- A Function valida no servidor: ocorrencia aberta, relator autenticado, integrantes aptos e rodada atual de assinatura.
+- A Function grava `awaiting_signatures`, prazo, dados de finalizacao, assinaturas pendentes, notificacoes e trilha de auditoria.
+- Foram removidas notificacoes duplicadas criadas pelo client nesse fechamento.
+
+### Assinatura no servidor
+
+Problema observado:
+
+- Mesmo apos ajustes de rules, a assinatura do GCM Silva ainda retornava `cloud_firestore/permission-denied`.
+- A causa provavel era a assinatura ainda tentar gravar direto em `occurrences/{id}/signatures/{ra}` pelo app, dependendo de indices como `team_auth_keys`/`team_auth_uids` estarem completos e perfeitamente sincronizados.
+
+Correcoes aplicadas:
+
+- Criada a Cloud Function `signOccurrence`.
+- O app deixou de fazer escrita direta em `signatures` ao assinar.
+- `OccurrenceRepository.addSignature` agora chama `OccurrenceTransitionService.signOccurrence`.
+- A Function valida no servidor: ocorrencia em `awaiting_signatures`, condutor na equipe, condutor coassinante, rodada atual e usuario autenticado compativel com o RA/UID.
+- A Function grava assinatura, `signed_handler_ids`, `signed_emails`, `signed_auth_uids`, auditoria inline, `auditLogs` e notificacao ao relator.
+- A validacao de coassinantes no servidor foi flexibilizada com seguranca para aceitar participantes `accepted` ou `pending` que nao tenham recusado, mantendo bloqueio para `declined`.
+
+### Firestore rules e permissao
+
+- As rules continuam fechando escrita direta sensivel para finalizacao, reabertura e assinatura.
+- A correcao principal nao foi abrir permissao ampla no Firestore, e sim mover a assinatura para Function administrativa com validacao explicita.
+- O arquivo `firestore.rules` permaneceu versionado e com restricoes para ocorrencias, assinaturas, participacoes, notificacoes e aditamentos.
+
+### UI de assinatura
+
+- O modal de assinatura foi ajustado para caber melhor no celular.
+- Foram adicionados botoes claros para assinar com biometria, assinar com senha/fallback e cancelar.
+- O erro de permissao deixou de depender da escrita direta do modal, porque a conclusao de assinatura agora passa pela Function `signOccurrence`.
+
+### Validacoes executadas nesta complementacao
+
+- `npm run build` em `functions/`.
+- Deploy das Functions para o projeto `canil-gcm`.
+- Criacao/atualizacao em producao das Functions `closeOccurrenceForSignatures`, `signOccurrence`, `requestOccurrenceCorrection`, `sealOccurrenceV4`, `declineOccurrenceParticipation`, `inviteVehicleCrewMember`, `respondVehicleCrewInvitation` e `onNotificationCreated`.
+- `dart format` nos arquivos alterados.
+- `dart analyze` na area de ocorrencias e servicos afetados.
+- `flutter build apk --release`.
+- APK copiado para `G:\Meu Drive\app k9\claude\app-release.apk`.
+
+Ultimo APK gerado nesta complementacao:
+
+- Caminho: `G:\Meu Drive\app k9\claude\app-release.apk`
+- Tamanho: `154496838 bytes`
+- Data/hora: `30/05/2026 16:45:39`
+
+### Observacao de Git
+
+- No momento desta complementacao, o trabalho ja estava diretamente na branch `main`.
+- Portanto, nao houve merge tecnico de uma feature branch para `main`; o encerramento correto e commit direto na `main`.
+
+## Pendencias recomendadas apos a complementacao
+
+1. Reinstalar o APK atualizado no celular.
+2. Testar novamente o fluxo completo: relator fecha para assinatura, GCM Silva abre a pendencia, revisa, assina e o relator visualiza assinatura concluida.
+3. Testar devolucao para retificacao novamente: integrante devolve, relator reabre, campos finais aparecem preenchidos, relator finaliza de novo e nova rodada de assinatura e criada.
+4. Confirmar que o hash v4 final continua incluindo equipe, participacoes, assinaturas e correction_requests.
+5. Revalidar push real com app em segundo plano/fechado.
+
 ## Pendências recomendadas para a próxima sessão
 
 1. Resolver permissão/propagação Eventarc para `onNotificationCreated`.

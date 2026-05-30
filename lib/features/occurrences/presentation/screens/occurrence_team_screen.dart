@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
@@ -38,7 +37,6 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     _viewModel = OccurrenceFinalizationViewModel(
       occurrenceRepository: OccurrenceRepository(FirebaseFirestore.instance),
       signatureRepository: SignatureRepository(),
-      notificationService: NotificationService(),
     );
     _viewModel.addListener(_syncAppBarActions);
     _viewModel.initialize(occurrenceId: widget.occurrenceId);

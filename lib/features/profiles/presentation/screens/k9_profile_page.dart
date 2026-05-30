@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -17,10 +18,10 @@ import 'package:canil_gcm/features/dogs/presentation/screens/vaccination_history
 import 'package:canil_gcm/features/dogs/presentation/screens/weight_history_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
-import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart' show showDogSwitcher;
+import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart'
+    show showDogSwitcher;
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
-import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
 
 class K9ProfilePage extends StatefulWidget {
   final Dog dog;
@@ -41,7 +42,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
+      final nutritionVM = Provider.of<NutritionViewModel>(
+        context,
+        listen: false,
+      );
       nutritionVM.loadForDog(widget.dog.id);
       nutritionVM.loadFullHistory(widget.dog.id);
     });
@@ -56,7 +60,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     final user = authVM.user;
     final email = user?.email ?? 'ragonha@canilgcm.com';
     final ra = HandlerIdentityService.raFromEmail(email) ?? 'ragonha';
-    final conductorName = user?.displayName ?? 'GCM ${ra[0].toUpperCase()}${ra.substring(1)}';
+    final conductorName =
+        user?.displayName ?? 'GCM ${ra[0].toUpperCase()}${ra.substring(1)}';
 
     return Scaffold(
       backgroundColor: profileBackground,
@@ -71,11 +76,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF040B0F),
-                Color(0xFF06131A),
-                profileBackground,
-              ],
+              colors: [Color(0xFF040B0F), Color(0xFF06131A), profileBackground],
             ),
           ),
           child: SafeArea(
@@ -83,7 +84,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               children: [
                 Column(
                   children: [
-                    _buildHeaderUniversal(context, ra, conductorName),
+                    _buildSharedBinomioHeader(context, conductorName),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: EdgeInsets.fromLTRB(
@@ -140,170 +141,47 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   }
 
   // ─── Header Universal ──────────────────────────────────────────────
-  Widget _buildHeaderUniversal(BuildContext context, String ra, String conductorName) {
+  Widget _buildSharedBinomioHeader(
+    BuildContext context,
+    String? conductorName,
+  ) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final hasShift = shiftVM.hasActiveShift;
-    final shiftTime = shiftVM.shiftStartTime;
-    final diffHours = shiftTime != null ? DateTime.now().difference(shiftTime).inHours : 5;
+    final elapsed = _formatShiftElapsed(shiftVM.shiftStartTime);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
         color: const Color(0x0A4DD0E1),
         border: Border(
-          bottom: BorderSide(color: const Color(0xFF4DD0E1).withAlpha(31), width: 1),
+          bottom: BorderSide(
+            color: const Color(0xFF4DD0E1).withAlpha(31),
+            width: 1,
+          ),
         ),
       ),
-      child: Row(
-        children: [
-          // Overlapping avatars stack
-          SizedBox(
-            width: 62,
-            height: 36,
-            child: Stack(
-              children: [
-                // Dog avatar
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1A2A30),
-                    border: Border.all(color: const Color(0xFF4DD0E1), width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    widget.dog.name.length >= 4 
-                        ? widget.dog.name.substring(0, 4).toUpperCase() 
-                        : widget.dog.name.toUpperCase(),
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF4DD0E1),
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                // Conductor avatar
-                Positioned(
-                  left: 24,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1A2A30),
-                      border: Border.all(color: const Color(0x804DD0E1), width: 2),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      ra.length >= 3 
-                          ? ra.substring(0, 3).toUpperCase() 
-                          : ra.toUpperCase(),
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Info block
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${widget.dog.name} · $conductorName',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                       hasShift ? 'Turno ativo' : 'Turno inativo',
-                      style: GoogleFonts.inter(
-                        color: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      hasShift ? ' · há ${diffHours}h' : '',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFFB0C4CC),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Actions
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  showDogSwitcher(context);
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0x144DD0E1),
-                    border: Border.all(color: const Color(0x334DD0E1)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF4DD0E1), size: 16),
-                ),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const HandlerProfilePage(showBottomNav: false),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0x144DD0E1),
-                    border: Border.all(color: const Color(0x334DD0E1)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.person_outline_rounded, color: Color(0xFF4DD0E1), size: 16),
-                ),
-              ),
-            ],
-          ),
-        ],
+      child: BinomioHeader(
+        dog: widget.dog,
+        handlerNameOverride: conductorName != null && conductorName.isNotEmpty
+            ? conductorName
+            : null,
+        subtitle: hasShift ? 'Turno ativo · $elapsed' : 'Turno inativo',
+        subtitleColor: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
+        statusDotColor: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
+        showStatusDot: true,
+        withBackground: false,
+        onSwitchDog: hasShift ? () => showDogSwitcher(context) : null,
       ),
     );
+  }
+
+  String _formatShiftElapsed(DateTime? start) {
+    if (start == null) return 'agora';
+    final diff = DateTime.now().difference(start);
+    if (diff.inMinutes < 1) return 'agora';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    return 'há ${diff.inDays}d';
   }
 
   // ─── Page Title ────────────────────────────────────────────────────
@@ -356,7 +234,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   border: Border.all(color: const Color(0xFF4DD0E1), width: 3),
                 ),
                 child: ClipOval(
-                  child: widget.dog.profileImageUrl != null && widget.dog.profileImageUrl!.isNotEmpty
+                  child:
+                      widget.dog.profileImageUrl != null &&
+                          widget.dog.profileImageUrl!.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: widget.dog.profileImageUrl!,
                           fit: BoxFit.cover,
@@ -375,7 +255,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF2ECC71),
-                    border: Border.all(color: const Color(0xFF050D10), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFF050D10),
+                      width: 2,
+                    ),
                   ),
                   alignment: Alignment.center,
                   child: const Text(
@@ -419,34 +302,56 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   children: [
                     Text(
                       'Idade: ',
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                     ),
                     Text(
                       '${widget.dog.age} anos',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '·',
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Peso: ',
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                     ),
                     Text(
                       '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2ECC71).withAlpha(31),
-                    border: Border.all(color: const Color(0xFF2ECC71).withAlpha(77)),
+                    border: Border.all(
+                      color: const Color(0xFF2ECC71).withAlpha(77),
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -472,8 +377,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
       color: const Color(0xFF1A2A30),
       alignment: Alignment.center,
       child: Text(
-        widget.dog.name.length >= 4 
-            ? widget.dog.name.substring(0, 4).toUpperCase() 
+        widget.dog.name.length >= 4
+            ? widget.dog.name.substring(0, 4).toUpperCase()
             : widget.dog.name.toUpperCase(),
         style: GoogleFonts.inter(
           color: const Color(0xFF4DD0E1),
@@ -492,18 +397,35 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   // ─── Status Médico Section (2x2 Grid) ──────────────────────────────
   Widget _buildStatusMedicoSection(BuildContext context) {
     final healthVM = Provider.of<HealthViewModel>(context);
-    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList();
+    final logs = healthVM.healthLogs
+        .where((l) => l.dogId == widget.dog.id)
+        .toList();
 
     // 1. Vacinas
-    final vaccineLogs = logs.where((l) => l.logType == 'Vacina' || l.vaccines.isNotEmpty).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final vaccineOk = vaccineLogs.isEmpty || DateTime.now().difference(vaccineLogs.first.date).inDays <= 365;
-    final nextVaccineDate = vaccineLogs.isNotEmpty ? vaccineLogs.first.date.add(const Duration(days: 365)) : DateTime.now().add(const Duration(days: 30));
+    final vaccineLogs =
+        logs
+            .where((l) => l.logType == 'Vacina' || l.vaccines.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final vaccineOk =
+        vaccineLogs.isEmpty ||
+        DateTime.now().difference(vaccineLogs.first.date).inDays <= 365;
+    final nextVaccineDate = vaccineLogs.isNotEmpty
+        ? vaccineLogs.first.date.add(const Duration(days: 365))
+        : DateTime.now().add(const Duration(days: 30));
 
     // 2. Antipulgas
-    final antipulgasLogs = logs.where((l) => l.logType == 'Antipulgas' || l.logType == 'Antiparasitário').toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final antipulgasDays = antipulgasLogs.isNotEmpty ? DateTime.now().difference(antipulgasLogs.first.date).inDays : 100;
+    final antipulgasLogs =
+        logs
+            .where(
+              (l) =>
+                  l.logType == 'Antipulgas' || l.logType == 'Antiparasitário',
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final antipulgasDays = antipulgasLogs.isNotEmpty
+        ? DateTime.now().difference(antipulgasLogs.first.date).inDays
+        : 100;
     final antipulgasOk = antipulgasDays <= 90;
     final antipulgasDaysRemaining = (90 - antipulgasDays).clamp(0, 90);
 
@@ -511,9 +433,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     final weightOk = widget.dog.weight != null;
 
     // 4. Exames
-    final examesLogs = logs.where((l) => l.logType == 'Exame' || l.logType == 'Consulta').toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final examesDays = examesLogs.isNotEmpty ? DateTime.now().difference(examesLogs.first.date).inDays : 150;
+    final examesLogs =
+        logs
+            .where((l) => l.logType == 'Exame' || l.logType == 'Consulta')
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final examesDays = examesLogs.isNotEmpty
+        ? DateTime.now().difference(examesLogs.first.date).inDays
+        : 150;
     final examesOk = examesDays <= 180;
 
     return Column(
@@ -534,10 +461,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               icon: '💉',
               label: 'VACINAS',
               value: vaccineOk ? 'Em dia' : 'Vencida',
-              sub: 'Próxima: V10 em ${DateFormat('dd/MM').format(nextVaccineDate)}',
+              sub:
+                  'Próxima: V10 em ${DateFormat('dd/MM').format(nextVaccineDate)}',
               status: vaccineOk ? _CardStatus.ok : _CardStatus.critical,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => VaccinationHistoryScreen(dog: widget.dog)),
+                MaterialPageRoute(
+                  builder: (_) => VaccinationHistoryScreen(dog: widget.dog),
+                ),
               ),
             ),
             // Antipulgas
@@ -545,10 +475,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               icon: '🪲',
               label: 'ANTIPULGAS',
               value: antipulgasOk ? 'Em dia' : 'Vencendo',
-              sub: antipulgasOk ? 'Vence em ${antipulgasDaysRemaining}d' : 'Venceu há ${antipulgasDays - 90}d',
+              sub: antipulgasOk
+                  ? 'Vence em ${antipulgasDaysRemaining}d'
+                  : 'Venceu há ${antipulgasDays - 90}d',
               status: antipulgasOk ? _CardStatus.ok : _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => VaccinationHistoryScreen(dog: widget.dog)),
+                MaterialPageRoute(
+                  builder: (_) => VaccinationHistoryScreen(dog: widget.dog),
+                ),
               ),
             ),
             // Peso
@@ -559,7 +493,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               sub: 'Estável · últimos 3 meses',
               status: weightOk ? _CardStatus.ok : _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => WeightHistoryScreen(dog: widget.dog)),
+                MaterialPageRoute(
+                  builder: (_) => WeightHistoryScreen(dog: widget.dog),
+                ),
               ),
             ),
             // Exames
@@ -567,10 +503,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               icon: '🩺',
               label: 'EXAMES',
               value: examesOk ? 'Em dia' : 'Vencendo',
-              sub: examesLogs.isNotEmpty ? 'Hemograma há ${examesDays ~/ 30} meses' : 'Nenhum exame recente',
+              sub: examesLogs.isNotEmpty
+                  ? 'Hemograma há ${examesDays ~/ 30} meses'
+                  : 'Nenhum exame recente',
               status: examesOk ? _CardStatus.ok : _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => VaccinationHistoryScreen(dog: widget.dog)),
+                MaterialPageRoute(
+                  builder: (_) => VaccinationHistoryScreen(dog: widget.dog),
+                ),
               ),
             ),
           ],
@@ -684,17 +624,24 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             itemBuilder: (context, idx) {
               final spec = actualSpecialties[idx];
               String emoji = '🛡';
-              if (spec.toLowerCase().contains('busc') || spec.toLowerCase().contains('capt')) {
+              if (spec.toLowerCase().contains('busc') ||
+                  spec.toLowerCase().contains('capt')) {
                 emoji = '🎯';
-              } else if (spec.toLowerCase().contains('detec') || spec.toLowerCase().contains('faro')) {
+              } else if (spec.toLowerCase().contains('detec') ||
+                  spec.toLowerCase().contains('faro')) {
                 emoji = '👃';
               }
 
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2ECC71).withAlpha(20),
-                  border: Border.all(color: const Color(0xFF2ECC71).withAlpha(64)),
+                  border: Border.all(
+                    color: const Color(0xFF2ECC71).withAlpha(64),
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -740,8 +687,28 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     final meals = vm.todayFeedings;
     final conformity = vm.conformityPercent;
 
-    final morningMeal = meals.firstWhere((m) => m.period == 'manha', orElse: () => Feeding(period: 'manha', amountGrams: 0, prescriptionAtTime: 0, divergencePercent: 0, fedAt: DateTime.now(), fedBy: ''));
-    final nightMeal = meals.firstWhere((m) => m.period == 'noite', orElse: () => Feeding(period: 'noite', amountGrams: 0, prescriptionAtTime: 0, divergencePercent: 0, fedAt: DateTime.now(), fedBy: ''));
+    final morningMeal = meals.firstWhere(
+      (m) => m.period == 'manha',
+      orElse: () => Feeding(
+        period: 'manha',
+        amountGrams: 0,
+        prescriptionAtTime: 0,
+        divergencePercent: 0,
+        fedAt: DateTime.now(),
+        fedBy: '',
+      ),
+    );
+    final nightMeal = meals.firstWhere(
+      (m) => m.period == 'noite',
+      orElse: () => Feeding(
+        period: 'noite',
+        amountGrams: 0,
+        prescriptionAtTime: 0,
+        divergencePercent: 0,
+        fedAt: DateTime.now(),
+        fedBy: '',
+      ),
+    );
 
     final hasMorning = morningMeal.amountGrams > 0;
     final hasNight = nightMeal.amountGrams > 0;
@@ -758,15 +725,17 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 HapticFeedback.lightImpact();
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => NutritionFullScreen(
-                      dog: widget.dog,
-                    ),
+                    builder: (context) => NutritionFullScreen(dog: widget.dog),
                   ),
                 );
               },
               child: Text(
                 'Ver tudo →',
-                style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF4DD0E1),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -799,7 +768,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
-                      child: const Icon(Icons.description_outlined, color: Color(0xFFE67E22), size: 14),
+                      child: const Icon(
+                        Icons.description_outlined,
+                        color: Color(0xFFE67E22),
+                        size: 14,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -816,7 +789,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                             ),
                           ),
                           Text(
-                            prescription != null 
+                            prescription != null
                                 ? '${prescription.amountGramsPerDay}g/dia • ${prescription.foodType}'
                                 : '800g/dia • ração premium',
                             style: GoogleFonts.inter(
@@ -848,10 +821,16 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: hasMorning ? const Color(0xFF2ECC71).withAlpha(15) : const Color(0xFFF1C40F).withAlpha(10),
+                        color: hasMorning
+                            ? const Color(0xFF2ECC71).withAlpha(15)
+                            : const Color(0xFFF1C40F).withAlpha(10),
                         border: Border.all(
-                          color: hasMorning ? const Color(0xFF2ECC71).withAlpha(77) : const Color(0xFFF1C40F).withAlpha(77),
-                          style: hasMorning ? BorderStyle.solid : BorderStyle.solid,
+                          color: hasMorning
+                              ? const Color(0xFF2ECC71).withAlpha(77)
+                              : const Color(0xFFF1C40F).withAlpha(77),
+                          style: hasMorning
+                              ? BorderStyle.solid
+                              : BorderStyle.solid,
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -860,7 +839,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             'MANHÃ',
                             style: GoogleFonts.inter(
-                              color: hasMorning ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F),
+                              color: hasMorning
+                                  ? const Color(0xFF2ECC71)
+                                  : const Color(0xFFF1C40F),
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -869,15 +850,25 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           const SizedBox(height: 4),
                           Text(
                             hasMorning ? '${morningMeal.amountGrams}g' : '400g',
-                            style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            hasMorning ? DateFormat('HH:mm').format(morningMeal.fedAt) : 'pendente',
+                            hasMorning
+                                ? DateFormat('HH:mm').format(morningMeal.fedAt)
+                                : 'pendente',
                             style: GoogleFonts.inter(
-                              color: hasMorning ? const Color(0xFF2ECC71) : const Color(0xFF5A7280),
+                              color: hasMorning
+                                  ? const Color(0xFF2ECC71)
+                                  : const Color(0xFF5A7280),
                               fontSize: 9,
-                              fontWeight: hasMorning ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: hasMorning
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -889,9 +880,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: hasNight ? const Color(0xFF2ECC71).withAlpha(15) : const Color(0xFFF1C40F).withAlpha(10),
+                        color: hasNight
+                            ? const Color(0xFF2ECC71).withAlpha(15)
+                            : const Color(0xFFF1C40F).withAlpha(10),
                         border: Border.all(
-                          color: hasNight ? const Color(0xFF2ECC71).withAlpha(77) : const Color(0xFFF1C40F).withAlpha(77),
+                          color: hasNight
+                              ? const Color(0xFF2ECC71).withAlpha(77)
+                              : const Color(0xFFF1C40F).withAlpha(77),
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -900,7 +895,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             'NOITE',
                             style: GoogleFonts.inter(
-                              color: hasNight ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F),
+                              color: hasNight
+                                  ? const Color(0xFF2ECC71)
+                                  : const Color(0xFFF1C40F),
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -909,15 +906,25 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           const SizedBox(height: 4),
                           Text(
                             hasNight ? '${nightMeal.amountGrams}g' : '400g',
-                            style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            hasNight ? DateFormat('HH:mm').format(nightMeal.fedAt) : 'pendente',
+                            hasNight
+                                ? DateFormat('HH:mm').format(nightMeal.fedAt)
+                                : 'pendente',
                             style: GoogleFonts.inter(
-                              color: hasNight ? const Color(0xFF2ECC71) : const Color(0xFF5A7280),
+                              color: hasNight
+                                  ? const Color(0xFF2ECC71)
+                                  : const Color(0xFF5A7280),
                               fontSize: 9,
-                              fontWeight: hasNight ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: hasNight
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -929,15 +936,24 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               const SizedBox(height: 12),
               // Conformity Bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2ECC71).withAlpha(13),
-                  border: Border.all(color: const Color(0xFF2ECC71).withAlpha(51)),
+                  border: Border.all(
+                    color: const Color(0xFF2ECC71).withAlpha(51),
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2ECC71), size: 18),
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: Color(0xFF2ECC71),
+                      size: 18,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -945,11 +961,18 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         children: [
                           Text(
                             'Conformidade em dia',
-                            style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           Text(
                             '${conformity.toStringAsFixed(0)}% da semana dentro da meta',
-                            style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 10),
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFB0C4CC),
+                              fontSize: 10,
+                            ),
                           ),
                         ],
                       ),
@@ -978,10 +1001,19 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       label: const Text('REGISTRAR ALIMENTAÇÃO'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFE67E22),
-                        side: BorderSide(color: const Color(0xFFE67E22).withAlpha(102), width: 1),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: BorderSide(
+                          color: const Color(0xFFE67E22).withAlpha(102),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 13),
-                        textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        textStyle: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ),
@@ -997,10 +1029,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   // ─── Evolução do Peso Card ─────────────────────────────────────────
   Widget _buildWeightEvolutionCard(BuildContext context) {
     final healthVM = Provider.of<HealthViewModel>(context);
-    final weightLogs = healthVM.healthLogs
-        .where((l) => l.dogId == widget.dog.id && l.weight != null)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date)); // Oldest first for chart
+    final weightLogs =
+        healthVM.healthLogs
+            .where((l) => l.dogId == widget.dog.id && l.weight != null)
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date)); // Oldest first for chart
 
     final currentWeight = widget.dog.weight ?? 28.0;
 
@@ -1015,12 +1048,18 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               onTap: () {
                 HapticFeedback.lightImpact();
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => WeightHistoryScreen(dog: widget.dog)),
+                  MaterialPageRoute(
+                    builder: (context) => WeightHistoryScreen(dog: widget.dog),
+                  ),
                 );
               },
               child: Text(
                 'Ver tudo →',
-                style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF4DD0E1),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1040,26 +1079,43 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   RichText(
-                    text: TextSpan(children: [
-                      TextSpan(
-                        text: currentWeight.toStringAsFixed(1),
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-                      ),
-                      TextSpan(
-                        text: ' kg',
-                        style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ]),
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: currentWeight.toStringAsFixed(1),
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' kg',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF7A8A92),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2ECC71).withAlpha(31),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '→ Estável',
-                      style: GoogleFonts.inter(color: const Color(0xFF2ECC71), fontSize: 10, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF2ECC71),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -1077,13 +1133,62 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('NOV', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('DEZ', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('JAN', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('FEV', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('MAR', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('ABR', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
-                  Text('MAI', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 8, fontWeight: FontWeight.w600)),
+                  Text(
+                    'NOV',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'DEZ',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'JAN',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'FEV',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'MAR',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'ABR',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'MAI',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF5A7280),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1096,10 +1201,15 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   // ─── Carteira de Vacinação Card ────────────────────────────────────
   Widget _buildVaccinationCard(BuildContext context) {
     final healthVM = Provider.of<HealthViewModel>(context);
-    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList();
+    final logs = healthVM.healthLogs
+        .where((l) => l.dogId == widget.dog.id)
+        .toList();
 
-    final vaccineLogs = logs.where((l) => l.logType == 'Vacina' || l.vaccines.isNotEmpty).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final vaccineLogs =
+        logs
+            .where((l) => l.logType == 'Vacina' || l.vaccines.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1112,12 +1222,19 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               onTap: () {
                 HapticFeedback.lightImpact();
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => VaccinationHistoryScreen(dog: widget.dog)),
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        VaccinationHistoryScreen(dog: widget.dog),
+                  ),
                 );
               },
               child: Text(
                 'Ver completa →',
-                style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF4DD0E1),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1159,25 +1276,40 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   ]
                 : List.generate(vaccineLogs.length.clamp(0, 3), (idx) {
                     final log = vaccineLogs[idx];
-                    final name = log.subtype ?? (log.vaccines.isNotEmpty ? log.vaccines.first : 'Vacina');
-                    final appliedDateStr = DateFormat('dd/MM/yyyy').format(log.date);
-                    
+                    final name =
+                        log.subtype ??
+                        (log.vaccines.isNotEmpty
+                            ? log.vaccines.first
+                            : 'Vacina');
+                    final appliedDateStr = DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(log.date);
+
                     // Próxima dose
-                    final nextDate = log.nextDueDate ?? log.date.add(const Duration(days: 365));
-                    final nextDateStr = DateFormat('dd/MM/yyyy').format(nextDate);
-                    
-                    final daysRemaining = nextDate.difference(DateTime.now()).inDays;
+                    final nextDate =
+                        log.nextDueDate ??
+                        log.date.add(const Duration(days: 365));
+                    final nextDateStr = DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(nextDate);
+
+                    final daysRemaining = nextDate
+                        .difference(DateTime.now())
+                        .inDays;
                     final isOverdue = daysRemaining < 0;
-                    final isUpcoming = daysRemaining >= 0 && daysRemaining <= 30;
-                    
-                    final status = isOverdue 
-                        ? _CardStatus.critical 
+                    final isUpcoming =
+                        daysRemaining >= 0 && daysRemaining <= 30;
+
+                    final status = isOverdue
+                        ? _CardStatus.critical
                         : (isUpcoming ? _CardStatus.warn : _CardStatus.ok);
-                    
+
                     final remainingStr = isOverdue
                         ? 'vencida há ${-daysRemaining}d'
-                        : (daysRemaining == 0 ? 'vence hoje' : 'em $daysRemaining dias');
-                    
+                        : (daysRemaining == 0
+                              ? 'vence hoje'
+                              : 'em $daysRemaining dias');
+
                     return _buildVaccineCardRow(
                       name: name,
                       applied: 'Aplicada em $appliedDateStr',
@@ -1216,7 +1348,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: statusColor),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1225,12 +1360,19 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 1),
                     Text(
                       applied,
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -1241,14 +1383,19 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     next,
                     style: GoogleFonts.inter(
-                      color: status == _CardStatus.ok ? Colors.white : statusColor,
+                      color: status == _CardStatus.ok
+                          ? Colors.white
+                          : statusColor,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     remaining,
-                    style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 10),
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFFB0C4CC),
+                      fontSize: 10,
+                    ),
                   ),
                 ],
               ),
@@ -1268,11 +1415,18 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   // ─── Laudos e Documentos Card (Unified 7 documents) ─────────────────
   Widget _buildLaudosCard(BuildContext context) {
     final healthVM = Provider.of<HealthViewModel>(context);
-    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList();
+    final logs = healthVM.healthLogs
+        .where((l) => l.dogId == widget.dog.id)
+        .toList();
 
     // Filtra logs que contêm anexos (laudos) ou exames
-    final docLogs = logs.where((l) => l.attachmentUrl != null && l.attachmentUrl!.isNotEmpty).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final docLogs =
+        logs
+            .where(
+              (l) => l.attachmentUrl != null && l.attachmentUrl!.isNotEmpty,
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1283,10 +1437,17 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             _buildSectionLabel('LAUDOS E DOCUMENTOS'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFF4DD0E1).withAlpha(25), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4DD0E1).withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Text(
                 docLogs.isEmpty ? '7' : docLogs.length.toString(),
-                style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF4DD0E1),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1301,26 +1462,70 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           child: Column(
             children: docLogs.isEmpty
                 ? [
-                    _buildDocRow('🩸', 'Laudo hepático · alta médica', 'Dra. Patrícia Lima · CRMV 9876', '02/2026', true),
-                    _buildDocRow('🦴', 'Laudo ortopédico anual', 'Dr. Carlos Mendes · CRMV 7890', '11/2025', true),
-                    _buildDocRow('🏅', 'Certificação em Detecção de Drogas', 'Ricardo Almeida · Belo Horizonte/MG', '08/2025', true),
-                    _buildDocRow('🏛', 'Homenagem da Câmara Municipal', 'Câmara Municipal de Limeira', '09/2024', true),
-                    _buildDocRow('🎓', 'Certificado Curso K9 Avançado', 'ANCC Brasil · 60h', '06/2024', true),
-                    _buildDocRow('📋', 'Laudo nutricional', 'Dra. Ana Souza · CRMV 12345', '03/2024', true),
-                    _buildDocRow('📄', 'Cadastro institucional GCM', 'RA 691755', '03/2022', false),
+                    _buildDocRow(
+                      '🩸',
+                      'Laudo hepático · alta médica',
+                      'Dra. Patrícia Lima · CRMV 9876',
+                      '02/2026',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '🦴',
+                      'Laudo ortopédico anual',
+                      'Dr. Carlos Mendes · CRMV 7890',
+                      '11/2025',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '🏅',
+                      'Certificação em Detecção de Drogas',
+                      'Ricardo Almeida · Belo Horizonte/MG',
+                      '08/2025',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '🏛',
+                      'Homenagem da Câmara Municipal',
+                      'Câmara Municipal de Limeira',
+                      '09/2024',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '🎓',
+                      'Certificado Curso K9 Avançado',
+                      'ANCC Brasil · 60h',
+                      '06/2024',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '📋',
+                      'Laudo nutricional',
+                      'Dra. Ana Souza · CRMV 12345',
+                      '03/2024',
+                      true,
+                    ),
+                    _buildDocRow(
+                      '📄',
+                      'Cadastro institucional GCM',
+                      'RA 691755',
+                      '03/2022',
+                      false,
+                    ),
                   ]
                 : List.generate(docLogs.length, (idx) {
                     final log = docLogs[idx];
                     final name = log.subtype ?? log.logType;
-                    final subtitle = log.healthObservations.isNotEmpty 
-                        ? log.healthObservations 
-                        : (log.vetName != null ? 'Responsável: ${log.vetName}' : 'Documento anexado');
+                    final subtitle = log.healthObservations.isNotEmpty
+                        ? log.healthObservations
+                        : (log.vetName != null
+                              ? 'Responsável: ${log.vetName}'
+                              : 'Documento anexado');
                     final dateStr = DateFormat('MM/yyyy').format(log.date);
-                    
+
                     String emoji = '📄';
                     if (log.type == 'exam') emoji = '🦴';
                     if (log.type == 'vaccination') emoji = '💉';
-                    
+
                     return _buildDocRow(
                       emoji,
                       name,
@@ -1339,8 +1544,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           },
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF4DD0E1),
-            side: BorderSide(color: const Color(0xFF4DD0E1).withAlpha(77), width: 1, style: BorderStyle.solid),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            side: BorderSide(
+              color: const Color(0xFF4DD0E1).withAlpha(77),
+              width: 1,
+              style: BorderStyle.solid,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 12),
             minimumSize: const Size(double.infinity, 44),
           ),
@@ -1351,7 +1562,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               const SizedBox(width: 6),
               Text(
                 'Anexar laudo ou documento',
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -1360,7 +1574,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     );
   }
 
-  Widget _buildDocRow(String emoji, String title, String subtitle, String date, bool showDivider) {
+  Widget _buildDocRow(
+    String emoji,
+    String title,
+    String subtitle,
+    String date,
+    bool showDivider,
+  ) {
     return Column(
       children: [
         Padding(
@@ -1384,14 +1604,21 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1401,7 +1628,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               const SizedBox(width: 8),
               Text(
                 date,
-                style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 10, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF5A7280),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -1419,8 +1650,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
   // ─── Eventos Médicos Recentes Card ─────────────────────────────────
   Widget _buildEventosCard(BuildContext context) {
     final healthVM = Provider.of<HealthViewModel>(context);
-    final logs = healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final logs =
+        healthVM.healthLogs.where((l) => l.dogId == widget.dog.id).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     final recentEvents = logs.where((l) => l.weight == null).toList();
 
@@ -1437,7 +1669,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               },
               child: Text(
                 'Ver tudo →',
-                style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 10, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF4DD0E1),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1453,14 +1689,32 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           child: Column(
             children: recentEvents.isEmpty
                 ? [
-                    _buildEventRow('10/04', '🪲', 'Antipulgas Bravecto', 'Aplicação trimestral', true),
-                    _buildEventRow('15/03', '🩺', 'Consulta de rotina', 'Dra. Ana Souza · CRMV 12345', true),
-                    _buildEventRow('28/02', '💊', 'Vermífugo Drontal', 'Aplicação trimestral', false),
+                    _buildEventRow(
+                      '10/04',
+                      '🪲',
+                      'Antipulgas Bravecto',
+                      'Aplicação trimestral',
+                      true,
+                    ),
+                    _buildEventRow(
+                      '15/03',
+                      '🩺',
+                      'Consulta de rotina',
+                      'Dra. Ana Souza · CRMV 12345',
+                      true,
+                    ),
+                    _buildEventRow(
+                      '28/02',
+                      '💊',
+                      'Vermífugo Drontal',
+                      'Aplicação trimestral',
+                      false,
+                    ),
                   ]
                 : List.generate(recentEvents.length.clamp(0, 3), (idx) {
                     final log = recentEvents[idx];
                     final dateStr = DateFormat('dd/MM').format(log.date);
-                    
+
                     String icon = '🩺';
                     if (log.type == 'vaccination') icon = '💉';
                     if (log.type == 'antiparasitic') icon = '🪲';
@@ -1468,10 +1722,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     if (log.type == 'surgery') icon = '🏥';
 
                     final name = log.subtype ?? log.logType;
-                    final subtitle = log.healthObservations.isNotEmpty 
-                        ? log.healthObservations 
-                        : (log.vetName != null ? 'Responsável: ${log.vetName}' : 'Registro clínico');
-                    
+                    final subtitle = log.healthObservations.isNotEmpty
+                        ? log.healthObservations
+                        : (log.vetName != null
+                              ? 'Responsável: ${log.vetName}'
+                              : 'Registro clínico');
+
                     return _buildEventRow(
                       dateStr,
                       icon,
@@ -1486,7 +1742,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     );
   }
 
-  Widget _buildEventRow(String date, String icon, String title, String subtitle, bool showDivider) {
+  Widget _buildEventRow(
+    String date,
+    String icon,
+    String title,
+    String subtitle,
+    bool showDivider,
+  ) {
     return Column(
       children: [
         Padding(
@@ -1497,7 +1759,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 width: 48,
                 child: Text(
                   date,
-                  style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 11, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF5A7280),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               Container(
@@ -1517,12 +1783,19 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
-                      style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF7A8A92),
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -1546,13 +1819,16 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
       onTap: () {
         HapticFeedback.mediumImpact();
         final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => HealthTypeSelectorScreen(dogId: widget.dog.id),
-          ),
-        ).then((_) {
-          healthVM.fetchHealthLogsForDog(widget.dog.id);
-        });
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (context) =>
+                    HealthTypeSelectorScreen(dogId: widget.dog.id),
+              ),
+            )
+            .then((_) {
+              healthVM.fetchHealthLogsForDog(widget.dog.id);
+            });
       },
       child: Container(
         width: double.infinity,
@@ -1571,7 +1847,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.healing_outlined, color: Color(0xFF050D10), size: 18),
+            const Icon(
+              Icons.healing_outlined,
+              color: Color(0xFF050D10),
+              size: 18,
+            ),
             const SizedBox(width: 8),
             Text(
               '⚕ REGISTRAR EVENTO DE SAÚDE',
@@ -1658,7 +1938,8 @@ class _MiniWeightChartPainter extends CustomPainter {
 
     for (int i = 0; i < values.length; i++) {
       final double x = i * spacing;
-      final double y = size.height - ((values[i] - minVal) / range) * (size.height - 10) - 5;
+      final double y =
+          size.height - ((values[i] - minVal) / range) * (size.height - 10) - 5;
       points.add(Offset(x, y));
 
       if (i == 0) {

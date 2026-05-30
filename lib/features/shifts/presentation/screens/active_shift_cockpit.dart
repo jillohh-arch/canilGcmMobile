@@ -22,7 +22,7 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
         // Header compacto (fixo no topo)
         _ShiftHeader(
           dog: dog,
-          callsign: callsign,
+          currentRa: currentRa,
           conductorPhotoUrl: conductorPhoto,
           onSwitchDog: () => _showDogSwitcher(context),
           onProfile: () => Navigator.of(context).push(

@@ -51,9 +51,16 @@ class SignatureRepository {
       'created_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await _occurrence(
-      occurrenceId,
-    ).update({'updated_at': FieldValue.serverTimestamp()});
+    try {
+      await _occurrence(
+        occurrenceId,
+      ).update({'updated_at': FieldValue.serverTimestamp()});
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') rethrow;
+      debugPrint(
+        '[SignatureRepository] Assinatura salva; metadado da ocorrencia bloqueado por rules.',
+      );
+    }
   }
 
   Future<void> updateSignature({

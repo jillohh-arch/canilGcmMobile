@@ -400,22 +400,6 @@ class OccurrenceViewModel extends ChangeNotifier {
         finalizationPhotoHashes: finalizationPhotoHashes,
       );
 
-      final notificationService = NotificationService();
-      final coSigners = occurrence.team.where(
-        (member) => member.role != TeamRole.titular,
-      );
-      for (final member in coSigners) {
-        await notificationService.createNotification(
-          userId: member.handlerId,
-          type: NotificationType.signatureRequested,
-          occurrenceId: occurrence.id,
-          occurrenceTitle: occurrence.typeName,
-          additionalData: member.handlerId,
-          targetScreen: 'occurrence_review',
-          actionRequired: true,
-        );
-      }
-
       _openSub?.cancel();
       _openSub = null;
       _openOccurrence = null;

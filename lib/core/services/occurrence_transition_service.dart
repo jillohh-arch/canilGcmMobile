@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 
 class SealOccurrenceResult {
@@ -67,6 +68,40 @@ class OccurrenceTransitionService {
     await callable.call<void>({
       'occurrence_id': occurrenceId,
       'reason': reason,
+    });
+  }
+
+  Future<void> closeForSignatures({
+    required String occurrenceId,
+    required String finalReport,
+    required List<OccurrenceResult> results,
+    required Map<String, dynamic>? details,
+    required List<String> finalizationPhotos,
+    required List<String> finalizationPhotoHashes,
+    Duration signatureDeadline = const Duration(hours: 48),
+  }) async {
+    final callable = _functions.httpsCallable('closeOccurrenceForSignatures');
+    await callable.call<void>({
+      'occurrence_id': occurrenceId,
+      'final_report': finalReport,
+      'results': results.map((result) => result.toMap()).toList(),
+      'details': details,
+      'finalization_photos': finalizationPhotos,
+      'finalization_photo_hashes': finalizationPhotoHashes,
+      'signature_deadline_minutes': signatureDeadline.inMinutes,
+    });
+  }
+
+  Future<void> signOccurrence({
+    required String occurrenceId,
+    required OccurrenceSignature signature,
+  }) async {
+    final callable = _functions.httpsCallable('signOccurrence');
+    await callable.call<void>({
+      'occurrence_id': occurrenceId,
+      'handler_id': signature.handlerId,
+      'signature_method': signature.signatureMethod.toMap(),
+      'signature_hash': signature.signatureHash,
     });
   }
 

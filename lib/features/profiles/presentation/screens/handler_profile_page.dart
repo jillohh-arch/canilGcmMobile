@@ -35,12 +35,20 @@ class HandlerProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<AuthViewModel, UserViewModel, DogViewModel, ShiftViewModel>(
+    return Consumer4<
+      AuthViewModel,
+      UserViewModel,
+      DogViewModel,
+      ShiftViewModel
+    >(
       builder: (context, authVM, userVM, dogVM, shiftVM, _) {
         final fbUser = authVM.user;
         final currentRa = HandlerIdentityService.raFromUser(fbUser) ?? '';
         final user = _findUser(userVM, currentRa);
-        final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
+        final callsign = userVM.displayNameFor(
+          ra: currentRa,
+          firebaseUser: fbUser,
+        );
         final name = _resolveName(user, callsign);
         final dog = _activeDog(dogVM, shiftVM, currentRa);
 
@@ -54,7 +62,9 @@ class HandlerProfilePage extends StatelessWidget {
               child: Column(
                 children: [
                   // Header
-                  _ProfileHeader(onClose: () => Navigator.of(context).maybePop()),
+                  _ProfileHeader(
+                    onClose: () => Navigator.of(context).maybePop(),
+                  ),
                   // Scroll content
                   Expanded(
                     child: SingleChildScrollView(
@@ -105,7 +115,9 @@ class HandlerProfilePage extends StatelessWidget {
   }
 
   String _resolveName(UserModel? user, String callsign) {
-    final name = user?.callsign.trim().isNotEmpty == true ? user!.callsign : callsign;
+    final name = user?.callsign.trim().isNotEmpty == true
+        ? user!.callsign
+        : callsign;
     if (name.trim().isEmpty || name == 'Condutor') return 'GCM Condutor';
     return name.startsWith('GCM ') ? name : 'GCM $name';
   }
@@ -133,9 +145,9 @@ class HandlerProfilePage extends StatelessWidget {
     HapticFeedback.mediumImpact();
     await shiftVM.endShift();
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expediente encerrado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Expediente encerrado')));
     }
   }
 
@@ -148,7 +160,10 @@ class HandlerProfilePage extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(
           'Sair do app?',
-          style: GoogleFonts.inter(color: _kTextPrimary, fontWeight: FontWeight.w700),
+          style: GoogleFonts.inter(
+            color: _kTextPrimary,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         content: Text(
           'Você precisará fazer login novamente.',
@@ -157,16 +172,32 @@ class HandlerProfilePage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancelar', style: GoogleFonts.inter(color: _kTextMuted)),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: _kTextMuted),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Sair', style: GoogleFonts.inter(color: AppTheme.error, fontWeight: FontWeight.w700)),
+            child: Text(
+              'Sair',
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
-    if (confirmed == true) await authVM.signOut();
+    if (confirmed == true) {
+      await authVM.signOut();
+      if (!context.mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route.isFirst);
+    }
   }
 }
 
@@ -191,7 +222,11 @@ class _ProfileHeader extends StatelessWidget {
               width: 36,
               height: 36,
               child: Center(
-                child: Icon(Icons.close_rounded, color: _kTextPrimary, size: 22),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: _kTextPrimary,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -282,10 +317,7 @@ class _IdentityCard extends StatelessWidget {
           // RA
           Text(
             'RA $ra · Limeira/SP',
-            style: GoogleFonts.inter(
-              color: _kTextSecondary,
-              fontSize: 11,
-            ),
+            style: GoogleFonts.inter(color: _kTextSecondary, fontSize: 11),
           ),
           const SizedBox(height: 8),
           // Badges
@@ -312,7 +344,9 @@ class _IdentityCard extends StatelessWidget {
 
   Widget _avatarFallback() {
     final initials = name.replaceAll('GCM ', '').trim();
-    final text = initials.length >= 3 ? initials.substring(0, 3).toUpperCase() : initials.toUpperCase();
+    final text = initials.length >= 3
+        ? initials.substring(0, 3).toUpperCase()
+        : initials.toUpperCase();
     return Container(
       color: const Color(0xFF1A2A30),
       alignment: Alignment.center,
@@ -333,7 +367,11 @@ class _Badge extends StatelessWidget {
   final Color bgColor;
   final Color textColor;
 
-  const _Badge({required this.label, required this.bgColor, required this.textColor});
+  const _Badge({
+    required this.label,
+    required this.bgColor,
+    required this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +434,9 @@ class _DogSection extends StatelessWidget {
                       border: Border.all(color: AppTheme.success, width: 2),
                     ),
                     child: ClipOval(
-                      child: dog!.profileImageUrl != null && dog!.profileImageUrl!.isNotEmpty
+                      child:
+                          dog!.profileImageUrl != null &&
+                              dog!.profileImageUrl!.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: dog!.profileImageUrl!,
                               width: 44,
@@ -476,7 +516,9 @@ class _DogSection extends StatelessWidget {
       color: const Color(0xFF1A2A30),
       alignment: Alignment.center,
       child: Text(
-        dog!.name.isNotEmpty ? dog!.name.substring(0, dog!.name.length.clamp(0, 4)).toUpperCase() : 'K9',
+        dog!.name.isNotEmpty
+            ? dog!.name.substring(0, dog!.name.length.clamp(0, 4)).toUpperCase()
+            : 'K9',
         style: GoogleFonts.inter(
           color: AppTheme.success,
           fontSize: 11,
@@ -614,7 +656,11 @@ class _ProfileSectionLabel extends StatelessWidget {
   final String? trailing;
   final String? aptoLabel;
 
-  const _ProfileSectionLabel({required this.text, this.trailing, this.aptoLabel});
+  const _ProfileSectionLabel({
+    required this.text,
+    this.trailing,
+    this.aptoLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -679,22 +725,34 @@ class _SelosSection extends StatelessWidget {
     final total = allSeals.length;
 
     // Selos por categoria
-    final operacional = allSeals.where((s) =>
-        s.id == 'plantoes_sem_lacunas' ||
-        s.id == 'relato_final_100' ||
-        s.id == 'pdfs_gerados_100').toList();
-    final treino = allSeals.where((s) =>
-        s.id == 'manutencoes_em_dia' ||
-        s.id == 'sessoes_registradas' ||
-        s.id == 'biblioteca_atualizada').toList();
-    final saude = allSeals.where((s) =>
-        s.id == 'vacinas_em_dia' ||
-        s.id == 'antipulgas_em_dia' ||
-        s.id == 'conformidade_alimentar' ||
-        s.id == 'peso_monitorado').toList();
-    final admin = allSeals.where((s) =>
-        s.id == 'perfil_completo' ||
-        s.id == 'documentos_do_cao').toList();
+    final operacional = allSeals
+        .where(
+          (s) =>
+              s.id == 'plantoes_sem_lacunas' ||
+              s.id == 'relato_final_100' ||
+              s.id == 'pdfs_gerados_100',
+        )
+        .toList();
+    final treino = allSeals
+        .where(
+          (s) =>
+              s.id == 'manutencoes_em_dia' ||
+              s.id == 'sessoes_registradas' ||
+              s.id == 'biblioteca_atualizada',
+        )
+        .toList();
+    final saude = allSeals
+        .where(
+          (s) =>
+              s.id == 'vacinas_em_dia' ||
+              s.id == 'antipulgas_em_dia' ||
+              s.id == 'conformidade_alimentar' ||
+              s.id == 'peso_monitorado',
+        )
+        .toList();
+    final admin = allSeals
+        .where((s) => s.id == 'perfil_completo' || s.id == 'documentos_do_cao')
+        .toList();
 
     // Label APTO
     String? aptoLabel;
@@ -718,19 +776,29 @@ class _SelosSection extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: AppTheme.primary.withAlpha(10),
-            border: const Border(left: BorderSide(color: AppTheme.primary, width: 3)),
+            border: const Border(
+              left: BorderSide(color: AppTheme.primary, width: 3),
+            ),
             borderRadius: BorderRadius.circular(6),
           ),
           child: RichText(
             text: TextSpan(
-              style: GoogleFonts.inter(color: _kTextSecondary, fontSize: 11, height: 1.4),
+              style: GoogleFonts.inter(
+                color: _kTextSecondary,
+                fontSize: 11,
+                height: 1.4,
+              ),
               children: [
                 TextSpan(
                   text: 'Selos institucionais',
-                  style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const TextSpan(
-                  text: ' calculados conforme protocolo. Não há ranking — apenas conformidade com o padrão estabelecido.',
+                  text:
+                      ' calculados conforme protocolo. Não há ranking — apenas conformidade com o padrão estabelecido.',
                 ),
               ],
             ),
@@ -844,7 +912,9 @@ class _SeloCard extends StatelessWidget {
                     Text(
                       seal.name,
                       style: GoogleFonts.inter(
-                        color: seal.isActive ? _kTextPrimary : const Color(0xFF95A5A6),
+                        color: seal.isActive
+                            ? _kTextPrimary
+                            : const Color(0xFF95A5A6),
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
@@ -927,7 +997,11 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final String desc;
 
-  const _MenuItem({required this.icon, required this.label, required this.desc});
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.desc,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -960,10 +1034,7 @@ class _MenuItem extends StatelessWidget {
                 const SizedBox(height: 1),
                 Text(
                   desc,
-                  style: GoogleFonts.inter(
-                    color: _kTextMuted,
-                    fontSize: 10,
-                  ),
+                  style: GoogleFonts.inter(color: _kTextMuted, fontSize: 10),
                 ),
               ],
             ),
@@ -1090,10 +1161,7 @@ class _FooterInfo extends StatelessWidget {
         return Center(
           child: Text(
             'Canil K9 · GCM Limeira-SP · v$version',
-            style: GoogleFonts.inter(
-              color: _kTextMuted,
-              fontSize: 9,
-            ),
+            style: GoogleFonts.inter(color: _kTextMuted, fontSize: 9),
           ),
         );
       },

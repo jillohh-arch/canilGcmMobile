@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/pending_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
@@ -40,8 +42,23 @@ class BinomioHeader extends StatelessWidget {
   /// URL da foto do condutor (se null, usa fallback icon)
   final String? conductorPhotoUrl;
 
+  /// Nome do condutor quando a tela já resolveu o display.
+  final String? handlerNameOverride;
+
   /// Widget à direita (ex: botão trocar cão, botão perfil)
   final Widget? trailing;
+
+  /// Callback para trocar o cão do turno. Quando informado, mostra o botão ⇄.
+  final VoidCallback? onSwitchDog;
+
+  /// Callback customizado para abrir o perfil do condutor.
+  final VoidCallback? onProfileTap;
+
+  /// Se true, mostra o sino de pendências/notificações.
+  final bool showNotificationButton;
+
+  /// RA usado para buscar pendências. Se null, usa o usuário autenticado.
+  final String? notificationUserId;
 
   /// Se true, mostra dot de status antes do subtitle
   final bool showStatusDot;
@@ -69,7 +86,12 @@ class BinomioHeader extends StatelessWidget {
     this.dogBorderColor,
     this.conductorBorderColor,
     this.conductorPhotoUrl,
+    this.handlerNameOverride,
     this.trailing,
+    this.onSwitchDog,
+    this.onProfileTap,
+    this.showNotificationButton = true,
+    this.notificationUserId,
     this.showStatusDot = false,
     this.statusDotColor,
     this.avatarSize = 50,
@@ -83,11 +105,18 @@ class BinomioHeader extends StatelessWidget {
     final userVM = Provider.of<UserViewModel>(context);
     final authVM = Provider.of<AuthViewModel>(context);
     final currentRa = HandlerIdentityService.raFromUser(authVM.user);
-    final handlerRa = dog.conductorRa ?? currentRa;
-    final handlerName = userVM.displayNameFor(
-      ra: handlerRa,
-      firebaseUser: handlerRa == currentRa ? authVM.user : null,
-    );
+    final handlerRa = currentRa ?? dog.conductorRa;
+    final notificationRa = notificationUserId?.trim().isNotEmpty == true
+        ? notificationUserId!.trim()
+        : currentRa;
+    final providedHandlerName = handlerNameOverride?.trim();
+    final handlerName =
+        providedHandlerName != null && providedHandlerName.isNotEmpty
+        ? providedHandlerName
+        : userVM.displayNameFor(
+            ra: handlerRa,
+            firebaseUser: handlerRa == currentRa ? authVM.user : null,
+          );
     final propPhoto = conductorPhotoUrl?.trim();
     final userPhoto = userVM.findByRa(handlerRa)?.photoUrl?.trim();
     final firebasePhoto = handlerRa == currentRa
@@ -194,31 +223,43 @@ class BinomioHeader extends StatelessWidget {
           ),
         ),
 
-        // Trailing widget + profile button
-        if (trailing != null || showProfileButton) ...[
+        // Ações padronizadas do header
+        if (onSwitchDog != null ||
+            trailing != null ||
+            (showNotificationButton && notificationRa != null) ||
+            showProfileButton) ...[
           const SizedBox(width: 8),
+          if (onSwitchDog != null) ...[
+            _HeaderIconButton(
+              icon: Icons.compare_arrows_rounded,
+              tooltip: 'Trocar K9',
+              onTap: onSwitchDog!,
+            ),
+            if (trailing != null ||
+                (showNotificationButton && notificationRa != null) ||
+                showProfileButton)
+              const SizedBox(width: 6),
+          ],
           ?trailing,
+          if (trailing != null &&
+              ((showNotificationButton && notificationRa != null) ||
+                  showProfileButton))
+            const SizedBox(width: 6),
+          if (showNotificationButton && notificationRa != null) ...[
+            _HeaderNotificationButton(userId: notificationRa),
+            if (showProfileButton) const SizedBox(width: 6),
+          ],
           if (showProfileButton) ...[
-            if (trailing != null) const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                );
-              },
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withAlpha(20),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primary.withAlpha(50)),
-                ),
-                child: const Center(
-                  child: Text('👤', style: TextStyle(fontSize: 13)),
-                ),
-              ),
+            _HeaderIconButton(
+              icon: Icons.person_outline_rounded,
+              tooltip: 'Perfil',
+              onTap:
+                  onProfileTap ??
+                  () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    );
+                  },
             ),
           ],
         ],
@@ -249,6 +290,74 @@ class BinomioHeader extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _HeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withAlpha(20),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.primary.withAlpha(50)),
+          ),
+          child: Center(child: Icon(icon, color: AppTheme.primary, size: 16)),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderNotificationButton extends StatelessWidget {
+  final String userId;
+
+  const _HeaderNotificationButton({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: NotificationService().getUnreadCount(userId: userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return Badge(
+          isLabelVisible: count > 0,
+          label: Text(count > 99 ? '99+' : '$count'),
+          backgroundColor: AppTheme.warning,
+          textColor: AppTheme.background,
+          child: _HeaderIconButton(
+            icon: Icons.notifications_none_rounded,
+            tooltip: 'Pendências',
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(
+                  builder: (_) => PendingScreen(userId: userId),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }
 

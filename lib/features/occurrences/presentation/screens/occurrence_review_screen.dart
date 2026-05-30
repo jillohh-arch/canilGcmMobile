@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
@@ -49,7 +48,6 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
     _teamViewModel = OccurrenceFinalizationViewModel(
       occurrenceRepository: _occurrenceRepository,
       signatureRepository: SignatureRepository(),
-      notificationService: NotificationService(),
     );
     _load();
   }

@@ -566,10 +566,102 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       });
     }
 
-    final draft = occurrence?.finalizationDraft;
+    final draft = _mergedDraftForOccurrence(occurrence);
     if (draft == null || draft.isEmpty || !mounted) return;
 
     _applyDraft(draft);
+  }
+
+  Map<String, dynamic>? _mergedDraftForOccurrence(Occurrence? occurrence) {
+    final storedDraft = occurrence?.finalizationDraft;
+    final finalFieldsDraft = _draftFromFinalizationFields(occurrence);
+    if (!_hasFinalizationDraftContent(storedDraft)) {
+      return finalFieldsDraft ?? storedDraft;
+    }
+    if (finalFieldsDraft == null) return storedDraft;
+
+    return {
+      ...finalFieldsDraft,
+      ...storedDraft!,
+      'final_report':
+          _nonEmptyDraftString(storedDraft['final_report']) ??
+          finalFieldsDraft['final_report'],
+      'results':
+          _nonEmptyDraftList(storedDraft['results']) ??
+          finalFieldsDraft['results'],
+      'details': _mergeDraftDetails(
+        finalFieldsDraft['details'],
+        storedDraft['details'],
+      ),
+    };
+  }
+
+  bool _hasFinalizationDraftContent(Map<String, dynamic>? draft) {
+    if (draft == null || draft.isEmpty) return false;
+    final report = draft['final_report'];
+    if (report is String && report.trim().isNotEmpty) return true;
+    final results = draft['results'];
+    if (results is List && results.isNotEmpty) return true;
+    final details = draft['details'];
+    if (details is Map && details.isNotEmpty) return true;
+    return false;
+  }
+
+  String? _nonEmptyDraftString(dynamic value) {
+    if (value is! String) return null;
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  List<dynamic>? _nonEmptyDraftList(dynamic value) {
+    if (value is! List || value.isEmpty) return null;
+    return value;
+  }
+
+  Map<String, dynamic> _mergeDraftDetails(dynamic base, dynamic override) {
+    final output = <String, dynamic>{};
+    if (base is Map) {
+      output.addAll(base.map((key, value) => MapEntry(key.toString(), value)));
+    }
+    if (override is Map) {
+      for (final entry in override.entries) {
+        final key = entry.key.toString();
+        final value = entry.value;
+        if (value is Map && output[key] is Map) {
+          output[key] = {
+            ...(output[key] as Map).map(
+              (nestedKey, nestedValue) =>
+                  MapEntry(nestedKey.toString(), nestedValue),
+            ),
+            ...value.map(
+              (nestedKey, nestedValue) =>
+                  MapEntry(nestedKey.toString(), nestedValue),
+            ),
+          };
+        } else if (value is List && value.isEmpty) {
+          continue;
+        } else {
+          output[key] = value;
+        }
+      }
+    }
+    return output;
+  }
+
+  Map<String, dynamic>? _draftFromFinalizationFields(Occurrence? occurrence) {
+    if (occurrence == null) return null;
+    final hasReport = occurrence.finalReport?.trim().isNotEmpty == true;
+    final hasResults = occurrence.results.isNotEmpty;
+    final hasDetails = occurrence.details?.isNotEmpty == true;
+    if (!hasReport && !hasResults && !hasDetails) return null;
+
+    return {
+      'current_step': 2,
+      'final_report': occurrence.finalReport ?? '',
+      'results': occurrence.results.map((result) => result.toMap()).toList(),
+      'details': occurrence.details ?? const <String, dynamic>{},
+      'restored_from_finalization': true,
+    };
   }
 
   void _applyDraft(Map<String, dynamic> draft) {

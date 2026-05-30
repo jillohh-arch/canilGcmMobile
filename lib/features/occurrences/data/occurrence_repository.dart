@@ -25,12 +25,6 @@ class OccurrenceRepository {
     return _collection.doc(occurrenceId).collection('signatures');
   }
 
-  String _signatureDocId(OccurrenceSignature signature) {
-    return signature.round <= 1
-        ? signature.handlerId
-        : 'round_${signature.round}_${signature.handlerId}';
-  }
-
   Future<Occurrence> create(Occurrence occurrence) async {
     final docRef = _collection.doc(occurrence.id);
     final now = DateTime.now();
@@ -558,59 +552,26 @@ class OccurrenceRepository {
     final resolvedPhotoHashes = finalizationPhotoHashes.isNotEmpty
         ? finalizationPhotoHashes
         : current.finalizationPhotoHashes;
-
     final resolvedDeadline =
         deadline ??
         DateTime.now().add(signatureDeadline ?? const Duration(hours: 48));
+    final resolvedSignatureDeadline =
+        signatureDeadline ?? resolvedDeadline.difference(DateTime.now());
+
     final signatureRound = current.signatureRound <= 0
         ? 1
         : current.signatureRound;
-    final entry = AuditService.buildInlineEntry(
-      action: 'closed_for_signatures',
+    await OccurrenceTransitionService().closeForSignatures(
+      occurrenceId: resolvedId,
+      finalReport: resolvedFinalReport,
+      results: finalResults,
+      details: resolvedDetails,
+      finalizationPhotos: resolvedPhotos,
+      finalizationPhotoHashes: resolvedPhotoHashes,
+      signatureDeadline: resolvedSignatureDeadline.isNegative
+          ? const Duration(hours: 48)
+          : resolvedSignatureDeadline,
     );
-    final docRef = _collection.doc(resolvedId);
-    final batch = _firestore.batch();
-
-    batch.update(docRef, {
-      'status': OccurrenceStatus.awaitingSignatures.toMap(),
-      'signature_request_at': FieldValue.serverTimestamp(),
-      'signature_deadline': Timestamp.fromDate(resolvedDeadline),
-      'final_report': resolvedFinalReport,
-      'results': finalResults.map((r) => r.toMap()).toList(),
-      'details': resolvedDetails,
-      'finalization_photos': resolvedPhotos,
-      'finalization_photo_hashes': resolvedPhotoHashes,
-      'finalization_draft': FieldValue.delete(),
-      'signature_round': signatureRound,
-      'signed_handler_ids': [],
-      'signed_emails': [],
-      'signed_auth_uids': [],
-      'updated_at': FieldValue.serverTimestamp(),
-      'audit_trail': FieldValue.arrayUnion([entry]),
-    });
-
-    for (final member in coSigners) {
-      final signature = OccurrenceSignature(
-        handlerId: member.handlerId,
-        status: SignatureStatus.pending,
-        round: signatureRound,
-      );
-      batch.set(
-        _signatures(resolvedId).doc(_signatureDocId(signature)),
-        {
-          ...OccurrenceSignature(
-            handlerId: member.handlerId,
-            status: SignatureStatus.pending,
-            round: signatureRound,
-          ).toJson(),
-          'created_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-    }
-
-    await batch.commit();
 
     unawaited(
       AuditService.log(
@@ -659,47 +620,13 @@ class OccurrenceRepository {
       throw StateError('Integrante sem participacao ativa nao pode assinar');
     }
 
-    final entry = AuditService.buildInlineEntry(
-      action: 'signature_added',
-      fieldName: 'signatures',
-      newValue: signature.toJson(),
-    );
-
     final round = current.signatureRound <= 0 ? 1 : current.signatureRound;
     final roundedSignature = signature.copyWith(round: round);
 
-    await _signatures(occurrenceId).doc(_signatureDocId(roundedSignature)).set({
-      ...roundedSignature.toJson(),
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    final occurrenceUpdates = <String, dynamic>{
-      'updated_at': FieldValue.serverTimestamp(),
-      'audit_trail': FieldValue.arrayUnion([entry]),
-    };
-    if (roundedSignature.status == SignatureStatus.signed) {
-      occurrenceUpdates['signed_handler_ids'] = FieldValue.arrayUnion([
-        signature.handlerId,
-      ]);
-      occurrenceUpdates['signed_emails'] = FieldValue.arrayUnion([
-        _emailForRa(signature.handlerId),
-      ]);
-      if (signingMember.authUid?.trim().isNotEmpty == true) {
-        occurrenceUpdates['signed_auth_uids'] = FieldValue.arrayUnion([
-          signingMember.authUid!.trim(),
-        ]);
-      }
-    }
-
-    try {
-      await _collection.doc(occurrenceId).update(occurrenceUpdates);
-    } on FirebaseException catch (error) {
-      debugPrint(
-        '[OccurrenceRepository] Assinatura gravada; '
-        'metadados da ocorrencia nao foram atualizados: '
-        '${error.code} ${error.message ?? ''}',
-      );
-    }
+    await OccurrenceTransitionService().signOccurrence(
+      occurrenceId: occurrenceId,
+      signature: roundedSignature,
+    );
 
     unawaited(
       AuditService.log(

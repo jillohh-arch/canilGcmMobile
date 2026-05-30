@@ -85,7 +85,7 @@ service cloud.firestore {
         && signatureId != occ.primary_handler_id;
     }
 
-    function hasAcceptedParticipation(occ, handlerId) {
+    function canSignParticipation(occ, handlerId) {
       return !(
           occ.accepted_handler_ids is list
           || occ.declined_handler_ids is list
@@ -94,6 +94,14 @@ service cloud.firestore {
         || (
           occ.accepted_handler_ids is list
           && handlerId in occ.accepted_handler_ids
+        )
+        || (
+          occ.pending_handler_ids is list
+          && handlerId in occ.pending_handler_ids
+          && !(
+            occ.declined_handler_ids is list
+            && handlerId in occ.declined_handler_ids
+          )
         );
     }
 
@@ -286,7 +294,7 @@ service cloud.firestore {
       return signedIn()
         && occ.status == 'awaiting_signatures'
         && isCoSignerTarget(occ, handlerId)
-        && hasAcceptedParticipation(occ, handlerId)
+        && canSignParticipation(occ, handlerId)
         && (
           !(request.resource.data.signature_round is int)
           || request.resource.data.signature_round == occ.signature_round
@@ -309,7 +317,7 @@ service cloud.firestore {
       return signedIn()
         && occ.status == 'awaiting_signatures'
         && isCoSignerTarget(occ, handlerId)
-        && hasAcceptedParticipation(occ, handlerId)
+        && canSignParticipation(occ, handlerId)
         && request.resource.data.handler_id == resource.data.handler_id
         && (
           !(request.resource.data.signature_round is int)

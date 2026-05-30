@@ -132,8 +132,12 @@ function isPrimaryHandler(occurrence: JsonMap, caller: CallerIdentity): boolean 
 
 function canActAsHandler(occurrence: JsonMap, handlerId: string, caller: CallerIdentity): boolean {
   const teamAuthKeys = stringArray(occurrence.team_auth_keys);
+  const matchingMember = teamMembers(occurrence).find((member) => handlerIdForMember(member) === handlerId);
+  const memberAuthUid = matchingMember ? stringValue(matchingMember.auth_uid ?? matchingMember.authUid) : undefined;
   return emailMatchesRa(caller.email, handlerId) ||
-    teamAuthKeys.includes(`${handlerId}:${caller.uid}`);
+    teamAuthKeys.includes(`${handlerId}:${caller.uid}`) ||
+    memberAuthUid === caller.uid ||
+    (handlerId === caller.ra && teamHandlerIds(occurrence).includes(handlerId));
 }
 
 function isTeamParticipant(occurrence: JsonMap, caller: CallerIdentity): boolean {
@@ -172,11 +176,22 @@ function acceptedHandlerIds(occurrence: JsonMap): string[] {
 }
 
 function coSignerIds(occurrence: JsonMap): string[] {
-  const accepted = new Set(acceptedHandlerIds(occurrence));
+  const accepted = new Set(stringArray(occurrence.accepted_handler_ids));
+  const pending = new Set(stringArray(occurrence.pending_handler_ids));
+  const declined = new Set(stringArray(occurrence.declined_handler_ids));
+  const hasParticipationLists = accepted.size > 0 ||
+    pending.size > 0 ||
+    declined.size > 0 ||
+    Number(occurrence.participation_revision ?? 0) > 0;
   return teamMembers(occurrence)
     .filter((member) => String(member.role ?? "integrante") !== "titular")
     .map(handlerIdForMember)
-    .filter((handlerId) => handlerId.length > 0 && accepted.has(handlerId))
+    .filter((handlerId) => {
+      if (handlerId.length === 0) return false;
+      if (declined.has(handlerId)) return false;
+      if (!hasParticipationLists) return true;
+      return accepted.has(handlerId) || pending.has(handlerId);
+    })
     .sort();
 }
 
@@ -378,6 +393,22 @@ function notificationPayload(
     read_at: null,
     resolved_at: null,
     additional_data: additionalData ?? "",
+  };
+}
+
+function finalizationDraftFromOccurrence(
+  occurrence: JsonMap,
+  reason: string,
+  round: number,
+): JsonMap {
+  return {
+    current_step: 2,
+    final_report: stringValue(occurrence.final_report) ?? "",
+    results: Array.isArray(occurrence.results) ? occurrence.results : [],
+    details: occurrence.details ?? null,
+    saved_at: new Date().toISOString(),
+    restored_from_signature_round: round,
+    correction_reason: reason,
   };
 }
 
@@ -765,6 +796,241 @@ export const sealOccurrenceV4 = onCall({region}, async (request) => {
   });
 });
 
+export const closeOccurrenceForSignatures = onCall({region}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const occurrenceId = requiredString(data, "occurrence_id");
+  const finalReport = requiredString(data, "final_report");
+  const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
+  const requestedResults = Array.isArray(data.results) ? data.results : [];
+  const requestedDetails = data.details ?? null;
+  const requestedPhotos = Array.isArray(data.finalization_photos) ?
+    data.finalization_photos :
+    [];
+  const requestedPhotoHashes = Array.isArray(data.finalization_photo_hashes) ?
+    data.finalization_photo_hashes :
+    [];
+  const rawDeadlineMinutes = Number(data.signature_deadline_minutes ?? 2880);
+  const deadlineMinutes = Number.isFinite(rawDeadlineMinutes) && rawDeadlineMinutes > 0 ?
+    Math.round(rawDeadlineMinutes) :
+    2880;
+
+  return db.runTransaction(async (transaction) => {
+    const occurrenceSnap = await transaction.get(occurrenceRef);
+    if (!occurrenceSnap.exists) {
+      throw new HttpsError("not-found", "OcorrÃªncia nÃ£o encontrada.");
+    }
+
+    const occurrence = occurrenceSnap.data() ?? {};
+    const currentStatus = String(occurrence.status ?? "in_progress");
+    if (!(currentStatus === "in_progress" || currentStatus === "finalizing")) {
+      throw new HttpsError(
+        "failed-precondition",
+        "SÃ³ Ã© possÃ­vel fechar ocorrÃªncias em andamento ou finalizaÃ§Ã£o.",
+      );
+    }
+    if (!isPrimaryHandler(occurrence, caller)) {
+      throw new HttpsError("permission-denied", "Somente o relator fecha para assinaturas.");
+    }
+
+    const coSigners = coSignerIds(occurrence);
+    if (coSigners.length === 0) {
+      throw new HttpsError("failed-precondition", "Nenhum integrante apto para co-assinatura.");
+    }
+
+    const round = signatureRound(occurrence);
+    const deadline = admin.firestore.Timestamp.fromMillis(
+      Date.now() + (deadlineMinutes * 60 * 1000),
+    );
+    const finalizationPhotos = requestedPhotos.length > 0 ?
+      requestedPhotos :
+      (Array.isArray(occurrence.finalization_photos) ? occurrence.finalization_photos : []);
+    const finalizationPhotoHashes = requestedPhotoHashes.length > 0 ?
+      requestedPhotoHashes :
+      (Array.isArray(occurrence.finalization_photo_hashes) ?
+        occurrence.finalization_photo_hashes :
+        []);
+    const results = requestedResults.length > 0 ?
+      requestedResults :
+      (Array.isArray(occurrence.results) ? occurrence.results : []);
+    const details = requestedDetails ?? occurrence.details ?? null;
+    const entry = auditEntry("closed_for_signatures", caller);
+
+    transaction.update(occurrenceRef, {
+      status: "awaiting_signatures",
+      signature_request_at: admin.firestore.FieldValue.serverTimestamp(),
+      signature_deadline: deadline,
+      final_report: finalReport,
+      results,
+      details,
+      finalization_photos: finalizationPhotos,
+      finalization_photo_hashes: finalizationPhotoHashes,
+      finalization_draft: admin.firestore.FieldValue.delete(),
+      signature_round: round,
+      signed_handler_ids: [],
+      signed_emails: [],
+      signed_auth_uids: [],
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      audit_trail: admin.firestore.FieldValue.arrayUnion(entry),
+    });
+
+    for (const handlerId of coSigners) {
+      const signatureId = round <= 1 ? handlerId : `round_${round}_${handlerId}`;
+      transaction.set(
+        occurrenceRef.collection("signatures").doc(signatureId),
+        {
+          handler_id: handlerId,
+          status: "pending",
+          signed_at: null,
+          signature_method: "biometric",
+          signature_hash: "",
+          round,
+          signature_round: round,
+          invalidated_at: null,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+      );
+      transaction.set(
+        db.collection("notifications").doc(handlerId).collection("items").doc(),
+        notificationPayload(
+          "signature_requested",
+          occurrenceId,
+          occurrence,
+          "occurrence_review",
+          handlerId,
+        ),
+      );
+    }
+
+    transaction.set(db.collection("auditLogs").doc(), {
+      action: "closed_for_signatures",
+      entity_type: "occurrence",
+      entity_id: occurrenceId,
+      summary: "OcorrÃªncia fechada para assinaturas",
+      actor: caller,
+      metadata: {
+        signature_round: round,
+        pending_signatures: coSigners,
+      },
+      source: "functions",
+      performed_at: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      status: "awaiting_signatures",
+      signature_round: round,
+      pending_signatures: coSigners,
+    };
+  });
+});
+
+export const signOccurrence = onCall({region}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const occurrenceId = requiredString(data, "occurrence_id");
+  const handlerId = stringValue(data.handler_id) ?? caller.ra;
+  const signatureMethod = stringValue(data.signature_method) ?? "biometric";
+  const signatureHash = stringValue(data.signature_hash) ?? "";
+  const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
+
+  return db.runTransaction(async (transaction) => {
+    const occurrenceSnap = await transaction.get(occurrenceRef);
+    if (!occurrenceSnap.exists) {
+      throw new HttpsError("not-found", "OcorrÃªncia nÃ£o encontrada.");
+    }
+
+    const occurrence = occurrenceSnap.data() ?? {};
+    if (String(occurrence.status ?? "") !== "awaiting_signatures") {
+      throw new HttpsError("failed-precondition", "OcorrÃªncia nÃ£o estÃ¡ aguardando assinaturas.");
+    }
+    if (!coSignerIds(occurrence).includes(handlerId)) {
+      throw new HttpsError("permission-denied", "Condutor nÃ£o possui assinatura pendente nesta ocorrÃªncia.");
+    }
+    if (!canActAsHandler(occurrence, handlerId, caller)) {
+      throw new HttpsError("permission-denied", "UsuÃ¡rio autenticado nÃ£o corresponde ao condutor da assinatura.");
+    }
+
+    const round = signatureRound(occurrence);
+    const signatureId = round <= 1 ? handlerId : `round_${round}_${handlerId}`;
+    const signatureRef = occurrenceRef.collection("signatures").doc(signatureId);
+    const signaturesSnap = await transaction.get(occurrenceRef.collection("signatures"));
+    const existingSignatures: JsonMap[] = signaturesSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+    const previousSignature = existingSignatures.find((signature) => signature.id === signatureId);
+    if (previousSignature?.["status"] === "signed") {
+      return {
+        status: "signed",
+        signature_round: round,
+        already_signed: true,
+      };
+    }
+
+    const entry = auditEntry("signature_added", caller);
+    const signedEmailSet = new Set([
+      emailForRa(handlerId),
+      `${handlerId.trim().toLowerCase()}@canilgcm.com`,
+      caller.email,
+    ].filter((email) => email.length > 0));
+
+    transaction.set(signatureRef, {
+      handler_id: handlerId,
+      status: "signed",
+      signed_at: admin.firestore.FieldValue.serverTimestamp(),
+      signature_method: signatureMethod,
+      signature_hash: signatureHash,
+      round,
+      signature_round: round,
+      invalidated_at: null,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, {merge: true});
+
+    transaction.update(occurrenceRef, {
+      signed_handler_ids: admin.firestore.FieldValue.arrayUnion(handlerId),
+      signed_emails: admin.firestore.FieldValue.arrayUnion(...Array.from(signedEmailSet)),
+      signed_auth_uids: admin.firestore.FieldValue.arrayUnion(caller.uid),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      audit_trail: admin.firestore.FieldValue.arrayUnion(entry),
+    });
+
+    const primaryRa = stringValue(occurrence.primary_handler_ra ?? occurrence.primary_handler_id);
+    if (primaryRa) {
+      transaction.set(
+        db.collection("notifications").doc(primaryRa).collection("items").doc(),
+        notificationPayload(
+          "signature_completed",
+          occurrenceId,
+          occurrence,
+          "occurrence_team",
+          handlerId,
+        ),
+      );
+    }
+
+    transaction.set(db.collection("auditLogs").doc(), {
+      action: "signature_added",
+      entity_type: "occurrence",
+      entity_id: occurrenceId,
+      summary: `Assinatura registrada por ${handlerId}`,
+      actor: caller,
+      metadata: {
+        handler_id: handlerId,
+        signature_round: round,
+        signature_method: signatureMethod,
+      },
+      source: "functions",
+      performed_at: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      status: "signed",
+      signature_round: round,
+    };
+  });
+});
+
 export const requestOccurrenceCorrection = onCall({region}, async (request) => {
   const caller = requireAuth(request.auth);
   const data = request.data as JsonMap;
@@ -816,6 +1082,7 @@ export const requestOccurrenceCorrection = onCall({region}, async (request) => {
       status: "in_progress",
       signature_request_at: null,
       signature_deadline: null,
+      finalization_draft: finalizationDraftFromOccurrence(occurrence, reason, round),
       signature_round: round + 1,
       signed_handler_ids: [],
       signed_emails: [],

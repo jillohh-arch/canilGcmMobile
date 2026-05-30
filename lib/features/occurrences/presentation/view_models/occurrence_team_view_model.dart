@@ -24,10 +24,10 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
   OccurrenceTeamViewModel({
     required OccurrenceRepository occurrenceRepository,
     required SignatureRepository signatureRepository,
-    required NotificationService notificationService,
+    NotificationService? notificationService,
   }) : _occurrenceRepository = occurrenceRepository,
        _signatureRepository = signatureRepository,
-       _notificationService = notificationService;
+       _notificationService = notificationService ?? NotificationService();
 
   Occurrence? get occurrence => _occurrence;
   List<OccurrenceTeamMember> get team => List.unmodifiable(_team);
@@ -210,25 +210,6 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
         signatureDeadline: signatureDeadline,
       );
 
-      final coSigners = _team
-          .where(
-            (member) =>
-                member.role != TeamRole.titular &&
-                _isParticipationActive(occurrence, member.handlerId),
-          )
-          .toList();
-      for (final member in coSigners) {
-        await _notificationService.createNotification(
-          userId: member.handlerId,
-          type: NotificationType.signatureRequested,
-          occurrenceId: occurrence.id,
-          occurrenceTitle: occurrence.typeName,
-          additionalData: member.handlerId,
-          targetScreen: 'occurrence_review',
-          actionRequired: true,
-        );
-      }
-
       _occurrence = await _occurrenceRepository.getById(occurrence.id);
       _signatures = await _signatureRepository.getSignatures(occurrence.id);
       notifyListeners();
@@ -262,13 +243,20 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
       if (areAllSignaturesCollected) {
         final primaryRa = occurrence.primaryHandlerRa;
         if (primaryRa?.isNotEmpty == true) {
-          await _notificationService.createNotification(
-            userId: primaryRa!,
-            type: NotificationType.signatureCompleted,
-            occurrenceId: occurrence.id,
-            occurrenceTitle: occurrence.typeName,
-            additionalData: signature.handlerId,
-          );
+          try {
+            await _notificationService.createNotification(
+              userId: primaryRa!,
+              type: NotificationType.signatureCompleted,
+              occurrenceId: occurrence.id,
+              occurrenceTitle: occurrence.typeName,
+              additionalData: signature.handlerId,
+            );
+          } catch (error) {
+            debugPrint(
+              '[OccurrenceTeamViewModel] Assinatura gravada; '
+              'notificacao ao relator falhou: $error',
+            );
+          }
         }
       }
 
