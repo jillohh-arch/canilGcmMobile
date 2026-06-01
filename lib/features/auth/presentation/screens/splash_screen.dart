@@ -50,8 +50,8 @@ class _SplashScreenState extends State<SplashScreen>
             center: Alignment(0.0, -0.3),
             radius: 0.6,
             colors: [
-              Color(0x144DD0E1), // ciano 8% no centro
-              Colors.transparent,
+              AppTheme.primaryChipBackground, // ciano 8% no centro
+              AppTheme.transparent,
             ],
           ),
         ),

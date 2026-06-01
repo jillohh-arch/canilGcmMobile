@@ -8,7 +8,7 @@ class _OccurrenceNatureSearchHint extends StatelessWidget {
     return Text(
       'Digite parte da natureza ou do código. A busca ignora acentos.',
       style: GoogleFonts.inter(
-        color: Colors.white.withAlpha(115),
+        color: AppTheme.textPrimary.withAlpha(115),
         fontSize: 11,
         height: 1.35,
       ),

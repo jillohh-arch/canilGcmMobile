@@ -258,11 +258,11 @@ class StartOccurrenceNatureLink extends StatelessWidget {
       controller: ctrl,
       focusNode: fn,
       onChanged: onChanged,
-      style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+      style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: 'Buscar natureza...',
         hintStyle: GoogleFonts.inter(
-          color: Colors.white.withAlpha(100),
+          color: AppTheme.textPrimary.withAlpha(100),
           fontSize: 14,
         ),
         prefixIcon: Icon(Icons.search, color: AppTheme.primary, size: 20),
@@ -306,7 +306,7 @@ class _NatureTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = selected
         ? AppTheme.primary
-        : Colors.white.withAlpha(25);
+        : AppTheme.textPrimary.withAlpha(25);
     final foreground = selected ? AppTheme.primary : AppTheme.textSecondary;
 
     return InkWell(
@@ -318,7 +318,7 @@ class _NatureTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primary.withAlpha(24)
-              : Colors.white.withAlpha(7),
+              : AppTheme.textPrimary.withAlpha(7),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: borderColor, width: selected ? 1.7 : 1),
         ),

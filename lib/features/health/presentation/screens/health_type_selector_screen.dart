@@ -9,7 +9,8 @@ class HealthTypeSelectorScreen extends StatefulWidget {
   const HealthTypeSelectorScreen({super.key, required this.dogId});
 
   @override
-  State<HealthTypeSelectorScreen> createState() => _HealthTypeSelectorScreenState();
+  State<HealthTypeSelectorScreen> createState() =>
+      _HealthTypeSelectorScreenState();
 }
 
 class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
@@ -20,49 +21,49 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       'id': 'vaccination',
       'label': 'Vacinação',
       'icon': Icons.vaccines_rounded,
-      'color': const Color(0xFF2ECC71),
+      'color': AppTheme.success,
     },
     {
       'id': 'antiparasitic',
       'label': 'Antiparasitário',
       'icon': Icons.bug_report_rounded,
-      'color': const Color(0xFF9B59B6),
+      'color': AppTheme.healthAccent,
     },
     {
       'id': 'exam',
       'label': 'Exame',
       'icon': Icons.biotech_rounded,
-      'color': const Color(0xFF3498DB),
+      'color': AppTheme.info,
     },
     {
       'id': 'consultation',
       'label': 'Consulta',
       'icon': Icons.medical_services_rounded,
-      'color': const Color(0xFF1ABC9C),
+      'color': AppTheme.successOperational,
     },
     {
       'id': 'medication',
       'label': 'Medicação',
       'icon': Icons.medication_rounded,
-      'color': const Color(0xFFF1C40F),
+      'color': AppTheme.warning,
     },
     {
       'id': 'symptom',
       'label': 'Sintoma observado',
       'icon': Icons.warning_rounded,
-      'color': const Color(0xFFE74C3C),
+      'color': AppTheme.error,
     },
     {
       'id': 'surgery',
       'label': 'Cirurgia',
       'icon': Icons.healing_rounded,
-      'color': const Color(0xFFE67E22),
+      'color': AppTheme.attention,
     },
     {
       'id': 'other',
       'label': 'Outro',
       'icon': Icons.more_horiz_rounded,
-      'color': const Color(0xFF95A5A6),
+      'color': AppTheme.textSoft,
     },
   ];
 
@@ -92,7 +93,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                       style: GoogleFonts.inter(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -107,12 +108,13 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.25,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 14,
+                            mainAxisSpacing: 14,
+                            childAspectRatio: 1.25,
+                          ),
                       itemCount: _categories.length,
                       itemBuilder: (context, index) {
                         final cat = _categories[index];
@@ -133,7 +135,9 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                                   : cs.surfaceContainerHighest.withAlpha(140),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isSelected ? color : Colors.white10,
+                                color: isSelected
+                                    ? color
+                                    : AppTheme.textPrimary.withAlpha(26),
                                 width: isSelected ? 2 : 1,
                               ),
                               boxShadow: isSelected
@@ -142,7 +146,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                                         color: color.withAlpha(50),
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
-                                      )
+                                      ),
                                     ]
                                   : [],
                             ),
@@ -150,22 +154,29 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Align(
                                     alignment: Alignment.topRight,
                                     child: Icon(
                                       cat['icon'] as IconData,
                                       size: 28,
-                                      color: isSelected ? color : AppTheme.textSecondary,
+                                      color: isSelected
+                                          ? color
+                                          : AppTheme.textSecondary,
                                     ),
                                   ),
                                   Text(
                                     cat['label'] as String,
                                     style: GoogleFonts.inter(
                                       fontSize: 15,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: isSelected
+                                          ? AppTheme.textPrimary
+                                          : AppTheme.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -179,7 +190,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                 ),
               ),
             ),
-            
+
             // Dynamic disclaimer and action button panel
             AnimatedSize(
               duration: const Duration(milliseconds: 250),
@@ -188,8 +199,11 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
-                  border: const Border(
-                    top: BorderSide(color: Colors.white10, width: 1),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppTheme.textPrimary.withAlpha(26),
+                      width: 1,
+                    ),
                   ),
                 ),
                 child: Column(
@@ -237,9 +251,11 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.black,
-                          disabledBackgroundColor: Colors.white10,
-                          disabledForegroundColor: Colors.white30,
+                          foregroundColor: AppTheme.background,
+                          disabledBackgroundColor: AppTheme.textPrimary
+                              .withAlpha(26),
+                          disabledForegroundColor: AppTheme.textPrimary
+                              .withAlpha(77),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

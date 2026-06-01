@@ -21,15 +21,15 @@ class _PdfAttachment extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppTheme.textPrimary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(61)),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.picture_as_pdf_rounded,
-            color: Colors.redAccent,
+            color: AppTheme.errorStrong,
             size: 28,
           ),
           const SizedBox(width: 12),
@@ -37,7 +37,7 @@ class _PdfAttachment extends StatelessWidget {
             child: Text(
               pdfName ?? 'arquivo.pdf',
               style: GoogleFonts.inter(
-                color: Colors.white70,
+                color: AppTheme.textPrimary.withAlpha(179),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -45,7 +45,11 @@ class _PdfAttachment extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white38, size: 18),
+            icon: Icon(
+              Icons.close,
+              color: AppTheme.textPrimary.withAlpha(97),
+              size: 18,
+            ),
             onPressed: onRemovePdf,
           ),
         ],
@@ -65,21 +69,21 @@ class _AttachPdfButton extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: const Icon(
+        icon: Icon(
           Icons.upload_file_rounded,
           size: 16,
-          color: Colors.redAccent,
+          color: AppTheme.errorStrong,
         ),
         label: Text(
           'ANEXAR LAUDO (PDF)',
           style: GoogleFonts.inter(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.redAccent,
+            color: AppTheme.errorStrong,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.redAccent),
+          side: const BorderSide(color: AppTheme.errorStrong),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),

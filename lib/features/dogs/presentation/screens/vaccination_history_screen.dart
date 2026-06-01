@@ -42,7 +42,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppTheme.transparent,
           systemNavigationBarColor: AppTheme.background,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -52,8 +52,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xFF040B0F),
-                Color(0xFF06131A),
+                AppTheme.background,
+                AppTheme.surfacePanelStrong,
                 AppTheme.background,
               ],
             ),
@@ -110,15 +110,17 @@ class VaccinationHistoryScreen extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                color: AppTheme.textPrimary.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: AppTheme.textPrimary.withValues(alpha: 0.15),
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
                 child: Text(
                   '‹',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     height: 0.9,
                     fontWeight: FontWeight.w300,
@@ -145,7 +147,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                 Text(
                   'Carteira de vacinação',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -169,10 +171,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
               color: AppTheme.success.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Text(
-              '💉',
-              style: TextStyle(fontSize: 20),
-            ),
+            child: const Text('💉', style: TextStyle(fontSize: 20)),
           ),
         ],
       ),
@@ -209,16 +208,13 @@ class VaccinationHistoryScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F2624),
+          color: AppTheme.surfacePanelAlt,
           border: Border.all(color: AppTheme.success.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Text(
-              '📄',
-              style: TextStyle(fontSize: 20),
-            ),
+            const Text('📄', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -227,7 +223,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                   Text(
                     'Exportar carteira em PDF',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -260,12 +256,16 @@ class VaccinationHistoryScreen extends StatelessWidget {
 
   // ─── Timeline horizontal ───────────────────────────────────────────
 
-  Widget _buildTimelineHorizontal(BuildContext context, List<HealthLogModel> logs) {
+  Widget _buildTimelineHorizontal(
+    BuildContext context,
+    List<HealthLogModel> logs,
+  ) {
     // Group by vaccine type and get the most recent log of each
     final latestByType = <String, HealthLogModel>{};
     for (final log in logs) {
       final type = log.vaccines.isNotEmpty ? log.vaccines.first : log.logType;
-      if (!latestByType.containsKey(type) || log.date.isAfter(latestByType[type]!.date)) {
+      if (!latestByType.containsKey(type) ||
+          log.date.isAfter(latestByType[type]!.date)) {
         latestByType[type] = log;
       }
     }
@@ -275,14 +275,19 @@ class VaccinationHistoryScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: AppTheme.textPrimary.withValues(alpha: 0.04),
+          border: Border.all(
+            color: AppTheme.textPrimary.withValues(alpha: 0.08),
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
           child: Text(
             'Nenhuma vacinação registrada',
-            style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 12,
+            ),
           ),
         ),
       );
@@ -294,32 +299,50 @@ class VaccinationHistoryScreen extends StatelessWidget {
 
     latestByType.forEach((type, log) {
       final status = _vaccineStatus(log);
-      final isAntiparasitic = log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
+      final isAntiparasitic =
+          log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
       final validityDays = isAntiparasitic ? 90 : 365;
       final nextDue = log.date.add(Duration(days: validityDays));
       final daysRemaining = nextDue.difference(now).inDays;
 
       String code = 'V';
-      if (type.toLowerCase().contains('raiva') || type.toLowerCase().contains('antirrábica')) {
+      if (type.toLowerCase().contains('raiva') ||
+          type.toLowerCase().contains('antirrábica')) {
         code = 'R';
-      } else if (log.logType == 'Antipulgas' || log.logType == 'Antiparasitário') {
+      } else if (log.logType == 'Antipulgas' ||
+          log.logType == 'Antiparasitário') {
         code = '!';
       }
 
-      timelineEvents.add(_TimelineEvent(
-        name: type,
-        nextDue: nextDue,
-        daysRemaining: daysRemaining,
-        code: code,
-        status: status,
-      ));
+      timelineEvents.add(
+        _TimelineEvent(
+          name: type,
+          nextDue: nextDue,
+          daysRemaining: daysRemaining,
+          code: code,
+          status: status,
+        ),
+      );
     });
 
     // Sort by soonest due
     timelineEvents.sort((a, b) => a.daysRemaining.compareTo(b.daysRemaining));
 
     // Dynamic month labels (every 2 months for 12 months)
-    final months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    final months = [
+      'JAN',
+      'FEV',
+      'MAR',
+      'ABR',
+      'MAI',
+      'JUN',
+      'JUL',
+      'AGO',
+      'SET',
+      'OUT',
+      'NOV',
+      'DEZ',
+    ];
     final monthLabels = <String>[];
     for (int i = 0; i <= 12; i += 2) {
       final mIdx = (now.month - 1 + i) % 12;
@@ -330,8 +353,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: AppTheme.textPrimary.withValues(alpha: 0.04),
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -385,8 +408,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
                     final timeLabel = evt.daysRemaining < 0
                         ? 'Atrasado'
                         : evt.daysRemaining <= 30
-                            ? '${evt.daysRemaining} dias'
-                            : '${(evt.daysRemaining / 30.0).round()} meses';
+                        ? '${evt.daysRemaining} dias'
+                        : '${(evt.daysRemaining / 30.0).round()} meses';
 
                     return Positioned(
                       left: leftOffset * trackWidth - 12,
@@ -398,7 +421,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                           Text(
                             evt.name.split(' ').first,
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -423,7 +446,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                               child: Text(
                                 evt.code,
                                 style: GoogleFonts.inter(
-                                  color: const Color(0xFF050D10),
+                                  color: AppTheme.background,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -470,7 +493,10 @@ class VaccinationHistoryScreen extends StatelessWidget {
 
   // ─── Grouped Vaccine List ──────────────────────────────────────────
 
-  Widget _buildGroupedList(BuildContext context, Map<String, List<HealthLogModel>> grouped) {
+  Widget _buildGroupedList(
+    BuildContext context,
+    Map<String, List<HealthLogModel>> grouped,
+  ) {
     if (grouped.isEmpty) return const SizedBox.shrink();
 
     // Group keys mapping to match mockup titles
@@ -480,7 +506,9 @@ class VaccinationHistoryScreen extends StatelessWidget {
         return 'V10 — POLIVALENTE';
       } else if (type.contains('raiva') || type.contains('antirrábica')) {
         return 'ANTIRRÁBICA';
-      } else if (type.contains('antipulgas') || type.contains('antiparasitário') || type.contains('bravecto')) {
+      } else if (type.contains('antipulgas') ||
+          type.contains('antiparasitário') ||
+          type.contains('bravecto')) {
         return 'ANTIPARASITÁRIO';
       } else {
         return rawType.toUpperCase();
@@ -541,7 +569,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
 
   Widget _buildVaccineCard(BuildContext context, HealthLogModel log) {
     final status = _vaccineStatus(log);
-    final isAntiparasitic = log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
+    final isAntiparasitic =
+        log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
     final validityDays = isAntiparasitic ? 90 : 365;
     final nextDue = log.date.add(Duration(days: validityDays));
 
@@ -560,17 +589,19 @@ class VaccinationHistoryScreen extends StatelessWidget {
     final rightDateColor = switch (status) {
       _VaccineStatus.vencida => AppTheme.textTertiary,
       _VaccineStatus.vencendo => AppTheme.warning,
-      _VaccineStatus.emDia => Colors.white,
+      _VaccineStatus.emDia => AppTheme.textPrimary,
     };
 
-    final nextText = DateFormat('dd/MM/yyyy').format(nextDue) + (status == _VaccineStatus.vencida ? ' ✓' : '');
+    final nextText =
+        DateFormat('dd/MM/yyyy').format(nextDue) +
+        (status == _VaccineStatus.vencida ? ' ✓' : '');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: AppTheme.surfacePanel,
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -594,9 +625,11 @@ class VaccinationHistoryScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      log.vaccines.isNotEmpty ? log.vaccines.first : log.logType,
+                      log.vaccines.isNotEmpty
+                          ? log.vaccines.first
+                          : log.logType,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -606,7 +639,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
                       '📄',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: AppTheme.textPrimary.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
@@ -622,14 +655,23 @@ class VaccinationHistoryScreen extends StatelessWidget {
                       const TextSpan(text: 'Aplicada '),
                       TextSpan(
                         text: DateFormat('dd/MM/yyyy').format(log.date),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
                       ),
                       TextSpan(text: ' · Lote ${_extractLot(log)}\n'),
                       TextSpan(
                         text: 'Dr(a). ${log.vetName ?? "Não informado"}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
                       ),
-                      TextSpan(text: ' · CRMV-${(log.professionalCrmv != null && log.professionalCrmv!.isNotEmpty) ? log.professionalCrmv : "N/A"}'),
+                      TextSpan(
+                        text:
+                            ' · CRMV-${(log.professionalCrmv != null && log.professionalCrmv!.isNotEmpty) ? log.professionalCrmv : "N/A"}',
+                      ),
                     ],
                   ),
                 ),
@@ -712,12 +754,16 @@ class VaccinationHistoryScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.add_circle_outline, color: Color(0xFF050D10), size: 18),
+              const Icon(
+                Icons.add_circle_outline,
+                color: AppTheme.background,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 'REGISTRAR VACINAÇÃO',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF050D10),
+                  color: AppTheme.background,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -734,12 +780,14 @@ class VaccinationHistoryScreen extends StatelessWidget {
 
   List<HealthLogModel> _extractVaccineLogs(List<HealthLogModel> logs) {
     return logs
-        .where((log) =>
-            log.dogId == dog.id &&
-            (log.logType == 'Vacina' ||
-                log.vaccines.isNotEmpty ||
-                log.logType == 'Antipulgas' ||
-                log.logType == 'Antiparasitário'))
+        .where(
+          (log) =>
+              log.dogId == dog.id &&
+              (log.logType == 'Vacina' ||
+                  log.vaccines.isNotEmpty ||
+                  log.logType == 'Antipulgas' ||
+                  log.logType == 'Antiparasitário'),
+        )
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }
@@ -754,7 +802,8 @@ class VaccinationHistoryScreen extends StatelessWidget {
   }
 
   _VaccineStatus _vaccineStatus(HealthLogModel log) {
-    final isAntiparasitic = log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
+    final isAntiparasitic =
+        log.logType == 'Antipulgas' || log.logType == 'Antiparasitário';
     final validityDays = isAntiparasitic ? 90 : 365;
     final nextDue = log.date.add(Duration(days: validityDays));
     final now = DateTime.now();

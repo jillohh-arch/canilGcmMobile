@@ -76,8 +76,8 @@ class HudSelectField<T> extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
                       color: value == null
-                          ? Colors.white.withAlpha(115)
-                          : Colors.white,
+                          ? AppTheme.textPrimary.withAlpha(115)
+                          : AppTheme.textPrimary,
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                     ),
@@ -99,7 +99,7 @@ class HudSelectField<T> extends StatelessWidget {
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (context) => _HudSelectBottomSheet<T>(
         label: label,
         icon: icon,

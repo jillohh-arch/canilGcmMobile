@@ -43,7 +43,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppTheme.transparent,
           systemNavigationBarColor: AppTheme.background,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -53,8 +53,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xFF040B0F),
-                Color(0xFF06131A),
+                AppTheme.background,
+                AppTheme.surfacePanelStrong,
                 AppTheme.background,
               ],
             ),
@@ -117,15 +117,17 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                color: AppTheme.textPrimary.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: AppTheme.textPrimary.withValues(alpha: 0.15),
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
                 child: Text(
                   '‹',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     height: 0.9,
                     fontWeight: FontWeight.w300,
@@ -152,7 +154,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 Text(
                   'Histórico de peso',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -213,7 +215,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1E26),
+          color: AppTheme.surfaceSheet,
           border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -228,7 +230,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                   Text(
                     'Exportar histórico em PDF',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -284,11 +286,11 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primary.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.04),
+              : AppTheme.textPrimary.withValues(alpha: 0.04),
           border: Border.all(
             color: selected
                 ? AppTheme.primary.withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.1),
+                : AppTheme.textPrimary.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -326,8 +328,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: AppTheme.surfacePanel,
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -339,7 +341,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 TextSpan(
                   text: currentWeight.toStringAsFixed(1),
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 40,
                     fontWeight: FontWeight.w900,
                   ),
@@ -402,8 +404,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         height: 160,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: AppTheme.textPrimary.withValues(alpha: 0.04),
+          border: Border.all(
+            color: AppTheme.textPrimary.withValues(alpha: 0.08),
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -446,8 +450,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: AppTheme.textPrimary.withValues(alpha: 0.04),
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -509,8 +513,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: AppTheme.textPrimary.withValues(alpha: 0.04),
+          border: Border.all(
+            color: AppTheme.textPrimary.withValues(alpha: 0.08),
+          ),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -528,7 +534,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             Text(
               value,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
@@ -632,8 +638,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: AppTheme.surfacePanel,
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -655,7 +661,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 TextSpan(
                   text: entry.weight.toStringAsFixed(1),
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
@@ -739,14 +745,14 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             children: [
               const Icon(
                 Icons.add_circle_outline,
-                color: Color(0xFF050D10),
+                color: AppTheme.background,
                 size: 18,
               ),
               const SizedBox(width: 8),
               Text(
                 'REGISTRAR NOVA PESAGEM',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF050D10),
+                  color: AppTheme.background,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -762,7 +768,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   void _showWeighForm(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       isScrollControlled: true,
       builder: (ctx) => _WeighFormSheet(
         dog: widget.dog,
@@ -858,7 +864,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF06131A),
+        color: AppTheme.surfacePanelStrong,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -885,7 +891,11 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
               ),
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.close, color: Colors.white60, size: 20),
+                child: Icon(
+                  Icons.close,
+                  color: AppTheme.textPrimary.withAlpha(153),
+                  size: 20,
+                ),
               ),
             ],
           ),
@@ -907,15 +917,17 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: AppTheme.textPrimary.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    border: Border.all(
+                      color: AppTheme.textPrimary.withValues(alpha: 0.12),
+                    ),
                   ),
                   child: const Center(
                     child: Text(
                       '-',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -933,7 +945,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                         TextSpan(
                           text: _weight.toStringAsFixed(1),
                           style: GoogleFonts.outfit(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 48,
                             fontWeight: FontWeight.w900,
                           ),
@@ -973,15 +985,17 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: AppTheme.textPrimary.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    border: Border.all(
+                      color: AppTheme.textPrimary.withValues(alpha: 0.12),
+                    ),
                   ),
                   child: const Center(
                     child: Text(
                       '+',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1037,11 +1051,13 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: _hasPhoto ? const Color(0xFF0F2624) : Colors.transparent,
+                color: _hasPhoto
+                    ? AppTheme.surfacePanelAlt
+                    : AppTheme.transparent,
                 border: Border.all(
                   color: _hasPhoto
                       ? AppTheme.success.withValues(alpha: 0.3)
-                      : Colors.white.withValues(alpha: 0.1),
+                      : AppTheme.textPrimary.withValues(alpha: 0.1),
                   style: _hasPhoto ? BorderStyle.solid : BorderStyle.solid,
                 ),
                 borderRadius: BorderRadius.circular(10),
@@ -1120,7 +1136,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                 child: Text(
                   'SALVAR REGISTRO',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF050D10),
+                    color: AppTheme.background,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.8,
@@ -1143,11 +1159,11 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primary.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.04),
+              : AppTheme.textPrimary.withValues(alpha: 0.04),
           border: Border.all(
             color: selected
                 ? AppTheme.primary.withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.1),
+                : AppTheme.textPrimary.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1202,14 +1218,14 @@ class _WeightFullChartPainter extends CustomPainter {
         size.height - ((idealWeightMax - minVal) / range) * size.height;
 
     final rectPaint = Paint()
-      ..color =
-          const Color(0x182ECC71) // Semi-transparent green
+      ..color = AppTheme.success
+          .withAlpha(24) // Semi-transparent green
       ..style = PaintingStyle.fill;
 
     canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
 
     final boundaryPaint = Paint()
-      ..color = const Color(0x352ECC71)
+      ..color = AppTheme.success.withAlpha(53)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
@@ -1221,7 +1237,7 @@ class _WeightFullChartPainter extends CustomPainter {
       text:
           'IDEAL ${idealWeightMin.toStringAsFixed(0)}-${idealWeightMax.toStringAsFixed(0)}kg',
       style: GoogleFonts.inter(
-        color: const Color(0xFF2ECC71),
+        color: AppTheme.success,
         fontSize: 8,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.5,
@@ -1241,10 +1257,10 @@ class _WeightFullChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final fillPaint = Paint()
-      ..shader = const LinearGradient(
+      ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x304DD0E1), Color(0x004DD0E1)],
+        colors: [AppTheme.primary.withAlpha(48), AppTheme.primary.withAlpha(0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.fill;
 
@@ -1282,7 +1298,7 @@ class _WeightFullChartPainter extends CustomPainter {
 
     if (points.isNotEmpty) {
       final bgPaint = Paint()
-        ..color = const Color(0xFF050D10)
+        ..color = AppTheme.background
         ..style = PaintingStyle.fill;
       canvas.drawCircle(points.last, 5, bgPaint);
       canvas.drawCircle(points.last, 4, dotPaint);

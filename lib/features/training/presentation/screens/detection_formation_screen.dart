@@ -33,7 +33,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   static const _yellow = AppTheme.warning;
   static const _green = AppTheme.success;
   static const _red = AppTheme.error;
-  static const _muted = Color(0xFF8FA3AD);
+  static const _muted = AppTheme.textSecondary;
   static const _mutedDark = AppTheme.textMuted;
 
   late final DetectionService _service;
@@ -72,7 +72,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         backgroundColor: _bg,
         body: AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle.light.copyWith(
-            statusBarColor: Colors.transparent,
+            statusBarColor: AppTheme.transparent,
             systemNavigationBarColor: _bg,
           ),
           child: SafeArea(
@@ -225,13 +225,13 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
           IconButton(
             onPressed: onBack,
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withAlpha(10),
+              backgroundColor: AppTheme.textPrimary.withAlpha(10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             tooltip: 'Voltar',
           ),
           const SizedBox(width: 10),
@@ -244,7 +244,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
@@ -283,7 +283,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
               Text(
                 'Não foi possível carregar a formação.',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -329,7 +329,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                 child: Text(
                   'Progresso no protocolo',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -351,7 +351,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
             child: LinearProgressIndicator(
               minHeight: 6,
               value: ratio,
-              backgroundColor: Colors.white.withAlpha(18),
+              backgroundColor: AppTheme.textPrimary.withAlpha(18),
               valueColor: const AlwaysStoppedAnimation(_green),
             ),
           ),
@@ -390,14 +390,16 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                 showCheckmark: false,
                 label: Text(DetectionOdorMaterials.label(material)),
                 labelStyle: GoogleFonts.inter(
-                  color: selected ? _bg : Colors.white,
+                  color: selected ? _bg : AppTheme.textPrimary,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
                 selectedColor: _yellow,
-                backgroundColor: Colors.white.withAlpha(9),
+                backgroundColor: AppTheme.textPrimary.withAlpha(9),
                 side: BorderSide(
-                  color: selected ? _yellow : Colors.white.withAlpha(18),
+                  color: selected
+                      ? _yellow
+                      : AppTheme.textPrimary.withAlpha(18),
                 ),
                 onSelected: (_) {
                   HapticFeedback.selectionClick();
@@ -435,14 +437,16 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                   ),
                   label: Text(line.displayName),
                   labelStyle: GoogleFonts.inter(
-                    color: selected ? _bg : Colors.white,
+                    color: selected ? _bg : AppTheme.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
                   selectedColor: _yellow,
-                  backgroundColor: Colors.white.withAlpha(9),
+                  backgroundColor: AppTheme.textPrimary.withAlpha(9),
                   side: BorderSide(
-                    color: selected ? _yellow : Colors.white.withAlpha(18),
+                    color: selected
+                        ? _yellow
+                        : AppTheme.textPrimary.withAlpha(18),
                   ),
                   onSelected: (_) {
                     HapticFeedback.selectionClick();
@@ -533,7 +537,10 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                   ),
                 ),
                 Expanded(
-                  child: Container(width: 2, color: Colors.white.withAlpha(18)),
+                  child: Container(
+                    width: 2,
+                    color: AppTheme.textPrimary.withAlpha(18),
+                  ),
                 ),
               ],
             ),
@@ -571,7 +578,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
-                              color: locked ? _muted : Colors.white,
+                              color: locked ? _muted : AppTheme.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -616,7 +623,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                             onPressed: () => _startPhase(line, phase),
                             style: FilledButton.styleFrom(
                               backgroundColor: _yellow,
-                              foregroundColor: const Color(0xFF1A1402),
+                              foregroundColor: AppTheme.background,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(11),
                               ),
@@ -997,12 +1004,10 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
             duration: const Duration(milliseconds: 160),
             height: 74,
             decoration: BoxDecoration(
-              color: selected
-                  ? const Color(0xFF2A2410)
-                  : const Color(0xFF132026),
+              color: selected ? _yellow.withAlpha(28) : AppTheme.surfacePanel,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected ? _yellow : Colors.white.withAlpha(25),
+                color: selected ? _yellow : AppTheme.textPrimary.withAlpha(25),
                 width: selected ? 1.6 : 1,
               ),
               boxShadow: selected
@@ -1024,7 +1029,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                     height: 16,
                     margin: const EdgeInsets.only(top: 12),
                     decoration: const BoxDecoration(
-                      color: Color(0xFF04090B),
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.all(Radius.elliptical(28, 16)),
                     ),
                   ),
@@ -1145,7 +1150,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 6,
-                    backgroundColor: Colors.white.withAlpha(18),
+                    backgroundColor: AppTheme.textPrimary.withAlpha(18),
                     valueColor: const AlwaysStoppedAnimation(_green),
                   ),
                 ),
@@ -1264,7 +1269,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
             onPressed: actionsDisabled ? null : () => _recordResult(true),
             style: FilledButton.styleFrom(
               backgroundColor: canRecord ? _green : _mutedDark,
-              foregroundColor: const Color(0xFF04140A),
+              foregroundColor: AppTheme.background,
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
@@ -1289,10 +1294,14 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: (accent ? _yellow : Colors.white).withAlpha(accent ? 22 : 10),
+        color: (accent ? _yellow : AppTheme.textPrimary).withAlpha(
+          accent ? 22 : 10,
+        ),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: (accent ? _yellow : Colors.white).withAlpha(accent ? 65 : 18),
+          color: (accent ? _yellow : AppTheme.textPrimary).withAlpha(
+            accent ? 65 : 18,
+          ),
         ),
       ),
       child: Text(
@@ -1317,9 +1326,11 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
 
   BoxDecoration _boxDecoration({Color? borderColor, double radius = 13}) {
     return BoxDecoration(
-      color: Colors.white.withAlpha(8),
+      color: AppTheme.textPrimary.withAlpha(8),
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: borderColor ?? Colors.white.withAlpha(20)),
+      border: Border.all(
+        color: borderColor ?? AppTheme.textPrimary.withAlpha(20),
+      ),
     );
   }
 
@@ -1333,14 +1344,14 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
           ? _green.withAlpha(12)
           : current
           ? _yellow.withAlpha(18)
-          : Colors.white.withAlpha(8),
+          : AppTheme.textPrimary.withAlpha(8),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
         color: current
             ? _yellow.withAlpha(90)
             : completed
             ? _green.withAlpha(45)
-            : Colors.white.withAlpha(18),
+            : AppTheme.textPrimary.withAlpha(18),
       ),
     );
   }
@@ -1604,7 +1615,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         title: Text(
           'Fase concluída',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1649,7 +1660,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         title: Text(
           'Sair da sessão?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w900,
           ),
         ),

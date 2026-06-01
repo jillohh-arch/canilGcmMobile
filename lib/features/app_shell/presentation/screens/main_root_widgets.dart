@@ -47,14 +47,14 @@ class _ActiveOperationBannerFrame extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Material(
-        color: Colors.transparent,
+        color: AppTheme.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(6),
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0E1A1F).withAlpha(244),
+              color: AppTheme.surfacePanel.withAlpha(244),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: AppTheme.warning.withAlpha(190),
@@ -66,8 +66,8 @@ class _ActiveOperationBannerFrame extends StatelessWidget {
                   blurRadius: 18,
                   spreadRadius: 1,
                 ),
-                const BoxShadow(
-                  color: Colors.black54,
+                BoxShadow(
+                  color: AppTheme.background.withAlpha(138),
                   blurRadius: 18,
                   offset: Offset(0, 8),
                 ),
@@ -110,7 +110,7 @@ class _ActiveOperationBannerFrame extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: AppTheme.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.7,
@@ -122,7 +122,7 @@ class _ActiveOperationBannerFrame extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          color: Colors.white60,
+                          color: AppTheme.textPrimary.withAlpha(153),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),

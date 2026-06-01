@@ -323,7 +323,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       decoration: BoxDecoration(
         border: Border.all(color: _divider),
         borderRadius: BorderRadius.circular(12),
-        color: const Color(0x0A4DD0E1),
+        color: AppTheme.primary.withAlpha(10),
       ),
       child: Row(
         children: [
@@ -338,7 +338,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
             child: Text(
               '${widget.eventIndex}',
               style: GoogleFonts.ibmPlexMono(
-                color: const Color(0xFF04181D),
+                color: AppTheme.surfacePanelStrong,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -361,7 +361,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                 Text(
                   widget.event.title ?? 'Evento',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -393,7 +393,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
           decoration: BoxDecoration(
             border: Border.all(color: _cyan),
             borderRadius: BorderRadius.circular(11),
-            color: const Color(0x0F4DD0E1),
+            color: AppTheme.primary.withAlpha(15),
           ),
           child: Row(
             children: [
@@ -404,7 +404,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                   controller: _searchController,
                   onChanged: _onSearchChanged,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -447,7 +447,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       decoration: BoxDecoration(
         border: Border.all(color: _divider),
         borderRadius: BorderRadius.circular(11),
-        color: const Color(0xFF06141A),
+        color: AppTheme.surfacePanelStrong,
       ),
       child: Column(
         children: _suggestions.asMap().entries.map((entry) {
@@ -478,7 +478,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                         Text(
                           result.label,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -623,7 +623,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                             ),
                             child: const Icon(
                               Icons.circle,
-                              color: Color(0xFF04181D),
+                              color: AppTheme.surfacePanelStrong,
                               size: 10,
                             ),
                           ),
@@ -642,14 +642,14 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xC7050D10),
+                    color: AppTheme.background.withAlpha(199),
                     border: Border.all(color: _divider),
                     borderRadius: BorderRadius.circular(7),
                   ),
                   child: Text(
                     'toque para ajustar',
                     style: GoogleFonts.ibmPlexMono(
-                      color: const Color(0xFFB0C4CC),
+                      color: AppTheme.textSecondary,
                       fontSize: 10,
                       letterSpacing: 0.2,
                     ),
@@ -695,9 +695,9 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0x40F1C40F)),
+        border: Border.all(color: AppTheme.warning.withAlpha(64)),
         borderRadius: BorderRadius.circular(11),
-        color: const Color(0x0DF1C40F),
+        color: AppTheme.warning.withAlpha(13),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -708,7 +708,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
             child: Text(
               'Você está corrigindo o local desta ação. A alteração fica registrada na trilha de auditoria, sem apagar o ponto original.',
               style: GoogleFonts.inter(
-                color: const Color(0xFFB0C4CC),
+                color: AppTheme.textSecondary,
                 fontSize: 12,
                 height: 1.45,
               ),
@@ -728,7 +728,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _cyan,
           disabledBackgroundColor: _cyan.withAlpha(60),
-          foregroundColor: const Color(0xFF04181D),
+          foregroundColor: AppTheme.surfacePanelStrong,
           padding: const EdgeInsets.all(15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -740,7 +740,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFF04181D),
+                  color: AppTheme.surfacePanelStrong,
                 ),
               )
             : Text(

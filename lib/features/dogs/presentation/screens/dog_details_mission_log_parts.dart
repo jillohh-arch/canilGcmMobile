@@ -1,4 +1,4 @@
-﻿part of 'dog_details_screen.dart';
+part of 'dog_details_screen.dart';
 
 class _MissionTimelineRail extends StatelessWidget {
   final _MissionTimelineItem item;
@@ -26,7 +26,7 @@ class _MissionTimelineRail extends StatelessWidget {
             Expanded(
               child: Container(
                 width: 1.5,
-                color: Colors.white10,
+                color: AppTheme.textPrimary.withAlpha(26),
                 margin: const EdgeInsets.symmetric(vertical: 4),
               ),
             ),
@@ -56,7 +56,7 @@ class _MissionTimelineContent extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: Colors.white30,
+                color: AppTheme.textPrimary.withAlpha(77),
               ),
             ),
           ],
@@ -67,7 +67,7 @@ class _MissionTimelineContent extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
         ),
         if (item.subtitle.isNotEmpty) ...[
@@ -76,7 +76,7 @@ class _MissionTimelineContent extends StatelessWidget {
             item.subtitle,
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: Colors.white38,
+              color: AppTheme.textPrimary.withAlpha(97),
               fontWeight: FontWeight.w500,
             ),
             maxLines: 2,

@@ -1,4 +1,4 @@
-﻿part of 'app_theme.dart';
+part of 'app_theme.dart';
 
 AppBarTheme _buildAppBarTheme(ColorScheme cs) {
   return AppBarTheme(
@@ -151,7 +151,7 @@ DividerThemeData _buildDividerTheme(ColorScheme cs) {
 
 ListTileThemeData _buildListTileTheme(ColorScheme cs) {
   return ListTileThemeData(
-    tileColor: Colors.transparent,
+    tileColor: AppTheme.transparent,
     iconColor: cs.secondary,
     textColor: cs.onSurface,
     subtitleTextStyle: GoogleFonts.inter(

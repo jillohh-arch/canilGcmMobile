@@ -12,7 +12,7 @@ class _QuickActionsSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(7),
+        color: AppTheme.textPrimary.withAlpha(7),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kBorder),
       ),
@@ -84,7 +84,7 @@ class _QuickActionsSection extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (_) => DynamicActivitySheet(
         category: nome,
         dogId: dog.id,
@@ -117,7 +117,7 @@ class _QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withAlpha(6),
+      color: AppTheme.textPrimary.withAlpha(6),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,

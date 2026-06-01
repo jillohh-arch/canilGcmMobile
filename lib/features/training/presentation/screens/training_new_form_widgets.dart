@@ -12,7 +12,7 @@ class _TrainingSectionLabel extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: GoogleFonts.inter(
-          color: Colors.white38,
+          color: AppTheme.textMuted,
           fontWeight: FontWeight.w800,
           fontSize: 10,
           letterSpacing: 1.2,
@@ -29,11 +29,11 @@ String? _requiredField(String? value) {
 (IconData, Color) _trainingSessionStyle(String type) {
   switch (type) {
     case 'Faro':
-      return (Icons.track_changes_rounded, const Color(0xFFFFB300));
+      return (Icons.track_changes_rounded, AppTheme.amber);
     case 'Proteção':
-      return (Icons.shield_rounded, const Color(0xFFEF5350));
+      return (Icons.shield_rounded, AppTheme.errorStrong);
     case 'Obediência':
-      return (Icons.school_rounded, const Color(0xFF42A5F5));
+      return (Icons.school_rounded, AppTheme.info);
     default:
       return (Icons.fitness_center_rounded, AppTheme.amber);
   }

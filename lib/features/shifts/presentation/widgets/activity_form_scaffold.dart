@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
+
 class ActivityFormScaffold extends StatelessWidget {
   final String title;
   final String? imagePath;
@@ -22,7 +24,7 @@ class ActivityFormScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: AppTheme.background,
       resizeToAvoidBottomInset: true,
       body: CustomScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -31,11 +33,11 @@ class ActivityFormScaffold extends StatelessWidget {
             expandedHeight: 250,
             pinned: true,
             stretch: true,
-            backgroundColor: const Color(0xFF1E1E1E),
+            backgroundColor: AppTheme.surfaceModal,
             leading: IconButton(
               icon: const Icon(
                 Icons.arrow_back_ios_rounded,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 size: 20,
               ),
               onPressed: isSaving ? null : onBack,
@@ -46,7 +48,7 @@ class ActivityFormScaffold extends StatelessWidget {
                 title,
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 16,
                 ),
               ),
@@ -63,13 +65,13 @@ class ActivityFormScaffold extends StatelessWidget {
                       ),
                     )
                   else
-                    Container(color: const Color(0xFF1E1E1E)),
+                    Container(color: AppTheme.surfaceModal),
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xFF121212)],
+                        colors: [AppTheme.transparent, AppTheme.background],
                         stops: [0.3, 1.0],
                       ),
                     ),
@@ -79,7 +81,7 @@ class ActivityFormScaffold extends StatelessWidget {
             ),
           ),
           SliverToBoxAdapter(
-            child: Container(color: const Color(0xFF121212), child: child),
+            child: Container(color: AppTheme.background, child: child),
           ),
         ],
       ),

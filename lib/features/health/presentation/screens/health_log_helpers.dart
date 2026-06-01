@@ -4,17 +4,17 @@ part of 'health_log_screen.dart';
 (IconData, Color) _iconAndColor(String logType) {
   switch (logType) {
     case 'Vacina':
-      return (Icons.vaccines_rounded, const Color(0xFFEF5350));
+      return (Icons.vaccines_rounded, AppTheme.errorStrong);
     case 'Consulta':
-      return (Icons.local_hospital_rounded, const Color(0xFF66BB6A));
+      return (Icons.local_hospital_rounded, AppTheme.successCheck);
     case 'Exame':
-      return (Icons.biotech_rounded, const Color(0xFF7E57C2));
+      return (Icons.biotech_rounded, AppTheme.healthAccent);
     case 'Medicação':
-      return (Icons.medication_rounded, const Color(0xFFFF7043));
+      return (Icons.medication_rounded, AppTheme.attention);
     case 'Banho':
-      return (Icons.water_drop_rounded, const Color(0xFF29B6F6));
+      return (Icons.water_drop_rounded, AppTheme.info);
     default:
-      return (Icons.medical_services_rounded, const Color(0xFFEF5350));
+      return (Icons.medical_services_rounded, AppTheme.errorStrong);
   }
 }
 

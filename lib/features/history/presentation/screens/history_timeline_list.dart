@@ -66,9 +66,9 @@ class _HistoryDaySection extends StatelessWidget {
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(6),
+              color: _hTextPrimary.withAlpha(6),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withAlpha(18)),
+              border: Border.all(color: _hTextPrimary.withAlpha(18)),
             ),
             child: Column(
               children: [

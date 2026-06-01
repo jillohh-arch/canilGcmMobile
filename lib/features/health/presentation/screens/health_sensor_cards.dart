@@ -14,7 +14,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
               icon: const Icon(
                 Icons.monitor_weight_outlined,
                 size: 24,
-                color: Colors.cyanAccent,
+                color: AppTheme.primary,
               ),
               isSelected: true,
               onTap: () => _showWeightDialog(dog),
@@ -28,7 +28,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
               icon: Icon(
                 Icons.query_builder,
                 size: 24,
-                color: Colors.cyanAccent.withValues(alpha: 0.5),
+                color: AppTheme.primary.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -40,7 +40,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
               icon: Icon(
                 Icons.water_drop_outlined,
                 size: 24,
-                color: Colors.cyanAccent.withValues(alpha: 0.5),
+                color: AppTheme.primary.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -82,7 +82,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Erro ao atualizar peso: $e'),
-          backgroundColor: const Color(0xFFE53935),
+          backgroundColor: AppTheme.errorStrong,
         ),
       );
       return;
@@ -105,7 +105,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Peso atualizado e histórico registrado.'),
-          backgroundColor: Color(0xFF1B8A4C),
+          backgroundColor: AppTheme.successOperational,
         ),
       );
     } catch (e) {
@@ -115,7 +115,7 @@ extension _HealthSensorCards on _HealthDashboardScreenState {
           content: Text(
             'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
           ),
-          backgroundColor: const Color(0xFFFBBF24),
+          backgroundColor: AppTheme.warningAccent,
         ),
       );
     }

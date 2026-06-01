@@ -52,7 +52,9 @@ class ActiveShiftSession {
       authUid: _parseString(json['auth_uid'] ?? json['authUid']),
       handlerEmail: _parseString(json['handler_email'] ?? json['handlerEmail']),
       dogId: json['dogId'] as String? ?? '',
-      serviceDogId: _parseString(json['service_dog_id'] ?? json['serviceDogId']),
+      serviceDogId: _parseString(
+        json['service_dog_id'] ?? json['serviceDogId'],
+      ),
       startedAt: _parseDate(json['startedAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']),
       endedAt: _parseDate(json['endedAt']),

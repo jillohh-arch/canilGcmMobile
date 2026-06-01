@@ -759,14 +759,14 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         title: Text(
           'Salvar como rascunho?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Você poderá retomar a finalização depois.',
           style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(200),
+            color: AppTheme.textPrimary.withAlpha(200),
             fontSize: 14,
           ),
         ),
@@ -847,10 +847,14 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
+                color: AppTheme.textPrimary.withAlpha(10),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.close,
+                color: AppTheme.textPrimary,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -861,7 +865,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 Text(
                   'FINALIZAR OCORRÊNCIA',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -899,7 +903,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             child: Text(
               '${widget.typeName} · ${widget.durationLabel} · ${widget.eventCount} evento${widget.eventCount != 1 ? 's' : ''}',
               style: GoogleFonts.inter(
-                color: Colors.white.withAlpha(200),
+                color: AppTheme.textPrimary.withAlpha(200),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -917,11 +921,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         children: List.generate(3, (i) {
           final Color color;
           if (i < _currentStep) {
-            color = const Color(0xFF2ECC71);
+            color = AppTheme.success;
           } else if (i == _currentStep) {
             color = AppTheme.primary;
           } else {
-            color = Colors.white.withAlpha(30);
+            color = AppTheme.textPrimary.withAlpha(30);
           }
           return Expanded(
             child: Container(
@@ -944,7 +948,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
         color: AppTheme.background,
-        border: Border(top: BorderSide(color: Colors.white.withAlpha(10))),
+        border: Border(
+          top: BorderSide(color: AppTheme.textPrimary.withAlpha(10)),
+        ),
       ),
       child: Row(
         children: [
@@ -953,8 +959,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               child: OutlinedButton(
                 onPressed: _goBack,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.white.withAlpha(40)),
+                  foregroundColor: AppTheme.textPrimary,
+                  side: BorderSide(color: AppTheme.textPrimary.withAlpha(40)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -975,10 +981,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             child: ElevatedButton(
               onPressed: _canAdvance ? (isLast ? _finalize : _goNext) : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isLast
-                    ? const Color(0xFF2ECC71)
-                    : AppTheme.primary,
-                disabledBackgroundColor: Colors.white.withAlpha(30),
+                backgroundColor: isLast ? AppTheme.success : AppTheme.primary,
+                disabledBackgroundColor: AppTheme.textPrimary.withAlpha(30),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -990,13 +994,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                       ),
                     )
                   : Text(
                       isLast ? '✓ CONCLUIR' : 'PRÓXIMO ›',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1093,7 +1097,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           Text(
             'ou digite diretamente:',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(120),
+              color: AppTheme.textPrimary.withAlpha(120),
               fontSize: 12,
             ),
           ),
@@ -1102,23 +1106,29 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             controller: _reportController,
             maxLines: 8,
             minLines: 5,
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
             onChanged: (_) {
               setState(() {});
               _scheduleDraftSave();
             },
             decoration: InputDecoration(
               hintText: 'Equipe foi acionada às... descreva o que aconteceu...',
-              hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(60)),
+              hintStyle: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(60),
+              ),
               filled: true,
-              fillColor: Colors.white.withAlpha(8),
+              fillColor: AppTheme.textPrimary.withAlpha(8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -1131,7 +1141,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           Text(
             'Caracteres: ${_reportController.text.length}',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(80),
+              color: AppTheme.textPrimary.withAlpha(80),
               fontSize: 11,
             ),
           ),
@@ -1161,7 +1171,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           Text(
             'Marque todos que se aplicam',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(100),
+              color: AppTheme.textPrimary.withAlpha(100),
               fontSize: 12,
             ),
           ),
@@ -1219,7 +1229,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   children: [
                     Icon(
                       Icons.check_circle_outline,
-                      color: const Color(0xFF2ECC71),
+                      color: AppTheme.success,
                       size: 48,
                     ),
                     const SizedBox(height: 16),
@@ -1227,7 +1237,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                       'Nenhum detalhe adicional necessário',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(180),
+                        color: AppTheme.textPrimary.withAlpha(180),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1272,9 +1282,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1300,7 +1310,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               Text(
                 'opcional',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(80),
+                  color: AppTheme.textPrimary.withAlpha(80),
                   fontSize: 10,
                 ),
               ),
@@ -1310,7 +1320,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           Text(
             'Foto do B.O., apreensões ou documentos relevantes.',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(120),
+              color: AppTheme.textPrimary.withAlpha(120),
               fontSize: 11.5,
               height: 1.4,
             ),
@@ -1364,10 +1374,14 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               width: 20,
               height: 20,
               decoration: BoxDecoration(
-                color: Colors.black.withAlpha(180),
+                color: AppTheme.background.withAlpha(180),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.close, size: 12, color: Colors.white),
+              child: const Icon(
+                Icons.close,
+                size: 12,
+                color: AppTheme.textPrimary,
+              ),
             ),
           ),
         ),
@@ -1472,9 +1486,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1489,7 +1503,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               Text(
                 result.label.toUpperCase(),
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
@@ -1513,7 +1527,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   setState(() {});
                   _scheduleDraftSave();
                 },
-                style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                ),
                 decoration: _detailFieldDecoration(field.label),
               ),
             ),
@@ -1528,9 +1545,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1543,7 +1560,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 child: Text(
                   'DROGA APREENDIDA',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
@@ -1589,9 +1606,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(3),
+                color: AppTheme.textPrimary.withAlpha(3),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withAlpha(10)),
+                border: Border.all(color: AppTheme.textPrimary.withAlpha(10)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1622,7 +1639,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   Text(
                     'TIPO',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withAlpha(120),
+                      color: AppTheme.textPrimary.withAlpha(120),
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -1647,12 +1664,12 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppTheme.primary.withAlpha(30)
-                                : Colors.white.withAlpha(5),
+                                : AppTheme.textPrimary.withAlpha(5),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: selected
                                   ? AppTheme.primary
-                                  : Colors.white.withAlpha(30),
+                                  : AppTheme.textPrimary.withAlpha(30),
                             ),
                           ),
                           child: Text(
@@ -1660,7 +1677,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                             style: GoogleFonts.inter(
                               color: selected
                                   ? AppTheme.primary
-                                  : Colors.white.withAlpha(180),
+                                  : AppTheme.textPrimary.withAlpha(180),
                               fontSize: 12,
                               fontWeight: selected
                                   ? FontWeight.w700
@@ -1681,7 +1698,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                       setState(() {});
                       _scheduleDraftSave();
                     },
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 14,
+                    ),
                     decoration: _detailFieldDecoration('Peso em gramas'),
                   ),
                 ],
@@ -1694,7 +1714,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               child: Text(
                 'Toque em ADICIONAR para registrar substâncias',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(80),
+                  color: AppTheme.textPrimary.withAlpha(80),
                   fontSize: 12,
                   fontStyle: FontStyle.italic,
                 ),
@@ -1709,18 +1729,18 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: GoogleFonts.inter(
-        color: Colors.white.withAlpha(120),
+        color: AppTheme.textPrimary.withAlpha(120),
         fontSize: 13,
       ),
       filled: true,
-      fillColor: Colors.white.withAlpha(8),
+      fillColor: AppTheme.textPrimary.withAlpha(8),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+        borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+        borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -1799,10 +1819,12 @@ class _ResultCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primary.withAlpha(25)
-              : Colors.white.withAlpha(5),
+              : AppTheme.textPrimary.withAlpha(5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppTheme.primary : Colors.white.withAlpha(20),
+            color: selected
+                ? AppTheme.primary
+                : AppTheme.textPrimary.withAlpha(20),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1827,7 +1849,9 @@ class _ResultCard extends StatelessWidget {
               result.label,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                color: selected ? Colors.white : Colors.white.withAlpha(180),
+                color: selected
+                    ? AppTheme.textPrimary
+                    : AppTheme.textPrimary.withAlpha(180),
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),

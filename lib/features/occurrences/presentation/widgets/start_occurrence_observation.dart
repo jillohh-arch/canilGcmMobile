@@ -14,11 +14,11 @@ class StartOccurrenceObservation extends StatelessWidget {
       controller: controller,
       maxLines: 3,
       minLines: 1,
-      style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+      style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: 'Observação inicial (opcional)',
         hintStyle: GoogleFonts.inter(
-          color: Colors.white.withAlpha(100),
+          color: AppTheme.textPrimary.withAlpha(100),
           fontSize: 14,
         ),
         filled: true,

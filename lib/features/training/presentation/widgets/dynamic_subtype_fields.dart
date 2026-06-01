@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/domain/activity_subtype_ids.dart';
 import 'scent_work_activity_fields.dart';
 import 'tracking_activity_fields.dart';
@@ -79,8 +80,8 @@ class DynamicSubtypeFields extends StatelessWidget {
         trackingAction: trackingActionBuilder(
           startLabel: 'INICIAR RASTREIO TÁTICO',
           startIcon: Icons.satellite_alt_rounded,
-          backgroundColor: const Color(0xFFFBBF24),
-          foregroundColor: Colors.black,
+          backgroundColor: AppTheme.warningAccent,
+          foregroundColor: AppTheme.background,
           padding: const EdgeInsets.only(bottom: 24),
         ),
       ),
@@ -134,8 +135,8 @@ class DynamicSubtypeFields extends StatelessWidget {
         trackingAction: trackingActionBuilder(
           startLabel: 'INICIAR RASTREIO DE PASSEIO',
           startIcon: Icons.directions_walk_rounded,
-          backgroundColor: const Color(0xFF43A047),
-          foregroundColor: Colors.white,
+          backgroundColor: AppTheme.successCheck,
+          foregroundColor: AppTheme.textPrimary,
           isLightMode: true,
           padding: const EdgeInsets.only(bottom: 24),
         ),

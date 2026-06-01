@@ -69,56 +69,112 @@ class _FieldDef {
 
 const _exerciseCatalog = <_ExerciseType>[
   // Cardiovascular
-  _ExerciseType(name: 'Passeio', icon: '🚶', category: 'CARDIOVASCULAR', gpsDefault: true, fields: [
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-    _FieldDef(key: 'distance', label: 'DISTÂNCIA', unit: 'km'),
-  ]),
-  _ExerciseType(name: 'Esteira', icon: '🏃', category: 'CARDIOVASCULAR', fields: [
-    _FieldDef(key: 'sets', label: 'SÉRIES', unit: 'x'),
-    _FieldDef(key: 'duration', label: 'DURAÇÃO/SÉRIE', unit: 'min'),
-    _FieldDef(key: 'speed', label: 'VELOCIDADE', unit: 'km/h'),
-  ]),
-  _ExerciseType(name: 'Paraquedas', icon: '🪂', category: 'CARDIOVASCULAR', gpsDefault: true, fields: [
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-    _FieldDef(key: 'distance', label: 'DISTÂNCIA', unit: 'm'),
-  ]),
-  _ExerciseType(name: 'Natação', icon: '🏊', category: 'CARDIOVASCULAR', fields: [
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-  ]),
+  _ExerciseType(
+    name: 'Passeio',
+    icon: '🚶',
+    category: 'CARDIOVASCULAR',
+    gpsDefault: true,
+    fields: [
+      _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
+      _FieldDef(key: 'distance', label: 'DISTÂNCIA', unit: 'km'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Esteira',
+    icon: '🏃',
+    category: 'CARDIOVASCULAR',
+    fields: [
+      _FieldDef(key: 'sets', label: 'SÉRIES', unit: 'x'),
+      _FieldDef(key: 'duration', label: 'DURAÇÃO/SÉRIE', unit: 'min'),
+      _FieldDef(key: 'speed', label: 'VELOCIDADE', unit: 'km/h'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Paraquedas',
+    icon: '🪂',
+    category: 'CARDIOVASCULAR',
+    gpsDefault: true,
+    fields: [
+      _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
+      _FieldDef(key: 'distance', label: 'DISTÂNCIA', unit: 'm'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Natação',
+    icon: '🏊',
+    category: 'CARDIOVASCULAR',
+    fields: [_FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min')],
+  ),
   // Força
-  _ExerciseType(name: 'Tração c/ peso', icon: '🏋', category: 'FORÇA', fields: [
-    _FieldDef(key: 'load', label: 'CARGA', unit: 'kg'),
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-  ]),
-  _ExerciseType(name: 'Tração elástica', icon: '🪢', category: 'FORÇA', fields: [
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-  ]),
-  _ExerciseType(name: 'Escalada', icon: '🧗', category: 'FORÇA', fields: [
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-    _FieldDef(key: 'height', label: 'ALTURA', unit: 'm'),
-  ]),
+  _ExerciseType(
+    name: 'Tração c/ peso',
+    icon: '🏋',
+    category: 'FORÇA',
+    fields: [
+      _FieldDef(key: 'load', label: 'CARGA', unit: 'kg'),
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+      _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Tração elástica',
+    icon: '🪢',
+    category: 'FORÇA',
+    fields: [_FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min')],
+  ),
+  _ExerciseType(
+    name: 'Escalada',
+    icon: '🧗',
+    category: 'FORÇA',
+    fields: [
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+      _FieldDef(key: 'height', label: 'ALTURA', unit: 'm'),
+    ],
+  ),
   // Agilidade e Pliometria
-  _ExerciseType(name: 'Bolinha em campo', icon: '⚽', category: 'AGILIDADE E PLIOMETRIA', fields: [
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'vezes'),
-    _FieldDef(key: 'diagonal', label: 'DIAGONAL', unit: 'm'),
-    _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
-  ]),
-  _ExerciseType(name: 'A-Frame', icon: '📐', category: 'AGILIDADE E PLIOMETRIA', fields: [
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-  ]),
-  _ExerciseType(name: 'Salto altura', icon: '⬆', category: 'AGILIDADE E PLIOMETRIA', fields: [
-    _FieldDef(key: 'height', label: 'ALTURA MÁX', unit: 'cm'),
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-  ]),
-  _ExerciseType(name: 'Salto distância', icon: '↔', category: 'AGILIDADE E PLIOMETRIA', fields: [
-    _FieldDef(key: 'distance', label: 'DISTÂNCIA MÁX', unit: 'm'),
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-  ]),
-  _ExerciseType(name: 'Cavaletes', icon: '🔢', category: 'AGILIDADE E PLIOMETRIA', fields: [
-    _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
-    _FieldDef(key: 'height', label: 'ALTURA', unit: 'cm'),
-  ]),
+  _ExerciseType(
+    name: 'Bolinha em campo',
+    icon: '⚽',
+    category: 'AGILIDADE E PLIOMETRIA',
+    fields: [
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'vezes'),
+      _FieldDef(key: 'diagonal', label: 'DIAGONAL', unit: 'm'),
+      _FieldDef(key: 'duration', label: 'DURAÇÃO', unit: 'min'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'A-Frame',
+    icon: '📐',
+    category: 'AGILIDADE E PLIOMETRIA',
+    fields: [_FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x')],
+  ),
+  _ExerciseType(
+    name: 'Salto altura',
+    icon: '⬆',
+    category: 'AGILIDADE E PLIOMETRIA',
+    fields: [
+      _FieldDef(key: 'height', label: 'ALTURA MÁX', unit: 'cm'),
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Salto distância',
+    icon: '↔',
+    category: 'AGILIDADE E PLIOMETRIA',
+    fields: [
+      _FieldDef(key: 'distance', label: 'DISTÂNCIA MÁX', unit: 'm'),
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+    ],
+  ),
+  _ExerciseType(
+    name: 'Cavaletes',
+    icon: '🔢',
+    category: 'AGILIDADE E PLIOMETRIA',
+    fields: [
+      _FieldDef(key: 'reps', label: 'REPETIÇÕES', unit: 'x'),
+      _FieldDef(key: 'height', label: 'ALTURA', unit: 'cm'),
+    ],
+  ),
 ];
 
 // ============================================================
@@ -174,8 +230,11 @@ class _ConditioningOverview extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -220,14 +279,22 @@ class _ConditioningOverview extends StatelessWidget {
           Consumer<TrainingViewModel>(
             builder: (_, vm, _) {
               final condSessions = vm.trainings
-                  .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
+                  .where(
+                    (t) => t.trainingType.toLowerCase().contains(
+                      'condicionamento',
+                    ),
+                  )
                   .toList();
               int? lastDays;
               if (condSessions.isNotEmpty) {
                 condSessions.sort((a, b) => b.date.compareTo(a.date));
-                lastDays = DateTime.now().difference(condSessions.first.date).inDays;
+                lastDays = DateTime.now()
+                    .difference(condSessions.first.date)
+                    .inDays;
               }
-              final lastStr = lastDays != null ? 'Última sessão há $lastDays dias' : 'Sem sessões';
+              final lastStr = lastDays != null
+                  ? 'Última sessão há $lastDays dias'
+                  : 'Sem sessões';
               return BinomioHeader(
                 dog: dog,
                 subtitle: '$lastStr · ${condSessions.length} sessões totais',
@@ -312,7 +379,7 @@ class _ConditioningOverview extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         margin: const EdgeInsets.symmetric(horizontal: 3),
         decoration: BoxDecoration(
-          color: Colors.black.withAlpha(50),
+          color: AppTheme.background.withAlpha(50),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -364,7 +431,10 @@ class _ConditioningOverview extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Container(height: 1, color: AppTheme.primary.withAlpha(40)),
+              child: Container(
+                height: 1,
+                color: AppTheme.primary.withAlpha(40),
+              ),
             ),
             const SizedBox(width: 8),
             Text(
@@ -422,9 +492,9 @@ class _ConditioningOverview extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
+          color: AppTheme.textPrimary.withAlpha(8),
           borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: Colors.white.withAlpha(20)),
+          border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,14 +530,21 @@ class _ConditioningOverview extends StatelessWidget {
             ),
             Consumer<TrainingViewModel>(
               builder: (_, vm, _) {
-                final sessions = vm.trainings.where((t) =>
-                    t.metadata?['exercise'] == ex.name &&
-                    t.trainingType.toLowerCase().contains('condicionamento'));
+                final sessions = vm.trainings.where(
+                  (t) =>
+                      t.metadata?['exercise'] == ex.name &&
+                      t.trainingType.toLowerCase().contains('condicionamento'),
+                );
                 String lastStr = 'Sem sessões';
                 if (sessions.isNotEmpty) {
-                  final sorted = sessions.toList()..sort((a, b) => b.date.compareTo(a.date));
-                  final days = DateTime.now().difference(sorted.first.date).inDays;
-                  lastStr = days == 0 ? 'Última: hoje' : 'Última: há $days dias';
+                  final sorted = sessions.toList()
+                    ..sort((a, b) => b.date.compareTo(a.date));
+                  final days = DateTime.now()
+                      .difference(sorted.first.date)
+                      .inDays;
+                  lastStr = days == 0
+                      ? 'Última: hoje'
+                      : 'Última: há $days dias';
                 }
                 return Text(
                   lastStr,
@@ -532,7 +609,14 @@ class _ConditioningOverview extends StatelessWidget {
                     borderRadius: BorderRadius.circular(7),
                   ),
                   child: Center(
-                    child: Text('+', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.primary, fontWeight: FontWeight.w700)),
+                    child: Text(
+                      '+',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -563,7 +647,9 @@ class _ConditioningOverview extends StatelessWidget {
     return Consumer<TrainingViewModel>(
       builder: (_, vm, _) {
         final recent = vm.trainings
-            .where((t) => t.trainingType.toLowerCase().contains('condicionamento'))
+            .where(
+              (t) => t.trainingType.toLowerCase().contains('condicionamento'),
+            )
             .take(5)
             .toList();
 
@@ -585,18 +671,24 @@ class _ConditioningOverview extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Container(height: 1, color: AppTheme.primary.withAlpha(40)),
+                  child: Container(
+                    height: 1,
+                    color: AppTheme.primary.withAlpha(40),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
             ...recent.map((s) {
-              final day = '${s.date.day.toString().padLeft(2, '0')}/${s.date.month.toString().padLeft(2, '0')}';
+              final day =
+                  '${s.date.day.toString().padLeft(2, '0')}/${s.date.month.toString().padLeft(2, '0')}';
               final exName = s.metadata?['exercise'] ?? 'Condicionamento';
-              final exIcon = _exerciseCatalog
-                  .where((e) => e.name == exName)
-                  .map((e) => e.icon)
-                  .firstOrNull ?? '💪';
+              final exIcon =
+                  _exerciseCatalog
+                      .where((e) => e.name == exName)
+                      .map((e) => e.icon)
+                      .firstOrNull ??
+                  '💪';
               final meta = s.metadata ?? {};
               final dur = meta['duration'];
               final intensity = meta['intensity'] ?? '';
@@ -607,11 +699,14 @@ class _ConditioningOverview extends StatelessWidget {
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(8),
+                  color: AppTheme.textPrimary.withAlpha(8),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withAlpha(15)),
+                  border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
                 ),
                 child: Row(
                   children: [
@@ -634,7 +729,10 @@ class _ConditioningOverview extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
-                        child: Text(exIcon, style: const TextStyle(fontSize: 14)),
+                        child: Text(
+                          exIcon,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -663,7 +761,10 @@ class _ConditioningOverview extends StatelessWidget {
                     ),
                     if (meta['gps'] == true)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withAlpha(25),
                           borderRadius: BorderRadius.circular(6),
@@ -677,7 +778,7 @@ class _ConditioningOverview extends StatelessWidget {
                           ),
                         ),
                       ),
-                   ],
+                  ],
                 ),
               );
             }),
@@ -744,7 +845,7 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione a intensidade'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.attention,
         ),
       );
       return;
@@ -809,11 +910,12 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
               .where((f) => f.key == 'distance')
               .firstOrNull;
           if (distField != null && distField.unit == 'km') {
-            _fieldControllers['distance']!.text =
-                (result.distanceMeters / 1000).toStringAsFixed(2);
+            _fieldControllers['distance']!.text = (result.distanceMeters / 1000)
+                .toStringAsFixed(2);
           } else {
-            _fieldControllers['distance']!.text =
-                result.distanceMeters.round().toString();
+            _fieldControllers['distance']!.text = result.distanceMeters
+                .round()
+                .toString();
           }
         }
       });
@@ -915,8 +1017,11 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
             children: [
               GestureDetector(
                 onTap: widget.onBack,
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -987,7 +1092,10 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
-              child: Text(widget.exercise.icon, style: const TextStyle(fontSize: 20)),
+              child: Text(
+                widget.exercise.icon,
+                style: const TextStyle(fontSize: 20),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -1067,7 +1175,11 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 16),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: AppTheme.textTertiary,
+            size: 16,
+          ),
         ],
       ),
     );
@@ -1184,10 +1296,14 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                   margin: EdgeInsets.only(left: i > 0 ? 6 : 0),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: selected ? colors[i].withAlpha(30) : Colors.white.withAlpha(8),
+                    color: selected
+                        ? colors[i].withAlpha(30)
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: selected ? colors[i] : Colors.white.withAlpha(20),
+                      color: selected
+                          ? colors[i]
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -1268,8 +1384,8 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                         hasResult
                             ? '${(_gpsResult!.distanceMeters / 1000).toStringAsFixed(2)} km · ${_formatGpsDuration(_gpsResult!.durationSeconds)}'
                             : widget.exercise.gpsDefault
-                                ? 'Recomendado para este exercício'
-                                : 'Opcional · toque para rastrear a rota',
+                            ? 'Recomendado para este exercício'
+                            : 'Opcional · toque para rastrear a rota',
                         style: GoogleFonts.inter(
                           color: hasResult
                               ? AppTheme.success
@@ -1362,10 +1478,12 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                   decoration: BoxDecoration(
                     color: selected
                         ? AppTheme.primary.withAlpha(30)
-                        : Colors.white.withAlpha(8),
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: selected ? AppTheme.primary : Colors.white.withAlpha(20),
+                      color: selected
+                          ? AppTheme.primary
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -1373,7 +1491,9 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                     child: Text(
                       _conditions[i],
                       style: GoogleFonts.inter(
-                        color: selected ? AppTheme.primary : AppTheme.textTertiary,
+                        color: selected
+                            ? AppTheme.primary
+                            : AppTheme.textTertiary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1467,7 +1587,7 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                     ),
                   )
                 : Text(

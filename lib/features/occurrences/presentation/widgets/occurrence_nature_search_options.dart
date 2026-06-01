@@ -18,7 +18,7 @@ class _OccurrenceNatureOptionsView extends StatelessWidget {
     return Align(
       alignment: Alignment.topLeft,
       child: Material(
-        color: Colors.transparent,
+        color: AppTheme.transparent,
         child: Container(
           width: MediaQuery.of(context).size.width - 32,
           constraints: const BoxConstraints(maxHeight: 280),

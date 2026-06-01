@@ -33,7 +33,7 @@ class _ShiftProfileCardsSection extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(7),
+            color: AppTheme.textPrimary.withAlpha(7),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: _kBorder),
           ),
@@ -243,7 +243,7 @@ class _ServiceSummaryDivider extends StatelessWidget {
     return Container(
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      color: Colors.white.withAlpha(18),
+      color: AppTheme.textPrimary.withAlpha(18),
     );
   }
 }

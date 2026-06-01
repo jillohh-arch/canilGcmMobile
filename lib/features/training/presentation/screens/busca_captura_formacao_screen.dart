@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -15,10 +16,12 @@ class BuscaCapturaFormacaoScreen extends StatefulWidget {
   const BuscaCapturaFormacaoScreen({super.key, required this.dog});
 
   @override
-  State<BuscaCapturaFormacaoScreen> createState() => _BuscaCapturaFormacaoScreenState();
+  State<BuscaCapturaFormacaoScreen> createState() =>
+      _BuscaCapturaFormacaoScreenState();
 }
 
-class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen> {
+class _BuscaCapturaFormacaoScreenState
+    extends State<BuscaCapturaFormacaoScreen> {
   int _activeTabIndex = 0;
 
   final List<String> _tabs = [
@@ -31,11 +34,11 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: const Color(0xFF050D10),
+          statusBarColor: AppTheme.transparent,
+          systemNavigationBarColor: AppTheme.background,
         ),
         child: SafeArea(
           child: Stack(
@@ -60,7 +63,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                 alignment: Alignment.centerLeft,
                                 child: const Icon(
                                   Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                   size: 20,
                                 ),
                               ),
@@ -72,7 +75,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                   Text(
                                     'FORMAÇÃO',
                                     style: GoogleFonts.inter(
-                                      color: const Color(0xFFF1C40F),
+                                      color: AppTheme.warning,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 1.5,
@@ -82,7 +85,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                   Text(
                                     'Busca & Captura',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white,
+                                      color: AppTheme.textPrimary,
                                       fontSize: 17,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -94,7 +97,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: const Color(0x1FF1C40F), // rgba(241, 196, 15, 0.12)
+                                color: AppTheme.warning.withAlpha(
+                                  31,
+                                ), // rgba(241, 196, 15, 0.12)
                                 borderRadius: BorderRadius.circular(9),
                               ),
                               alignment: Alignment.center,
@@ -110,10 +115,14 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0x0FF1C40F), // rgba(241, 196, 15, 0.06)
+                            color: AppTheme.warning.withAlpha(
+                              15,
+                            ), // rgba(241, 196, 15, 0.06)
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: const Color(0x33F1C40F), // rgba(241, 196, 15, 0.2)
+                              color: AppTheme.warning.withAlpha(
+                                51,
+                              ), // rgba(241, 196, 15, 0.2)
                               width: 1,
                             ),
                           ),
@@ -125,16 +134,18 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: const Color(0xFFF1C40F),
+                                    color: AppTheme.warning,
                                     width: 1.5,
                                   ),
-                                  color: const Color(0xFF1A2A30),
+                                  color: AppTheme.surfacePanelAlt,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  widget.dog.name.isNotEmpty ? widget.dog.name[0] : 'K',
+                                  widget.dog.name.isNotEmpty
+                                      ? widget.dog.name[0]
+                                      : 'K',
                                   style: GoogleFonts.inter(
-                                    color: const Color(0xFFF1C40F),
+                                    color: AppTheme.warning,
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -148,7 +159,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                     Text(
                                       '${widget.dog.name} · Condutor',
                                       style: GoogleFonts.inter(
-                                        color: Colors.white,
+                                        color: AppTheme.textPrimary,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -157,7 +168,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                     RichText(
                                       text: TextSpan(
                                         style: GoogleFonts.inter(
-                                          color: const Color(0xFFB0C4CC),
+                                          color: AppTheme.textSecondary,
                                           fontSize: 10,
                                         ),
                                         children: const [
@@ -165,7 +176,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                                           TextSpan(
                                             text: 'Módulo 2',
                                             style: TextStyle(
-                                              color: Color(0xFFF1C40F),
+                                              color: AppTheme.warning,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -187,10 +198,10 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                   Container(
                     height: 44,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: Color(0x10FFFFFF),
+                          color: AppTheme.textPrimary.withAlpha(16),
                           width: 1,
                         ),
                       ),
@@ -212,7 +223,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                             decoration: BoxDecoration(
                               border: Border(
                                 bottom: BorderSide(
-                                  color: isActive ? const Color(0xFF4DD0E1) : Colors.transparent,
+                                  color: isActive
+                                      ? AppTheme.primary
+                                      : AppTheme.transparent,
                                   width: 2,
                                 ),
                               ),
@@ -221,7 +234,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                             child: Text(
                               _tabs[index],
                               style: GoogleFonts.inter(
-                                color: isActive ? const Color(0xFF4DD0E1) : const Color(0xFF5A7280),
+                                color: isActive
+                                    ? AppTheme.primary
+                                    : AppTheme.textMuted,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -255,13 +270,13 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 right: 0,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
-                        Color(0xFF050D10),
-                        Color(0x00050D10),
+                        AppTheme.background,
+                        AppTheme.background.withAlpha(0),
                       ],
                     ),
                   ),
@@ -271,19 +286,23 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                       final trackingService = GpsTrackingService();
                       String handlerId = 'Condutor';
                       try {
-                        final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+                        final shiftVM = Provider.of<ShiftViewModel>(
+                          context,
+                          listen: false,
+                        );
                         handlerId = shiftVM.handlerId ?? 'Condutor';
                       } catch (_) {}
-                      final result = await Navigator.of(context).push<GpsTrackResult?>(
-                        MaterialPageRoute(
-                          builder: (_) => GpsTrackingScreen(
-                            activityLabel: 'Busca & Captura · Formação',
-                            dogName: widget.dog.name,
-                            handlerName: handlerId,
-                            trackingService: trackingService,
-                          ),
-                        ),
-                      );
+                      final result = await Navigator.of(context)
+                          .push<GpsTrackResult?>(
+                            MaterialPageRoute(
+                              builder: (_) => GpsTrackingScreen(
+                                activityLabel: 'Busca & Captura · Formação',
+                                dogName: widget.dog.name,
+                                handlerName: handlerId,
+                                trackingService: trackingService,
+                              ),
+                            ),
+                          );
                       if (result != null && context.mounted) {
                         final session = TrainingSessionModel(
                           dogId: widget.dog.id,
@@ -301,14 +320,17 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                           },
                         );
                         try {
-                          final vm = Provider.of<TrainingViewModel>(context, listen: false);
+                          final vm = Provider.of<TrainingViewModel>(
+                            context,
+                            listen: false,
+                          );
                           await vm.addTrainingSession(session);
                         } catch (_) {}
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4DD0E1),
-                      foregroundColor: const Color(0xFF050D10),
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: AppTheme.background,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -349,7 +371,8 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         _buildModuleCard(
           number: '1',
           title: 'Pareamento de Odor',
-          subtitle: 'Associação primária entre o artigo de referência e a recompensa.',
+          subtitle:
+              'Associação primária entre o artigo de referência e a recompensa.',
           status: 'CONCLUÍDO',
           progress: 1.0,
           isCompleted: true,
@@ -360,7 +383,8 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         _buildModuleCard(
           number: '2',
           title: 'Indicações Estruturais',
-          subtitle: 'Persistência na indicação em fontes de odor com barreiras simples.',
+          subtitle:
+              'Persistência na indicação em fontes de odor com barreiras simples.',
           status: 'EM TREINO',
           progress: 0.7,
           isCompleted: false,
@@ -371,7 +395,8 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         _buildModuleCard(
           number: '3',
           title: 'Operacional Urbano',
-          subtitle: 'Rastreamento em vias públicas com alto nível de distrações e ruídos.',
+          subtitle:
+              'Rastreamento em vias públicas com alto nível de distrações e ruídos.',
           status: 'BLOQUEADO',
           progress: 0.0,
           isCompleted: false,
@@ -383,10 +408,10 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
           margin: const EdgeInsets.only(top: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0x05FFFFFF),
+            color: AppTheme.textPrimary.withAlpha(5),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: const Color(0x1AFFFFFF),
+              color: AppTheme.textPrimary.withAlpha(26),
               width: 1,
               style: BorderStyle.solid,
             ),
@@ -395,14 +420,14 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
             children: [
               const Icon(
                 Icons.assignment_turned_in_outlined,
-                color: Color(0xFF5A7280),
+                color: AppTheme.textMuted,
                 size: 24,
               ),
               const SizedBox(height: 6),
               Text(
                 'Avaliação de Aptidão Final',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFFB0C4CC),
+                  color: AppTheme.textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -412,7 +437,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 'Após concluir os 3 módulos, o binômio passará pelo teste final de certificação operacional.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF5A7280),
+                  color: AppTheme.textMuted,
                   fontSize: 11,
                   height: 1.4,
                 ),
@@ -434,33 +459,41 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
     required bool isActive,
     required String progressText,
   }) {
-    Color sideColor = const Color(0xFF95A5A6).withAlpha(80);
-    Color numBg = const Color(0x14FFFFFF);
-    Color numText = const Color(0xFF95A5A6);
-    Color statusBg = const Color(0x14FFFFFF);
+    Color sideColor = AppTheme.textSoft.withAlpha(80);
+    Color numBg = AppTheme.textPrimary.withAlpha(20);
+    Color numText = AppTheme.textSoft;
+    Color statusBg = AppTheme.textPrimary.withAlpha(20);
 
     if (isCompleted) {
-      sideColor = const Color(0xFF2ECC71);
-      numBg = const Color(0x262ECC71);
-      numText = const Color(0xFF2ECC71);
-      statusBg = const Color(0x1F2ECC71);
+      sideColor = AppTheme.success;
+      numBg = AppTheme.success.withAlpha(38);
+      numText = AppTheme.success;
+      statusBg = AppTheme.success.withAlpha(31);
     } else if (isActive) {
-      sideColor = const Color(0xFFF1C40F);
-      numBg = const Color(0x26F1C40F);
-      numText = const Color(0xFFF1C40F);
-      statusBg = const Color(0x1FF1C40F);
+      sideColor = AppTheme.warning;
+      numBg = AppTheme.warning.withAlpha(38);
+      numText = AppTheme.warning;
+      statusBg = AppTheme.warning.withAlpha(31);
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0x0AF1C40F) : const Color(0x0DFFFFFF),
+        color: isActive
+            ? AppTheme.warning.withAlpha(10)
+            : AppTheme.textPrimary.withAlpha(13),
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(color: sideColor, width: 3),
-          top: BorderSide(color: const Color(0x14FFFFFF), width: 1),
-          right: BorderSide(color: const Color(0x14FFFFFF), width: 1),
-          bottom: BorderSide(color: const Color(0x14FFFFFF), width: 1),
+          top: BorderSide(color: AppTheme.textPrimary.withAlpha(20), width: 1),
+          right: BorderSide(
+            color: AppTheme.textPrimary.withAlpha(20),
+            width: 1,
+          ),
+          bottom: BorderSide(
+            color: AppTheme.textPrimary.withAlpha(20),
+            width: 1,
+          ),
         ),
       ),
       padding: const EdgeInsets.all(14),
@@ -496,7 +529,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     Text(
                       title,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -505,7 +538,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     Text(
                       subtitle,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF5A7280),
+                        color: AppTheme.textMuted,
                         fontSize: 10,
                         height: 1.3,
                       ),
@@ -539,7 +572,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Text(
                 progressText,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFFB0C4CC),
+                  color: AppTheme.textSecondary,
                   fontSize: 11,
                 ),
               ),
@@ -547,7 +580,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 Text(
                   '${(progress * 100).round()}%',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFFF1C40F),
+                    color: AppTheme.warning,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -560,7 +593,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               width: double.infinity,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0x10FFFFFF),
+                color: AppTheme.textPrimary.withAlpha(16),
                 borderRadius: BorderRadius.circular(2),
               ),
               alignment: Alignment.centerLeft,
@@ -569,7 +602,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 child: Container(
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isCompleted ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F),
+                    color: isCompleted ? AppTheme.success : AppTheme.warning,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -590,12 +623,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0x0FF1C40F),
+            color: AppTheme.warning.withAlpha(15),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0x33F1C40F),
-              width: 1,
-            ),
+            border: Border.all(color: AppTheme.warning.withAlpha(51), width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,14 +637,14 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0x26F1C40F),
-                      border: Border.all(color: const Color(0xFFF1C40F), width: 1.5),
+                      color: AppTheme.warning.withAlpha(38),
+                      border: Border.all(color: AppTheme.warning, width: 1.5),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       '2',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFFF1C40F),
+                        color: AppTheme.warning,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
@@ -624,7 +654,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                   Text(
                     'Indicações Estruturais',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
@@ -635,7 +665,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Text(
                 'Consolidar indicações diretas e persistentes em fontes de odor variadas com barreiras simples.',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFFB0C4CC),
+                  color: AppTheme.textSecondary,
                   fontSize: 11,
                   height: 1.4,
                 ),
@@ -643,10 +673,10 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.only(top: 8),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(
-                      color: Color(0x26F1C40F),
+                      color: AppTheme.warning.withAlpha(38),
                       width: 1,
                     ),
                   ),
@@ -673,7 +703,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
             Text(
               'MARCOS PEDAGÓGICOS',
               style: GoogleFonts.inter(
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -698,7 +728,8 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         ),
         _buildMarcoItem(
           title: 'Persistência em fonte oculta',
-          subtitle: 'Indicação clara em fonte totalmente escondida sob entulho.',
+          subtitle:
+              'Indicação clara em fonte totalmente escondida sob entulho.',
           isAtingido: false,
           sessionsCount: '3 sessões',
         ),
@@ -708,16 +739,14 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0x0A4DD0E1),
+            color: AppTheme.primary.withAlpha(10),
             borderRadius: BorderRadius.circular(6),
-            border: const Border(
-              left: BorderSide(color: Color(0xFF4DD0E1), width: 3),
-            ),
+            border: Border(left: BorderSide(color: AppTheme.primary, width: 3)),
           ),
           child: RichText(
             text: TextSpan(
               style: GoogleFonts.inter(
-                color: const Color(0xFFB0C4CC),
+                color: AppTheme.textSecondary,
                 fontSize: 11,
                 height: 1.5,
               ),
@@ -726,7 +755,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 TextSpan(
                   text: 'Artigo pessoal (camiseta/meia/chave)',
                   style: TextStyle(
-                    color: Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -745,7 +774,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Text(
           label,
           style: GoogleFonts.inter(
-            color: const Color(0xFF7A8A92),
+            color: AppTheme.textTertiary,
             fontSize: 9,
             letterSpacing: 0.5,
           ),
@@ -754,7 +783,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Text(
           value,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -773,10 +802,14 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isAtingido ? const Color(0x0F2ECC71) : const Color(0x0DFFFFFF),
+        color: isAtingido
+            ? AppTheme.success.withAlpha(15)
+            : AppTheme.textPrimary.withAlpha(13),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isAtingido ? const Color(0x402ECC71) : const Color(0x14FFFFFF),
+          color: isAtingido
+              ? AppTheme.success.withAlpha(64)
+              : AppTheme.textPrimary.withAlpha(20),
           width: 1,
         ),
       ),
@@ -788,15 +821,17 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isAtingido ? const Color(0xFF2ECC71) : const Color(0x33FFFFFF),
+                color: isAtingido
+                    ? AppTheme.success
+                    : AppTheme.textPrimary.withAlpha(51),
                 width: 1.5,
               ),
-              color: isAtingido ? const Color(0xFF2ECC71) : Colors.transparent,
+              color: isAtingido ? AppTheme.success : AppTheme.transparent,
             ),
             alignment: Alignment.center,
             child: Icon(
               Icons.check_rounded,
-              color: isAtingido ? const Color(0xFF050D10) : Colors.transparent,
+              color: isAtingido ? AppTheme.background : AppTheme.transparent,
               size: 14,
             ),
           ),
@@ -808,7 +843,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 Text(
                   title,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -817,7 +852,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 Text(
                   subtitle,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF5A7280),
+                    color: AppTheme.textMuted,
                     fontSize: 10,
                   ),
                 ),
@@ -828,13 +863,13 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0x144DD0E1),
+              color: AppTheme.primary.withAlpha(20),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               sessionsCount,
               style: GoogleFonts.inter(
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -899,27 +934,24 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
     required String conductor,
     required String resultClass,
   }) {
-    Color resultColor = const Color(0xFF2ECC71);
-    Color resultBg = const Color(0x1F2ECC71);
+    Color resultColor = AppTheme.success;
+    Color resultBg = AppTheme.success.withAlpha(31);
 
     if (resultClass == 'checagem') {
-      resultColor = const Color(0xFFF1C40F);
-      resultBg = const Color(0x1FF1C40F);
+      resultColor = AppTheme.warning;
+      resultBg = AppTheme.warning.withAlpha(31);
     } else if (resultClass == 'perda') {
-      resultColor = const Color(0xFFE67E22);
-      resultBg = const Color(0x1FE67E22);
+      resultColor = AppTheme.attention;
+      resultBg = AppTheme.attention.withAlpha(31);
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0x0DFFFFFF),
+        color: AppTheme.textPrimary.withAlpha(13),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0x14FFFFFF),
-          width: 1,
-        ),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(20), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +967,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     Text(
                       date,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -944,7 +976,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                     Text(
                       marco,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF5A7280),
+                        color: AppTheme.textMuted,
                         fontSize: 11,
                       ),
                     ),
@@ -972,10 +1004,10 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.only(top: 8),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(
-                  color: Color(0x0DFFFFFF),
+                  color: AppTheme.textPrimary.withAlpha(13),
                   width: 1,
                 ),
               ),
@@ -998,12 +1030,12 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
   Widget _buildSessionStatItem(IconData icon, String value) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF4DD0E1), size: 12),
+        Icon(icon, color: AppTheme.primary, size: 12),
         const SizedBox(width: 4),
         Text(
           value,
           style: GoogleFonts.inter(
-            color: const Color(0xFFB0C4CC),
+            color: AppTheme.textSecondary,
             fontSize: 10.5,
           ),
         ),
@@ -1025,16 +1057,18 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0x0DFFFFFF),
+                    color: AppTheme.textPrimary.withAlpha(13),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0x14FFFFFF)),
+                    border: Border.all(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   child: Column(
                     children: [
                       Text(
                         '116m',
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF4DD0E1),
+                          color: AppTheme.primary,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1043,7 +1077,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                       Text(
                         'DISTÂNCIA MÉDIA',
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF7A8A92),
+                          color: AppTheme.textTertiary,
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.8,
@@ -1058,16 +1092,18 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0x0DFFFFFF),
+                    color: AppTheme.textPrimary.withAlpha(13),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0x14FFFFFF)),
+                    border: Border.all(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   child: Column(
                     children: [
                       Text(
                         '4.8 min',
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF4DD0E1),
+                          color: AppTheme.primary,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1076,7 +1112,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
                       Text(
                         'TEMPO MÉDIO',
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF7A8A92),
+                          color: AppTheme.textTertiary,
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.8,
@@ -1094,9 +1130,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0x0DFFFFFF),
+            color: AppTheme.textPrimary.withAlpha(13),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0x14FFFFFF)),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
           ),
           margin: const EdgeInsets.only(bottom: 12),
           child: Column(
@@ -1105,7 +1141,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Text(
                 'DISTÂNCIA POR SESSÃO (ÚLTIMAS 7)',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.2,
@@ -1116,8 +1152,20 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('150m', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9)),
-                  Text('0m', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9)),
+                  Text(
+                    '150m',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 9,
+                    ),
+                  ),
+                  Text(
+                    '0m',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 9,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1141,8 +1189,20 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('05/Mai', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9)),
-                  Text('Hoje', style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9)),
+                  Text(
+                    '05/Mai',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 9,
+                    ),
+                  ),
+                  Text(
+                    'Hoje',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 9,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1153,9 +1213,9 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0x0DFFFFFF),
+            color: AppTheme.textPrimary.withAlpha(13),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0x14FFFFFF)),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1163,18 +1223,18 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               Text(
                 'DISTRIBUIÇÃO DE RESULTADOS',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.2,
                 ),
               ),
               const SizedBox(height: 12),
-              _buildDistributionRow('Completa', 0.75, '75%', const Color(0xFF2ECC71)),
+              _buildDistributionRow('Completa', 0.75, '75%', AppTheme.success),
               const SizedBox(height: 8),
-              _buildDistributionRow('Checagem', 0.15, '15%', const Color(0xFFF1C40F)),
+              _buildDistributionRow('Checagem', 0.15, '15%', AppTheme.warning),
               const SizedBox(height: 8),
-              _buildDistributionRow('Perda', 0.10, '10%', const Color(0xFFE67E22)),
+              _buildDistributionRow('Perda', 0.10, '10%', AppTheme.attention),
             ],
           ),
         ),
@@ -1194,14 +1254,8 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: highlight
-                  ? [
-                      const Color(0xFFF1C40F),
-                      const Color(0x4DF1C40F),
-                    ]
-                  : [
-                      const Color(0xFF4DD0E1),
-                      const Color(0x4D4DD0E1),
-                    ],
+                  ? [AppTheme.warning, AppTheme.warning.withAlpha(77)]
+                  : [AppTheme.primary, AppTheme.primary.withAlpha(77)],
             ),
           ),
         ),
@@ -1209,7 +1263,12 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
     );
   }
 
-  Widget _buildDistributionRow(String label, double percent, String percentText, Color color) {
+  Widget _buildDistributionRow(
+    String label,
+    double percent,
+    String percentText,
+    Color color,
+  ) {
     return Row(
       children: [
         SizedBox(
@@ -1217,7 +1276,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
           child: Text(
             label,
             style: GoogleFonts.inter(
-              color: const Color(0xFFB0C4CC),
+              color: AppTheme.textSecondary,
               fontSize: 11,
             ),
           ),
@@ -1226,7 +1285,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
           child: Container(
             height: 8,
             decoration: BoxDecoration(
-              color: const Color(0x0DFFFFFF),
+              color: AppTheme.textPrimary.withAlpha(13),
               borderRadius: BorderRadius.circular(4),
             ),
             alignment: Alignment.centerLeft,
@@ -1249,7 +1308,7 @@ class _BuscaCapturaFormacaoScreenState extends State<BuscaCapturaFormacaoScreen>
             percentText,
             textAlign: TextAlign.right,
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),

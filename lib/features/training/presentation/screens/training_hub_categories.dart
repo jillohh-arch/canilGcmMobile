@@ -28,7 +28,7 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
             Text(
               'ESPECIALIDADES',
               style: GoogleFonts.inter(
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -36,22 +36,19 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Expanded(
-              child: Divider(
-                color: Color(0x264DD0E1), // rgba(77, 208, 225, 0.15)
-                thickness: 1,
-              ),
+              child: Divider(color: AppTheme.primaryDivider, thickness: 1),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0x1A4DD0E1), // rgba(77, 208, 225, 0.1)
+                color: AppTheme.primaryChipBackground,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '$activeCount ativas',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -82,13 +79,13 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
         // Add new specialty button
         CustomPaint(
           painter: DashedBorderPainter(
-            color: const Color(0x4D4DD0E1), // rgba(77, 208, 225, 0.3)
+            color: AppTheme.primary.withAlpha(77),
             borderRadius: 12.0,
             dashLength: 6,
             gap: 4,
           ),
           child: Material(
-            color: Colors.transparent,
+            color: AppTheme.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: onAddSpecialtyTap,
@@ -96,7 +93,7 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
-                  color: const Color(0x0A4DD0E1), // rgba(77, 208, 225, 0.04)
+                  color: AppTheme.primaryOverlay,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -105,7 +102,7 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
                     Text(
                       '+',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -114,7 +111,7 @@ class _TrainingSpecialtiesSection extends StatelessWidget {
                     Text(
                       'Iniciar nova especialidade',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -167,50 +164,39 @@ class _SpecialtyRow extends StatelessWidget {
     required bool isOperational,
     required String lastTrainingLabel,
   }) {
-    final Color sideColor =
-        isOperational ? const Color(0xFF2ECC71) : const Color(0xFFF1C40F);
+    final Color sideColor = isOperational ? AppTheme.success : AppTheme.warning;
     final String emoji = _specialtyEmojiFor(specialty.name);
 
     return Material(
-      color: Colors.transparent,
+      color: AppTheme.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
             color: specialty.isInFormation
-                ? const Color(0x0AF1C40F)
-                : const Color(0x0DFFFFFF),
+                ? AppTheme.warning.withAlpha(10)
+                : AppTheme.surfaceWhiteOverlay,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0x14FFFFFF),
-              width: 1,
-            ),
+            border: Border.all(color: AppTheme.surfaceWhiteBorder, width: 1),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Row(
               children: [
-                Container(
-                  width: 3,
-                  height: 78,
-                  color: sideColor,
-                ),
+                Container(width: 3, height: 78, color: sideColor),
                 const SizedBox(width: 12),
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     color: isOperational
-                        ? const Color(0x1F2ECC71)
-                        : const Color(0x1FF1C40F),
+                        ? AppTheme.success.withAlpha(31)
+                        : AppTheme.warning.withAlpha(31),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 22),
-                  ),
+                  child: Text(emoji, style: const TextStyle(fontSize: 22)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -222,7 +208,7 @@ class _SpecialtyRow extends StatelessWidget {
                         Text(
                           specialty.name,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
@@ -232,11 +218,13 @@ class _SpecialtyRow extends StatelessWidget {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2),
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: isOperational
-                                    ? const Color(0x1F2ECC71)
-                                    : const Color(0x1FF1C40F),
+                                    ? AppTheme.success.withAlpha(31)
+                                    : AppTheme.warning.withAlpha(31),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
@@ -271,7 +259,7 @@ class _SpecialtyRow extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
-                                  color: const Color(0xFFB0C4CC),
+                                  color: AppTheme.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -288,10 +276,7 @@ class _SpecialtyRow extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   '›',
-                  style: TextStyle(
-                    color: Color(0xFF5A7280),
-                    fontSize: 24,
-                  ),
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 24),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -324,8 +309,9 @@ class _DetectionSpecialtyRow extends StatelessWidget {
         final lines = snapshot.data ?? [];
 
         // Derivar badge agregado (prioridade: in_formation > operational > not_started)
-        final hasFormation =
-            lines.any((l) => l.status == 'in_formation' || l.status == 'triagem');
+        final hasFormation = lines.any(
+          (l) => l.status == 'in_formation' || l.status == 'triagem',
+        );
         final hasOperational = lines.any((l) => l.status == 'operational');
 
         final bool isOperational;
@@ -335,15 +321,15 @@ class _DetectionSpecialtyRow extends StatelessWidget {
         if (hasFormation) {
           isOperational = false;
           badgeLabel = 'EM FORMAÇÃO';
-          badgeColor = const Color(0xFFF1C40F);
+          badgeColor = AppTheme.warning;
         } else if (hasOperational) {
           isOperational = true;
           badgeLabel = 'OPERACIONAL';
-          badgeColor = const Color(0xFF2ECC71);
+          badgeColor = AppTheme.success;
         } else {
           isOperational = false;
           badgeLabel = 'NÃO INICIADA';
-          badgeColor = const Color(0xFF5A7280);
+          badgeColor = AppTheme.textMuted;
         }
 
         // Última sessão entre todas as linhas
@@ -361,18 +347,18 @@ class _DetectionSpecialtyRow extends StatelessWidget {
         final String emoji = _specialtyEmojiFor(specialty.name);
 
         return Material(
-          color: Colors.transparent,
+          color: AppTheme.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: onTap,
             child: Container(
               decoration: BoxDecoration(
                 color: hasFormation
-                    ? const Color(0x0AF1C40F)
-                    : const Color(0x0DFFFFFF),
+                    ? AppTheme.warning.withAlpha(10)
+                    : AppTheme.surfaceWhiteOverlay,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: const Color(0x14FFFFFF),
+                  color: AppTheme.surfaceWhiteBorder,
                   width: 1,
                 ),
               ),
@@ -380,11 +366,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 child: Row(
                   children: [
-                    Container(
-                      width: 3,
-                      height: 78,
-                      color: badgeColor,
-                    ),
+                    Container(width: 3, height: 78, color: badgeColor),
                     const SizedBox(width: 12),
                     Container(
                       width: 44,
@@ -394,10 +376,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                         borderRadius: BorderRadius.circular(11),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        emoji,
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 22)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -409,7 +388,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                             Text(
                               specialty.name,
                               style: GoogleFonts.inter(
-                                color: Colors.white,
+                                color: AppTheme.textPrimary,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -419,7 +398,9 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 7, vertical: 2),
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: badgeColor.withAlpha(30),
                                     borderRadius: BorderRadius.circular(6),
@@ -454,7 +435,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.inter(
-                                      color: const Color(0xFFB0C4CC),
+                                      color: AppTheme.textSecondary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -471,10 +452,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                     const SizedBox(width: 8),
                     const Text(
                       '›',
-                      style: TextStyle(
-                        color: Color(0xFF5A7280),
-                        fontSize: 24,
-                      ),
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 24),
                     ),
                     const SizedBox(width: 14),
                   ],
@@ -492,10 +470,7 @@ class _TrainingGeneralSection extends StatelessWidget {
   final List<TrainingGeneralTypeModel> trainings;
   final ValueChanged<String> onTap;
 
-  const _TrainingGeneralSection({
-    required this.trainings,
-    required this.onTap,
-  });
+  const _TrainingGeneralSection({required this.trainings, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -508,7 +483,7 @@ class _TrainingGeneralSection extends StatelessWidget {
             Text(
               'TREINOS GERAIS',
               style: GoogleFonts.inter(
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -516,10 +491,7 @@ class _TrainingGeneralSection extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Expanded(
-              child: Divider(
-                color: Color(0x264DD0E1), // rgba(77, 208, 225, 0.15)
-                thickness: 1,
-              ),
+              child: Divider(color: AppTheme.primaryDivider, thickness: 1),
             ),
           ],
         ),
@@ -557,29 +529,23 @@ class _GeneralTrainingTile extends StatelessWidget {
   final TrainingGeneralTypeModel training;
   final VoidCallback onTap;
 
-  const _GeneralTrainingTile({
-    required this.training,
-    required this.onTap,
-  });
+  const _GeneralTrainingTile({required this.training, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final String emoji = _specialtyEmojiFor(training.name);
 
     return Material(
-      color: Colors.transparent,
+      color: AppTheme.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0x0DFFFFFF), // rgba(255, 255, 255, 0.03)
+            color: AppTheme.surfaceWhiteOverlay,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0x14FFFFFF), // rgba(255, 255, 255, 0.08)
-              width: 1,
-            ),
+            border: Border.all(color: AppTheme.surfaceWhiteBorder, width: 1),
           ),
           child: Row(
             children: [
@@ -588,14 +554,11 @@ class _GeneralTrainingTile extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0x1A4DD0E1), // rgba(77, 208, 225, 0.1)
+                  color: AppTheme.primaryChipBackground,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 16),
-                ),
+                child: Text(emoji, style: const TextStyle(fontSize: 16)),
               ),
               const SizedBox(width: 10),
               // Info
@@ -607,7 +570,7 @@ class _GeneralTrainingTile extends StatelessWidget {
                     Text(
                       training.name,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -618,7 +581,7 @@ class _GeneralTrainingTile extends StatelessWidget {
                     Text(
                       training.lastTrainingLabel,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF5A7280),
+                        color: AppTheme.textMuted,
                         fontSize: 9,
                         fontWeight: FontWeight.w500,
                       ),
@@ -646,9 +609,9 @@ class _TrainingEmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
+        color: AppTheme.textPrimary.withAlpha(6),
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: const Color(0x264DD0E1)),
+        border: Border.all(color: AppTheme.primaryDivider),
       ),
       child: Row(
         children: [
@@ -658,7 +621,7 @@ class _TrainingEmptyState extends StatelessWidget {
             child: Text(
               message,
               style: GoogleFonts.inter(
-                color: const Color(0xFFA7B4BA),
+                color: AppTheme.textSoft,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -681,13 +644,19 @@ String _specialtyEmojiFor(String value) {
   return '🎯';
 }
 
-Widget _buildSpecialtyMeta(TrainingSpecialtyModel specialty, List<TrainingHubSession> sessions) {
+Widget _buildSpecialtyMeta(
+  TrainingSpecialtyModel specialty,
+  List<TrainingHubSession> sessions,
+) {
   final key = normalizeTrainingKey(specialty.name);
-  final sessionsCount = sessions.where((s) =>
-    normalizeTrainingKey(s.specialty) == key &&
-    s.date.year == DateTime.now().year &&
-    s.date.month == DateTime.now().month
-  ).length;
+  final sessionsCount = sessions
+      .where(
+        (s) =>
+            normalizeTrainingKey(s.specialty) == key &&
+            s.date.year == DateTime.now().year &&
+            s.date.month == DateTime.now().month,
+      )
+      .length;
 
   if (key.contains('detec') || key.contains('faro')) {
     if (specialty.subAreas.isNotEmpty) {
@@ -707,7 +676,7 @@ Widget _buildSpecialtyMeta(TrainingSpecialtyModel specialty, List<TrainingHubSes
     return Text(
       'Caça consolidada · Defesa em abertura',
       style: GoogleFonts.inter(
-        color: const Color(0xFF7A8A92),
+        color: AppTheme.textTertiary,
         fontSize: 10,
         fontWeight: FontWeight.w500,
       ),
@@ -719,7 +688,7 @@ Widget _buildSpecialtyMeta(TrainingSpecialtyModel specialty, List<TrainingHubSes
   return Text(
     '$prefix · $sessionsCount sessões neste mês',
     style: GoogleFonts.inter(
-      color: const Color(0xFF7A8A92),
+      color: AppTheme.textTertiary,
       fontSize: 10,
       fontWeight: FontWeight.w500,
     ),
@@ -743,7 +712,7 @@ class _DetectionMetaFromLines extends StatelessWidget {
           return Text(
             'Carregando linhas...',
             style: GoogleFonts.inter(
-              color: const Color(0xFF7A8A92),
+              color: AppTheme.textTertiary,
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -776,20 +745,28 @@ class _DetectionMetaFromLines extends StatelessWidget {
         void addGroup(List<String> list, String label) {
           if (list.isEmpty) return;
           if (spans.isNotEmpty) {
-            spans.add(const TextSpan(
-              text: ' · ',
-              style: TextStyle(color: Color(0xFFB0C4CC)),
-            ));
+            spans.add(
+              const TextSpan(
+                text: ' · ',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            );
           }
-          spans.add(TextSpan(
-            text: '${list.join("/")} ',
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, color: Colors.white),
-          ));
-          spans.add(TextSpan(
-            text: label,
-            style: const TextStyle(color: Color(0xFFB0C4CC)),
-          ));
+          spans.add(
+            TextSpan(
+              text: '${list.join("/")} ',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          );
+          spans.add(
+            TextSpan(
+              text: label,
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          );
         }
 
         addGroup(operationalList, 'operacional');
@@ -800,7 +777,7 @@ class _DetectionMetaFromLines extends StatelessWidget {
           return Text(
             'Nenhuma linha configurada',
             style: GoogleFonts.inter(
-              color: const Color(0xFF7A8A92),
+              color: AppTheme.textTertiary,
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -839,16 +816,28 @@ Widget _buildSubAreasText(List<TrainingSubAreaModel> subAreas) {
   void addGroup(List<String> list, String label) {
     if (list.isEmpty) return;
     if (spans.isNotEmpty) {
-      spans.add(const TextSpan(text: ' · ', style: TextStyle(color: Color(0xFFB0C4CC))));
+      spans.add(
+        const TextSpan(
+          text: ' · ',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+      );
     }
-    spans.add(TextSpan(
-      text: '${list.join('/')}: ',
-      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-    ));
-    spans.add(TextSpan(
-      text: label,
-      style: const TextStyle(color: Color(0xFFB0C4CC)),
-    ));
+    spans.add(
+      TextSpan(
+        text: '${list.join('/')}: ',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: AppTheme.textPrimary,
+        ),
+      ),
+    );
+    spans.add(
+      TextSpan(
+        text: label,
+        style: const TextStyle(color: AppTheme.textSecondary),
+      ),
+    );
   }
 
   addGroup(operationalList, 'operacional');
@@ -899,7 +888,10 @@ class DashedBorderPainter extends CustomPainter {
       while (distance < measure.length) {
         final double len = dashLength;
         dashedPath.addPath(
-          measure.extractPath(distance, (distance + len).clamp(0.0, measure.length)),
+          measure.extractPath(
+            distance,
+            (distance + len).clamp(0.0, measure.length),
+          ),
           Offset.zero,
         );
         distance += len + gap;

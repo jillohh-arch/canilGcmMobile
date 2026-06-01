@@ -34,12 +34,12 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(5),
+          color: AppTheme.textPrimary.withAlpha(5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isRecent
                 ? AppTheme.primary.withAlpha(75)
-                : Colors.white.withAlpha(15),
+                : AppTheme.textPrimary.withAlpha(15),
           ),
         ),
         child: Row(
@@ -71,7 +71,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                         child: Text(
                           event.title ?? event.category.label,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -109,7 +109,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFFB0C4CC),
+                        color: AppTheme.textSecondary,
                         fontSize: 12,
                         height: 1.5,
                       ),
@@ -122,7 +122,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                     Text(
                       'editado',
                       style: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(100),
+                        color: AppTheme.textPrimary.withAlpha(100),
                         fontSize: 10,
                         fontStyle: FontStyle.italic,
                       ),
@@ -222,10 +222,10 @@ class _PhotoThumbnails extends StatelessWidget {
               photoUrls[i],
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
-                color: Colors.white.withAlpha(10),
+                color: AppTheme.textPrimary.withAlpha(10),
                 child: Icon(
                   Icons.broken_image_outlined,
-                  color: Colors.white.withAlpha(60),
+                  color: AppTheme.textPrimary.withAlpha(60),
                   size: 20,
                 ),
               ),
@@ -247,15 +247,12 @@ class _CategoryIcon extends StatelessWidget {
     final (icon, color) = switch (category) {
       OccurrenceEventCategory.opening => ('▶', AppTheme.primary),
       OccurrenceEventCategory.arrival => ('▶', AppTheme.primary),
-      OccurrenceEventCategory.approach => ('👤', const Color(0xFFF1C40F)),
-      OccurrenceEventCategory.dogWork => ('🐾', const Color(0xFF2ECC71)),
-      OccurrenceEventCategory.positiveIndication => (
-        '✓',
-        const Color(0xFF2ECC71),
-      ),
-      OccurrenceEventCategory.seizure => ('📦', const Color(0xFF9B59B6)),
-      OccurrenceEventCategory.closure => ('■', const Color(0xFF95A5A6)),
-      OccurrenceEventCategory.other => ('●', const Color(0xFFE67E22)),
+      OccurrenceEventCategory.approach => ('👤', AppTheme.warning),
+      OccurrenceEventCategory.dogWork => ('🐾', AppTheme.success),
+      OccurrenceEventCategory.positiveIndication => ('✓', AppTheme.success),
+      OccurrenceEventCategory.seizure => ('📦', AppTheme.healthAccent),
+      OccurrenceEventCategory.closure => ('■', AppTheme.textSecondary),
+      OccurrenceEventCategory.other => ('●', AppTheme.attention),
     };
 
     return Container(

@@ -19,13 +19,13 @@ class HudTabBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: _hudBackground,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0x3300E5FF)),
+        border: Border.all(color: AppTheme.primaryChipBorder),
         boxShadow: [BoxShadow(color: _hudCyan.withAlpha(24), blurRadius: 16)],
       ),
       child: TabBar(
         controller: controller,
         isScrollable: false,
-        dividerColor: Colors.transparent,
+        dividerColor: AppTheme.transparent,
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: _hudCyan.withAlpha(28),
@@ -33,7 +33,7 @@ class HudTabBar extends StatelessWidget {
           border: Border.all(color: _hudCyan),
         ),
         labelColor: _hudCyan,
-        unselectedLabelColor: Colors.white54,
+        unselectedLabelColor: AppTheme.textPrimary.withAlpha(138),
         labelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w900,
           fontSize: 11,

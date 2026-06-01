@@ -42,7 +42,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(24),
+                color: AppTheme.textPrimary.withAlpha(24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -53,7 +53,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                 ? 'Substâncias Alvo'
                 : 'Nova Especialidade',
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -64,7 +64,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                 ? 'Selecione quais substâncias o cão começará a farejar'
                 : 'Selecione qual especialidade deseja iniciar com ${widget.dog.name}',
             style: GoogleFonts.inter(
-              color: const Color(0xFF7A8A92),
+              color: AppTheme.textTertiary,
               fontSize: 11,
             ),
           ),
@@ -94,8 +94,10 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                     }
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF7A8A92),
-                    side: const BorderSide(color: Color(0x1AFFFFFF)),
+                    foregroundColor: AppTheme.textTertiary,
+                    side: const BorderSide(
+                      color: AppTheme.surfaceWhiteBorderMedium,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -120,7 +122,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                     backgroundColor: AppTheme.primary,
                     foregroundColor: AppTheme.background,
                     disabledBackgroundColor: AppTheme.primaryDivider,
-                    disabledForegroundColor: const Color(0x33050D10),
+                    disabledForegroundColor: AppTheme.background.withAlpha(51),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -170,7 +172,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0x0DFFFFFF),
+        color: AppTheme.surfaceWhiteOverlay,
         border: Border.all(color: AppTheme.surfaceWhiteBorder),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -179,17 +181,14 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
         title: Text(
           title,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: GoogleFonts.inter(
-            color: const Color(0xFF7A8A92),
-            fontSize: 11,
-          ),
+          style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 11),
         ),
         trailing: const Icon(
           Icons.chevron_right_rounded,
@@ -261,7 +260,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
             Text(
               title,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -271,7 +270,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
         subtitle: Text(
           subtitle,
           style: GoogleFonts.inter(
-            color: const Color(0xFF7A8A92),
+            color: AppTheme.textTertiary,
             fontSize: 10.5,
           ),
         ),
@@ -294,7 +293,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
           Text(
             'Confirmar início de formação',
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -304,7 +303,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
             'O cão será registrado como "Em Formação" na especialidade de $_selectedSpecialty.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              color: const Color(0xFFB0C4CC),
+              color: AppTheme.textSecondary,
               fontSize: 11,
               height: 1.4,
             ),

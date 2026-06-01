@@ -35,9 +35,7 @@ class _AlertCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withAlpha(15),
         borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: color, width: 3),
-        ),
+        border: Border(left: BorderSide(color: color, width: 3)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -76,11 +74,7 @@ class _AlertCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: _kTextMuted,
-              size: 14,
-            ),
+            Icon(Icons.chevron_right_rounded, color: _kTextMuted, size: 14),
           ],
         ),
       ),

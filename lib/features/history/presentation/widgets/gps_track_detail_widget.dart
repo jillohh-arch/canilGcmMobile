@@ -102,7 +102,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.success,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF04140A), width: 2),
+                  border: Border.all(color: AppTheme.background, width: 2),
                 ),
               ),
             ),
@@ -115,7 +115,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.error,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF1A0606), width: 2),
+                  border: Border.all(color: AppTheme.background, width: 2),
                 ),
               ),
             ),
@@ -130,9 +130,12 @@ class GpsTrackDetailWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
-          color: const Color(0x07FFFFFF),
+          color: AppTheme.surfaceWhiteOverlayWeak,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0x12FFFFFF), width: 1),
+          border: Border.all(
+            color: AppTheme.surfaceWhiteBorderSubtle,
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +153,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
             Text(
               value,
               style: GoogleFonts.ibmPlexMono(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),

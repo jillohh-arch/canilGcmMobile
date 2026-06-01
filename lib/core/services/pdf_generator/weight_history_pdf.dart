@@ -25,12 +25,11 @@ class WeightHistoryPdf {
     );
 
     final fonts = await PdfFonts.load();
-    
+
     // Filter weight-related logs
-    final weightLogs = logs
-        .where((log) => log.dogId == dog.id && log.weight != null)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date)); // Newest first
+    final weightLogs =
+        logs.where((log) => log.dogId == dog.id && log.weight != null).toList()
+          ..sort((a, b) => b.date.compareTo(a.date)); // Newest first
 
     final docId = _buildDocId(dog);
     final count = weightLogs.length;
@@ -38,9 +37,15 @@ class WeightHistoryPdf {
     // Calculate statistics
     final weights = weightLogs.map((l) => l.weight!).toList();
     final current = weights.isNotEmpty ? weights.first : (dog.weight ?? 0.0);
-    final min = weights.isNotEmpty ? weights.reduce((a, b) => a < b ? a : b) : current;
-    final max = weights.isNotEmpty ? weights.reduce((a, b) => a > b ? a : b) : current;
-    final avg = weights.isNotEmpty ? weights.reduce((a, b) => a + b) / weights.length : current;
+    final min = weights.isNotEmpty
+        ? weights.reduce((a, b) => a < b ? a : b)
+        : current;
+    final max = weights.isNotEmpty
+        ? weights.reduce((a, b) => a > b ? a : b)
+        : current;
+    final avg = weights.isNotEmpty
+        ? weights.reduce((a, b) => a + b) / weights.length
+        : current;
 
     // Determine weight trend
     String trendText = 'Estável';
@@ -127,7 +132,8 @@ class WeightHistoryPdf {
                             color: _textSecondary,
                           ),
                         ),
-                        if (dog.idealWeightMin != null && dog.idealWeightMax != null)
+                        if (dog.idealWeightMin != null &&
+                            dog.idealWeightMax != null)
                           pw.Text(
                             'Peso Ideal Configurado: ${dog.idealWeightMin!.toStringAsFixed(1)} kg a ${dog.idealWeightMax!.toStringAsFixed(1)} kg',
                             style: pw.TextStyle(
@@ -142,14 +148,16 @@ class WeightHistoryPdf {
                   pw.SizedBox(width: 20),
                   // Current Status Box
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: pw.BoxDecoration(
                       color: rangeColor.withAlpha(25),
-                      border: pw.Border.all(
-                        color: rangeColor,
-                        width: 1.5,
+                      border: pw.Border.all(color: rangeColor, width: 1.5),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(8),
                       ),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
                     ),
                     child: pw.Column(
                       children: [
@@ -183,7 +191,12 @@ class WeightHistoryPdf {
             // --- 4 QUADROS DE ESTATÍSTICA ---
             pw.Row(
               children: [
-                _buildStatBox('PESO ATUAL', '${current.toStringAsFixed(1)} kg', fonts, isPrimary: true),
+                _buildStatBox(
+                  'PESO ATUAL',
+                  '${current.toStringAsFixed(1)} kg',
+                  fonts,
+                  isPrimary: true,
+                ),
                 pw.SizedBox(width: 8),
                 _buildStatBox('MÍNIMO', '${min.toStringAsFixed(1)} kg', fonts),
                 pw.SizedBox(width: 8),
@@ -202,7 +215,14 @@ class WeightHistoryPdf {
               color: _blue,
             ),
             pw.SizedBox(height: 8),
-            _buildClinicalAnalysis(dog, current, trendText, rangeStatus, rangeColor, fonts),
+            _buildClinicalAnalysis(
+              dog,
+              current,
+              trendText,
+              rangeStatus,
+              rangeColor,
+              fonts,
+            ),
 
             pw.SizedBox(height: 20),
 
@@ -266,11 +286,19 @@ class WeightHistoryPdf {
                     children: [
                       pw.Text(
                         'Código de Rastreamento de Auditoria:',
-                        style: pw.TextStyle(font: fonts.regular, fontSize: 8, color: _textTertiary),
+                        style: pw.TextStyle(
+                          font: fonts.regular,
+                          fontSize: 8,
+                          color: _textTertiary,
+                        ),
                       ),
                       pw.Text(
                         _buildAuditReference(dog),
-                        style: pw.TextStyle(font: fonts.bold, fontSize: 8.5, color: _textSecondary),
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 8.5,
+                          color: _textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -297,20 +325,32 @@ class WeightHistoryPdf {
 
   /// Gera uma referência de auditoria baseada no ID do cão e no timestamp atual.
   static String _buildAuditReference(Dog dog) {
-    final dogPart = dog.id.length >= 6 ? dog.id.substring(0, 6).toUpperCase() : dog.id.toUpperCase();
+    final dogPart = dog.id.length >= 6
+        ? dog.id.substring(0, 6).toUpperCase()
+        : dog.id.toUpperCase();
     final timePart = DateTime.now().millisecondsSinceEpoch.toString();
-    final truncatedTime = timePart.length > 5 ? timePart.substring(timePart.length - 5) : timePart;
+    final truncatedTime = timePart.length > 5
+        ? timePart.substring(timePart.length - 5)
+        : timePart;
     return 'AUDIT-$dogPart-$truncatedTime';
   }
 
   /// Caixa estatística.
-  static pw.Widget _buildStatBox(String label, String value, PdfFonts fonts, {bool isPrimary = false}) {
+  static pw.Widget _buildStatBox(
+    String label,
+    String value,
+    PdfFonts fonts, {
+    bool isPrimary = false,
+  }) {
     return pw.Expanded(
       child: pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: pw.BoxDecoration(
           color: isPrimary ? _blue.withAlpha(20) : _lightGray,
-          border: pw.Border.all(color: isPrimary ? _blue : _cardBorder, width: 1),
+          border: pw.Border.all(
+            color: isPrimary ? _blue : _cardBorder,
+            width: 1,
+          ),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
         ),
         child: pw.Column(
@@ -341,16 +381,26 @@ class WeightHistoryPdf {
 
   /// Constrói a avaliação de desempenho clínico.
   static pw.Widget _buildClinicalAnalysis(
-      Dog dog, double currentWeight, String trend, String rangeStatus, PdfColor color, PdfFonts fonts) {
+    Dog dog,
+    double currentWeight,
+    String trend,
+    String rangeStatus,
+    PdfColor color,
+    PdfFonts fonts,
+  ) {
     String message = '';
     if (rangeStatus == 'DENTRO DA FAIXA IDEAL') {
-      message = 'O cão encontra-se no peso recomendado para as atividades institucionais e de alta intensidade do canil. Recomenda-se manter a rotina nutricional e de treinos atual.';
+      message =
+          'O cão encontra-se no peso recomendado para as atividades institucionais e de alta intensidade do canil. Recomenda-se manter a rotina nutricional e de treinos atual.';
     } else if (rangeStatus == 'ABAIXO DO PESO IDEAL') {
-      message = 'Atenção: O cão está abaixo do peso ideal recomendado. Isso pode impactar sua performance de guarda, proteção e resistência física. Sugere-se avaliação de ração/suplementação.';
+      message =
+          'Atenção: O cão está abaixo do peso ideal recomendado. Isso pode impactar sua performance de guarda, proteção e resistência física. Sugere-se avaliação de ração/suplementação.';
     } else if (rangeStatus == 'ACIMA DO PESO IDEAL') {
-      message = 'Alerta: O cão está acima da faixa ideal de peso recomendada. O sobrepeso aumenta o estresse articular em saltos e corridas. Recomenda-se ajustar a porção diária de ração.';
+      message =
+          'Alerta: O cão está acima da faixa ideal de peso recomendada. O sobrepeso aumenta o estresse articular em saltos e corridas. Recomenda-se ajustar a porção diária de ração.';
     } else {
-      message = 'Não há uma faixa de peso ideal cadastrada para este cão no sistema. Defina os limites idealMin e idealMax para viabilizar o acompanhamento clínico automático.';
+      message =
+          'Não há uma faixa de peso ideal cadastrada para este cão no sistema. Defina os limites idealMin e idealMax para viabilizar o acompanhamento clínico automático.';
     }
 
     return pw.Container(
@@ -365,7 +415,11 @@ class WeightHistoryPdf {
         children: [
           pw.Text(
             'Tendência de Peso: $trend',
-            style: pw.TextStyle(font: fonts.bold, fontSize: 10, color: _textPrimary),
+            style: pw.TextStyle(
+              font: fonts.bold,
+              fontSize: 10,
+              color: _textPrimary,
+            ),
           ),
           pw.SizedBox(height: 4),
           pw.Text(
@@ -383,7 +437,10 @@ class WeightHistoryPdf {
   }
 
   /// Constrói a tabela de histórico de peso.
-  static pw.Widget _buildWeightTable(List<HealthLogModel> logs, PdfFonts fonts) {
+  static pw.Widget _buildWeightTable(
+    List<HealthLogModel> logs,
+    PdfFonts fonts,
+  ) {
     if (logs.isEmpty) {
       return pw.Container(
         height: 80,
@@ -394,12 +451,22 @@ class WeightHistoryPdf {
         ),
         child: pw.Text(
           'Nenhuma pesagem registrada no histórico.',
-          style: pw.TextStyle(font: fonts.regular, fontSize: 10, color: _textTertiary),
+          style: pw.TextStyle(
+            font: fonts.regular,
+            fontSize: 10,
+            color: _textTertiary,
+          ),
         ),
       );
     }
 
-    final headers = ['Data', 'Peso (kg)', 'Variação', 'Registrado Por', 'Observações'];
+    final headers = [
+      'Data',
+      'Peso (kg)',
+      'Variação',
+      'Registrado Por',
+      'Observações',
+    ];
 
     return pw.Table(
       border: pw.TableBorder.all(color: _cardBorder, width: 0.5),
@@ -413,19 +480,20 @@ class WeightHistoryPdf {
       children: [
         // Table Header
         pw.TableRow(
-          decoration: pw.BoxDecoration(
-            color: _blue,
-          ),
+          decoration: pw.BoxDecoration(color: _blue),
           children: headers.map((header) {
             return pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
               alignment: pw.Alignment.centerLeft,
               child: pw.Text(
                 header,
                 style: pw.TextStyle(
                   font: fonts.bold,
                   fontSize: 9,
-                  color: PdfColors.white,
+                  color: PdfInstitutionalColors.white,
                 ),
               ),
             );
@@ -451,39 +519,91 @@ class WeightHistoryPdf {
           PdfColor diffColor = _textSecondary;
           if (diff != null && diff.abs() >= 0.1) {
             diffStr = '${diff > 0 ? "+" : ""}${diff.toStringAsFixed(1)} kg';
-            diffColor = diff > 0 ? PdfInstitutionalColors.amberWarning : PdfInstitutionalColors.greenInstitutional;
+            diffColor = diff > 0
+                ? PdfInstitutionalColors.amberWarning
+                : PdfInstitutionalColors.greenInstitutional;
           }
 
           final registeredBy = log.vetName ?? log.createdBy ?? 'Sistema';
-          final obs = log.healthObservations.trim().isNotEmpty ? log.healthObservations : 'Nenhuma';
+          final obs = log.healthObservations.trim().isNotEmpty
+              ? log.healthObservations
+              : 'Nenhuma';
 
           final isRowOdd = index.isOdd;
-          final rowBg = isRowOdd ? _lightGray : PdfColors.white;
+          final rowBg = isRowOdd ? _lightGray : PdfInstitutionalColors.white;
 
           return pw.TableRow(
-            decoration: pw.BoxDecoration(
-              color: rowBg,
-            ),
+            decoration: pw.BoxDecoration(color: rowBg),
             children: [
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(appDate, style: pw.TextStyle(font: fonts.regular, fontSize: 8.5, color: _textPrimary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  appDate,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8.5,
+                    color: _textPrimary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(weightStr, style: pw.TextStyle(font: fonts.bold, fontSize: 8.5, color: _textPrimary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  weightStr,
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 8.5,
+                    color: _textPrimary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(diffStr, style: pw.TextStyle(font: fonts.bold, fontSize: 8.5, color: diffColor)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  diffStr,
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 8.5,
+                    color: diffColor,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(registeredBy, style: pw.TextStyle(font: fonts.regular, fontSize: 8, color: _textSecondary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  registeredBy,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8,
+                    color: _textSecondary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(obs, style: pw.TextStyle(font: fonts.regular, fontSize: 8, color: _textSecondary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  obs,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8,
+                    color: _textSecondary,
+                  ),
+                ),
               ),
             ],
           );

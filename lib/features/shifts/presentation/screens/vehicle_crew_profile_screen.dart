@@ -363,7 +363,7 @@ class _InfoChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: AppTheme.primary.withAlpha(12),
-        border: Border.all(color: Colors.white.withAlpha(16)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(16)),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -397,7 +397,7 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(child: Divider(color: Colors.white.withAlpha(18))),
+        Expanded(child: Divider(color: AppTheme.textPrimary.withAlpha(18))),
         if (trailing != null) ...[
           const SizedBox(width: 10),
           Text(
@@ -440,11 +440,11 @@ class _MemberCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isCurrentUser
             ? AppTheme.primary.withAlpha(10)
-            : Colors.white.withAlpha(7),
+            : AppTheme.textPrimary.withAlpha(7),
         border: Border.all(
           color: member.isPending
               ? AppTheme.warning.withAlpha(96)
-              : Colors.white.withAlpha(18),
+              : AppTheme.textPrimary.withAlpha(18),
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -693,14 +693,18 @@ class _AvailableHandlersSheetState extends State<_AvailableHandlersSheet> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 hintText: 'Buscar por nome, guerra ou RA',
                 filled: true,
-                fillColor: Colors.white.withAlpha(7),
+                fillColor: AppTheme.textPrimary.withAlpha(7),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.white.withAlpha(18)),
+                  borderSide: BorderSide(
+                    color: AppTheme.textPrimary.withAlpha(18),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.white.withAlpha(18)),
+                  borderSide: BorderSide(
+                    color: AppTheme.textPrimary.withAlpha(18),
+                  ),
                 ),
               ),
             ),
@@ -730,7 +734,7 @@ class _AvailableHandlersSheetState extends State<_AvailableHandlersSheet> {
                             side: BorderSide(
                               color: selected
                                   ? AppTheme.primary
-                                  : Colors.white.withAlpha(18),
+                                  : AppTheme.textPrimary.withAlpha(18),
                             ),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -806,7 +810,7 @@ class _InitialsAvatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         border: Border.all(color: color),
       ),
       child: Text(

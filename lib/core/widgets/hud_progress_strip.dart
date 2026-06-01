@@ -36,7 +36,9 @@ class HudProgressStrip extends StatelessWidget {
           final step = steps[index];
           final isActive = index == currentIndex;
           final isDone = index < currentIndex;
-          final color = isActive || isDone ? accent : Colors.white24;
+          final color = isActive || isDone
+              ? accent
+              : AppTheme.textPrimary.withAlpha(61);
 
           return Padding(
             padding: EdgeInsets.only(right: index == steps.length - 1 ? 0 : 10),
@@ -53,7 +55,9 @@ class HudProgressStrip extends StatelessWidget {
                       : _hudPanel.withAlpha(170),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isActive ? accent : Colors.white12,
+                    color: isActive
+                        ? accent
+                        : AppTheme.textPrimary.withAlpha(31),
                     width: isActive ? 1.2 : 0.6,
                   ),
                   boxShadow: isActive
@@ -90,7 +94,9 @@ class HudProgressStrip extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
-                              color: isActive ? Colors.white : Colors.white70,
+                              color: isActive
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textPrimary.withAlpha(179),
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1,
@@ -103,7 +109,7 @@ class HudProgressStrip extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
-                                color: Colors.white54,
+                                color: AppTheme.textPrimary.withAlpha(138),
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                               ),

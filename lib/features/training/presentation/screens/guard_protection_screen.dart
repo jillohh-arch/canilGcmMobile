@@ -75,7 +75,11 @@ class _CapabilityData {
   final _CapabilityState state;
   final String impulse;
 
-  const _CapabilityData({required this.name, required this.state, required this.impulse});
+  const _CapabilityData({
+    required this.name,
+    required this.state,
+    required this.impulse,
+  });
 }
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -93,7 +97,9 @@ class _GuardProtectionScreenState extends State<GuardProtectionScreen> {
   bool get _isOperational {
     final specialties = widget.dog.specialties ?? [];
     return specialties.any(
-      (s) => s.toLowerCase().contains('guarda') && !s.toLowerCase().contains('form'),
+      (s) =>
+          s.toLowerCase().contains('guarda') &&
+          !s.toLowerCase().contains('form'),
     );
   }
 
@@ -137,42 +143,79 @@ class _FormationViewState extends State<_FormationView> {
       name: 'Caça',
       emoji: '🦌',
       state: _ImpulseState.consolidated,
-      contextText: 'Equipamento se move e ativa o impulso · base emocional do trabalho',
+      contextText:
+          'Equipamento se move e ativa o impulso · base emocional do trabalho',
       progress: 1.0,
     ),
     _ImpulseData(
       name: 'Defesa',
       emoji: '🛡',
       state: _ImpulseState.opening,
-      contextText: 'Confronto direto com o cão · pagamento volta em caça pra equilibrar',
+      contextText:
+          'Confronto direto com o cão · pagamento volta em caça pra equilibrar',
       progress: 0.4,
     ),
     _ImpulseData(
       name: 'Agressão',
       emoji: '⚔',
       state: _ImpulseState.notStarted,
-      contextText: 'Cão como parceiro de luta · trabalha após defesa consolidada',
+      contextText:
+          'Cão como parceiro de luta · trabalha após defesa consolidada',
       progress: 0.0,
     ),
   ];
 
   final List<_CapabilityData> _capabilities = [
-    const _CapabilityData(name: 'Material inicial', state: _CapabilityState.done, impulse: 'Caça'),
-    const _CapabilityData(name: 'Mordida firme', state: _CapabilityState.done, impulse: 'Caça'),
-    const _CapabilityData(name: 'Boca cheia', state: _CapabilityState.done, impulse: 'Caça'),
-    const _CapabilityData(name: 'Estabilização', state: _CapabilityState.inProgress, impulse: 'Defesa'),
-    const _CapabilityData(name: 'Manga jovem', state: _CapabilityState.done, impulse: 'Defesa'),
-    const _CapabilityData(name: 'Manga adulta', state: _CapabilityState.inProgress, impulse: 'Defesa'),
-    const _CapabilityData(name: 'Traje', state: _CapabilityState.notStarted, impulse: 'Agressão'),
-    const _CapabilityData(name: 'Vara', state: _CapabilityState.notStarted, impulse: 'Agressão'),
+    const _CapabilityData(
+      name: 'Material inicial',
+      state: _CapabilityState.done,
+      impulse: 'Caça',
+    ),
+    const _CapabilityData(
+      name: 'Mordida firme',
+      state: _CapabilityState.done,
+      impulse: 'Caça',
+    ),
+    const _CapabilityData(
+      name: 'Boca cheia',
+      state: _CapabilityState.done,
+      impulse: 'Caça',
+    ),
+    const _CapabilityData(
+      name: 'Estabilização',
+      state: _CapabilityState.inProgress,
+      impulse: 'Defesa',
+    ),
+    const _CapabilityData(
+      name: 'Manga jovem',
+      state: _CapabilityState.done,
+      impulse: 'Defesa',
+    ),
+    const _CapabilityData(
+      name: 'Manga adulta',
+      state: _CapabilityState.inProgress,
+      impulse: 'Defesa',
+    ),
+    const _CapabilityData(
+      name: 'Traje',
+      state: _CapabilityState.notStarted,
+      impulse: 'Agressão',
+    ),
+    const _CapabilityData(
+      name: 'Vara',
+      state: _CapabilityState.notStarted,
+      impulse: 'Agressão',
+    ),
   ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TrainingViewModel>(context, listen: false)
-          .fetchTrainingsForDog(widget.dog.id);
+      Provider.of<TrainingViewModel>(
+        context,
+        listen: false,
+      ).fetchTrainingsForDog(widget.dog.id);
     });
   }
 
@@ -227,11 +270,15 @@ class _FormationViewState extends State<_FormationView> {
     }
   }
 
-  void _showUpdateCommandStageModal(String name, int currentStage, ValueChanged<int> onStageUpdated) {
+  void _showUpdateCommandStageModal(
+    String name,
+    int currentStage,
+    ValueChanged<int> onStageUpdated,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (context) {
         return UpdateCommandStageModal(
           commandName: name,
@@ -245,11 +292,11 @@ class _FormationViewState extends State<_FormationView> {
   void _showUpdateCapabilityModal(_CapabilityData capability) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (context) {
         return Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0C1920),
+            color: AppTheme.surfacePanel,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -262,7 +309,7 @@ class _FormationViewState extends State<_FormationView> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(24),
+                    color: AppTheme.textPrimary.withAlpha(24),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -271,7 +318,7 @@ class _FormationViewState extends State<_FormationView> {
               Text(
                 'Atualizar Estado da Capacidade',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -280,7 +327,7 @@ class _FormationViewState extends State<_FormationView> {
               Text(
                 'Capacidade: "${capability.name}" (${capability.impulse})',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -330,7 +377,9 @@ class _FormationViewState extends State<_FormationView> {
       onTap: () {
         HapticFeedback.lightImpact();
         setState(() {
-          final idx = _capabilities.indexWhere((c) => c.name == capability.name && c.impulse == capability.impulse);
+          final idx = _capabilities.indexWhere(
+            (c) => c.name == capability.name && c.impulse == capability.impulse,
+          );
           if (idx != -1) {
             _capabilities[idx] = _CapabilityData(
               name: capability.name,
@@ -345,9 +394,11 @@ class _FormationViewState extends State<_FormationView> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withAlpha(20) : Colors.white.withAlpha(4),
+          color: isSelected
+              ? color.withAlpha(20)
+              : AppTheme.textPrimary.withAlpha(4),
           border: Border.all(
-            color: isSelected ? color : Colors.white.withAlpha(12),
+            color: isSelected ? color : AppTheme.textPrimary.withAlpha(12),
             width: isSelected ? 1.5 : 1.0,
           ),
           borderRadius: BorderRadius.circular(10),
@@ -361,7 +412,7 @@ class _FormationViewState extends State<_FormationView> {
                   Text(
                     title,
                     style: GoogleFonts.inter(
-                      color: isSelected ? color : Colors.white,
+                      color: isSelected ? color : AppTheme.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -421,8 +472,11 @@ class _FormationViewState extends State<_FormationView> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -466,8 +520,11 @@ class _FormationViewState extends State<_FormationView> {
           Consumer<TrainingViewModel>(
             builder: (_, vm, _) {
               final sessions = vm.trainings
-                  .where((t) => t.trainingType.toLowerCase().contains('guarda') ||
-                      t.trainingType.toLowerCase().contains('proteção'))
+                  .where(
+                    (t) =>
+                        t.trainingType.toLowerCase().contains('guarda') ||
+                        t.trainingType.toLowerCase().contains('proteção'),
+                  )
                   .toList();
               return BinomioHeader(
                 dog: widget.dog,
@@ -504,19 +561,21 @@ class _FormationViewState extends State<_FormationView> {
                 decoration: BoxDecoration(
                   color: selected
                       ? AppTheme.primary.withAlpha(20)
-                      : Colors.transparent,
+                      : AppTheme.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: selected
                         ? AppTheme.primary.withAlpha(60)
-                        : Colors.white.withAlpha(15),
+                        : AppTheme.textPrimary.withAlpha(15),
                   ),
                 ),
                 child: Center(
                   child: Text(
                     _tabs[i],
                     style: GoogleFonts.inter(
-                      color: selected ? AppTheme.primary : AppTheme.textTertiary,
+                      color: selected
+                          ? AppTheme.primary
+                          : AppTheme.textTertiary,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -572,7 +631,8 @@ class _FormationViewState extends State<_FormationView> {
   }
 
   Widget _impulseTrailCard(_ImpulseData impulse) {
-    final isSelected = _selectedImpulseFilter.toLowerCase() == impulse.name.toLowerCase();
+    final isSelected =
+        _selectedImpulseFilter.toLowerCase() == impulse.name.toLowerCase();
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -584,10 +644,14 @@ class _FormationViewState extends State<_FormationView> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? impulse.stateColor.withAlpha(20) : Colors.white.withAlpha(8),
+          color: isSelected
+              ? impulse.stateColor.withAlpha(20)
+              : AppTheme.textPrimary.withAlpha(8),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? impulse.stateColor.withAlpha(120) : Colors.white.withAlpha(20),
+            color: isSelected
+                ? impulse.stateColor.withAlpha(120)
+                : AppTheme.textPrimary.withAlpha(20),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -604,7 +668,10 @@ class _FormationViewState extends State<_FormationView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
-                    child: Text(impulse.emoji, style: const TextStyle(fontSize: 14)),
+                    child: Text(
+                      impulse.emoji,
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -629,10 +696,7 @@ class _FormationViewState extends State<_FormationView> {
                 const SizedBox(width: 6),
                 Text(
                   impulse.badge,
-                  style: TextStyle(
-                    color: impulse.stateColor,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: impulse.stateColor, fontSize: 14),
                 ),
               ],
             ),
@@ -643,7 +707,7 @@ class _FormationViewState extends State<_FormationView> {
               child: LinearProgressIndicator(
                 value: impulse.progress,
                 minHeight: 4,
-                backgroundColor: Colors.white.withAlpha(15),
+                backgroundColor: AppTheme.textPrimary.withAlpha(15),
                 valueColor: AlwaysStoppedAnimation(impulse.stateColor),
               ),
             ),
@@ -663,7 +727,10 @@ class _FormationViewState extends State<_FormationView> {
 
   Widget _buildCapabilitiesSection() {
     final filteredCapabilities = _capabilities
-        .where((cap) => cap.impulse.toLowerCase() == _selectedImpulseFilter.toLowerCase())
+        .where(
+          (cap) =>
+              cap.impulse.toLowerCase() == _selectedImpulseFilter.toLowerCase(),
+        )
         .toList();
 
     return Column(
@@ -706,14 +773,21 @@ class _FormationViewState extends State<_FormationView> {
               final color = isDone
                   ? AppTheme.success
                   : isInProgress
-                      ? AppTheme.warning
-                      : AppTheme.textTertiary;
-              final icon = isDone ? '✓' : isInProgress ? '◔' : '○';
+                  ? AppTheme.warning
+                  : AppTheme.textTertiary;
+              final icon = isDone
+                  ? '✓'
+                  : isInProgress
+                  ? '◔'
+                  : '○';
 
               return GestureDetector(
                 onTap: () => _showUpdateCapabilityModal(cap),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withAlpha(15),
                     borderRadius: BorderRadius.circular(8),
@@ -722,10 +796,7 @@ class _FormationViewState extends State<_FormationView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        icon,
-                        style: TextStyle(color: color, fontSize: 12),
-                      ),
+                      Text(icon, style: TextStyle(color: color, fontSize: 12)),
                       const SizedBox(width: 5),
                       Text(
                         cap.name,
@@ -751,11 +822,16 @@ class _FormationViewState extends State<_FormationView> {
       children: [
         _sectionLabel('COMANDOS DA ESPECIALIDADE'),
         const SizedBox(height: 10),
-        _commandItem('Larga', 'Solta o equipamento sob comando', _largaStage, () {
-          _showUpdateCommandStageModal('Larga', _largaStage, (newStage) {
-            setState(() => _largaStage = newStage);
-          });
-        }),
+        _commandItem(
+          'Larga',
+          'Solta o equipamento sob comando',
+          _largaStage,
+          () {
+            _showUpdateCommandStageModal('Larga', _largaStage, (newStage) {
+              setState(() => _largaStage = newStage);
+            });
+          },
+        ),
         const SizedBox(height: 6),
         _commandItem('Atenção', 'Latir para o figurante', _atencaoStage, () {
           _showUpdateCommandStageModal('Atenção', _atencaoStage, (newStage) {
@@ -770,7 +846,7 @@ class _FormationViewState extends State<_FormationView> {
     final status = _getCommandStatusLabel(stage);
     final color = _getCommandStatusColor(stage);
     final icon = _getCommandStatusIcon(stage);
-    
+
     String bullets = '';
     for (int i = 0; i < 5; i++) {
       bullets += i < stage ? '●' : '○';
@@ -782,9 +858,9 @@ class _FormationViewState extends State<_FormationView> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
+          color: AppTheme.textPrimary.withAlpha(8),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withAlpha(20)),
+          border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
         ),
         child: Row(
           children: [
@@ -860,13 +936,13 @@ class _FormationViewState extends State<_FormationView> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppTheme.warning.withAlpha(25),
-                const Color(0xFF0C1920),
-              ],
+              colors: [AppTheme.warning.withAlpha(25), AppTheme.surfacePanel],
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.warning.withAlpha(80), width: 1.5),
+            border: Border.all(
+              color: AppTheme.warning.withAlpha(80),
+              width: 1.5,
+            ),
             boxShadow: [
               BoxShadow(
                 color: AppTheme.warning.withAlpha(10),
@@ -899,7 +975,7 @@ class _FormationViewState extends State<_FormationView> {
                         Text(
                           'Defesa',
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -916,7 +992,10 @@ class _FormationViewState extends State<_FormationView> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.warning.withAlpha(20),
                       borderRadius: BorderRadius.circular(6),
@@ -933,7 +1012,7 @@ class _FormationViewState extends State<_FormationView> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(color: Colors.white24),
+              Divider(color: AppTheme.textPrimary.withAlpha(61)),
               const SizedBox(height: 8),
               Text(
                 'DIRETRIZES DO IMPULSO',
@@ -965,10 +1044,12 @@ class _FormationViewState extends State<_FormationView> {
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(6),
+              color: AppTheme.textPrimary.withAlpha(6),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isChecked ? AppTheme.warning.withAlpha(40) : Colors.white.withAlpha(12),
+                color: isChecked
+                    ? AppTheme.warning.withAlpha(40)
+                    : AppTheme.textPrimary.withAlpha(12),
               ),
             ),
             child: CheckboxListTile(
@@ -982,7 +1063,9 @@ class _FormationViewState extends State<_FormationView> {
               title: Text(
                 item['title'] as String,
                 style: GoogleFonts.inter(
-                  color: isChecked ? Colors.white : AppTheme.textSecondary,
+                  color: isChecked
+                      ? AppTheme.textPrimary
+                      : AppTheme.textSecondary,
                   fontSize: 12,
                   fontWeight: isChecked ? FontWeight.w600 : FontWeight.normal,
                 ),
@@ -1002,9 +1085,11 @@ class _FormationViewState extends State<_FormationView> {
     return Consumer<TrainingViewModel>(
       builder: (context, vm, _) {
         final sessions = vm.trainings
-            .where((t) =>
-                t.trainingType.toLowerCase().contains('guarda') ||
-                t.trainingType.toLowerCase().contains('proteção'))
+            .where(
+              (t) =>
+                  t.trainingType.toLowerCase().contains('guarda') ||
+                  t.trainingType.toLowerCase().contains('proteção'),
+            )
             .toList();
 
         if (sessions.isEmpty) {
@@ -1064,23 +1149,24 @@ class _FormationViewState extends State<_FormationView> {
     final figurante = session.metadata?['figurante'] ?? 'Não especificado';
     final payment = session.metadata?['payment'] ?? 'SEM';
     final equipment = session.metadata?['equipment'] ?? '';
-    final capabilities = session.metadata?['capabilities'] as List<dynamic>? ?? [];
-    
-    Color paymentColor = const Color(0xFF95A5A6);
+    final capabilities =
+        session.metadata?['capabilities'] as List<dynamic>? ?? [];
+
+    Color paymentColor = AppTheme.textSoft;
     String paymentText = 'SEM PAGAMENTO';
     String paymentEmoji = '⊘';
-    
+
     final pClean = payment.toString().toUpperCase();
     if (pClean.contains('CAÇA') || pClean.contains('CACA')) {
-      paymentColor = const Color(0xFF2ECC71);
+      paymentColor = AppTheme.success;
       paymentText = 'CAÇA';
       paymentEmoji = '🦌';
     } else if (pClean.contains('DEFESA')) {
-      paymentColor = const Color(0xFFF1C40F);
+      paymentColor = AppTheme.warning;
       paymentText = 'DEFESA';
       paymentEmoji = '🛡';
     } else if (pClean.contains('AGRESSÃO') || pClean.contains('AGRESSAO')) {
-      paymentColor = const Color(0xFFE74C3C);
+      paymentColor = AppTheme.error;
       paymentText = 'AGRESSÃO';
       paymentEmoji = '⚔';
     }
@@ -1089,9 +1175,9 @@ class _FormationViewState extends State<_FormationView> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
+        color: AppTheme.textPrimary.withAlpha(6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(12)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1104,7 +1190,7 @@ class _FormationViewState extends State<_FormationView> {
                   Text(
                     day,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1126,7 +1212,7 @@ class _FormationViewState extends State<_FormationView> {
                     Text(
                       impulse,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1147,7 +1233,10 @@ class _FormationViewState extends State<_FormationView> {
                 decoration: BoxDecoration(
                   color: paymentColor.withAlpha(20),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: paymentColor.withAlpha(60), width: 1.0),
+                  border: Border.all(
+                    color: paymentColor.withAlpha(60),
+                    width: 1.0,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1170,7 +1259,7 @@ class _FormationViewState extends State<_FormationView> {
           ),
           if (equipment.isNotEmpty || capabilities.isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Divider(color: Colors.white10, height: 1),
+            Divider(color: AppTheme.textPrimary.withAlpha(26), height: 1),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
@@ -1178,28 +1267,43 @@ class _FormationViewState extends State<_FormationView> {
               children: [
                 if (equipment.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(10),
+                      color: AppTheme.textPrimary.withAlpha(10),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '🎒 $equipment',
-                      style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 9.5),
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 9.5,
+                      ),
                     ),
                   ),
-                ...capabilities.map((c) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withAlpha(15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppTheme.primary.withAlpha(30)),
+                ...capabilities.map(
+                  (c) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withAlpha(15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.primary.withAlpha(30)),
+                    ),
+                    child: Text(
+                      '✓ $c',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.primary,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    '✓ $c',
-                    style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 9.5, fontWeight: FontWeight.w500),
-                  ),
-                )),
+                ),
               ],
             ),
           ],
@@ -1223,9 +1327,11 @@ class _FormationViewState extends State<_FormationView> {
     return Consumer<TrainingViewModel>(
       builder: (context, vm, _) {
         final sessions = vm.trainings
-            .where((t) =>
-                t.trainingType.toLowerCase().contains('guarda') ||
-                t.trainingType.toLowerCase().contains('proteção'))
+            .where(
+              (t) =>
+                  t.trainingType.toLowerCase().contains('guarda') ||
+                  t.trainingType.toLowerCase().contains('proteção'),
+            )
             .toList();
 
         if (sessions.isEmpty) {
@@ -1234,7 +1340,10 @@ class _FormationViewState extends State<_FormationView> {
               padding: const EdgeInsets.symmetric(vertical: 40.0),
               child: Text(
                 'Registre treinos para ver estatísticas.',
-                style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textTertiary,
+                  fontSize: 12,
+                ),
               ),
             ),
           );
@@ -1303,21 +1412,21 @@ class _FormationViewState extends State<_FormationView> {
               title: '🦌 Caça',
               count: cacaCount,
               total: totalImpulses,
-              color: const Color(0xFF2ECC71),
+              color: AppTheme.success,
             ),
             const SizedBox(height: 8),
             _buildStatProgressBar(
               title: '🛡 Defesa',
               count: defesaCount,
               total: totalImpulses,
-              color: const Color(0xFFF1C40F),
+              color: AppTheme.warning,
             ),
             const SizedBox(height: 8),
             _buildStatProgressBar(
               title: '⚔ Agressão',
               count: agressaoCount,
               total: totalImpulses,
-              color: const Color(0xFFE74C3C),
+              color: AppTheme.error,
             ),
             const SizedBox(height: 24),
             _sectionLabel('PAGAMENTOS DA SESSÃO'),
@@ -1326,28 +1435,28 @@ class _FormationViewState extends State<_FormationView> {
               title: '🦌 Caça Padrão',
               count: payCaca,
               total: totalPayments,
-              color: const Color(0xFF2ECC71),
+              color: AppTheme.success,
             ),
             const SizedBox(height: 8),
             _buildStatProgressBar(
               title: '🛡 Defesa',
               count: payDefesa,
               total: totalPayments,
-              color: const Color(0xFFF1C40F),
+              color: AppTheme.warning,
             ),
             const SizedBox(height: 8),
             _buildStatProgressBar(
               title: '⚔ Agressão',
               count: payAgressao,
               total: totalPayments,
-              color: const Color(0xFFE74C3C),
+              color: AppTheme.error,
             ),
             const SizedBox(height: 8),
             _buildStatProgressBar(
               title: '⊘ Sem Pagamento',
               count: paySem,
               total: totalPayments,
-              color: const Color(0xFF95A5A6),
+              color: AppTheme.textSoft,
             ),
             if (evalCount > 0) ...[
               const SizedBox(height: 24),
@@ -1356,9 +1465,9 @@ class _FormationViewState extends State<_FormationView> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(6),
+                  color: AppTheme.textPrimary.withAlpha(6),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withAlpha(12)),
+                  border: Border.all(color: AppTheme.textPrimary.withAlpha(12)),
                 ),
                 child: Row(
                   children: [
@@ -1371,7 +1480,7 @@ class _FormationViewState extends State<_FormationView> {
                           Text(
                             'Avaliação Média do Figurante',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1449,7 +1558,7 @@ class _FormationViewState extends State<_FormationView> {
             Text(
               '$count ($pctString%)',
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1463,7 +1572,7 @@ class _FormationViewState extends State<_FormationView> {
             height: 8,
             child: LinearProgressIndicator(
               value: pct,
-              backgroundColor: Colors.white.withAlpha(12),
+              backgroundColor: AppTheme.textPrimary.withAlpha(12),
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
@@ -1476,9 +1585,11 @@ class _FormationViewState extends State<_FormationView> {
     return Consumer<TrainingViewModel>(
       builder: (_, vm, _) {
         final recent = vm.trainings
-            .where((t) =>
-                t.trainingType.toLowerCase().contains('guarda') ||
-                t.trainingType.toLowerCase().contains('proteção'))
+            .where(
+              (t) =>
+                  t.trainingType.toLowerCase().contains('guarda') ||
+                  t.trainingType.toLowerCase().contains('proteção'),
+            )
             .take(3)
             .toList();
 
@@ -1506,9 +1617,9 @@ class _FormationViewState extends State<_FormationView> {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Row(
         children: [
@@ -1578,10 +1689,8 @@ class _FormationViewState extends State<_FormationView> {
               HapticFeedback.lightImpact();
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => _SessionFormScreen(
-                    dog: widget.dog,
-                    isFormation: true,
-                  ),
+                  builder: (_) =>
+                      _SessionFormScreen(dog: widget.dog, isFormation: true),
                 ),
               );
             },
@@ -1668,8 +1777,10 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TrainingViewModel>(context, listen: false)
-          .fetchTrainingsForDog(widget.dog.id);
+      Provider.of<TrainingViewModel>(
+        context,
+        listen: false,
+      ).fetchTrainingsForDog(widget.dog.id);
     });
   }
 
@@ -1723,8 +1834,11 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1768,17 +1882,23 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
           Consumer<TrainingViewModel>(
             builder: (_, vm, _) {
               final sessions = vm.trainings
-                  .where((t) => t.trainingType.toLowerCase().contains('guarda') ||
-                      t.trainingType.toLowerCase().contains('proteção'))
+                  .where(
+                    (t) =>
+                        t.trainingType.toLowerCase().contains('guarda') ||
+                        t.trainingType.toLowerCase().contains('proteção'),
+                  )
                   .toList();
               int? lastDays;
               if (sessions.isNotEmpty) {
                 sessions.sort((a, b) => b.date.compareTo(a.date));
-                lastDays = DateTime.now().difference(sessions.first.date).inDays;
+                lastDays = DateTime.now()
+                    .difference(sessions.first.date)
+                    .inDays;
               }
               return BinomioHeader(
                 dog: widget.dog,
-                subtitle: 'Operacional · ${sessions.length} sessões${lastDays != null ? ' · última há ${lastDays}d' : ''}',
+                subtitle:
+                    'Operacional · ${sessions.length} sessões${lastDays != null ? ' · última há ${lastDays}d' : ''}',
                 subtitleColor: AppTheme.success,
                 dogBorderColor: AppTheme.success,
                 conductorBorderColor: AppTheme.success,
@@ -1832,7 +1952,7 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
               hintText: 'O que você quer aprimorar?',
               hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
               filled: true,
-              fillColor: Colors.black.withAlpha(65),
+              fillColor: AppTheme.background.withAlpha(65),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
@@ -1841,8 +1961,10 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -1856,8 +1978,10 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
                   setState(() {});
                 },
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(14),
@@ -1904,9 +2028,9 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(20)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1921,8 +2045,10 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
-                  child:
-                      Text(impulse.emoji, style: const TextStyle(fontSize: 14)),
+                  child: Text(
+                    impulse.emoji,
+                    style: const TextStyle(fontSize: 14),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1957,7 +2083,7 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
             child: LinearProgressIndicator(
               value: impulse.progress,
               minHeight: 4,
-              backgroundColor: Colors.white.withAlpha(15),
+              backgroundColor: AppTheme.textPrimary.withAlpha(15),
               valueColor: AlwaysStoppedAnimation(impulse.stateColor),
             ),
           ),
@@ -1978,9 +2104,11 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
     return Consumer<TrainingViewModel>(
       builder: (_, vm, _) {
         final recent = vm.trainings
-            .where((t) =>
-                t.trainingType.toLowerCase().contains('guarda') ||
-                t.trainingType.toLowerCase().contains('proteção'))
+            .where(
+              (t) =>
+                  t.trainingType.toLowerCase().contains('guarda') ||
+                  t.trainingType.toLowerCase().contains('proteção'),
+            )
             .take(3)
             .toList();
 
@@ -2016,9 +2144,9 @@ class _MaintenanceViewState extends State<_MaintenanceView> {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Row(
         children: [
@@ -2146,11 +2274,11 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
   void _showFiguranteSelector() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (context) {
         return Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0C1920),
+            color: AppTheme.surfacePanel,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -2163,7 +2291,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(24),
+                    color: AppTheme.textPrimary.withAlpha(24),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -2172,7 +2300,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
               Text(
                 'Selecionar Figurante',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2183,10 +2311,18 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   leading: const Text('👤', style: TextStyle(fontSize: 18)),
                   title: Text(
                     fig,
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   trailing: _figuranteController.text == fig
-                      ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20)
+                      ? const Icon(
+                          Icons.check_circle_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
+                        )
                       : null,
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -2197,12 +2333,16 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   },
                 );
               }),
-              const Divider(color: Colors.white24),
+              Divider(color: AppTheme.textPrimary.withAlpha(61)),
               ListTile(
                 leading: const Text('➕', style: TextStyle(fontSize: 16)),
                 title: Text(
                   'Cadastrar outro figurante...',
-                  style: GoogleFonts.inter(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.inter(
+                    color: AppTheme.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -2222,26 +2362,39 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF0C1920),
+          backgroundColor: AppTheme.surfacePanel,
           title: Text(
             'Novo Figurante',
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Digite o nome do figurante',
               hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
-              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.primary)),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(77),
+                ),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppTheme.primary),
+              ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar', style: GoogleFonts.inter(color: AppTheme.textTertiary)),
+              child: Text(
+                'Cancelar',
+                style: GoogleFonts.inter(color: AppTheme.textTertiary),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -2252,7 +2405,13 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                 }
                 Navigator.of(context).pop();
               },
-              child: Text('Confirmar', style: GoogleFonts.inter(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Confirmar',
+                style: GoogleFonts.inter(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -2261,7 +2420,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
   }
 
   // Impulso trabalhado
-  static const _impulseOptions = ['🦌 Caça', '🛡 Defesa', '⚔ Agressão', 'Mista'];
+  static const _impulseOptions = [
+    '🦌 Caça',
+    '🛡 Defesa',
+    '⚔ Agressão',
+    'Mista',
+  ];
   String? _selectedImpulse;
 
   // Equipamento
@@ -2292,7 +2456,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
   bool _scenarioActive = false;
 
   // Comportamento
-  static const _behaviorOptions = ['Hesitante', 'Equilibrado', 'Firme', 'Exagerado'];
+  static const _behaviorOptions = [
+    'Hesitante',
+    'Equilibrado',
+    'Firme',
+    'Exagerado',
+  ];
   String? _selectedBehavior;
 
   // Avaliação (4 critérios x 4 níveis)
@@ -2327,7 +2496,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione o impulso trabalhado'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.attention,
         ),
       );
       return;
@@ -2433,9 +2602,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: themeColor.withAlpha(40)),
-        ),
+        border: Border(bottom: BorderSide(color: themeColor.withAlpha(40))),
       ),
       child: Column(
         children: [
@@ -2443,8 +2610,11 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -2488,8 +2658,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
           BinomioHeader(
             dog: widget.dog,
             subtitle: widget.isFormation ? 'FORMAÇÃO' : 'MANUTENÇÃO',
-            subtitleColor: widget.isFormation ? AppTheme.warning : AppTheme.success,
-            dogBorderColor: widget.isFormation ? AppTheme.warning : AppTheme.success,
+            subtitleColor: widget.isFormation
+                ? AppTheme.warning
+                : AppTheme.success,
+            dogBorderColor: widget.isFormation
+                ? AppTheme.warning
+                : AppTheme.success,
             avatarSize: 38,
             withBackground: false,
           ),
@@ -2511,13 +2685,13 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
             final selected = _selectedImpulse == opt;
             Color chipColor = AppTheme.primary;
             if (opt.contains('Caça')) {
-              chipColor = const Color(0xFF2ECC71);
+              chipColor = AppTheme.success;
             } else if (opt.contains('Defesa')) {
-              chipColor = const Color(0xFFF1C40F);
+              chipColor = AppTheme.warning;
             } else if (opt.contains('Agressão')) {
-              chipColor = const Color(0xFFE74C3C);
+              chipColor = AppTheme.error;
             } else {
-              chipColor = const Color(0xFF95A5A6);
+              chipColor = AppTheme.textSoft;
             }
 
             return GestureDetector(
@@ -2526,12 +2700,19 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                 setState(() => _selectedImpulse = selected ? null : opt);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
-                  color: selected ? chipColor.withAlpha(20) : Colors.white.withAlpha(8),
+                  color: selected
+                      ? chipColor.withAlpha(20)
+                      : AppTheme.textPrimary.withAlpha(8),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: selected ? chipColor : Colors.white.withAlpha(25),
+                    color: selected
+                        ? chipColor
+                        : AppTheme.textPrimary.withAlpha(25),
                     width: selected ? 1.5 : 1.0,
                   ),
                 ),
@@ -2563,10 +2744,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
+              color: AppTheme.textPrimary.withAlpha(8),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isSelected ? AppTheme.primary.withAlpha(60) : Colors.white.withAlpha(20),
+                color: isSelected
+                    ? AppTheme.primary.withAlpha(60)
+                    : AppTheme.textPrimary.withAlpha(20),
               ),
             ),
             child: Row(
@@ -2575,15 +2758,24 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isSelected ? _figuranteController.text : 'Selecionar figurante...',
+                    isSelected
+                        ? _figuranteController.text
+                        : 'Selecionar figurante...',
                     style: GoogleFonts.inter(
-                      color: isSelected ? Colors.white : AppTheme.textTertiary,
+                      color: isSelected
+                          ? AppTheme.textPrimary
+                          : AppTheme.textTertiary,
                       fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textTertiary),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppTheme.textTertiary,
+                ),
               ],
             ),
           ),
@@ -2691,22 +2883,36 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: _scenarioActive ? const Color(0xFFE74C3C).withAlpha(15) : Colors.white.withAlpha(8),
+            color: _scenarioActive
+                ? AppTheme.error.withAlpha(15)
+                : AppTheme.textPrimary.withAlpha(8),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _scenarioActive ? const Color(0xFFE74C3C).withAlpha(60) : Colors.white.withAlpha(20),
+              color: _scenarioActive
+                  ? AppTheme.error.withAlpha(60)
+                  : AppTheme.textPrimary.withAlpha(20),
               width: _scenarioActive ? 1.5 : 1.0,
             ),
           ),
           child: Row(
             children: [
-              Text('🎬', style: TextStyle(fontSize: 16, color: _scenarioActive ? const Color(0xFFE74C3C) : AppTheme.textTertiary)),
+              Text(
+                '🎬',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _scenarioActive
+                      ? AppTheme.error
+                      : AppTheme.textTertiary,
+                ),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Cenário simulado',
                   style: GoogleFonts.inter(
-                    color: _scenarioActive ? const Color(0xFFE74C3C) : AppTheme.textPrimary,
+                    color: _scenarioActive
+                        ? AppTheme.error
+                        : AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2718,10 +2924,10 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   HapticFeedback.lightImpact();
                   setState(() => _scenarioActive = v);
                 },
-                activeTrackColor: const Color(0xFFE74C3C).withAlpha(100),
-                activeThumbColor: const Color(0xFFE74C3C),
+                activeTrackColor: AppTheme.error.withAlpha(100),
+                activeThumbColor: AppTheme.error,
                 inactiveThumbColor: AppTheme.textTertiary,
-                inactiveTrackColor: Colors.white.withAlpha(15),
+                inactiveTrackColor: AppTheme.textPrimary.withAlpha(15),
               ),
             ],
           ),
@@ -2736,18 +2942,18 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
               hintText: 'Descreva o cenário simulado...',
               hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
               filled: true,
-              fillColor: Colors.white.withAlpha(8),
+              fillColor: AppTheme.textPrimary.withAlpha(8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: const Color(0xFFE74C3C).withAlpha(40)),
+                borderSide: BorderSide(color: AppTheme.error.withAlpha(40)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: const Color(0xFFE74C3C).withAlpha(40)),
+                borderSide: BorderSide(color: AppTheme.error.withAlpha(40)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFE74C3C)),
+                borderSide: BorderSide(color: AppTheme.error),
               ),
               contentPadding: const EdgeInsets.all(14),
             ),
@@ -2779,12 +2985,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   decoration: BoxDecoration(
                     color: selected
                         ? AppTheme.primary.withAlpha(20)
-                        : Colors.white.withAlpha(8),
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: selected
                           ? AppTheme.primary.withAlpha(60)
-                          : Colors.white.withAlpha(20),
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -2839,9 +3045,9 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2858,7 +3064,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
           Row(
             children: List.generate(_evalLevels.length, (i) {
               final selected = currentScore == i;
-              const cyanColor = Color(0xFF4DD0E1);
+              const cyanColor = AppTheme.primary;
               return Expanded(
                 child: GestureDetector(
                   onTap: () {
@@ -2869,10 +3075,14 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                     margin: EdgeInsets.only(left: i > 0 ? 4 : 0),
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
-                      color: selected ? cyanColor.withAlpha(25) : Colors.transparent,
+                      color: selected
+                          ? cyanColor.withAlpha(25)
+                          : AppTheme.transparent,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: selected ? cyanColor : Colors.white.withAlpha(15),
+                        color: selected
+                            ? cyanColor
+                            : AppTheme.textPrimary.withAlpha(15),
                       ),
                     ),
                     child: Center(
@@ -2903,10 +3113,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
         const SizedBox(height: 4),
         Text(
           'Onde a sessão terminou emocionalmente · imensa maioria das vezes em caça',
-          style: GoogleFonts.inter(
-            color: AppTheme.textTertiary,
-            fontSize: 10,
-          ),
+          style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 10),
         ),
         const SizedBox(height: 10),
         Row(
@@ -2916,13 +3123,13 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
 
             Color themedColor = color;
             if (label == 'CAÇA') {
-              themedColor = const Color(0xFF2ECC71);
+              themedColor = AppTheme.success;
             } else if (label == 'DEFESA') {
-              themedColor = const Color(0xFFF1C40F);
+              themedColor = AppTheme.warning;
             } else if (label == 'AGRESSÃO') {
-              themedColor = const Color(0xFFE74C3C);
+              themedColor = AppTheme.error;
             } else if (label == 'SEM') {
-              themedColor = const Color(0xFF95A5A6);
+              themedColor = AppTheme.textSoft;
             }
 
             return Expanded(
@@ -2935,10 +3142,14 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
                   margin: EdgeInsets.only(left: i > 0 ? 6 : 0),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: selected ? themedColor.withAlpha(20) : Colors.white.withAlpha(8),
+                    color: selected
+                        ? themedColor.withAlpha(20)
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: selected ? themedColor : Colors.white.withAlpha(20),
+                      color: selected
+                          ? themedColor
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -2993,14 +3204,14 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
             hintText: 'Notas do figurante sobre a sessão...',
             hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
             filled: true,
-            fillColor: Colors.white.withAlpha(8),
+            fillColor: AppTheme.textPrimary.withAlpha(8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+              borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+              borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
             ),
             contentPadding: const EdgeInsets.all(14),
           ),
@@ -3072,10 +3283,12 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
       decoration: BoxDecoration(
         color: selected
             ? AppTheme.primary.withAlpha(20)
-            : Colors.white.withAlpha(8),
+            : AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? AppTheme.primary.withAlpha(60) : Colors.white.withAlpha(25),
+          color: selected
+              ? AppTheme.primary.withAlpha(60)
+              : AppTheme.textPrimary.withAlpha(25),
         ),
       ),
       child: Text(

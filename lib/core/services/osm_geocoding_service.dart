@@ -37,7 +37,7 @@ class OsmGeocodingService {
   final http.Client _client;
 
   OsmGeocodingService({http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   /// Busca endereços/POIs via Photon com bias geográfico.
   /// Retorna lista vazia em caso de erro ou query vazia.
@@ -72,7 +72,9 @@ class OsmGeocodingService {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final features = json['features'] as List<dynamic>? ?? [];
 
-      return features.map((f) => _parseFeature(f as Map<String, dynamic>)).toList();
+      return features
+          .map((f) => _parseFeature(f as Map<String, dynamic>))
+          .toList();
     } on TimeoutException {
       return [];
     } catch (_) {

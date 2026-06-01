@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Tela de resumo após finalizar o rastreamento GPS.
 ///
@@ -38,7 +39,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: Column(
         children: [
           // Header
@@ -52,7 +53,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                   Text(
                     'RASTREAMENTO CONCLUÍDO',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF2ECC71),
+                      color: AppTheme.success,
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
@@ -62,7 +63,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                   Text(
                     widget.activityLabel,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                     ),
@@ -71,7 +72,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                   Text(
                     '${widget.dogName} · ${widget.handlerName} · ${_formatDateRange()}',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF7D8D99),
+                      color: AppTheme.textTertiary,
                       fontSize: 11.5,
                     ),
                   ),
@@ -80,10 +81,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
             ),
           ),
           // Map
-          SizedBox(
-            height: 230,
-            child: _buildMap(route),
-          ),
+          SizedBox(height: 230, child: _buildMap(route)),
           // Metrics grid
           Padding(
             padding: const EdgeInsets.all(16),
@@ -151,11 +149,11 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
   Widget _buildMap(List<LatLng> route) {
     if (route.isEmpty) {
       return Container(
-        color: const Color(0xFF0A1418),
+        color: AppTheme.surfacePanelSoft,
         alignment: Alignment.center,
         child: Text(
           'Sem pontos registrados',
-          style: GoogleFonts.inter(color: const Color(0xFF5A7280)),
+          style: GoogleFonts.inter(color: AppTheme.textMuted),
         ),
       );
     }
@@ -183,11 +181,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
         ),
         PolylineLayer(
           polylines: [
-            Polyline(
-              points: route,
-              color: const Color(0xFF4DD0E1),
-              strokeWidth: 4.5,
-            ),
+            Polyline(points: route, color: AppTheme.primary, strokeWidth: 4.5),
           ],
         ),
         MarkerLayer(
@@ -199,12 +193,9 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
               height: 16,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71),
+                  color: AppTheme.success,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF04140A),
-                    width: 2.5,
-                  ),
+                  border: Border.all(color: AppTheme.background, width: 2.5),
                 ),
               ),
             ),
@@ -215,16 +206,13 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
               height: 18,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE74C3C),
+                  color: AppTheme.error,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF1A0606),
-                    width: 2,
-                  ),
+                  border: Border.all(color: AppTheme.background, width: 2),
                 ),
                 child: const Icon(
                   Icons.flag_rounded,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   size: 10,
                 ),
               ),
@@ -240,9 +228,12 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
       child: Container(
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: const Color(0x07FFFFFF),
+          color: AppTheme.surfaceWhiteOverlayWeak,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0x12FFFFFF), width: 1),
+          border: Border.all(
+            color: AppTheme.surfaceWhiteBorderSubtle,
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +241,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
             Text(
               label.toUpperCase(),
               style: GoogleFonts.inter(
-                color: const Color(0xFF5A7280),
+                color: AppTheme.textMuted,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.6,
@@ -263,7 +254,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                   TextSpan(
                     text: value,
                     style: GoogleFonts.ibmPlexMono(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
@@ -272,7 +263,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
                     TextSpan(
                       text: ' $unit',
                       style: GoogleFonts.ibmPlexMono(
-                        color: const Color(0xFF5A7280),
+                        color: AppTheme.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -334,15 +325,15 @@ class _DiscardButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0x24E74C3C),
+          color: AppTheme.error.withAlpha(36),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0x73E74C3C), width: 1.5),
+          border: Border.all(color: AppTheme.error.withAlpha(115), width: 1.5),
         ),
         alignment: Alignment.center,
         child: Text(
           'Descartar',
           style: GoogleFonts.inter(
-            color: const Color(0xFFE74C3C),
+            color: AppTheme.error,
             fontSize: 14,
             fontWeight: FontWeight.w800,
           ),
@@ -363,19 +354,23 @@ class _ConfirmButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF4DD0E1),
+          color: AppTheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
         alignment: Alignment.center,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_rounded, color: Color(0xFF04181C), size: 17),
+            const Icon(
+              Icons.check_rounded,
+              color: AppTheme.background,
+              size: 17,
+            ),
             const SizedBox(width: 8),
             Text(
               'Confirmar rota',
               style: GoogleFonts.inter(
-                color: const Color(0xFF04181C),
+                color: AppTheme.background,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),

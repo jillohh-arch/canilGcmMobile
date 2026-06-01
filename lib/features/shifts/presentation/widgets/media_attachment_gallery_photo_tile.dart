@@ -19,10 +19,10 @@ class _PhotoTile extends StatelessWidget {
       width: 100,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppTheme.textPrimary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isSelected ? const Color(0xFFFBBF24) : Colors.transparent,
+          color: isSelected ? AppTheme.warningAccent : AppTheme.transparent,
           width: 2,
         ),
       ),
@@ -53,11 +53,14 @@ class _PhotoTileStatusOverlay extends StatelessWidget {
     if (status == MediaAttachmentRows.statusUploading) {
       return Container(
         decoration: BoxDecoration(
-          color: Colors.black54,
+          color: AppTheme.background.withAlpha(138),
           borderRadius: BorderRadius.circular(6),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+          child: CircularProgressIndicator(
+            color: AppTheme.textPrimary,
+            strokeWidth: 2,
+          ),
         ),
       );
     }
@@ -65,11 +68,15 @@ class _PhotoTileStatusOverlay extends StatelessWidget {
     if (status == MediaAttachmentRows.statusDone) {
       return Container(
         decoration: BoxDecoration(
-          color: Colors.black45,
+          color: AppTheme.background.withAlpha(115),
           borderRadius: BorderRadius.circular(6),
         ),
         child: const Center(
-          child: Icon(Icons.check_circle, color: Color(0xFF43A047), size: 32),
+          child: Icon(
+            Icons.check_circle,
+            color: AppTheme.successCheck,
+            size: 32,
+          ),
         ),
       );
     }
@@ -92,11 +99,11 @@ class _PhotoTileRemoveButton extends StatelessWidget {
         onTap: onRemove,
         child: Container(
           padding: const EdgeInsets.all(4),
-          decoration: const BoxDecoration(
-            color: Colors.black54,
+          decoration: BoxDecoration(
+            color: AppTheme.background.withAlpha(138),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.close, size: 16, color: Colors.white),
+          child: Icon(Icons.close, size: 16, color: AppTheme.textPrimary),
         ),
       ),
     );

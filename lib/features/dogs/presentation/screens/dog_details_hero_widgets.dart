@@ -10,10 +10,10 @@ class _DogHeroAvatar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
+        border: Border.all(color: AppTheme.textPrimary, width: 3),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(80),
+            color: AppTheme.background.withAlpha(80),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -21,12 +21,16 @@ class _DogHeroAvatar extends StatelessWidget {
       ),
       child: CircleAvatar(
         radius: 56,
-        backgroundColor: Colors.white24,
+        backgroundColor: AppTheme.textPrimary.withAlpha(61),
         backgroundImage: dog.profileImageUrl != null
             ? NetworkImage(dog.profileImageUrl!)
             : null,
         child: dog.profileImageUrl == null
-            ? const FaIcon(FontAwesomeIcons.dog, size: 40, color: Colors.white)
+            ? const FaIcon(
+                FontAwesomeIcons.dog,
+                size: 40,
+                color: AppTheme.textPrimary,
+              )
             : null,
       ),
     );
@@ -52,7 +56,7 @@ class _DogHeroIdentity extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 26,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             letterSpacing: 0.5,
             height: 1.0,
           ),
@@ -63,7 +67,7 @@ class _DogHeroIdentity extends StatelessWidget {
               dog.breed,
               style: GoogleFonts.inter(
                 fontSize: 13,
-                color: Colors.white70,
+                color: AppTheme.textPrimary.withAlpha(179),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -71,9 +75,7 @@ class _DogHeroIdentity extends StatelessWidget {
             Icon(
               dog.sex == 'F' ? Icons.female_rounded : Icons.male_rounded,
               size: 16,
-              color: dog.sex == 'F'
-                  ? const Color(0xFFFF80AB)
-                  : const Color(0xFF82B1FF),
+              color: dog.sex == 'F' ? AppTheme.healthAccent : AppTheme.info,
             ),
           ],
         ),
@@ -82,7 +84,7 @@ class _DogHeroIdentity extends StatelessWidget {
           '${dog.age} anos · ID: ${dog.id.substring(0, 8).toUpperCase()}',
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: Colors.white38,
+            color: AppTheme.textPrimary.withAlpha(97),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),

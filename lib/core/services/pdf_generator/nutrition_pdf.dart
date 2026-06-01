@@ -30,7 +30,8 @@ class NutritionPdf {
     );
 
     final fonts = await PdfFonts.load();
-    final docId = 'NUT-${dog.name.toUpperCase()}-${DateFormat('yyMM').format(DateTime.now())}';
+    final docId =
+        'NUT-${dog.name.toUpperCase()}-${DateFormat('yyMM').format(DateTime.now())}';
 
     pdf.addPage(
       pw.MultiPage(
@@ -72,16 +73,27 @@ class NutritionPdf {
                     ),
                   ),
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: pw.BoxDecoration(
                       color: _orange.withAlpha(25),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(6),
+                      ),
                     ),
                     child: pw.Column(
                       children: [
-                        pw.Text('CONFORMIDADE', style: fonts.label(color: _orange)),
+                        pw.Text(
+                          'CONFORMIDADE',
+                          style: fonts.label(color: _orange),
+                        ),
                         pw.SizedBox(height: 2),
-                        pw.Text('${conformityPercent.toStringAsFixed(0)}%', style: fonts.heading(color: _orange)),
+                        pw.Text(
+                          '${conformityPercent.toStringAsFixed(0)}%',
+                          style: fonts.heading(color: _orange),
+                        ),
                       ],
                     ),
                   ),
@@ -89,7 +101,11 @@ class NutritionPdf {
               ),
             ),
 
-            PdfCommonWidgets.sectionTitle(title: 'PRESCRIÇÃO VIGENTE', fonts: fonts, color: _orange),
+            PdfCommonWidgets.sectionTitle(
+              title: 'PRESCRIÇÃO VIGENTE',
+              fonts: fonts,
+              color: _orange,
+            ),
             pw.SizedBox(height: 8),
 
             prescription == null
@@ -101,32 +117,58 @@ class NutritionPdf {
                   )
                 : PdfCommonWidgets.infoTable(
                     rows: [
-                      MapEntry('Dose Diária', '${prescription.amountGramsPerDay}g / dia'),
+                      MapEntry(
+                        'Dose Diária',
+                        '${prescription.amountGramsPerDay}g / dia',
+                      ),
                       MapEntry('Alimento', prescription.foodType),
-                      MapEntry('Veterinário', 'Dr(a). ${prescription.vetName ?? "Não informado"}'),
+                      MapEntry(
+                        'Veterinário',
+                        'Dr(a). ${prescription.vetName ?? "Não informado"}',
+                      ),
                       MapEntry('CRMV', prescription.vetCrmv ?? 'Não informado'),
-                      MapEntry('Vigência', 'Desde ${DateFormat('dd/MM/yyyy').format(prescription.vigentFrom)}'),
+                      MapEntry(
+                        'Vigência',
+                        'Desde ${DateFormat('dd/MM/yyyy').format(prescription.vigentFrom)}',
+                      ),
                     ],
                     fonts: fonts,
                   ),
 
             pw.SizedBox(height: 20),
 
-            PdfCommonWidgets.sectionTitle(title: 'ESTATÍSTICAS DA CONFORMIDADE', fonts: fonts, color: _orange),
+            PdfCommonWidgets.sectionTitle(
+              title: 'ESTATÍSTICAS DA CONFORMIDADE',
+              fonts: fonts,
+              color: _orange,
+            ),
             pw.SizedBox(height: 8),
 
             PdfCommonWidgets.infoTable(
               rows: [
-                MapEntry('Total de Refeições', '${feedings.length} registradas'),
-                MapEntry('Refeições Conformes', '$conformCount (${conformityPercent.toStringAsFixed(0)}%)'),
-                MapEntry('Refeições Divergentes', '$divergentCount (${(100 - conformityPercent).toStringAsFixed(0)}%)'),
+                MapEntry(
+                  'Total de Refeições',
+                  '${feedings.length} registradas',
+                ),
+                MapEntry(
+                  'Refeições Conformes',
+                  '$conformCount (${conformityPercent.toStringAsFixed(0)}%)',
+                ),
+                MapEntry(
+                  'Refeições Divergentes',
+                  '$divergentCount (${(100 - conformityPercent).toStringAsFixed(0)}%)',
+                ),
               ],
               fonts: fonts,
             ),
 
             pw.SizedBox(height: 20),
 
-            PdfCommonWidgets.sectionTitle(title: 'HISTÓRICO RECENTE DE REFEIÇÕES', fonts: fonts, color: _orange),
+            PdfCommonWidgets.sectionTitle(
+              title: 'HISTÓRICO RECENTE DE REFEIÇÕES',
+              fonts: fonts,
+              color: _orange,
+            ),
             pw.SizedBox(height: 8),
 
             pw.Table(
@@ -175,8 +217,8 @@ class NutritionPdf {
                           f.period == 'manha'
                               ? 'Manhã'
                               : f.period == 'almoco'
-                                  ? 'Almoço'
-                                  : 'Noite',
+                              ? 'Almoço'
+                              : 'Noite',
                           style: fonts.body(),
                         ),
                       ),

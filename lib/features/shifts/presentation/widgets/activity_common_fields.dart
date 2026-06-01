@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 
 import 'location_time_row.dart';
@@ -66,7 +67,7 @@ class ActivityDescriptionField extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Icon(
             isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-            color: isListening ? Colors.redAccent : Colors.white54,
+            color: isListening ? AppTheme.errorStrong : AppTheme.textMuted,
           ),
         ),
       ),

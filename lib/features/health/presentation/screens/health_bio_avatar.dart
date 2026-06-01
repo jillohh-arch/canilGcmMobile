@@ -16,14 +16,14 @@ class _PulsingDogAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.cyanAccent.withValues(
+              color: AppTheme.primary.withValues(
                 alpha: 0.3 + (animation.value * 0.7),
               ),
               width: 2 + (animation.value * 1),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.cyanAccent.withValues(
+                color: AppTheme.primary.withValues(
                   alpha: 0.4 * animation.value,
                 ),
                 blurRadius: 15 + (15 * animation.value),
@@ -36,12 +36,16 @@ class _PulsingDogAvatar extends StatelessWidget {
       },
       child: CircleAvatar(
         radius: 55,
-        backgroundColor: const Color(0xFF111111),
+        backgroundColor: AppTheme.surfacePanelSoft,
         backgroundImage: dog.profileImageUrl != null
             ? CachedNetworkImageProvider(dog.profileImageUrl!)
             : null,
         child: dog.profileImageUrl == null
-            ? const Icon(Icons.pets, size: 40, color: Colors.white24)
+            ? Icon(
+                Icons.pets,
+                size: 40,
+                color: AppTheme.textPrimary.withAlpha(61),
+              )
             : null,
       ),
     );

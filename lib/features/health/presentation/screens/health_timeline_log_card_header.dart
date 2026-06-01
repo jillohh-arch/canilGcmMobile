@@ -39,7 +39,7 @@ class _HealthLogCardHeader extends StatelessWidget {
           Text(
             _formatMilitaryDate(log.date),
             style: GoogleFonts.shareTechMono(
-              color: Colors.white70,
+              color: AppTheme.textPrimary.withAlpha(179),
               fontSize: 11,
             ),
           ),

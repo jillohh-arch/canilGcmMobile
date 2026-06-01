@@ -44,7 +44,7 @@ class TacticalTextField extends StatelessWidget {
       onTap: onTap,
       onChanged: onChanged,
       style: GoogleFonts.inter(
-        color: Colors.white,
+        color: AppTheme.textPrimary,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
@@ -58,11 +58,11 @@ class TacticalTextField extends StatelessWidget {
         filled: false,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: Color(0xFF2A2A2A)),
+          borderSide: const BorderSide(color: AppTheme.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: Color(0xFF2A2A2A), width: 1),
+          borderSide: const BorderSide(color: AppTheme.outline, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),

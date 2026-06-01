@@ -6,14 +6,14 @@ extension _HealthDashboardTimelineSection on _HealthDashboardScreenState {
       padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
       child: Row(
         children: [
-          Container(width: 4, height: 14, color: Colors.cyanAccent),
+          Container(width: 4, height: 14, color: AppTheme.primary),
           const SizedBox(width: 8),
           Text(
             'PRONTUÁRIO DE COMBATE / HISTÓRICO',
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: Colors.white54,
+              color: AppTheme.textPrimary.withAlpha(138),
               letterSpacing: 1.5,
             ),
           ),
@@ -30,7 +30,7 @@ extension _HealthDashboardTimelineSection on _HealthDashboardScreenState {
           child: Text(
             'NENHUM REGISTRO MÉDICO',
             style: GoogleFonts.shareTechMono(
-              color: Colors.white24,
+              color: AppTheme.textPrimary.withAlpha(61),
               fontSize: 14,
             ),
           ),

@@ -14,8 +14,8 @@ pw.Widget _buildReportHeader(
           pw.Container(
             width: 40,
             height: 40,
-            decoration: const pw.BoxDecoration(
-              color: PdfColors.grey800,
+            decoration: pw.BoxDecoration(
+              color: PdfInstitutionalColors.grey800,
               shape: pw.BoxShape.circle,
             ),
             child: pw.Center(
@@ -24,7 +24,7 @@ pw.Widget _buildReportHeader(
                 style: pw.TextStyle(
                   font: fontBlack,
                   fontSize: 11,
-                  color: PdfColors.white,
+                  color: PdfInstitutionalColors.white,
                 ),
               ),
             ),
@@ -46,7 +46,7 @@ pw.Widget _buildReportHeader(
                 style: pw.TextStyle(
                   font: fontBold,
                   fontSize: 9,
-                  color: PdfColors.grey600,
+                  color: PdfInstitutionalColors.grey600,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -65,18 +65,26 @@ pw.Widget _buildReportFooter(pw.Context context, pw.Font font) {
     children: [
       pw.Text(
         'Documento de uso interno — não divulgar sem autorização',
-        style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey500),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 8,
+          color: PdfInstitutionalColors.grey500,
+        ),
       ),
       pw.Text(
         'Pág. ${context.pageNumber} / ${context.pagesCount}',
-        style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey500),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 8,
+          color: PdfInstitutionalColors.grey500,
+        ),
       ),
     ],
   );
 }
 
 pw.Widget _sectionDivider() {
-  return pw.Container(height: 2, color: PdfColors.grey800);
+  return pw.Container(height: 2, color: PdfInstitutionalColors.grey800);
 }
 
 pw.Widget _infoBlock(
@@ -93,7 +101,7 @@ pw.Widget _infoBlock(
         style: pw.TextStyle(
           font: bold,
           fontSize: 8,
-          color: PdfColors.grey600,
+          color: PdfInstitutionalColors.grey600,
           letterSpacing: 0.8,
         ),
       ),
@@ -111,7 +119,7 @@ pw.Widget _tableHeader(String text, pw.Font font) {
       style: pw.TextStyle(
         font: font,
         fontSize: 8,
-        color: PdfColors.white,
+        color: PdfInstitutionalColors.white,
         letterSpacing: 0.5,
       ),
     ),
@@ -123,7 +131,11 @@ pw.Widget _tableCell(String text, pw.Font font) {
     padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
     child: pw.Text(
       text,
-      style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey800),
+      style: pw.TextStyle(
+        font: font,
+        fontSize: 9,
+        color: PdfInstitutionalColors.grey800,
+      ),
     ),
   );
 }

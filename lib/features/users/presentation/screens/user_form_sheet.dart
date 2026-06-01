@@ -189,7 +189,7 @@ class _UserFormSheetState extends State<_UserFormSheet> {
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                        color: Colors.black,
+                        color: AppTheme.background,
                         strokeWidth: 2.5,
                       ),
                     )

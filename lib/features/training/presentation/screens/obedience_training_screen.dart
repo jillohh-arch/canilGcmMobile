@@ -26,25 +26,34 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
 
   // Command library organized by category
   static const _commandCategories = <_CommandCategory>[
-    _CommandCategory(name: 'OPERACIONAIS', commands: [
-      _Command(name: 'Senta', stage: CommandStage.full),
-      _Command(name: 'Deita', stage: CommandStage.full),
-      _Command(name: 'Fica', stage: CommandStage.full),
-      _Command(name: 'Junto', stage: CommandStage.full),
-      _Command(name: 'Junto à direita', stage: CommandStage.full),
-      _Command(name: 'Vem', stage: CommandStage.full),
-      _Command(name: 'Solta', stage: CommandStage.full),
-    ]),
-    _CommandCategory(name: 'POSTURAIS', commands: [
-      _Command(name: 'Levanta', stage: CommandStage.full),
-      _Command(name: 'Cumprimenta', stage: CommandStage.dev),
-      _Command(name: 'Abraço', stage: CommandStage.intro),
-    ]),
-    _CommandCategory(name: 'HABILIDADES', commands: [
-      _Command(name: 'Jump', stage: CommandStage.partial),
-      _Command(name: 'Hop', stage: CommandStage.dev),
-      _Command(name: 'Parkour', stage: CommandStage.intro),
-    ]),
+    _CommandCategory(
+      name: 'OPERACIONAIS',
+      commands: [
+        _Command(name: 'Senta', stage: CommandStage.full),
+        _Command(name: 'Deita', stage: CommandStage.full),
+        _Command(name: 'Fica', stage: CommandStage.full),
+        _Command(name: 'Junto', stage: CommandStage.full),
+        _Command(name: 'Junto à direita', stage: CommandStage.full),
+        _Command(name: 'Vem', stage: CommandStage.full),
+        _Command(name: 'Solta', stage: CommandStage.full),
+      ],
+    ),
+    _CommandCategory(
+      name: 'POSTURAIS',
+      commands: [
+        _Command(name: 'Levanta', stage: CommandStage.full),
+        _Command(name: 'Cumprimenta', stage: CommandStage.dev),
+        _Command(name: 'Abraço', stage: CommandStage.intro),
+      ],
+    ),
+    _CommandCategory(
+      name: 'HABILIDADES',
+      commands: [
+        _Command(name: 'Jump', stage: CommandStage.partial),
+        _Command(name: 'Hop', stage: CommandStage.dev),
+        _Command(name: 'Parkour', stage: CommandStage.intro),
+      ],
+    ),
   ];
 
   // Environments
@@ -77,7 +86,7 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione ao menos um comando trabalhado'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.attention,
         ),
       );
       return;
@@ -86,7 +95,7 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione o desempenho geral'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.attention,
         ),
       );
       return;
@@ -190,8 +199,11 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -301,7 +313,7 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
               hintText: 'O que quer trabalhar?',
               hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
               filled: true,
-              fillColor: Colors.black.withAlpha(65),
+              fillColor: AppTheme.background.withAlpha(65),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
@@ -310,7 +322,10 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -324,7 +339,10 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
                   setState(() {});
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(14),
@@ -408,33 +426,35 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: selected
                       ? AppTheme.primary.withAlpha(25)
-                      : Colors.white.withAlpha(8),
+                      : AppTheme.textPrimary.withAlpha(8),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: selected
                         ? AppTheme.primary.withAlpha(100)
-                        : Colors.white.withAlpha(20),
+                        : AppTheme.textPrimary.withAlpha(20),
                   ),
                 ),
                 child: Row(
                   children: [
                     Text(
                       cmd.stageIcon,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: cmd.stageColor,
-                      ),
+                      style: TextStyle(fontSize: 14, color: cmd.stageColor),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         cmd.name,
                         style: GoogleFonts.inter(
-                          color: selected ? AppTheme.primary : AppTheme.textSecondary,
+                          color: selected
+                              ? AppTheme.primary
+                              : AppTheme.textSecondary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -497,14 +517,14 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
                   decoration: BoxDecoration(
                     color: selected
                         ? (isBad
-                            ? AppTheme.error.withAlpha(25)
-                            : AppTheme.success.withAlpha(25))
-                        : Colors.white.withAlpha(8),
+                              ? AppTheme.error.withAlpha(25)
+                              : AppTheme.success.withAlpha(25))
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: selected
                           ? (isBad ? AppTheme.error : AppTheme.success)
-                          : Colors.white.withAlpha(20),
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -553,8 +573,12 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
           maxLines: 3,
           style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 13),
           decoration: InputDecoration(
-            hintText: 'Algum comando precisa subir/baixar de estágio? Notas da sessão...',
-            hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 12),
+            hintText:
+                'Algum comando precisa subir/baixar de estágio? Notas da sessão...',
+            hintStyle: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 12,
+            ),
             filled: true,
             fillColor: AppTheme.primary.withAlpha(10),
             border: OutlineInputBorder(
@@ -576,8 +600,11 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
     return Consumer<TrainingViewModel>(
       builder: (_, vm, _) {
         final recent = vm.trainings
-            .where((t) => t.trainingType.toLowerCase().contains('obediência') ||
-                t.trainingType.toLowerCase().contains('obediencia'))
+            .where(
+              (t) =>
+                  t.trainingType.toLowerCase().contains('obediência') ||
+                  t.trainingType.toLowerCase().contains('obediencia'),
+            )
             .take(3)
             .toList();
 
@@ -604,7 +631,8 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
   }
 
   Widget _recentCard(TrainingSessionModel session) {
-    final day = '${session.date.day.toString().padLeft(2, '0')}/${session.date.month.toString().padLeft(2, '0')}';
+    final day =
+        '${session.date.day.toString().padLeft(2, '0')}/${session.date.month.toString().padLeft(2, '0')}';
     final rating = session.metadata?['rating'] ?? '';
     final cmdCount = session.metadata?['commandCount'] ?? '';
     final env = session.metadata?['environment'] ?? session.location;
@@ -613,9 +641,9 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Row(
         children: [
@@ -737,10 +765,14 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? AppTheme.primary.withAlpha(30) : Colors.white.withAlpha(8),
+        color: selected
+            ? AppTheme.primary.withAlpha(30)
+            : AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? AppTheme.primary : Colors.white.withAlpha(25),
+          color: selected
+              ? AppTheme.primary
+              : AppTheme.textPrimary.withAlpha(25),
         ),
       ),
       child: Text(

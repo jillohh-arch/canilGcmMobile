@@ -41,7 +41,7 @@ extension _DynamicActivitySheetEnvironmentActions
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Clima atualizado com sucesso!'),
-              backgroundColor: Color(0xFF1B8A4C),
+              backgroundColor: AppTheme.successOperational,
             ),
           );
         }

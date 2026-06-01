@@ -72,7 +72,7 @@ class _NewTrainingFormState extends State<_NewTrainingForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Treino registrado!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.successOperational,
         ),
       );
       _clearForm();
@@ -80,7 +80,7 @@ class _NewTrainingFormState extends State<_NewTrainingForm> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
       );
     }
   }

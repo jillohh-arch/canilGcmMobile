@@ -3,26 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/profiles/domain/operational_profile_models.dart';
 
-const Color profileBackground = Color(0xFF040B0F);
-const Color profileCard = Color(0xFF071923);
-const Color profileCardAlt = Color(0xFF091F2B);
-const Color profileBorder = Color(0xFF244556);
-const Color profilePrimary = Color(0xFF49D7F0);
-const Color profileSuccess = Color(0xFF74E66C);
-const Color profileAttention = Color(0xFFFFC62D);
-const Color profileCritical = Color(0xFFFF4E4E);
-const Color profileTextPrimary = Color(0xFFF2F6F8);
-const Color profileTextSecondary = Color(0xFFC6D0D6);
-const Color profileTextMuted = Color(0xFF8A98A1);
+const Color profileBackground = AppTheme.surfaceBackdrop;
+const Color profileCard = AppTheme.profileCard;
+const Color profileCardAlt = AppTheme.profileCardAlt;
+const Color profileBorder = AppTheme.profileBorder;
+const Color profilePrimary = AppTheme.profilePrimary;
+const Color profileSuccess = AppTheme.profileSuccess;
+const Color profileAttention = AppTheme.profileAttention;
+const Color profileCritical = AppTheme.profileCritical;
+const Color profileTextPrimary = AppTheme.profileTextPrimary;
+const Color profileTextSecondary = AppTheme.profileTextSecondary;
+const Color profileTextMuted = AppTheme.profileTextMuted;
 
 BoxDecoration profileCardDecoration({Color? borderColor}) {
   return BoxDecoration(
     gradient: const LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [profileCardAlt, profileCard, Color(0xFF06141C)],
+      colors: [profileCardAlt, profileCard, AppTheme.profileGradientEnd],
     ),
     borderRadius: BorderRadius.circular(8),
     border: Border.all(color: borderColor ?? profileBorder, width: 1),
@@ -468,7 +469,7 @@ class OperationalBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF06131A),
+        color: AppTheme.surfacePanelDeep,
         border: Border(top: BorderSide(color: profilePrimary.withAlpha(65))),
         boxShadow: [
           BoxShadow(
@@ -923,7 +924,7 @@ class _CenterNavItem extends StatelessWidget {
               width: 76,
               height: 58,
               decoration: BoxDecoration(
-                color: const Color(0xFF0A2430),
+                color: AppTheme.profileChip,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(6),
                   bottom: Radius.circular(2),

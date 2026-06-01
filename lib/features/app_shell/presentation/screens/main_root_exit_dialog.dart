@@ -31,13 +31,13 @@ extension _MainRootExitDialog on _MainRootScreenState {
         content: Text(
           'Toque novamente para sair',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
         ),
         duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFF1C2A30),
+        backgroundColor: AppTheme.surfacePanelAlt,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

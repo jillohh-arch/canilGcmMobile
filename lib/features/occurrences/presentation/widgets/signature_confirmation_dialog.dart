@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -208,7 +210,7 @@ class _SignatureConfirmationDialogState
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.check_circle, color: Colors.green),
+        icon: const Icon(Icons.check_circle, color: AppTheme.success),
         title: const Text('Assinatura realizada'),
         content: Text(message),
         actions: [
@@ -338,9 +340,9 @@ class _SignatureConfirmationDialogState
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.draw_rounded,
-                    color: Colors.black87,
+                    color: AppTheme.background.withAlpha(222),
                     size: 28,
                   ),
                 ),
@@ -454,21 +456,18 @@ class _SignatureConfirmationDialogState
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
+                        color: AppTheme.warning.withAlpha(80),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.amber.shade900,
-                          ),
+                          Icon(Icons.info_outline, color: AppTheme.warning),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Ao assinar, você confirma que revisou o conteúdo e está de acordo com o registro.',
                               style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: Colors.amber.shade900),
+                                  ?.copyWith(color: AppTheme.warning),
                             ),
                           ),
                         ],
@@ -559,7 +558,7 @@ class _SignatureConfirmationDialogState
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                           ),
                         )
                       : const Icon(Icons.draw_rounded),

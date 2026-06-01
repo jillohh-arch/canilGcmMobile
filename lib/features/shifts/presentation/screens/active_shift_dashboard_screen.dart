@@ -181,7 +181,7 @@ class _ActiveShiftDashboardScreenState
               backgroundColor: AppTheme.background,
               body: AnnotatedRegion<SystemUiOverlayStyle>(
                 value: SystemUiOverlayStyle.light.copyWith(
-                  statusBarColor: Colors.transparent,
+                  statusBarColor: AppTheme.transparent,
                   systemNavigationBarColor: AppTheme.surfaceNavigation,
                   systemNavigationBarIconBrightness: Brightness.light,
                 ),

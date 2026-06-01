@@ -60,7 +60,7 @@ class HudStagePanel extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white54,
+                  color: AppTheme.textPrimary.withAlpha(138),
                   letterSpacing: 1,
                 ),
               ),
@@ -72,7 +72,7 @@ class HudStagePanel extends StatelessWidget {
             height: 2,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [accent, accent.withAlpha(20), Colors.transparent],
+                colors: [accent, accent.withAlpha(20), AppTheme.transparent],
               ),
             ),
           ),
@@ -80,7 +80,7 @@ class HudStagePanel extends StatelessWidget {
           Text(
             subtitles[currentIndex],
             style: GoogleFonts.inter(
-              color: Colors.white60,
+              color: AppTheme.textPrimary.withAlpha(153),
               fontSize: 12,
               height: 1.35,
               fontWeight: FontWeight.w600,

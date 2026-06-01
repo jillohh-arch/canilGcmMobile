@@ -29,7 +29,8 @@ class PdfFonts {
       regular: await PdfGoogleFonts.iBMPlexSansRegular(),
       medium: await PdfGoogleFonts.iBMPlexSansMedium(),
       bold: await PdfGoogleFonts.iBMPlexSansBold(),
-      black: await PdfGoogleFonts.iBMPlexSansBold(), // Mapped to bold to maintain compatibility
+      black:
+          await PdfGoogleFonts.iBMPlexSansBold(), // Mapped to bold to maintain compatibility
       semiBold: await PdfGoogleFonts.iBMPlexSansSemiBold(),
       monoRegular: await PdfGoogleFonts.iBMPlexMonoRegular(),
       monoBold: await PdfGoogleFonts.iBMPlexMonoBold(),
@@ -37,47 +38,47 @@ class PdfFonts {
   }
 
   pw.TextStyle body({PdfColor? color}) => pw.TextStyle(
-        font: regular,
-        fontSize: 10,
-        color: color ?? PdfInstitutionalColors.textPrimary,
-      );
+    font: regular,
+    fontSize: 10,
+    color: color ?? PdfInstitutionalColors.textPrimary,
+  );
 
   pw.TextStyle bodyBold({PdfColor? color}) => pw.TextStyle(
-        font: bold,
-        fontSize: 10,
-        color: color ?? PdfInstitutionalColors.textPrimary,
-      );
+    font: bold,
+    fontSize: 10,
+    color: color ?? PdfInstitutionalColors.textPrimary,
+  );
 
   pw.TextStyle caption({PdfColor? color}) => pw.TextStyle(
-        font: regular,
-        fontSize: 9,
-        color: color ?? PdfInstitutionalColors.textTertiary,
-      );
+    font: regular,
+    fontSize: 9,
+    color: color ?? PdfInstitutionalColors.textTertiary,
+  );
 
   pw.TextStyle label({PdfColor? color}) => pw.TextStyle(
-        font: bold,
-        fontSize: 8,
-        color: color ?? PdfInstitutionalColors.textTertiary,
-        letterSpacing: 1.0,
-      );
+    font: bold,
+    fontSize: 8,
+    color: color ?? PdfInstitutionalColors.textTertiary,
+    letterSpacing: 1.0,
+  );
 
   pw.TextStyle sectionTitle({PdfColor? color}) => pw.TextStyle(
-        font: bold,
-        fontSize: 13,
-        color: color ?? PdfInstitutionalColors.textPrimary,
-      );
+    font: bold,
+    fontSize: 13,
+    color: color ?? PdfInstitutionalColors.textPrimary,
+  );
 
   pw.TextStyle heading({PdfColor? color}) => pw.TextStyle(
-        font: black,
-        fontSize: 24,
-        color: color ?? PdfInstitutionalColors.textPrimary,
-      );
+    font: black,
+    fontSize: 24,
+    color: color ?? PdfInstitutionalColors.textPrimary,
+  );
 
   pw.TextStyle mono({PdfColor? color, double? fontSize}) => pw.TextStyle(
-        font: monoRegular,
-        fontSize: fontSize ?? 8,
-        color: color ?? PdfInstitutionalColors.textTertiary,
-      );
+    font: monoRegular,
+    fontSize: fontSize ?? 8,
+    color: color ?? PdfInstitutionalColors.textTertiary,
+  );
 }
 
 /// Widgets reutilizáveis para PDFs institucionais.
@@ -110,7 +111,7 @@ class PdfCommonWidgets {
                 style: pw.TextStyle(
                   font: fonts.black,
                   fontSize: 7,
-                  color: PdfColors.white,
+                  color: PdfInstitutionalColors.white,
                 ),
               ),
             ),
@@ -155,10 +156,7 @@ class PdfCommonWidgets {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(
-            'GCM Limeira · Canil K9 · $docType',
-            style: fonts.caption(),
-          ),
+          pw.Text('GCM Limeira · Canil K9 · $docType', style: fonts.caption()),
           pw.Text(
             'Pág. ${context.pageNumber} / ${context.pagesCount}',
             style: fonts.caption(),
@@ -194,16 +192,13 @@ class PdfCommonWidgets {
   }) {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      color: alternate ? PdfInstitutionalColors.background : PdfInstitutionalColors.lightGray,
+      color: alternate
+          ? PdfInstitutionalColors.background
+          : PdfInstitutionalColors.lightGray,
       child: pw.Row(
         children: [
-          pw.SizedBox(
-            width: 120,
-            child: pw.Text(label, style: fonts.label()),
-          ),
-          pw.Expanded(
-            child: pw.Text(value, style: fonts.bodyBold()),
-          ),
+          pw.SizedBox(width: 120, child: pw.Text(label, style: fonts.label())),
+          pw.Expanded(child: pw.Text(value, style: fonts.bodyBold())),
         ],
       ),
     );

@@ -33,7 +33,8 @@ class TrainingAttempt {
       id: docId ?? json['id'] as String?,
       sessionId: json['session_id'] as String? ?? '',
       attemptNumber: json['attempt_number'] as int? ?? 0,
-      linesWorked: (json['lines_worked'] as List<dynamic>?)
+      linesWorked:
+          (json['lines_worked'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],

@@ -116,7 +116,7 @@ class _TimelineConnector extends StatelessWidget {
             child: Container(
               width: 2,
               color: isFirst
-                  ? Colors.transparent
+                  ? AppTheme.transparent
                   : AppTheme.primary.withAlpha(40),
             ),
           ),
@@ -126,7 +126,7 @@ class _TimelineConnector extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isFirst ? AppTheme.primary : Colors.transparent,
+              color: isFirst ? AppTheme.primary : AppTheme.transparent,
               border: Border.all(
                 color: AppTheme.primary,
                 width: isFirst ? 0 : 1.5,
@@ -138,7 +138,7 @@ class _TimelineConnector extends StatelessWidget {
             child: Container(
               width: 2,
               color: isLast
-                  ? Colors.transparent
+                  ? AppTheme.transparent
                   : AppTheme.primary.withAlpha(40),
             ),
           ),
@@ -160,22 +160,22 @@ class _ErrorState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFE53935).withAlpha(12),
+        color: AppTheme.errorStrong.withAlpha(12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE53935).withAlpha(60)),
+        border: Border.all(color: AppTheme.errorStrong.withAlpha(60)),
       ),
       child: Column(
         children: [
           const Icon(
             Icons.warning_amber_rounded,
-            color: Color(0xFFE53935),
+            color: AppTheme.errorStrong,
             size: 32,
           ),
           const SizedBox(height: 12),
           Text(
             'Erro ao carregar eventos',
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -185,7 +185,7 @@ class _ErrorState extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(160),
+              color: AppTheme.textPrimary.withAlpha(160),
               fontSize: 12,
               height: 1.4,
             ),
@@ -228,15 +228,15 @@ class _EmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(10)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(10)),
       ),
       child: Column(
         children: [
           Icon(
             Icons.timeline_outlined,
-            color: Colors.white.withAlpha(60),
+            color: AppTheme.textPrimary.withAlpha(60),
             size: 32,
           ),
           const SizedBox(height: 12),
@@ -244,7 +244,7 @@ class _EmptyState extends StatelessWidget {
             'Adicione o primeiro evento\ndesta ocorrência',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(100),
+              color: AppTheme.textPrimary.withAlpha(100),
               fontSize: 13,
               height: 1.4,
             ),

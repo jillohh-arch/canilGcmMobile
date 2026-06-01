@@ -1,4 +1,4 @@
-﻿part of 'tactical_card.dart';
+part of 'tactical_card.dart';
 
 class TacticalCardStat extends StatelessWidget {
   final String label;
@@ -18,7 +18,7 @@ class TacticalCardStat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 14, color: Colors.white54),
+          Icon(icon, size: 14, color: AppTheme.textPrimary.withAlpha(138)),
           const SizedBox(height: 2),
         ],
         Text(
@@ -26,7 +26,7 @@ class TacticalCardStat extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -35,7 +35,7 @@ class TacticalCardStat extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 8,
             fontWeight: FontWeight.w600,
-            color: Colors.white54,
+            color: AppTheme.textPrimary.withAlpha(138),
             letterSpacing: 0.6,
           ),
           textAlign: TextAlign.center,

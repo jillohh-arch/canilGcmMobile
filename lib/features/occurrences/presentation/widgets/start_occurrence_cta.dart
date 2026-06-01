@@ -23,10 +23,7 @@ class StartOccurrenceCta extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppTheme.background.withAlpha(0),
-            AppTheme.background,
-          ],
+          colors: [AppTheme.background.withAlpha(0), AppTheme.background],
           stops: const [0.0, 0.3],
         ),
       ),

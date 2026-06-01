@@ -5,15 +5,18 @@ extension _MainRootOccurrenceDialog on _MainRootScreenState {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
+        backgroundColor: AppTheme.surfaceModal,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         title: const Text(
           'Ocorrência em andamento',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        content: const Text(
+        content: Text(
           'Já existe uma ocorrência aberta para este K9. Continue o registro ou encerre antes de iniciar outra.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppTheme.textPrimary.withAlpha(179)),
         ),
         actions: [
           TextButton(

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
@@ -13,13 +15,14 @@ class OsmStaticMapGenerator {
   static const _tileUrl =
       'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
   static const _userAgent = 'CanilK9GCM/1.0 (canil.k9.gcm@limeira.sp.gov.br)';
-  static const _tileSize = 256; // tiles padrão (sem @2x) para economizar memória
+  static const _tileSize =
+      256; // tiles padrão (sem @2x) para economizar memória
   static const _maxTiles = 9; // máximo de tiles para evitar OOM
 
   final http.Client _client;
 
   OsmStaticMapGenerator({http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   /// Gera imagem PNG do mapa de deslocamento com pinos numerados e trilha.
   /// [locations] lista de locais clusterizados.
@@ -183,12 +186,15 @@ class OsmStaticMapGenerator {
     required List<OccurrenceLocation> locations,
   }) async {
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()));
+    final canvas = Canvas(
+      recorder,
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+    );
 
     // Fundo escuro
     canvas.drawRect(
       Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-      Paint()..color = const Color(0xFF071319),
+      Paint()..color = AppTheme.surfaceNavigation,
     );
 
     // Posicionar tiles
@@ -228,7 +234,7 @@ class OsmStaticMapGenerator {
       canvas.drawPath(
         path,
         Paint()
-          ..color = const Color(0xFF4DD0E1)
+          ..color = AppTheme.primary
           ..strokeWidth = 3.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round,
@@ -240,13 +246,13 @@ class OsmStaticMapGenerator {
       final loc = locations[i];
       final point = pixelPoints[i];
       final isFirst = loc.index == 1;
-      final color = isFirst ? const Color(0xFF2ECC71) : const Color(0xFF4DD0E1);
+      final color = isFirst ? AppTheme.success : AppTheme.primary;
 
       // Sombra
       canvas.drawCircle(
         point + const Offset(0, 2),
         14,
-        Paint()..color = Colors.black.withAlpha(80),
+        Paint()..color = AppTheme.background.withAlpha(80),
       );
 
       // Círculo principal
@@ -257,7 +263,7 @@ class OsmStaticMapGenerator {
         point,
         13,
         Paint()
-          ..color = const Color(0xFF050D10)
+          ..color = AppTheme.background
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.5,
       );
@@ -267,7 +273,7 @@ class OsmStaticMapGenerator {
         text: TextSpan(
           text: '${loc.index}',
           style: const TextStyle(
-            color: Color(0xFF04181D),
+            color: AppTheme.surfacePanelStrong,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),

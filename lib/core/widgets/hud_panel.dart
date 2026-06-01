@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-const _hudPanel = Color(0xFF0E1A1F);
+import 'package:canil_gcm/core/theme/app_theme.dart';
+
+const _hudPanel = AppTheme.surfacePanel;
 
 class HudPanel extends StatelessWidget {
   final Widget child;
@@ -30,8 +32,8 @@ class HudPanel extends StatelessWidget {
             blurRadius: 22,
             spreadRadius: 1,
           ),
-          const BoxShadow(
-            color: Colors.black54,
+          BoxShadow(
+            color: AppTheme.background.withAlpha(138),
             blurRadius: 18,
             offset: Offset(0, 10),
           ),
@@ -50,7 +52,7 @@ class HudPanel extends StatelessWidget {
                   top: Radius.circular(6),
                 ),
                 gradient: LinearGradient(
-                  colors: [accent.withAlpha(60), Colors.transparent],
+                  colors: [accent.withAlpha(60), AppTheme.transparent],
                 ),
               ),
             ),

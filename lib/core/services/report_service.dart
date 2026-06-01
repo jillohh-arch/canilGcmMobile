@@ -5,6 +5,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'pdf_generator/pdf_colors.dart';
+
 part 'report_service_entry.dart';
 part 'report_service_formatters.dart';
 part 'report_service_pdf_builder.dart';

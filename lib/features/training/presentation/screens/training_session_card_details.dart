@@ -38,12 +38,14 @@ class _SessionTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color == Colors.white
-            ? Colors.white.withAlpha(12)
+        color: color == AppTheme.textPrimary
+            ? AppTheme.textPrimary.withAlpha(12)
             : color.withAlpha(35),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: color == Colors.white ? Colors.white12 : color.withAlpha(140),
+          color: color == AppTheme.textPrimary
+              ? AppTheme.surfaceWhiteBorder
+              : color.withAlpha(140),
         ),
       ),
       child: Text(label, style: textStyle),
@@ -71,7 +73,7 @@ class _SessionDateBlock extends StatelessWidget {
           dateText,
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: Colors.white54,
+            color: AppTheme.textMuted,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -107,14 +109,17 @@ class _SessionStateLine extends StatelessWidget {
           Container(width: 26, height: 2, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Container(height: 1, color: Colors.white.withAlpha(18)),
+            child: Container(
+              height: 1,
+              color: AppTheme.textPrimary.withAlpha(18),
+            ),
           ),
           const SizedBox(width: 8),
           Text(
             expanded ? 'REGISTRO ABERTO' : 'TOQUE PARA DETALHES',
             style: GoogleFonts.inter(
               fontSize: 9,
-              color: expanded ? color : Colors.white38,
+              color: expanded ? color : AppTheme.textMuted,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.9,
             ),

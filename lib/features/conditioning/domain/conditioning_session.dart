@@ -33,7 +33,10 @@ class ConditioningSession {
     required this.performedBy,
   });
 
-  factory ConditioningSession.fromJson(Map<String, dynamic> json, {String? docId}) {
+  factory ConditioningSession.fromJson(
+    Map<String, dynamic> json, {
+    String? docId,
+  }) {
     return ConditioningSession(
       id: docId ?? json['id'] as String?,
       exerciseType: json['exercise_type'] as String? ?? 'passeio',
@@ -51,7 +54,8 @@ class ConditioningSession {
   Map<String, dynamic> toJson() {
     return {
       'exercise_type': exerciseType,
-      if (exerciseNameCustom != null) 'exercise_name_custom': exerciseNameCustom,
+      if (exerciseNameCustom != null)
+        'exercise_name_custom': exerciseNameCustom,
       'metrics': metrics,
       'intensity': intensity,
       if (gpsTrackId != null) 'gps_track_id': gpsTrackId,
@@ -66,7 +70,8 @@ class ConditioningSession {
   int? get durationMinutes => metrics['duration_minutes'] as int?;
 
   /// Distância em metros (extraída das métricas).
-  double? get distanceMeters => (metrics['distance_meters'] as num?)?.toDouble();
+  double? get distanceMeters =>
+      (metrics['distance_meters'] as num?)?.toDouble();
 
   static const List<String> exerciseTypes = [
     'passeio',

@@ -75,11 +75,7 @@ class _LoginErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: AppTheme.error,
-            size: 20,
-          ),
+          Icon(Icons.warning_amber_rounded, color: AppTheme.error, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -109,7 +105,9 @@ class _BiometricButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         icon: const Icon(Icons.fingerprint_rounded, size: 24),
         label: Text(
@@ -148,7 +146,9 @@ class _PasswordLoginButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppTheme.primary.withAlpha(180)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         child: Text(
           'ENTRAR COM SENHA',
@@ -169,7 +169,7 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: Color(0xFF1D2C33))),
+        const Expanded(child: Divider(color: AppTheme.outlineVariant)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -182,7 +182,7 @@ class _Divider extends StatelessWidget {
             ),
           ),
         ),
-        const Expanded(child: Divider(color: Color(0xFF1D2C33))),
+        const Expanded(child: Divider(color: AppTheme.outlineVariant)),
       ],
     );
   }

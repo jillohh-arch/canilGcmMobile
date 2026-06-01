@@ -3,13 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
-enum LiveSessionState {
-  preTrail,
-  running,
-  summary,
-}
+enum LiveSessionState { preTrail, running, summary }
 
 class MapEvent {
   final Offset position;
@@ -96,7 +93,9 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
         _distance += 2 + math.Random().nextInt(3);
 
         // Simulate path random walk
-        _angle += (math.Random().nextDouble() - 0.5) * 0.5; // slight directional change
+        _angle +=
+            (math.Random().nextDouble() - 0.5) *
+            0.5; // slight directional change
         double step = 3.0 + math.Random().nextDouble() * 3.0;
         _currentX += math.cos(_angle) * step;
         _currentY += math.sin(_angle) * step;
@@ -134,7 +133,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
     HapticFeedback.heavyImpact();
     _timer?.cancel();
     if (success) {
-      _logEvent('LOCALIZAÇÃO', 'Alvo localizado', const Color(0xFF2ECC71));
+      _logEvent('LOCALIZAÇÃO', 'Alvo localizado', AppTheme.success);
       _finalResult = 'Completa';
     } else {
       _finalResult = 'Checagem';
@@ -153,15 +152,13 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: const Color(0xFF050D10),
+          statusBarColor: AppTheme.transparent,
+          systemNavigationBarColor: AppTheme.background,
         ),
-        child: SafeArea(
-          child: _buildBody(),
-        ),
+        child: SafeArea(child: _buildBody()),
       ),
     );
   }
@@ -200,7 +197,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                       alignment: Alignment.centerLeft,
                       child: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         size: 20,
                       ),
                     ),
@@ -212,7 +209,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                         Text(
                           'PREPARAÇÃO DE RASTRO',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFF4DD0E1),
+                            color: AppTheme.primary,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 1.5,
@@ -222,7 +219,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                         Text(
                           'Busca & Captura',
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
                           ),
@@ -234,7 +231,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0x1F4DD0E1),
+                      color: AppTheme.primary.withAlpha(31),
                       borderRadius: BorderRadius.circular(9),
                     ),
                     alignment: Alignment.center,
@@ -254,7 +251,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Text(
                       'STATUS DE SENSORES E SINAIS',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
@@ -264,15 +261,35 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0x0DFFFFFF),
-                        border: Border.all(color: const Color(0x14FFFFFF)),
+                        color: AppTheme.textPrimary.withAlpha(13),
+                        border: Border.all(
+                          color: AppTheme.textPrimary.withAlpha(20),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         children: [
-                          _buildSystemRow('Sinal de GPS', 'Precisão de 3 metros (Excelente)', 'OK', const Color(0xFF2ECC71), true),
-                          _buildSystemRow('Bateria do Celular', '74% restante', 'OK', const Color(0xFF2ECC71), true),
-                          _buildSystemRow('Armazenamento Local', '18.4 GB livres', 'OK', const Color(0xFF2ECC71), true),
+                          _buildSystemRow(
+                            'Sinal de GPS',
+                            'Precisão de 3 metros (Excelente)',
+                            'OK',
+                            AppTheme.success,
+                            true,
+                          ),
+                          _buildSystemRow(
+                            'Bateria do Celular',
+                            '74% restante',
+                            'OK',
+                            AppTheme.success,
+                            true,
+                          ),
+                          _buildSystemRow(
+                            'Armazenamento Local',
+                            '18.4 GB livres',
+                            'OK',
+                            AppTheme.success,
+                            true,
+                          ),
                         ],
                       ),
                     ),
@@ -282,7 +299,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Text(
                       'CONFIGURAÇÕES DEFINIDAS',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
@@ -291,14 +308,22 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0x0DFFFFFF),
-                        border: Border.all(color: const Color(0x14FFFFFF)),
+                        color: AppTheme.textPrimary.withAlpha(13),
+                        border: Border.all(
+                          color: AppTheme.textPrimary.withAlpha(20),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         children: [
-                          _buildConfigOverviewRow('Cenário ativo', widget.scenario),
-                          _buildConfigOverviewRow('Objetivo de distância', '${widget.distanceGoal}m'),
+                          _buildConfigOverviewRow(
+                            'Cenário ativo',
+                            widget.scenario,
+                          ),
+                          _buildConfigOverviewRow(
+                            'Objetivo de distância',
+                            '${widget.distanceGoal}m',
+                          ),
                           _buildConfigOverviewRow('Cão', widget.dog.name),
                         ],
                       ),
@@ -309,25 +334,29 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0x0FF1C40F),
+                        color: AppTheme.warning.withAlpha(15),
                         borderRadius: BorderRadius.circular(6),
-                        border: const Border(
-                          left: BorderSide(color: Color(0xFFF1C40F), width: 3),
+                        border: Border(
+                          left: BorderSide(color: AppTheme.warning, width: 3),
                         ),
                       ),
                       child: RichText(
                         text: TextSpan(
                           style: GoogleFonts.inter(
-                            color: const Color(0xFFB0C4CC),
+                            color: AppTheme.textSecondary,
                             fontSize: 11,
                             height: 1.5,
                           ),
                           children: const [
-                            TextSpan(text: 'Importante: O rastreamento contínuo utiliza o GPS em segundo plano. '),
                             TextSpan(
-                              text: 'Certifique-se de que a bateria é suficiente.',
+                              text:
+                                  'Importante: O rastreamento contínuo utiliza o GPS em segundo plano. ',
+                            ),
+                            TextSpan(
+                              text:
+                                  'Certifique-se de que a bateria é suficiente.',
                               style: TextStyle(
-                                color: Color(0xFFF1C40F),
+                                color: AppTheme.warning,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -349,21 +378,18 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
           right: 0,
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [
-                  Color(0xFF050D10),
-                  Color(0x00050D10),
-                ],
+                colors: [AppTheme.background, AppTheme.background.withAlpha(0)],
               ),
             ),
             child: ElevatedButton(
               onPressed: _startSession,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2ECC71),
-                foregroundColor: const Color(0xFF050D10),
+                backgroundColor: AppTheme.success,
+                foregroundColor: AppTheme.background,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -392,7 +418,13 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
     );
   }
 
-  Widget _buildSystemRow(String title, String desc, String badge, Color badgeColor, bool ok) {
+  Widget _buildSystemRow(
+    String title,
+    String desc,
+    String badge,
+    Color badgeColor,
+    bool ok,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -406,7 +438,9 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
             ),
             alignment: Alignment.center,
             child: Icon(
-              ok ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+              ok
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.warning_amber_rounded,
               color: badgeColor,
               size: 16,
             ),
@@ -418,12 +452,19 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   desc,
-                  style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 11),
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -436,7 +477,11 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
             ),
             child: Text(
               badge,
-              style: GoogleFonts.inter(color: badgeColor, fontSize: 9, fontWeight: FontWeight.w700),
+              style: GoogleFonts.inter(
+                color: badgeColor,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -447,14 +492,30 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
   Widget _buildConfigOverviewRow(String label, String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x0AFFFFFF))),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppTheme.textPrimary.withAlpha(10)),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 11, fontWeight: FontWeight.w500)),
-          Text(value, style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -466,10 +527,12 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
       children: [
         // Live status top bar
         Container(
-          color: const Color(0x142ECC71), // rgba(46, 204, 113, 0.08)
+          color: AppTheme.success.withAlpha(20), // rgba(46, 204, 113, 0.08)
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0x332ECC71))),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: AppTheme.success.withAlpha(51)),
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -479,8 +542,8 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2ECC71),
+                    decoration: BoxDecoration(
+                      color: AppTheme.success,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -488,7 +551,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                   Text(
                     'GRAVANDO RASTRO GPS',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF2ECC71),
+                      color: AppTheme.success,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,
@@ -499,7 +562,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
               Text(
                 'Binômio: ${widget.dog.name}',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFFB0C4CC),
+                  color: AppTheme.textSecondary,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
@@ -515,7 +578,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
               // Simulated map (Grid + Line Draw)
               Positioned.fill(
                 child: Container(
-                  color: const Color(0xFF0D2030),
+                  color: AppTheme.surfacePanelAlt,
                   child: CustomPaint(
                     painter: LiveMapPainter(
                       points: _trailPoints,
@@ -533,8 +596,8 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFA050D10),
-                    border: Border.all(color: const Color(0x334DD0E1)),
+                    color: AppTheme.background.withAlpha(250),
+                    border: Border.all(color: AppTheme.primary.withAlpha(51)),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
@@ -546,50 +609,80 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               children: [
                                 Text(
                                   'DISTÂNCIA',
-                                  style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9, fontWeight: FontWeight.w700),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
                                   children: [
                                     Text(
                                       '$_distance',
-                                      style: GoogleFonts.inter(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
+                                      style: GoogleFonts.inter(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
                                       'm',
-                                      style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: GoogleFonts.inter(
+                                        color: AppTheme.primary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          Container(width: 1, height: 35, color: const Color(0x264DD0E1)),
+                          Container(
+                            width: 1,
+                            height: 35,
+                            color: AppTheme.primary.withAlpha(38),
+                          ),
                           Expanded(
                             child: Column(
                               children: [
                                 Text(
                                   'DURAÇÃO',
-                                  style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9, fontWeight: FontWeight.w700),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
                                   children: [
                                     Text(
                                       _formatDuration(_seconds),
-                                      style: GoogleFonts.inter(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
+                                      style: GoogleFonts.inter(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
                                       'min',
-                                      style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: GoogleFonts.inter(
+                                        color: AppTheme.primary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -601,27 +694,49 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.only(top: 10),
-                        decoration: const BoxDecoration(
-                          border: Border(top: BorderSide(color: Color(0x1F4DD0E1))),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: AppTheme.primary.withAlpha(31),
+                            ),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             RichText(
                               text: TextSpan(
-                                style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 10),
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 10,
+                                ),
                                 children: [
                                   const TextSpan(text: 'Precisão: '),
-                                  TextSpan(text: '3.1m', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  TextSpan(
+                                    text: '3.1m',
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             RichText(
                               text: TextSpan(
-                                style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 10),
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 10,
+                                ),
                                 children: [
                                   const TextSpan(text: 'Velocidade: '),
-                                  TextSpan(text: '3.6 km/h', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  TextSpan(
+                                    text: '3.6 km/h',
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -638,14 +753,14 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
 
         // Marker Actions Panel
         Container(
-          color: const Color(0xFA050D10),
+          color: AppTheme.background.withAlpha(250),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Column(
             children: [
               Text(
                 'REGISTRAR MARCAÇÃO OPERACIONAL',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF5A7280),
+                  color: AppTheme.textMuted,
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.0,
@@ -658,8 +773,12 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     child: _buildMarkBtn(
                       emoji: '🎯',
                       label: 'Indicação',
-                      color: const Color(0xFF4DD0E1),
-                      onTap: () => _logEvent('INDICAÇÃO', 'Indicação positiva', const Color(0xFF4DD0E1)),
+                      color: AppTheme.primary,
+                      onTap: () => _logEvent(
+                        'INDICAÇÃO',
+                        'Indicação positiva',
+                        AppTheme.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -667,8 +786,12 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     child: _buildMarkBtn(
                       emoji: '⚠️',
                       label: 'Checagem',
-                      color: const Color(0xFFF1C40F),
-                      onTap: () => _logEvent('CHECAGEM', 'Checagem de rastro', const Color(0xFFF1C40F)),
+                      color: AppTheme.warning,
+                      onTap: () => _logEvent(
+                        'CHECAGEM',
+                        'Checagem de rastro',
+                        AppTheme.warning,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -676,8 +799,12 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     child: _buildMarkBtn(
                       emoji: '❌',
                       label: 'Perda',
-                      color: const Color(0xFFE67E22),
-                      onTap: () => _logEvent('PERDA', 'Perda de rastro', const Color(0xFFE67E22)),
+                      color: AppTheme.attention,
+                      onTap: () => _logEvent(
+                        'PERDA',
+                        'Perda de rastro',
+                        AppTheme.attention,
+                      ),
                     ),
                   ),
                 ],
@@ -689,14 +816,21 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _stopSession(false),
-                      icon: const Icon(Icons.stop_rounded, color: Color(0xFFE74C3C), size: 16),
+                      icon: const Icon(
+                        Icons.stop_rounded,
+                        color: AppTheme.error,
+                        size: 16,
+                      ),
                       label: Text(
                         'PARAR SESSÃO',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFE74C3C),
-                        side: const BorderSide(color: Color(0xFFE74C3C), width: 1.5),
+                        foregroundColor: AppTheme.error,
+                        side: BorderSide(color: AppTheme.error, width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -711,11 +845,14 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                       icon: const Icon(Icons.check_circle_rounded, size: 16),
                       label: Text(
                         'ALVO LOCALIZADO',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2ECC71),
-                        foregroundColor: const Color(0xFF050D10),
+                        backgroundColor: AppTheme.success,
+                        foregroundColor: AppTheme.background,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -732,14 +869,19 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
     );
   }
 
-  Widget _buildMarkBtn({required String emoji, required String label, required Color color, required VoidCallback onTap}) {
+  Widget _buildMarkBtn({
+    required String emoji,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0x0AFFFFFF),
-          border: Border.all(color: const Color(0x1AFFFFFF)),
+          color: AppTheme.textPrimary.withAlpha(10),
+          border: Border.all(color: AppTheme.textPrimary.withAlpha(26)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -749,7 +891,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
             Text(
               label,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -768,22 +910,28 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
           children: [
             // Summary Header
             Container(
-              color: const Color(0x0F2ECC71),
+              color: AppTheme.success.withAlpha(15),
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0x332ECC71))),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: AppTheme.success.withAlpha(51)),
+                ),
               ),
               child: Row(
                 children: [
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(
-                      color: Color(0x332ECC71),
+                    decoration: BoxDecoration(
+                      color: AppTheme.success.withAlpha(51),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.check_rounded, color: Color(0xFF2ECC71), size: 20),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: AppTheme.success,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -793,7 +941,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                         Text(
                           'SESSÃO CONCLUÍDA',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFF2ECC71),
+                            color: AppTheme.success,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1,
@@ -803,7 +951,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                         Text(
                           'Resumo da trilha de B&C',
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -826,8 +974,10 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Container(
                       height: 180,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0D2030),
-                        border: Border.all(color: const Color(0x334DD0E1)),
+                        color: AppTheme.surfacePanelAlt,
+                        border: Border.all(
+                          color: AppTheme.primary.withAlpha(51),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ClipRRect(
@@ -849,8 +999,10 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0x0DFFFFFF),
-                              border: Border.all(color: const Color(0x14FFFFFF)),
+                              color: AppTheme.textPrimary.withAlpha(13),
+                              border: Border.all(
+                                color: AppTheme.textPrimary.withAlpha(20),
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
@@ -858,12 +1010,21 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               children: [
                                 Text(
                                   'DISTÂNCIA',
-                                  style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '${_distance}m',
-                                  style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 24, fontWeight: FontWeight.w800),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.primary,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ],
                             ),
@@ -874,8 +1035,10 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0x0DFFFFFF),
-                              border: Border.all(color: const Color(0x14FFFFFF)),
+                              color: AppTheme.textPrimary.withAlpha(13),
+                              border: Border.all(
+                                color: AppTheme.textPrimary.withAlpha(20),
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
@@ -883,12 +1046,21 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               children: [
                                 Text(
                                   'DURAÇÃO',
-                                  style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   _formatDuration(_seconds),
-                                  style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 24, fontWeight: FontWeight.w800),
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.primary,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ],
                             ),
@@ -902,7 +1074,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Text(
                       'EVENTOS REGISTRADOS',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
@@ -912,16 +1084,24 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     if (_events.isEmpty)
                       Text(
                         'Nenhum evento registrado.',
-                        style: GoogleFonts.inter(color: const Color(0xFF5A7280), fontSize: 12),
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textMuted,
+                          fontSize: 12,
+                        ),
                       )
                     else
                       ..._events.map((ev) {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0x0DFFFFFF),
-                            border: Border.all(color: const Color(0x0AFFFFFF)),
+                            color: AppTheme.textPrimary.withAlpha(13),
+                            border: Border.all(
+                              color: AppTheme.textPrimary.withAlpha(10),
+                            ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -929,7 +1109,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               Text(
                                 ev.time,
                                 style: GoogleFonts.inter(
-                                  color: const Color(0xFF5A7280),
+                                  color: AppTheme.textMuted,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -948,7 +1128,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                                 child: Text(
                                   ev.label,
                                   style: GoogleFonts.inter(
-                                    color: Colors.white,
+                                    color: AppTheme.textPrimary,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -957,7 +1137,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               Text(
                                 '${ev.distance}m',
                                 style: GoogleFonts.inter(
-                                  color: const Color(0xFF4DD0E1),
+                                  color: AppTheme.primary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -972,7 +1152,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Text(
                       'RESULTADO DA SESSÃO',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
@@ -982,9 +1162,9 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Row(
                       children: ['Completa', 'Checagem', 'Perda'].map((res) {
                         final isSelected = _finalResult == res;
-                        Color selectCol = const Color(0xFF2ECC71);
-                        if (res == 'Checagem') selectCol = const Color(0xFFF1C40F);
-                        if (res == 'Perda') selectCol = const Color(0xFFE67E22);
+                        Color selectCol = AppTheme.success;
+                        if (res == 'Checagem') selectCol = AppTheme.warning;
+                        if (res == 'Perda') selectCol = AppTheme.attention;
 
                         return Expanded(
                           child: GestureDetector(
@@ -998,9 +1178,13 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               margin: const EdgeInsets.symmetric(horizontal: 3),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: isSelected ? selectCol.withAlpha(20) : const Color(0x0DFFFFFF),
+                                color: isSelected
+                                    ? selectCol.withAlpha(20)
+                                    : AppTheme.textPrimary.withAlpha(13),
                                 border: Border.all(
-                                  color: isSelected ? selectCol : const Color(0x14FFFFFF),
+                                  color: isSelected
+                                      ? selectCol
+                                      : AppTheme.textPrimary.withAlpha(20),
                                 ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1008,7 +1192,9 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                               child: Text(
                                 res.toUpperCase(),
                                 style: GoogleFonts.inter(
-                                  color: isSelected ? selectCol : const Color(0xFF7A8A92),
+                                  color: isSelected
+                                      ? selectCol
+                                      : AppTheme.textTertiary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1024,7 +1210,7 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Text(
                       'OBSERVAÇÕES ADICIONAIS',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.2,
@@ -1033,19 +1219,24 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     const SizedBox(height: 10),
                     TextField(
                       controller: _summaryNotesController,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                      ),
                       maxLines: 3,
                       decoration: InputDecoration(
                         hintText: 'Digite aqui observações adicionais...',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF5A7280)),
+                        hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
                         filled: true,
-                        fillColor: const Color(0x0DFFFFFF),
+                        fillColor: AppTheme.textPrimary.withAlpha(13),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0x14FFFFFF)),
+                          borderSide: BorderSide(
+                            color: AppTheme.textPrimary.withAlpha(20),
+                          ),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
+                          borderSide: BorderSide(color: AppTheme.primary),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         contentPadding: const EdgeInsets.all(12),
@@ -1065,14 +1256,11 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
           right: 0,
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [
-                  Color(0xFF050D10),
-                  Color(0x00050D10),
-                ],
+                colors: [AppTheme.background, AppTheme.background.withAlpha(0)],
               ),
             ),
             child: Row(
@@ -1083,16 +1271,22 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                     Navigator.of(context).pop();
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF7A8A92),
-                    side: const BorderSide(color: Color(0x1AFFFFFF)),
+                    foregroundColor: AppTheme.textTertiary,
+                    side: BorderSide(color: AppTheme.textPrimary.withAlpha(26)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 20,
+                    ),
                   ),
                   child: Text(
                     'Descartar',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1102,15 +1296,17 @@ class _BuscaCapturaLiveScreenState extends State<BuscaCapturaLiveScreen> {
                       HapticFeedback.mediumImpact();
                       // Show success snackbar
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sessão de rastro salva com sucesso!')),
+                        const SnackBar(
+                          content: Text('Sessão de rastro salva com sucesso!'),
+                        ),
                       );
                       // Pop back twice (first pops live, second pops maintenance/formation to go back to training hub)
                       Navigator.of(context).pop();
                       Navigator.of(context).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2ECC71),
-                      foregroundColor: const Color(0xFF050D10),
+                      backgroundColor: AppTheme.success,
+                      foregroundColor: AppTheme.background,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1146,7 +1342,7 @@ class LiveMapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // Draw map grid lines
     final gridPaint = Paint()
-      ..color = const Color(0x0D4DD0E1)
+      ..color = AppTheme.primary.withAlpha(13)
       ..strokeWidth = 1.0;
 
     const double gridSize = 30.0;
@@ -1161,7 +1357,7 @@ class LiveMapPainter extends CustomPainter {
 
     // Draw trail line
     final trailPaint = Paint()
-      ..color = const Color(0xFF4DD0E1)
+      ..color = AppTheme.primary
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -1174,7 +1370,7 @@ class LiveMapPainter extends CustomPainter {
     canvas.drawPath(path, trailPaint);
 
     // Draw start marker
-    final startPaint = Paint()..color = const Color(0xFFF1C40F);
+    final startPaint = Paint()..color = AppTheme.warning;
     canvas.drawCircle(points.first, 8.0, startPaint);
 
     // Draw event markers
@@ -1185,10 +1381,10 @@ class LiveMapPainter extends CustomPainter {
 
     // Draw current location marker
     final currentPaint = Paint()
-      ..color = const Color(0xFF2ECC71)
+      ..color = AppTheme.success
       ..style = PaintingStyle.fill;
     final currentOutline = Paint()
-      ..color = Colors.white
+      ..color = AppTheme.textPrimary
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 

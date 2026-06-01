@@ -306,7 +306,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppTheme.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -412,7 +412,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
+        color: AppTheme.textPrimary.withAlpha(6),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.outline),
       ),
@@ -491,7 +491,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
               overlayColor: AppTheme.primary.withAlpha(40),
               valueIndicatorColor: AppTheme.primary,
               valueIndicatorTextStyle: GoogleFonts.inter(
-                color: Colors.black,
+                color: AppTheme.background,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -555,7 +555,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w900,
                     fontSize: 13,
-                    color: Colors.black,
+                    color: AppTheme.background,
                   ),
                 ),
               ),
@@ -649,7 +649,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? color.withAlpha(15)
-                      : Colors.white.withAlpha(5),
+                      : AppTheme.textPrimary.withAlpha(5),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isSelected ? color : AppTheme.outline,
@@ -745,7 +745,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
               fontSize: 13,
             ),
             filled: true,
-            fillColor: Colors.white.withAlpha(6),
+            fillColor: AppTheme.textPrimary.withAlpha(6),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppTheme.outline),
@@ -772,7 +772,7 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         onPressed: _isSaving ? null : _saveEvaluation,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primary,
-          foregroundColor: Colors.black,
+          foregroundColor: AppTheme.background,
           disabledBackgroundColor: AppTheme.outline,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -785,7 +785,9 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppTheme.background,
+                  ),
                 ),
               )
             : Text(

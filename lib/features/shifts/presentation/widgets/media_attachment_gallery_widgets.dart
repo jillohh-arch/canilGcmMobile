@@ -10,7 +10,7 @@ class _MediaAttachmentSectionLabel extends StatelessWidget {
       style: GoogleFonts.inter(
         fontSize: 10,
         fontWeight: FontWeight.w800,
-        color: Colors.white54,
+        color: AppTheme.textMuted,
         letterSpacing: 1,
       ),
     );

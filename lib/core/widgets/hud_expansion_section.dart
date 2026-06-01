@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class HudExpansionSection extends StatelessWidget {
@@ -20,12 +22,12 @@ class HudExpansionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      data: Theme.of(context).copyWith(dividerColor: AppTheme.transparent),
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         maintainState: true,
-        collapsedBackgroundColor: const Color(0xFF1E1E1E),
-        backgroundColor: const Color(0xFF161616),
+        collapsedBackgroundColor: AppTheme.surfaceModal,
+        backgroundColor: AppTheme.surfacePanel,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         collapsedShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
@@ -37,7 +39,7 @@ class HudExpansionSection extends StatelessWidget {
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
             fontSize: 13,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
         ),
         childrenPadding: const EdgeInsets.all(16),

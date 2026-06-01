@@ -12,12 +12,12 @@ class _WeightUpdateDialog extends StatelessWidget {
       backgroundColor: AppTheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        side: const BorderSide(color: Color(0x9900E5FF)),
+        side: BorderSide(color: AppTheme.primary.withAlpha(153)),
       ),
       title: Text(
         'ATUALIZAR PESO',
         style: GoogleFonts.inter(
-          color: Colors.cyanAccent,
+          color: AppTheme.primary,
           fontSize: 16,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.4,
@@ -30,7 +30,7 @@ class _WeightUpdateDialog extends StatelessWidget {
           Text(
             'Informe o peso atual do cão em quilogramas.',
             style: GoogleFonts.inter(
-              color: Colors.white70,
+              color: AppTheme.textPrimary.withAlpha(179),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -41,26 +41,26 @@ class _WeightUpdateDialog extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             autofocus: true,
             style: GoogleFonts.shareTechMono(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
             decoration: InputDecoration(
               suffixText: 'kg',
               suffixStyle: GoogleFonts.inter(
-                color: Colors.cyanAccent.withValues(alpha: 0.75),
+                color: AppTheme.primary.withValues(alpha: 0.75),
                 fontWeight: FontWeight.w900,
               ),
               filled: true,
-              fillColor: const Color(0xFF0B1020),
+              fillColor: AppTheme.surfacePanelStrong,
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
-                borderSide: const BorderSide(color: Color(0x5500E5FF)),
+                borderSide: BorderSide(color: AppTheme.primary.withAlpha(85)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
                 borderSide: const BorderSide(
-                  color: Colors.cyanAccent,
+                  color: AppTheme.primary,
                   width: 1.4,
                 ),
               ),
@@ -74,14 +74,14 @@ class _WeightUpdateDialog extends StatelessWidget {
           child: Text(
             'CANCELAR',
             style: GoogleFonts.inter(
-              color: Colors.white54,
+              color: AppTheme.textPrimary.withAlpha(138),
               fontWeight: FontWeight.w800,
             ),
           ),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: Colors.cyanAccent,
+            backgroundColor: AppTheme.primary,
             foregroundColor: AppTheme.background,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
@@ -95,7 +95,7 @@ class _WeightUpdateDialog extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Informe um peso válido.'),
-                  backgroundColor: Color(0xFFE53935),
+                  backgroundColor: AppTheme.errorStrong,
                 ),
               );
               return;

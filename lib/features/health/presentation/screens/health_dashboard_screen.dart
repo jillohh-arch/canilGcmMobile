@@ -62,7 +62,9 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen>
         body: Center(
           child: Text(
             'Nenhum turno ativo.',
-            style: GoogleFonts.inter(color: Colors.white54),
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary.withAlpha(138),
+            ),
           ),
         ),
       );

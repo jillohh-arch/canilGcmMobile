@@ -56,7 +56,7 @@ extension _DynamicActivitySheetLayout on _DynamicActivitySheetState {
     return ActivityCardCatalog.glowFor(
       category: widget.category,
       id: _selectedSubtype,
-      fallback: const Color(0xFF1B8A4C),
+      fallback: AppTheme.successOperational,
     );
   }
 

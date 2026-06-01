@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/activity_weather_button.dart';
 import 'package:canil_gcm/core/widgets/hud_chip_group.dart';
 import 'package:canil_gcm/core/widgets/hud_controls.dart';
@@ -109,7 +110,7 @@ class ScentWorkActivityFields extends StatelessWidget {
         ActivityWeatherButton(
           label: 'CAPTURAR CLIMA (GPS)',
           onPressed: onPullWeather,
-          backgroundColor: const Color(0xFF1B4F72),
+          backgroundColor: AppTheme.infoStrong,
           height: 44,
         ),
         const SizedBox(height: 12),

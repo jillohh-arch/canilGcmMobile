@@ -47,7 +47,7 @@ class _LatestRecordsSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(7),
+        color: AppTheme.textPrimary.withAlpha(7),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kBorder),
       ),
@@ -111,7 +111,7 @@ class _LatestRecordRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
+        color: AppTheme.textPrimary.withAlpha(6),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kBorderSubtle),
       ),

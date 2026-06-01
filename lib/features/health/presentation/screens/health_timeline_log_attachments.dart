@@ -65,10 +65,11 @@ class _TacticalHealthThumbnail extends StatelessWidget {
         child: CachedNetworkImage(
           imageUrl: url!,
           fit: BoxFit.cover,
-          placeholder: (context, url) => Container(color: Colors.white10),
-          errorWidget: (context, url, error) => const Icon(
+          placeholder: (context, url) =>
+              Container(color: AppTheme.textPrimary.withAlpha(26)),
+          errorWidget: (context, url, error) => Icon(
             Icons.image_not_supported,
-            color: Colors.white24,
+            color: AppTheme.textPrimary.withAlpha(61),
             size: 24,
           ),
         ),

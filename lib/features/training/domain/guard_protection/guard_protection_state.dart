@@ -2,7 +2,8 @@
 /// Subcoleção: /dogs/{dogId}/guard_protection_state/{stateId}
 class GuardProtectionState {
   final String? id;
-  final String cacaImpulse; // 'not_started' | 'opening' | 'developing' | 'consolidated'
+  final String
+  cacaImpulse; // 'not_started' | 'opening' | 'developing' | 'consolidated'
   final String defesaImpulse;
   final String agressaoImpulse;
   final List<TechnicalCapability> technicalCapabilities;
@@ -17,17 +18,24 @@ class GuardProtectionState {
     this.specialtyCommands = const [],
   });
 
-  factory GuardProtectionState.fromJson(Map<String, dynamic> json, {String? docId}) {
+  factory GuardProtectionState.fromJson(
+    Map<String, dynamic> json, {
+    String? docId,
+  }) {
     return GuardProtectionState(
       id: docId ?? json['id'] as String?,
       cacaImpulse: json['caca_impulse'] as String? ?? 'not_started',
       defesaImpulse: json['defesa_impulse'] as String? ?? 'not_started',
       agressaoImpulse: json['agressao_impulse'] as String? ?? 'not_started',
-      technicalCapabilities: (json['technical_capabilities'] as List<dynamic>?)
-              ?.map((e) => TechnicalCapability.fromJson(e as Map<String, dynamic>))
+      technicalCapabilities:
+          (json['technical_capabilities'] as List<dynamic>?)
+              ?.map(
+                (e) => TechnicalCapability.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [],
-      specialtyCommands: (json['specialty_commands'] as List<dynamic>?)
+      specialtyCommands:
+          (json['specialty_commands'] as List<dynamic>?)
               ?.map((e) => SpecialtyCommand.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -39,8 +47,9 @@ class GuardProtectionState {
       'caca_impulse': cacaImpulse,
       'defesa_impulse': defesaImpulse,
       'agressao_impulse': agressaoImpulse,
-      'technical_capabilities':
-          technicalCapabilities.map((e) => e.toJson()).toList(),
+      'technical_capabilities': technicalCapabilities
+          .map((e) => e.toJson())
+          .toList(),
       'specialty_commands': specialtyCommands.map((e) => e.toJson()).toList(),
     };
   }
@@ -58,7 +67,8 @@ class GuardProtectionState {
       cacaImpulse: cacaImpulse ?? this.cacaImpulse,
       defesaImpulse: defesaImpulse ?? this.defesaImpulse,
       agressaoImpulse: agressaoImpulse ?? this.agressaoImpulse,
-      technicalCapabilities: technicalCapabilities ?? this.technicalCapabilities,
+      technicalCapabilities:
+          technicalCapabilities ?? this.technicalCapabilities,
       specialtyCommands: specialtyCommands ?? this.specialtyCommands,
     );
   }
@@ -89,7 +99,8 @@ class TechnicalCapability {
 
 class SpecialtyCommand {
   final String name;
-  final String stage; // 'not_trained' | 'introduced' | 'developing' | 'consolidated'
+  final String
+  stage; // 'not_trained' | 'introduced' | 'developing' | 'consolidated'
 
   SpecialtyCommand({required this.name, this.stage = 'not_trained'});
 

@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -17,12 +19,12 @@ class UserDetailsScreen extends StatelessWidget {
         ? const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+            colors: [AppTheme.infoStrong, AppTheme.info],
           )
         : const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF37474F), Color(0xFF263238)],
+            colors: [AppTheme.surfacePanelAlt, AppTheme.surfacePanel],
           );
 
     return Scaffold(
@@ -44,7 +46,7 @@ class UserDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 40),
                         CircleAvatar(
                           radius: 56,
-                          backgroundColor: Colors.white24,
+                          backgroundColor: AppTheme.textPrimary.withAlpha(61),
                           backgroundImage: user.photoUrl != null
                               ? NetworkImage(user.photoUrl!)
                               : null,
@@ -52,7 +54,7 @@ class UserDetailsScreen extends StatelessWidget {
                               ? const Icon(
                                   Icons.person,
                                   size: 56,
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                 )
                               : null,
                         ),
@@ -82,7 +84,7 @@ class UserDetailsScreen extends StatelessWidget {
                     user.name,
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: Colors.grey[500],
+                      color: AppTheme.textMuted,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -144,7 +146,7 @@ class _CompactStat extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 10,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[500],
+            color: AppTheme.textMuted,
           ),
         ),
       ],
@@ -174,14 +176,14 @@ class _LinkedDogsSection extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.2,
-              color: Colors.grey[400],
+              color: AppTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
           if (linkedDogs.isEmpty)
             Text(
               'Nenhum K9 vinculado a este condutor.',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: AppTheme.textTertiary),
             )
           else
             ...linkedDogs.map(

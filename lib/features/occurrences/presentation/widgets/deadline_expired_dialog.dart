@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
@@ -184,7 +186,7 @@ class _SmallProgress extends StatelessWidget {
       height: 16,
       child: CircularProgressIndicator(
         strokeWidth: 2,
-        color: onPrimary ? Colors.white : null,
+        color: onPrimary ? AppTheme.textPrimary : null,
       ),
     );
   }

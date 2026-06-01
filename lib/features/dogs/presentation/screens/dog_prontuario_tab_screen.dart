@@ -17,13 +17,16 @@ class DogProntuarioTabScreen extends StatelessWidget {
     final dog = _activeDog(shiftVM.activeDogId, dogVM.dogs);
 
     if (!shiftVM.hasActiveShift || dog == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppTheme.background,
         body: Center(
           child: Text(
             'Nenhum cão ativo.\nInicie um turno para ver o prontuário.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54, fontSize: 14),
+            style: TextStyle(
+              color: AppTheme.textPrimary.withAlpha(138),
+              fontSize: 14,
+            ),
           ),
         ),
       );

@@ -24,8 +24,8 @@ class _SensorCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF082F49).withValues(alpha: 0.3)
-              : const Color(0xFF111827),
+              ? AppTheme.infoStrong.withValues(alpha: 0.3)
+              : AppTheme.surfacePanelAlt,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(6),
             topRight: const Radius.circular(6),
@@ -34,14 +34,14 @@ class _SensorCard extends StatelessWidget {
           ),
           border: Border.all(
             color: isSelected
-                ? Colors.cyanAccent
-                : Colors.cyanAccent.withValues(alpha: 0.2),
+                ? AppTheme.primary
+                : AppTheme.primary.withValues(alpha: 0.2),
             width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.cyanAccent.withValues(alpha: 0.15),
+                    color: AppTheme.primary.withValues(alpha: 0.15),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),
@@ -57,7 +57,7 @@ class _SensorCard extends StatelessWidget {
                 child: Icon(
                   Icons.edit_rounded,
                   size: 14,
-                  color: Colors.cyanAccent.withValues(alpha: 0.85),
+                  color: AppTheme.primary.withValues(alpha: 0.85),
                 ),
               ),
             Column(
@@ -71,8 +71,8 @@ class _SensorCard extends StatelessWidget {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? Colors.cyanAccent
-                        : Colors.cyanAccent.withValues(alpha: 0.7),
+                        ? AppTheme.primary
+                        : AppTheme.primary.withValues(alpha: 0.7),
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 1,
@@ -84,7 +84,9 @@ class _SensorCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: isSelected ? Colors.white : Colors.white54,
+                    color: isSelected
+                        ? AppTheme.textPrimary
+                        : AppTheme.textPrimary.withAlpha(138),
                     letterSpacing: 0.5,
                   ),
                   textAlign: TextAlign.center,
@@ -97,7 +99,7 @@ class _SensorCard extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 7,
                       fontWeight: FontWeight.w900,
-                      color: Colors.cyanAccent.withValues(alpha: 0.68),
+                      color: AppTheme.primary.withValues(alpha: 0.68),
                       letterSpacing: 0.7,
                     ),
                   ),

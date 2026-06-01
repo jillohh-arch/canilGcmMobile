@@ -33,21 +33,21 @@ class _SummaryCards extends StatelessWidget {
           label: 'Faro',
           value: '$scentCount',
           icon: Icons.track_changes_rounded,
-          color: const Color(0xFF29B6F6),
+          color: AppTheme.info,
         ),
         const SizedBox(width: 10),
         _MiniStat(
           label: 'Melhor',
           value: bestDuration,
           icon: Icons.emoji_events_rounded,
-          color: const Color(0xFF66BB6A),
+          color: AppTheme.success,
         ),
         const SizedBox(width: 10),
         _MiniStat(
           label: 'Média',
           value: avgDuration,
           icon: Icons.timer_rounded,
-          color: const Color(0xFF7E57C2),
+          color: AppTheme.healthAccent,
         ),
       ],
     );
@@ -86,7 +86,7 @@ class _MiniStat extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -95,7 +95,7 @@ class _MiniStat extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 8,
                 fontWeight: FontWeight.w600,
-                color: Colors.white38,
+                color: AppTheme.textMuted,
                 letterSpacing: 0.6,
               ),
             ),

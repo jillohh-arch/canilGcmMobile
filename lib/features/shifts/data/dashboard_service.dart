@@ -100,7 +100,7 @@ DateTime _parseTimestamp(dynamic value) {
 /// Service para buscar dados dinâmicos do dashboard no Firestore.
 class DashboardService {
   DashboardService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -163,7 +163,10 @@ class DashboardService {
     final snapshot = await _db
         .collection('registros')
         .where('caoId', isEqualTo: dogId)
-        .where('dataHora', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where(
+          'dataHora',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+        )
         .where('dataHora', isLessThan: Timestamp.fromDate(endOfDay))
         .count()
         .get();

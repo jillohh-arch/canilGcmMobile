@@ -19,6 +19,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
+import 'pdf_colors.dart';
 import 'pdf_common_widgets.dart';
 
 /// Gerador do PDF institucional de ocorrencia baseado nos mockups V2.
@@ -27,25 +28,25 @@ class OccurrencePdfGenerator {
   static const _pdfPhotoMaxDimension = 960;
   static const _pdfPhotoJpegQuality = 72;
 
-  static final _paper = PdfColors.white;
-  static final _ink = PdfColor.fromHex('14202B');
-  static final _inkSoft = PdfColor.fromHex('46586A');
-  static final _inkFaint = PdfColor.fromHex('8493A1');
-  static final _line = PdfColor.fromHex('DDE4EA');
-  static final _lineSoft = PdfColor.fromHex('EAEFF3');
-  static final _cyan = PdfColor.fromHex('0A8E9D');
-  static final _cyanDeep = PdfColor.fromHex('07707C');
-  static final _green = PdfColor.fromHex('1F9D52');
-  static final _greenBg = PdfColor.fromHex('F1FAF4');
-  static final _greenLine = PdfColor.fromHex('BFE6CF');
-  static final _amber = PdfColor.fromHex('B07D0A');
-  static final _amberBg = PdfColor.fromHex('FDF8EC');
-  static final _amberLine = PdfColor.fromHex('ECDCA8');
-  static final _headerBg = PdfColor.fromHex('0E1A24');
-  static final _headerAccent = PdfColor.fromHex('2BB6C4');
-  static final _mapBg = PdfColor.fromHex('F3F6F8');
-  static final _mapRoad = PdfColor.fromHex('DDE4EA');
-  static final _mediaBg = PdfColor.fromHex('D5E0E6');
+  static final _paper = PdfInstitutionalColors.white;
+  static final _ink = PdfInstitutionalColors.textInk;
+  static final _inkSoft = PdfInstitutionalColors.textMuted;
+  static final _inkFaint = PdfInstitutionalColors.textFaint;
+  static final _line = PdfInstitutionalColors.dividerStrong;
+  static final _lineSoft = PdfInstitutionalColors.dividerSoft;
+  static final _cyan = PdfInstitutionalColors.cyan;
+  static final _cyanDeep = PdfInstitutionalColors.cyanDeep;
+  static final _green = PdfInstitutionalColors.green;
+  static final _greenBg = PdfInstitutionalColors.greenBackground;
+  static final _greenLine = PdfInstitutionalColors.greenBorder;
+  static final _amber = PdfInstitutionalColors.amber;
+  static final _amberBg = PdfInstitutionalColors.amberBackground;
+  static final _amberLine = PdfInstitutionalColors.amberBorder;
+  static final _headerBg = PdfInstitutionalColors.headerBackground;
+  static final _headerAccent = PdfInstitutionalColors.headerAccent;
+  static final _mapBg = PdfInstitutionalColors.mapBackground;
+  static final _mapRoad = PdfInstitutionalColors.dividerStrong;
+  static final _mediaBg = PdfInstitutionalColors.mediaBackground;
 
   static const _docType = 'Registro de Ocorrencia';
   static const _systemName = 'Sistema Canil K9 GCM';
@@ -463,7 +464,7 @@ class OccurrencePdfGenerator {
                       'GUARDA CIVIL MUNICIPAL DE LIMEIRA',
                       style: pw.TextStyle(
                         font: f.bold,
-                        color: PdfColors.white,
+                        color: PdfInstitutionalColors.white,
                         fontSize: 13.5,
                         letterSpacing: 0.3,
                       ),
@@ -489,7 +490,7 @@ class OccurrencePdfGenerator {
                     ctx.docId,
                     style: pw.TextStyle(
                       font: f.bold,
-                      color: PdfColors.white,
+                      color: PdfInstitutionalColors.white,
                       fontSize: 11,
                       letterSpacing: 0.3,
                     ),
@@ -499,7 +500,7 @@ class OccurrencePdfGenerator {
                     pageNumber > 0 ? 'PAGINA $pageNumber' : '',
                     style: pw.TextStyle(
                       font: f.medium,
-                      color: PdfColor.fromHex('8AA0AD'),
+                      color: PdfInstitutionalColors.textPlaceholder,
                       fontSize: 7.5,
                       letterSpacing: 1.2,
                     ),
@@ -556,7 +557,7 @@ class OccurrencePdfGenerator {
       width: 32,
       height: 38,
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromHex('13242F'),
+        color: PdfInstitutionalColors.headerDeep,
         border: pw.Border.all(color: _headerAccent, width: 1.1),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
       ),
@@ -576,7 +577,7 @@ class OccurrencePdfGenerator {
                 style: pw.TextStyle(
                   font: fonts.black,
                   fontSize: 8,
-                  color: PdfColor.fromHex('13242F'),
+                  color: PdfInstitutionalColors.headerDeep,
                 ),
               ),
             ),
@@ -586,7 +587,7 @@ class OccurrencePdfGenerator {
             'K9',
             style: pw.TextStyle(
               font: fonts.black,
-              color: PdfColors.white,
+              color: PdfInstitutionalColors.white,
               fontSize: 8,
             ),
           ),
@@ -746,7 +747,7 @@ class OccurrencePdfGenerator {
       width: 48,
       height: 48,
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromHex('EEF2F5'),
+        color: PdfInstitutionalColors.panelLight,
         shape: pw.BoxShape.circle,
         border: pw.Border.all(color: c, width: 1.4),
       ),
@@ -921,14 +922,17 @@ class OccurrencePdfGenerator {
                     decoration: pw.BoxDecoration(
                       color: _cyan,
                       shape: pw.BoxShape.circle,
-                      border: pw.Border.all(color: PdfColors.white, width: 2),
+                      border: pw.Border.all(
+                        color: PdfInstitutionalColors.white,
+                        width: 2,
+                      ),
                     ),
                   ),
                   pw.Container(
                     width: 36,
                     height: 7,
                     decoration: pw.BoxDecoration(
-                      color: PdfColor.fromInt(0x330A8E9D),
+                      color: PdfInstitutionalColors.cyanOverlay,
                       borderRadius: const pw.BorderRadius.all(
                         pw.Radius.circular(8),
                       ),
@@ -966,7 +970,11 @@ class OccurrencePdfGenerator {
       top: top,
       child: pw.Text(
         text,
-        style: _body(fonts, size: 6.5, color: PdfColor.fromHex('97A6B2')),
+        style: _body(
+          fonts,
+          size: 6.5,
+          color: PdfInstitutionalColors.textSubtle,
+        ),
       ),
     );
   }
@@ -1159,7 +1167,7 @@ class OccurrencePdfGenerator {
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('FAFCFD'),
+              color: PdfInstitutionalColors.panelSoft,
               border: pw.Border(top: pw.BorderSide(color: _line)),
             ),
             child: pw.Row(
@@ -1388,7 +1396,7 @@ class OccurrencePdfGenerator {
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: _line),
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              color: PdfColor.fromHex('#0A1A20'),
+              color: PdfInstitutionalColors.darkSurface,
             ),
             alignment: pw.Alignment.center,
             child: pw.Text(
@@ -1401,8 +1409,8 @@ class OccurrencePdfGenerator {
         ...locations.map((loc) {
           final isFirst = loc.index == 1;
           final pinColor = isFirst
-              ? PdfColor.fromHex('#2ECC71')
-              : PdfColor.fromHex('#4DD0E1');
+              ? PdfInstitutionalColors.greenBright
+              : PdfInstitutionalColors.cyanAccent;
           return pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 6),
             child: pw.Row(
@@ -1421,7 +1429,7 @@ class OccurrencePdfGenerator {
                     style: _bodyBold(
                       f,
                       size: 8,
-                      color: PdfColor.fromHex('#04181D'),
+                      color: PdfInstitutionalColors.darkSurfaceDeep,
                     ),
                   ),
                 ),
@@ -1938,7 +1946,7 @@ class OccurrencePdfGenerator {
       decoration: pw.BoxDecoration(
         border: pw.Border(
           left: pw.BorderSide(
-            color: label == 'Fotos' ? PdfColors.white : _line,
+            color: label == 'Fotos' ? PdfInstitutionalColors.white : _line,
           ),
         ),
       ),
@@ -2046,7 +2054,11 @@ class OccurrencePdfGenerator {
                     ),
                     child: pw.Text(
                       'SINC',
-                      style: _bodyBold(f, size: 6.3, color: PdfColors.white),
+                      style: _bodyBold(
+                        f,
+                        size: 6.3,
+                        color: PdfInstitutionalColors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -2170,7 +2182,11 @@ class OccurrencePdfGenerator {
                     ),
                     child: pw.Text(
                       'FINAL',
-                      style: _bodyBold(f, size: 6.3, color: PdfColors.white),
+                      style: _bodyBold(
+                        f,
+                        size: 6.3,
+                        color: PdfInstitutionalColors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -2226,7 +2242,7 @@ class OccurrencePdfGenerator {
             width: 32,
             height: 32,
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('EEF2F5'),
+              color: PdfInstitutionalColors.panelLight,
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
             ),
             child: pw.Center(
@@ -2286,8 +2302,10 @@ class OccurrencePdfGenerator {
                       vertical: 6,
                     ),
                     decoration: pw.BoxDecoration(
-                      color: PdfColor.fromHex('EEF9FB'),
-                      border: pw.Border.all(color: PdfColor.fromHex('B8E3E8')),
+                      color: PdfInstitutionalColors.panelCyan,
+                      border: pw.Border.all(
+                        color: PdfInstitutionalColors.panelCyanBorder,
+                      ),
                       borderRadius: const pw.BorderRadius.all(
                         pw.Radius.circular(7),
                       ),
@@ -2313,7 +2331,7 @@ class OccurrencePdfGenerator {
                       style: _body(
                         f,
                         size: 9.5,
-                        color: PdfColor.fromHex('26313C'),
+                        color: PdfInstitutionalColors.timelineDark,
                       ),
                     ),
                   ),
@@ -2321,7 +2339,7 @@ class OccurrencePdfGenerator {
                   pw.Container(
                     padding: const pw.EdgeInsets.all(10),
                     decoration: pw.BoxDecoration(
-                      color: PdfColor.fromHex('F7F9FB'),
+                      color: PdfInstitutionalColors.panelSubtle,
                       border: pw.Border.all(color: _lineSoft),
                       borderRadius: const pw.BorderRadius.all(
                         pw.Radius.circular(7),
@@ -2833,7 +2851,7 @@ class OccurrencePdfGenerator {
 
   pw.TableRow _pdfTableHeader(_OccurrencePdfContext ctx, List<String> labels) {
     return pw.TableRow(
-      decoration: pw.BoxDecoration(color: PdfColor.fromHex('F7F9FB')),
+      decoration: pw.BoxDecoration(color: PdfInstitutionalColors.panelSubtle),
       children: labels
           .map(
             (label) =>
@@ -2929,7 +2947,7 @@ class OccurrencePdfGenerator {
           pw.Container(
             padding: const pw.EdgeInsets.all(9),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F6F8FA'),
+              color: PdfInstitutionalColors.panelMuted,
               border: pw.Border.all(color: _lineSoft),
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
             ),
@@ -3077,7 +3095,7 @@ class OccurrencePdfGenerator {
 
   pw.Widget _emptyBox(String message, PdfFonts fonts) {
     return _roundedCard(
-      background: PdfColor.fromHex('F7F9FB'),
+      background: PdfInstitutionalColors.panelSubtle,
       padding: const pw.EdgeInsets.all(14),
       child: pw.Text(message, style: _body(fonts, size: 9, color: _inkSoft)),
     );
@@ -3168,7 +3186,7 @@ class OccurrencePdfGenerator {
                 style: pw.TextStyle(
                   font: ctx.fonts.regular,
                   fontSize: 8.5,
-                  color: PdfColors.grey700,
+                  color: PdfInstitutionalColors.grey700,
                 ),
               ),
             ],
@@ -3179,7 +3197,7 @@ class OccurrencePdfGenerator {
             style: pw.TextStyle(
               font: ctx.fonts.regular,
               fontSize: 8.5,
-              color: PdfColors.grey700,
+              color: PdfInstitutionalColors.grey700,
             ),
           ),
           pw.SizedBox(height: 8),
@@ -3189,7 +3207,7 @@ class OccurrencePdfGenerator {
             width: double.infinity,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F9F9F9'),
+              color: PdfInstitutionalColors.panelNeutral,
               borderRadius: pw.BorderRadius.circular(4),
             ),
             child: pw.Column(
@@ -3200,7 +3218,7 @@ class OccurrencePdfGenerator {
                   style: pw.TextStyle(
                     font: ctx.fonts.bold,
                     fontSize: 7.5,
-                    color: PdfColors.grey600,
+                    color: PdfInstitutionalColors.grey600,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -3210,7 +3228,7 @@ class OccurrencePdfGenerator {
                   style: pw.TextStyle(
                     font: ctx.fonts.regular,
                     fontSize: 9,
-                    color: PdfColors.grey900,
+                    color: PdfInstitutionalColors.grey900,
                     lineSpacing: 2,
                   ),
                 ),
@@ -3230,7 +3248,7 @@ class OccurrencePdfGenerator {
             width: double.infinity,
             padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F5F5F5'),
+              color: PdfInstitutionalColors.panelNeutralAlt,
               borderRadius: pw.BorderRadius.circular(4),
             ),
             child: pw.Row(
@@ -3240,7 +3258,7 @@ class OccurrencePdfGenerator {
                   style: pw.TextStyle(
                     font: ctx.fonts.bold,
                     fontSize: 7,
-                    color: PdfColors.grey600,
+                    color: PdfInstitutionalColors.grey600,
                   ),
                 ),
                 pw.Expanded(
@@ -3249,7 +3267,7 @@ class OccurrencePdfGenerator {
                     style: pw.TextStyle(
                       font: ctx.fonts.monoRegular,
                       fontSize: 6.5,
-                      color: PdfColors.grey800,
+                      color: PdfInstitutionalColors.grey800,
                     ),
                   ),
                 ),
@@ -3293,7 +3311,7 @@ class OccurrencePdfGenerator {
       margin: const pw.EdgeInsets.only(bottom: 6),
       padding: const pw.EdgeInsets.all(8),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColor.fromHex('E0E0E0')),
+        border: pw.Border.all(color: PdfInstitutionalColors.neutralBorder),
         borderRadius: pw.BorderRadius.circular(4),
       ),
       child: pw.Column(
@@ -3317,7 +3335,7 @@ class OccurrencePdfGenerator {
                 style: pw.TextStyle(
                   font: ctx.fonts.bold,
                   fontSize: 8,
-                  color: PdfColors.grey600,
+                  color: PdfInstitutionalColors.grey600,
                 ),
               ),
               pw.Expanded(
@@ -3326,7 +3344,7 @@ class OccurrencePdfGenerator {
                   style: pw.TextStyle(
                     font: ctx.fonts.regular,
                     fontSize: 8,
-                    color: PdfColors.grey700,
+                    color: PdfInstitutionalColors.grey700,
                     decoration: pw.TextDecoration.lineThrough,
                   ),
                 ),
@@ -3342,7 +3360,7 @@ class OccurrencePdfGenerator {
                 style: pw.TextStyle(
                   font: ctx.fonts.bold,
                   fontSize: 8,
-                  color: PdfColors.grey600,
+                  color: PdfInstitutionalColors.grey600,
                 ),
               ),
               pw.Expanded(
@@ -3351,7 +3369,7 @@ class OccurrencePdfGenerator {
                   style: pw.TextStyle(
                     font: ctx.fonts.bold,
                     fontSize: 8,
-                    color: PdfColors.grey900,
+                    color: PdfInstitutionalColors.grey900,
                   ),
                 ),
               ),
@@ -3364,7 +3382,7 @@ class OccurrencePdfGenerator {
               style: pw.TextStyle(
                 font: ctx.fonts.regular,
                 fontSize: 7.5,
-                color: PdfColors.grey600,
+                color: PdfInstitutionalColors.grey600,
                 fontStyle: pw.FontStyle.italic,
               ),
             ),

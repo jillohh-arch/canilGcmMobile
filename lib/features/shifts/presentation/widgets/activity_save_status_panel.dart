@@ -20,7 +20,7 @@ class ActivitySaveStatusPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final statusColor = saveFailed ? const Color(0xFFE53935) : accentColor;
+    final statusColor = saveFailed ? AppTheme.errorStrong : accentColor;
     final statusText = saveStatus.isEmpty
         ? (saveFailed ? 'Falha ao salvar.' : 'Sincronizando...')
         : saveStatus;
@@ -44,7 +44,7 @@ class ActivitySaveStatusPanel extends StatelessWidget {
             child: Text(
               statusText,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),

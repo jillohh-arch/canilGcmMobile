@@ -8,36 +8,49 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
     final dogId = shiftVM.activeDogId!;
 
-    debugPrint('[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)');
+    debugPrint(
+      '[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)',
+    );
 
     // Buscar treinos
     final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
-    trainingVM.fetchTrainingsForDog(dogId).then((_) {
-      final count = trainingVM.trainings.length;
-      debugPrint('[History] Treinos carregados: $count');
-    }).catchError((e) {
-      debugPrint('[History] ERRO ao carregar treinos: $e');
-    });
+    trainingVM
+        .fetchTrainingsForDog(dogId)
+        .then((_) {
+          final count = trainingVM.trainings.length;
+          debugPrint('[History] Treinos carregados: $count');
+        })
+        .catchError((e) {
+          debugPrint('[History] ERRO ao carregar treinos: $e');
+        });
 
     // Buscar registros de saúde
     final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    healthVM.fetchHealthLogsForDog(dogId).then((_) {
-      final count = healthVM.healthLogs.length;
-      debugPrint('[History] Saúde carregados: $count');
-    }).catchError((e) {
-      debugPrint('[History] ERRO ao carregar saúde: $e');
-    });
+    healthVM
+        .fetchHealthLogsForDog(dogId)
+        .then((_) {
+          final count = healthVM.healthLogs.length;
+          debugPrint('[History] Saúde carregados: $count');
+        })
+        .catchError((e) {
+          debugPrint('[History] ERRO ao carregar saúde: $e');
+        });
 
     // Buscar nutrição
     final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
     nutritionVM.loadForDog(dogId, forceReload: forceReload).catchError((e) {
       debugPrint('[History] ERRO ao carregar nutrição: $e');
     });
-    nutritionVM.loadFullHistory(dogId).then((_) {
-      debugPrint('[History] Nutrição carregados: ${nutritionVM.historyFeedings.length}');
-    }).catchError((e) {
-      debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
-    });
+    nutritionVM
+        .loadFullHistory(dogId)
+        .then((_) {
+          debugPrint(
+            '[History] Nutrição carregados: ${nutritionVM.historyFeedings.length}',
+          );
+        })
+        .catchError((e) {
+          debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
+        });
 
     // Observar ocorrências (stream real-time)
     Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);

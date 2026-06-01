@@ -32,7 +32,7 @@ class _TrainingTypeSelector extends StatelessWidget {
                   : colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: isSelected ? color : Colors.white12,
+                color: isSelected ? color : AppTheme.surfaceWhiteBorder,
                 width: isSelected ? 1.5 : 0.5,
               ),
             ),
@@ -42,7 +42,7 @@ class _TrainingTypeSelector extends StatelessWidget {
                 Icon(
                   icon,
                   size: 18,
-                  color: isSelected ? color : Colors.white38,
+                  color: isSelected ? color : AppTheme.textMuted,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -50,7 +50,7 @@ class _TrainingTypeSelector extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? color : Colors.white60,
+                    color: isSelected ? color : AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -90,7 +90,9 @@ class _SubstanceSelector extends StatelessWidget {
               label: Text(substance),
               labelStyle: GoogleFonts.inter(
                 fontSize: 13,
-                color: isSelected ? Colors.black : Colors.white70,
+                color: isSelected
+                    ? AppTheme.background
+                    : AppTheme.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
               backgroundColor: colorScheme.surfaceContainerHighest,

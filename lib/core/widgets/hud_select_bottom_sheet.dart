@@ -63,7 +63,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded),
-                color: Colors.white54,
+                color: AppTheme.textPrimary.withAlpha(138),
               ),
             ],
           ),
@@ -72,7 +72,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
             height: 2,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [accent, accent.withAlpha(20), Colors.transparent],
+                colors: [accent, accent.withAlpha(20), AppTheme.transparent],
               ),
             ),
           ),
@@ -105,7 +105,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
                       border: Border.all(
                         color: isSelected
                             ? accent
-                            : Colors.white.withAlpha(18),
+                            : AppTheme.textPrimary.withAlpha(18),
                       ),
                     ),
                     child: Row(
@@ -114,7 +114,9 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
                           isSelected
                               ? Icons.radio_button_checked_rounded
                               : Icons.radio_button_off_rounded,
-                          color: isSelected ? accent : Colors.white30,
+                          color: isSelected
+                              ? accent
+                              : AppTheme.textPrimary.withAlpha(77),
                           size: 18,
                         ),
                         const SizedBox(width: 10),
@@ -122,7 +124,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
                           child: Text(
                             labelBuilder(item),
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                             ),

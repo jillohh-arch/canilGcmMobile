@@ -59,10 +59,10 @@ extension _StandardSheetFields on _DynamicActivitySheetState {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF1B8A4C),
-              onPrimary: Colors.white,
-              surface: Color(0xFF1E1E1E),
-              onSurface: Colors.white,
+              primary: AppTheme.successOperational,
+              onPrimary: AppTheme.textPrimary,
+              surface: AppTheme.surfaceModal,
+              onSurface: AppTheme.textPrimary,
             ),
           ),
           child: child!,

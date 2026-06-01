@@ -28,7 +28,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
                 height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(12),
+                  color: AppTheme.textPrimary.withAlpha(12),
                 ),
               ),
             ),
@@ -40,7 +40,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
                 height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black.withAlpha(25),
+                  color: AppTheme.background.withAlpha(25),
                 ),
               ),
             ),
@@ -77,7 +77,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
             _QuickActionButton(
               icon: Icons.track_changes_rounded,
               label: 'Faro',
-              color: const Color(0xFFFFB300),
+              color: AppTheme.amber,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -90,7 +90,7 @@ extension _DogDetailsHeader on _DogDetailsScreenState {
             _QuickActionButton(
               icon: Icons.medical_services_rounded,
               label: 'Saúde',
-              color: const Color(0xFFEF5350),
+              color: AppTheme.errorStrong,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(

@@ -316,25 +316,27 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F2027),
+        backgroundColor: AppTheme.surfaceSheet,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Nenhum evento registrado',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Deseja finalizar a ocorrência sem nenhum evento?',
-          style: GoogleFonts.inter(color: Colors.white70),
+          style: GoogleFonts.inter(color: AppTheme.textPrimary.withAlpha(179)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: Colors.white54),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(138),
+              ),
             ),
           ),
           TextButton(
@@ -344,7 +346,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
             },
             child: Text(
               'Finalizar',
-              style: GoogleFonts.inter(color: const Color(0xFFE74C3C)),
+              style: GoogleFonts.inter(color: AppTheme.error),
             ),
           ),
         ],
@@ -362,12 +364,12 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F2027),
+        backgroundColor: AppTheme.surfaceSheet,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Editar dados da ocorrência',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
@@ -389,22 +391,29 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               const SizedBox(height: 6),
               TextField(
                 controller: locationCtrl,
-                style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Endereço',
                   hintStyle: GoogleFonts.inter(
-                    color: Colors.white38,
+                    color: AppTheme.textPrimary.withAlpha(97),
                     fontSize: 14,
                   ),
                   filled: true,
-                  fillColor: Colors.white.withAlpha(8),
+                  fillColor: AppTheme.textPrimary.withAlpha(8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                    borderSide: BorderSide(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                    borderSide: BorderSide(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -430,22 +439,29 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
               TextField(
                 controller: observationCtrl,
                 maxLines: 3,
-                style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Observação (opcional)',
                   hintStyle: GoogleFonts.inter(
-                    color: Colors.white38,
+                    color: AppTheme.textPrimary.withAlpha(97),
                     fontSize: 14,
                   ),
                   filled: true,
-                  fillColor: Colors.white.withAlpha(8),
+                  fillColor: AppTheme.textPrimary.withAlpha(8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                    borderSide: BorderSide(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                    borderSide: BorderSide(
+                      color: AppTheme.textPrimary.withAlpha(20),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -465,7 +481,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: Colors.white54),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(138),
+              ),
             ),
           ),
           TextButton(
@@ -512,7 +530,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0A1A20),
+      backgroundColor: AppTheme.surfacePanelSoft,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -553,12 +571,12 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F2027),
+        backgroundColor: AppTheme.surfaceSheet,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Descartar ocorrência?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -567,27 +585,37 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
           children: [
             Text(
               'Esta ação não pode ser desfeita. A ocorrência será marcada como descartada.',
-              style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(179),
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: reasonController,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
                 hintText: 'Motivo (obrigatório)',
                 hintStyle: GoogleFonts.inter(
-                  color: Colors.white38,
+                  color: AppTheme.textPrimary.withAlpha(97),
                   fontSize: 14,
                 ),
                 filled: true,
-                fillColor: Colors.white.withAlpha(8),
+                fillColor: AppTheme.textPrimary.withAlpha(8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                  borderSide: BorderSide(
+                    color: AppTheme.textPrimary.withAlpha(20),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                  borderSide: BorderSide(
+                    color: AppTheme.textPrimary.withAlpha(20),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -606,7 +634,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: Colors.white54),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(138),
+              ),
             ),
           ),
           TextButton(
@@ -929,12 +959,12 @@ class _Header extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withAlpha(10),
-                border: Border.all(color: Colors.white.withAlpha(20)),
+                color: AppTheme.textPrimary.withAlpha(10),
+                border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 size: 16,
               ),
             ),
@@ -960,7 +990,7 @@ class _Header extends StatelessWidget {
                       child: Text(
                         typeName,
                         style: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: AppTheme.textPrimary,
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
@@ -987,10 +1017,10 @@ class _Header extends StatelessWidget {
             PopupMenuButton<String>(
               icon: Icon(
                 Icons.more_vert,
-                color: Colors.white.withAlpha(180),
+                color: AppTheme.textPrimary.withAlpha(180),
                 size: 22,
               ),
-              color: const Color(0xFF0F2027),
+              color: AppTheme.surfaceSheet,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1016,7 +1046,7 @@ class _Header extends StatelessWidget {
                         Text(
                           'Editar dados',
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 13,
                           ),
                         ),
@@ -1066,15 +1096,15 @@ class _SyncErrorBanner extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFE53935).withAlpha(20),
+          color: AppTheme.errorStrong.withAlpha(20),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE53935).withAlpha(80)),
+          border: Border.all(color: AppTheme.errorStrong.withAlpha(80)),
         ),
         child: Row(
           children: [
             const Icon(
               Icons.warning_amber_rounded,
-              color: Color(0xFFE53935),
+              color: AppTheme.errorStrong,
               size: 18,
             ),
             const SizedBox(width: 10),
@@ -1082,7 +1112,7 @@ class _SyncErrorBanner extends StatelessWidget {
               child: Text(
                 'Sincronização com falha. Toque para tentar novamente.',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(200),
+                  color: AppTheme.textPrimary.withAlpha(200),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1130,7 +1160,7 @@ class _AwaitingSignaturesNotice extends StatelessWidget {
                 child: Text(
                   'Aguardando assinaturas',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1142,7 +1172,7 @@ class _AwaitingSignaturesNotice extends StatelessWidget {
           Text(
             'O registro está travado para edição até a conclusão das assinaturas.',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(170),
+              color: AppTheme.textPrimary.withAlpha(170),
               fontSize: 12,
               height: 1.35,
             ),
@@ -1173,9 +1203,9 @@ class _ReadOnlyOccurrenceNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(6),
+        color: AppTheme.textPrimary.withAlpha(6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(18)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(18)),
       ),
       child: Row(
         children: [
@@ -1189,7 +1219,7 @@ class _ReadOnlyOccurrenceNotice extends StatelessWidget {
             child: Text(
               'Visualização sem edição para este condutor.',
               style: GoogleFonts.inter(
-                color: Colors.white.withAlpha(180),
+                color: AppTheme.textPrimary.withAlpha(180),
                 fontSize: 12,
                 height: 1.35,
               ),
@@ -1246,7 +1276,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(40),
+                color: AppTheme.textPrimary.withAlpha(40),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1265,7 +1295,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
           Text(
             'Atual: ${widget.currentTypeName}',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(120),
+              color: AppTheme.textPrimary.withAlpha(120),
               fontSize: 12,
             ),
           ),
@@ -1273,24 +1303,31 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
           TextField(
             controller: widget.searchController,
             onChanged: (v) => setState(() => _query = v),
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Buscar natureza...',
-              hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+              hintStyle: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(97),
+                fontSize: 14,
+              ),
               prefixIcon: const Icon(
                 Icons.search,
                 color: AppTheme.primary,
                 size: 18,
               ),
               filled: true,
-              fillColor: Colors.white.withAlpha(8),
+              fillColor: AppTheme.textPrimary.withAlpha(8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -1321,7 +1358,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
                     decoration: BoxDecoration(
                       color: isCurrent
                           ? AppTheme.primary.withAlpha(20)
-                          : Colors.transparent,
+                          : AppTheme.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: isCurrent
                           ? Border.all(color: AppTheme.primary.withAlpha(60))
@@ -1338,7 +1375,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
                                 style: GoogleFonts.inter(
                                   color: isCurrent
                                       ? AppTheme.primary
-                                      : Colors.white,
+                                      : AppTheme.textPrimary,
                                   fontSize: 14,
                                   fontWeight: isCurrent
                                       ? FontWeight.w600
@@ -1349,7 +1386,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
                               Text(
                                 '${nature.code} · ${nature.group}',
                                 style: GoogleFonts.inter(
-                                  color: Colors.white.withAlpha(80),
+                                  color: AppTheme.textPrimary.withAlpha(80),
                                   fontSize: 11,
                                 ),
                               ),

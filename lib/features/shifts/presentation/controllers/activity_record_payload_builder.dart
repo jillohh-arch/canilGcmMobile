@@ -20,7 +20,9 @@ abstract final class ActivityRecordPayloadBuilder {
       dogName: dogName,
       date: date,
       type: HealthLogModel.mapLegacyLogType(logType),
-      subtype: vaccines.isNotEmpty ? vaccines.first : (logType == 'Pesagem' ? 'Pesagem' : null),
+      subtype: vaccines.isNotEmpty
+          ? vaccines.first
+          : (logType == 'Pesagem' ? 'Pesagem' : null),
       healthObservations: observations + _returnDateSuffix(returnDate),
       vetName: _optionalText(vetName),
       mediaAttachments: _optionalMedia(mediaAttachments),

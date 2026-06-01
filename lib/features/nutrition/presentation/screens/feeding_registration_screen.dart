@@ -96,7 +96,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         backgroundColor: AppTheme.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white70, size: 22),
+          icon: Icon(
+            Icons.close,
+            color: AppTheme.textPrimary.withAlpha(179),
+            size: 22,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -126,7 +130,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                     _buildPeriodSelector(),
                     const SizedBox(height: 20),
                     // Compliance toggle
-                    if (prescription != null) _buildComplianceCheckbox(prescription),
+                    if (prescription != null)
+                      _buildComplianceCheckbox(prescription),
                     // Quantidade
                     _buildAmountField(prescription),
                     const SizedBox(height: 20),
@@ -142,7 +147,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                     _buildObservationsField(),
                     const SizedBox(height: 16),
                     // Info de prescrição
-                    if (prescription != null) _buildPrescriptionInfo(prescription),
+                    if (prescription != null)
+                      _buildPrescriptionInfo(prescription),
                   ],
                 ),
               ),
@@ -159,8 +165,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: AppTheme.textPrimary.withValues(alpha: 0.04),
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -232,7 +238,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: color.withValues(alpha: bgAlpha / 255.0),
-            border: Border.all(color: color.withValues(alpha: borderAlpha / 255.0)),
+            border: Border.all(
+              color: color.withValues(alpha: borderAlpha / 255.0),
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -272,17 +280,25 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             decoration: BoxDecoration(
-              color: _isCompliant ? AppTheme.success.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
+              color: _isCompliant
+                  ? AppTheme.success.withValues(alpha: 0.08)
+                  : AppTheme.textPrimary.withValues(alpha: 0.04),
               border: Border.all(
-                color: _isCompliant ? AppTheme.success.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1),
+                color: _isCompliant
+                    ? AppTheme.success.withValues(alpha: 0.3)
+                    : AppTheme.textPrimary.withValues(alpha: 0.1),
               ),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
                 Icon(
-                  _isCompliant ? Icons.check_box : Icons.check_box_outline_blank,
-                  color: _isCompliant ? AppTheme.success : AppTheme.textTertiary,
+                  _isCompliant
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
+                  color: _isCompliant
+                      ? AppTheme.success
+                      : AppTheme.textTertiary,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -290,9 +306,13 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                   child: Text(
                     'Servido em conformidade com a prescrição (${prescription.amountPerMeal}g)',
                     style: GoogleFonts.inter(
-                      color: _isCompliant ? Colors.white : AppTheme.textSecondary,
+                      color: _isCompliant
+                          ? AppTheme.textPrimary
+                          : AppTheme.textSecondary,
                       fontSize: 12,
-                      fontWeight: _isCompliant ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: _isCompliant
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -306,8 +326,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   }
 
   Widget _buildAmountField(dynamic prescription) {
-    final prescribedPerMeal =
-        prescription != null ? '${prescription.amountPerMeal}g' : '—';
+    final prescribedPerMeal = prescription != null
+        ? '${prescription.amountPerMeal}g'
+        : '—';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,8 +359,14 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: _isCompliant ? Colors.white.withValues(alpha: 0.02) : Colors.white.withValues(alpha: 0.06),
-            border: Border.all(color: _isCompliant ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15)),
+            color: _isCompliant
+                ? AppTheme.textPrimary.withValues(alpha: 0.02)
+                : AppTheme.textPrimary.withValues(alpha: 0.06),
+            border: Border.all(
+              color: _isCompliant
+                  ? AppTheme.textPrimary.withValues(alpha: 0.08)
+                  : AppTheme.textPrimary.withValues(alpha: 0.15),
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
@@ -348,7 +375,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             style: GoogleFonts.inter(
-              color: _isCompliant ? AppTheme.textTertiary : AppTheme.textPrimary,
+              color: _isCompliant
+                  ? AppTheme.textTertiary
+                  : AppTheme.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
@@ -365,8 +394,10 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -400,7 +431,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 16),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: AppTheme.warning,
+                size: 16,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -427,25 +462,24 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
+            color: AppTheme.textPrimary.withValues(alpha: 0.04),
             border: Border.all(color: AppTheme.warning.withValues(alpha: 0.15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
             controller: _divergenceReasonController,
             maxLines: 2,
-            style: GoogleFonts.inter(
-              color: AppTheme.textPrimary,
-              fontSize: 13,
-            ),
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Ex: pós-treino intenso, orientação veterinária...',
               hintStyle: GoogleFonts.inter(
                 color: AppTheme.textTertiary.withValues(alpha: 0.4),
                 fontSize: 12,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -474,7 +508,10 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _buildTimeChip('agora', 'Agora · ${DateFormat('HH:mm').format(DateTime.now())}'),
+            _buildTimeChip(
+              'agora',
+              'Agora · ${DateFormat('HH:mm').format(DateTime.now())}',
+            ),
             _buildTimeChip('5min', 'Há 5min'),
             _buildTimeChip('15min', 'Há 15min'),
             _buildTimeChip('custom', 'Editar'),
@@ -501,7 +538,12 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             setState(() {
               _timeOption = 'custom';
               _selectedTime = DateTime(
-                  now.year, now.month, now.day, picked.hour, picked.minute);
+                now.year,
+                now.month,
+                now.day,
+                picked.hour,
+                picked.minute,
+              );
             });
           }
         } else {
@@ -526,7 +568,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: color.withValues(alpha: selected ? 0.12 : 0.04),
-          border: Border.all(color: color.withValues(alpha: selected ? 0.4 : 0.1)),
+          border: Border.all(
+            color: color.withValues(alpha: selected ? 0.4 : 0.1),
+          ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -564,8 +608,10 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             width: double.infinity,
             height: _photoFile != null ? 120 : 60,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              color: AppTheme.textPrimary.withValues(alpha: 0.04),
+              border: Border.all(
+                color: AppTheme.textPrimary.withValues(alpha: 0.12),
+              ),
               borderRadius: BorderRadius.circular(10),
             ),
             child: _photoFile != null
@@ -591,8 +637,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                               color: AppTheme.error.withValues(alpha: 0.8),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close,
-                                color: Colors.white, size: 14),
+                            child: const Icon(
+                              Icons.close,
+                              color: AppTheme.textPrimary,
+                              size: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -601,8 +650,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.camera_alt_outlined,
-                          color: AppTheme.textTertiary, size: 20),
+                      Icon(
+                        Icons.camera_alt_outlined,
+                        color: AppTheme.textTertiary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Tirar foto ou escolher da galeria',
@@ -635,14 +687,18 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             children: [
               ListTile(
                 leading: Icon(Icons.camera_alt, color: _nutritionColor),
-                title: Text('Câmera',
-                    style: GoogleFonts.inter(color: AppTheme.textPrimary)),
+                title: Text(
+                  'Câmera',
+                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
+                ),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
                 leading: Icon(Icons.photo_library, color: _nutritionColor),
-                title: Text('Galeria',
-                    style: GoogleFonts.inter(color: AppTheme.textPrimary)),
+                title: Text(
+                  'Galeria',
+                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
+                ),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
             ],
@@ -681,25 +737,26 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            color: AppTheme.textPrimary.withValues(alpha: 0.04),
+            border: Border.all(
+              color: AppTheme.textPrimary.withValues(alpha: 0.12),
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextField(
             controller: _observationsController,
             maxLines: 3,
-            style: GoogleFonts.inter(
-              color: AppTheme.textPrimary,
-              fontSize: 13,
-            ),
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Ex: cão comeu com apetite normal...',
               hintStyle: GoogleFonts.inter(
                 color: AppTheme.textTertiary.withValues(alpha: 0.4),
                 fontSize: 13,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               border: InputBorder.none,
             ),
           ),
@@ -754,7 +811,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: _saving ? _nutritionColor.withValues(alpha: 0.4) : _nutritionColor,
+            color: _saving
+                ? _nutritionColor.withValues(alpha: 0.4)
+                : _nutritionColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -772,18 +831,21 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     strokeWidth: 2,
                   ),
                 )
               else
-                const Icon(Icons.check_circle_outline,
-                    color: Color(0xFF050D10), size: 18),
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: AppTheme.background,
+                  size: 18,
+                ),
               const SizedBox(width: 8),
               Text(
                 _saving ? 'SALVANDO...' : 'REGISTRAR ALIMENTAÇÃO',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF050D10),
+                  color: AppTheme.background,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -811,10 +873,15 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
 
     final prescription = vm.prescription;
     final prescriptionAtTime = prescription?.amountPerMeal ?? 0;
-    final divergence = prescription != null ? Feeding.calculateDivergence(amount, prescriptionAtTime) : 0.0;
+    final divergence = prescription != null
+        ? Feeding.calculateDivergence(amount, prescriptionAtTime)
+        : 0.0;
 
     // Motivo é obrigatório quando a quantidade diverge > 10%
-    if (prescription != null && !_isCompliant && divergence.abs() > 10 && _divergenceReasonController.text.trim().isEmpty) {
+    if (prescription != null &&
+        !_isCompliant &&
+        divergence.abs() > 10 &&
+        _divergenceReasonController.text.trim().isEmpty) {
       _showError('Informe o motivo da divergência');
       return;
     }
@@ -835,8 +902,8 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         divergencePercent: divergence,
         divergenceReason: !_isCompliant && divergence.abs() > 10
             ? _divergenceReasonController.text.trim().isNotEmpty
-                ? _divergenceReasonController.text.trim()
-                : null
+                  ? _divergenceReasonController.text.trim()
+                  : null
             : null,
         observations: _observationsController.text.trim().isNotEmpty
             ? _observationsController.text.trim()

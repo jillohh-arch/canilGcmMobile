@@ -21,12 +21,12 @@ import 'package:canil_gcm/features/profiles/domain/seal_data.dart';
 import 'package:canil_gcm/features/profiles/domain/seal_definitions.dart';
 
 // ── Design tokens ────────────────────────────────────────────────────────────
-const Color _kBg = Color(0xFF050D10);
-const Color _kTextPrimary = Color(0xFFFFFFFF);
-const Color _kTextSecondary = Color(0xFFB0C4CC);
-const Color _kTextMuted = Color(0xFF7A8A92);
-const Color _kBorder = Color(0x14FFFFFF);
-const Color _kBorderSubtle = Color(0x0FFFFFFF);
+const Color _kBg = AppTheme.background;
+const Color _kTextPrimary = AppTheme.textPrimary;
+const Color _kTextSecondary = AppTheme.textSecondary;
+const Color _kTextMuted = AppTheme.textTertiary;
+const Color _kBorder = AppTheme.surfaceWhiteBorder;
+const Color _kBorderSubtle = AppTheme.surfaceWhiteBorderSubtle;
 
 class HandlerProfilePage extends StatelessWidget {
   final bool showBottomNav;
@@ -56,7 +56,7 @@ class HandlerProfilePage extends StatelessWidget {
           backgroundColor: _kBg,
           body: AnnotatedRegion<SystemUiOverlayStyle>(
             value: SystemUiOverlayStyle.light.copyWith(
-              statusBarColor: Colors.transparent,
+              statusBarColor: AppTheme.transparent,
             ),
             child: SafeArea(
               child: Column(
@@ -156,7 +156,7 @@ class HandlerProfilePage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(
           'Sair do app?',
@@ -286,7 +286,7 @@ class _IdentityCard extends StatelessWidget {
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF1A2A30),
+              color: AppTheme.surfacePanelAlt,
               border: Border.all(color: AppTheme.primary, width: 3),
             ),
             child: ClipOval(
@@ -348,7 +348,7 @@ class _IdentityCard extends StatelessWidget {
         ? initials.substring(0, 3).toUpperCase()
         : initials.toUpperCase();
     return Container(
-      color: const Color(0xFF1A2A30),
+      color: AppTheme.surfacePanelAlt,
       alignment: Alignment.center,
       child: Text(
         text,
@@ -418,7 +418,7 @@ class _DogSection extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(8),
+                color: AppTheme.textPrimary.withAlpha(8),
                 border: Border.all(color: _kBorder),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -430,7 +430,7 @@ class _DogSection extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF1A2A30),
+                      color: AppTheme.surfacePanelAlt,
                       border: Border.all(color: AppTheme.success, width: 2),
                     ),
                     child: ClipOval(
@@ -498,7 +498,7 @@ class _DogSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
+              color: AppTheme.textPrimary.withAlpha(8),
               border: Border.all(color: _kBorder),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -513,7 +513,7 @@ class _DogSection extends StatelessWidget {
 
   Widget _dogFallback() {
     return Container(
-      color: const Color(0xFF1A2A30),
+      color: AppTheme.surfacePanelAlt,
       alignment: Alignment.center,
       child: Text(
         dog!.name.isNotEmpty
@@ -600,7 +600,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         border: Border.all(color: _kBorderSubtle),
         borderRadius: BorderRadius.circular(11),
       ),
@@ -872,7 +872,7 @@ class _SeloCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = seal.isActive ? AppTheme.success : const Color(0xFF95A5A6);
+    final color = seal.isActive ? AppTheme.success : AppTheme.textSoft;
     final opacity = seal.isActive ? 1.0 : 0.4;
 
     return GestureDetector(
@@ -884,7 +884,7 @@ class _SeloCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: seal.isActive
                 ? AppTheme.success.withAlpha(10)
-                : Colors.white.withAlpha(8),
+                : AppTheme.textPrimary.withAlpha(8),
             border: Border.all(
               color: seal.isActive
                   ? AppTheme.success.withAlpha(51)
@@ -914,7 +914,7 @@ class _SeloCard extends StatelessWidget {
                       style: GoogleFonts.inter(
                         color: seal.isActive
                             ? _kTextPrimary
-                            : const Color(0xFF95A5A6),
+                            : AppTheme.textSoft,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
@@ -955,7 +955,7 @@ class _SettingsMenu extends StatelessWidget {
         const _ProfileSectionLabel(text: 'CONFIGURAÇÕES'),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
+            color: AppTheme.textPrimary.withAlpha(5),
             border: Border.all(color: _kBorderSubtle),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -1052,7 +1052,7 @@ class _MenuDivider extends StatelessWidget {
     return Container(
       height: 1,
       margin: const EdgeInsets.only(left: 58),
-      color: Colors.white.withAlpha(10),
+      color: AppTheme.textPrimary.withAlpha(10),
     );
   }
 }

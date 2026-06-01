@@ -52,10 +52,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     final error = await _service.start(activityLabel: widget.activityLabel);
     if (error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: AppTheme.error,
-        ),
+        SnackBar(content: Text(error), backgroundColor: AppTheme.error),
       );
       Navigator.of(context).pop();
     }
@@ -66,7 +63,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     setState(() {});
     // Centralizar mapa na posição atual
     if (_mapReady && _service.currentPosition != null) {
-      _mapController.move(_service.currentPosition!, _mapController.camera.zoom);
+      _mapController.move(
+        _service.currentPosition!,
+        _mapController.camera.zoom,
+      );
     }
   }
 
@@ -110,7 +110,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     return PopScope(
       canPop: true, // Back sai da tela mas NÃO para o rastreamento
       child: Scaffold(
-        backgroundColor: const Color(0xFF050D10),
+        backgroundColor: AppTheme.background,
         body: Column(
           children: [
             _buildHeader(),
@@ -136,10 +136,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0x144DD0E1),
+                  color: AppTheme.primaryChipBackground,
                   borderRadius: BorderRadius.circular(9),
                   border: Border.all(
-                    color: const Color(0x334DD0E1),
+                    color: AppTheme.primaryChipBorder,
                     width: 1,
                   ),
                 ),
@@ -147,7 +147,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                 child: const Text(
                   '‹',
                   style: TextStyle(
-                    color: Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -163,7 +163,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                   Text(
                     widget.activityLabel,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -171,7 +171,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                   Text(
                     '${widget.dogName} · ${widget.handlerName}',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF7D8D99),
+                      color: AppTheme.textTertiary,
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -183,26 +183,23 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0x144DD0E1),
+                color: AppTheme.primaryChipBackground,
                 borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: const Color(0x334DD0E1),
-                  width: 1,
-                ),
+                border: Border.all(color: AppTheme.primaryChipBorder, width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.gps_fixed,
-                    color: Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     size: 12,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'GPS',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF4DD0E1),
+                      color: AppTheme.primary,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
@@ -247,7 +244,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                 polylines: [
                   Polyline(
                     points: route,
-                    color: const Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     strokeWidth: 4.5,
                   ),
                 ],
@@ -263,10 +260,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                     height: 16,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2ECC71),
+                        color: AppTheme.success,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF04140A),
+                          color: AppTheme.background,
                           width: 2.5,
                         ),
                       ),
@@ -280,15 +277,15 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                     height: 20,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4DD0E1),
+                        color: AppTheme.primary,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF04181C),
+                          color: AppTheme.background,
                           width: 2.5,
                         ),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x994DD0E1),
+                            color: AppTheme.primary.withAlpha(153),
                             blurRadius: 12,
                             spreadRadius: 4,
                           ),
@@ -313,13 +310,13 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
 
   Widget _buildRecordingBadge() {
     final isPaused = _service.isPaused;
-    final color = isPaused ? const Color(0xFFF1C40F) : const Color(0xFF2ECC71);
+    final color = isPaused ? AppTheme.warning : AppTheme.success;
     final label = isPaused ? 'PAUSADO' : 'RASTREANDO';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xD1050D10),
+        color: AppTheme.background.withAlpha(209),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withAlpha(80), width: 1),
       ),
@@ -329,10 +326,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 7),
           Text(
@@ -352,9 +346,9 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
   Widget _buildMetricsPanel() {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF050D10),
+        color: AppTheme.background,
         border: Border(
-          top: BorderSide(color: Color(0x1F4DD0E1), width: 1),
+          top: BorderSide(color: AppTheme.primaryDivider, width: 1),
         ),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -369,7 +363,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
           Text(
             _service.distanceKm.toStringAsFixed(2),
             style: GoogleFonts.ibmPlexMono(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 46,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
@@ -378,7 +372,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
           Text(
             'km',
             style: GoogleFonts.inter(
-              color: const Color(0xFF5A7280),
+              color: AppTheme.textMuted,
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -392,10 +386,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
               const SizedBox(width: 9),
               _buildMetricCard('Ritmo /km', _service.avgPaceFormatted),
               const SizedBox(width: 9),
-              _buildMetricCard(
-                'km/h',
-                _service.avgSpeedKmh.toStringAsFixed(1),
-              ),
+              _buildMetricCard('km/h', _service.avgSpeedKmh.toStringAsFixed(1)),
             ],
           ),
           const SizedBox(height: 16),
@@ -410,13 +401,13 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
                       color: _service.isPaused
-                          ? const Color(0xFF2ECC71)
-                          : const Color(0x24F1C40F),
+                          ? AppTheme.success
+                          : AppTheme.warning.withAlpha(36),
                       borderRadius: BorderRadius.circular(14),
                       border: _service.isPaused
                           ? null
                           : Border.all(
-                              color: const Color(0x66F1C40F),
+                              color: AppTheme.warning.withAlpha(102),
                               width: 1.5,
                             ),
                     ),
@@ -425,8 +416,8 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                       _service.isPaused ? 'Retomar' : 'Pausar',
                       style: GoogleFonts.inter(
                         color: _service.isPaused
-                            ? const Color(0xFF04140A)
-                            : const Color(0xFFF1C40F),
+                            ? AppTheme.background
+                            : AppTheme.warning,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -443,10 +434,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0x24E74C3C),
+                      color: AppTheme.error.withAlpha(36),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0x73E74C3C),
+                        color: AppTheme.error.withAlpha(115),
                         width: 1.5,
                       ),
                     ),
@@ -454,7 +445,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                     child: Text(
                       'Finalizar',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFFE74C3C),
+                        color: AppTheme.error,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -475,10 +466,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0x07FFFFFF),
+          color: AppTheme.surfaceWhiteOverlayWeak,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0x12FFFFFF),
+            color: AppTheme.surfaceWhiteBorderSubtle,
             width: 1,
           ),
         ),
@@ -487,7 +478,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
             Text(
               value,
               style: GoogleFonts.ibmPlexMono(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
@@ -496,7 +487,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
             Text(
               label,
               style: GoogleFonts.inter(
-                color: const Color(0xFF5A7280),
+                color: AppTheme.textMuted,
                 fontSize: 8.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,

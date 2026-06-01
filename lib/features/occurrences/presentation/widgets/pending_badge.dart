@@ -4,10 +4,7 @@ import 'package:canil_gcm/core/services/notification_service.dart';
 class PendingBadge extends StatelessWidget {
   final String userId;
 
-  const PendingBadge({
-    super.key,
-    required this.userId,
-  });
+  const PendingBadge({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {

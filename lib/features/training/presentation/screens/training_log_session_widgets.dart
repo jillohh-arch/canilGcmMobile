@@ -55,11 +55,11 @@ class _SessionCardState extends State<_SessionCard> {
   (IconData, Color) _typeStyle(String type) {
     switch (type) {
       case 'Faro':
-        return (Icons.track_changes_rounded, const Color(0xFFFFB300));
+        return (Icons.track_changes_rounded, AppTheme.amber);
       case 'Proteção':
-        return (Icons.shield_rounded, const Color(0xFFEF5350));
+        return (Icons.shield_rounded, AppTheme.errorStrong);
       case 'Obediência':
-        return (Icons.school_rounded, const Color(0xFF42A5F5));
+        return (Icons.school_rounded, AppTheme.info);
       default:
         return (Icons.fitness_center_rounded, AppTheme.amber);
     }
@@ -79,7 +79,7 @@ class _SessionCardState extends State<_SessionCard> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1726),
+          color: AppTheme.surfacePanel,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: _expanded ? color.withAlpha(210) : color.withAlpha(90),
@@ -97,7 +97,7 @@ class _SessionCardState extends State<_SessionCard> {
             end: Alignment.bottomRight,
             colors: [
               color.withAlpha(_expanded ? 36 : 22),
-              const Color(0xFF0B1020),
+              AppTheme.surfacePanelSoft,
               AppTheme.background,
             ],
           ),
@@ -144,7 +144,7 @@ class _EmptyTraining extends StatelessWidget {
                 'Nenhum treino registrado',
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
                 ),
@@ -154,7 +154,7 @@ class _EmptyTraining extends StatelessWidget {
                 'Toque em + para adicionar uma sessão.',
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: Colors.white54,
+                  color: AppTheme.textMuted,
                   fontWeight: FontWeight.w700,
                 ),
               ),

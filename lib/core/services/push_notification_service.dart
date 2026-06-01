@@ -8,6 +8,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
@@ -425,7 +427,7 @@ Future<void> _showRemoteNotificationWith(
     importance: Importance.high,
     priority: Priority.high,
     category: AndroidNotificationCategory.status,
-    color: const Color(0xFF4DD0E1),
+    color: AppTheme.primary,
     actions: type == 'vehicle_crew_invitation'
         ? const [
             AndroidNotificationAction(

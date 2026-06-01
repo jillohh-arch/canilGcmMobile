@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class QuickLocationActions extends StatelessWidget {
@@ -27,7 +29,7 @@ class QuickLocationActions extends StatelessWidget {
             icon: const Icon(
               Icons.gps_fixed_rounded,
               size: 18,
-              color: Colors.black,
+              color: AppTheme.background,
             ),
             label: Text(
               'CAPTURAR GPS',
@@ -55,13 +57,13 @@ class QuickLocationActions extends StatelessWidget {
             icon: const Icon(
               Icons.schedule_rounded,
               size: 18,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
             label: Text(
               'HORA ATUAL',
               style: GoogleFonts.inter(
                 fontSize: 10,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,
               ),

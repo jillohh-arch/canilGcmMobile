@@ -5,23 +5,23 @@ class WeightChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paintLine = Paint()
-      ..color = Colors.cyanAccent
+      ..color = AppTheme.primary
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round;
 
     final paintGlow = Paint()
-      ..color = Colors.cyanAccent.withValues(alpha: 0.4)
+      ..color = AppTheme.primary.withValues(alpha: 0.4)
       ..strokeWidth = 6
       ..style = PaintingStyle.stroke
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
 
     final paintDotOuter = Paint()
-      ..color = const Color(0xFF082F49)
+      ..color = AppTheme.infoStrong
       ..style = PaintingStyle.fill;
 
     final paintDotInner = Paint()
-      ..color = Colors.cyanAccent
+      ..color = AppTheme.primary
       ..style = PaintingStyle.fill;
 
     // Coordenadas simuladas para o gráfico (pode ser substituído por dados reais no futuro)

@@ -51,7 +51,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(24),
+                  color: AppTheme.textPrimary.withAlpha(24),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -60,7 +60,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
             Text(
               'Novo Comando de Obediência',
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -88,14 +88,19 @@ class _AddCommandModalState extends State<AddCommandModal> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _nameController,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 13,
+              ),
               decoration: InputDecoration(
                 hintText: 'Ex: Sit, Platz, Junto, Aqui...',
                 hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
                 filled: true,
                 fillColor: AppTheme.surfaceWhiteOverlay,
                 enabledBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
+                  borderSide: const BorderSide(
+                    color: AppTheme.surfaceWhiteBorderMedium,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -183,7 +188,10 @@ class _AddCommandModalState extends State<AddCommandModal> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _descController,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 13,
+              ),
               maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Ex: Sentar rápido e focado ao lado esquerdo...',
@@ -191,7 +199,9 @@ class _AddCommandModalState extends State<AddCommandModal> {
                 filled: true,
                 fillColor: AppTheme.surfaceWhiteOverlay,
                 enabledBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0x14FFFFFF)),
+                  borderSide: const BorderSide(
+                    color: AppTheme.surfaceWhiteBorder,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -214,7 +224,9 @@ class _AddCommandModalState extends State<AddCommandModal> {
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.textTertiary,
-                      side: const BorderSide(color: Color(0x1AFFFFFF)),
+                      side: const BorderSide(
+                        color: AppTheme.surfaceWhiteBorderMedium,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

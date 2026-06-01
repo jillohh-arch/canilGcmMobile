@@ -79,7 +79,7 @@ class _TacticalCardCircleDecoration extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withAlpha(alpha),
+          color: AppTheme.textPrimary.withAlpha(alpha),
         ),
       ),
     );

@@ -177,7 +177,7 @@ class _ActivityCategoryConfirmButton extends StatelessWidget {
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: card['glow'] as Color,
-            foregroundColor: Colors.white,
+            foregroundColor: AppTheme.textPrimary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
             ),

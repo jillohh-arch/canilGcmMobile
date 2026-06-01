@@ -46,14 +46,14 @@ class _HealthSummaryBento extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
                 Text(
                   _formatDogDetailsDate(lastHealth!.date),
                   style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: Colors.white38,
+                    color: AppTheme.textPrimary.withAlpha(97),
                   ),
                 ),
               ],
@@ -61,22 +61,25 @@ class _HealthSummaryBento extends StatelessWidget {
           else
             Text(
               'Sem registros',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppTheme.textPrimary.withAlpha(97),
+              ),
             ),
           if (lastVaccineDate != null)
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.vaccines_rounded,
                   size: 12,
-                  color: Colors.white38,
+                  color: AppTheme.textPrimary.withAlpha(97),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'Vacina: ${_formatDogDetailsDate(lastVaccineDate!)}',
                   style: GoogleFonts.inter(
                     fontSize: 9,
-                    color: Colors.white38,
+                    color: AppTheme.textPrimary.withAlpha(97),
                   ),
                 ),
               ],
@@ -127,7 +130,7 @@ class _WeightSummaryBento extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
                 Text(
@@ -135,7 +138,7 @@ class _WeightSummaryBento extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white38,
+                    color: AppTheme.textPrimary.withAlpha(97),
                     letterSpacing: 0.8,
                   ),
                 ),

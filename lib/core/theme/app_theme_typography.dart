@@ -1,4 +1,4 @@
-﻿part of 'app_theme.dart';
+part of 'app_theme.dart';
 
 TextTheme _buildAppTextTheme(ColorScheme cs) {
   return GoogleFonts.interTextTheme(

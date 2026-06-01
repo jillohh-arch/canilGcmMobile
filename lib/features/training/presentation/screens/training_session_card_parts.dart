@@ -100,8 +100,8 @@ class _SessionTitleBlock extends StatelessWidget {
             if (session.substanceUsed != null)
               _SessionTag(
                 label: session.substanceUsed!.toUpperCase(),
-                color: Colors.white,
-                labelColor: Colors.white60,
+                color: AppTheme.textPrimary,
+                labelColor: AppTheme.textSecondary,
                 fontSize: 9,
                 letterSpacing: 0.8,
                 fontFamily: _SessionTagFont.robotoMono,
@@ -113,7 +113,7 @@ class _SessionTitleBlock extends StatelessWidget {
           session.location,
           style: GoogleFonts.inter(
             fontSize: 12,
-            color: Colors.white70,
+            color: AppTheme.textSecondary,
             fontWeight: FontWeight.w600,
           ),
           maxLines: 2,

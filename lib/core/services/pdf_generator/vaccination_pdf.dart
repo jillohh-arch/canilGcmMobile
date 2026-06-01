@@ -25,16 +25,19 @@ class VaccinationPdf {
     );
 
     final fonts = await PdfFonts.load();
-    
+
     // Filter vaccine-related logs
-    final vaccineLogs = logs
-        .where((log) =>
-            log.dogId == dog.id &&
-            (log.type == 'vaccination' ||
-                log.logType == 'Vacina' ||
-                log.vaccines.isNotEmpty))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final vaccineLogs =
+        logs
+            .where(
+              (log) =>
+                  log.dogId == dog.id &&
+                  (log.type == 'vaccination' ||
+                      log.logType == 'Vacina' ||
+                      log.vaccines.isNotEmpty),
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     final docId = _buildDocId(dog);
     final overallStatus = _getOverallStatus(vaccineLogs);
@@ -108,10 +111,15 @@ class VaccinationPdf {
                   pw.SizedBox(width: 20),
                   // Status box
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: pw.BoxDecoration(
                       color: isVaccineOk
-                          ? PdfInstitutionalColors.greenInstitutional.withAlpha(25)
+                          ? PdfInstitutionalColors.greenInstitutional.withAlpha(
+                              25,
+                            )
                           : PdfInstitutionalColors.redAlert.withAlpha(25),
                       border: pw.Border.all(
                         color: isVaccineOk
@@ -119,7 +127,9 @@ class VaccinationPdf {
                             : PdfInstitutionalColors.redAlert,
                         width: 1.5,
                       ),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(8),
+                      ),
                     ),
                     child: pw.Column(
                       children: [
@@ -219,11 +229,19 @@ class VaccinationPdf {
                     children: [
                       pw.Text(
                         'Código de Rastreamento de Auditoria:',
-                        style: pw.TextStyle(font: fonts.regular, fontSize: 8, color: _textTertiary),
+                        style: pw.TextStyle(
+                          font: fonts.regular,
+                          fontSize: 8,
+                          color: _textTertiary,
+                        ),
                       ),
                       pw.Text(
                         _buildAuditReference(dog),
-                        style: pw.TextStyle(font: fonts.bold, fontSize: 8.5, color: _textSecondary),
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 8.5,
+                          color: _textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -250,9 +268,13 @@ class VaccinationPdf {
 
   /// Gera uma referência de auditoria baseada no ID do cão e no timestamp atual.
   static String _buildAuditReference(Dog dog) {
-    final dogPart = dog.id.length >= 6 ? dog.id.substring(0, 6).toUpperCase() : dog.id.toUpperCase();
+    final dogPart = dog.id.length >= 6
+        ? dog.id.substring(0, 6).toUpperCase()
+        : dog.id.toUpperCase();
     final timePart = DateTime.now().millisecondsSinceEpoch.toString();
-    final truncatedTime = timePart.length > 5 ? timePart.substring(timePart.length - 5) : timePart;
+    final truncatedTime = timePart.length > 5
+        ? timePart.substring(timePart.length - 5)
+        : timePart;
     return 'AUDIT-$dogPart-$truncatedTime';
   }
 
@@ -262,7 +284,8 @@ class VaccinationPdf {
     final now = DateTime.now();
     bool hasExpired = false;
     for (final log in vaccineLogs) {
-      final nextDue = log.nextDueDate ?? log.date.add(const Duration(days: 365));
+      final nextDue =
+          log.nextDueDate ?? log.date.add(const Duration(days: 365));
       if (now.isAfter(nextDue)) {
         hasExpired = true;
         break;
@@ -272,7 +295,10 @@ class VaccinationPdf {
   }
 
   /// Constrói o alerta de próximas doses.
-  static pw.Widget _buildUpcomingAlert(List<HealthLogModel> logs, PdfFonts fonts) {
+  static pw.Widget _buildUpcomingAlert(
+    List<HealthLogModel> logs,
+    PdfFonts fonts,
+  ) {
     final now = DateTime.now();
     final upcoming = <Map<String, dynamic>>[];
 
@@ -280,14 +306,16 @@ class VaccinationPdf {
     final latestByType = <String, HealthLogModel>{};
     for (final log in logs) {
       final name = log.subtype ?? 'Geral';
-      if (!latestByType.containsKey(name) || log.date.isAfter(latestByType[name]!.date)) {
+      if (!latestByType.containsKey(name) ||
+          log.date.isAfter(latestByType[name]!.date)) {
         latestByType[name] = log;
       }
     }
 
     for (final entry in latestByType.entries) {
       final log = entry.value;
-      final nextDue = log.nextDueDate ?? log.date.add(const Duration(days: 365));
+      final nextDue =
+          log.nextDueDate ?? log.date.add(const Duration(days: 365));
       final diffDays = nextDue.difference(now).inDays;
 
       if (diffDays <= 30) {
@@ -305,7 +333,9 @@ class VaccinationPdf {
         padding: const pw.EdgeInsets.all(10),
         decoration: pw.BoxDecoration(
           color: PdfInstitutionalColors.greenInstitutional.withAlpha(15),
-          border: pw.Border.all(color: PdfInstitutionalColors.greenInstitutional.withAlpha(50)),
+          border: pw.Border.all(
+            color: PdfInstitutionalColors.greenInstitutional.withAlpha(50),
+          ),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
         ),
         child: pw.Row(
@@ -340,8 +370,10 @@ class VaccinationPdf {
         final text = overdue
             ? 'A vacina ${alert['name']} está VENCIDA há $days dia(s) (${DateFormat('dd/MM/yyyy').format(alert['dueDate'])}).'
             : 'A vacina ${alert['name']} vencerá em $days dia(s) (${DateFormat('dd/MM/yyyy').format(alert['dueDate'])}).';
-        
-        final color = overdue ? PdfInstitutionalColors.redAlert : PdfInstitutionalColors.amberWarning;
+
+        final color = overdue
+            ? PdfInstitutionalColors.redAlert
+            : PdfInstitutionalColors.amberWarning;
 
         return pw.Container(
           width: double.infinity,
@@ -381,7 +413,10 @@ class VaccinationPdf {
   }
 
   /// Constrói a tabela de histórico de imunizações.
-  static pw.Widget _buildImmunizationTable(List<HealthLogModel> logs, PdfFonts fonts) {
+  static pw.Widget _buildImmunizationTable(
+    List<HealthLogModel> logs,
+    PdfFonts fonts,
+  ) {
     if (logs.isEmpty) {
       return pw.Container(
         height: 80,
@@ -392,12 +427,22 @@ class VaccinationPdf {
         ),
         child: pw.Text(
           'Nenhuma vacina cadastrada no histórico médico deste cão.',
-          style: pw.TextStyle(font: fonts.regular, fontSize: 10, color: _textTertiary),
+          style: pw.TextStyle(
+            font: fonts.regular,
+            fontSize: 10,
+            color: _textTertiary,
+          ),
         ),
       );
     }
 
-    final headers = ['Vacina', 'Aplicação', 'Validade / Próx. Dose', 'Veterinário / CRMV', 'Status'];
+    final headers = [
+      'Vacina',
+      'Aplicação',
+      'Validade / Próx. Dose',
+      'Veterinário / CRMV',
+      'Status',
+    ];
     final now = DateTime.now();
 
     return pw.Table(
@@ -412,19 +457,20 @@ class VaccinationPdf {
       children: [
         // Table Header
         pw.TableRow(
-          decoration: pw.BoxDecoration(
-            color: _cyan,
-          ),
+          decoration: pw.BoxDecoration(color: _cyan),
           children: headers.map((header) {
             return pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
               alignment: pw.Alignment.centerLeft,
               child: pw.Text(
                 header,
                 style: pw.TextStyle(
                   font: fonts.bold,
                   fontSize: 9,
-                  color: PdfColors.white,
+                  color: PdfInstitutionalColors.white,
                 ),
               ),
             );
@@ -435,43 +481,89 @@ class VaccinationPdf {
           final log = logs[index];
           final vaccineName = log.subtype ?? 'Vacina Geral';
           final appDate = DateFormat('dd/MM/yyyy').format(log.date);
-          final nextDue = log.nextDueDate ?? log.date.add(const Duration(days: 365));
+          final nextDue =
+              log.nextDueDate ?? log.date.add(const Duration(days: 365));
           final nextDueDateStr = DateFormat('dd/MM/yyyy').format(nextDue);
-          
+
           final isOverdue = now.isAfter(nextDue);
           final statusStr = isOverdue ? 'Vencido' : 'OK';
-          final statusColor = isOverdue ? PdfInstitutionalColors.redAlert : PdfInstitutionalColors.greenInstitutional;
+          final statusColor = isOverdue
+              ? PdfInstitutionalColors.redAlert
+              : PdfInstitutionalColors.greenInstitutional;
 
           final vetName = log.vetName ?? 'Não Informado';
-          final crmv = log.professionalCrmv != null ? ' (CRMV: ${log.professionalCrmv})' : '';
+          final crmv = log.professionalCrmv != null
+              ? ' (CRMV: ${log.professionalCrmv})'
+              : '';
           final vetInfo = '$vetName$crmv';
 
           final isRowOdd = index.isOdd;
-          final rowBg = isRowOdd ? _lightGray : PdfColors.white;
+          final rowBg = isRowOdd ? _lightGray : PdfInstitutionalColors.white;
 
           return pw.TableRow(
-            decoration: pw.BoxDecoration(
-              color: rowBg,
-            ),
+            decoration: pw.BoxDecoration(color: rowBg),
             children: [
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(vaccineName, style: pw.TextStyle(font: fonts.bold, fontSize: 8.5, color: _textPrimary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  vaccineName,
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 8.5,
+                    color: _textPrimary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(appDate, style: pw.TextStyle(font: fonts.regular, fontSize: 8.5, color: _textSecondary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  appDate,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8.5,
+                    color: _textSecondary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(nextDueDateStr, style: pw.TextStyle(font: fonts.regular, fontSize: 8.5, color: _textSecondary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  nextDueDateStr,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8.5,
+                    color: _textSecondary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: pw.Text(vetInfo, style: pw.TextStyle(font: fonts.regular, fontSize: 8, color: _textSecondary)),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: pw.Text(
+                  vetInfo,
+                  style: pw.TextStyle(
+                    font: fonts.regular,
+                    fontSize: 8,
+                    color: _textSecondary,
+                  ),
+                ),
               ),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
                 child: pw.Text(
                   statusStr,
                   style: pw.TextStyle(

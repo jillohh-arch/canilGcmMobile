@@ -116,7 +116,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
             content: Text(
               'Retificação #${amendment.sequenceNumber} criada com sucesso',
             ),
-            backgroundColor: const Color(0xFF1B8A4C),
+            backgroundColor: AppTheme.successOperational,
           ),
         );
         Navigator.of(context).pop(amendment);
@@ -124,10 +124,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
     } on StateError catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: AppTheme.error,
-          ),
+          SnackBar(content: Text(e.message), backgroundColor: AppTheme.error),
         );
       }
     } catch (e) {
@@ -147,18 +144,18 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF04181D),
+      backgroundColor: AppTheme.surfacePanelStrong,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A1A20),
+        backgroundColor: AppTheme.surfacePanelSoft,
         title: Text(
           'Nova Retificação',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
@@ -183,8 +180,8 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
             _buildSectionLabel('CORREÇÕES'),
             const SizedBox(height: 8),
             ..._corrections.asMap().entries.map(
-                  (entry) => _buildCorrectionCard(entry.key, entry.value),
-                ),
+              (entry) => _buildCorrectionCard(entry.key, entry.value),
+            ),
             const SizedBox(height: 12),
             _buildAddCorrectionButton(),
             const SizedBox(height: 32),
@@ -206,9 +203,9 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,7 +213,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
           Text(
             occ.typeName,
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -225,7 +222,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
           Text(
             'ID: ${occ.id.substring(0, 8)}... · Selada',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(100),
+              color: AppTheme.textPrimary.withAlpha(100),
               fontSize: 11,
             ),
           ),
@@ -266,26 +263,31 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
       controller: controller,
       maxLines: maxLines,
       onChanged: (_) => setState(() {}),
-      style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+      style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+        hintStyle: GoogleFonts.inter(
+          color: AppTheme.textPrimary.withAlpha(97),
+          fontSize: 14,
+        ),
         filled: true,
-        fillColor: Colors.white.withAlpha(8),
+        fillColor: AppTheme.textPrimary.withAlpha(8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+          borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+          borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: AppTheme.primary),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
     );
   }
@@ -295,9 +297,9 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
+        color: AppTheme.textPrimary.withAlpha(5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +309,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
               Text(
                 'Correção ${index + 1}',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -317,7 +319,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
                 onTap: () => _removeCorrection(index),
                 child: Icon(
                   Icons.close,
-                  color: Colors.white.withAlpha(100),
+                  color: AppTheme.textPrimary.withAlpha(100),
                   size: 18,
                 ),
               ),
@@ -328,33 +330,36 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
           // Campo a corrigir
           DropdownButtonFormField<String>(
             initialValue: correction.selectedField,
-            dropdownColor: const Color(0xFF0A1A20),
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+            dropdownColor: AppTheme.surfacePanelSoft,
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
             decoration: InputDecoration(
               labelText: 'Campo',
               labelStyle: GoogleFonts.inter(
-                color: Colors.white54,
+                color: AppTheme.textPrimary.withAlpha(138),
                 fontSize: 12,
               ),
               filled: true,
-              fillColor: Colors.white.withAlpha(8),
+              fillColor: AppTheme.textPrimary.withAlpha(8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
             items: _editableFields
                 .map(
-                  (f) => DropdownMenuItem(
-                    value: f.key,
-                    child: Text(f.label),
-                  ),
+                  (f) => DropdownMenuItem(value: f.key, child: Text(f.label)),
                 )
                 .toList(),
             onChanged: (value) {
@@ -370,7 +375,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
             Text(
               'Valor anterior:',
               style: GoogleFonts.inter(
-                color: Colors.white54,
+                color: AppTheme.textPrimary.withAlpha(138),
                 fontSize: 11,
               ),
             ),
@@ -379,13 +384,13 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(5),
+                color: AppTheme.textPrimary.withAlpha(5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 _getOldValue(correction.selectedField!) ?? '(vazio)',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(120),
+                  color: AppTheme.textPrimary.withAlpha(120),
                   fontSize: 12,
                 ),
                 maxLines: 3,
@@ -466,13 +471,13 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                 ),
               )
             : Text(
                 'CRIAR RETIFICAÇÃO',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
@@ -486,16 +491,16 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFBBF24).withAlpha(10),
+        color: AppTheme.warningAccent.withAlpha(10),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFBBF24).withAlpha(30)),
+        border: Border.all(color: AppTheme.warningAccent.withAlpha(30)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.info_outline,
-            color: Color(0xFFFBBF24),
+            color: AppTheme.warningAccent,
             size: 16,
           ),
           const SizedBox(width: 10),
@@ -505,7 +510,7 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
               'o selo original da ocorrência. O registro original permanece '
               'intacto e auditável.',
               style: GoogleFonts.inter(
-                color: const Color(0xFFFBBF24).withAlpha(180),
+                color: AppTheme.warningAccent.withAlpha(180),
                 fontSize: 11,
                 height: 1.4,
               ),

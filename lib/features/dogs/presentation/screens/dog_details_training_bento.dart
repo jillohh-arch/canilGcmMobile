@@ -68,21 +68,24 @@ class _TrainingSummaryText extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
           ),
           Text(
             lastTraining!.location,
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: Colors.white54,
+              color: AppTheme.textPrimary.withAlpha(138),
               fontWeight: FontWeight.w500,
             ),
           ),
         ] else
           Text(
             'Nenhum treino registrado',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.white38),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppTheme.textPrimary.withAlpha(97),
+            ),
           ),
       ],
     );
@@ -112,7 +115,7 @@ class _SessionCounter extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 8,
             fontWeight: FontWeight.w700,
-            color: Colors.white38,
+            color: AppTheme.textPrimary.withAlpha(97),
             letterSpacing: 0.8,
           ),
         ),

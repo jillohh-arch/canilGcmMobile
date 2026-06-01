@@ -36,7 +36,7 @@ class _ChartSection extends StatelessWidget {
             subtitle,
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: Colors.white30,
+              color: AppTheme.textMuted,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -73,7 +73,7 @@ class _SearchDurationChart extends StatelessWidget {
             show: true,
             drawVerticalLine: false,
             getDrawingHorizontalLine: (v) => FlLine(
-              color: Colors.white10,
+              color: AppTheme.surfaceWhiteBorder,
               strokeWidth: 1,
               dashArray: [4, 4],
             ),
@@ -88,7 +88,7 @@ class _SearchDurationChart extends StatelessWidget {
                   '${val.round()}s',
                   style: GoogleFonts.inter(
                     fontSize: 9,
-                    color: Colors.white38,
+                    color: AppTheme.textMuted,
                   ),
                 ),
               ),
@@ -107,7 +107,7 @@ class _SearchDurationChart extends StatelessWidget {
                     '${d.day}/${d.month}',
                     style: GoogleFonts.inter(
                       fontSize: 9,
-                      color: Colors.white38,
+                      color: AppTheme.textMuted,
                     ),
                   );
                 },
@@ -126,7 +126,7 @@ class _SearchDurationChart extends StatelessWidget {
                 return LineTooltipItem(
                   '${s.y.round()}s',
                   GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -149,7 +149,7 @@ class _SearchDurationChart extends StatelessWidget {
                       radius: 4,
                       color: AppTheme.amber,
                       strokeWidth: 2,
-                      strokeColor: Colors.white,
+                      strokeColor: AppTheme.textPrimary,
                     ),
               ),
               belowBarData: BarAreaData(
@@ -188,7 +188,7 @@ class _StreakCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _hudPanel.withAlpha(235),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFF6B35).withAlpha(60)),
+        border: Border.all(color: AppTheme.attention.withAlpha(60)),
       ),
       child: Row(
         children: [
@@ -197,7 +197,7 @@ class _StreakCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withAlpha(20),
+              color: AppTheme.attention.withAlpha(20),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -219,7 +219,9 @@ class _StreakCard extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: streak > 0 ? const Color(0xFFFF6B35) : AppTheme.textTertiary,
+                        color: streak > 0
+                            ? AppTheme.attention
+                            : AppTheme.textTertiary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -280,11 +282,12 @@ class _StreakCard extends StatelessWidget {
   int _calculateMaxStreak(List<TrainingSessionModel> sessions) {
     if (sessions.isEmpty) return 0;
     final sorted = [...sessions]..sort((a, b) => a.date.compareTo(b.date));
-    final dates = sorted
-        .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
-        .toSet()
-        .toList()
-      ..sort();
+    final dates =
+        sorted
+            .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+            .toSet()
+            .toList()
+          ..sort();
 
     int maxStreak = 1;
     int current = 1;
@@ -302,7 +305,11 @@ class _StreakCard extends StatelessWidget {
   int _countThisWeek(List<TrainingSessionModel> sessions) {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final start = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
     return sessions.where((s) => s.date.isAfter(start)).length;
   }
 }
@@ -329,7 +336,7 @@ class _WeeklyBarChart extends StatelessWidget {
                 return BarTooltipItem(
                   '${rod.toY.round()} sessões',
                   GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 11,
                   ),
@@ -341,7 +348,7 @@ class _WeeklyBarChart extends StatelessWidget {
             show: true,
             drawVerticalLine: false,
             getDrawingHorizontalLine: (v) => FlLine(
-              color: Colors.white10,
+              color: AppTheme.surfaceWhiteBorder,
               strokeWidth: 1,
               dashArray: [4, 4],
             ),
@@ -354,7 +361,10 @@ class _WeeklyBarChart extends StatelessWidget {
                 reservedSize: 28,
                 getTitlesWidget: (val, meta) => Text(
                   '${val.round()}',
-                  style: GoogleFonts.inter(fontSize: 9, color: Colors.white38),
+                  style: GoogleFonts.inter(
+                    fontSize: 9,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
               ),
             ),
@@ -364,16 +374,25 @@ class _WeeklyBarChart extends StatelessWidget {
                 reservedSize: 28,
                 getTitlesWidget: (val, meta) {
                   final idx = val.toInt();
-                  if (idx < 0 || idx >= weekData.length) return const SizedBox();
+                  if (idx < 0 || idx >= weekData.length) {
+                    return const SizedBox();
+                  }
                   return Text(
                     weekData[idx].label,
-                    style: GoogleFonts.inter(fontSize: 9, color: Colors.white38),
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      color: AppTheme.textMuted,
+                    ),
                   );
                 },
               ),
             ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           barGroups: weekData.asMap().entries.map((entry) {
             final isCurrentWeek = entry.key == weekData.length - 1;
@@ -405,7 +424,9 @@ class _WeeklyBarChart extends StatelessWidget {
       final weekStart = now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
       final start = DateTime(weekStart.year, weekStart.month, weekStart.day);
       final end = start.add(const Duration(days: 7));
-      final count = sessions.where((s) => s.date.isAfter(start) && s.date.isBefore(end)).length;
+      final count = sessions
+          .where((s) => s.date.isAfter(start) && s.date.isBefore(end))
+          .length;
       final label = '${start.day}/${start.month}';
       weeks.add(_WeekData(label: label, count: count));
     }
@@ -499,7 +520,9 @@ class _SpecialtyDonutChart extends StatelessWidget {
     );
   }
 
-  List<_DistributionData> _getDistribution(List<TrainingSessionModel> sessions) {
+  List<_DistributionData> _getDistribution(
+    List<TrainingSessionModel> sessions,
+  ) {
     final map = <String, int>{};
     for (final s in sessions) {
       final type = _normalizeType(s.trainingType);
@@ -507,29 +530,48 @@ class _SpecialtyDonutChart extends StatelessWidget {
     }
 
     final colors = {
-      'Detecção': const Color(0xFF4dd0e1),
-      'Obediência': const Color(0xFF66BB6A),
-      'Condicionamento': const Color(0xFFFBBF24),
-      'Guarda & Proteção': const Color(0xFFEF5350),
-      'Faro': const Color(0xFF29B6F6),
-      'Outro': const Color(0xFF7E57C2),
+      'Detecção': AppTheme.primary,
+      'Obediência': AppTheme.success,
+      'Condicionamento': AppTheme.warningAccent,
+      'Guarda & Proteção': AppTheme.errorStrong,
+      'Faro': AppTheme.info,
+      'Outro': AppTheme.healthAccent,
     };
 
-    final sorted = map.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    return sorted.map((e) => _DistributionData(
-      name: e.key,
-      count: e.value,
-      color: colors[e.key] ?? const Color(0xFF7E57C2),
-    )).toList();
+    final sorted = map.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted
+        .map(
+          (e) => _DistributionData(
+            name: e.key,
+            count: e.value,
+            color: colors[e.key] ?? AppTheme.healthAccent,
+          ),
+        )
+        .toList();
   }
 
   String _normalizeType(String type) {
     final lower = type.toLowerCase();
-    if (lower.contains('detec') || lower.contains('droga')) return 'Detecção';
-    if (lower.contains('obed')) return 'Obediência';
-    if (lower.contains('condic') || lower.contains('físic')) return 'Condicionamento';
-    if (lower.contains('guarda') || lower.contains('proteção') || lower.contains('protecao')) return 'Guarda & Proteção';
-    if (lower.contains('faro') || lower.contains('rastro') || lower.contains('busca')) return 'Faro';
+    if (lower.contains('detec') || lower.contains('droga')) {
+      return 'Detecção';
+    }
+    if (lower.contains('obed')) {
+      return 'Obediência';
+    }
+    if (lower.contains('condic') || lower.contains('físic')) {
+      return 'Condicionamento';
+    }
+    if (lower.contains('guarda') ||
+        lower.contains('proteção') ||
+        lower.contains('protecao')) {
+      return 'Guarda & Proteção';
+    }
+    if (lower.contains('faro') ||
+        lower.contains('rastro') ||
+        lower.contains('busca')) {
+      return 'Faro';
+    }
     return 'Outro';
   }
 }
@@ -538,7 +580,11 @@ class _DistributionData {
   final String name;
   final int count;
   final Color color;
-  const _DistributionData({required this.name, required this.count, required this.color});
+  const _DistributionData({
+    required this.name,
+    required this.count,
+    required this.color,
+  });
 }
 
 // ─── SPECIALTY PROGRESS BARS ─────────────────────────────────────────────────
@@ -550,7 +596,9 @@ class _SpecialtyProgressBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final last30 = sessions.where((s) => now.difference(s.date).inDays <= 30).toList();
+    final last30 = sessions
+        .where((s) => now.difference(s.date).inDays <= 30)
+        .toList();
     final specialties = _getSpecialtyActivity(last30);
 
     return Container(
@@ -601,10 +649,7 @@ class _SpecialtyProgressBars extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                spec.emoji,
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text(spec.emoji, style: const TextStyle(fontSize: 12)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -632,7 +677,7 @@ class _SpecialtyProgressBars extends StatelessWidget {
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 5,
-              backgroundColor: Colors.white.withAlpha(10),
+              backgroundColor: AppTheme.textPrimary.withAlpha(10),
               valueColor: AlwaysStoppedAnimation<Color>(spec.color),
             ),
           ),
@@ -641,7 +686,9 @@ class _SpecialtyProgressBars extends StatelessWidget {
     );
   }
 
-  List<_SpecialtyActivity> _getSpecialtyActivity(List<TrainingSessionModel> sessions) {
+  List<_SpecialtyActivity> _getSpecialtyActivity(
+    List<TrainingSessionModel> sessions,
+  ) {
     final map = <String, int>{};
     for (final s in sessions) {
       final type = _normalizeType(s.trainingType);
@@ -649,23 +696,63 @@ class _SpecialtyProgressBars extends StatelessWidget {
     }
 
     final specs = [
-      _SpecialtyActivity(name: 'Detecção', emoji: '👃', color: const Color(0xFF4dd0e1), count: map['Detecção'] ?? 0),
-      _SpecialtyActivity(name: 'Obediência', emoji: '🎓', color: const Color(0xFF66BB6A), count: map['Obediência'] ?? 0),
-      _SpecialtyActivity(name: 'Condicionamento', emoji: '💪', color: const Color(0xFFFBBF24), count: map['Condicionamento'] ?? 0),
-      _SpecialtyActivity(name: 'Guarda & Proteção', emoji: '🛡', color: const Color(0xFFEF5350), count: map['Guarda & Proteção'] ?? 0),
-      _SpecialtyActivity(name: 'Faro', emoji: '🔍', color: const Color(0xFF29B6F6), count: map['Faro'] ?? 0),
+      _SpecialtyActivity(
+        name: 'Detecção',
+        emoji: '👃',
+        color: AppTheme.primary,
+        count: map['Detecção'] ?? 0,
+      ),
+      _SpecialtyActivity(
+        name: 'Obediência',
+        emoji: '🎓',
+        color: AppTheme.success,
+        count: map['Obediência'] ?? 0,
+      ),
+      _SpecialtyActivity(
+        name: 'Condicionamento',
+        emoji: '💪',
+        color: AppTheme.warningAccent,
+        count: map['Condicionamento'] ?? 0,
+      ),
+      _SpecialtyActivity(
+        name: 'Guarda & Proteção',
+        emoji: '🛡',
+        color: AppTheme.errorStrong,
+        count: map['Guarda & Proteção'] ?? 0,
+      ),
+      _SpecialtyActivity(
+        name: 'Faro',
+        emoji: '🔍',
+        color: AppTheme.info,
+        count: map['Faro'] ?? 0,
+      ),
     ];
 
-    return specs.where((s) => s.count > 0).toList()..sort((a, b) => b.count.compareTo(a.count));
+    return specs.where((s) => s.count > 0).toList()
+      ..sort((a, b) => b.count.compareTo(a.count));
   }
 
   String _normalizeType(String type) {
     final lower = type.toLowerCase();
-    if (lower.contains('detec') || lower.contains('droga')) return 'Detecção';
-    if (lower.contains('obed')) return 'Obediência';
-    if (lower.contains('condic') || lower.contains('físic')) return 'Condicionamento';
-    if (lower.contains('guarda') || lower.contains('proteção') || lower.contains('protecao')) return 'Guarda & Proteção';
-    if (lower.contains('faro') || lower.contains('rastro') || lower.contains('busca')) return 'Faro';
+    if (lower.contains('detec') || lower.contains('droga')) {
+      return 'Detecção';
+    }
+    if (lower.contains('obed')) {
+      return 'Obediência';
+    }
+    if (lower.contains('condic') || lower.contains('físic')) {
+      return 'Condicionamento';
+    }
+    if (lower.contains('guarda') ||
+        lower.contains('proteção') ||
+        lower.contains('protecao')) {
+      return 'Guarda & Proteção';
+    }
+    if (lower.contains('faro') ||
+        lower.contains('rastro') ||
+        lower.contains('busca')) {
+      return 'Faro';
+    }
     return 'Outro';
   }
 }
@@ -675,7 +762,12 @@ class _SpecialtyActivity {
   final String emoji;
   final Color color;
   final int count;
-  const _SpecialtyActivity({required this.name, required this.emoji, required this.color, required this.count});
+  const _SpecialtyActivity({
+    required this.name,
+    required this.emoji,
+    required this.color,
+    required this.count,
+  });
 }
 
 // Section header

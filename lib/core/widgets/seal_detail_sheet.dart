@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -16,7 +16,7 @@ class SealDetailSheet extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (_) => SealDetailSheet(seal: seal),
     );
   }
@@ -28,7 +28,7 @@ class SealDetailSheet extends StatelessWidget {
         maxHeight: MediaQuery.of(context).size.height * 0.7,
       ),
       decoration: const BoxDecoration(
-        color: Color(0xFF0E1A1F),
+        color: AppTheme.surfacePanel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SingleChildScrollView(
@@ -40,7 +40,7 @@ class SealDetailSheet extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(40),
+                color: AppTheme.textPrimary.withAlpha(40),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -51,7 +51,7 @@ class SealDetailSheet extends StatelessWidget {
               seal.name,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
@@ -61,7 +61,7 @@ class SealDetailSheet extends StatelessWidget {
               seal.subtitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                color: const Color(0xFFB0C4CC),
+                color: AppTheme.textSecondary,
                 fontSize: 12,
               ),
             ),
@@ -82,7 +82,7 @@ class _SealIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = seal.isActive ? AppTheme.success : const Color(0xFF95A5A6);
+    final color = seal.isActive ? AppTheme.success : AppTheme.textSoft;
     return Container(
       width: 56,
       height: 56,
@@ -152,10 +152,7 @@ class _InactiveContent extends StatelessWidget {
           _DetailSection(label: 'ESTADO ATUAL', text: seal.currentState!),
         if (seal.requiredAction != null) ...[
           const SizedBox(height: 14),
-          _DetailSection(
-            label: 'AÇÃO NECESSÁRIA',
-            text: seal.requiredAction!,
-          ),
+          _DetailSection(label: 'AÇÃO NECESSÁRIA', text: seal.requiredAction!),
         ],
         const SizedBox(height: 20),
         if (seal.actionButtonLabel != null)
@@ -207,14 +204,14 @@ class _DetailSection extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(8),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: AppTheme.textPrimary.withAlpha(8),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             text,
             style: GoogleFonts.inter(
-              color: const Color(0xFFB0C4CC),
+              color: AppTheme.textSecondary,
               fontSize: 12,
               height: 1.5,
             ),
@@ -244,7 +241,7 @@ class _SheetButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: filled ? AppTheme.primary : Colors.transparent,
+          color: filled ? AppTheme.primary : AppTheme.transparent,
           border: Border.all(
             color: filled ? AppTheme.primary : AppTheme.primary.withAlpha(128),
           ),
@@ -254,7 +251,7 @@ class _SheetButton extends StatelessWidget {
           child: Text(
             label,
             style: GoogleFonts.inter(
-              color: filled ? Colors.black : AppTheme.primary,
+              color: filled ? AppTheme.background : AppTheme.primary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),

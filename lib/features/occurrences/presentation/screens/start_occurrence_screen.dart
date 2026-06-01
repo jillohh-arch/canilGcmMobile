@@ -130,7 +130,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         title: Text(
           'Preencher local',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -140,11 +140,14 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
             TextField(
               controller: cepController,
               keyboardType: TextInputType.number,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
                 hintText: 'CEP (opcional)',
                 hintStyle: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(100),
+                  color: AppTheme.textPrimary.withAlpha(100),
                 ),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(
@@ -161,11 +164,14 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
               controller: addressController,
               autofocus: true,
               maxLines: 2,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
                 hintText: 'Endereço completo',
                 hintStyle: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(100),
+                  color: AppTheme.textPrimary.withAlpha(100),
                 ),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(
@@ -184,7 +190,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'CANCELAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -303,14 +311,14 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         title: Text(
           'Ocorrência em andamento',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Voce ja tem uma ocorrencia aberta. Continue nela para finalizar ou registrar novos eventos.',
           style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(200),
+            color: AppTheme.textPrimary.withAlpha(200),
             fontSize: 14,
           ),
         ),
@@ -322,7 +330,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
             },
             child: Text(
               'VOLTAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -360,14 +370,14 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
         title: Text(
           'Descartar dados?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Você tem dados preenchidos que serão perdidos.',
           style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(200),
+            color: AppTheme.textPrimary.withAlpha(200),
             fontSize: 14,
           ),
         ),
@@ -376,7 +386,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'CANCELAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -612,9 +624,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Colors.transparent,
+                            AppTheme.transparent,
                             AppTheme.primary.withAlpha(50),
-                            Colors.transparent,
+                            AppTheme.transparent,
                           ],
                         ),
                       ),
@@ -672,7 +684,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
                       'Local e horário são preenchidos automaticamente.\nToque nos cards para ajustar antes de iniciar.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(100),
+                        color: AppTheme.textPrimary.withAlpha(100),
                         fontSize: 12,
                         height: 1.5,
                       ),

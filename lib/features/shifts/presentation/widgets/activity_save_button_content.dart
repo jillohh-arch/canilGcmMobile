@@ -13,7 +13,10 @@ class _SavingButtonContent extends StatelessWidget {
         const SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+          child: CircularProgressIndicator(
+            color: AppTheme.textPrimary,
+            strokeWidth: 2,
+          ),
         ),
         const SizedBox(width: 12),
         Flexible(
@@ -21,7 +24,7 @@ class _SavingButtonContent extends StatelessWidget {
             saveStatus,
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w900,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 14,
             ),
             overflow: TextOverflow.ellipsis,

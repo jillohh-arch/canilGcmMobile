@@ -15,7 +15,7 @@ class _OccurrenceNatureOptionTexts extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w800,
           ),
@@ -26,7 +26,7 @@ class _OccurrenceNatureOptionTexts extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(115),
+            color: AppTheme.textPrimary.withAlpha(115),
             fontSize: 9,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.8,

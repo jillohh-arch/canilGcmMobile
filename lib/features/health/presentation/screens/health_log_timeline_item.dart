@@ -34,10 +34,12 @@ class _HealthTimelineItemState extends State<_HealthTimelineItem> {
                 margin: EdgeInsets.only(bottom: widget.isLast ? 0 : 14),
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(_expanded ? 15 : 8),
+                  color: AppTheme.textPrimary.withAlpha(_expanded ? 15 : 8),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: _expanded ? color.withAlpha(80) : Colors.white10,
+                    color: _expanded
+                        ? color.withAlpha(80)
+                        : AppTheme.textPrimary.withAlpha(26),
                     width: _expanded ? 1 : 0.5,
                   ),
                 ),
@@ -87,7 +89,7 @@ class _HealthTimelineRail extends StatelessWidget {
             Expanded(
               child: Container(
                 width: 1.5,
-                color: Colors.white10,
+                color: AppTheme.textPrimary.withAlpha(26),
                 margin: const EdgeInsets.symmetric(vertical: 4),
               ),
             ),

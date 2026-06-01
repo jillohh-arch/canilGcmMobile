@@ -9,8 +9,8 @@ import 'package:canil_gcm/core/services/audit_service.dart';
 
 class HealthViewModel extends ChangeNotifier {
   HealthViewModel()
-      : _healthService = HealthService(),
-        _dogService = DogService();
+    : _healthService = HealthService(),
+      _dogService = DogService();
 
   HealthViewModel.withServices(this._healthService, this._dogService);
 
@@ -43,8 +43,13 @@ class HealthViewModel extends ChangeNotifier {
         action: 'create',
         entityType: 'health',
         entityId: newLog.id ?? '',
-        summary: 'Registro de saúde criado: ${newLog.logType} — ${newLog.dogId}',
-        after: {'logType': newLog.logType, 'dogId': newLog.dogId, 'observations': newLog.healthObservations},
+        summary:
+            'Registro de saúde criado: ${newLog.logType} — ${newLog.dogId}',
+        after: {
+          'logType': newLog.logType,
+          'dogId': newLog.dogId,
+          'observations': newLog.healthObservations,
+        },
       );
 
       _setLoading(false);
@@ -77,7 +82,11 @@ class HealthViewModel extends ChangeNotifier {
         entityType: 'health',
         entityId: log.id ?? '',
         summary: 'Registro de saúde editado: ${log.logType} — ${log.dogId}',
-        after: {'logType': log.logType, 'dogId': log.dogId, 'observations': log.healthObservations},
+        after: {
+          'logType': log.logType,
+          'dogId': log.dogId,
+          'observations': log.healthObservations,
+        },
       );
 
       developer.log('Health log updated: ${log.id}', name: 'HealthViewModel');
@@ -184,5 +193,4 @@ class HealthViewModel extends ChangeNotifier {
       );
     }
   }
-
 }

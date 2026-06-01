@@ -164,8 +164,8 @@ class RegistroDetalhePage extends StatelessWidget {
     HapticFeedback.selectionClick();
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withAlpha(150),
+      backgroundColor: AppTheme.transparent,
+      barrierColor: _bg.withAlpha(150),
       builder: (ctx) => SafeArea(
         top: false,
         child: Padding(
@@ -251,7 +251,7 @@ class HistoryDetailScaffold extends StatelessWidget {
       backgroundColor: _bg,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppTheme.transparent,
           systemNavigationBarColor: _bg,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -314,9 +314,9 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: _textPrimary.withValues(alpha: 0.08),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: _textPrimary.withValues(alpha: 0.15),
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -324,7 +324,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                   child: Text(
                     '‹',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: _textPrimary,
                       fontSize: 22,
                       height: 0.9,
                       fontWeight: FontWeight.w300,
@@ -369,16 +369,16 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: _textPrimary.withValues(alpha: 0.08),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: _textPrimary.withValues(alpha: 0.15),
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
                   child: Icon(
                     Icons.share_outlined,
-                    color: Colors.white,
+                    color: _textPrimary,
                     size: 16,
                   ),
                 ),
@@ -417,8 +417,8 @@ class HistoryDetailScaffold extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: AppTheme.surfacePanel,
+        border: Border.all(color: _textPrimary.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -443,7 +443,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                     Text(
                       detail.title,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: _textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -487,7 +487,7 @@ class HistoryDetailScaffold extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+          Container(height: 1, color: _textPrimary.withValues(alpha: 0.06)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -498,7 +498,7 @@ class HistoryDetailScaffold extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+          Container(height: 1, color: _textPrimary.withValues(alpha: 0.06)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -508,7 +508,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                 height: 30,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF16242A),
+                  color: AppTheme.surfacePanelAlt,
                   border: Border.all(color: _green, width: 1.5),
                 ),
                 child: Center(
@@ -517,7 +517,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                         ? detail.dogName[0].toUpperCase()
                         : '🐕',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: _textPrimary,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -531,7 +531,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                   height: 30,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF16242A),
+                    color: AppTheme.surfacePanelAlt,
                     border: Border.all(color: _cyan, width: 1.5),
                   ),
                   child: Center(
@@ -540,7 +540,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                           ? detail.handlerName[0].toUpperCase()
                           : '👤',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: _textPrimary,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -560,7 +560,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                       TextSpan(
                         text: detail.dogName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -568,7 +568,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                       TextSpan(
                         text: detail.handlerName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -601,7 +601,7 @@ class HistoryDetailScaffold extends StatelessWidget {
         Text(
           value,
           style: GoogleFonts.ibmPlexMono(
-            color: Colors.white,
+            color: _textPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -809,7 +809,7 @@ class HistoryDetailScaffold extends StatelessWidget {
           ),
           blockBody,
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withAlpha(15)),
+          Container(height: 1, color: _textPrimary.withAlpha(15)),
           const SizedBox(height: 11),
           InkWell(
             onTap: () => _showAuditTrail(context),
@@ -827,7 +827,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                       TextSpan(
                         text: '$count ${count == 1 ? 'registro' : 'registros'}',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -844,7 +844,7 @@ class HistoryDetailScaffold extends StatelessWidget {
           ),
           if (isFinalizedOcc) ...[
             const SizedBox(height: 11),
-            Container(height: 1, color: Colors.white.withAlpha(15)),
+            Container(height: 1, color: _textPrimary.withAlpha(15)),
             const SizedBox(height: 11),
             InkWell(
               onTap: () => _openCreateAmendment(context),
@@ -916,7 +916,7 @@ class HistoryDetailScaffold extends StatelessWidget {
           ),
           body,
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white.withAlpha(15)),
+          Container(height: 1, color: _textPrimary.withAlpha(15)),
           const SizedBox(height: 11),
           InkWell(
             onTap: () => _showAuditTrail(context),
@@ -934,7 +934,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                       TextSpan(
                         text: '$count ${count == 1 ? 'registro' : 'registros'}',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -950,7 +950,7 @@ class HistoryDetailScaffold extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 11),
-          Container(height: 1, color: Colors.white.withAlpha(15)),
+          Container(height: 1, color: _textPrimary.withAlpha(15)),
           const SizedBox(height: 11),
           InkWell(
             onTap: () => _openCreateAmendment(context),
@@ -996,9 +996,9 @@ class HistoryDetailScaffold extends StatelessWidget {
     HapticFeedback.mediumImpact();
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       isScrollControlled: true,
-      barrierColor: Colors.black.withAlpha(180),
+      barrierColor: _bg.withAlpha(180),
       builder: (ctx) => Container(
         decoration: const BoxDecoration(
           color: _bg,
@@ -1015,7 +1015,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: _textPrimary.withAlpha(61),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1032,7 +1032,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                 Text(
                   'Trilha de Auditoria',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: _textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1063,7 +1063,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                                   Text(
                                     event.action,
                                     style: GoogleFonts.inter(
-                                      color: Colors.white,
+                                      color: _textPrimary,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1089,7 +1089,7 @@ class HistoryDetailScaffold extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Divider(color: Colors.white10),
+                      Divider(color: _textPrimary.withAlpha(26)),
                     ],
                   ],
                 ),
@@ -1171,7 +1171,7 @@ class HistoryOccurrenceBody extends StatelessWidget {
                         Text(
                           label,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: _textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1209,8 +1209,8 @@ class HistoryOccurrenceBody extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -1248,8 +1248,8 @@ class HistoryOccurrenceBody extends StatelessWidget {
                   margin: const EdgeInsets.only(right: 9),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: Colors.white.withAlpha(20)),
-                    color: const Color(0xFF0E1B20),
+                    border: Border.all(color: _textPrimary.withAlpha(20)),
+                    color: AppTheme.surfacePanel,
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
@@ -1262,14 +1262,20 @@ class HistoryOccurrenceBody extends StatelessWidget {
                             width: 96,
                             height: 96,
                             placeholder: (context, url) =>
-                                Container(color: Colors.white10),
-                            errorWidget: (context, url, error) => const Center(
-                              child: Icon(Icons.image, color: Colors.white24),
+                                Container(color: _textPrimary.withAlpha(26)),
+                            errorWidget: (context, url, error) => Center(
+                              child: Icon(
+                                Icons.image,
+                                color: _textPrimary.withAlpha(61),
+                              ),
                             ),
                           )
                         else
-                          const Center(
-                            child: Icon(Icons.image, color: Colors.white24),
+                          Center(
+                            child: Icon(
+                              Icons.image,
+                              color: _textPrimary.withAlpha(61),
+                            ),
                           ),
                         Positioned(
                           left: 6,
@@ -1299,8 +1305,8 @@ class HistoryOccurrenceBody extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
-          border: Border.all(color: Colors.white.withAlpha(15)),
+          color: _textPrimary.withAlpha(8),
+          border: Border.all(color: _textPrimary.withAlpha(15)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1308,7 +1314,7 @@ class HistoryOccurrenceBody extends StatelessWidget {
             Text(
               number,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: _textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
@@ -1334,7 +1340,7 @@ class _MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0E1C22)
+      ..color = AppTheme.surfacePanel
       ..strokeWidth = 1.0;
 
     for (double i = 0; i < size.width; i += 30) {
@@ -1388,8 +1394,8 @@ class HistoryDetectionBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -1418,7 +1424,7 @@ class HistoryDetectionBody extends StatelessWidget {
                             children: [
                               TextSpan(
                                 text: '$consecutive',
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(color: _textPrimary),
                               ),
                               TextSpan(
                                 text: ' / $requiredHits',
@@ -1488,8 +1494,8 @@ class HistoryDetectionBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1501,7 +1507,7 @@ class HistoryDetectionBody extends StatelessWidget {
                   Text(
                     '${attempts.length} repetições',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: _textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1547,7 +1553,7 @@ class HistoryDetectionBody extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Container(height: 1, color: Colors.white.withAlpha(10)),
+              Container(height: 1, color: _textPrimary.withAlpha(10)),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -1569,7 +1575,7 @@ class HistoryDetectionBody extends StatelessWidget {
                           TextSpan(
                             text: '$hitsCount acertos',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: _textPrimary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1610,8 +1616,8 @@ class HistoryDetectionBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -1637,10 +1643,12 @@ class HistoryDetectionBody extends StatelessWidget {
       children: List.generate(phases.length, (index) {
         final done = index < activeIndex;
         final current = index == activeIndex;
-        final border = done ? _green : (current ? _amber : Colors.white24);
+        final border = done
+            ? _green
+            : (current ? _amber : _textPrimary.withAlpha(61));
         final bg = done
             ? _green.withAlpha(40)
-            : (current ? _amber.withAlpha(40) : Colors.transparent);
+            : (current ? _amber.withAlpha(40) : AppTheme.transparent);
         final textColor = done ? _green : (current ? _amber : _textMuted);
 
         return Expanded(
@@ -1650,7 +1658,9 @@ class HistoryDetectionBody extends StatelessWidget {
                 Expanded(
                   child: Container(
                     height: 2,
-                    color: index <= activeIndex ? _green : Colors.white10,
+                    color: index <= activeIndex
+                        ? _green
+                        : _textPrimary.withAlpha(26),
                   ),
                 ),
               Column(
@@ -1689,7 +1699,9 @@ class HistoryDetectionBody extends StatelessWidget {
                 Expanded(
                   child: Container(
                     height: 2,
-                    color: index < activeIndex ? _green : Colors.white10,
+                    color: index < activeIndex
+                        ? _green
+                        : _textPrimary.withAlpha(26),
                   ),
                 ),
             ],
@@ -1723,10 +1735,10 @@ class HistoryDetectionBody extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: selected ? color.withAlpha(30) : Colors.white.withAlpha(8),
+        color: selected ? color.withAlpha(30) : _textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? color : Colors.white.withAlpha(25),
+          color: selected ? color : _textPrimary.withAlpha(25),
         ),
       ),
       child: Text(
@@ -1823,8 +1835,8 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1834,9 +1846,9 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                   Container(
                     width: 32,
                     height: 32,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white12,
+                      color: _textPrimary.withAlpha(31),
                     ),
                     child: const Center(
                       child: Text('👤', style: TextStyle(fontSize: 16)),
@@ -1850,7 +1862,7 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                         Text(
                           figurante,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: _textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1907,7 +1919,7 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                   Text(
                     name,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: _textPrimary,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1937,8 +1949,8 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -1965,11 +1977,11 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isActive ? stateColor.withAlpha(15) : Colors.white.withAlpha(5),
+        color: isActive ? stateColor.withAlpha(15) : _textPrimary.withAlpha(5),
         border: Border.all(
           color: isActive
               ? stateColor.withAlpha(50)
-              : Colors.white.withAlpha(12),
+              : _textPrimary.withAlpha(12),
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1994,7 +2006,7 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                 Text(
                   name,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: _textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -2020,7 +2032,7 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
               child: Text(
                 'TRABALHADO HOJE',
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: _textPrimary,
                   fontSize: 8,
                   fontWeight: FontWeight.bold,
                 ),
@@ -2054,7 +2066,7 @@ class HistoryGuardaProtecaoBody extends StatelessWidget {
                 margin: const EdgeInsets.only(left: 3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: active ? activeColor : Colors.white10,
+                  color: active ? activeColor : _textPrimary.withAlpha(26),
                 ),
               );
             }),
@@ -2118,8 +2130,8 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
           height: 130,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: Colors.white.withAlpha(20)),
-            color: const Color(0xFF0A161B),
+            border: Border.all(color: _textPrimary.withAlpha(20)),
+            color: AppTheme.surfacePanelSoft,
           ),
           child: Stack(
             children: [
@@ -2181,8 +2193,8 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -2204,8 +2216,8 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
-          border: Border.all(color: Colors.white.withAlpha(15)),
+          color: _textPrimary.withAlpha(8),
+          border: Border.all(color: _textPrimary.withAlpha(15)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -2213,7 +2225,7 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
             Text(
               number,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: _textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
@@ -2263,11 +2275,11 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDone
             ? _green.withAlpha(10)
-            : (isDev ? _amber.withAlpha(10) : Colors.white.withAlpha(8)),
+            : (isDev ? _amber.withAlpha(10) : _textPrimary.withAlpha(8)),
         border: Border.all(
           color: isDone
               ? _green.withAlpha(56)
-              : (isDev ? _amber.withAlpha(56) : Colors.white.withAlpha(18)),
+              : (isDev ? _amber.withAlpha(56) : _textPrimary.withAlpha(18)),
         ),
         borderRadius: BorderRadius.circular(11),
       ),
@@ -2287,7 +2299,7 @@ class HistoryBuscaCapturaBody extends StatelessWidget {
             child: Text(
               name,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: _textPrimary,
                 fontSize: 12.5,
                 fontWeight: FontWeight.bold,
               ),
@@ -2444,8 +2456,8 @@ class HistoryObedienciaBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -2479,7 +2491,7 @@ class HistoryObedienciaBody extends StatelessWidget {
       child: Text(
         text,
         style: GoogleFonts.inter(
-          color: const Color(0xFF7D8D99),
+          color: _textMuted,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -2524,8 +2536,8 @@ class HistoryObedienciaBody extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(5),
-        border: Border.all(color: Colors.white.withAlpha(12)),
+        color: _textPrimary.withAlpha(5),
+        border: Border.all(color: _textPrimary.withAlpha(12)),
         borderRadius: BorderRadius.circular(11),
       ),
       child: Row(
@@ -2533,7 +2545,7 @@ class HistoryObedienciaBody extends StatelessWidget {
           RichText(
             text: TextSpan(
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: _textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -2560,7 +2572,7 @@ class HistoryObedienciaBody extends StatelessWidget {
                 margin: const EdgeInsets.only(left: 3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: active ? color : Colors.white10,
+                  color: active ? color : _textPrimary.withAlpha(26),
                 ),
               );
             }),
@@ -2648,7 +2660,7 @@ class HistorySaudeBody extends StatelessWidget {
                       Text(
                         'Reforço / Próxima dose agenda',
                         style: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -2675,8 +2687,8 @@ class HistorySaudeBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(12)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(12)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -2690,7 +2702,7 @@ class HistorySaudeBody extends StatelessWidget {
                     Text(
                       vetName,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: _textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2713,8 +2725,8 @@ class HistorySaudeBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(12)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(12)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -2728,7 +2740,7 @@ class HistorySaudeBody extends StatelessWidget {
                     Text(
                       'comprovante_evento.pdf',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: _textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2754,8 +2766,8 @@ class HistorySaudeBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -2807,8 +2819,8 @@ class HistoryNutricaoBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -2832,7 +2844,7 @@ class HistoryNutricaoBody extends StatelessWidget {
                       Text(
                         '${served}g',
                         style: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: _textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -2864,7 +2876,7 @@ class HistoryNutricaoBody extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Container(height: 1, color: Colors.white.withAlpha(10)),
+              Container(height: 1, color: _textPrimary.withAlpha(10)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2879,7 +2891,7 @@ class HistoryNutricaoBody extends StatelessWidget {
                   Text(
                     racaoName,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: _textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2933,8 +2945,8 @@ class HistoryNutricaoBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(12)),
+            color: _textPrimary.withAlpha(5),
+            border: Border.all(color: _textPrimary.withAlpha(12)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -2952,7 +2964,7 @@ class HistoryNutricaoBody extends StatelessWidget {
                     Text(
                       'Laudo Nutricional Vigente',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: _textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2980,8 +2992,8 @@ class HistoryNutricaoBody extends StatelessWidget {
           width: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withAlpha(15)),
-            color: const Color(0xFF0A161B),
+            border: Border.all(color: _textPrimary.withAlpha(15)),
+            color: AppTheme.surfacePanelSoft,
           ),
           child: Center(
             child: Column(
@@ -3011,8 +3023,8 @@ class HistoryNutricaoBody extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(8),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -3049,8 +3061,8 @@ Widget _buildConfigGrid(Map<String, String> values) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(5),
-          border: Border.all(color: Colors.white.withAlpha(12)),
+          color: _textPrimary.withAlpha(5),
+          border: Border.all(color: _textPrimary.withAlpha(12)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -3070,7 +3082,7 @@ Widget _buildConfigGrid(Map<String, String> values) {
             Text(
               e.value,
               style: GoogleFonts.inter(
-                color: isWarning ? _amber : Colors.white,
+                color: isWarning ? _amber : _textPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -3126,7 +3138,7 @@ class _MenuRow extends StatelessWidget {
       title: Text(
         label,
         style: GoogleFonts.inter(
-          color: Colors.white,
+          color: _textPrimary,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -3151,7 +3163,7 @@ class _CtaBar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [_bg, Colors.transparent],
+          colors: [_bg, AppTheme.transparent],
         ),
       ),
       child: Row(
@@ -3406,7 +3418,7 @@ class _OccurrenceTimelineSectionState
                           Expanded(
                             child: Container(
                               width: 2,
-                              color: Colors.white.withAlpha(20),
+                              color: _textPrimary.withAlpha(20),
                             ),
                           ),
                       ],
@@ -3420,7 +3432,7 @@ class _OccurrenceTimelineSectionState
                             Text(
                               ev.title ?? 'Evento',
                               style: GoogleFonts.inter(
-                                color: Colors.white,
+                                color: _textPrimary,
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -3616,7 +3628,7 @@ class _AmendmentCard extends StatelessWidget {
                 child: Text(
                   dateStr,
                   style: GoogleFonts.inter(
-                    color: Colors.white.withAlpha(120),
+                    color: _textPrimary.withAlpha(120),
                     fontSize: 11,
                   ),
                 ),
@@ -3627,7 +3639,7 @@ class _AmendmentCard extends StatelessWidget {
           Text(
             '${amendment.createdByName} (RA: ${amendment.createdByRa})',
             style: GoogleFonts.inter(
-              color: Colors.white.withAlpha(160),
+              color: _textPrimary.withAlpha(160),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -3636,7 +3648,7 @@ class _AmendmentCard extends StatelessWidget {
           Text(
             amendment.reason,
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: _textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               height: 1.4,
@@ -3651,7 +3663,7 @@ class _AmendmentCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(5),
+                  color: _textPrimary.withAlpha(5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -3672,7 +3684,7 @@ class _AmendmentCard extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.remove_circle_outline,
-                          color: Colors.redAccent.withAlpha(150),
+                          color: AppTheme.errorStrong.withAlpha(150),
                           size: 12,
                         ),
                         const SizedBox(width: 6),
@@ -3680,7 +3692,7 @@ class _AmendmentCard extends StatelessWidget {
                           child: Text(
                             '${correction.oldValue ?? '(vazio)'}',
                             style: GoogleFonts.inter(
-                              color: Colors.white.withAlpha(100),
+                              color: _textPrimary.withAlpha(100),
                               fontSize: 11,
                               decoration: TextDecoration.lineThrough,
                             ),
@@ -3694,7 +3706,7 @@ class _AmendmentCard extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.add_circle_outline,
-                          color: const Color(0xFF4CAF50).withAlpha(180),
+                          color: _green.withAlpha(180),
                           size: 12,
                         ),
                         const SizedBox(width: 6),
@@ -3702,7 +3714,7 @@ class _AmendmentCard extends StatelessWidget {
                           child: Text(
                             '${correction.newValue}',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: _textPrimary,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
@@ -3715,7 +3727,7 @@ class _AmendmentCard extends StatelessWidget {
                       Text(
                         correction.description!,
                         style: GoogleFonts.inter(
-                          color: Colors.white.withAlpha(80),
+                          color: _textPrimary.withAlpha(80),
                           fontSize: 10,
                           fontStyle: FontStyle.italic,
                         ),

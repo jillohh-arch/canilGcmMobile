@@ -22,7 +22,7 @@ class _SaveTrainingButton extends StatelessWidget {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      color: Colors.black,
+                      color: AppTheme.background,
                       strokeWidth: 2,
                     ),
                   )
@@ -33,7 +33,7 @@ class _SaveTrainingButton extends StatelessWidget {
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
+              foregroundColor: AppTheme.background,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

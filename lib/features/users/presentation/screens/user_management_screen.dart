@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
@@ -126,12 +128,12 @@ class _UserCard extends StatelessWidget {
         ? const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+            colors: [AppTheme.infoStrong, AppTheme.info],
           )
         : const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF37474F), Color(0xFF263238)],
+            colors: [AppTheme.surfacePanelAlt, AppTheme.surfacePanel],
           );
 
     return TacticalCard(
@@ -145,16 +147,23 @@ class _UserCard extends StatelessWidget {
       avatar: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white30, width: 2),
+          border: Border.all(
+            color: AppTheme.textPrimary.withAlpha(77),
+            width: 2,
+          ),
         ),
         child: CircleAvatar(
           radius: 32,
-          backgroundColor: Colors.white24,
+          backgroundColor: AppTheme.textPrimary.withAlpha(61),
           backgroundImage: user.photoUrl != null
               ? NetworkImage(user.photoUrl!)
               : null,
           child: user.photoUrl == null
-              ? const Icon(Icons.person, size: 32, color: Colors.white70)
+              ? Icon(
+                  Icons.person,
+                  size: 32,
+                  color: AppTheme.textPrimary.withAlpha(179),
+                )
               : null,
         ),
       ),
@@ -182,16 +191,20 @@ class _UserCardActions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+          icon: Icon(
+            Icons.edit_outlined,
+            color: AppTheme.textPrimary,
+            size: 20,
+          ),
           onPressed: onEdit,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
         ),
         const SizedBox(height: 12),
         IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.delete_outline,
-            color: Colors.white70,
+            color: AppTheme.textPrimary.withAlpha(179),
             size: 20,
           ),
           onPressed: onDelete,

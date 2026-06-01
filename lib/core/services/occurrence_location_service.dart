@@ -70,16 +70,18 @@ class OccurrenceLocationService {
           .where((e) => e.placeLabel != null && e.placeLabel!.isNotEmpty)
           .map((e) => e.placeLabel!)
           .firstOrNull;
-      final label = existingLabel ??
-          await _resolveLabel(cluster.lat, cluster.lng);
-      locations.add(OccurrenceLocation(
-        index: i + 1,
-        lat: cluster.lat,
-        lng: cluster.lng,
-        label: label,
-        arrivedAt: cluster.events.first.timestamp,
-        events: cluster.events,
-      ));
+      final label =
+          existingLabel ?? await _resolveLabel(cluster.lat, cluster.lng);
+      locations.add(
+        OccurrenceLocation(
+          index: i + 1,
+          lat: cluster.lat,
+          lng: cluster.lng,
+          label: label,
+          arrivedAt: cluster.events.first.timestamp,
+          events: cluster.events,
+        ),
+      );
     }
 
     return locations;
@@ -173,7 +175,8 @@ class OccurrenceLocationService {
     const earthRadius = 6371000.0; // metros
     final dLat = _toRad(lat2 - lat1);
     final dLng = _toRad(lng2 - lng1);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;

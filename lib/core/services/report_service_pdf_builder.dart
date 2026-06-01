@@ -78,9 +78,9 @@ class _ActivityReportPdfBuilder {
     return pw.Container(
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
-        color: PdfColors.grey100,
+        color: PdfInstitutionalColors.grey100,
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-        border: pw.Border.all(color: PdfColors.grey300),
+        border: pw.Border.all(color: PdfInstitutionalColors.grey300),
       ),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -120,7 +120,7 @@ class _ActivityReportPdfBuilder {
       style: pw.TextStyle(
         font: fonts.black,
         fontSize: 13,
-        color: PdfColors.grey800,
+        color: PdfInstitutionalColors.grey800,
         letterSpacing: 1.5,
       ),
     );
@@ -138,10 +138,13 @@ class _ActivityReportPdfBuilder {
         3: pw.FlexColumnWidth(1.5),
         4: pw.FlexColumnWidth(2.5),
       },
-      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      border: pw.TableBorder.all(
+        color: PdfInstitutionalColors.grey300,
+        width: 0.5,
+      ),
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey800),
+          decoration: pw.BoxDecoration(color: PdfInstitutionalColors.grey800),
           children: [
             'DATA',
             'HORA',
@@ -155,7 +158,9 @@ class _ActivityReportPdfBuilder {
           final reportEntry = entry.value;
           return pw.TableRow(
             decoration: pw.BoxDecoration(
-              color: odd ? PdfColors.grey50 : PdfColors.white,
+              color: odd
+                  ? PdfInstitutionalColors.grey50
+                  : PdfInstitutionalColors.white,
             ),
             children: [
               _tableCell(_formatReportDate(reportEntry.date), fonts.regular),
@@ -176,7 +181,7 @@ class _ActivityReportPdfBuilder {
       style: pw.TextStyle(
         font: fonts.bold,
         fontSize: 10,
-        color: PdfColors.grey600,
+        color: PdfInstitutionalColors.grey600,
       ),
     );
   }
@@ -208,14 +213,14 @@ class _ActivityReportPdfBuilder {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Container(height: 1, color: PdfColors.grey700),
+          pw.Container(height: 1, color: PdfInstitutionalColors.grey700),
           pw.SizedBox(height: 6),
           pw.Text(
             label,
             style: pw.TextStyle(
               font: fonts.regular,
               fontSize: 10,
-              color: PdfColors.grey600,
+              color: PdfInstitutionalColors.grey600,
             ),
           ),
           pw.SizedBox(height: 2),

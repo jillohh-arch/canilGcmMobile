@@ -18,8 +18,8 @@ class _AssumptionHeader extends StatelessWidget {
     final greeting = hour < 12
         ? 'Bom dia'
         : hour < 18
-            ? 'Boa tarde'
-            : 'Boa noite';
+        ? 'Boa tarde'
+        : 'Boa noite';
 
     final now = DateTime.now();
     final weekdays = [

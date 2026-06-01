@@ -8,6 +8,7 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/pdf_generator/pdf_colors.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
@@ -137,7 +138,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       backgroundColor: _hBg,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppTheme.transparent,
           systemNavigationBarColor: _hBg,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -241,7 +242,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   ) async {
     final pdf = pw.Document();
     final range = _periodDateRange();
-    final accent = PdfColor.fromHex('5A4080');
+    final accent = PdfInstitutionalColors.purple;
     final rangeEnd = range.end.subtract(const Duration(days: 1));
     final dateLabel =
         '${DateFormat('dd/MM/yyyy').format(range.start)} a ${DateFormat('dd/MM/yyyy').format(rangeEnd)}';
@@ -287,7 +288,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F6F2FA'),
+              color: PdfInstitutionalColors.historyBackground,
               border: pw.Border.all(color: accent, width: 0.6),
               borderRadius: pw.BorderRadius.circular(4),
             ),
@@ -316,7 +317,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 .toList(),
             headerDecoration: pw.BoxDecoration(color: accent),
             headerStyle: pw.TextStyle(
-              color: PdfColors.white,
+              color: PdfInstitutionalColors.white,
               fontSize: 9,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -324,7 +325,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             cellAlignment: pw.Alignment.centerLeft,
             cellPadding: const pw.EdgeInsets.all(6),
             oddRowDecoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F8FAFB'),
+              color: PdfInstitutionalColors.lightGray,
             ),
           ),
         ],
@@ -353,7 +354,10 @@ class _HistoryScreenState extends State<HistoryScreen>
       children: [
         pw.Text(
           label.toUpperCase(),
-          style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+          style: pw.TextStyle(
+            fontSize: 7,
+            color: PdfInstitutionalColors.grey600,
+          ),
         ),
         pw.SizedBox(height: 3),
         pw.Text(
@@ -480,7 +484,9 @@ class _HistoryShiftHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
         color: AppTheme.primary.withAlpha(10),
-        border: const Border(bottom: BorderSide(color: Color(0x1E4DD0E1))),
+        border: Border(
+          bottom: BorderSide(color: AppTheme.primary.withAlpha(30)),
+        ),
       ),
       child: BinomioHeader(
         dog: dog,

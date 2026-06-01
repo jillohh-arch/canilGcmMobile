@@ -81,18 +81,20 @@ class NutritionViewModel extends ChangeNotifier {
 
     // Inicia stream de refeições do dia
     _feedingsSub?.cancel();
-    _feedingsSub = _service.watchTodayFeedings(dogId).listen(
-      (feedings) {
-        _todayFeedings = feedings;
-        _calculateConformity();
-        notifyListeners();
-      },
-      onError: (e) {
-        debugPrint('[NutritionVM] Erro no stream de refeições: $e');
-        _todayFeedings = [];
-        notifyListeners();
-      },
-    );
+    _feedingsSub = _service
+        .watchTodayFeedings(dogId)
+        .listen(
+          (feedings) {
+            _todayFeedings = feedings;
+            _calculateConformity();
+            notifyListeners();
+          },
+          onError: (e) {
+            debugPrint('[NutritionVM] Erro no stream de refeições: $e');
+            _todayFeedings = [];
+            notifyListeners();
+          },
+        );
 
     _loading = false;
     notifyListeners();
@@ -118,11 +120,13 @@ class NutritionViewModel extends ChangeNotifier {
 
       // Calcula conformidade 90 dias
       _totalFeedings90d = _historyFeedings.length;
-      _conformFeedings90d =
-          _historyFeedings.where((f) => f.divergencePercent.abs() <= 10.0).length;
+      _conformFeedings90d = _historyFeedings
+          .where((f) => f.divergencePercent.abs() <= 10.0)
+          .length;
       _divergentFeedings90d = _totalFeedings90d - _conformFeedings90d;
-      _conformity90d =
-          _totalFeedings90d > 0 ? (_conformFeedings90d / _totalFeedings90d) * 100 : 0.0;
+      _conformity90d = _totalFeedings90d > 0
+          ? (_conformFeedings90d / _totalFeedings90d) * 100
+          : 0.0;
 
       // Aplica filtros
       _applyFilters();
@@ -144,7 +148,11 @@ class NutritionViewModel extends ChangeNotifier {
   }
 
   /// Registra refeição com upload de foto da balança.
-  Future<void> addFeedingWithPhoto(String dogId, Feeding feeding, File? photo) async {
+  Future<void> addFeedingWithPhoto(
+    String dogId,
+    Feeding feeding,
+    File? photo,
+  ) async {
     final feedingId = await _service.addFeeding(dogId, feeding);
     if (photo != null) {
       try {
@@ -185,10 +193,14 @@ class NutritionViewModel extends ChangeNotifier {
 
     switch (_filterType) {
       case 'conformes':
-        filtered = filtered.where((f) => f.divergencePercent.abs() <= 10.0).toList();
+        filtered = filtered
+            .where((f) => f.divergencePercent.abs() <= 10.0)
+            .toList();
         break;
       case 'divergencias':
-        filtered = filtered.where((f) => f.divergencePercent.abs() > 10.0).toList();
+        filtered = filtered
+            .where((f) => f.divergencePercent.abs() > 10.0)
+            .toList();
         break;
     }
 
@@ -204,24 +216,33 @@ class NutritionViewModel extends ChangeNotifier {
     final days = <DailyConsumption>[];
 
     for (int i = 13; i >= 0; i--) {
-      final date = DateTime(now.year, now.month, now.day)
-          .subtract(Duration(days: i));
+      final date = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: i));
       final nextDate = date.add(const Duration(days: 1));
 
-      final dayFeedings = _historyFeedings.where((f) =>
-          f.fedAt.isAfter(date) && f.fedAt.isBefore(nextDate)).toList();
+      final dayFeedings = _historyFeedings
+          .where((f) => f.fedAt.isAfter(date) && f.fedAt.isBefore(nextDate))
+          .toList();
 
-      final totalGrams =
-          dayFeedings.fold<int>(0, (sum, f) => sum + f.amountGrams);
+      final totalGrams = dayFeedings.fold<int>(
+        0,
+        (sum, f) => sum + f.amountGrams,
+      );
       final allConform =
-          dayFeedings.isEmpty || dayFeedings.every((f) => f.divergencePercent.abs() <= 10.0);
+          dayFeedings.isEmpty ||
+          dayFeedings.every((f) => f.divergencePercent.abs() <= 10.0);
 
-      days.add(DailyConsumption(
-        date: date,
-        totalGrams: totalGrams,
-        isConform: allConform,
-        feedingCount: dayFeedings.length,
-      ));
+      days.add(
+        DailyConsumption(
+          date: date,
+          totalGrams: totalGrams,
+          isConform: allConform,
+          feedingCount: dayFeedings.length,
+        ),
+      );
     }
 
     return days;
@@ -235,8 +256,9 @@ class NutritionViewModel extends ChangeNotifier {
       _conformityPercent = 0.0;
       return;
     }
-    final conformCount =
-        _todayFeedings.where((f) => f.divergencePercent.abs() <= 10.0).length;
+    final conformCount = _todayFeedings
+        .where((f) => f.divergencePercent.abs() <= 10.0)
+        .length;
     _conformityPercent = (conformCount / _todayFeedings.length) * 100;
   }
 

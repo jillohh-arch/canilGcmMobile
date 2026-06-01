@@ -21,7 +21,7 @@ class _TacticalHealthLogCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
         decoration: ShapeDecoration(
-          color: const Color(0xFF0F172A),
+          color: AppTheme.surfacePanel,
           shape: BeveledRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(

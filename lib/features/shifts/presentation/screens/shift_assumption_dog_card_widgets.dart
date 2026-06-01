@@ -294,7 +294,7 @@ class _PendenciesList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.black.withAlpha(50),
+        color: AppTheme.background.withAlpha(50),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -653,7 +653,7 @@ class _VehicleEmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.primary.withAlpha(28)),
       ),
@@ -687,7 +687,7 @@ class _AssumptionCta extends StatelessWidget {
     final isUnfit = fitness.status == DogFitnessStatus.unfit;
 
     final bgColor = isUnfit ? AppTheme.warning.withAlpha(20) : AppTheme.primary;
-    final fgColor = isUnfit ? AppTheme.warning : Colors.black;
+    final fgColor = isUnfit ? AppTheme.warning : AppTheme.background;
     final borderSide = isUnfit
         ? BorderSide(color: AppTheme.warning.withAlpha(130))
         : BorderSide.none;

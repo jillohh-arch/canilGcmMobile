@@ -15,7 +15,8 @@ import 'package:canil_gcm/core/services/storage_service.dart';
 
 class HealthEventFormScreen extends StatefulWidget {
   final String dogId;
-  final String type; // 'vaccination' | 'antiparasitic' | 'exam' | 'consultation' | 'medication' | 'symptom' | 'surgery' | 'other'
+  final String
+  type; // 'vaccination' | 'antiparasitic' | 'exam' | 'consultation' | 'medication' | 'symptom' | 'surgery' | 'other'
 
   const HealthEventFormScreen({
     super.key,
@@ -32,14 +33,15 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
   final _storageService = StorageService();
 
   // Controllers
-  final _subtypeController = TextEditingController(); // e.g. vaccine name, medicine name
+  final _subtypeController =
+      TextEditingController(); // e.g. vaccine name, medicine name
   final _observationsController = TextEditingController();
   final _weightController = TextEditingController();
   final _vetNameController = TextEditingController();
   final _crmvController = TextEditingController();
   final _clinicController = TextEditingController();
   final _costController = TextEditingController();
-  
+
   // Specific medication fields
   final _dosageController = TextEditingController();
   final _frequencyController = TextEditingController();
@@ -84,28 +86,42 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
 
   Color get _categoryColor {
     switch (widget.type) {
-      case 'vaccination': return const Color(0xFF2ECC71);
-      case 'antiparasitic': return const Color(0xFF9B59B6);
-      case 'exam': return const Color(0xFF3498DB);
-      case 'consultation': return const Color(0xFF1ABC9C);
-      case 'medication': return const Color(0xFFF1C40F);
-      case 'symptom': return const Color(0xFFE74C3C);
-      case 'surgery': return const Color(0xFFE67E22);
+      case 'vaccination':
+        return AppTheme.success;
+      case 'antiparasitic':
+        return AppTheme.healthAccent;
+      case 'exam':
+        return AppTheme.info;
+      case 'consultation':
+        return AppTheme.successOperational;
+      case 'medication':
+        return AppTheme.warning;
+      case 'symptom':
+        return AppTheme.error;
+      case 'surgery':
+        return AppTheme.attention;
       case 'other':
       default:
-        return const Color(0xFF95A5A6);
+        return AppTheme.textSoft;
     }
   }
 
   String get _categoryTitle {
     switch (widget.type) {
-      case 'vaccination': return 'Nova Vacina';
-      case 'antiparasitic': return 'Novo Antiparasitário';
-      case 'exam': return 'Novo Exame';
-      case 'consultation': return 'Nova Consulta';
-      case 'medication': return 'Nova Medicação';
-      case 'symptom': return 'Registrar Sintoma';
-      case 'surgery': return 'Nova Cirurgia';
+      case 'vaccination':
+        return 'Nova Vacina';
+      case 'antiparasitic':
+        return 'Novo Antiparasitário';
+      case 'exam':
+        return 'Novo Exame';
+      case 'consultation':
+        return 'Nova Consulta';
+      case 'medication':
+        return 'Nova Medicação';
+      case 'symptom':
+        return 'Registrar Sintoma';
+      case 'surgery':
+        return 'Nova Cirurgia';
       case 'other':
       default:
         return 'Outro Evento';
@@ -131,12 +147,18 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
+              leading: const Icon(
+                Icons.camera_alt_rounded,
+                color: AppTheme.primary,
+              ),
               title: Text('Tirar Foto', style: GoogleFonts.inter()),
               onTap: () async {
                 Navigator.pop(context);
                 final picker = ImagePicker();
-                final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+                final picked = await picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 80,
+                );
                 if (picked != null) {
                   setState(() {
                     _attachmentFile = File(picked.path);
@@ -146,12 +168,18 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primary),
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: AppTheme.primary,
+              ),
               title: Text('Escolher da Galeria', style: GoogleFonts.inter()),
               onTap: () async {
                 Navigator.pop(context);
                 final picker = ImagePicker();
-                final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+                final picked = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 80,
+                );
                 if (picked != null) {
                   setState(() {
                     _attachmentFile = File(picked.path);
@@ -161,13 +189,26 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.picture_as_pdf_rounded, color: AppTheme.primary),
-              title: Text('Selecionar Documento/PDF', style: GoogleFonts.inter()),
+              leading: const Icon(
+                Icons.picture_as_pdf_rounded,
+                color: AppTheme.primary,
+              ),
+              title: Text(
+                'Selecionar Documento/PDF',
+                style: GoogleFonts.inter(),
+              ),
               onTap: () async {
                 Navigator.pop(context);
                 final result = await FilePicker.pickFiles(
                   type: FileType.custom,
-                  allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+                  allowedExtensions: [
+                    'pdf',
+                    'doc',
+                    'docx',
+                    'jpg',
+                    'jpeg',
+                    'png',
+                  ],
                 );
                 if (result != null && result.files.single.path != null) {
                   setState(() {
@@ -206,11 +247,14 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       // Dynamic sub-typing / values mapping
       String finalObservations = _observationsController.text.trim();
       if (widget.type == 'symptom') {
-        finalObservations = '[Gravidade Subjetiva: ${_symptomSeverity.toInt()}/5]\n$finalObservations';
+        finalObservations =
+            '[Gravidade Subjetiva: ${_symptomSeverity.toInt()}/5]\n$finalObservations';
       } else if (widget.type == 'medication') {
-        finalObservations = '[Dosagem: ${_dosageController.text.trim()} | Frequência: ${_frequencyController.text.trim()} | Duração: ${_durationController.text.trim()}]\n$finalObservations';
+        finalObservations =
+            '[Dosagem: ${_dosageController.text.trim()} | Frequência: ${_frequencyController.text.trim()} | Duração: ${_durationController.text.trim()}]\n$finalObservations';
       } else if (widget.type == 'surgery') {
-        finalObservations = '[Cuidados Pós-Operatórios / Anestesia: ${_anesthesiaController.text.trim()}]\n$finalObservations';
+        finalObservations =
+            '[Cuidados Pós-Operatórios / Anestesia: ${_anesthesiaController.text.trim()}]\n$finalObservations';
       }
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -220,18 +264,28 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         dogName: dogName,
         date: _applicationDate,
         type: widget.type,
-        subtype: _subtypeController.text.trim().isNotEmpty ? _subtypeController.text.trim() : null,
-        weight: _weightController.text.trim().isNotEmpty 
-            ? double.tryParse(_weightController.text.trim().replaceAll(',', '.')) 
+        subtype: _subtypeController.text.trim().isNotEmpty
+            ? _subtypeController.text.trim()
+            : null,
+        weight: _weightController.text.trim().isNotEmpty
+            ? double.tryParse(
+                _weightController.text.trim().replaceAll(',', '.'),
+              )
             : null,
         healthObservations: finalObservations,
         nextDueDate: _nextDueDate,
-        professionalCrmv: _crmvController.text.trim().isNotEmpty ? _crmvController.text.trim() : null,
-        professionalClinic: _clinicController.text.trim().isNotEmpty ? _clinicController.text.trim() : null,
-        vetName: _vetNameController.text.trim().isNotEmpty ? _vetNameController.text.trim() : null,
+        professionalCrmv: _crmvController.text.trim().isNotEmpty
+            ? _crmvController.text.trim()
+            : null,
+        professionalClinic: _clinicController.text.trim().isNotEmpty
+            ? _clinicController.text.trim()
+            : null,
+        vetName: _vetNameController.text.trim().isNotEmpty
+            ? _vetNameController.text.trim()
+            : null,
         attachmentUrl: attachmentUrl,
-        costBrl: _costController.text.trim().isNotEmpty 
-            ? double.tryParse(_costController.text.trim().replaceAll(',', '.')) 
+        costBrl: _costController.text.trim().isNotEmpty
+            ? double.tryParse(_costController.text.trim().replaceAll(',', '.'))
             : null,
         createdBy: uid,
       );
@@ -242,7 +296,7 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Registro de ${log.logType} salvo com sucesso!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.success,
         ),
       );
 
@@ -252,7 +306,7 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro ao salvar registro: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.error,
         ),
       );
     } finally {
@@ -275,20 +329,24 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(2),
-          child: Container(
-            color: _categoryColor,
-            height: 3,
-          ),
+          child: Container(color: _categoryColor, height: 3),
         ),
       ),
       body: _isSaving
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary)),
-                  SizedBox(height: 16),
-                  Text('Gravando e sincronizando prontuário...', style: TextStyle(color: Colors.white70)),
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Gravando e sincronizando prontuário...',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary.withAlpha(179),
+                    ),
+                  ),
                 ],
               ),
             )
@@ -326,7 +384,7 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _categoryColor,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppTheme.textPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -399,7 +457,13 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
     if (widget.type == 'vaccination') {
       label = 'Vacina';
       icon = Icons.vaccines_rounded;
-      suggestions = ['V10', 'Antirrábica', 'Gripe', 'Giardíase', 'Leishmaniose'];
+      suggestions = [
+        'V10',
+        'Antirrábica',
+        'Gripe',
+        'Giardíase',
+        'Leishmaniose',
+      ];
     } else if (widget.type == 'antiparasitic') {
       label = 'Medicamento / Marca';
       icon = Icons.bug_report_rounded;
@@ -407,11 +471,21 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
     } else if (widget.type == 'exam') {
       label = 'Tipo de Exame';
       icon = Icons.biotech_rounded;
-      suggestions = ['Hemograma', 'Ultrassonografia', 'Raio-X', 'Exame de Urina'];
+      suggestions = [
+        'Hemograma',
+        'Ultrassonografia',
+        'Raio-X',
+        'Exame de Urina',
+      ];
     } else if (widget.type == 'consultation') {
       label = 'Motivo da Consulta';
       icon = Icons.medical_services_rounded;
-      suggestions = ['Rotina', 'Averiguação de Sintomas', 'Retorno', 'Urgência'];
+      suggestions = [
+        'Rotina',
+        'Averiguação de Sintomas',
+        'Retorno',
+        'Urgência',
+      ];
     } else if (widget.type == 'medication') {
       label = 'Nome do Medicamento';
       icon = Icons.medication_rounded;
@@ -429,13 +503,20 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
 
     if (suggestions.isNotEmpty) {
       return DropdownButtonFormField<String>(
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
-        ),
-        initialValue: suggestions.contains(_subtypeController.text) ? _subtypeController.text : null,
-        items: suggestions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList()
-          ..add(const DropdownMenuItem(value: 'outros', child: Text('Outro...'))),
+        decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+        initialValue: suggestions.contains(_subtypeController.text)
+            ? _subtypeController.text
+            : null,
+        items:
+            suggestions
+                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                .toList()
+              ..add(
+                const DropdownMenuItem(
+                  value: 'outros',
+                  child: Text('Outro...'),
+                ),
+              ),
         onChanged: (val) {
           if (val == 'outros') {
             _subtypeController.clear();
@@ -449,7 +530,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                   title: Text('Especificar $label', style: GoogleFonts.inter()),
                   content: TextField(
                     controller: controller,
-                    decoration: InputDecoration(labelText: 'Digite o nome do $label'),
+                    decoration: InputDecoration(
+                      labelText: 'Digite o nome do $label',
+                    ),
                   ),
                   actions: [
                     TextButton(
@@ -475,17 +558,16 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             });
           }
         },
-        validator: (value) => _subtypeController.text.isEmpty ? 'Campo obrigatório' : null,
+        validator: (value) =>
+            _subtypeController.text.isEmpty ? 'Campo obrigatório' : null,
       );
     }
 
     return TextFormField(
       controller: _subtypeController,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-      ),
-      validator: (value) => (value == null || value.trim().isEmpty) ? 'Campo obrigatório' : null,
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+      validator: (value) =>
+          (value == null || value.trim().isEmpty) ? 'Campo obrigatório' : null,
     );
   }
 
@@ -525,11 +607,15 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             ),
             readOnly: true,
             controller: TextEditingController(
-              text: _nextDueDate != null ? DateFormat('dd/MM/yyyy').format(_nextDueDate!) : 'Não definida',
+              text: _nextDueDate != null
+                  ? DateFormat('dd/MM/yyyy').format(_nextDueDate!)
+                  : 'Não definida',
             ),
           ),
           const SizedBox(height: 16),
-          _buildObservationsField('Observações da vacina (lote, fabricante, etc.)'),
+          _buildObservationsField(
+            'Observações da vacina (lote, fabricante, etc.)',
+          ),
           const SizedBox(height: 24),
         ];
 
@@ -543,12 +629,16 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
               prefixIcon: Icon(Icons.event_repeat_rounded),
             ),
             controller: TextEditingController(
-              text: _nextDueDate != null ? DateFormat('dd/MM/yyyy').format(_nextDueDate!) : 'Selecione uma data ou atalho',
+              text: _nextDueDate != null
+                  ? DateFormat('dd/MM/yyyy').format(_nextDueDate!)
+                  : 'Selecione uma data ou atalho',
             ),
             onTap: () async {
               final date = await showDatePicker(
                 context: context,
-                initialDate: _nextDueDate ?? DateTime.now().add(const Duration(days: 30)),
+                initialDate:
+                    _nextDueDate ??
+                    DateTime.now().add(const Duration(days: 30)),
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
@@ -564,7 +654,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                 child: OutlinedButton(
                   onPressed: () {
                     setState(() {
-                      _nextDueDate = _applicationDate.add(const Duration(days: 30));
+                      _nextDueDate = _applicationDate.add(
+                        const Duration(days: 30),
+                      );
                     });
                   },
                   child: const Text('+1 Mês (Simparic/Nexgard)'),
@@ -575,7 +667,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                 child: OutlinedButton(
                   onPressed: () {
                     setState(() {
-                      _nextDueDate = _applicationDate.add(const Duration(days: 90));
+                      _nextDueDate = _applicationDate.add(
+                        const Duration(days: 90),
+                      );
                     });
                   },
                   child: const Text('+3 Meses (Bravecto)'),
@@ -593,20 +687,35 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
           _buildSectionHeader('POSOLOGIA'),
           TextFormField(
             controller: _dosageController,
-            decoration: const InputDecoration(labelText: 'Dosagem (Ex: 1 comp., 2ml)', prefixIcon: Icon(Icons.scale_rounded)),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Defina a dosagem' : null,
+            decoration: const InputDecoration(
+              labelText: 'Dosagem (Ex: 1 comp., 2ml)',
+              prefixIcon: Icon(Icons.scale_rounded),
+            ),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Defina a dosagem'
+                : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _frequencyController,
-            decoration: const InputDecoration(labelText: 'Frequência (Ex: 12 em 12h, 1x ao dia)', prefixIcon: Icon(Icons.timer_rounded)),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Defina a frequência' : null,
+            decoration: const InputDecoration(
+              labelText: 'Frequência (Ex: 12 em 12h, 1x ao dia)',
+              prefixIcon: Icon(Icons.timer_rounded),
+            ),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Defina a frequência'
+                : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _durationController,
-            decoration: const InputDecoration(labelText: 'Duração (Ex: 7 dias, contínuo)', prefixIcon: Icon(Icons.calendar_today_rounded)),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Defina a duração' : null,
+            decoration: const InputDecoration(
+              labelText: 'Duração (Ex: 7 dias, contínuo)',
+              prefixIcon: Icon(Icons.calendar_today_rounded),
+            ),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Defina a duração'
+                : null,
           ),
           const SizedBox(height: 16),
           _buildObservationsField('Outras orientações...'),
@@ -630,7 +739,10 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                 Expanded(
                   child: Text(
                     'Aviso Ético: Registro de sintomas pelo condutor. Não substitui o diagnóstico veterinário profissional.',
-                    style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -654,7 +766,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             },
           ),
           const SizedBox(height: 16),
-          _buildObservationsField('Descreva detalhadamente o sintoma observado, frequência e comportamento do cão...'),
+          _buildObservationsField(
+            'Descreva detalhadamente o sintoma observado, frequência e comportamento do cão...',
+          ),
           const SizedBox(height: 24),
         ];
 
@@ -677,12 +791,15 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
               prefixIcon: Icon(Icons.event_repeat_rounded),
             ),
             controller: TextEditingController(
-              text: _nextDueDate != null ? DateFormat('dd/MM/yyyy').format(_nextDueDate!) : 'Selecione se aplicável',
+              text: _nextDueDate != null
+                  ? DateFormat('dd/MM/yyyy').format(_nextDueDate!)
+                  : 'Selecione se aplicável',
             ),
             onTap: () async {
               final date = await showDatePicker(
                 context: context,
-                initialDate: _nextDueDate ?? DateTime.now().add(const Duration(days: 7)),
+                initialDate:
+                    _nextDueDate ?? DateTime.now().add(const Duration(days: 7)),
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
@@ -714,12 +831,18 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         hintText: hint,
         alignLabelWithHint: true,
       ),
-      validator: (value) => (value == null || value.trim().isEmpty) ? 'Informe as observações' : null,
+      validator: (value) => (value == null || value.trim().isEmpty)
+          ? 'Informe as observações'
+          : null,
     );
   }
 
   Widget _buildProfessionalFields() {
-    final isMandatory = widget.type == 'vaccination' || widget.type == 'surgery' || widget.type == 'consultation' || widget.type == 'exam';
+    final isMandatory =
+        widget.type == 'vaccination' ||
+        widget.type == 'surgery' ||
+        widget.type == 'consultation' ||
+        widget.type == 'exam';
 
     return Column(
       children: [
@@ -729,7 +852,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             labelText: 'Nome do Veterinário',
             prefixIcon: Icon(Icons.person_rounded),
           ),
-          validator: (val) => isMandatory && (val == null || val.trim().isEmpty) ? 'Nome do profissional é obrigatório' : null,
+          validator: (val) => isMandatory && (val == null || val.trim().isEmpty)
+              ? 'Nome do profissional é obrigatório'
+              : null,
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -739,7 +864,8 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             prefixIcon: Icon(Icons.badge_rounded),
           ),
           validator: (val) {
-            final requiredForThisType = widget.type == 'vaccination' || widget.type == 'surgery';
+            final requiredForThisType =
+                widget.type == 'vaccination' || widget.type == 'surgery';
             if (requiredForThisType && (val == null || val.trim().isEmpty)) {
               return 'CRMV é obrigatório';
             }
@@ -753,7 +879,9 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             labelText: 'Clínica / Hospital Veterinário',
             prefixIcon: Icon(Icons.apartment_rounded),
           ),
-          validator: (val) => isMandatory && (val == null || val.trim().isEmpty) ? 'Local de atendimento é obrigatório' : null,
+          validator: (val) => isMandatory && (val == null || val.trim().isEmpty)
+              ? 'Local de atendimento é obrigatório'
+              : null,
         ),
       ],
     );
@@ -765,7 +893,7 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(26)),
       ),
       child: Row(
         children: [
@@ -787,18 +915,24 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Arquivo pronto para envio',
-                        style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textTertiary),
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: AppTheme.textTertiary,
+                        ),
                       ),
                     ],
                   )
                 : Text(
                     'Nenhum anexo selecionado',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textTertiary),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppTheme.textTertiary,
+                    ),
                   ),
           ),
           if (_attachmentName != null)
             IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.red),
+              icon: const Icon(Icons.close_rounded, color: AppTheme.error),
               onPressed: () {
                 setState(() {
                   _attachmentFile = null;
@@ -809,12 +943,17 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
           const SizedBox(width: 8),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white12,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              backgroundColor: AppTheme.textPrimary.withAlpha(31),
+              foregroundColor: AppTheme.textPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             icon: const Icon(Icons.attach_file_rounded, size: 16),
-            label: Text(_attachmentName != null ? 'Alterar' : 'Anexar', style: const TextStyle(fontSize: 13)),
+            label: Text(
+              _attachmentName != null ? 'Alterar' : 'Anexar',
+              style: const TextStyle(fontSize: 13),
+            ),
             onPressed: _pickAttachment,
           ),
         ],

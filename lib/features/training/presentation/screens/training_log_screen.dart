@@ -27,9 +27,9 @@ part 'training_new_form_actions.dart';
 part 'training_new_form_fields.dart';
 part 'training_new_form_selectors.dart';
 
-final _hudBackground = AppTheme.background;
-const _hudPanel = Color(0xFF0E1A1F);
-final _hudCyan = AppTheme.primary;
+const _hudBackground = AppTheme.background;
+const _hudPanel = AppTheme.surfacePanel;
+const _hudCyan = AppTheme.primary;
 
 class TrainingLogScreen extends StatefulWidget {
   final String dogId;
@@ -64,7 +64,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w900,
             fontSize: 18,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             letterSpacing: 1.5,
           ),
         ),
@@ -74,7 +74,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
             tooltip: 'Exportar PDF',
             icon: const Icon(
               Icons.picture_as_pdf_rounded,
-              color: Color(0xFFFBBF24),
+              color: AppTheme.warningAccent,
             ),
             onPressed: () => _exportTrainingPdf(context),
           ),
@@ -88,7 +88,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
             context: context,
             isScrollControlled: true,
             useSafeArea: true,
-            backgroundColor: Colors.transparent,
+            backgroundColor: AppTheme.transparent,
             builder: (_) => DynamicActivitySheet(
               category: 'Treino',
               dogId: widget.dogId,
@@ -117,16 +117,17 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
     if (matchingDogs.isEmpty) {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('Aguarde o carregamento dos dados do K9.')),
+        const SnackBar(
+          content: Text('Aguarde o carregamento dos dados do K9.'),
+        ),
       );
       return;
     }
     final dog = matchingDogs.first;
 
-    final trainings = trainingVM.trainings
-        .where((t) => t.dogId == widget.dogId)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final trainings =
+        trainingVM.trainings.where((t) => t.dogId == widget.dogId).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     if (trainings.isEmpty) {
       if (!ctx.mounted) return;
@@ -139,17 +140,22 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
       return;
     }
 
-    final entries = trainings.map((t) => ReportEntry(
-      date: t.date,
-      type: t.trainingType,
-      location: t.location.isNotEmpty ? t.location : 'Canil GCM',
-      observations: t.handlerNotes,
-    )).toList();
+    final entries = trainings
+        .map(
+          (t) => ReportEntry(
+            date: t.date,
+            type: t.trainingType,
+            location: t.location.isNotEmpty ? t.location : 'Canil GCM',
+            observations: t.handlerNotes,
+          ),
+        )
+        .toList();
 
     try {
       final first = trainings.first.date;
       final last = trainings.last.date;
-      String fmt(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+      String fmt(DateTime d) =>
+          '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
       final pdfBytes = await ReportService.generateActivityReport(
         dog: dog,
@@ -165,7 +171,10 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
     } catch (e) {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text('Erro ao gerar PDF: $e'), backgroundColor: AppTheme.error),
+        SnackBar(
+          content: Text('Erro ao gerar PDF: $e'),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }

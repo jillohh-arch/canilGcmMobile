@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'seal_data.dart';
 
 /// Lista completa dos 12 selos de conformidade profissional.
@@ -12,7 +12,8 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: true,
       subtitle: 'ha 142 dias',
       icon: Icons.calendar_month_rounded,
-      criterion: 'Todos os plantoes dos ultimos 90 dias registrados com inicio e fim.',
+      criterion:
+          'Todos os plantoes dos ultimos 90 dias registrados com inicio e fim.',
       activity: '12 plantoes consecutivos registrados sem lacuna.',
       howToMaintain: 'Continue registrando inicio e fim de cada plantao.',
     ),
@@ -22,7 +23,8 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: true,
       subtitle: 'ultimas 30 ocorrencias',
       icon: Icons.edit_note_rounded,
-      criterion: 'Ultimas 30 ocorrencias com final_report preenchido completamente.',
+      criterion:
+          'Ultimas 30 ocorrencias com final_report preenchido completamente.',
       activity: '30/30 ocorrencias com relato completo.',
       howToMaintain: 'Sempre completar o wizard de finalizacao.',
     ),
@@ -43,9 +45,11 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: true,
       subtitle: ' especialidades',
       icon: Icons.fitness_center_rounded,
-      criterion: 'Especialidades operacionais com sessao de manutencao nos ultimos 30 dias.',
+      criterion:
+          'Especialidades operacionais com sessao de manutencao nos ultimos 30 dias.',
       activity: ' especialidades com manutencao recente.',
-      howToMaintain: 'Realizar sessao de manutencao a cada 30 dias por especialidade.',
+      howToMaintain:
+          'Realizar sessao de manutencao a cada 30 dias por especialidade.',
     ),
     const SealData(
       id: 'sessoes_registradas',
@@ -53,9 +57,11 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: true,
       subtitle: 'dados completos',
       icon: Icons.assignment_turned_in_rounded,
-      criterion: 'Sessoes de treino dos ultimos 30 dias registradas com duracao, comandos trabalhados e observacoes.',
+      criterion:
+          'Sessoes de treino dos ultimos 30 dias registradas com duracao, comandos trabalhados e observacoes.',
       activity: 'Sessoes registradas no ultimo mes com dados completos.',
-      howToMaintain: 'Registrar toda sessao de treino conduzida, mesmo as curtas.',
+      howToMaintain:
+          'Registrar toda sessao de treino conduzida, mesmo as curtas.',
     ),
     const SealData(
       id: 'biblioteca_atualizada',
@@ -65,7 +71,8 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       icon: Icons.pets_rounded,
       criterion: 'Comandos com stage_updated_at em ate 90 dias.',
       activity: 'Biblioteca de comandos com estagios atualizados.',
-      howToMaintain: 'Atualizar estagios dos comandos apos sessoes de obediencia.',
+      howToMaintain:
+          'Atualizar estagios dos comandos apos sessoes de obediencia.',
     ),
     // ── SAUDE DO CAO ─────────────────────────────────────────────────────
     const SealData(
@@ -85,7 +92,8 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       subtitle: 'vence em 15 dias',
       icon: Icons.shield_rounded,
       currentState: 'Ultima dose Bravecto em 02/03/2026, vence em 15 dias.',
-      requiredAction: 'Aplique antiparasitario e registre o evento de saude para reativar este selo.',
+      requiredAction:
+          'Aplique antiparasitario e registre o evento de saude para reativar este selo.',
       actionButtonLabel: 'Registrar antipulgas',
       actionRoute: '/registrar/saude',
     ),
@@ -95,7 +103,8 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: true,
       subtitle: '100% conforme laudo',
       icon: Icons.restaurant_rounded,
-      criterion: '>= 90% de aderencia a prescricao nutricional nos ultimos 30 dias.',
+      criterion:
+          '>= 90% de aderencia a prescricao nutricional nos ultimos 30 dias.',
       activity: '100% conforme laudo nutricional vigente.',
       howToMaintain: 'Seguir a prescricao registrada pelo veterinario.',
     ),
@@ -126,8 +135,10 @@ List<SealData> buildSealDefinitions({int specialtyCount = 0}) {
       isActive: false,
       subtitle: '2 pendentes',
       icon: Icons.assignment_rounded,
-      currentState: '2 documentos pendentes (laudo nutricional desatualizado, sem comprovante de antipulgas recente).',
-      requiredAction: 'Anexar laudo nutricional vigente e comprovante de antipulgas atualizado.',
+      currentState:
+          '2 documentos pendentes (laudo nutricional desatualizado, sem comprovante de antipulgas recente).',
+      requiredAction:
+          'Anexar laudo nutricional vigente e comprovante de antipulgas atualizado.',
       actionButtonLabel: 'Ver documentos pendentes',
       actionRoute: '/cao/documentos',
     ),

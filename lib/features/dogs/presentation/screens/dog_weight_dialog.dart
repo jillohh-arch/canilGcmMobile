@@ -12,17 +12,17 @@ void _showDogWeightDialog(
   showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF141A21),
+      backgroundColor: AppTheme.surfacePanelAlt,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        side: const BorderSide(color: Color(0xFF2A2A2A)),
+        side: const BorderSide(color: AppTheme.outline),
       ),
       title: Text(
         'ATUALIZAR PESO',
         style: GoogleFonts.inter(
           fontSize: 16,
           fontWeight: FontWeight.w800,
-          color: Colors.white,
+          color: AppTheme.textPrimary,
           letterSpacing: 1,
         ),
       ),
@@ -32,7 +32,10 @@ void _showDogWeightDialog(
         children: [
           Text(
             'Insira o novo peso do cão em quilogramas (kg).',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppTheme.textPrimary.withAlpha(179),
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -41,19 +44,21 @@ void _showDogWeightDialog(
             style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
             decoration: InputDecoration(
               suffixText: 'kg',
-              suffixStyle: GoogleFonts.inter(color: Colors.white38),
+              suffixStyle: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(97),
+              ),
               enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF2A2A2A)),
+                borderSide: BorderSide(color: AppTheme.outline),
               ),
               focusedBorder: const OutlineInputBorder(
                 borderSide: BorderSide(color: _weightAccent, width: 1.5),
               ),
               filled: true,
-              fillColor: Colors.black12,
+              fillColor: AppTheme.background.withAlpha(31),
             ),
           ),
         ],
@@ -65,7 +70,7 @@ void _showDogWeightDialog(
             'CANCELAR',
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
-              color: Colors.white38,
+              color: AppTheme.textPrimary.withAlpha(97),
             ),
           ),
         ),
@@ -84,7 +89,7 @@ void _showDogWeightDialog(
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Informe um peso válido.'),
-                  backgroundColor: Color(0xFFE53935),
+                  backgroundColor: AppTheme.errorStrong,
                 ),
               );
               return;
@@ -106,7 +111,7 @@ void _showDogWeightDialog(
               messenger.showSnackBar(
                 SnackBar(
                   content: Text('Erro ao atualizar peso: $e'),
-                  backgroundColor: const Color(0xFFE53935),
+                  backgroundColor: AppTheme.errorStrong,
                 ),
               );
               return;
@@ -138,7 +143,7 @@ void _showDogWeightDialog(
                   content: Text(
                     'Peso atualizado. Histórico médico pendente: ${_cleanHealthError(e)}',
                   ),
-                  backgroundColor: const Color(0xFFFBBF24),
+                  backgroundColor: AppTheme.warningAccent,
                 ),
               );
             }
@@ -147,7 +152,7 @@ void _showDogWeightDialog(
             'SALVAR',
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w800,
-              color: Colors.black,
+              color: AppTheme.background,
             ),
           ),
         ),

@@ -31,7 +31,7 @@ class _HealthLogCardBody extends StatelessWidget {
                       ? log.healthObservations
                       : 'Registro operacional documentado.',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -74,13 +74,16 @@ class _HealthVetBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black38,
+        color: AppTheme.background.withAlpha(97),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(26)),
       ),
       child: Text(
         'VET/RESP: ${vetName.toUpperCase()}',
-        style: GoogleFonts.shareTechMono(color: Colors.white54, fontSize: 10),
+        style: GoogleFonts.shareTechMono(
+          color: AppTheme.textPrimary.withAlpha(138),
+          fontSize: 10,
+        ),
       ),
     );
   }

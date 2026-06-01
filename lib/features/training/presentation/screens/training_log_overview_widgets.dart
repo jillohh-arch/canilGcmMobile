@@ -41,7 +41,7 @@ class _TrainingHudHeader extends StatelessWidget {
                 Text(
                   'PAINEL DE EVOLUÇÃO',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.1,
@@ -51,7 +51,7 @@ class _TrainingHudHeader extends StatelessWidget {
                 Text(
                   lastLabel,
                   style: GoogleFonts.inter(
-                    color: Colors.white60,
+                    color: AppTheme.textSecondary,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),

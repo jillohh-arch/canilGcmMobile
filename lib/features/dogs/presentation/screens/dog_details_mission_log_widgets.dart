@@ -31,11 +31,16 @@ class _MissionLogHeader extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.4,
-            color: Colors.white38,
+            color: AppTheme.textPrimary.withAlpha(97),
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(child: Container(height: 1, color: Colors.white10)),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppTheme.textPrimary.withAlpha(26),
+          ),
+        ),
       ],
     );
   }
@@ -51,11 +56,18 @@ class _MissionLogEmptyState extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
-            const Icon(Icons.timeline_rounded, size: 40, color: Colors.white12),
+            Icon(
+              Icons.timeline_rounded,
+              size: 40,
+              color: AppTheme.textPrimary.withAlpha(31),
+            ),
             const SizedBox(height: 8),
             Text(
               'Nenhuma atividade registrada',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white24),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppTheme.textPrimary.withAlpha(61),
+              ),
             ),
           ],
         ),

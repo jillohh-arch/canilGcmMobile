@@ -90,7 +90,7 @@ class HistoryTimelineItem extends StatelessWidget {
               child: Divider(
                 height: 1,
                 thickness: 1,
-                color: Colors.white.withAlpha(13),
+                color: _hTextPrimary.withAlpha(13),
               ),
             ),
         ],
@@ -321,7 +321,7 @@ class _AuthorBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(10),
+        color: _hTextPrimary.withAlpha(10),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

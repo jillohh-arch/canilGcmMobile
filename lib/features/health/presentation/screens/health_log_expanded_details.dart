@@ -11,7 +11,7 @@ class _HealthExpandedDetails extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: 10),
-        const Divider(color: Colors.white12),
+        Divider(color: AppTheme.textPrimary.withAlpha(31)),
         const SizedBox(height: 6),
         if (log.weight != null)
           _DetailRow(
@@ -63,7 +63,7 @@ class _DetailRow extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white70,
+                  color: AppTheme.textPrimary.withAlpha(179),
                   letterSpacing: 0.8,
                 ),
               ),
@@ -72,7 +72,7 @@ class _DetailRow extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white70,
+                  color: AppTheme.textPrimary.withAlpha(179),
                 ),
               ),
             ],

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ActivityWeatherButton extends StatelessWidget {
@@ -13,7 +15,7 @@ class ActivityWeatherButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     required this.backgroundColor,
-    this.foregroundColor = Colors.white,
+    this.foregroundColor = AppTheme.textPrimary,
     this.height = 48,
   });
 

@@ -1,10 +1,10 @@
 part of 'dog_details_screen.dart';
 
-const _trainingAccent = Color(0xFFFFB300);
-const _healthAccent = Color(0xFFEF5350);
-const _weightAccent = Color(0xFF66BB6A);
-const _maleAccent = Color(0xFF82B1FF);
-const _femaleAccent = Color(0xFFFF80AB);
+const _trainingAccent = AppTheme.amber;
+const _healthAccent = AppTheme.errorStrong;
+const _weightAccent = AppTheme.successCheck;
+const _maleAccent = AppTheme.info;
+const _femaleAccent = AppTheme.healthAccent;
 final _ageAccent = AppTheme.primary;
 
 class _CockpitBento extends StatelessWidget {

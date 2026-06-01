@@ -1,4 +1,4 @@
-﻿part of 'tactical_card.dart';
+part of 'tactical_card.dart';
 
 class StatusPill extends StatelessWidget {
   final String status;
@@ -17,9 +17,12 @@ class StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.black.withAlpha(50),
+        color: AppTheme.background.withAlpha(50),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white24, width: 0.5),
+        border: Border.all(
+          color: AppTheme.textPrimary.withAlpha(61),
+          width: 0.5,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -31,7 +34,7 @@ class StatusPill extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 9,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               letterSpacing: 0.8,
             ),
           ),

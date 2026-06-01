@@ -7,12 +7,12 @@ class _CloseTrackingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(8),
-      decoration: const BoxDecoration(
-        color: Colors.black45,
+      decoration: BoxDecoration(
+        color: AppTheme.background.withAlpha(115),
         shape: BoxShape.circle,
       ),
       child: IconButton(
-        icon: const Icon(Icons.close_rounded, color: Colors.white),
+        icon: const Icon(Icons.close_rounded, color: AppTheme.textPrimary),
         onPressed: () => Navigator.pop(context),
       ),
     );
@@ -54,9 +54,7 @@ class _TrackingMap extends StatelessWidget {
             polylines: [
               Polyline(
                 points: routePoints,
-                color: isLightMode
-                    ? const Color(0xFF26C6DA)
-                    : const Color(0xFFFBBF24),
+                color: isLightMode ? AppTheme.primary : AppTheme.warningAccent,
                 strokeWidth: 5.0,
                 strokeJoin: StrokeJoin.round,
                 strokeCap: StrokeCap.round,
@@ -98,9 +96,12 @@ class _TrackingControlPanel extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
             decoration: BoxDecoration(
-              color: Colors.black.withAlpha(180),
-              border: const Border(
-                top: BorderSide(color: Colors.white12, width: 1),
+              color: AppTheme.background.withAlpha(180),
+              border: Border(
+                top: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(31),
+                  width: 1,
+                ),
               ),
             ),
             child: Column(
@@ -150,8 +151,8 @@ class _TrackingActionButton extends StatelessWidget {
         onPressed: isTracking ? onStopAndSave : onStartTracking,
         style: ElevatedButton.styleFrom(
           backgroundColor: isTracking
-              ? const Color(0xFFC62828)
-              : const Color(0xFF1B8A4C),
+              ? AppTheme.statusAlert
+              : AppTheme.successOperational,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           elevation: 0,
         ),
@@ -160,7 +161,7 @@ class _TrackingActionButton extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
         ),
       ),
@@ -184,7 +185,7 @@ class _MetricBox extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.white54,
+            color: AppTheme.textPrimary.withAlpha(138),
             letterSpacing: 0.5,
           ),
         ),
@@ -194,7 +195,7 @@ class _MetricBox extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 24,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
         ),
       ],

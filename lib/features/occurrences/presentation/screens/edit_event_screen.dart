@@ -242,7 +242,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('GPS atualizado', style: GoogleFonts.inter()),
-            backgroundColor: const Color(0xFF2ECC71),
+            backgroundColor: AppTheme.success,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -272,11 +272,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Remover foto?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -285,7 +285,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'CANCELAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -318,11 +320,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Excluir evento?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -332,7 +334,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             Text(
               'Esta ação é registrada na auditoria.',
               style: GoogleFonts.inter(
-                color: Colors.white.withAlpha(180),
+                color: AppTheme.textPrimary.withAlpha(180),
                 fontSize: 13,
               ),
             ),
@@ -340,11 +342,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
             TextField(
               controller: reasonCtrl,
               autofocus: true,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
                 hintText: 'Motivo da exclusão',
                 hintStyle: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(100),
+                  color: AppTheme.textPrimary.withAlpha(100),
                 ),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(
@@ -363,7 +368,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(
               'CANCELAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -560,18 +567,18 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Descartar alterações?',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Você tem dados não salvos que serão perdidos.',
           style: GoogleFonts.inter(
-            color: Colors.white.withAlpha(200),
+            color: AppTheme.textPrimary.withAlpha(200),
             fontSize: 14,
           ),
         ),
@@ -580,7 +587,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'CANCELAR',
-              style: GoogleFonts.inter(color: Colors.white.withAlpha(150)),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary.withAlpha(150),
+              ),
             ),
           ),
           TextButton(
@@ -662,12 +671,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
+                color: AppTheme.textPrimary.withAlpha(10),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 size: 16,
               ),
             ),
@@ -677,7 +686,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             child: Text(
               _isEditing ? 'Editar evento' : 'Novo evento',
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -770,12 +779,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               decoration: BoxDecoration(
                 color: selected
                     ? AppTheme.primary.withAlpha(20)
-                    : Colors.white.withAlpha(5),
+                    : AppTheme.textPrimary.withAlpha(5),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: selected
                       ? AppTheme.primary
-                      : Colors.white.withAlpha(15),
+                      : AppTheme.textPrimary.withAlpha(15),
                 ),
               ),
               child: Row(
@@ -788,13 +797,17 @@ class _EditEventScreenState extends State<EditEventScreen> {
                       border: Border.all(
                         color: selected
                             ? AppTheme.primary
-                            : Colors.white.withAlpha(80),
+                            : AppTheme.textPrimary.withAlpha(80),
                         width: 2,
                       ),
-                      color: selected ? AppTheme.primary : Colors.transparent,
+                      color: selected ? AppTheme.primary : AppTheme.transparent,
                     ),
                     child: selected
-                        ? const Icon(Icons.check, size: 12, color: Colors.white)
+                        ? const Icon(
+                            Icons.check,
+                            size: 12,
+                            color: AppTheme.textPrimary,
+                          )
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -802,8 +815,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                     cat.label,
                     style: GoogleFonts.inter(
                       color: selected
-                          ? Colors.white
-                          : Colors.white.withAlpha(180),
+                          ? AppTheme.textPrimary
+                          : AppTheme.textPrimary.withAlpha(180),
                       fontSize: 14,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     ),
@@ -833,7 +846,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _titleController,
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+          style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
           decoration: _fieldDecoration('Ex: Abordagem no veículo'),
         ),
       ],
@@ -858,7 +871,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           controller: _descriptionController,
           maxLines: 4,
           minLines: 2,
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
+          style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 14),
           decoration: _fieldDecoration('Descreva o que aconteceu...'),
         ),
       ],
@@ -868,16 +881,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
   InputDecoration _fieldDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.inter(color: Colors.white.withAlpha(80)),
+      hintStyle: GoogleFonts.inter(color: AppTheme.textPrimary.withAlpha(80)),
       filled: true,
-      fillColor: Colors.white.withAlpha(8),
+      fillColor: AppTheme.textPrimary.withAlpha(8),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+        borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.white.withAlpha(20)),
+        borderSide: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -896,13 +909,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: hasGps
-              ? const Color(0xFF2ECC71).withAlpha(12)
-              : Colors.white.withAlpha(5),
+              ? AppTheme.success.withAlpha(12)
+              : AppTheme.textPrimary.withAlpha(5),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: hasGps
-                ? const Color(0xFF2ECC71).withAlpha(60)
-                : Colors.white.withAlpha(20),
+                ? AppTheme.success.withAlpha(60)
+                : AppTheme.textPrimary.withAlpha(20),
           ),
         ),
         child: Row(
@@ -913,7 +926,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.5,
-                  color: Color(0xFF2ECC71),
+                  color: AppTheme.success,
                 ),
               )
             else
@@ -921,8 +934,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 hasGps ? Icons.location_on : Icons.location_off_outlined,
                 size: 16,
                 color: hasGps
-                    ? const Color(0xFF2ECC71)
-                    : Colors.white.withAlpha(120),
+                    ? AppTheme.success
+                    : AppTheme.textPrimary.withAlpha(120),
               ),
             const SizedBox(width: 10),
             Expanded(
@@ -934,7 +947,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           _gpsAddress ??
                               '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
                           style: GoogleFonts.inter(
-                            color: Colors.white.withAlpha(200),
+                            color: AppTheme.textPrimary.withAlpha(200),
                             fontSize: 12,
                           ),
                         ),
@@ -943,7 +956,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           Text(
                             '${_gpsLat!.toStringAsFixed(5)}, ${_gpsLng!.toStringAsFixed(5)}',
                             style: GoogleFonts.inter(
-                              color: Colors.white.withAlpha(80),
+                              color: AppTheme.textPrimary.withAlpha(80),
                               fontSize: 10,
                             ),
                           ),
@@ -953,7 +966,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   : Text(
                       'Sem localização',
                       style: GoogleFonts.inter(
-                        color: Colors.white.withAlpha(100),
+                        color: AppTheme.textPrimary.withAlpha(100),
                         fontSize: 12,
                       ),
                     ),
@@ -973,7 +986,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 child: Text(
                   'MAPA',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1028,7 +1041,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
             child: Text(
               'Adicione fotos como evidência',
               style: GoogleFonts.inter(
-                color: Colors.white.withAlpha(80),
+                color: AppTheme.textPrimary.withAlpha(80),
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
               ),
@@ -1071,9 +1084,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(5),
+              color: AppTheme.textPrimary.withAlpha(5),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withAlpha(15)),
+              border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1093,7 +1106,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   child: Text(
                     label,
                     style: GoogleFonts.inter(
-                      color: Colors.white.withAlpha(150),
+                      color: AppTheme.textPrimary.withAlpha(150),
                       fontSize: 12,
                     ),
                   ),
@@ -1111,7 +1124,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
         color: AppTheme.background,
-        border: Border(top: BorderSide(color: Colors.white.withAlpha(10))),
+        border: Border(
+          top: BorderSide(color: AppTheme.textPrimary.withAlpha(10)),
+        ),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -1131,13 +1146,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                   ),
                 )
               : Text(
                   'SALVAR EVENTO',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
@@ -1173,10 +1188,12 @@ class _TimeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primary.withAlpha(30)
-              : Colors.white.withAlpha(8),
+              : AppTheme.textPrimary.withAlpha(8),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppTheme.primary : Colors.white.withAlpha(20),
+            color: selected
+                ? AppTheme.primary
+                : AppTheme.textPrimary.withAlpha(20),
           ),
         ),
         child: Row(
@@ -1188,7 +1205,7 @@ class _TimeChip extends StatelessWidget {
                 size: 12,
                 color: selected
                     ? AppTheme.primary
-                    : Colors.white.withAlpha(150),
+                    : AppTheme.textPrimary.withAlpha(150),
               ),
               const SizedBox(width: 4),
             ],
@@ -1197,7 +1214,7 @@ class _TimeChip extends StatelessWidget {
               style: GoogleFonts.inter(
                 color: selected
                     ? AppTheme.primary
-                    : Colors.white.withAlpha(150),
+                    : AppTheme.textPrimary.withAlpha(150),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),

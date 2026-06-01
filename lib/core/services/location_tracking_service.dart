@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';

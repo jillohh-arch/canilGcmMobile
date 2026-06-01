@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Text(
           message,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
@@ -238,8 +238,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (_formKey.currentState!.validate()) {
                         final ra = _raController.text.trim();
                         final pass = _passwordController.text.trim();
-                        final success =
-                            await authVM.signInWithRaAndPassword(ra, pass);
+                        final success = await authVM.signInWithRaAndPassword(
+                          ra,
+                          pass,
+                        );
                         if (success) {
                           await _secureStorage.write(
                             key: 'cached_ra',

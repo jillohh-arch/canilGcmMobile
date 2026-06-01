@@ -47,7 +47,7 @@ class StartOccurrenceTimeChips extends StatelessWidget {
             Text(
               formattedTime,
               style: GoogleFonts.inter(
-                color: Colors.white.withAlpha(180),
+                color: AppTheme.textPrimary.withAlpha(180),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -71,12 +71,14 @@ class StartOccurrenceTimeChips extends StatelessWidget {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppTheme.primary.withAlpha(25)
-                      : Colors.transparent,
+                      : AppTheme.transparent,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected
@@ -88,7 +90,9 @@ class StartOccurrenceTimeChips extends StatelessWidget {
                 child: Text(
                   chip.label,
                   style: GoogleFonts.inter(
-                    color: isSelected ? AppTheme.primary : Colors.white.withAlpha(180),
+                    color: isSelected
+                        ? AppTheme.primary
+                        : AppTheme.textPrimary.withAlpha(180),
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   ),

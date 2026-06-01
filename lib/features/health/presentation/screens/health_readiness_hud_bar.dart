@@ -35,7 +35,7 @@ class _ReadinessHudBar extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
-                color: Colors.white54,
+                color: AppTheme.textPrimary.withAlpha(138),
                 letterSpacing: 0.5,
               ),
             ),
@@ -53,7 +53,7 @@ class _ReadinessHudBar extends StatelessWidget {
         Container(
           height: 8,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: AppTheme.surfacePanel,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: barColor.withValues(alpha: 0.3)),
             boxShadow: [
@@ -68,7 +68,7 @@ class _ReadinessHudBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: score / 100,
-              backgroundColor: Colors.transparent,
+              backgroundColor: AppTheme.transparent,
               valueColor: AlwaysStoppedAnimation<Color>(barColor),
             ),
           ),
@@ -78,7 +78,7 @@ class _ReadinessHudBar extends StatelessWidget {
           'Vacinação, peso, higiene e treino recente.',
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: Colors.white38,
+            color: AppTheme.textPrimary.withAlpha(97),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -87,7 +87,7 @@ class _ReadinessHudBar extends StatelessWidget {
           'Vacinação ${breakdown.vacinacao}/30 • Peso ${breakdown.peso}/25 • Higiene ${breakdown.higiene}/15 • Treino ${breakdown.treino}/30',
           style: GoogleFonts.inter(
             fontSize: 10,
-            color: Colors.white60,
+            color: AppTheme.textPrimary.withAlpha(153),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -96,8 +96,8 @@ class _ReadinessHudBar extends StatelessWidget {
   }
 
   Color _readinessColor(int score) {
-    if (score >= 80) return Colors.cyanAccent;
-    if (score >= 50) return Colors.orangeAccent;
-    return Colors.redAccent;
+    if (score >= 80) return AppTheme.primary;
+    if (score >= 50) return AppTheme.attention;
+    return AppTheme.errorStrong;
   }
 }

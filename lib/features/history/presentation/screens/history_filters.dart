@@ -43,7 +43,7 @@ extension _HistoryFilters on _HistoryScreenState {
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -279,9 +279,9 @@ class _PopupFilterPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(7),
+          color: _hTextPrimary.withAlpha(7),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withAlpha(30)),
+          border: Border.all(color: _hTextPrimary.withAlpha(30)),
         ),
         child: Row(
           children: [
@@ -332,9 +332,9 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
         decoration: BoxDecoration(
-          color: active ? _hCyan.withAlpha(22) : Colors.white.withAlpha(5),
+          color: active ? _hCyan.withAlpha(22) : _hTextPrimary.withAlpha(5),
           border: Border.all(
-            color: active ? _hCyan : Colors.white.withAlpha(24),
+            color: active ? _hCyan : _hTextPrimary.withAlpha(24),
           ),
           borderRadius: BorderRadius.circular(13),
         ),

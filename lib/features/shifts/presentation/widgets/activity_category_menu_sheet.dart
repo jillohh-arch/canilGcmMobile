@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
+
 part 'activity_category_carousel.dart';
 part 'activity_category_menu_frame.dart';
 

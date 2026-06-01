@@ -166,7 +166,7 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Rastreamento finalizado. Distância e tempo calculados.'),
-        backgroundColor: Color(0xFF1B8A4C),
+        backgroundColor: AppTheme.successOperational,
       ),
     );
   }

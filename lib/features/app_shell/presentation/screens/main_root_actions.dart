@@ -2,15 +2,19 @@ part of 'main_root_screen.dart';
 
 extension _MainRootActions on _MainRootScreenState {
   // ─── Tokens espelhados do Header Universal ─────────────────────────
-  static const _navBg = Color(0x0A4DD0E1); // rgba(77,208,225,0.04)
-  static const _navBorder = Color(0x1F4DD0E1); // rgba(77,208,225,0.12)
-  static const _iconInactive = Color(0xFF5A7280);
-  static const _iconActive = Color(0xFF4DD0E1);
-  static const _pillBg = Color(0x1A4DD0E1); // rgba(77,208,225,0.10)
-  static const _pillBorder = Color(0x384DD0E1); // rgba(77,208,225,0.22)
-  static const _fabColor = Color(0xFF4DD0E1);
-  static const _fabIconColor = Color(0xFF04181C);
-  static const _fabRingColor = Color(0xFF050D10);
+  static const _navBg = AppTheme.primaryOverlay; // rgba(77,208,225,0.04)
+  static const _navBorder = AppTheme.primaryDivider; // rgba(77,208,225,0.12)
+  static const _iconInactive = AppTheme.textMuted;
+  static const _iconActive = AppTheme.primary;
+  static final _pillBg = AppTheme.primary.withAlpha(
+    26,
+  ); // rgba(77,208,225,0.10)
+  static final _pillBorder = AppTheme.primary.withAlpha(
+    56,
+  ); // rgba(77,208,225,0.22)
+  static const _fabColor = AppTheme.primary;
+  static const _fabIconColor = AppTheme.background;
+  static const _fabRingColor = AppTheme.background;
   static const _fabSize = 54.0;
   static const _fabElevation = 22.0; // how much FAB rises above bar
 
@@ -27,9 +31,7 @@ extension _MainRootActions on _MainRootScreenState {
             child: Container(
               decoration: const BoxDecoration(
                 color: _navBg,
-                border: Border(
-                  top: BorderSide(color: _navBorder, width: 1),
-                ),
+                border: Border(top: BorderSide(color: _navBorder, width: 1)),
               ),
             ),
           ),
@@ -60,9 +62,7 @@ extension _MainRootActions on _MainRootScreenState {
             top: -_fabElevation,
             left: 0,
             right: 0,
-            child: Center(
-              child: _buildCenterFab(context, activeDogId),
-            ),
+            child: Center(child: _buildCenterFab(context, activeDogId)),
           ),
         ],
       ),
@@ -89,10 +89,10 @@ extension _MainRootActions on _MainRootScreenState {
               vertical: 8,
             ),
             decoration: BoxDecoration(
-              color: isSelected ? _pillBg : Colors.transparent,
+              color: isSelected ? _pillBg : AppTheme.transparent,
               borderRadius: BorderRadius.circular(100),
               border: Border.all(
-                color: isSelected ? _pillBorder : Colors.transparent,
+                color: isSelected ? _pillBorder : AppTheme.transparent,
                 width: 1,
               ),
             ),
@@ -234,5 +234,3 @@ extension _MainRootActions on _MainRootScreenState {
     );
   }
 }
-
-

@@ -41,7 +41,7 @@ class StartOccurrenceBinomio extends StatelessWidget {
         Text(
           '$dogName  ·  $handlerName',
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,

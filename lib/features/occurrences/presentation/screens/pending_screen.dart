@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
@@ -360,25 +362,25 @@ class _NotificationCard extends StatelessWidget {
       case NotificationType.vehicleCrewInvitation:
         return Theme.of(context).colorScheme.primary;
       case NotificationType.vehicleCrewInvitationAccepted:
-        return Colors.green;
+        return AppTheme.success;
       case NotificationType.vehicleCrewInvitationDeclined:
         return Theme.of(context).colorScheme.error;
       case NotificationType.occurrenceParticipationRequested:
         return Theme.of(context).colorScheme.primary;
       case NotificationType.occurrenceParticipationAccepted:
-        return Colors.green;
+        return AppTheme.success;
       case NotificationType.occurrenceParticipationDeclined:
         return Theme.of(context).colorScheme.error;
       case NotificationType.signatureRequested:
         return Theme.of(context).colorScheme.primary;
       case NotificationType.signatureCompleted:
-        return Colors.green;
+        return AppTheme.success;
       case NotificationType.signatureDeclined:
         return Theme.of(context).colorScheme.error;
       case NotificationType.correctionRequested:
         return Theme.of(context).colorScheme.tertiary;
       case NotificationType.deadlineWarning:
-        return Colors.amber.shade800;
+        return AppTheme.attention;
       case NotificationType.occurrenceFinalized:
         return Theme.of(context).colorScheme.secondary;
       case NotificationType.amendmentCreated:

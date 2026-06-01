@@ -69,13 +69,16 @@ class DetectionEntryScreen extends StatelessWidget {
                         onTap: () => Navigator.of(context).pop(),
                         child: Row(
                           children: [
-                            const Icon(Icons.arrow_back_ios_new_rounded,
-                                color: Color(0xFF5A7280), size: 14),
+                            const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: AppTheme.textMuted,
+                              size: 14,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Treino',
                               style: GoogleFonts.inter(
-                                color: const Color(0xFF5A7280),
+                                color: AppTheme.textMuted,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -86,7 +89,7 @@ class DetectionEntryScreen extends StatelessWidget {
                       Text(
                         ' › Detecção',
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF7D8D99),
+                          color: AppTheme.textTertiary,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -97,7 +100,7 @@ class DetectionEntryScreen extends StatelessWidget {
                   Text(
                     'Detecção',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 23,
                       fontWeight: FontWeight.w800,
                     ),
@@ -106,7 +109,7 @@ class DetectionEntryScreen extends StatelessWidget {
                   Text(
                     'Escolha a linha de trabalho do ${dog.name}',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF7D8D99),
+                      color: AppTheme.textTertiary,
                       fontSize: 12.5,
                     ),
                   ),
@@ -123,8 +126,7 @@ class DetectionEntryScreen extends StatelessWidget {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
                     return const Center(
-                      child:
-                          CircularProgressIndicator(color: AppTheme.primary),
+                      child: CircularProgressIndicator(color: AppTheme.primary),
                     );
                   }
 
@@ -187,16 +189,12 @@ class DetectionEntryScreen extends StatelessWidget {
       case 'not_started':
       case 'triagem':
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DetectionTriagemScreen(dog: dog),
-          ),
+          MaterialPageRoute(builder: (_) => DetectionTriagemScreen(dog: dog)),
         );
         break;
       case 'in_formation':
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DetectionFormationScreen(dog: dog),
-          ),
+          MaterialPageRoute(builder: (_) => DetectionFormationScreen(dog: dog)),
         );
         break;
       case 'operational':
@@ -208,9 +206,7 @@ class DetectionEntryScreen extends StatelessWidget {
         break;
       default:
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DetectionTriagemScreen(dog: dog),
-          ),
+          MaterialPageRoute(builder: (_) => DetectionTriagemScreen(dog: dog)),
         );
     }
   }
@@ -239,9 +235,9 @@ class _DetectionLineCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(6), // rgba(255,255,255,0.025)
+          color: AppTheme.textPrimary.withAlpha(6),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withAlpha(18)), // 0.07
+          border: Border.all(color: AppTheme.textPrimary.withAlpha(18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +254,7 @@ class _DetectionLineCard extends StatelessWidget {
                       Text(
                         line.displayName,
                         style: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: AppTheme.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
@@ -266,7 +262,7 @@ class _DetectionLineCard extends StatelessWidget {
                       Text(
                         state.kindLabel,
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF5A7280),
+                          color: AppTheme.textMuted,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
@@ -294,9 +290,7 @@ class _DetectionLineCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 13),
               decoration: const BoxDecoration(
                 border: Border(
-                  top: BorderSide(
-                    color: Color(0x0FFFFFFF), // rgba(255,255,255,0.06)
-                  ),
+                  top: BorderSide(color: AppTheme.surfaceWhiteBorderSubtle),
                 ),
               ),
               child: Row(
@@ -316,7 +310,7 @@ class _DetectionLineCard extends StatelessWidget {
                       Text(
                         state.ctaDestination,
                         style: GoogleFonts.inter(
-                          color: const Color(0xFF5A7280),
+                          color: AppTheme.textMuted,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -387,7 +381,7 @@ class _DetectionLineCard extends StatelessWidget {
             RichText(
               text: TextSpan(
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF7D8D99),
+                  color: AppTheme.textTertiary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -408,7 +402,7 @@ class _DetectionLineCard extends StatelessWidget {
             Text(
               '$phasesCompleted / $totalPhases fases',
               style: GoogleFonts.inter(
-                color: const Color(0xFF7D8D99),
+                color: AppTheme.textTertiary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -421,9 +415,8 @@ class _DetectionLineCard extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 6,
-            backgroundColor: Colors.white.withAlpha(18),
-            valueColor:
-                const AlwaysStoppedAnimation<Color>(AppTheme.warning),
+            backgroundColor: AppTheme.textPrimary.withAlpha(18),
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.warning),
           ),
         ),
       ],
@@ -434,10 +427,10 @@ class _DetectionLineCard extends StatelessWidget {
     if (line.status == 'operational') {
       final freshness = _calculateFreshness();
       final isStale = freshness > 14;
-      final freshnessColor =
-          isStale ? AppTheme.warning : AppTheme.success;
-      final freshnessLabel =
-          isStale ? 'Manutenção atrasada' : 'Manutenção em dia';
+      final freshnessColor = isStale ? AppTheme.warning : AppTheme.success;
+      final freshnessLabel = isStale
+          ? 'Manutenção atrasada'
+          : 'Manutenção em dia';
 
       return Row(
         children: [
@@ -461,7 +454,7 @@ class _DetectionLineCard extends StatelessWidget {
           Text(
             ' · última sessão há ',
             style: GoogleFonts.inter(
-              color: const Color(0xFFAEBCC4),
+              color: AppTheme.textSoft,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -469,7 +462,7 @@ class _DetectionLineCard extends StatelessWidget {
           Text(
             '${freshness}d',
             style: GoogleFonts.ibmPlexMono(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -482,7 +475,7 @@ class _DetectionLineCard extends StatelessWidget {
     return Text(
       state.metaLabel,
       style: GoogleFonts.inter(
-        color: const Color(0xFF7D8D99),
+        color: AppTheme.textTertiary,
         fontSize: 12,
         fontWeight: FontWeight.w500,
       ),
@@ -526,7 +519,7 @@ class _LineVisualState {
     switch (line.status) {
       case 'operational':
         return _LineVisualState(
-          color: const Color(0xFF2ECC71),
+          color: AppTheme.success,
           badgeLabel: 'OPERACIONAL',
           kindLabel: kind,
           ctaLabel: 'Abrir manutenção',
@@ -535,7 +528,7 @@ class _LineVisualState {
         );
       case 'in_formation':
         return _LineVisualState(
-          color: const Color(0xFFF1C40F),
+          color: AppTheme.warning,
           badgeLabel: 'EM FORMAÇÃO',
           kindLabel: kind,
           ctaLabel: 'Continuar formação',
@@ -544,7 +537,7 @@ class _LineVisualState {
         );
       case 'triagem':
         return _LineVisualState(
-          color: const Color(0xFF4DD0E1),
+          color: AppTheme.primary,
           badgeLabel: 'EM TRIAGEM',
           kindLabel: kind,
           ctaLabel: 'Continuar triagem',
@@ -553,7 +546,7 @@ class _LineVisualState {
         );
       default: // not_started
         return _LineVisualState(
-          color: const Color(0xFF5A7280),
+          color: AppTheme.textMuted,
           badgeLabel: 'NÃO INICIADA',
           kindLabel: kind,
           ctaLabel: 'Iniciar triagem',

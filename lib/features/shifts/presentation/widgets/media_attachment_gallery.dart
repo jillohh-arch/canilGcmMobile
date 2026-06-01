@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/controllers/media_attachment_rows.dart';
 import 'package:canil_gcm/core/widgets/tactical_text_field.dart';
 

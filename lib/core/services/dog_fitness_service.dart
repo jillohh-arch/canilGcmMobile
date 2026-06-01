@@ -30,16 +30,16 @@ class DogFitnessResult {
   const DogFitnessResult({required this.status, required this.pendencies});
 
   String get statusLabel => switch (status) {
-        DogFitnessStatus.apt => 'APTO PARA PLANTÃO',
-        DogFitnessStatus.warning => 'APTO COM PENDÊNCIA',
-        DogFitnessStatus.unfit => 'NÃO APTO PARA PLANTÃO',
-      };
+    DogFitnessStatus.apt => 'APTO PARA PLANTÃO',
+    DogFitnessStatus.warning => 'APTO COM PENDÊNCIA',
+    DogFitnessStatus.unfit => 'NÃO APTO PARA PLANTÃO',
+  };
 
   String get statusIcon => switch (status) {
-        DogFitnessStatus.apt => '✓',
-        DogFitnessStatus.warning => '!',
-        DogFitnessStatus.unfit => '⊘',
-      };
+    DogFitnessStatus.apt => '✓',
+    DogFitnessStatus.warning => '!',
+    DogFitnessStatus.unfit => '⊘',
+  };
 }
 
 /// Calcula aptidão do cão baseado em dados de saúde disponíveis.
@@ -59,10 +59,12 @@ class DogFitnessService {
 
     // ── Status do cão ──────────────────────────────────────────────
     if (dog.status != 'Ativo') {
-      pendencies.add(DogPendency(
-        label: _statusLabel(dog.status),
-        severity: DogPendencySeverity.critical,
-      ));
+      pendencies.add(
+        DogPendency(
+          label: _statusLabel(dog.status),
+          severity: DogPendencySeverity.critical,
+        ),
+      );
     }
 
     // ── Vacina ─────────────────────────────────────────────────────
@@ -73,24 +75,30 @@ class DogFitnessService {
       if (daysSinceVaccine > 372) {
         // Vencida há mais de 7 dias
         final daysOverdue = daysSinceVaccine - 365;
-        pendencies.add(DogPendency(
-          label: 'Vacina vencida há $daysOverdue dias',
-          severity: DogPendencySeverity.critical,
-        ));
+        pendencies.add(
+          DogPendency(
+            label: 'Vacina vencida há $daysOverdue dias',
+            severity: DogPendencySeverity.critical,
+          ),
+        );
       } else if (daysSinceVaccine > 335) {
         // Vencendo em 30 dias
         final daysLeft = 365 - daysSinceVaccine;
-        pendencies.add(DogPendency(
-          label: 'Vacina vence em $daysLeft dias',
-          severity: DogPendencySeverity.warning,
-        ));
+        pendencies.add(
+          DogPendency(
+            label: 'Vacina vence em $daysLeft dias',
+            severity: DogPendencySeverity.warning,
+          ),
+        );
       }
     } else {
       // Sem registro de vacina
-      pendencies.add(DogPendency(
-        label: 'Sem registro de vacinação',
-        severity: DogPendencySeverity.critical,
-      ));
+      pendencies.add(
+        DogPendency(
+          label: 'Sem registro de vacinação',
+          severity: DogPendencySeverity.critical,
+        ),
+      );
     }
 
     // ── Banho / Antipulgas ─────────────────────────────────────────
@@ -100,37 +108,43 @@ class DogFitnessService {
       // Antipulgas mensal: vencendo se >25 dias, vencido se >30
       if (daysSinceBath > 30) {
         final daysOverdue = daysSinceBath - 30;
-        pendencies.add(DogPendency(
-          label: 'Antipulgas vencido há $daysOverdue dias',
-          severity: DogPendencySeverity.warning,
-        ));
+        pendencies.add(
+          DogPendency(
+            label: 'Antipulgas vencido há $daysOverdue dias',
+            severity: DogPendencySeverity.warning,
+          ),
+        );
       } else if (daysSinceBath > 25) {
         final daysLeft = 30 - daysSinceBath;
-        pendencies.add(DogPendency(
-          label: 'Antipulgas vence em $daysLeft dias',
-          severity: DogPendencySeverity.warning,
-        ));
+        pendencies.add(
+          DogPendency(
+            label: 'Antipulgas vence em $daysLeft dias',
+            severity: DogPendencySeverity.warning,
+          ),
+        );
       }
     }
 
     // ── Determinar status final ────────────────────────────────────
-    final hasCritical =
-        pendencies.any((p) => p.severity == DogPendencySeverity.critical);
-    final hasWarning =
-        pendencies.any((p) => p.severity == DogPendencySeverity.warning);
+    final hasCritical = pendencies.any(
+      (p) => p.severity == DogPendencySeverity.critical,
+    );
+    final hasWarning = pendencies.any(
+      (p) => p.severity == DogPendencySeverity.warning,
+    );
 
     final status = hasCritical
         ? DogFitnessStatus.unfit
         : hasWarning
-            ? DogFitnessStatus.warning
-            : DogFitnessStatus.apt;
+        ? DogFitnessStatus.warning
+        : DogFitnessStatus.apt;
 
     return DogFitnessResult(status: status, pendencies: pendencies);
   }
 
   String _statusLabel(String status) => switch (status) {
-        'Licença' => 'Em licença',
-        'Aposentado' => 'Aposentado',
-        _ => status,
-      };
+    'Licença' => 'Em licença',
+    'Aposentado' => 'Aposentado',
+    _ => status,
+  };
 }

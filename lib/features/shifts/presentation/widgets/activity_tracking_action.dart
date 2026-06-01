@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
+
 class ActivityTrackingAction extends StatelessWidget {
   final bool hasRoute;
   final num? distanceMeters;
@@ -38,19 +40,22 @@ class ActivityTrackingAction extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       margin: capturedMargin,
       decoration: BoxDecoration(
-        color: const Color(0xFF1B8A4C).withAlpha(40),
+        color: AppTheme.successOperational.withAlpha(40),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF1B8A4C)),
+        border: Border.all(color: AppTheme.successOperational),
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF1B8A4C)),
+          const Icon(
+            Icons.check_circle_rounded,
+            color: AppTheme.successOperational,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Rota capturada: ${(distanceMeters ?? 0).toStringAsFixed(0)} m',
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),

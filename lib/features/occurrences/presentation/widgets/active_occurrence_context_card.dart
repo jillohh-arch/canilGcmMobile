@@ -54,7 +54,7 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
                 child: Text(
                   typeName,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -79,7 +79,7 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
                     Text(
                       '$dogName · $handlerName',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -186,7 +186,7 @@ class _TeamSummaryAction extends StatelessWidget {
         : 'Definir equipe';
 
     return Material(
-      color: Colors.transparent,
+      color: AppTheme.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
@@ -422,7 +422,7 @@ class _InfoRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -457,7 +457,7 @@ class _Metric extends StatelessWidget {
         Text(
           value,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),

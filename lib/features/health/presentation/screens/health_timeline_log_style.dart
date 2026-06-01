@@ -3,15 +3,15 @@ part of 'health_dashboard_screen.dart';
 Color _healthLogColor(String type) {
   switch (type) {
     case 'Vacina':
-      return const Color(0xFFFF00FF);
+      return AppTheme.healthAccent;
     case 'Exame':
-      return Colors.cyanAccent;
+      return AppTheme.primary;
     case 'Banho':
-      return const Color(0xFF00BFFF);
+      return AppTheme.info;
     case 'Consulta':
-      return Colors.orangeAccent;
+      return AppTheme.attention;
     default:
-      return Colors.cyan;
+      return AppTheme.primary;
   }
 }
 

@@ -82,7 +82,7 @@ class _SessionNotesBox extends StatelessWidget {
                 notes,
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.white70,
+                  color: AppTheme.textSecondary,
                   fontWeight: FontWeight.w500,
                   height: 1.35,
                 ),
@@ -124,7 +124,7 @@ class _DetailChip extends StatelessWidget {
             label,
             style: GoogleFonts.inter(
               fontSize: 10,
-              color: Colors.white70,
+              color: AppTheme.textSecondary,
               fontWeight: FontWeight.w700,
             ),
           ),

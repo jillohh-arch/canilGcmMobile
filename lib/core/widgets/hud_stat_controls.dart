@@ -37,7 +37,7 @@ class HudInfoPill extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.1,
@@ -96,7 +96,7 @@ class HudMetricCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-              color: Colors.white54,
+              color: AppTheme.textPrimary.withAlpha(138),
               fontSize: 9,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.3,
@@ -137,7 +137,7 @@ class HudActionButton extends StatelessWidget {
         label: Text(
           label,
           style: GoogleFonts.inter(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 11,
             fontWeight: FontWeight.w900,
             letterSpacing: 1.4,

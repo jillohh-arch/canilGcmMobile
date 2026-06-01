@@ -9,17 +9,21 @@ class _AttachPhotoButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: onPressed,
-      icon: const Icon(Icons.camera_alt, size: 16, color: Colors.white70),
+      icon: Icon(
+        Icons.camera_alt,
+        size: 16,
+        color: AppTheme.textPrimary.withAlpha(179),
+      ),
       label: Text(
         'ANEXAR FOTO',
         style: GoogleFonts.inter(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          color: Colors.white70,
+          color: AppTheme.textPrimary.withAlpha(179),
         ),
       ),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Colors.white12),
+        side: BorderSide(color: AppTheme.textPrimary.withAlpha(31)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),
     );
@@ -37,13 +41,13 @@ class _CompressionStatus extends StatelessWidget {
         Text(
           'COMPRIMINDO IMAGEM...',
           style: GoogleFonts.inter(
-            color: Colors.white70,
+            color: AppTheme.textPrimary.withAlpha(179),
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
-        const LinearProgressIndicator(color: Colors.white70),
+        LinearProgressIndicator(color: AppTheme.textPrimary.withAlpha(179)),
         const SizedBox(height: 16),
       ],
     );

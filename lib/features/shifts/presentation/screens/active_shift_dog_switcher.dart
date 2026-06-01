@@ -190,7 +190,7 @@ class _DogSwitchTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(8),
+          color: AppTheme.textPrimary.withAlpha(8),
           border: Border.all(color: AppTheme.primary.withAlpha(40)),
           borderRadius: BorderRadius.circular(14),
         ),
@@ -371,7 +371,7 @@ Future<bool> _showFitnessConfirmation(
     context: context,
     barrierDismissible: false,
     builder: (dialogCtx) => AlertDialog(
-      backgroundColor: const Color(0xFF0F1E24),
+      backgroundColor: AppTheme.surfaceSheet,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: color.withAlpha(80)),
@@ -473,7 +473,7 @@ Future<bool> _showFitnessConfirmation(
           onPressed: () => Navigator.of(dialogCtx).pop(true),
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
-            foregroundColor: Colors.white,
+            foregroundColor: AppTheme.textPrimary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),

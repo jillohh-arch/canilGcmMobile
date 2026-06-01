@@ -44,7 +44,7 @@ extension _HealthDashboardScaffoldParts on _HealthDashboardScreenState {
           fontSize: 12,
           fontWeight: FontWeight.w900,
           letterSpacing: 3,
-          color: Colors.cyanAccent.withValues(alpha: 0.7),
+          color: AppTheme.primary.withValues(alpha: 0.7),
         ),
       ),
       centerTitle: true,

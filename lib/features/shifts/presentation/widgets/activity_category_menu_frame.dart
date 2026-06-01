@@ -9,12 +9,12 @@ class _ActivityCategoryMenuFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const ValueKey('MenuSheet'),
-      decoration: const BoxDecoration(
-        color: Color(0xFF171717),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceModal,
         borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black54,
+            color: AppTheme.background.withAlpha(138),
             offset: Offset(0, -6),
             blurRadius: 20,
           ),
@@ -42,7 +42,7 @@ class _ActivityCategoryDragHandle extends StatelessWidget {
         width: 48,
         height: 5,
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(80),
+          color: AppTheme.textPrimary.withAlpha(80),
           borderRadius: BorderRadius.circular(6),
         ),
       ),
@@ -63,7 +63,7 @@ class _ActivityCategoryMenuTitle extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 20,
           fontWeight: FontWeight.w900,
-          color: Colors.white,
+          color: AppTheme.textPrimary,
         ),
       ),
     );

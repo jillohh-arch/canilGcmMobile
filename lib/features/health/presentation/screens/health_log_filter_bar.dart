@@ -1,4 +1,4 @@
-﻿part of 'health_log_screen.dart';
+part of 'health_log_screen.dart';
 
 class _HealthFilterBar extends StatelessWidget {
   final List<String> filters;
@@ -34,7 +34,9 @@ class _HealthFilterBar extends StatelessWidget {
                     Icon(
                       _logIcon(filter),
                       size: 13,
-                      color: isSelected ? color : Colors.white70,
+                      color: isSelected
+                          ? color
+                          : AppTheme.textPrimary.withAlpha(179),
                     ),
                     const SizedBox(width: 4),
                   ],
@@ -44,13 +46,15 @@ class _HealthFilterBar extends StatelessWidget {
               labelStyle: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? color : Colors.white70,
+                color: isSelected ? color : AppTheme.textPrimary.withAlpha(179),
               ),
               backgroundColor: Theme.of(
                 context,
               ).colorScheme.surfaceContainerHighest,
               selectedColor: color.withAlpha(40),
-              side: BorderSide(color: isSelected ? color : Colors.white12),
+              side: BorderSide(
+                color: isSelected ? color : AppTheme.textPrimary.withAlpha(31),
+              ),
               checkmarkColor: color,
               onSelected: (_) => onSelected(filter),
             ),

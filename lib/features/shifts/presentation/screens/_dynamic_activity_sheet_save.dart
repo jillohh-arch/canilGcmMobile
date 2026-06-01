@@ -37,7 +37,7 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
         HapticFeedback.mediumImpact();
         _showOperationalSnack(
           _successSaveMessage(),
-          backgroundColor: const Color(0xFF1B8A4C),
+          backgroundColor: AppTheme.successOperational,
           icon: Icons.cloud_done_rounded,
         );
         if (closeAfterSave) {
@@ -54,7 +54,7 @@ extension _DynamicActivitySheetSave on _DynamicActivitySheetState {
         );
         _showOperationalSnack(
           message.isEmpty ? 'Não foi possível salvar o registro.' : message,
-          backgroundColor: const Color(0xFFE53935),
+          backgroundColor: AppTheme.errorStrong,
           icon: Icons.error_outline_rounded,
         );
       }

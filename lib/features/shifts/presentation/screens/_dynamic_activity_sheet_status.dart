@@ -21,8 +21,8 @@ extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {
       HapticFeedback.lightImpact();
       _showOperationalSnack(
         'Aguarde a sincronização terminar antes de sair.',
-        backgroundColor: const Color(0xFFFBBF24),
-        foregroundColor: Colors.black,
+        backgroundColor: AppTheme.warningAccent,
+        foregroundColor: AppTheme.background,
       );
       return;
     }
@@ -32,8 +32,8 @@ extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {
 
   void _showOperationalSnack(
     String message, {
-    Color backgroundColor = const Color(0xFF121826),
-    Color foregroundColor = Colors.white,
+    Color backgroundColor = AppTheme.surfaceSnack,
+    Color foregroundColor = AppTheme.textPrimary,
     IconData? icon,
   }) {
     if (!mounted) return;

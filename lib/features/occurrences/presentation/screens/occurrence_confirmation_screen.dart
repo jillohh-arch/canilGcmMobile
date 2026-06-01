@@ -108,7 +108,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     return Text(
       'Ocorrência finalizada',
       style: GoogleFonts.inter(
-        color: Colors.white,
+        color: AppTheme.textPrimary,
         fontSize: 22,
         fontWeight: FontWeight.w800,
       ),
@@ -131,9 +131,9 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(20)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
       ),
       child: Column(
         children: [
@@ -212,7 +212,10 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           Expanded(
             child: Text(
               detail.isNotEmpty ? '${result.label} · $detail' : result.label,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 12),
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -268,12 +271,16 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
                   child: Text(
                     'SHA-256: $shortHash',
                     style: GoogleFonts.sourceCodePro(
-                      color: Colors.white70,
+                      color: AppTheme.textPrimary.withAlpha(179),
                       fontSize: 11,
                     ),
                   ),
                 ),
-                Icon(Icons.copy_outlined, color: Colors.white38, size: 14),
+                Icon(
+                  Icons.copy_outlined,
+                  color: AppTheme.textPrimary.withAlpha(97),
+                  size: 14,
+                ),
               ],
             ),
           ),
@@ -482,7 +489,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
             ),
             const SizedBox(width: 12),
@@ -567,7 +574,7 @@ class _SummaryRow extends StatelessWidget {
           ? null
           : BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Colors.white.withAlpha(10)),
+                bottom: BorderSide(color: AppTheme.textPrimary.withAlpha(10)),
               ),
             ),
       child: Row(
@@ -588,7 +595,7 @@ class _SummaryRow extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),

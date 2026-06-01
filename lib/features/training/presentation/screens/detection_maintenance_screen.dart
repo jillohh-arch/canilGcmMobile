@@ -92,7 +92,7 @@ class _DetectionMaintenanceScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione o resultado da sessão'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.attention,
         ),
       );
       return;
@@ -377,14 +377,14 @@ class _DetectionMaintenanceScreenState
                   decoration: BoxDecoration(
                     color: selected
                         ? AppTheme.success.withAlpha(20)
-                        : Colors.white.withAlpha(8),
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: selected
                           ? AppTheme.success
                           : enabled
-                          ? Colors.white.withAlpha(20)
-                          : Colors.white.withAlpha(10),
+                          ? AppTheme.textPrimary.withAlpha(20)
+                          : AppTheme.textPrimary.withAlpha(10),
                       width: 1.5,
                     ),
                   ),
@@ -472,7 +472,7 @@ class _DetectionMaintenanceScreenState
               hintText: 'O que quer aprimorar?',
               hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
               filled: true,
-              fillColor: Colors.black.withAlpha(65),
+              fillColor: AppTheme.background.withAlpha(65),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
@@ -609,12 +609,12 @@ class _DetectionMaintenanceScreenState
                         ? (isBad
                               ? AppTheme.error.withAlpha(25)
                               : AppTheme.success.withAlpha(25))
-                        : Colors.white.withAlpha(8),
+                        : AppTheme.textPrimary.withAlpha(8),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: selected
                           ? (isBad ? AppTheme.error : AppTheme.success)
-                          : Colors.white.withAlpha(20),
+                          : AppTheme.textPrimary.withAlpha(20),
                       width: 1.5,
                     ),
                   ),
@@ -723,9 +723,9 @@ class _DetectionMaintenanceScreenState
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(8),
+        color: AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
       ),
       child: Row(
         children: [
@@ -849,10 +849,12 @@ class _DetectionMaintenanceScreenState
       decoration: BoxDecoration(
         color: selected
             ? AppTheme.primary.withAlpha(30)
-            : Colors.white.withAlpha(8),
+            : AppTheme.textPrimary.withAlpha(8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? AppTheme.primary : Colors.white.withAlpha(25),
+          color: selected
+              ? AppTheme.primary
+              : AppTheme.textPrimary.withAlpha(25),
         ),
       ),
       child: Text(

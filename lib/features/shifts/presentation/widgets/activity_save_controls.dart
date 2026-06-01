@@ -82,7 +82,9 @@ class ActivityPrimarySaveButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: (isSaving || isCompressing) ? null : onSave,
       style: ElevatedButton.styleFrom(
-        backgroundColor: isSaving ? Colors.black45 : AppTheme.primary,
+        backgroundColor: isSaving
+            ? AppTheme.background.withAlpha(115)
+            : AppTheme.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         elevation: 0,
       ),

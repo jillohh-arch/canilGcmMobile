@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -31,7 +33,7 @@ class HudChoiceChipGroup extends StatelessWidget {
           label: Text(option),
           selected: isSelected,
           showCheckmark: false,
-          backgroundColor: Colors.transparent,
+          backgroundColor: AppTheme.transparent,
           selectedColor: accent,
           shape: _chipShape(isSelected),
           labelStyle: _chipLabelStyle(isSelected),
@@ -74,7 +76,7 @@ class HudMultiChipGroup extends StatelessWidget {
           label: Text(option),
           selected: isSelected,
           showCheckmark: false,
-          backgroundColor: Colors.transparent,
+          backgroundColor: AppTheme.transparent,
           selectedColor: accent,
           shape: _chipShape(isSelected),
           labelStyle: _chipLabelStyle(isSelected),
@@ -117,7 +119,7 @@ class HudToggleChipGroup extends StatelessWidget {
           label: Text(option),
           selected: isSelected,
           showCheckmark: false,
-          backgroundColor: Colors.transparent,
+          backgroundColor: AppTheme.transparent,
           selectedColor: accent,
           shape: _chipShape(isSelected),
           labelStyle: _chipLabelStyle(isSelected),
@@ -154,7 +156,7 @@ class _HudChipSection extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: Colors.white54,
+              color: AppTheme.textPrimary.withAlpha(138),
               letterSpacing: 1.0,
             ),
           ),
@@ -170,7 +172,7 @@ OutlinedBorder _chipShape(bool isSelected) {
   return RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(6),
     side: BorderSide(
-      color: isSelected ? Colors.transparent : const Color(0xFF2A2A2A),
+      color: isSelected ? AppTheme.transparent : AppTheme.outline,
       width: 1,
     ),
   );
@@ -179,6 +181,8 @@ OutlinedBorder _chipShape(bool isSelected) {
 TextStyle _chipLabelStyle(bool isSelected) {
   return GoogleFonts.inter(
     fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-    color: isSelected ? Colors.black : Colors.white54,
+    color: isSelected
+        ? AppTheme.background
+        : AppTheme.textPrimary.withAlpha(138),
   );
 }

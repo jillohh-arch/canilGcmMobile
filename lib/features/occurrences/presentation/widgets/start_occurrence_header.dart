@@ -22,7 +22,7 @@ class StartOccurrenceHeader extends StatelessWidget {
           IconButton(
             onPressed: onBack,
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            color: Colors.white,
+            color: AppTheme.textPrimary,
           ),
           Expanded(
             child: Column(
@@ -40,7 +40,7 @@ class StartOccurrenceHeader extends StatelessWidget {
                 Text(
                   'Nova Ocorrência',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
@@ -52,7 +52,7 @@ class StartOccurrenceHeader extends StatelessWidget {
           IconButton(
             onPressed: onClose,
             icon: const Icon(Icons.close_rounded, size: 22),
-            color: Colors.white70,
+            color: AppTheme.textPrimary.withAlpha(179),
           ),
         ],
       ),

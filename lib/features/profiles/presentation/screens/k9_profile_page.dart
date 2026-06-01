@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
@@ -67,8 +68,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
       backgroundColor: profileBackground,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: const Color(0xFF050D10),
+          statusBarColor: AppTheme.transparent,
+          systemNavigationBarColor: AppTheme.background,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
         child: Container(
@@ -76,7 +77,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF040B0F), Color(0xFF06131A), profileBackground],
+              colors: [
+                AppTheme.surfaceBackdrop,
+                AppTheme.surfacePanelDeep,
+                profileBackground,
+              ],
             ),
           ),
           child: SafeArea(
@@ -152,12 +157,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
-        color: const Color(0x0A4DD0E1),
+        color: AppTheme.primary.withAlpha(10),
         border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFF4DD0E1).withAlpha(31),
-            width: 1,
-          ),
+          bottom: BorderSide(color: AppTheme.primary.withAlpha(31), width: 1),
         ),
       ),
       child: BinomioHeader(
@@ -166,8 +168,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             ? conductorName
             : null,
         subtitle: hasShift ? 'Turno ativo · $elapsed' : 'Turno inativo',
-        subtitleColor: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
-        statusDotColor: hasShift ? const Color(0xFF2ECC71) : Colors.amber,
+        subtitleColor: hasShift ? AppTheme.success : AppTheme.warning,
+        statusDotColor: hasShift ? AppTheme.success : AppTheme.warning,
         showStatusDot: true,
         withBackground: false,
         onSwitchDog: hasShift ? () => showDogSwitcher(context) : null,
@@ -191,7 +193,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
       child: Text(
         '🐕 PRONTUÁRIO DO CÃO',
         style: GoogleFonts.inter(
-          color: const Color(0xFF4DD0E1),
+          color: AppTheme.primary,
           fontSize: 10,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.5,
@@ -212,11 +214,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF4DD0E1).withAlpha(13),
-            const Color(0xFF2ECC71).withAlpha(5),
+            AppTheme.primary.withAlpha(13),
+            AppTheme.success.withAlpha(5),
           ],
         ),
-        border: Border.all(color: const Color(0xFF4DD0E1).withAlpha(51)),
+        border: Border.all(color: AppTheme.primary.withAlpha(51)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -230,8 +232,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 height: 72,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF1A2A30),
-                  border: Border.all(color: const Color(0xFF4DD0E1), width: 3),
+                  color: AppTheme.surfacePanelAlt,
+                  border: Border.all(color: AppTheme.primary, width: 3),
                 ),
                 child: ClipOval(
                   child:
@@ -254,17 +256,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   height: 22,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF2ECC71),
-                    border: Border.all(
-                      color: const Color(0xFF050D10),
-                      width: 2,
-                    ),
+                    color: AppTheme.success,
+                    border: Border.all(color: AppTheme.background, width: 2),
                   ),
                   alignment: Alignment.center,
                   child: const Text(
                     '✓',
                     style: TextStyle(
-                      color: Color(0xFF050D10),
+                      color: AppTheme.background,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -282,7 +281,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 Text(
                   widget.dog.name,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                   ),
@@ -291,7 +290,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 Text(
                   '${widget.dog.breed.toUpperCase()} · Macho',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
@@ -303,14 +302,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       'Idade: ',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                     ),
                     Text(
                       '${widget.dog.age} anos',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -319,7 +318,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       '·',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                     ),
@@ -327,14 +326,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       'Peso: ',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                     ),
                     Text(
                       '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -348,16 +347,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2ECC71).withAlpha(31),
-                    border: Border.all(
-                      color: const Color(0xFF2ECC71).withAlpha(77),
-                    ),
+                    color: AppTheme.success.withAlpha(31),
+                    border: Border.all(color: AppTheme.success.withAlpha(77)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     statusText.toUpperCase(),
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF2ECC71),
+                      color: AppTheme.success,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
@@ -374,14 +371,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
 
   Widget _dogInitialsFallback() {
     return Container(
-      color: const Color(0xFF1A2A30),
+      color: AppTheme.surfacePanelAlt,
       alignment: Alignment.center,
       child: Text(
         widget.dog.name.length >= 4
             ? widget.dog.name.substring(0, 4).toUpperCase()
             : widget.dog.name.toUpperCase(),
         style: GoogleFonts.inter(
-          color: const Color(0xFF4DD0E1),
+          color: AppTheme.primary,
           fontSize: 14,
           fontWeight: FontWeight.w800,
         ),
@@ -528,15 +525,15 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     required VoidCallback onTap,
   }) {
     final Color sideColor = switch (status) {
-      _CardStatus.ok => const Color(0xFF2ECC71),
-      _CardStatus.warn => const Color(0xFFF1C40F),
-      _CardStatus.critical => const Color(0xFFE74C3C),
+      _CardStatus.ok => AppTheme.success,
+      _CardStatus.warn => AppTheme.warning,
+      _CardStatus.critical => AppTheme.error,
     };
 
     final Color bgColor = switch (status) {
-      _CardStatus.ok => Colors.white.withAlpha(8),
-      _CardStatus.warn => const Color(0xFFF1C40F).withAlpha(10),
-      _CardStatus.critical => const Color(0xFFE74C3C).withAlpha(10),
+      _CardStatus.ok => AppTheme.textPrimary.withAlpha(8),
+      _CardStatus.warn => AppTheme.warning.withAlpha(10),
+      _CardStatus.critical => AppTheme.error.withAlpha(10),
     };
 
     return GestureDetector(
@@ -549,9 +546,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           color: bgColor,
           border: Border(
             left: BorderSide(color: sideColor, width: 3),
-            top: BorderSide(color: Colors.white.withAlpha(20)),
-            right: BorderSide(color: Colors.white.withAlpha(20)),
-            bottom: BorderSide(color: Colors.white.withAlpha(20)),
+            top: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
+            right: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
+            bottom: BorderSide(color: AppTheme.textPrimary.withAlpha(20)),
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -567,7 +564,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 Text(
                   label,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF7A8A92),
+                    color: AppTheme.textTertiary,
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
@@ -579,7 +576,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             Text(
               value,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -588,7 +585,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             Text(
               sub,
               style: GoogleFonts.inter(
-                color: const Color(0xFFB0C4CC),
+                color: AppTheme.textSecondary,
                 fontSize: 9,
               ),
               maxLines: 1,
@@ -638,10 +635,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withAlpha(20),
-                  border: Border.all(
-                    color: const Color(0xFF2ECC71).withAlpha(64),
-                  ),
+                  color: AppTheme.success.withAlpha(20),
+                  border: Border.all(color: AppTheme.success.withAlpha(64)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -655,7 +650,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         Text(
                           spec,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -663,7 +658,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         Text(
                           '● OPERACIONAL',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFF2ECC71),
+                            color: AppTheme.success,
                             fontSize: 8,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.3,
@@ -732,7 +727,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               child: Text(
                 'Ver tudo →',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -744,8 +739,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFE67E22).withAlpha(10),
-            border: Border.all(color: const Color(0xFFE67E22).withAlpha(51)),
+            color: AppTheme.attention.withAlpha(10),
+            border: Border.all(color: AppTheme.attention.withAlpha(51)),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -755,7 +750,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(64),
+                  color: AppTheme.background.withAlpha(64),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -764,13 +759,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE67E22).withAlpha(38),
+                        color: AppTheme.attention.withAlpha(38),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.description_outlined,
-                        color: Color(0xFFE67E22),
+                        color: AppTheme.attention,
                         size: 14,
                       ),
                     ),
@@ -782,7 +777,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             'PRESCRIÇÃO VIGENTE',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFFE67E22),
+                              color: AppTheme.attention,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -793,7 +788,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                                 ? '${prescription.amountGramsPerDay}g/dia • ${prescription.foodType}'
                                 : '800g/dia • ração premium',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -803,7 +798,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                                 ? 'Laudo: Dr(a). ${prescription.vetName ?? 'Ana Souza'}'
                                 : 'Laudo: Dra. Ana Souza',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF7A8A92),
+                              color: AppTheme.textTertiary,
                               fontSize: 9,
                             ),
                           ),
@@ -822,12 +817,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: hasMorning
-                            ? const Color(0xFF2ECC71).withAlpha(15)
-                            : const Color(0xFFF1C40F).withAlpha(10),
+                            ? AppTheme.success.withAlpha(15)
+                            : AppTheme.warning.withAlpha(10),
                         border: Border.all(
                           color: hasMorning
-                              ? const Color(0xFF2ECC71).withAlpha(77)
-                              : const Color(0xFFF1C40F).withAlpha(77),
+                              ? AppTheme.success.withAlpha(77)
+                              : AppTheme.warning.withAlpha(77),
                           style: hasMorning
                               ? BorderStyle.solid
                               : BorderStyle.solid,
@@ -840,8 +835,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                             'MANHÃ',
                             style: GoogleFonts.inter(
                               color: hasMorning
-                                  ? const Color(0xFF2ECC71)
-                                  : const Color(0xFFF1C40F),
+                                  ? AppTheme.success
+                                  : AppTheme.warning,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -851,7 +846,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             hasMorning ? '${morningMeal.amountGrams}g' : '400g',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -863,8 +858,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                                 : 'pendente',
                             style: GoogleFonts.inter(
                               color: hasMorning
-                                  ? const Color(0xFF2ECC71)
-                                  : const Color(0xFF5A7280),
+                                  ? AppTheme.success
+                                  : AppTheme.textMuted,
                               fontSize: 9,
                               fontWeight: hasMorning
                                   ? FontWeight.bold
@@ -881,12 +876,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: hasNight
-                            ? const Color(0xFF2ECC71).withAlpha(15)
-                            : const Color(0xFFF1C40F).withAlpha(10),
+                            ? AppTheme.success.withAlpha(15)
+                            : AppTheme.warning.withAlpha(10),
                         border: Border.all(
                           color: hasNight
-                              ? const Color(0xFF2ECC71).withAlpha(77)
-                              : const Color(0xFFF1C40F).withAlpha(77),
+                              ? AppTheme.success.withAlpha(77)
+                              : AppTheme.warning.withAlpha(77),
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -896,8 +891,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                             'NOITE',
                             style: GoogleFonts.inter(
                               color: hasNight
-                                  ? const Color(0xFF2ECC71)
-                                  : const Color(0xFFF1C40F),
+                                  ? AppTheme.success
+                                  : AppTheme.warning,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
@@ -907,7 +902,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             hasNight ? '${nightMeal.amountGrams}g' : '400g',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -919,8 +914,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                                 : 'pendente',
                             style: GoogleFonts.inter(
                               color: hasNight
-                                  ? const Color(0xFF2ECC71)
-                                  : const Color(0xFF5A7280),
+                                  ? AppTheme.success
+                                  : AppTheme.textMuted,
                               fontSize: 9,
                               fontWeight: hasNight
                                   ? FontWeight.bold
@@ -941,17 +936,15 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withAlpha(13),
-                  border: Border.all(
-                    color: const Color(0xFF2ECC71).withAlpha(51),
-                  ),
+                  color: AppTheme.success.withAlpha(13),
+                  border: Border.all(color: AppTheme.success.withAlpha(51)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.check_circle_outline_rounded,
-                      color: Color(0xFF2ECC71),
+                      color: AppTheme.success,
                       size: 18,
                     ),
                     const SizedBox(width: 10),
@@ -962,7 +955,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             'Conformidade em dia',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -970,7 +963,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                           Text(
                             '${conformity.toStringAsFixed(0)}% da semana dentro da meta',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFFB0C4CC),
+                              color: AppTheme.textSecondary,
                               fontSize: 10,
                             ),
                           ),
@@ -1000,9 +993,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       icon: const Icon(Icons.restaurant, size: 14),
                       label: const Text('REGISTRAR ALIMENTAÇÃO'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFE67E22),
+                        foregroundColor: AppTheme.attention,
                         side: BorderSide(
-                          color: const Color(0xFFE67E22).withAlpha(102),
+                          color: AppTheme.attention.withAlpha(102),
                           width: 1,
                         ),
                         shape: RoundedRectangleBorder(
@@ -1056,7 +1049,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               child: Text(
                 'Ver tudo →',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1068,8 +1061,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: AppTheme.textPrimary.withAlpha(5),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1084,7 +1077,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         TextSpan(
                           text: currentWeight.toStringAsFixed(1),
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: AppTheme.textPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1092,7 +1085,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                         TextSpan(
                           text: ' kg',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFF7A8A92),
+                            color: AppTheme.textTertiary,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1106,13 +1099,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2ECC71).withAlpha(31),
+                      color: AppTheme.success.withAlpha(31),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '→ Estável',
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF2ECC71),
+                        color: AppTheme.success,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1136,7 +1129,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'NOV',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1144,7 +1137,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'DEZ',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1152,7 +1145,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'JAN',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1160,7 +1153,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'FEV',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1168,7 +1161,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'MAR',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1176,7 +1169,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'ABR',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1184,7 +1177,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     'MAI',
                     style: GoogleFonts.inter(
-                      color: const Color(0xFF5A7280),
+                      color: AppTheme.textMuted,
                       fontSize: 8,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1231,7 +1224,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               child: Text(
                 'Ver completa →',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1242,8 +1235,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: AppTheme.textPrimary.withAlpha(5),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1334,9 +1327,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     required bool showDivider,
   }) {
     final statusColor = switch (status) {
-      _CardStatus.ok => const Color(0xFF2ECC71),
-      _CardStatus.warn => const Color(0xFFF1C40F),
-      _CardStatus.critical => const Color(0xFFE74C3C),
+      _CardStatus.ok => AppTheme.success,
+      _CardStatus.warn => AppTheme.warning,
+      _CardStatus.critical => AppTheme.error,
     };
 
     return Column(
@@ -1361,7 +1354,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       name,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1370,7 +1363,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       applied,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                     ),
@@ -1384,7 +1377,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     next,
                     style: GoogleFonts.inter(
                       color: status == _CardStatus.ok
-                          ? Colors.white
+                          ? AppTheme.textPrimary
                           : statusColor,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -1393,7 +1386,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                   Text(
                     remaining,
                     style: GoogleFonts.inter(
-                      color: const Color(0xFFB0C4CC),
+                      color: AppTheme.textSecondary,
                       fontSize: 10,
                     ),
                   ),
@@ -1406,7 +1399,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           Container(
             height: 1,
             margin: const EdgeInsets.symmetric(horizontal: 12),
-            color: Colors.white.withAlpha(10),
+            color: AppTheme.textPrimary.withAlpha(10),
           ),
       ],
     );
@@ -1438,13 +1431,13 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF4DD0E1).withAlpha(25),
+                color: AppTheme.primary.withAlpha(25),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 docLogs.isEmpty ? '7' : docLogs.length.toString(),
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1455,8 +1448,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: AppTheme.textPrimary.withAlpha(5),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1543,9 +1536,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             HapticFeedback.lightImpact();
           },
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF4DD0E1),
+            foregroundColor: AppTheme.primary,
             side: BorderSide(
-              color: const Color(0xFF4DD0E1).withAlpha(77),
+              color: AppTheme.primary.withAlpha(77),
               width: 1,
               style: BorderStyle.solid,
             ),
@@ -1591,7 +1584,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4DD0E1).withAlpha(20),
+                  color: AppTheme.primary.withAlpha(20),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
@@ -1605,7 +1598,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       title,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1616,7 +1609,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       subtitle,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                       maxLines: 1,
@@ -1629,7 +1622,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               Text(
                 date,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF5A7280),
+                  color: AppTheme.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1641,7 +1634,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           Container(
             height: 1,
             margin: const EdgeInsets.symmetric(horizontal: 12),
-            color: Colors.white.withAlpha(10),
+            color: AppTheme.textPrimary.withAlpha(10),
           ),
       ],
     );
@@ -1670,7 +1663,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
               child: Text(
                 'Ver tudo →',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1682,8 +1675,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(5),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: AppTheme.textPrimary.withAlpha(5),
+            border: Border.all(color: AppTheme.textPrimary.withAlpha(15)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1760,7 +1753,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 child: Text(
                   date,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF5A7280),
+                    color: AppTheme.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1770,7 +1763,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE74C3C).withAlpha(31),
+                  color: AppTheme.error.withAlpha(31),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
@@ -1784,7 +1777,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       title,
                       style: GoogleFonts.inter(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1793,7 +1786,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     Text(
                       subtitle,
                       style: GoogleFonts.inter(
-                        color: const Color(0xFF7A8A92),
+                        color: AppTheme.textTertiary,
                         fontSize: 10,
                       ),
                     ),
@@ -1807,7 +1800,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           Container(
             height: 1,
             margin: const EdgeInsets.symmetric(horizontal: 12),
-            color: Colors.white.withAlpha(10),
+            color: AppTheme.textPrimary.withAlpha(10),
           ),
       ],
     );
@@ -1834,11 +1827,11 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF4DD0E1),
+          color: AppTheme.primary,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4DD0E1).withAlpha(51),
+              color: AppTheme.primary.withAlpha(51),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1849,14 +1842,14 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           children: [
             const Icon(
               Icons.healing_outlined,
-              color: Color(0xFF050D10),
+              color: AppTheme.background,
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
               '⚕ REGISTRAR EVENTO DE SAÚDE',
               style: GoogleFonts.inter(
-                color: const Color(0xFF050D10),
+                color: AppTheme.background,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
@@ -1877,7 +1870,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           Text(
             text,
             style: GoogleFonts.inter(
-              color: const Color(0xFF4DD0E1),
+              color: AppTheme.primary,
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.2,
@@ -1885,10 +1878,7 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Container(
-              height: 1,
-              color: const Color(0xFF4DD0E1).withAlpha(38),
-            ),
+            child: Container(height: 1, color: AppTheme.primary.withAlpha(38)),
           ),
         ],
       ),
@@ -1916,17 +1906,17 @@ class _MiniWeightChartPainter extends CustomPainter {
     final double range = maxVal - minVal > 0 ? maxVal - minVal : 1.0;
 
     final paintLine = Paint()
-      ..color = const Color(0xFF4DD0E1)
+      ..color = AppTheme.primary
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final paintArea = Paint()
-      ..shader = const LinearGradient(
+      ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x204DD0E1), Color(0x004DD0E1)],
+        colors: [AppTheme.primary.withAlpha(32), AppTheme.primary.withAlpha(0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.fill;
 
@@ -1958,7 +1948,7 @@ class _MiniWeightChartPainter extends CustomPainter {
     canvas.drawPath(areaPath, paintArea);
     canvas.drawPath(path, paintLine);
 
-    final dotPaint = Paint()..color = const Color(0xFF4DD0E1);
+    final dotPaint = Paint()..color = AppTheme.primary;
     for (int i = 0; i < points.length; i++) {
       if (i == points.length - 1) {
         // Last point with outer black border
@@ -1967,7 +1957,7 @@ class _MiniWeightChartPainter extends CustomPainter {
           points[i],
           4,
           Paint()
-            ..color = const Color(0xFF050D10)
+            ..color = AppTheme.background
             ..strokeWidth = 1.5
             ..style = PaintingStyle.stroke,
         );

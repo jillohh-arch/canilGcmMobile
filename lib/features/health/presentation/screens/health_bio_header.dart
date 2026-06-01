@@ -17,7 +17,7 @@ extension _HealthBioHeader on _HealthDashboardScreenState {
             style: GoogleFonts.inter(
               fontSize: 26,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               letterSpacing: 2,
             ),
           ),

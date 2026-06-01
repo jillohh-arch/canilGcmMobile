@@ -27,14 +27,14 @@ class _HealthTimelineItemBody extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.white70,
+                color: AppTheme.textPrimary.withAlpha(179),
               ),
             ),
             const SizedBox(width: 6),
             Icon(
               expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
               size: 18,
-              color: Colors.white70,
+              color: AppTheme.textPrimary.withAlpha(179),
             ),
           ],
         ),
@@ -45,7 +45,7 @@ class _HealthTimelineItemBody extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
           ),
         ],

@@ -77,7 +77,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(24),
+                color: AppTheme.textPrimary.withAlpha(24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -86,7 +86,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
           Text(
             'Atualizar Nível do Comando',
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: AppTheme.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -110,7 +110,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
 
             Color borderColor = AppTheme.surfaceWhiteBorder;
             Color bgColor = AppTheme.surfaceWhiteOverlay;
-            Color titleColor = Colors.white;
+            Color titleColor = AppTheme.textPrimary;
 
             if (isSelected) {
               borderColor = AppTheme.primary;
@@ -145,11 +145,11 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                         shape: BoxShape.circle,
                         color: isSelected
                             ? AppTheme.primary
-                            : Colors.transparent,
+                            : AppTheme.transparent,
                         border: Border.all(
                           color: isSelected
                               ? AppTheme.primary
-                              : const Color(0x33FFFFFF),
+                              : AppTheme.surfaceWhiteBorderStrong,
                           width: 1.5,
                         ),
                       ),
@@ -226,7 +226,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0x1FE67E22), // rgba(230, 126, 34, 0.12)
+                color: AppTheme.attention.withAlpha(31),
                 border: Border.all(color: AppTheme.attention),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -277,7 +277,9 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textTertiary,
-                    side: const BorderSide(color: Color(0x1AFFFFFF)),
+                    side: const BorderSide(
+                      color: AppTheme.surfaceWhiteBorderMedium,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

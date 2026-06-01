@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/domain/activity_subtype_ids.dart';
 
 abstract final class ActivityCardCatalog {
@@ -7,32 +8,32 @@ abstract final class ActivityCardCatalog {
     {
       'id': ActivitySubtypeIds.detection,
       'image': 'assets/images/card_deteccao.png',
-      'glow': Colors.orangeAccent,
+      'glow': AppTheme.attention,
     },
     {
       'id': ActivitySubtypeIds.supportVehicle,
       'image': 'assets/images/card_apoio.png',
-      'glow': Colors.orangeAccent,
+      'glow': AppTheme.attention,
     },
     {
       'id': ActivitySubtypeIds.missingPerson,
       'image': 'assets/images/card_busca_captura.png',
-      'glow': Colors.redAccent,
+      'glow': AppTheme.error,
     },
     {
       'id': ActivitySubtypeIds.serviceOrder,
       'image': 'assets/images/card_ordem_servico.png',
-      'glow': Colors.blueGrey,
+      'glow': AppTheme.textMuted,
     },
     {
       'id': ActivitySubtypeIds.event,
       'image': 'assets/images/card_palestras.png',
-      'glow': Colors.greenAccent,
+      'glow': AppTheme.success,
     },
     {
       'id': ActivitySubtypeIds.other,
       'image': 'assets/images/card_outros.png',
-      'glow': Colors.white54,
+      'glow': AppTheme.textSecondary,
     },
   ];
 
@@ -40,27 +41,27 @@ abstract final class ActivityCardCatalog {
     {
       'id': ActivitySubtypeIds.obedience,
       'image': 'assets/images/card_obediencia.png',
-      'glow': Colors.blueAccent,
+      'glow': AppTheme.info,
     },
     {
       'id': ActivitySubtypeIds.scentWork,
       'image': 'assets/images/card_faro.png',
-      'glow': Colors.orangeAccent,
+      'glow': AppTheme.attention,
     },
     {
       'id': ActivitySubtypeIds.guardProtection,
       'image': 'assets/images/card_protecao.png',
-      'glow': Colors.redAccent,
+      'glow': AppTheme.error,
     },
     {
       'id': ActivitySubtypeIds.searchCapture,
       'image': 'assets/images/card_treino_busca.png',
-      'glow': Colors.greenAccent,
+      'glow': AppTheme.success,
     },
     {
       'id': ActivitySubtypeIds.physicalConditioning,
       'image': 'assets/images/card_condicionamento.png',
-      'glow': Colors.cyanAccent,
+      'glow': AppTheme.primary,
     },
   ];
 
@@ -68,22 +69,22 @@ abstract final class ActivityCardCatalog {
     {
       'id': ActivitySubtypeIds.consultation,
       'image': 'assets/images/card_consulta.png',
-      'glow': Colors.tealAccent,
+      'glow': AppTheme.primary,
     },
     {
       'id': ActivitySubtypeIds.vaccine,
       'image': 'assets/images/card_vacina.png',
-      'glow': Colors.lightBlueAccent,
+      'glow': AppTheme.info,
     },
     {
       'id': ActivitySubtypeIds.exam,
       'image': 'assets/images/card_exame.png',
-      'glow': Colors.indigoAccent,
+      'glow': AppTheme.healthAccent,
     },
     {
       'id': ActivitySubtypeIds.bath,
       'image': 'assets/images/card_banho.png',
-      'glow': Colors.cyanAccent,
+      'glow': AppTheme.primary,
     },
   ];
 

@@ -1,4 +1,4 @@
-﻿part of 'tactical_card.dart';
+part of 'tactical_card.dart';
 
 class _TacticalCardContent extends StatelessWidget {
   final Widget? avatar;
@@ -69,7 +69,7 @@ class _TacticalCardHeader extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   letterSpacing: 0.8,
                   height: 1.1,
                 ),
@@ -82,7 +82,7 @@ class _TacticalCardHeader extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white60,
+                    color: AppTheme.textPrimary.withAlpha(153),
                   ),
                 ),
               ],
@@ -109,14 +109,19 @@ class _TacticalCardStatsRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withAlpha(40),
+        color: AppTheme.background.withAlpha(40),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           for (var i = 0; i < stats.length; i++) ...[
-            if (i > 0) Container(width: 1, height: 28, color: Colors.white24),
+            if (i > 0)
+              Container(
+                width: 1,
+                height: 28,
+                color: AppTheme.textPrimary.withAlpha(61),
+              ),
             Expanded(child: stats[i]),
           ],
         ],

@@ -109,7 +109,7 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
                   backgroundColor: AppTheme.background,
                   body: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: SystemUiOverlayStyle.light.copyWith(
-                      statusBarColor: Colors.transparent,
+                      statusBarColor: AppTheme.transparent,
                       systemNavigationBarColor: AppTheme.surfaceNavigation,
                       systemNavigationBarIconBrightness: Brightness.light,
                     ),
@@ -162,7 +162,7 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (_) => AddSpecialtyModal(dog: dog),
     );
   }
@@ -236,7 +236,7 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppTheme.transparent,
       builder: (_) => DynamicActivitySheet(
         category: 'Treino',
         dogId: dog.id,
@@ -328,7 +328,7 @@ class _TrainingHubBody extends StatelessWidget {
                           Text(
                             'Treinos',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                             ),

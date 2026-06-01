@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 
 part 'occurrence_nature_search_hint.dart';

@@ -39,8 +39,7 @@ class GpsTrackResult {
     return "$min'${sec.toString().padLeft(2, '0')}\"";
   }
 
-  List<LatLng> get polyline =>
-      points.map((p) => LatLng(p.lat, p.lng)).toList();
+  List<LatLng> get polyline => points.map((p) => LatLng(p.lat, p.lng)).toList();
 
   Map<String, dynamic> toJson() {
     return {
@@ -72,18 +71,18 @@ class GpsTrackPoint {
   LatLng get latLng => LatLng(lat, lng);
 
   Map<String, dynamic> toJson() => {
-        'lat': double.parse(lat.toStringAsFixed(6)),
-        'lng': double.parse(lng.toStringAsFixed(6)),
-        'ts': timestamp.millisecondsSinceEpoch,
-        'acc': accuracy.round(),
-      };
+    'lat': double.parse(lat.toStringAsFixed(6)),
+    'lng': double.parse(lng.toStringAsFixed(6)),
+    'ts': timestamp.millisecondsSinceEpoch,
+    'acc': accuracy.round(),
+  };
 
   factory GpsTrackPoint.fromPosition(Position p) => GpsTrackPoint(
-        lat: p.latitude,
-        lng: p.longitude,
-        timestamp: p.timestamp,
-        accuracy: p.accuracy,
-      );
+    lat: p.latitude,
+    lng: p.longitude,
+    timestamp: p.timestamp,
+    accuracy: p.accuracy,
+  );
 }
 
 /// Estados do rastreamento.
@@ -139,8 +138,7 @@ class GpsTrackingService extends ChangeNotifier {
   bool get isTracking => _state == GpsTrackingState.tracking;
   bool get isPaused => _state == GpsTrackingState.paused;
   bool get isActive =>
-      _state == GpsTrackingState.tracking ||
-      _state == GpsTrackingState.paused;
+      _state == GpsTrackingState.tracking || _state == GpsTrackingState.paused;
   bool get isFinished => _state == GpsTrackingState.finished;
 
   double get distanceMeters => _distanceMeters;
@@ -156,8 +154,7 @@ class GpsTrackingService extends ChangeNotifier {
   LatLng? get currentPosition =>
       _points.isNotEmpty ? _points.last.latLng : null;
 
-  LatLng? get startPosition =>
-      _points.isNotEmpty ? _points.first.latLng : null;
+  LatLng? get startPosition => _points.isNotEmpty ? _points.first.latLng : null;
 
   double get avgSpeedKmh {
     if (_elapsedSeconds <= 0) return 0;
@@ -320,7 +317,7 @@ class GpsTrackingService extends ChangeNotifier {
     // Filtro 4: velocidade impossível (salto de GPS)
     final timeDiff =
         position.timestamp.difference(prev.timestamp).inMilliseconds.abs() /
-            1000;
+        1000;
     if (timeDiff <= 0) return;
     final speed = distance / timeDiff;
     if (speed > _maxSpeedMs) return;

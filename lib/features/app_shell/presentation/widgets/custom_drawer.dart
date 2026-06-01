@@ -5,10 +5,7 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/pending_scre
 class CustomDrawer extends StatelessWidget {
   final String userId;
 
-  const CustomDrawer({
-    super.key,
-    required this.userId,
-  });
+  const CustomDrawer({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -27,16 +24,16 @@ class CustomDrawer extends StatelessWidget {
                 Text(
                   'Canil GCM',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'RA: $userId',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ],
             ),

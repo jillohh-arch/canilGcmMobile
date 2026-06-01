@@ -138,7 +138,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
                   child: Text(
                     '${loc.index}',
                     style: GoogleFonts.ibmPlexMono(
-                      color: const Color(0xFF04181D),
+                      color: AppTheme.background,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -181,7 +181,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
                 child: Text(
                   '${loc.index}',
                   style: GoogleFonts.ibmPlexMono(
-                    color: const Color(0xFF04181D),
+                    color: AppTheme.background,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),
@@ -192,7 +192,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
                 child: Text(
                   loc.label,
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),

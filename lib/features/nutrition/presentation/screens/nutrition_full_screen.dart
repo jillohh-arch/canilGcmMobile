@@ -20,10 +20,7 @@ import 'package:canil_gcm/core/services/pdf_generator/nutrition_pdf.dart';
 class NutritionFullScreen extends StatefulWidget {
   final Dog dog;
 
-  const NutritionFullScreen({
-    super.key,
-    required this.dog,
-  });
+  const NutritionFullScreen({super.key, required this.dog});
 
   @override
   State<NutritionFullScreen> createState() => _NutritionFullScreenState();
@@ -52,7 +49,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppTheme.transparent,
           systemNavigationBarColor: AppTheme.background,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -62,8 +59,8 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xFF040B0F),
-                Color(0xFF06131A),
+                AppTheme.surfaceBackdrop,
+                AppTheme.surfacePanelDeep,
                 AppTheme.background,
               ],
             ),
@@ -84,7 +81,12 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                           _buildHeader(context, historyContextLabel),
                           Expanded(
                             child: SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                8,
+                                16,
+                                100,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -133,15 +135,17 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                color: AppTheme.textPrimary.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: AppTheme.textPrimary.withValues(alpha: 0.15),
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(
                 child: Text(
                   '‹',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 22,
                     height: 0.9,
                     fontWeight: FontWeight.w300,
@@ -168,7 +172,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                 Text(
                   'Nutrição',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -192,10 +196,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
               color: _nutritionColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Text(
-              '🥩',
-              style: TextStyle(fontSize: 20),
-            ),
+            child: const Text('🥩', style: TextStyle(fontSize: 20)),
           ),
         ],
       ),
@@ -239,16 +240,13 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF261D15),
+          color: AppTheme.surfaceNutrition,
           border: Border.all(color: _nutritionColor.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Text(
-              '📄',
-              style: TextStyle(fontSize: 20),
-            ),
+            const Text('📄', style: TextStyle(fontSize: 20)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -257,7 +255,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                   Text(
                     'Exportar relatório nutricional',
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -302,8 +300,10 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F1B22),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+            color: AppTheme.surfacePanelMuted,
+            border: Border.all(
+              color: AppTheme.textPrimary.withValues(alpha: 0.04),
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: prescription == null
@@ -314,7 +314,10 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                     Expanded(
                       child: Text(
                         'Cão sem laudo nutricional · registros não terão referência',
-                        style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 12),
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -325,10 +328,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '📋',
-                          style: TextStyle(fontSize: 24),
-                        ),
+                        const Text('📋', style: TextStyle(fontSize: 24)),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -337,7 +337,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                               Text(
                                 '${prescription.amountGramsPerDay}g/dia · ${prescription.foodType.toLowerCase()}',
                                 style: GoogleFonts.inter(
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -380,7 +380,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
   void _showPrescriptionHistory(NutritionViewModel vm) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF06131A),
+      backgroundColor: AppTheme.surfacePanelDeep,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -401,7 +401,9 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              ...vm.prescriptionHistory.map((p) => _buildPrescriptionHistoryItem(p)),
+              ...vm.prescriptionHistory.map(
+                (p) => _buildPrescriptionHistoryItem(p),
+              ),
             ],
           ),
         ),
@@ -415,9 +417,11 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: isActive ? 0.08 : 0.04),
+        color: AppTheme.textPrimary.withValues(alpha: isActive ? 0.08 : 0.04),
         border: Border.all(
-          color: isActive ? _nutritionColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
+          color: isActive
+              ? _nutritionColor.withValues(alpha: 0.4)
+              : AppTheme.textPrimary.withValues(alpha: 0.1),
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -430,7 +434,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                 Text(
                   '${p.amountGramsPerDay}g/dia • ${p.foodType}',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -473,15 +477,15 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
     final conformColor = vm.conformity90d >= 90
         ? AppTheme.success
         : vm.conformity90d >= 70
-            ? _nutritionColor
-            : AppTheme.error;
+        ? _nutritionColor
+        : AppTheme.error;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: AppTheme.surfacePanelMuted,
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.04)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -516,7 +520,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                 Text(
                   'Conformidade últimos 90 dias',
                   style: GoogleFonts.inter(
-                    color: Colors.white,
+                    color: AppTheme.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -564,8 +568,10 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            color: AppTheme.textPrimary.withValues(alpha: 0.04),
+            border: Border.all(
+              color: AppTheme.textPrimary.withValues(alpha: 0.08),
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -609,7 +615,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
             const SizedBox(width: 16),
             _legendDot(AppTheme.warning, 'Divergente'),
             const SizedBox(width: 16),
-            _legendDot(Colors.white30, 'Prescrição'),
+            _legendDot(AppTheme.textPrimary.withAlpha(77), 'Prescrição'),
           ],
         ),
       ],
@@ -631,10 +637,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
         const SizedBox(width: 6),
         Text(
           label,
-          style: GoogleFonts.inter(
-            color: AppTheme.textTertiary,
-            fontSize: 10,
-          ),
+          style: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 10),
         ),
       ],
     );
@@ -663,13 +666,33 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
             children: [
               _filterChip('todas', 'Todas', vm.filterType, vm.setFilterType),
               const SizedBox(width: 6),
-              _filterChip('conformes', 'Conformes', vm.filterType, vm.setFilterType),
+              _filterChip(
+                'conformes',
+                'Conformes',
+                vm.filterType,
+                vm.setFilterType,
+              ),
               const SizedBox(width: 6),
-              _filterChip('divergencias', 'Divergências', vm.filterType, vm.setFilterType),
+              _filterChip(
+                'divergencias',
+                'Divergências',
+                vm.filterType,
+                vm.setFilterType,
+              ),
               const SizedBox(width: 12),
-              _filterChip('semana', 'Esta semana', vm.filterPeriod, vm.setFilterPeriod),
+              _filterChip(
+                'semana',
+                'Esta semana',
+                vm.filterPeriod,
+                vm.setFilterPeriod,
+              ),
               const SizedBox(width: 6),
-              _filterChip('mes', 'Este mês', vm.filterPeriod, vm.setFilterPeriod),
+              _filterChip(
+                'mes',
+                'Este mês',
+                vm.filterPeriod,
+                vm.setFilterPeriod,
+              ),
             ],
           ),
         ),
@@ -678,16 +701,24 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
   }
 
   Widget _filterChip(
-      String value, String label, String current, void Function(String) onTap) {
+    String value,
+    String label,
+    String current,
+    void Function(String) onTap,
+  ) {
     final selected = current == value;
     return GestureDetector(
       onTap: () => onTap(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? _nutritionColor.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
+          color: selected
+              ? _nutritionColor.withValues(alpha: 0.12)
+              : AppTheme.textPrimary.withValues(alpha: 0.04),
           border: Border.all(
-            color: selected ? _nutritionColor.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
+            color: selected
+                ? _nutritionColor.withValues(alpha: 0.4)
+                : AppTheme.textPrimary.withValues(alpha: 0.1),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -774,7 +805,11 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
 
     // Calculate relative day name
     final now = DateTime.now();
-    final diff = DateTime(now.year, now.month, now.day).difference(DateTime(f.fedAt.year, f.fedAt.month, f.fedAt.day)).inDays;
+    final diff = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(f.fedAt.year, f.fedAt.month, f.fedAt.day)).inDays;
     String dayLabel = DateFormat('dd/MM').format(f.fedAt);
     if (diff == 0) {
       dayLabel = 'HOJE';
@@ -789,9 +824,11 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B22),
+        color: AppTheme.surfacePanelMuted,
         border: Border.all(
-          color: isDivergent ? AppTheme.warning.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.04),
+          color: isDivergent
+              ? AppTheme.warning.withValues(alpha: 0.2)
+              : AppTheme.textPrimary.withValues(alpha: 0.04),
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -808,10 +845,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           ),
           const SizedBox(width: 16),
           // Period emoji
-          Text(
-            periodIcon,
-            style: const TextStyle(fontSize: 16),
-          ),
+          Text(periodIcon, style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 16),
           // Amount details
           Expanded(
@@ -827,7 +861,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
                           TextSpan(
                             text: f.amountGrams.toString(),
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: AppTheme.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
@@ -930,12 +964,16 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.add_circle_outline, color: Color(0xFF050D10), size: 18),
+              const Icon(
+                Icons.add_circle_outline,
+                color: AppTheme.background,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 'REGISTRAR ALIMENTAÇÃO',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF050D10),
+                  color: AppTheme.background,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -993,9 +1031,10 @@ class _NutritionBarChartPainter extends CustomPainter {
     final barSpacing = (size.width - 16) / data.length;
 
     // Linha pontilhada da prescrição
-    final prescriptionY = size.height - (prescribedPerDay / ceiling) * size.height;
+    final prescriptionY =
+        size.height - (prescribedPerDay / ceiling) * size.height;
     final dashPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
+      ..color = AppTheme.textPrimary.withValues(alpha: 0.25)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
@@ -1013,7 +1052,7 @@ class _NutritionBarChartPainter extends CustomPainter {
     final textSpan = TextSpan(
       text: '${prescribedPerDay}g',
       style: GoogleFonts.inter(
-        color: Colors.white70,
+        color: AppTheme.textPrimary.withAlpha(179),
         fontSize: 8,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.5,
