@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -522,6 +523,19 @@ class OccurrenceViewModel extends ChangeNotifier {
         ? occurrence.signatures
         : await _signatureRepository.getSignatures(occurrence.id);
     final enrichedOccurrence = occurrence.copyWith(signatures: signatures);
+    IntegrityVerdict? integrityVerdict;
+    if (enrichedOccurrence.integrityHash?.trim().isNotEmpty == true) {
+      try {
+        integrityVerdict = await IntegrityVerificationService().verifyById(
+          occurrence.id,
+          verifyMediaBytes: false,
+        );
+      } catch (error) {
+        debugPrint(
+          '[OccurrenceViewModel] Verificacao local do selo falhou: $error',
+        );
+      }
+    }
     final generator = OccurrencePdfGenerator();
     return generator.generate(
       occurrence: enrichedOccurrence,
@@ -529,6 +543,7 @@ class OccurrenceViewModel extends ChangeNotifier {
       dog: dog,
       handlerName: handlerName,
       handlerRa: handlerRa,
+      integrityVerdict: integrityVerdict,
     );
   }
 

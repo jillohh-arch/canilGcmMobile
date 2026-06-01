@@ -146,7 +146,10 @@ void main() {
               'foto-trocada',
         );
 
-        final verdict = await service.verifyById(sealed.id);
+        final verdict = await service.verifyById(
+          sealed.id,
+          verifyMediaBytes: true,
+        );
 
         expect(verdict.status, IntegrityStatus.broken);
         expect(verdict.checkedMediaCount, 1);
@@ -177,7 +180,10 @@ void main() {
             'foto-a',
       );
 
-      final verdict = await service.verifyById(sealed.id);
+      final verdict = await service.verifyById(
+        sealed.id,
+        verifyMediaBytes: true,
+      );
 
       expect(verdict.status, IntegrityStatus.intact);
       expect(verdict.checkedMediaCount, 1);
@@ -194,6 +200,72 @@ void main() {
 
       expect(participation.status, OccurrenceParticipationStatus.accepted);
       expect(participation.toHashPayload()['status'], 'accepted');
+    });
+
+    test('hash canonico ignora duplicatas em arrays como a Function', () {
+      final base = _occurrence().copyWith(
+        results: const [
+          OccurrenceResult.drugSeized,
+          OccurrenceResult.drugSeized,
+        ],
+        finalizationPhotos: const [
+          ' https://example.test/final.jpg ',
+          'https://example.test/final.jpg',
+        ],
+        finalizationPhotoHashes: const [' final-hash ', 'final-hash'],
+        acceptedHandlerIds: const ['123', '123'],
+      );
+      final canonical = _occurrence().copyWith(
+        finalizationPhotos: const ['https://example.test/final.jpg'],
+        finalizationPhotoHashes: const ['final-hash'],
+        acceptedHandlerIds: const ['123'],
+      );
+      final duplicatedEvent = _eventWithPhotoUrls(
+        photoHash: 'foto-a',
+        photoUrls: const [
+          ' https://example.test/foto.jpg ',
+          'https://example.test/foto.jpg',
+        ],
+      );
+      final canonicalEvent = _eventWithPhotoUrls(
+        photoHash: 'foto-a',
+        photoUrls: const ['https://example.test/foto.jpg'],
+      );
+
+      final duplicatedHash =
+          OccurrenceFinalizationService.calculateIntegrityHashV4For(
+            base,
+            events: [duplicatedEvent],
+          );
+      final canonicalHash =
+          OccurrenceFinalizationService.calculateIntegrityHashV4For(
+            canonical,
+            events: [canonicalEvent],
+          );
+
+      expect(duplicatedHash, canonicalHash);
+    });
+
+    test('hash canonico ignora eventos soft-deletados como a Function', () {
+      final occurrence = _occurrence();
+      final activeEvent = _event(id: 'event-1', photoHash: 'foto-a');
+      final deletedEvent = _event(
+        id: 'event-2',
+        photoHash: 'foto-removida',
+      ).copyWith(deletedAt: DateTime.utc(2026, 5, 29, 12));
+
+      final withDeleted =
+          OccurrenceFinalizationService.calculateIntegrityHashV4For(
+            occurrence,
+            events: [activeEvent, deletedEvent],
+          );
+      final withoutDeleted =
+          OccurrenceFinalizationService.calculateIntegrityHashV4For(
+            occurrence,
+            events: [activeEvent],
+          );
+
+      expect(withDeleted, withoutDeleted);
     });
   });
 }
@@ -270,6 +342,18 @@ Occurrence _occurrence() {
 }
 
 OccurrenceEvent _event({String id = 'event-1', required String photoHash}) {
+  return _eventWithPhotoUrls(
+    id: id,
+    photoHash: photoHash,
+    photoUrls: const ['https://example.test/foto.jpg'],
+  );
+}
+
+OccurrenceEvent _eventWithPhotoUrls({
+  String id = 'event-1',
+  required String photoHash,
+  required List<String> photoUrls,
+}) {
   final now = DateTime.utc(2026, 5, 29, 11);
   return OccurrenceEvent(
     id: id,
@@ -278,7 +362,7 @@ OccurrenceEvent _event({String id = 'event-1', required String photoHash}) {
     timestamp: now,
     title: 'Indicação',
     description: 'K9 indicou odor alvo',
-    photoUrls: const ['https://example.test/foto.jpg'],
+    photoUrls: photoUrls,
     photoMetadata: [
       {'sha256': photoHash},
     ],

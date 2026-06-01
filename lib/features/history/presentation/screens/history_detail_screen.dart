@@ -620,91 +620,11 @@ class HistoryDetailScaffold extends StatelessWidget {
     final hasOccurrenceHash = occurrenceHash?.isNotEmpty == true;
 
     if (isOcc && isFinalizedOcc && hasOccurrenceHash) {
-      return FutureBuilder<IntegrityVerdict>(
-        future: IntegrityVerificationService().verifyById(detail.id),
-        builder: (context, snapshot) {
-          final verdict = snapshot.data;
-          final verifying = snapshot.connectionState == ConnectionState.waiting;
-          final color = verifying
-              ? _cyan
-              : verdict?.status == IntegrityStatus.broken
-              ? _red
-              : verdict?.status == IntegrityStatus.legacy
-              ? _amber
-              : _green;
-          final icon = verifying
-              ? Icons.hourglass_top_rounded
-              : verdict?.status == IntegrityStatus.broken
-              ? Icons.gpp_bad_outlined
-              : verdict?.status == IntegrityStatus.legacy
-              ? Icons.history_edu_outlined
-              : Icons.verified_user_outlined;
-          final title = verifying
-              ? 'VERIFICANDO SELO SHA-256'
-              : '${(verdict?.label ?? 'Documento integro').toUpperCase()} - HASH V${verdict?.hashVersion ?? '?'}';
-
-          return _buildIntegrityCard(
-            context: context,
-            color: color,
-            icon: icon,
-            title: title,
-            body: Padding(
-              padding: const EdgeInsets.only(top: 9),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SelectableText(
-                    occurrenceHash!,
-                    style: GoogleFonts.ibmPlexMono(
-                      color: _textSecondary,
-                      fontSize: 10.5,
-                      height: 1.5,
-                    ),
-                  ),
-                  if (verdict?.recomputedHash != null &&
-                      verdict!.recomputedHash != verdict.storedHash) ...[
-                    const SizedBox(height: 8),
-                    SelectableText(
-                      'Recalculado: ${verdict.recomputedHash}',
-                      style: GoogleFonts.ibmPlexMono(
-                        color: _red,
-                        fontSize: 10.5,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                  if (verdict?.hasMediaIssues == true) ...[
-                    const SizedBox(height: 8),
-                    ...verdict!.mediaIssues
-                        .take(3)
-                        .map(
-                          (issue) => Text(
-                            issue,
-                            style: GoogleFonts.inter(
-                              color: _red,
-                              fontSize: 11,
-                              height: 1.4,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                  ] else if ((verdict?.checkedMediaCount ?? 0) > 0) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Midias verificadas no Storage: ${verdict!.checkedMediaCount}',
-                      style: GoogleFonts.inter(
-                        color: _green,
-                        fontSize: 11,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
+      return _VerifiedOccurrenceIntegrityCard(
+        detail: detail,
+        occurrenceHash: occurrenceHash!,
+        onAuditTrail: () => _showAuditTrail(context),
+        onCreateAmendment: () => _openCreateAmendment(context),
       );
     }
 
@@ -879,6 +799,7 @@ class HistoryDetailScaffold extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Widget _buildIntegrityCard({
     required BuildContext context,
     required Color color,
@@ -1105,6 +1026,289 @@ class HistoryDetailScaffold extends StatelessWidget {
 // =============================================================================
 // BODY 1: OCORRÊNCIA
 // =============================================================================
+
+class _VerifiedOccurrenceIntegrityCard extends StatefulWidget {
+  final RecordDetail detail;
+  final String occurrenceHash;
+  final VoidCallback onAuditTrail;
+  final VoidCallback onCreateAmendment;
+
+  const _VerifiedOccurrenceIntegrityCard({
+    required this.detail,
+    required this.occurrenceHash,
+    required this.onAuditTrail,
+    required this.onCreateAmendment,
+  });
+
+  @override
+  State<_VerifiedOccurrenceIntegrityCard> createState() =>
+      _VerifiedOccurrenceIntegrityCardState();
+}
+
+class _VerifiedOccurrenceIntegrityCardState
+    extends State<_VerifiedOccurrenceIntegrityCard> {
+  late Future<IntegrityVerdict> _future;
+  bool _deepMediaVerification = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _verify(verifyMediaBytes: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant _VerifiedOccurrenceIntegrityCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.detail.id != widget.detail.id) {
+      _deepMediaVerification = false;
+      _future = _verify(verifyMediaBytes: false);
+    }
+  }
+
+  Future<IntegrityVerdict> _verify({required bool verifyMediaBytes}) {
+    return IntegrityVerificationService().verifyById(
+      widget.detail.id,
+      verifyMediaBytes: verifyMediaBytes,
+    );
+  }
+
+  void _verifyMediaBytes() {
+    setState(() {
+      _deepMediaVerification = true;
+      _future = _verify(verifyMediaBytes: true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<IntegrityVerdict>(
+      future: _future,
+      builder: (context, snapshot) {
+        final verdict = snapshot.data;
+        final verifying = snapshot.connectionState == ConnectionState.waiting;
+        final color = verifying
+            ? _cyan
+            : verdict?.status == IntegrityStatus.broken
+            ? _red
+            : verdict?.status == IntegrityStatus.legacy
+            ? _amber
+            : _green;
+        final icon = verifying
+            ? Icons.hourglass_top_rounded
+            : verdict?.status == IntegrityStatus.broken
+            ? Icons.gpp_bad_outlined
+            : verdict?.status == IntegrityStatus.legacy
+            ? Icons.history_edu_outlined
+            : Icons.verified_user_outlined;
+        final title = verifying
+            ? (_deepMediaVerification
+                  ? 'VERIFICANDO MIDIAS NO STORAGE'
+                  : 'VERIFICANDO SELO SHA-256')
+            : '${(verdict?.label ?? 'Documento integro').toUpperCase()} - HASH V${verdict?.hashVersion ?? '?'}';
+
+        return _buildCard(
+          color: color,
+          icon: icon,
+          title: title,
+          body: _buildBody(verdict, verifying),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(IntegrityVerdict? verdict, bool verifying) {
+    final canCheckMedia =
+        !verifying &&
+        !_deepMediaVerification &&
+        verdict?.status == IntegrityStatus.intact &&
+        (verdict?.hashVersion ?? 1) >= 2;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(
+            widget.occurrenceHash,
+            style: GoogleFonts.ibmPlexMono(
+              color: _textSecondary,
+              fontSize: 10.5,
+              height: 1.5,
+            ),
+          ),
+          if (verdict?.recomputedHash != null &&
+              verdict!.recomputedHash != verdict.storedHash) ...[
+            const SizedBox(height: 8),
+            SelectableText(
+              'Recalculado: ${verdict.recomputedHash}',
+              style: GoogleFonts.ibmPlexMono(
+                color: _red,
+                fontSize: 10.5,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (verdict?.hasMediaIssues == true) ...[
+            const SizedBox(height: 8),
+            ...verdict!.mediaIssues
+                .take(3)
+                .map(
+                  (issue) => Text(
+                    issue,
+                    style: GoogleFonts.inter(
+                      color: _red,
+                      fontSize: 11,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+          ] else if ((verdict?.checkedMediaCount ?? 0) > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Midias verificadas no Storage: ${verdict!.checkedMediaCount}',
+              style: GoogleFonts.inter(
+                color: _green,
+                fontSize: 11,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (canCheckMedia) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Hash documental conferido. As fotos podem ser verificadas sob demanda.',
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 11,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              onPressed: _verifyMediaBytes,
+              icon: const Icon(Icons.photo_library_outlined, size: 16),
+              label: const Text('Verificar fotos no Storage'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _cyan,
+                side: BorderSide(color: _cyan.withAlpha(150)),
+                textStyle: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required Color color,
+    required IconData icon,
+    required String title,
+    required Widget body,
+  }) {
+    final count = widget.detail.auditEvents.length;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(10),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: color.withAlpha(38)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body,
+          const SizedBox(height: 12),
+          Container(height: 1, color: _textPrimary.withAlpha(15)),
+          const SizedBox(height: 11),
+          InkWell(
+            onTap: widget.onAuditTrail,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(
+                      color: _textSecondary,
+                      fontSize: 12,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Trilha de auditoria - '),
+                      TextSpan(
+                        text: '$count ${count == 1 ? 'registro' : 'registros'}',
+                        style: const TextStyle(
+                          color: _textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _textSecondary,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 11),
+          Container(height: 1, color: _textPrimary.withAlpha(15)),
+          const SizedBox(height: 11),
+          InkWell(
+            onTap: widget.onCreateAmendment,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.post_add_rounded, color: _amber, size: 14),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Adicionar retificacao',
+                      style: GoogleFonts.inter(
+                        color: _amber,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: _amber.withAlpha(150),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class HistoryOccurrenceBody extends StatelessWidget {
   final RecordDetail detail;

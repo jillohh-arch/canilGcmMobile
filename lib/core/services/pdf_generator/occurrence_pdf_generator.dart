@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
@@ -42,6 +43,7 @@ class OccurrencePdfGenerator {
   static final _amber = PdfInstitutionalColors.amber;
   static final _amberBg = PdfInstitutionalColors.amberBackground;
   static final _amberLine = PdfInstitutionalColors.amberBorder;
+  static final _red = PdfInstitutionalColors.redAlert;
   static final _headerBg = PdfInstitutionalColors.headerBackground;
   static final _headerAccent = PdfInstitutionalColors.headerAccent;
   static final _mapBg = PdfInstitutionalColors.mapBackground;
@@ -64,6 +66,7 @@ class OccurrencePdfGenerator {
     required Dog dog,
     required String handlerName,
     required String handlerRa,
+    IntegrityVerdict? integrityVerdict,
   }) async {
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
@@ -104,6 +107,7 @@ class OccurrencePdfGenerator {
       displacementMapImage: displacementMapImage,
       locations: locations,
       amendments: amendments,
+      integrityVerdict: integrityVerdict,
     );
 
     pdf
@@ -2928,9 +2932,22 @@ class OccurrencePdfGenerator {
     final storedHash = ctx.occurrence.integrityHash?.trim();
     final hasHash = storedHash != null && storedHash.isNotEmpty;
     final hash = hasHash ? storedHash : 'Hash ainda nao calculado';
-    final stateColor = hasHash ? _green : _amber;
-    final stateBg = hasHash ? _greenBg : _amberBg;
-    final stateLine = hasHash ? _greenLine : _amberLine;
+    final verdict = ctx.integrityVerdict;
+    final isBroken = verdict?.status == IntegrityStatus.broken;
+    final isIntact = verdict?.status == IntegrityStatus.intact;
+    final stateColor = isBroken
+        ? _red
+        : isIntact
+        ? _green
+        : _amber;
+    final stateBg = isIntact ? _greenBg : _amberBg;
+    final stateLine = isIntact ? _greenLine : _amberLine;
+    final stateSymbol = isBroken
+        ? '!'
+        : isIntact
+        ? 'OK'
+        : '!';
+    final stateText = _integrityStateText(hasHash: hasHash, verdict: verdict);
     return _roundedCard(
       padding: const pw.EdgeInsets.all(13),
       radius: 9,
@@ -2964,28 +2981,65 @@ class OccurrencePdfGenerator {
             child: pw.Row(
               children: [
                 pw.Text(
-                  hasHash ? 'OK' : '!',
+                  stateSymbol,
                   style: _bodyBold(f, size: 8, color: stateColor),
                 ),
                 pw.SizedBox(width: 8),
                 pw.Expanded(
                   child: pw.Text(
-                    hasHash
-                        ? 'INTEGRO\nConteudo nao alterado apos a finalizacao.'
-                        : 'PENDENTE\nFinalize a ocorrencia para cristalizar o hash.',
+                    stateText,
                     style: _body(
                       f,
                       size: 7.7,
-                      color: hasHash ? _inkSoft : _amber,
+                      color: isIntact ? _inkSoft : stateColor,
                     ),
                   ),
                 ),
               ],
             ),
           ),
+          if (isBroken && verdict?.recomputedHash?.isNotEmpty == true) ...[
+            pw.SizedBox(height: 8),
+            _tinyLabel('SHA-256 recalculado pelo verificador local', f),
+            pw.SizedBox(height: 5),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(9),
+              decoration: pw.BoxDecoration(
+                color: PdfInstitutionalColors.panelMuted,
+                border: pw.Border.all(color: _amberLine),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              ),
+              child: pw.Text(
+                verdict!.recomputedHash!,
+                style: _mono(f, size: 7.6, color: _red),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _integrityStateText({
+    required bool hasHash,
+    required IntegrityVerdict? verdict,
+  }) {
+    if (!hasHash) {
+      return 'PENDENTE\nFinalize a ocorrencia para cristalizar o hash.';
+    }
+    if (verdict == null) {
+      return 'SELO ARMAZENADO\nVerificacao local indisponivel neste PDF. Confirme pelo QR Code.';
+    }
+    return switch (verdict.status) {
+      IntegrityStatus.intact =>
+        'INTEGRO\nHash recalculado localmente e conferido com o selo armazenado.',
+      IntegrityStatus.broken =>
+        'SELO QUEBRADO\nHash recalculado nao confere com o selo armazenado.',
+      IntegrityStatus.legacy =>
+        'SELO LEGADO\nVersao de hash nao recalculavel pelo verificador atual.',
+      IntegrityStatus.unsealed =>
+        'PENDENTE\nOcorrencia sem selo de integridade armazenado.',
+    };
   }
 
   pw.Widget _verificationBox(_OccurrencePdfContext ctx) {
@@ -3018,7 +3072,7 @@ class OccurrencePdfGenerator {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'Escaneie para verificar a integridade e autenticidade do documento.',
+                      'Escaneie para recalcular o hash documental no servidor. A pagina tambem permite verificar fotos no Storage sob demanda.',
                       style: _body(f, size: 7.8, color: _inkSoft),
                     ),
                     pw.SizedBox(height: 4),
@@ -3044,7 +3098,7 @@ class OccurrencePdfGenerator {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
             ),
             child: pw.Text(
-              'A consulta pelo QR Code recalcula o hash no servidor e compara com o selo armazenado no Firestore.',
+              'Consulta rapida: hash documental. Verificacao profunda: baixa as midias do Storage e compara os SHA-256 registrados.',
               style: _body(f, size: 7, color: _green),
             ),
           ),
@@ -3407,6 +3461,7 @@ class _OccurrencePdfContext {
   final pw.ImageProvider? displacementMapImage;
   final List<OccurrenceLocation> locations;
   final List<Amendment> amendments;
+  final IntegrityVerdict? integrityVerdict;
 
   const _OccurrencePdfContext({
     required this.occurrence,
@@ -3422,6 +3477,7 @@ class _OccurrencePdfContext {
     required this.displacementMapImage,
     required this.locations,
     this.amendments = const [],
+    this.integrityVerdict,
   });
 }
 

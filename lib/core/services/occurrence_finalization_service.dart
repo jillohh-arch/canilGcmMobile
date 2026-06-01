@@ -297,13 +297,10 @@ class OccurrenceFinalizationService {
         occurrence.correctionRequests.map(_normalizeForHash).toList()
           ..sort((a, b) => _canonicalJson(a).compareTo(_canonicalJson(b)));
     final eventPayload =
-        events.map((event) {
-          final photoHashes =
-              event.photoMetadata
-                  .where((metadata) => metadata['sha256'] != null)
-                  .map((metadata) => metadata['sha256'].toString())
-                  .toList()
-                ..sort();
+        events.where((event) => !event.isDeleted).map((event) {
+          final photoHashes = _sortedStringValues(
+            event.photoMetadata.map((metadata) => metadata['sha256']),
+          );
           final payload = {
             'category': event.category.toMap(),
             'description': event.description,
@@ -311,7 +308,7 @@ class OccurrenceFinalizationService {
             'gps_lat': event.gpsLat,
             'gps_lng': event.gpsLng,
             'id': event.id,
-            'photo_urls': [...event.photoUrls]..sort(),
+            'photo_urls': _stringArray(event.photoUrls),
             'place_label': event.placeLabel,
             'timestamp': event.timestamp.toUtc().toIso8601String(),
             'title': event.title,
@@ -327,14 +324,15 @@ class OccurrenceFinalizationService {
           if (byTimestamp != 0) return byTimestamp;
           return (a['id'] as String).compareTo(b['id'] as String);
         });
-    final resultPayload =
-        occurrence.results.map((result) => result.toMap()).toList()..sort();
+    final resultPayload = _stringArray(
+      occurrence.results.map((result) => result.toMap()),
+    );
 
     final payload = {
       'details': _normalizeForHash(occurrence.details),
       'dog_id': occurrence.dogId,
       'final_report': occurrence.finalReport,
-      'finalization_photos': [...occurrence.finalizationPhotos]..sort(),
+      'finalization_photos': _stringArray(occurrence.finalizationPhotos),
       'gps_accuracy': occurrence.gpsAccuracy,
       'gps_lat': occurrence.gpsLat,
       'gps_lng': occurrence.gpsLng,
@@ -358,8 +356,8 @@ class OccurrenceFinalizationService {
     };
     if (includePhotoHashes) {
       payload['finalization_photo_hashes'] = [
-        ...occurrence.finalizationPhotoHashes,
-      ]..sort();
+        ..._stringArray(occurrence.finalizationPhotoHashes),
+      ];
     }
     if (includeTeamAndSignatures) {
       payload['team'] = sortedTeam
@@ -370,17 +368,20 @@ class OccurrenceFinalizationService {
           .toList();
     }
     if (includeCrewReview) {
-      payload['accepted_handler_ids'] = [...occurrence.acceptedHandlerIds]
-        ..sort();
-      payload['declined_handler_ids'] = [...occurrence.declinedHandlerIds]
-        ..sort();
-      payload['edit_authorized_handler_ids'] = [
-        ...occurrence.editAuthorizedHandlerIds,
-      ]..sort();
+      payload['accepted_handler_ids'] = _stringArray(
+        occurrence.acceptedHandlerIds,
+      );
+      payload['declined_handler_ids'] = _stringArray(
+        occurrence.declinedHandlerIds,
+      );
+      payload['edit_authorized_handler_ids'] = _stringArray(
+        occurrence.editAuthorizedHandlerIds,
+      );
       payload['participation_revision'] = occurrence.participationRevision;
       payload['participation_status'] = occurrence.participationStatus;
-      payload['pending_handler_ids'] = [...occurrence.pendingHandlerIds]
-        ..sort();
+      payload['pending_handler_ids'] = _stringArray(
+        occurrence.pendingHandlerIds,
+      );
       payload['signature_round'] = occurrence.signatureRound;
       payload['participations'] = sortedParticipations
           .map((participation) => participation.toHashPayload())
@@ -441,6 +442,26 @@ class OccurrenceFinalizationService {
       return value.map(_normalizeForHash).toList();
     }
     return value;
+  }
+
+  static List<String> _stringArray(Iterable<dynamic> values) {
+    return {
+      for (final value in values)
+        if (_stringValue(value) != null) _stringValue(value)!,
+    }.toList()..sort();
+  }
+
+  static List<String> _sortedStringValues(Iterable<dynamic> values) {
+    return [
+      for (final value in values)
+        if (_stringValue(value) != null) _stringValue(value)!,
+    ]..sort();
+  }
+
+  static String? _stringValue(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
   }
 
   static String? _finalReportFor(Occurrence occurrence) {

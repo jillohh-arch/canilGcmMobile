@@ -91,7 +91,7 @@ class IntegrityVerificationService {
 
   Future<IntegrityVerdict> verifyById(
     String occurrenceId, {
-    bool verifyMediaBytes = true,
+    bool verifyMediaBytes = false,
   }) async {
     final occurrence = await _occurrences.getById(occurrenceId);
     if (occurrence == null) {

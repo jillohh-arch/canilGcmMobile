@@ -11,6 +11,18 @@ const region = "southamerica-east1";
 
 type JsonMap = Record<string, unknown>;
 
+interface ExpectedMedia {
+  label: string;
+  url: string;
+  expectedHash?: string;
+}
+
+interface MediaVerificationResult {
+  status: "not_requested" | "skipped" | "passed" | "failed";
+  checked: number;
+  issues: string[];
+}
+
 interface CallerIdentity {
   uid: string;
   email: string;
@@ -74,6 +86,13 @@ function stringArray(value: unknown): string[] {
   ).sort();
 }
 
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => stringValue(item))
+    .filter((item): item is string => Boolean(item));
+}
+
 function mapArray(value: unknown): JsonMap[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is JsonMap => isPlainObject(item));
@@ -119,6 +138,57 @@ function canonicalJson(value: unknown): string {
 
 function hashPayload(payload: unknown): string {
   return crypto.createHash("sha256").update(canonicalJson(payload), "utf8").digest("hex");
+}
+
+function storageLocationFromUrl(rawUrl: string): {bucket?: string; path?: string} {
+  const url = rawUrl.trim();
+  if (!url) return {};
+  if (url.startsWith("gs://")) {
+    const withoutScheme = url.slice("gs://".length);
+    const slash = withoutScheme.indexOf("/");
+    if (slash < 0) return {bucket: withoutScheme};
+    return {
+      bucket: withoutScheme.slice(0, slash),
+      path: withoutScheme.slice(slash + 1),
+    };
+  }
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const bucketIndex = parts.indexOf("b");
+    const objectIndex = parts.indexOf("o");
+    if (bucketIndex >= 0 && objectIndex > bucketIndex && parts[bucketIndex + 1]) {
+      return {
+        bucket: decodeURIComponent(parts[bucketIndex + 1]),
+        path: decodeURIComponent(parts.slice(objectIndex + 1).join("/")),
+      };
+    }
+    if (parsed.hostname === "storage.googleapis.com" && parts.length >= 2) {
+      return {
+        bucket: decodeURIComponent(parts[0]),
+        path: decodeURIComponent(parts.slice(1).join("/")),
+      };
+    }
+  } catch {
+    return {};
+  }
+  return {};
+}
+
+async function sha256FromStorageUrl(rawUrl: string, maxBytes = 20 * 1024 * 1024): Promise<string | undefined> {
+  const location = storageLocationFromUrl(rawUrl);
+  if (!location.path) return undefined;
+  const bucket = location.bucket ?
+    admin.storage().bucket(location.bucket) :
+    admin.storage().bucket();
+  const file = bucket.file(location.path);
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size ?? 0);
+  if (Number.isFinite(size) && size > maxBytes) {
+    throw new Error(`midia excede limite de ${maxBytes} bytes`);
+  }
+  const [bytes] = await file.download();
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 function isPrimaryHandler(occurrence: JsonMap, caller: CallerIdentity): boolean {
@@ -292,6 +362,71 @@ function eventHashPayload(
   };
   if (includePhotoHashes) payload.photo_hashes = photoHashes;
   return payload;
+}
+
+function expectedEventMedia(eventId: string, event: JsonMap): ExpectedMedia[] {
+  if (event.deleted_at !== undefined && event.deleted_at !== null) return [];
+  const metadata = mapArray(event.photo_metadata);
+  const metadataByUrl = new Map<string, JsonMap>();
+  for (const item of metadata) {
+    const url = stringValue(item.url);
+    if (url) metadataByUrl.set(url, item);
+  }
+  return stringList(event.photo_urls).map((url, index) => {
+    const item = metadataByUrl.get(url) ?? metadata[index];
+    return {
+      label: `evento ${eventId} foto ${index + 1}`,
+      url,
+      expectedHash: stringValue(item?.sha256),
+    };
+  });
+}
+
+function expectedFinalizationMedia(occurrence: JsonMap): ExpectedMedia[] {
+  const urls = stringList(occurrence.finalization_photos);
+  const hashes = stringList(occurrence.finalization_photo_hashes);
+  return urls.map((url, index) => ({
+    label: `finalizacao foto ${index + 1}`,
+    url,
+    expectedHash: hashes[index],
+  }));
+}
+
+async function verifyMediaBytes(
+  occurrence: JsonMap,
+  events: Array<{id: string; data: JsonMap}>,
+): Promise<MediaVerificationResult> {
+  const expectedMedia = [
+    ...events.flatMap((event) => expectedEventMedia(event.id, event.data)),
+    ...expectedFinalizationMedia(occurrence),
+  ];
+  const issues: string[] = [];
+  let checked = 0;
+
+  for (const media of expectedMedia) {
+    if (!media.url) continue;
+    if (!media.expectedHash) {
+      issues.push(`${media.label}: hash esperado ausente`);
+      continue;
+    }
+    try {
+      const actualHash = await sha256FromStorageUrl(media.url);
+      checked += 1;
+      if (!actualHash) {
+        issues.push(`${media.label}: URL de Storage nao reconhecida`);
+      } else if (actualHash !== media.expectedHash) {
+        issues.push(`${media.label}: SHA-256 da midia nao confere`);
+      }
+    } catch (error) {
+      issues.push(`${media.label}: falha ao verificar midia (${String(error)})`);
+    }
+  }
+
+  return {
+    status: issues.length > 0 ? "failed" : "passed",
+    checked,
+    issues,
+  };
 }
 
 function buildHashPayloadForVersion(
@@ -1328,7 +1463,10 @@ function occurrenceIdFromRequest(req: {path: string; url?: string; query: JsonMa
   return undefined;
 }
 
-async function verifyOccurrenceDocument(occurrenceId: string): Promise<JsonMap> {
+async function verifyOccurrenceDocument(
+  occurrenceId: string,
+  options: {verifyMedia?: boolean} = {},
+): Promise<JsonMap> {
   const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
   const occurrenceSnap = await occurrenceRef.get();
   const checkedAt = new Date().toISOString();
@@ -1401,18 +1539,40 @@ async function verifyOccurrenceDocument(occurrenceId: string): Promise<JsonMap> 
       hashVersion,
     ),
   );
-  const intact = storedHash === recalculatedHash;
+  const documentIntact = storedHash === recalculatedHash;
+  let mediaResult: MediaVerificationResult = {
+    status: "not_requested",
+    checked: 0,
+    issues: [],
+  };
+  if (options.verifyMedia === true) {
+    mediaResult = documentIntact && hashVersion >= 2 ?
+      await verifyMediaBytes(occurrence, events) :
+      {status: "skipped", checked: 0, issues: []};
+  }
+  const mediaIntact = mediaResult.status === "passed" ? true :
+    mediaResult.status === "failed" ? false :
+      null;
+  const intact = documentIntact && mediaIntact !== false;
+  const status = !documentIntact ? "broken" :
+    mediaIntact === false ? "media_broken" :
+      "intact";
 
   return {
     ...baseResult,
-    status: intact ? "intact" : "broken",
+    status,
     sealed: true,
     intact,
+    document_intact: documentIntact,
     recalculated_hash: recalculatedHash,
     events_checked: events.length,
     signatures_checked: signatures.length,
     participations_checked: participations.length,
     correction_requests_checked: correctionRequests.length,
+    media_verification: mediaResult.status,
+    media_checked: mediaResult.checked,
+    media_intact: mediaIntact,
+    media_issues: mediaResult.issues,
   };
 }
 
@@ -1428,13 +1588,28 @@ function htmlEscape(value: unknown): string {
 function verificationHtml(result: JsonMap): string {
   const status = String(result.status ?? "unknown");
   const ok = result.intact === true;
-  const title = ok ? "Selo íntegro" : "Selo não confirmado";
+  const mediaStatus = String(result.media_verification ?? "not_requested");
+  const mediaChecked = Number(result.media_checked ?? 0);
+  const title = ok && mediaStatus === "passed" ?
+    "Selo e midias integros" :
+    ok ? "Selo documental integro" : "Selo nao confirmado";
   const accent = ok ? "#1f9d52" : "#b42318";
-  const message = ok ?
-    "O hash armazenado confere com o recálculo feito no servidor." :
-    status === "broken" ?
-      "O hash armazenado não confere com o recálculo do servidor." :
-      "Não foi possível confirmar a integridade deste registro.";
+  const message = ok && mediaStatus === "passed" ?
+    "O hash armazenado confere com o recalculo do servidor, e as midias verificadas no Storage conferem com os SHA-256 registrados." :
+    ok ?
+      "O hash documental armazenado confere com o recalculo feito no servidor. As midias nao foram baixadas nesta consulta." :
+      status === "media_broken" ?
+        "O hash documental confere, mas uma ou mais midias nao conferem com os SHA-256 registrados." :
+        status === "broken" ?
+          "O hash armazenado nao confere com o recalculo do servidor." :
+          "Nao foi possivel confirmar a integridade deste registro.";
+  const mediaIssues = Array.isArray(result.media_issues) ? result.media_issues : [];
+  const mediaRows = mediaIssues.length > 0 ?
+    `<dt>Problemas de midia</dt><dd>${mediaIssues.map((issue) => `<div>${htmlEscape(issue)}</div>`).join("")}</dd>` :
+    "";
+  const mediaAction = ok && mediaStatus === "not_requested" ?
+    `<p><a href="?id=${encodeURIComponent(String(result.occurrence_id ?? ""))}&media=1">Verificar fotos no Storage</a></p>` :
+    "";
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -1452,6 +1627,7 @@ function verificationHtml(result: JsonMap): string {
     dt { color: #7aa1aa; }
     dd { margin: 0; overflow-wrap: anywhere; }
     code { color: #4dd0e1; }
+    a { color: #4dd0e1; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -1460,6 +1636,7 @@ function verificationHtml(result: JsonMap): string {
       <span class="badge">${htmlEscape(title)}</span>
       <h1>Verificação de ocorrência</h1>
       <p>${htmlEscape(message)}</p>
+      ${mediaAction}
       <dl>
         <dt>Ocorrência</dt><dd><code>${htmlEscape(result.occurrence_id)}</code></dd>
         <dt>Natureza</dt><dd>${htmlEscape(result.type_name ?? "Não informada")}</dd>
@@ -1467,6 +1644,8 @@ function verificationHtml(result: JsonMap): string {
         <dt>Versão do hash</dt><dd>${htmlEscape(result.hash_version)}</dd>
         <dt>Hash armazenado</dt><dd><code>${htmlEscape(result.stored_hash ?? "-")}</code></dd>
         <dt>Hash recalculado</dt><dd><code>${htmlEscape(result.recalculated_hash ?? "-")}</code></dd>
+        <dt>Midias</dt><dd>${htmlEscape(mediaStatus)} - ${htmlEscape(mediaChecked)} verificada(s)</dd>
+        ${mediaRows}
         <dt>Verificado em</dt><dd>${htmlEscape(result.checked_at)}</dd>
       </dl>
     </section>
@@ -1483,7 +1662,10 @@ export const verifyOccurrence = onRequest({region}, async (req, res) => {
       return;
     }
 
-    const result = await verifyOccurrenceDocument(occurrenceId);
+    const verifyMedia = req.query.media === "1" ||
+      req.query.media === "true" ||
+      req.query.deep === "1";
+    const result = await verifyOccurrenceDocument(occurrenceId, {verifyMedia});
     const wantsJson = req.query.format === "json" ||
       String(req.headers.accept ?? "").includes("application/json");
     const statusCode = result.status === "not_found" ? 404 : 200;
