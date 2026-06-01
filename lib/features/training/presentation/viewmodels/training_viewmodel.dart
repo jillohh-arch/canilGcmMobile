@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/training/data/training_service.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
-import 'package:canil_gcm/core/services/audit_service.dart';
 
 class TrainingViewModel extends ChangeNotifier {
   final TrainingService _trainingService = TrainingService();
@@ -29,21 +28,21 @@ class TrainingViewModel extends ChangeNotifier {
 
       final newSession = await _trainingService.addTrainingSession(session);
 
-      // Update Dog's lastTrainingDate
-      await _dogService.updateDogDates(
-        session.dogId,
-        lastTrainingDate: session.date,
-      );
+      // A falha nesse resumo não pode anular o registro de treino já gravado.
+      try {
+        await _dogService.updateDogDates(
+          newSession.dogId,
+          lastTrainingDate: newSession.date,
+        );
+      } catch (e) {
+        developer.log(
+          'Training saved, but dog lastTrainingDate update failed: $e',
+          name: 'TrainingViewModel',
+          error: e,
+        );
+      }
 
       _trainings.insert(0, newSession);
-
-      AuditService.log(
-        action: 'create',
-        entityType: 'training',
-        entityId: newSession.id ?? '',
-        summary: 'Treino registrado: ${session.trainingType} — ${session.dogId}',
-        after: {'trainingType': session.trainingType, 'dogId': session.dogId, 'duration': session.searchDuration},
-      );
 
       developer.log(
         'Training session added: ${newSession.id}',
@@ -110,7 +109,10 @@ class TrainingViewModel extends ChangeNotifier {
       // Update local state
       _trainings.removeWhere((t) => t.id == id);
 
-      developer.log('Training session soft-deleted: $id', name: 'TrainingViewModel');
+      developer.log(
+        'Training session soft-deleted: $id',
+        name: 'TrainingViewModel',
+      );
       _setLoading(false);
     } catch (e) {
       _setLoading(false);

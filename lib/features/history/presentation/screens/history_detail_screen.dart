@@ -11,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/integrity_verification_service.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
@@ -29,15 +30,15 @@ import 'package:canil_gcm/features/history/presentation/widgets/gps_track_detail
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/occurrence_displacement_map.dart';
 
-// --- Design tokens from mockup ---
-const Color _bg = Color(0xFF050D10);
-const Color _cyan = Color(0xFF4DD0E1);
-const Color _textPrimary = Color(0xFFFFFFFF);
-const Color _textSecondary = Color(0xFFB0C4CC);
-const Color _textMuted = Color(0xFF5A7280);
-const Color _green = Color(0xFF2ECC71);
-const Color _amber = Color(0xFFF1C40F);
-const Color _red = Color(0xFFE74C3C);
+// Tokens locais mantidos por compatibilidade com a tela longa.
+const Color _bg = AppTheme.background;
+const Color _cyan = AppTheme.primary;
+const Color _textPrimary = AppTheme.textPrimary;
+const Color _textSecondary = AppTheme.textSecondary;
+const Color _textMuted = AppTheme.textMuted;
+const Color _green = AppTheme.success;
+const Color _amber = AppTheme.warning;
+const Color _red = AppTheme.error;
 
 class HistoryDetailScreen extends StatelessWidget {
   final HistoryEntry entry;
@@ -669,6 +670,33 @@ class HistoryDetailScaffold extends StatelessWidget {
                         color: _red,
                         fontSize: 10.5,
                         height: 1.5,
+                      ),
+                    ),
+                  ],
+                  if (verdict?.hasMediaIssues == true) ...[
+                    const SizedBox(height: 8),
+                    ...verdict!.mediaIssues
+                        .take(3)
+                        .map(
+                          (issue) => Text(
+                            issue,
+                            style: GoogleFonts.inter(
+                              color: _red,
+                              fontSize: 11,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                  ] else if ((verdict?.checkedMediaCount ?? 0) > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Midias verificadas no Storage: ${verdict!.checkedMediaCount}',
+                      style: GoogleFonts.inter(
+                        color: _green,
+                        fontSize: 11,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -3442,8 +3470,8 @@ class _StartDot extends StatelessWidget {
       height: 12,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFFF1C40F), // Amber
-        border: Border.all(color: const Color(0xFF050D10), width: 2),
+        color: _amber,
+        border: Border.all(color: _bg, width: 2),
       ),
     );
   }
@@ -3460,8 +3488,8 @@ class _EndPin extends StatelessWidget {
         width: 14,
         height: 14,
         decoration: BoxDecoration(
-          color: const Color(0xFF2ECC71), // Green
-          border: Border.all(color: const Color(0xFF050D10), width: 2),
+          color: _green,
+          border: Border.all(color: _bg, width: 2),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(7),
             topRight: Radius.circular(7),

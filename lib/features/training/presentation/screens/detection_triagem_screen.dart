@@ -44,27 +44,32 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
     {
       'key': 'drive',
       'label': 'Drive para bola',
-      'description': 'Impulso de caça e obsessão pelo brinquedo/objeto de busca.',
+      'description':
+          'Impulso de caça e obsessão pelo brinquedo/objeto de busca.',
     },
     {
       'key': 'foco',
       'label': 'Foco',
-      'description': 'Capacidade de ignorar distrações externas e manter a atenção na tarefa.',
+      'description':
+          'Capacidade de ignorar distrações externas e manter a atenção na tarefa.',
     },
     {
       'key': 'persistencia',
       'label': 'Persistência',
-      'description': 'Insistência na busca do odor ou do brinquedo mesmo em situações difíceis.',
+      'description':
+          'Insistência na busca do odor ou do brinquedo mesmo em situações difíceis.',
     },
     {
       'key': 'independencia',
       'label': 'Independência',
-      'description': 'Autonomia e proatividade para investigar sem depender do condutor.',
+      'description':
+          'Autonomia e proatividade para investigar sem depender do condutor.',
     },
     {
       'key': 'nervo',
       'label': 'Nervo',
-      'description': 'Estabilidade emocional frente a sons, superfícies estranhas e alturas.',
+      'description':
+          'Estabilidade emocional frente a sons, superfícies estranhas e alturas.',
     },
   ];
 
@@ -74,7 +79,8 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
     super.dispose();
   }
 
-  int get _totalScore => _scores.values.fold(0, (total, val) => total + val.round());
+  int get _totalScore =>
+      _scores.values.fold(0, (total, val) => total + val.round());
 
   String get _recommendation {
     final total = _totalScore;
@@ -100,9 +106,16 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
   bool get _hasDivergence {
     final recomm = _recommendation;
     final decision = _selectedDecision;
-    if (recomm == 'Apto' && decision != 'Continuar Formação (F1)') return true;
-    if (recomm == 'Reavaliar' && decision != 'Reavaliar em 30 dias') return true;
-    if (recomm == 'Reprovado' && decision != 'Sugerir redirecionamento/doação') return true;
+    if (recomm == 'Apto' && decision != 'Continuar Formação (F1)') {
+      return true;
+    }
+    if (recomm == 'Reavaliar' && decision != 'Reavaliar em 30 dias') {
+      return true;
+    }
+    if (recomm == 'Reprovado' &&
+        decision != 'Sugerir redirecionamento/doação') {
+      return true;
+    }
     return false;
   }
 
@@ -146,7 +159,11 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
       final userVM = Provider.of<UserViewModel>(context, listen: false);
       final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
 
-      final currentRa = shiftVM.handlerId ?? HandlerIdentityService.raFromUser(authVM.user) ?? '';
+      final currentRa =
+          shiftVM.handlerId ??
+          HandlerIdentityService.raFromUser(authVM.user) ??
+          '';
+      final dogId = shiftVM.activeDogId ?? widget.dog.id;
       final handlerName = userVM.displayNameFor(
         ra: currentRa,
         firebaseUser: authVM.user,
@@ -155,7 +172,8 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
 
       final evaluationData = {
         'date': Timestamp.now(),
-        'dogId': widget.dog.id,
+        'dogId': dogId,
+        'dog_id': dogId,
         'dogName': widget.dog.name,
         'scores': _scores.map((key, value) => MapEntry(key, value.round())),
         'totalScore': _totalScore,
@@ -166,12 +184,18 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         'handlerId': currentRa,
         'handlerName': handlerName,
         'createdAt': FieldValue.serverTimestamp(),
+        'audit_trail': [
+          AuditService.buildInlineEntry(
+            action: 'created',
+            reason: 'Triagem de detecção registrada.',
+          ),
+        ],
       };
 
       // 1. Write evaluation to /dogs/{dogId}/triagem_evaluations
       final evalRef = await FirebaseFirestore.instance
           .collection('dogs')
-          .doc(widget.dog.id)
+          .doc(dogId)
           .collection('triagem_evaluations')
           .add(evaluationData);
 
@@ -191,21 +215,24 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
 
       // 3. Update specialty in /dogs/{dogId}/specialties/deteccao
       final specialtyService = DogSpecialtyService();
-      final existing = await specialtyService.getByType(widget.dog.id, 'deteccao');
+      final existing = await specialtyService.getByType(dogId, 'deteccao');
       final updatedSpecialty = DogSpecialty(
         id: existing?.id,
         type: 'deteccao',
         status: newStatus,
         currentPhase: newPhase,
-        startedAt: newStatus == 'in_formation' ? DateTime.now() : existing?.startedAt,
+        startedAt: newStatus == 'in_formation'
+            ? DateTime.now()
+            : existing?.startedAt,
         operationalSince: existing?.operationalSince,
-        notes: 'Triagem realizada em ${DateFormat('dd/MM/yyyy').format(DateTime.now())}. Decisão: $_selectedDecision. Pontuação: $_totalScore/50.',
+        notes:
+            'Triagem realizada em ${DateFormat('dd/MM/yyyy').format(DateTime.now())}. Decisão: $_selectedDecision. Pontuação: $_totalScore/50.',
       );
 
       if (existing != null) {
-        await specialtyService.updateSpecialty(widget.dog.id, updatedSpecialty);
+        await specialtyService.updateSpecialty(dogId, updatedSpecialty);
       } else {
-        await specialtyService.addSpecialty(widget.dog.id, updatedSpecialty);
+        await specialtyService.addSpecialty(dogId, updatedSpecialty);
       }
 
       // 4. Log audit trails
@@ -213,7 +240,8 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         action: 'created',
         entityType: 'triagem_evaluation',
         entityId: evalRef.id,
-        summary: 'Avaliação de triagem de detecção registrada para ${widget.dog.name}: $_totalScore/50 ($_selectedDecision)',
+        summary:
+            'Avaliação de triagem de detecção registrada para ${widget.dog.name}: $_totalScore/50 ($_selectedDecision)',
         after: evaluationData,
       );
 
@@ -221,8 +249,11 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         action: existing != null ? 'updated' : 'created',
         entityType: 'specialty',
         entityId: existing?.id ?? 'deteccao',
-        summary: 'Especialidade Detecção para ${widget.dog.name} definida como $newStatus (Fase: $newPhase)',
-        before: existing != null ? {'status': existing.status, 'currentPhase': existing.currentPhase} : null,
+        summary:
+            'Especialidade Detecção para ${widget.dog.name} definida como $newStatus (Fase: $newPhase)',
+        before: existing != null
+            ? {'status': existing.status, 'currentPhase': existing.currentPhase}
+            : null,
         after: {'status': newStatus, 'currentPhase': newPhase},
       );
 
@@ -286,7 +317,10 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -416,7 +450,10 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: levelColor.withAlpha(20),
                       borderRadius: BorderRadius.circular(4),
@@ -453,7 +490,10 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
               thumbColor: AppTheme.primary,
               overlayColor: AppTheme.primary.withAlpha(40),
               valueIndicatorColor: AppTheme.primary,
-              valueIndicatorTextStyle: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold),
+              valueIndicatorTextStyle: GoogleFonts.inter(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             child: Slider(
               value: value,
@@ -502,7 +542,10 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: recommColor,
                   borderRadius: BorderRadius.circular(6),
@@ -599,9 +642,14 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
               },
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? color.withAlpha(15) : Colors.white.withAlpha(5),
+                  color: isSelected
+                      ? color.withAlpha(15)
+                      : Colors.white.withAlpha(5),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isSelected ? color : AppTheme.outline,
@@ -617,8 +665,12 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
                         opt['value'] as String,
                         style: GoogleFonts.inter(
                           fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                          color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          color: isSelected
+                              ? AppTheme.textPrimary
+                              : AppTheme.textSecondary,
                         ),
                       ),
                     ),
@@ -688,7 +740,10 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
             hintText: _hasDivergence
                 ? 'Justifique obrigatoriamente a escolha de decisão manual diferente da recomendação automática baseada na pontuação...'
                 : 'Descreva observações adicionais sobre o K9 (comportamento sob pressão, reatividade a barulho, etc.)...',
-            hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary, fontSize: 13),
+            hintStyle: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 13,
+            ),
             filled: true,
             fillColor: Colors.white.withAlpha(6),
             border: OutlineInputBorder(

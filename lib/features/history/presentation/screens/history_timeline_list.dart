@@ -18,10 +18,10 @@ class _HistoryTimeline extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 8, bottom: 100),
-      itemCount: _itemCount(),
+      padding: const EdgeInsets.only(top: 8, bottom: 142),
+      itemCount: groups.length + (hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (hasMore && index == _itemCount() - 1) {
+        if (hasMore && index == groups.length) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 22),
             child: OutlinedButton(
@@ -31,48 +31,58 @@ class _HistoryTimeline extends StatelessWidget {
                 side: BorderSide(color: _hCyan.withAlpha(120)),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
               child: Text(
-                'CARREGAR MAIS 30',
+                'Carregar mais 30',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
                 ),
               ),
             ),
           );
         }
 
-        int offset = 0;
-        for (final group in groups) {
-          if (index == offset) {
-            return _DayHeader(group: group);
-          }
-          offset++;
-          if (index < offset + group.entries.length) {
-            final entryIndex = index - offset;
-            final isLast = entryIndex == group.entries.length - 1;
-            return HistoryTimelineItem(
-              entry: group.entries[entryIndex],
-              isLast: isLast,
-            );
-          }
-          offset += group.entries.length;
-        }
-        return const SizedBox.shrink();
+        return _HistoryDaySection(group: groups[index]);
       },
     );
   }
+}
 
-  int _itemCount() {
-    int count = 0;
-    for (final group in groups) {
-      count += 1 + group.entries.length;
-    }
-    return count + (hasMore ? 1 : 0);
+class _HistoryDaySection extends StatelessWidget {
+  final HistoryDayGroup group;
+
+  const _HistoryDaySection({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: [
+          _DayHeader(group: group),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(6),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withAlpha(18)),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < group.entries.length; i++)
+                  HistoryTimelineItem(
+                    entry: group.entries[i],
+                    isLast: i == group.entries.length - 1,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -83,33 +93,29 @@ class _DayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _hBg,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text(
-            group.label,
-            style: GoogleFonts.inter(
-              color: _hCyan,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          group.label,
+          style: GoogleFonts.inter(
+            color: _hCyan,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.8,
           ),
-          Text(
-            group.dateFormatted,
-            style: GoogleFonts.inter(
-              color: _hTextMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+        const Spacer(),
+        Text(
+          group.dateFormatted,
+          style: GoogleFonts.inter(
+            color: _hTextMuted,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -177,10 +183,9 @@ extension _HistoryGrouping on _HistoryScreenState {
       final dayEntries = grouped[key]!
         ..sort((a, b) => b.time.compareTo(a.time));
 
-      final label = _labelForDate(date, today, yesterday);
       return HistoryDayGroup(
         date: date,
-        label: label,
+        label: _labelForDate(date, today, yesterday),
         dateFormatted: _formatDayDateExtended(date),
         entries: dayEntries,
       );
@@ -223,9 +228,6 @@ extension _HistoryGrouping on _HistoryScreenState {
       'novembro',
       'dezembro',
     ];
-    final day = date.day;
-    final month = months[date.month];
-    final weekday = weekdays[date.weekday];
-    return '$day de $month · $weekday';
+    return '${date.day} de ${months[date.month]} · ${weekdays[date.weekday]}';
   }
 }

@@ -30,32 +30,46 @@ class OccurrenceRepository {
     final now = DateTime.now();
 
     final entry = AuditService.buildInlineEntry(action: 'created');
-    final acceptedHandlerIds = occurrence.teamHandlerIds;
+    final primaryHandlerId = _primaryParticipationHandlerId(occurrence);
+    final teamHandlerIds = occurrence.teamHandlerIds;
+    final acceptedHandlerIds = primaryHandlerId == null
+        ? <String>[]
+        : <String>[primaryHandlerId];
+    final pendingHandlerIds = teamHandlerIds
+        .where((handlerId) => handlerId != primaryHandlerId)
+        .toList();
     final created = occurrence.copyWith(
       createdAt: now,
       updatedAt: now,
       auditTrail: [entry],
-      participationStatus: acceptedHandlerIds.isEmpty ? null : 'accepted',
+      participationStatus: teamHandlerIds.isEmpty
+          ? null
+          : pendingHandlerIds.isEmpty
+          ? 'accepted'
+          : 'pending_acceptance',
       acceptedHandlerIds: acceptedHandlerIds,
       declinedHandlerIds: const [],
-      pendingHandlerIds: const [],
+      pendingHandlerIds: pendingHandlerIds,
       editAuthorizedHandlerIds: acceptedHandlerIds,
-      participationRevision: acceptedHandlerIds.isEmpty ? 0 : 1,
+      participationRevision: teamHandlerIds.isEmpty ? 0 : 1,
     );
 
     final batch = _firestore.batch();
     batch.set(docRef, created.toMap());
     final participationAt = DateTime.now();
     for (final member in created.team) {
-      if (member.handlerId.trim().isEmpty) continue;
+      final handlerId = member.handlerId.trim();
+      if (handlerId.isEmpty) continue;
       final participation = OccurrenceParticipation(
-        handlerId: member.handlerId.trim(),
-        status: OccurrenceParticipationStatus.included,
+        handlerId: handlerId,
+        status: handlerId == primaryHandlerId
+            ? OccurrenceParticipationStatus.accepted
+            : OccurrenceParticipationStatus.pending,
         at: participationAt,
         updatedBy: created.primaryHandlerRa,
       );
       batch.set(
-        docRef.collection('participations').doc(member.handlerId.trim()),
+        docRef.collection('participations').doc(handlerId),
         participation.toJson(),
       );
     }
@@ -80,6 +94,24 @@ class OccurrenceRepository {
     );
 
     return created;
+  }
+
+  static String? _primaryParticipationHandlerId(Occurrence occurrence) {
+    final primaryRa = occurrence.primaryHandlerRa?.trim();
+    if (primaryRa != null && primaryRa.isNotEmpty) return primaryRa;
+
+    for (final member in occurrence.team) {
+      if (member.role == TeamRole.titular &&
+          member.handlerId.trim().isNotEmpty) {
+        return member.handlerId.trim();
+      }
+    }
+
+    final primaryId = occurrence.primaryHandlerId.trim();
+    if (primaryId.isNotEmpty && occurrence.teamHandlerIds.contains(primaryId)) {
+      return primaryId;
+    }
+    return null;
   }
 
   Future<void> update(String id, Map<String, dynamic> updates) async {

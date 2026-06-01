@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:canil_gcm/core/services/active_shift_identity_service.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_formation_session.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_phase_config.dart';
@@ -22,17 +25,16 @@ class DetectionService {
       _firestore.collection('dogs').doc(dogId).collection('training_attempts');
 
   Stream<List<DetectionLine>> watchLines(String dogId) {
-    return _linesCol(dogId).snapshots().map(
-      (snap) {
-        final lines = snap.docs
-            .map((doc) => DetectionLine.fromJson(doc.data(), docId: doc.id))
-            .where((line) => !line.isDeleted)
-            .toList()
-          ..sort(_sortLines);
-        _healFormationCompleteLines(dogId, lines);
-        return lines.map(_healFormationCompleteLocal).toList();
-      },
-    );
+    return _linesCol(dogId).snapshots().map((snap) {
+      final lines =
+          snap.docs
+              .map((doc) => DetectionLine.fromJson(doc.data(), docId: doc.id))
+              .where((line) => !line.isDeleted)
+              .toList()
+            ..sort(_sortLines);
+      _healFormationCompleteLines(dogId, lines);
+      return lines.map(_healFormationCompleteLocal).toList();
+    });
   }
 
   Future<List<DetectionLine>> getLines(String dogId) async {
@@ -93,54 +95,26 @@ class DetectionService {
     if (existing.isNotEmpty) return existing;
 
     final now = DateTime.now();
-    final defaults = [
-      DetectionLine(
-        id: 'drogas',
-        type: 'drogas',
-        status: 'in_formation',
-        currentPhase: '1b',
-        startedAt: now,
-        updatedAt: now,
-        auditTrail: [
-          _auditEntry(
-            action: 'created',
-            handlerId: handlerId,
-            handlerName: handlerName,
-            reason: 'Linha padrão criada para início da formação.',
+    final defaults = DetectionLine.officialTypes
+        .map(
+          (type) => DetectionLine(
+            id: type,
+            type: type,
+            status: 'not_started',
+            currentPhase: '1b',
+            updatedAt: now,
+            auditTrail: [
+              _auditEntry(
+                action: 'created',
+                handlerId: handlerId,
+                handlerName: handlerName,
+                reason:
+                    'Linha oficial criada como não iniciada; formação depende de triagem.',
+              ),
+            ],
           ),
-        ],
-      ),
-      DetectionLine(
-        id: 'armas',
-        type: 'armas',
-        status: 'not_started',
-        currentPhase: '1b',
-        updatedAt: now,
-        auditTrail: [
-          _auditEntry(
-            action: 'created',
-            handlerId: handlerId,
-            handlerName: handlerName,
-            reason: 'Linha padrão disponível para formação futura.',
-          ),
-        ],
-      ),
-      DetectionLine(
-        id: 'cadaver',
-        type: 'cadaver',
-        status: 'not_started',
-        currentPhase: '1b',
-        updatedAt: now,
-        auditTrail: [
-          _auditEntry(
-            action: 'created',
-            handlerId: handlerId,
-            handlerName: handlerName,
-            reason: 'Linha padrão disponível para formação futura.',
-          ),
-        ],
-      ),
-    ];
+        )
+        .toList(growable: false);
 
     final batch = _firestore.batch();
     for (final line in defaults) {
@@ -164,18 +138,33 @@ class DetectionService {
 
   Future<String> addLine(String dogId, DetectionLine line) async {
     final docId = line.id ?? line.normalizedType;
-    await _linesCol(dogId).doc(docId).set(line.toJson());
+    final handlerId = await _resolvedHandlerId();
+    final created = line.copyWith(
+      id: docId,
+      updatedAt: DateTime.now(),
+      auditTrail: line.auditTrail.isEmpty
+          ? [
+              _auditEntry(
+                action: 'created',
+                handlerId: handlerId,
+                handlerName: '',
+                reason: 'Linha de detecção criada.',
+              ),
+            ]
+          : line.auditTrail,
+    );
+    await _linesCol(dogId).doc(docId).set(created.toJson());
     return docId;
   }
 
   Future<void> updateLine(String dogId, DetectionLine line) async {
     if (line.id == null) return;
-    await _linesCol(dogId)
-        .doc(line.id)
-        .set(
-          line.copyWith(updatedAt: DateTime.now()).toJson(),
-          SetOptions(merge: true),
-        );
+    await _saveLineWithAudit(
+      dogId: dogId,
+      line: line,
+      action: 'updated',
+      reason: 'Linha de detecção atualizada.',
+    );
   }
 
   Future<DetectionLine> ensureLineStarted({
@@ -263,6 +252,15 @@ class DetectionService {
     );
     if (open != null) return open;
 
+    final activeLine = line.status == 'not_started'
+        ? await ensureLineStarted(
+            dogId: dogId,
+            line: line,
+            handlerId: handlerId,
+            handlerName: handlerName,
+          )
+        : line;
+
     final sessionRef = _sessionsCol(dogId).doc();
     final now = DateTime.now();
     final auditTrail = [
@@ -271,7 +269,7 @@ class DetectionService {
         handlerId: handlerId,
         handlerName: handlerName,
         reason: 'Sessão de formação iniciada.',
-        metadata: {'phase': phase.code, 'line': line.displayName},
+        metadata: {'phase': phase.code, 'line': activeLine.displayName},
       ),
     ];
     final session = DetectionFormationSession.fromRecorder(
@@ -279,8 +277,8 @@ class DetectionService {
       dogId: dogId,
       dogName: dogName,
       lineId: lineDocId,
-      lineName: line.displayName,
-      lineType: line.normalizedType,
+      lineName: activeLine.displayName,
+      lineType: activeLine.normalizedType,
       phase: phase,
       startedAt: now,
       recorder: DetectionSessionRecorder(phase: phase),
@@ -297,7 +295,8 @@ class DetectionService {
       action: 'created',
       entityType: 'training_session',
       entityId: sessionRef.id,
-      summary: 'Sessão de formação ${line.displayName} ${phase.code} iniciada',
+      summary:
+          'Sessão de formação ${activeLine.displayName} ${phase.code} iniciada',
       after: session.toJson(),
     );
 
@@ -411,13 +410,10 @@ class DetectionService {
               handlerName: handlerName,
               reason:
                   'Formação concluída — todas as 8 fases do protocolo atingidas.',
-              metadata: {
-                'session_id': session.id,
-                'final_phase': phase.code,
-              },
-              ),
+              metadata: {'session_id': session.id, 'final_phase': phase.code},
+            ),
           ]),
-      }, SetOptions(merge: true));
+        }, SetOptions(merge: true));
       } else {
         // Avanço normal para a próxima fase
         batch.set(lineRef, {
@@ -612,24 +608,99 @@ class DetectionService {
     final updated = line.copyWith(
       consecutiveHits: newConsecutive,
       bestStreak: newBest,
-      updatedAt: DateTime.now(),
     );
-    await updateLine(dogId, updated);
-    return updated;
+    return _saveLineWithAudit(
+      dogId: dogId,
+      line: updated,
+      action: 'hit_registered',
+      reason: 'Acerto registrado na manutenção de detecção.',
+      metadata: {'consecutive_hits': newConsecutive, 'best_streak': newBest},
+    );
   }
 
   Future<DetectionLine> registerMiss(String dogId, DetectionLine line) async {
-    final updated = line.copyWith(
-      consecutiveHits: 0,
-      updatedAt: DateTime.now(),
+    final updated = line.copyWith(consecutiveHits: 0);
+    return _saveLineWithAudit(
+      dogId: dogId,
+      line: updated,
+      action: 'miss_registered',
+      reason: 'Erro registrado na manutenção de detecção.',
+      metadata: {'previous_consecutive_hits': line.consecutiveHits},
     );
-    await updateLine(dogId, updated);
-    return updated;
   }
 
   Future<String> addAttempt(String dogId, TrainingAttempt attempt) async {
-    final docRef = await _attemptsCol(dogId).add(attempt.toJson());
+    final docRef = _attemptsCol(dogId).doc();
+    final activeShift = await ActiveShiftIdentityService.resolve(
+      firestore: _firestore,
+    );
+    final handlerRa = activeShift?.handlerId ?? _currentHandlerRa() ?? '';
+    final entry = _auditEntry(
+      action: 'created',
+      handlerId: handlerRa,
+      handlerName: '',
+      reason: 'Tentativa de detecção registrada.',
+      metadata: {
+        'session_id': attempt.sessionId,
+        'attempt_number': attempt.attemptNumber,
+        'result': attempt.result,
+      },
+    );
+    await docRef.set({
+      ...attempt.toJson(),
+      'dogId': dogId,
+      'dog_id': dogId,
+      if (handlerRa.isNotEmpty) 'handlerId': handlerRa,
+      if (handlerRa.isNotEmpty) 'handler_id': handlerRa,
+      'created_at': FieldValue.serverTimestamp(),
+      'audit_trail': [entry],
+    });
     return docRef.id;
+  }
+
+  String? _currentHandlerRa() {
+    try {
+      return HandlerIdentityService.raFromUser(
+        FirebaseAuth.instance.currentUser,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _resolvedHandlerId([String? preferredRa]) async {
+    final activeShift = await ActiveShiftIdentityService.resolve(
+      firestore: _firestore,
+      preferredRa: preferredRa,
+    );
+    return activeShift?.handlerId ?? _currentHandlerRa() ?? '';
+  }
+
+  Future<DetectionLine> _saveLineWithAudit({
+    required String dogId,
+    required DetectionLine line,
+    required String action,
+    String? reason,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final docId = line.id ?? line.normalizedType;
+    final handlerId = await _resolvedHandlerId();
+    final entry = _auditEntry(
+      action: action,
+      handlerId: handlerId,
+      handlerName: '',
+      reason: reason,
+      metadata: metadata,
+    );
+    final updated = line.copyWith(
+      id: docId,
+      updatedAt: DateTime.now(),
+      auditTrail: [...line.auditTrail, entry],
+    );
+    await _linesCol(
+      dogId,
+    ).doc(docId).set(updated.toJson(), SetOptions(merge: true));
+    return updated;
   }
 
   Future<List<TrainingAttempt>> getAttemptsForSession(

@@ -38,7 +38,8 @@ void main() {
             .get();
 
         expect(snap.exists, isTrue);
-        expect(snap.data()!['status'], 'in_formation');
+        expect(snap.data()!['status'], 'not_started');
+        expect(snap.data()!['started_at'], isNull);
         expect(snap.data()!['current_phase'], '1b');
         expect(snap.data()!['audit_trail'], isNotEmpty);
       },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 class UpdateCommandStageModal extends StatefulWidget {
   final String commandName;
@@ -15,18 +16,34 @@ class UpdateCommandStageModal extends StatefulWidget {
   });
 
   @override
-  State<UpdateCommandStageModal> createState() => _UpdateCommandStageModalState();
+  State<UpdateCommandStageModal> createState() =>
+      _UpdateCommandStageModalState();
 }
 
 class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
   late int _selectedStage;
 
   final List<Map<String, String>> _stagesInfo = [
-    {'name': 'Não treinado', 'desc': 'O cão não conhece o comando ou está iniciando a indução.'},
-    {'name': 'Introduzido', 'desc': 'Conhece sob forte estímulo ou recompensa contínua.'},
-    {'name': 'Em desenvolvimento', 'desc': 'Executa em ambiente controlado com recompensas parciais.'},
-    {'name': 'Consolidado', 'desc': 'Executa com precisão em distrações moderadas.'},
-    {'name': 'Operacional', 'desc': 'Fixado de forma confiável em qualquer cenário tático.'},
+    {
+      'name': 'Não treinado',
+      'desc': 'O cão não conhece o comando ou está iniciando a indução.',
+    },
+    {
+      'name': 'Introduzido',
+      'desc': 'Conhece sob forte estímulo ou recompensa contínua.',
+    },
+    {
+      'name': 'Em desenvolvimento',
+      'desc': 'Executa em ambiente controlado com recompensas parciais.',
+    },
+    {
+      'name': 'Consolidado',
+      'desc': 'Executa com precisão em distrações moderadas.',
+    },
+    {
+      'name': 'Operacional',
+      'desc': 'Fixado de forma confiável em qualquer cenário tático.',
+    },
   ];
 
   @override
@@ -41,10 +58,15 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0C1920),
+        color: AppTheme.surfacePanel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,7 +95,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
           Text(
             'Comando: "${widget.commandName}"',
             style: GoogleFonts.inter(
-              color: const Color(0xFF4DD0E1),
+              color: AppTheme.primary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -86,17 +108,17 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
             final isCurrent = stageNum == widget.currentStage;
             final isSelected = stageNum == _selectedStage;
 
-            Color borderColor = const Color(0x14FFFFFF);
-            Color bgColor = const Color(0x0DFFFFFF);
+            Color borderColor = AppTheme.surfaceWhiteBorder;
+            Color bgColor = AppTheme.surfaceWhiteOverlay;
             Color titleColor = Colors.white;
 
             if (isSelected) {
-              borderColor = const Color(0xFF4DD0E1);
-              bgColor = const Color(0x1F4DD0E1);
-              titleColor = const Color(0xFF4DD0E1);
+              borderColor = AppTheme.primary;
+              bgColor = AppTheme.primaryDivider;
+              titleColor = AppTheme.primary;
             } else if (isCurrent) {
-              borderColor = const Color(0x334DD0E1);
-              bgColor = const Color(0x0A4DD0E1);
+              borderColor = AppTheme.primaryChipBorder;
+              bgColor = AppTheme.primaryOverlay;
             }
 
             return GestureDetector(
@@ -121,9 +143,13 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                       height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected ? const Color(0xFF4DD0E1) : Colors.transparent,
+                        color: isSelected
+                            ? AppTheme.primary
+                            : Colors.transparent,
                         border: Border.all(
-                          color: isSelected ? const Color(0xFF4DD0E1) : const Color(0x33FFFFFF),
+                          color: isSelected
+                              ? AppTheme.primary
+                              : const Color(0x33FFFFFF),
                           width: 1.5,
                         ),
                       ),
@@ -131,7 +157,9 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                       child: Text(
                         '$stageNum',
                         style: GoogleFonts.inter(
-                          color: isSelected ? const Color(0xFF050D10) : const Color(0xFFB0C4CC),
+                          color: isSelected
+                              ? AppTheme.background
+                              : AppTheme.textSecondary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -146,19 +174,30 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                             children: [
                               Text(
                                 _stagesInfo[index]['name']!,
-                                style: GoogleFonts.inter(color: titleColor, fontSize: 13, fontWeight: FontWeight.w600),
+                                style: GoogleFonts.inter(
+                                  color: titleColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               if (isCurrent) ...[
                                 const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0x264DD0E1),
+                                    color: AppTheme.primaryChipBorder,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     'ATUAL',
-                                    style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 8, fontWeight: FontWeight.bold),
+                                    style: GoogleFonts.inter(
+                                      color: AppTheme.primary,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -167,7 +206,10 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                           const SizedBox(height: 2),
                           Text(
                             _stagesInfo[index]['desc']!,
-                            style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10),
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textTertiary,
+                              fontSize: 10,
+                            ),
                           ),
                         ],
                       ),
@@ -185,7 +227,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0x1FE67E22), // rgba(230, 126, 34, 0.12)
-                border: Border.all(color: const Color(0xFFE67E22)),
+                border: Border.all(color: AppTheme.attention),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -200,7 +242,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                         Text(
                           'AVISO DE REGRESSÃO',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFFE67E22),
+                            color: AppTheme.attention,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
@@ -210,7 +252,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                         Text(
                           'Você está reduzindo o nível de consolidação deste comando. Recomenda-se registrar notas no treino justificando a regressão.',
                           style: GoogleFonts.inter(
-                            color: const Color(0xFFB0C4CC),
+                            color: AppTheme.textSecondary,
                             fontSize: 10.5,
                             height: 1.4,
                           ),
@@ -234,7 +276,7 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                     Navigator.of(context).pop();
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF7A8A92),
+                    foregroundColor: AppTheme.textTertiary,
                     side: const BorderSide(color: Color(0x1AFFFFFF)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -243,7 +285,10 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                   ),
                   child: Text(
                     'Cancelar',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -256,8 +301,10 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                     Navigator.of(context).pop(true);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isRegression ? const Color(0xFFE67E22) : const Color(0xFF4DD0E1),
-                    foregroundColor: const Color(0xFF050D10),
+                    backgroundColor: isRegression
+                        ? AppTheme.attention
+                        : AppTheme.primary,
+                    foregroundColor: AppTheme.background,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -265,7 +312,10 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                   ),
                   child: Text(
                     isRegression ? 'Confirmar Regressão' : 'Atualizar Nível',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),

@@ -755,7 +755,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Salvar como rascunho?',
           style: GoogleFonts.inter(

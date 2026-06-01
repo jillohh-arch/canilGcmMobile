@@ -1,3 +1,4 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/core/domain/occurrence_participation.dart';
@@ -119,6 +120,81 @@ void main() {
         expect(verdict.status, IntegrityStatus.intact);
       }
     });
+
+    test(
+      'verificacao profunda quebra selo quando bytes da foto mudam',
+      () async {
+        final db = FakeFirebaseFirestore();
+        final event = _event(photoHash: 'foto-a');
+        final base = _occurrence();
+        final hash = OccurrenceFinalizationService.calculateIntegrityHashV2For(
+          base,
+          events: [event],
+        );
+        final sealed = base.copyWith(integrityHash: hash, hashVersion: 2);
+        await db.collection('occurrences').doc(sealed.id).set(sealed.toMap());
+        await db
+            .collection('occurrences')
+            .doc(sealed.id)
+            .collection('events')
+            .doc(event.id)
+            .set(event.toMap());
+
+        final service = IntegrityVerificationService(
+          firestore: db,
+          mediaHashReader: (_, {int maxBytes = 20 * 1024 * 1024}) async =>
+              'foto-trocada',
+        );
+
+        final verdict = await service.verifyById(sealed.id);
+
+        expect(verdict.status, IntegrityStatus.broken);
+        expect(verdict.checkedMediaCount, 1);
+        expect(verdict.mediaIssues.single, contains('SHA-256'));
+      },
+    );
+
+    test('verificacao profunda mantem selo quando bytes conferem', () async {
+      final db = FakeFirebaseFirestore();
+      final event = _event(photoHash: 'foto-a');
+      final base = _occurrence();
+      final hash = OccurrenceFinalizationService.calculateIntegrityHashV2For(
+        base,
+        events: [event],
+      );
+      final sealed = base.copyWith(integrityHash: hash, hashVersion: 2);
+      await db.collection('occurrences').doc(sealed.id).set(sealed.toMap());
+      await db
+          .collection('occurrences')
+          .doc(sealed.id)
+          .collection('events')
+          .doc(event.id)
+          .set(event.toMap());
+
+      final service = IntegrityVerificationService(
+        firestore: db,
+        mediaHashReader: (_, {int maxBytes = 20 * 1024 * 1024}) async =>
+            'foto-a',
+      );
+
+      final verdict = await service.verifyById(sealed.id);
+
+      expect(verdict.status, IntegrityStatus.intact);
+      expect(verdict.checkedMediaCount, 1);
+      expect(verdict.mediaIssues, isEmpty);
+    });
+
+    test('participacao v4 preserva status aceito no payload do hash', () {
+      final participation = OccurrenceParticipation.fromJson({
+        'handler_id': '123',
+        'status': 'accepted',
+        'at': '2026-05-29T10:00:00.000Z',
+        'updated_by': '123',
+      });
+
+      expect(participation.status, OccurrenceParticipationStatus.accepted);
+      expect(participation.toHashPayload()['status'], 'accepted');
+    });
   });
 }
 
@@ -137,7 +213,7 @@ Occurrence _occurrenceV4() {
     participations: [
       OccurrenceParticipation(
         handlerId: '123',
-        status: OccurrenceParticipationStatus.included,
+        status: OccurrenceParticipationStatus.accepted,
         at: now,
         updatedBy: '123',
       ),

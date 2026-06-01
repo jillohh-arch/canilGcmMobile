@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/mixins/soft_deletable.dart';
+import 'package:canil_gcm/core/services/active_shift_identity_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/training/data/training_repository.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
@@ -21,18 +23,50 @@ class TrainingService {
   Future<TrainingSessionModel> addTrainingSession(
     TrainingSessionModel session,
   ) async {
-    final docRef = await _firestore
-        .collection('trainings')
-        .add(session.toJson());
-    return TrainingSessionModel.fromJson(session.toJson(), docRef.id);
+    final docRef = _firestore.collection('trainings').doc();
+    final entry = AuditService.buildInlineEntry(action: 'created');
+    final after = {...await _trainingPayload(session), 'id': docRef.id};
+
+    await docRef.set({
+      ...after,
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': [entry],
+    });
+
+    await AuditService.log(
+      action: 'created',
+      entityType: 'training',
+      entityId: docRef.id,
+      summary: _summaryFor(session, 'Treino registrado'),
+      after: after,
+    );
+
+    return TrainingSessionModel.fromJson(after, docRef.id);
   }
 
   Future<void> updateTrainingSession(TrainingSessionModel session) async {
     if (session.id == null) return;
-    await _firestore
-        .collection('trainings')
-        .doc(session.id)
-        .set(session.toJson(), SetOptions(merge: true));
+    final docRef = _firestore.collection('trainings').doc(session.id);
+    final snapshot = await docRef.get();
+    final before = snapshot.data();
+    final after = await _trainingPayload(session);
+    final entry = AuditService.buildInlineEntry(action: 'updated');
+
+    await docRef.set({
+      ...after,
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    }, SetOptions(merge: true));
+
+    await AuditService.log(
+      action: 'updated',
+      entityType: 'training',
+      entityId: session.id!,
+      summary: _summaryFor(session, 'Treino atualizado'),
+      before: before,
+      after: after,
+    );
   }
 
   /// Soft delete: marca o treino como excluído sem removê-lo fisicamente.
@@ -72,7 +106,7 @@ class TrainingService {
       'audit_trail': FieldValue.arrayUnion([entry]),
     });
 
-    AuditService.log(
+    await AuditService.log(
       action: 'deleted',
       entityType: 'training',
       entityId: id,
@@ -103,7 +137,9 @@ class TrainingService {
 
     try {
       final query = SoftDeletable.activeOnly(
-        _firestore.collection('training_sessions').where('dogId', isEqualTo: dogId),
+        _firestore
+            .collection('training_sessions')
+            .where('dogId', isEqualTo: dogId),
       );
       final rootSessions = await query.get();
       for (final doc in rootSessions.docs) {
@@ -118,7 +154,10 @@ class TrainingService {
 
     try {
       final query = SoftDeletable.activeOnly(
-        _firestore.collection('dogs').doc(dogId).collection('training_sessions'),
+        _firestore
+            .collection('dogs')
+            .doc(dogId)
+            .collection('training_sessions'),
       );
       final dogSessions = await query.get();
       for (final doc in dogSessions.docs) {
@@ -129,7 +168,9 @@ class TrainingService {
         }
       }
     } catch (e) {
-      debugPrint('[TrainingService] Erro ao buscar dogs/$dogId/training_sessions: $e');
+      debugPrint(
+        '[TrainingService] Erro ao buscar dogs/$dogId/training_sessions: $e',
+      );
     }
 
     final trainings = byKey.values.toList();
@@ -138,9 +179,7 @@ class TrainingService {
   }
 
   Future<List<TrainingSessionModel>> getAllTrainings() async {
-    final query = SoftDeletable.activeOnly(
-      _firestore.collection('trainings'),
-    );
+    final query = SoftDeletable.activeOnly(_firestore.collection('trainings'));
     final snapshot = await query.get();
     final trainings = snapshot.docs
         .map((doc) => TrainingSessionModel.fromJson(doc.data(), doc.id))
@@ -334,5 +373,44 @@ class TrainingService {
   DateTime _startOfWeek(DateTime now) {
     final start = now.subtract(Duration(days: now.weekday - 1));
     return DateTime(start.year, start.month, start.day);
+  }
+
+  String _summaryFor(TrainingSessionModel session, String prefix) {
+    final dog = session.dogName.trim().isNotEmpty
+        ? session.dogName.trim()
+        : session.dogId;
+    return '$prefix: ${session.trainingType} - $dog';
+  }
+
+  Future<Map<String, dynamic>> _trainingPayload(
+    TrainingSessionModel session,
+  ) async {
+    final activeShift = await ActiveShiftIdentityService.resolve(
+      firestore: _firestore,
+      preferredRa: session.handlerId,
+    );
+    final handlerRa =
+        activeShift?.handlerId ??
+        _currentHandlerRa() ??
+        session.handlerId.trim();
+    final dogId = activeShift?.dogId ?? session.dogId;
+    final payload = Map<String, dynamic>.from(session.toJson());
+    payload['dogId'] = dogId;
+    payload['dog_id'] = dogId;
+    if (handlerRa.isNotEmpty) {
+      payload['handlerId'] = handlerRa;
+      payload['handler_id'] = handlerRa;
+    }
+    return payload;
+  }
+
+  String? _currentHandlerRa() {
+    try {
+      return HandlerIdentityService.raFromUser(
+        FirebaseAuth.instance.currentUser,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

@@ -106,11 +106,11 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
                 );
 
                 return Scaffold(
-                  backgroundColor: const Color(0xFF050D10),
+                  backgroundColor: AppTheme.background,
                   body: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: SystemUiOverlayStyle.light.copyWith(
                       statusBarColor: Colors.transparent,
-                      systemNavigationBarColor: const Color(0xFF07141B),
+                      systemNavigationBarColor: AppTheme.surfaceNavigation,
                       systemNavigationBarIconBrightness: Brightness.light,
                     ),
                     child: _TrainingHubBody(
@@ -280,7 +280,11 @@ class _TrainingHubBody extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF061017), Color(0xFF050D10), Color(0xFF050D10)],
+          colors: [
+            AppTheme.surfacePanelStrong,
+            AppTheme.background,
+            AppTheme.background,
+          ],
         ),
       ),
       child: SafeArea(
@@ -291,20 +295,17 @@ class _TrainingHubBody extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
               decoration: const BoxDecoration(
-                color: Color(0x0A4DD0E1), // rgba(77, 208, 225, 0.04)
+                color: AppTheme.primaryOverlay,
                 border: Border(
-                  bottom: BorderSide(
-                    color: Color(0x1F4DD0E1), // rgba(77, 208, 225, 0.12)
-                    width: 1,
-                  ),
+                  bottom: BorderSide(color: AppTheme.primaryDivider, width: 1),
                 ),
               ),
               child: BinomioHeader(
                 dog: dog,
                 subtitle: 'Turno ativo$elapsedText',
-                subtitleColor: const Color(0xFF2ECC71),
+                subtitleColor: AppTheme.success,
                 showStatusDot: true,
-                statusDotColor: const Color(0xFF2ECC71),
+                statusDotColor: AppTheme.success,
                 withBackground: false,
                 showProfileButton: true,
                 onSwitchDog: () => showDogSwitcher(context),
@@ -336,7 +337,7 @@ class _TrainingHubBody extends StatelessWidget {
                           RichText(
                             text: TextSpan(
                               style: GoogleFonts.inter(
-                                color: const Color(0xFF7A8A92),
+                                color: AppTheme.textTertiary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -344,7 +345,7 @@ class _TrainingHubBody extends StatelessWidget {
                                 TextSpan(
                                   text: '${data.trainingsThisWeek} sessões',
                                   style: const TextStyle(
-                                    color: Color(0xFF4DD0E1),
+                                    color: AppTheme.primary,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -409,12 +410,12 @@ class _TrainingNoShift extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: Center(
         child: Text(
           'Nenhum turno ativo.\nInicie um turno para acessar o hub de treinos.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFFA7B4BA)),
+          style: TextStyle(color: AppTheme.textSoft),
         ),
       ),
     );
@@ -427,11 +428,11 @@ class _TrainingMissingDog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFF050D10),
+      backgroundColor: AppTheme.background,
       body: Center(
         child: Text(
           'K9 do turno não encontrado.',
-          style: TextStyle(color: Color(0xFFA7B4BA)),
+          style: TextStyle(color: AppTheme.textSoft),
         ),
       ),
     );

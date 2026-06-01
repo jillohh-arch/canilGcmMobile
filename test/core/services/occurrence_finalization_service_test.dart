@@ -116,13 +116,13 @@ void main() {
             participations: [
               OccurrenceParticipation(
                 handlerId: '123',
-                status: OccurrenceParticipationStatus.included,
+                status: OccurrenceParticipationStatus.accepted,
                 at: DateTime.utc(2026, 5, 29, 10),
                 updatedBy: '123',
               ),
               OccurrenceParticipation(
                 handlerId: '456',
-                status: OccurrenceParticipationStatus.included,
+                status: OccurrenceParticipationStatus.accepted,
                 at: DateTime.utc(2026, 5, 29, 10),
                 updatedBy: '123',
               ),

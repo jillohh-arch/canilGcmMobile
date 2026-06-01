@@ -6,10 +6,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 class StartOccurrenceObservation extends StatelessWidget {
   final TextEditingController controller;
 
-  const StartOccurrenceObservation({
-    super.key,
-    required this.controller,
-  });
+  const StartOccurrenceObservation({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +22,7 @@ class StartOccurrenceObservation extends StatelessWidget {
           fontSize: 14,
         ),
         filled: true,
-        fillColor: const Color(0xFF0E1A1F),
+        fillColor: AppTheme.surfacePanel,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: AppTheme.primary.withAlpha(60)),
@@ -38,8 +35,10 @@ class StartOccurrenceObservation extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: AppTheme.primary),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
     );
   }

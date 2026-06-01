@@ -115,4 +115,9 @@ class OccurrenceTransitionService {
       'reason': reason,
     });
   }
+
+  Future<void> acceptParticipation({required String occurrenceId}) async {
+    final callable = _functions.httpsCallable('acceptOccurrenceParticipation');
+    await callable.call<void>({'occurrence_id': occurrenceId});
+  }
 }

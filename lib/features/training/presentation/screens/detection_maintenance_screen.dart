@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
@@ -25,12 +26,14 @@ class _DetectionMaintenanceScreenState
   final _focusController = TextEditingController();
   final _obsController = TextEditingController();
 
-  // Linhas de detecção
-  static const _lines = [
-    _DetectionLine(name: 'Drogas', icon: '💊'),
-    _DetectionLine(name: 'Armas', icon: '🔫'),
-    _DetectionLine(name: 'Cadáver', icon: '🕯'),
-  ];
+  static final _lines = DetectionLine.officialTypes
+      .map(
+        (type) => _DetectionLine(
+          name: DetectionLine.displayNameForType(type),
+          icon: DetectionLine.iconForType(type),
+        ),
+      )
+      .toList(growable: false);
 
   // Cenários
   static const _scenarios = [
@@ -42,11 +45,7 @@ class _DetectionMaintenanceScreenState
   ];
 
   // Materiais de odor
-  static const _materials = [
-    'Nose-MP Drogas',
-    'Droga real',
-    'Scentlogix',
-  ];
+  static const _materials = ['Nose-MP Drogas', 'Droga real', 'Scentlogix'];
 
   // Sugestões de foco
   static const _focusSuggestions = [
@@ -185,9 +184,7 @@ class _DetectionMaintenanceScreenState
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(
-            color: AppTheme.success.withAlpha(40),
-          ),
+          bottom: BorderSide(color: AppTheme.success.withAlpha(40)),
         ),
       ),
       child: Column(
@@ -197,8 +194,11 @@ class _DetectionMaintenanceScreenState
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppTheme.textPrimary, size: 20),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppTheme.textPrimary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -251,7 +251,9 @@ class _DetectionMaintenanceScreenState
               children: [
                 BinomioHeader(
                   dog: widget.dog,
-                  subtitle: isOp ? 'OPERACIONAL EM ${_lines[_selectedLineIndex].name.toUpperCase()}' : 'EM FORMAÇÃO',
+                  subtitle: isOp
+                      ? 'OPERACIONAL EM ${_lines[_selectedLineIndex].name.toUpperCase()}'
+                      : 'EM FORMAÇÃO',
                   subtitleColor: isOp ? AppTheme.success : AppTheme.warning,
                   dogBorderColor: AppTheme.success,
                   conductorBorderColor: AppTheme.success,
@@ -259,7 +261,10 @@ class _DetectionMaintenanceScreenState
                   statusDotColor: isOp ? AppTheme.success : AppTheme.warning,
                   avatarSize: 44,
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.success.withAlpha(40),
                       borderRadius: BorderRadius.circular(12),
@@ -287,18 +292,26 @@ class _DetectionMaintenanceScreenState
                   child: Consumer<TrainingViewModel>(
                     builder: (_, vm, _) {
                       final detSessions = vm.trainings
-                          .where((t) => t.trainingType.toLowerCase().contains('detec'))
+                          .where(
+                            (t) =>
+                                t.trainingType.toLowerCase().contains('detec'),
+                          )
                           .toList();
                       final count = detSessions.length;
                       int? lastDays;
                       if (detSessions.isNotEmpty) {
                         detSessions.sort((a, b) => b.date.compareTo(a.date));
-                        lastDays = DateTime.now().difference(detSessions.first.date).inDays;
+                        lastDays = DateTime.now()
+                            .difference(detSessions.first.date)
+                            .inDays;
                       }
                       return Row(
                         children: [
                           _statItem('SESSÕES', '$count'),
-                          _statItem('ÚLTIMA', lastDays != null ? '${lastDays}d' : '—'),
+                          _statItem(
+                            'ÚLTIMA',
+                            lastDays != null ? '${lastDays}d' : '—',
+                          ),
                           _statItem('CERTIFICADO', '🏅'),
                         ],
                       );
@@ -370,8 +383,8 @@ class _DetectionMaintenanceScreenState
                       color: selected
                           ? AppTheme.success
                           : enabled
-                              ? Colors.white.withAlpha(20)
-                              : Colors.white.withAlpha(10),
+                          ? Colors.white.withAlpha(20)
+                          : Colors.white.withAlpha(10),
                       width: 1.5,
                     ),
                   ),
@@ -379,7 +392,10 @@ class _DetectionMaintenanceScreenState
                     opacity: enabled ? 1.0 : 0.4,
                     child: Column(
                       children: [
-                        Text(_lines[i].icon, style: const TextStyle(fontSize: 18)),
+                        Text(
+                          _lines[i].icon,
+                          style: const TextStyle(fontSize: 18),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           _lines[i].name,
@@ -394,10 +410,12 @@ class _DetectionMaintenanceScreenState
                           selected
                               ? '● OPERACIONAL'
                               : enabled
-                                  ? 'DISPONÍVEL'
-                                  : 'NÃO INICIADA',
+                              ? 'DISPONÍVEL'
+                              : 'NÃO INICIADA',
                           style: GoogleFonts.inter(
-                            color: selected ? AppTheme.success : AppTheme.textTertiary,
+                            color: selected
+                                ? AppTheme.success
+                                : AppTheme.textTertiary,
                             fontSize: 8,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.3,
@@ -463,7 +481,10 @@ class _DetectionMaintenanceScreenState
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppTheme.primary.withAlpha(65)),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -477,7 +498,10 @@ class _DetectionMaintenanceScreenState
                   setState(() {});
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withAlpha(20),
                     borderRadius: BorderRadius.circular(14),
@@ -583,8 +607,8 @@ class _DetectionMaintenanceScreenState
                   decoration: BoxDecoration(
                     color: selected
                         ? (isBad
-                            ? AppTheme.error.withAlpha(25)
-                            : AppTheme.success.withAlpha(25))
+                              ? AppTheme.error.withAlpha(25)
+                              : AppTheme.success.withAlpha(25))
                         : Colors.white.withAlpha(8),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
@@ -689,7 +713,8 @@ class _DetectionMaintenanceScreenState
   }
 
   Widget _recentCard(TrainingSessionModel session) {
-    final day = '${session.date.day.toString().padLeft(2, '0')}/${session.date.month.toString().padLeft(2, '0')}';
+    final day =
+        '${session.date.day.toString().padLeft(2, '0')}/${session.date.month.toString().padLeft(2, '0')}';
     final rating = session.metadata?['rating'] ?? '';
     final scenario = session.metadata?['scenario'] ?? session.location;
     final focus = session.metadata?['focus'] ?? '';
@@ -822,7 +847,9 @@ class _DetectionMaintenanceScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? AppTheme.primary.withAlpha(30) : Colors.white.withAlpha(8),
+        color: selected
+            ? AppTheme.primary.withAlpha(30)
+            : Colors.white.withAlpha(8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: selected ? AppTheme.primary : Colors.white.withAlpha(25),

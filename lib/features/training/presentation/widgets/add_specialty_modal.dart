@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
@@ -22,10 +23,15 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0C1920),
+        color: AppTheme.surfacePanel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +49,9 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
           ),
           const SizedBox(height: 16),
           Text(
-            _selectedSpecialty == 'Detecção' ? 'Substâncias Alvo' : 'Nova Especialidade',
+            _selectedSpecialty == 'Detecção'
+                ? 'Substâncias Alvo'
+                : 'Nova Especialidade',
             style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 16,
@@ -95,18 +103,23 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                   ),
                   child: Text(
                     _selectedSpecialty != null ? 'Voltar' : 'Cancelar',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _selectedSpecialty == null ? null : () => _saveSpecialty(),
+                  onPressed: _selectedSpecialty == null
+                      ? null
+                      : () => _saveSpecialty(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4DD0E1),
-                    foregroundColor: const Color(0xFF050D10),
-                    disabledBackgroundColor: const Color(0x1F4DD0E1),
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: AppTheme.background,
+                    disabledBackgroundColor: AppTheme.primaryDivider,
                     disabledForegroundColor: const Color(0x33050D10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -114,8 +127,13 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: Text(
-                    _selectedSpecialty == 'Detecção' ? 'Confirmar' : 'Iniciar Formação',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800),
+                    _selectedSpecialty == 'Detecção'
+                        ? 'Confirmar'
+                        : 'Iniciar Formação',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
@@ -129,9 +147,21 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
   Widget _buildSpecialtySelector() {
     return Column(
       children: [
-        _buildSpecialtyCard('🎯', 'Busca & Captura', 'Formação em rastro e perseguição de odor humano.'),
-        _buildSpecialtyCard('👃', 'Detecção', 'Drogas, armas, explosivos ou cadáveres.'),
-        _buildSpecialtyCard('🛡', 'Guarda & Proteção', 'Impulsos de caça, guarda de perímetro e defesa.'),
+        _buildSpecialtyCard(
+          '🎯',
+          'Busca & Captura',
+          'Formação em rastro e perseguição de odor humano.',
+        ),
+        _buildSpecialtyCard(
+          '👃',
+          'Detecção',
+          'Drogas, armas, explosivos ou cadáveres.',
+        ),
+        _buildSpecialtyCard(
+          '🛡',
+          'Guarda & Proteção',
+          'Impulsos de caça, guarda de perímetro e defesa.',
+        ),
       ],
     );
   }
@@ -141,20 +171,30 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: const Color(0x0DFFFFFF),
-        border: Border.all(color: const Color(0x14FFFFFF)),
+        border: Border.all(color: AppTheme.surfaceWhiteBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListTile(
         leading: Text(emoji, style: const TextStyle(fontSize: 24)),
         title: Text(
           title,
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         subtitle: Text(
           subtitle,
-          style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 11),
+          style: GoogleFonts.inter(
+            color: const Color(0xFF7A8A92),
+            fontSize: 11,
+          ),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF5A7280)),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppTheme.textMuted,
+        ),
         onTap: () {
           HapticFeedback.lightImpact();
           setState(() {
@@ -168,9 +208,21 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
   Widget _buildSubstanceSelector() {
     return Column(
       children: [
-        _buildSubstanceRow('💊', 'Drogas', 'maconha, cocaína, crack, LSD, ecstasy, etc.'),
-        _buildSubstanceRow('🔫', 'Armas e Pólvora', 'munições e derivados de pólvora.'),
-        _buildSubstanceRow('🕯', 'Cadáver', 'fontes biológicas e decomposição.'),
+        _buildSubstanceRow(
+          '💊',
+          'Drogas',
+          'maconha, cocaína, crack, LSD, ecstasy, etc.',
+        ),
+        _buildSubstanceRow(
+          '🔫',
+          'Armas',
+          'armas, munições e peças relacionadas.',
+        ),
+        _buildSubstanceRow(
+          '🕯',
+          'Cadáver',
+          'fontes biológicas e decomposição.',
+        ),
       ],
     );
   }
@@ -180,8 +232,12 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0x1A4DD0E1) : const Color(0x0DFFFFFF),
-        border: Border.all(color: isSelected ? const Color(0xFF4DD0E1) : const Color(0x14FFFFFF)),
+        color: isSelected
+            ? AppTheme.primaryChipBackground
+            : AppTheme.surfaceWhiteOverlay,
+        border: Border.all(
+          color: isSelected ? AppTheme.primary : AppTheme.surfaceWhiteBorder,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: CheckboxListTile(
@@ -196,21 +252,28 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
             }
           });
         },
-        activeColor: const Color(0xFF4DD0E1),
-        checkColor: const Color(0xFF050D10),
+        activeColor: AppTheme.primary,
+        checkColor: AppTheme.background,
         title: Row(
           children: [
             Text(emoji, style: const TextStyle(fontSize: 20)),
             const SizedBox(width: 8),
             Text(
               title,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
         subtitle: Text(
           subtitle,
-          style: GoogleFonts.inter(color: const Color(0xFF7A8A92), fontSize: 10.5),
+          style: GoogleFonts.inter(
+            color: const Color(0xFF7A8A92),
+            fontSize: 10.5,
+          ),
         ),
       ),
     );
@@ -220,7 +283,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0x0DFFFFFF),
+        color: AppTheme.surfaceWhiteOverlay,
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,
@@ -230,13 +293,21 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
           const SizedBox(height: 10),
           Text(
             'Confirmar início de formação',
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'O cão será registrado como "Em Formação" na especialidade de $_selectedSpecialty.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(color: const Color(0xFFB0C4CC), fontSize: 11, height: 1.4),
+            style: GoogleFonts.inter(
+              color: const Color(0xFFB0C4CC),
+              fontSize: 11,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -245,7 +316,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
 
   Future<void> _saveSpecialty() async {
     HapticFeedback.mediumImpact();
-    
+
     String? typeKey;
     if (_selectedSpecialty == 'Busca & Captura') {
       typeKey = 'busca_captura';
@@ -257,17 +328,21 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
 
     if (typeKey == null) return;
 
+    final startsImmediately = typeKey != 'deteccao';
+    final entry = AuditService.buildInlineEntry(action: 'created');
     final data = <String, dynamic>{
       'type': typeKey,
-      'status': 'in_formation',
-      'started_at': FieldValue.serverTimestamp(),
+      'status': startsImmediately ? 'in_formation' : 'not_started',
+      if (startsImmediately) 'started_at': FieldValue.serverTimestamp(),
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': [entry],
     };
 
     if (typeKey == 'deteccao') {
-      data['sub_areas'] = _selectedSubstances.map((subName) => {
-        'name': subName,
-        'status': 'in_formation',
-      }).toList();
+      data['sub_areas'] = _selectedSubstances
+          .map((subName) => {'name': subName, 'status': 'not_started'})
+          .toList();
     }
 
     try {
@@ -284,7 +359,7 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
         SnackBar(
           content: Text(
             _selectedSpecialty == 'Detecção'
-                ? 'Especialidade de Detecção iniciada com as substâncias: ${_selectedSubstances.join(", ")}!'
+                ? 'Especialidade de Detecção cadastrada para triagem: ${_selectedSubstances.join(", ")}!'
                 : 'Especialidade de $_selectedSpecialty iniciada com sucesso!',
           ),
           backgroundColor: AppTheme.success,

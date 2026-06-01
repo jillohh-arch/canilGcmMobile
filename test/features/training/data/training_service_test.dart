@@ -2,6 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/training/data/training_service.dart';
+import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 
 void main() {
   late FakeFirebaseFirestore fakeFirestore;
@@ -13,34 +14,75 @@ void main() {
   });
 
   group('softDelete', () {
-    test('marca documento com deleted_at, deleted_by e delete_reason', () async {
-      // Arrange: cria um treino na collection 'trainings'
-      final docRef = await fakeFirestore.collection('trainings').add({
-        'dogId': 'dog1',
-        'trainingType': 'Obediência',
-        'date': DateTime(2026, 5, 27).toIso8601String(),
-        'location': 'Canil',
-        'weather': 'Ensolarado',
-        'handlerNotes': 'Sessão normal',
-      });
+    test(
+      'usa cão e condutor do turno ativo como identidade canonica',
+      () async {
+        await fakeFirestore.collection('active_shifts').doc('691755').set({
+          'handlerId': 'uid-legado',
+          'dogId': 'dog-antigo',
+          'service_dog_id': 'dog-do-turno',
+          'status': 'active',
+        });
 
-      // Act: soft delete (sem FirebaseAuth, vai falhar por userId null)
-      // Testamos diretamente no Firestore para validar a lógica de escrita
-      await fakeFirestore.collection('trainings').doc(docRef.id).update({
-        'deleted_at': DateTime.now().toIso8601String(),
-        'deleted_by': 'test-user-id',
-        'delete_reason': 'Registro duplicado',
-        'deleted_reason': 'Registro duplicado',
-      });
+        final session = TrainingSessionModel(
+          dogId: 'dog-da-tela',
+          dogName: 'Bono',
+          handlerId: '691755',
+          date: DateTime(2026, 5, 31, 18, 59),
+          trainingType: 'Deteccao',
+          location: 'Canil',
+          weather: '',
+          handlerNotes: 'Teste',
+        );
 
-      // Assert
-      final snap = await fakeFirestore.collection('trainings').doc(docRef.id).get();
-      final data = snap.data()!;
-      expect(data['deleted_at'], isNotNull);
-      expect(data['deleted_by'], equals('test-user-id'));
-      expect(data['delete_reason'], equals('Registro duplicado'));
-      expect(data['deleted_reason'], equals('Registro duplicado'));
-    });
+        final saved = await service.addTrainingSession(session);
+
+        expect(saved.handlerId, '691755');
+        expect(saved.dogId, 'dog-do-turno');
+
+        final snap = await fakeFirestore
+            .collection('trainings')
+            .doc(saved.id)
+            .get();
+        expect(snap.data()?['handlerId'], '691755');
+        expect(snap.data()?['dogId'], 'dog-do-turno');
+      },
+    );
+
+    test(
+      'marca documento com deleted_at, deleted_by e delete_reason',
+      () async {
+        // Arrange: cria um treino na collection 'trainings'
+        final docRef = await fakeFirestore.collection('trainings').add({
+          'dogId': 'dog1',
+          'trainingType': 'Obediência',
+          'date': DateTime(2026, 5, 27).toIso8601String(),
+          'location': 'Canil',
+          'weather': 'Ensolarado',
+          'handlerNotes': 'Sessão normal',
+        });
+
+        // Act: soft delete (sem FirebaseAuth, vai falhar por userId null)
+        // Testamos diretamente no Firestore para validar a lógica de escrita
+        await fakeFirestore.collection('trainings').doc(docRef.id).update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'deleted_by': 'test-user-id',
+          'delete_reason': 'Registro duplicado',
+          'deleted_reason': 'Registro duplicado',
+        });
+
+        // Assert
+        final snap = await fakeFirestore
+            .collection('trainings')
+            .doc(docRef.id)
+            .get();
+        final data = snap.data()!;
+        expect(data['deleted_at'], isNotNull);
+        expect(data['deleted_by'], equals('test-user-id'));
+        expect(data['delete_reason'], equals('Registro duplicado'));
+        expect(data['deleted_reason'], equals('Registro duplicado'));
+      },
+    );
 
     test('documento soft-deleted não aparece em getTrainingsForDog', () async {
       // Arrange: cria 2 treinos, soft-deleta 1
@@ -123,80 +165,86 @@ void main() {
       expect(results.first.trainingType, equals('Busca e Captura'));
     });
 
-    test('soft delete funciona em collection alternativa (training_sessions)', () async {
-      // Arrange
-      await fakeFirestore.collection('training_sessions').add({
-        'dogId': 'dog1',
-        'trainingType': 'Obediência',
-        'date': DateTime(2026, 5, 20).toIso8601String(),
-        'location': 'Praça',
-        'weather': 'Sol',
-        'handlerNotes': 'Sessão root',
-      });
+    test(
+      'soft delete funciona em collection alternativa (training_sessions)',
+      () async {
+        // Arrange
+        await fakeFirestore.collection('training_sessions').add({
+          'dogId': 'dog1',
+          'trainingType': 'Obediência',
+          'date': DateTime(2026, 5, 20).toIso8601String(),
+          'location': 'Praça',
+          'weather': 'Sol',
+          'handlerNotes': 'Sessão root',
+        });
 
-      await fakeFirestore.collection('training_sessions').add({
-        'dogId': 'dog1',
-        'trainingType': 'Condicionamento',
-        'date': DateTime(2026, 5, 19).toIso8601String(),
-        'location': 'Pista',
-        'weather': 'Nublado',
-        'handlerNotes': 'Deletado',
-        'deleted_at': DateTime.now().toIso8601String(),
-        'deleted_by': 'user1',
-        'delete_reason': 'Duplicado',
-      });
+        await fakeFirestore.collection('training_sessions').add({
+          'dogId': 'dog1',
+          'trainingType': 'Condicionamento',
+          'date': DateTime(2026, 5, 19).toIso8601String(),
+          'location': 'Pista',
+          'weather': 'Nublado',
+          'handlerNotes': 'Deletado',
+          'deleted_at': DateTime.now().toIso8601String(),
+          'deleted_by': 'user1',
+          'delete_reason': 'Duplicado',
+        });
 
-      // Act
-      final results = await service.getTrainingsForDog('dog1');
+        // Act
+        final results = await service.getTrainingsForDog('dog1');
 
-      // Assert
-      final fromTrainingSessions = results.where(
-        (t) => t.trainingType == 'Condicionamento',
-      );
-      expect(fromTrainingSessions, isEmpty);
-    });
+        // Assert
+        final fromTrainingSessions = results.where(
+          (t) => t.trainingType == 'Condicionamento',
+        );
+        expect(fromTrainingSessions, isEmpty);
+      },
+    );
 
-    test('soft delete funciona em subcollection dogs/{dogId}/training_sessions', () async {
-      // Arrange
-      await fakeFirestore
-          .collection('dogs')
-          .doc('dog1')
-          .collection('training_sessions')
-          .add({
-        'dogId': 'dog1',
-        'trainingType': 'Detecção',
-        'date': DateTime(2026, 5, 18).toIso8601String(),
-        'location': 'Campo',
-        'weather': 'Limpo',
-        'handlerNotes': 'Ativo',
-      });
+    test(
+      'soft delete funciona em subcollection dogs/{dogId}/training_sessions',
+      () async {
+        // Arrange
+        await fakeFirestore
+            .collection('dogs')
+            .doc('dog1')
+            .collection('training_sessions')
+            .add({
+              'dogId': 'dog1',
+              'trainingType': 'Detecção',
+              'date': DateTime(2026, 5, 18).toIso8601String(),
+              'location': 'Campo',
+              'weather': 'Limpo',
+              'handlerNotes': 'Ativo',
+            });
 
-      await fakeFirestore
-          .collection('dogs')
-          .doc('dog1')
-          .collection('training_sessions')
-          .add({
-        'dogId': 'dog1',
-        'trainingType': 'Guarda',
-        'date': DateTime(2026, 5, 17).toIso8601String(),
-        'location': 'Canil',
-        'weather': 'Chuva',
-        'handlerNotes': 'Deletado',
-        'deleted_at': DateTime.now().toIso8601String(),
-        'deleted_by': 'user1',
-        'delete_reason': 'Erro de registro',
-      });
+        await fakeFirestore
+            .collection('dogs')
+            .doc('dog1')
+            .collection('training_sessions')
+            .add({
+              'dogId': 'dog1',
+              'trainingType': 'Guarda',
+              'date': DateTime(2026, 5, 17).toIso8601String(),
+              'location': 'Canil',
+              'weather': 'Chuva',
+              'handlerNotes': 'Deletado',
+              'deleted_at': DateTime.now().toIso8601String(),
+              'deleted_by': 'user1',
+              'delete_reason': 'Erro de registro',
+            });
 
-      // Act
-      final results = await service.getTrainingsForDog('dog1');
+        // Act
+        final results = await service.getTrainingsForDog('dog1');
 
-      // Assert: apenas o não-deletado da subcollection
-      final fromSubcollection = results.where(
-        (t) => t.trainingType == 'Guarda',
-      );
-      expect(fromSubcollection, isEmpty);
-      expect(results.any((t) => t.trainingType == 'Detecção'), isTrue);
-    });
+        // Assert: apenas o não-deletado da subcollection
+        final fromSubcollection = results.where(
+          (t) => t.trainingType == 'Guarda',
+        );
+        expect(fromSubcollection, isEmpty);
+        expect(results.any((t) => t.trainingType == 'Detecção'), isTrue);
+      },
+    );
   });
 
   group('validações', () {

@@ -131,6 +131,34 @@ class StorageService {
     }
   }
 
+  /// Baixa um arquivo pelo URL do Firebase Storage e recalcula o SHA-256.
+  Future<String?> sha256FromUrl(
+    String url, {
+    int maxBytes = 20 * 1024 * 1024,
+  }) async {
+    if (url.trim().isEmpty) return null;
+    try {
+      final Reference ref = _storage.refFromURL(url.trim());
+      final bytes = await ref.getData(maxBytes);
+      if (bytes == null) return null;
+      return sha256.convert(bytes).toString();
+    } on FirebaseException catch (e) {
+      if (e.code == 'object-not-found') {
+        debugPrint(
+          '[StorageService] Aviso object-not-found ao verificar hash: ${e.message}',
+        );
+        return null;
+      }
+      debugPrint(
+        '[StorageService] Erro Firebase ao verificar hash: ${e.code} - ${e.message}',
+      );
+      throw Exception('Falha ao verificar integridade da midia: ${e.message}');
+    } catch (e) {
+      debugPrint('[StorageService] Erro generico ao verificar hash: $e');
+      throw Exception('Falha ao verificar integridade da midia.');
+    }
+  }
+
   /// Faz upload de bytes para um caminho fixo no Storage.
   /// Usado para documentos institucionais que precisam de caminho estavel.
   Future<String?> uploadBytes(

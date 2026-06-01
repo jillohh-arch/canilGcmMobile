@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
+
 /// Widget reutilizável que exibe o mapa da rota GPS + métricas
 /// no detalhe do histórico. Recebe o objeto `gps_track` do metadata.
 class GpsTrackDetailWidget extends StatelessWidget {
@@ -29,7 +31,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
           child: Text(
             'RASTREAMENTO GPS',
             style: GoogleFonts.inter(
-              color: const Color(0xFF4DD0E1),
+              color: AppTheme.primary,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -39,10 +41,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
         // Map
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 200,
-            child: _buildMap(points),
-          ),
+          child: SizedBox(height: 200, child: _buildMap(points)),
         ),
         const SizedBox(height: 12),
         // Metrics grid
@@ -89,11 +88,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
         ),
         PolylineLayer(
           polylines: [
-            Polyline(
-              points: points,
-              color: const Color(0xFF4DD0E1),
-              strokeWidth: 4,
-            ),
+            Polyline(points: points, color: AppTheme.primary, strokeWidth: 4),
           ],
         ),
         MarkerLayer(
@@ -105,12 +100,9 @@ class GpsTrackDetailWidget extends StatelessWidget {
               height: 14,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71),
+                  color: AppTheme.success,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF04140A),
-                    width: 2,
-                  ),
+                  border: Border.all(color: const Color(0xFF04140A), width: 2),
                 ),
               ),
             ),
@@ -121,12 +113,9 @@ class GpsTrackDetailWidget extends StatelessWidget {
               height: 14,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE74C3C),
+                  color: AppTheme.error,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF1A0606),
-                    width: 2,
-                  ),
+                  border: Border.all(color: const Color(0xFF1A0606), width: 2),
                 ),
               ),
             ),
@@ -151,7 +140,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
             Text(
               label.toUpperCase(),
               style: GoogleFonts.inter(
-                color: const Color(0xFF5A7280),
+                color: AppTheme.textMuted,
                 fontSize: 8.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,

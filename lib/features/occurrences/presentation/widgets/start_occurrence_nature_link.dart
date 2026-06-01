@@ -158,7 +158,7 @@ class StartOccurrenceNatureLink extends StatelessWidget {
               controller: controller,
               focusNode: focusNode,
               natures: natures,
-              panelColor: const Color(0xFF0E1A1F),
+              panelColor: AppTheme.surfacePanel,
               accent: AppTheme.primary,
               fieldBuilder: _buildField,
               onSelected: onSelected,
@@ -267,7 +267,7 @@ class StartOccurrenceNatureLink extends StatelessWidget {
         ),
         prefixIcon: Icon(Icons.search, color: AppTheme.primary, size: 20),
         filled: true,
-        fillColor: const Color(0xFF0E1A1F),
+        fillColor: AppTheme.surfacePanel,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: AppTheme.primary.withAlpha(60)),

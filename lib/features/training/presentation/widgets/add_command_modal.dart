@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 class AddCommandModal extends StatefulWidget {
@@ -29,10 +30,15 @@ class _AddCommandModalState extends State<AddCommandModal> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0C1920),
+        color: AppTheme.surfacePanel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Form(
         key: _formKey,
         child: Column(
@@ -63,7 +69,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
             Text(
               'Cadastre um comando customizado para ${widget.dog.name}',
               style: GoogleFonts.inter(
-                color: const Color(0xFF7A8A92),
+                color: AppTheme.textTertiary,
                 fontSize: 11,
               ),
             ),
@@ -72,7 +78,12 @@ class _AddCommandModalState extends State<AddCommandModal> {
             // Command Name Field
             Text(
               'NOME DO COMANDO',
-              style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 6),
             TextFormField(
@@ -80,21 +91,26 @@ class _AddCommandModalState extends State<AddCommandModal> {
               style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Ex: Sit, Platz, Junto, Aqui...',
-                hintStyle: GoogleFonts.inter(color: const Color(0xFF5A7280)),
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
                 filled: true,
-                fillColor: const Color(0x0DFFFFFF),
+                fillColor: AppTheme.surfaceWhiteOverlay,
                 enabledBorder: OutlineInputBorder(
                   borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
+                  borderSide: const BorderSide(color: AppTheme.primary),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
               validator: (val) {
-                if (val == null || val.trim().isEmpty) return 'Insira o nome do comando';
+                if (val == null || val.trim().isEmpty) {
+                  return 'Insira o nome do comando';
+                }
                 return null;
               },
             ),
@@ -103,7 +119,12 @@ class _AddCommandModalState extends State<AddCommandModal> {
             // Command Type Segmented Row
             Text(
               'TIPO DE COMANDO',
-              style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 8),
             Row(
@@ -121,9 +142,13 @@ class _AddCommandModalState extends State<AddCommandModal> {
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: isActive ? const Color(0x1F4DD0E1) : const Color(0x0DFFFFFF),
+                        color: isActive
+                            ? AppTheme.primaryDivider
+                            : AppTheme.surfaceWhiteOverlay,
                         border: Border.all(
-                          color: isActive ? const Color(0xFF4DD0E1) : const Color(0x14FFFFFF),
+                          color: isActive
+                              ? AppTheme.primary
+                              : AppTheme.surfaceWhiteBorder,
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -131,7 +156,9 @@ class _AddCommandModalState extends State<AddCommandModal> {
                       child: Text(
                         type,
                         style: GoogleFonts.inter(
-                          color: isActive ? const Color(0xFF4DD0E1) : const Color(0xFF7A8A92),
+                          color: isActive
+                              ? AppTheme.primary
+                              : AppTheme.textTertiary,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -146,7 +173,12 @@ class _AddCommandModalState extends State<AddCommandModal> {
             // Description / notes
             Text(
               'DESCRIÇÃO / OBJETIVO',
-              style: GoogleFonts.inter(color: const Color(0xFF4DD0E1), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 6),
             TextFormField(
@@ -155,15 +187,15 @@ class _AddCommandModalState extends State<AddCommandModal> {
               maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Ex: Sentar rápido e focado ao lado esquerdo...',
-                hintStyle: GoogleFonts.inter(color: const Color(0xFF5A7280)),
+                hintStyle: GoogleFonts.inter(color: AppTheme.textMuted),
                 filled: true,
-                fillColor: const Color(0x0DFFFFFF),
+                fillColor: AppTheme.surfaceWhiteOverlay,
                 enabledBorder: OutlineInputBorder(
                   borderSide: const BorderSide(color: Color(0x14FFFFFF)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
+                  borderSide: const BorderSide(color: AppTheme.primary),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 contentPadding: const EdgeInsets.all(12),
@@ -181,7 +213,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
                       Navigator.of(context).pop();
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF7A8A92),
+                      foregroundColor: AppTheme.textTertiary,
                       side: const BorderSide(color: Color(0x1AFFFFFF)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -190,7 +222,10 @@ class _AddCommandModalState extends State<AddCommandModal> {
                     ),
                     child: Text(
                       'Cancelar',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -199,8 +234,8 @@ class _AddCommandModalState extends State<AddCommandModal> {
                   child: ElevatedButton(
                     onPressed: _saveCommand,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4DD0E1),
-                      foregroundColor: const Color(0xFF050D10),
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: AppTheme.background,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -208,7 +243,10 @@ class _AddCommandModalState extends State<AddCommandModal> {
                     ),
                     child: Text(
                       'Cadastrar',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -227,9 +265,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
     final cmdName = _nameController.text.trim();
     // Simulate save success
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Comando "$cmdName" cadastrado com sucesso!'),
-      ),
+      SnackBar(content: Text('Comando "$cmdName" cadastrado com sucesso!')),
     );
     Navigator.of(context).pop(true);
   }

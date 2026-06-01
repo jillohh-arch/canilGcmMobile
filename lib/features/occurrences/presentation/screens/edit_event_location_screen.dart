@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/osm_geocoding_service.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
@@ -50,12 +51,12 @@ class EditEventLocationScreen extends StatefulWidget {
 }
 
 class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
-  static const _cyan = Color(0xFF4DD0E1);
-  static const _bg = Color(0xFF050D10);
-  static const _divider = Color(0x1F4DD0E1);
-  static const _chipBg = Color(0x144DD0E1);
-  static const _chipBd = Color(0x334DD0E1);
-  static const _muted = Color(0xFF5A7280);
+  static const _cyan = AppTheme.primary;
+  static const _bg = AppTheme.background;
+  static const _divider = AppTheme.primaryDivider;
+  static const _chipBg = AppTheme.primaryChipBackground;
+  static const _chipBd = AppTheme.primaryChipBorder;
+  static const _muted = AppTheme.textMuted;
 
   final _searchController = TextEditingController();
   final _geocodingService = OsmGeocodingService();
@@ -150,8 +151,9 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final point = LatLng(position.latitude, position.longitude);
@@ -203,12 +205,14 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
 
     // Modo pick-only: retorna resultado sem persistir
     if (widget.pickOnly) {
-      Navigator.of(context).pop(LocationPickResult(
-        lat: _selectedPoint!.latitude,
-        lng: _selectedPoint!.longitude,
-        label: _selectedLabel,
-        source: _locationSource,
-      ));
+      Navigator.of(context).pop(
+        LocationPickResult(
+          lat: _selectedPoint!.latitude,
+          lng: _selectedPoint!.longitude,
+          label: _selectedLabel,
+          source: _locationSource,
+        ),
+      );
       return;
     }
 
@@ -230,9 +234,9 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -406,10 +410,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                   ),
                   decoration: InputDecoration(
                     hintText: 'Endereço, POI ou rua...',
-                    hintStyle: GoogleFonts.inter(
-                      color: _muted,
-                      fontSize: 15,
-                    ),
+                    hintStyle: GoogleFonts.inter(color: _muted, fontSize: 15),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -611,10 +612,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                             decoration: BoxDecoration(
                               color: _cyan,
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _bg,
-                                width: 2.5,
-                              ),
+                              border: Border.all(color: _bg, width: 2.5),
                               boxShadow: [
                                 BoxShadow(
                                   color: _cyan.withAlpha(60),
@@ -639,8 +637,10 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
                 top: 10,
                 left: 10,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xC7050D10),
                     border: Border.all(color: _divider),

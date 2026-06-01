@@ -672,6 +672,9 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     if (ra != null && occurrence.declinedHandlerIds.contains(ra)) {
       return false;
     }
+    if (occurrence.participationRevision > 0) {
+      return ra != null && occurrence.acceptedHandlerIds.contains(ra);
+    }
 
     final authorizedIds = occurrence.editAuthorizedHandlerIds;
     final authorizedEmails = occurrence.editAuthorizedEmails;
@@ -1087,7 +1090,7 @@ class _SyncErrorBanner extends StatelessWidget {
             ),
             const Icon(
               Icons.refresh_rounded,
-              color: Color(0xFF4DD0E1),
+              color: AppTheme.primary,
               size: 16,
             ),
           ],
@@ -1276,7 +1279,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
               hintStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
               prefixIcon: const Icon(
                 Icons.search,
-                color: Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 size: 18,
               ),
               filled: true,
@@ -1291,7 +1294,7 @@ class _EditNatureSheetContentState extends State<_EditNatureSheetContent> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF4DD0E1)),
+                borderSide: const BorderSide(color: AppTheme.primary),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,

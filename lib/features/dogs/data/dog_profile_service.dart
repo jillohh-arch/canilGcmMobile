@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
+import 'package:canil_gcm/core/services/audit_service.dart';
+
 /// Modelo de vacina vindo do Firestore.
 class VaccineRecord {
   final String id;
@@ -33,9 +35,8 @@ class VaccineRecord {
 
   bool get isExpired => DateTime.now().isAfter(dataVencimento);
 
-  int get daysOverdue => isExpired
-      ? DateTime.now().difference(dataVencimento).inDays
-      : 0;
+  int get daysOverdue =>
+      isExpired ? DateTime.now().difference(dataVencimento).inDays : 0;
 }
 
 /// Modelo de aptidão operacional.
@@ -152,7 +153,7 @@ DateTime _parseTs(dynamic value) {
 /// Service para buscar dados complementares do perfil do cão.
 class DogProfileService {
   DogProfileService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -309,7 +310,10 @@ class DogProfileService {
       emissor: emissor,
     );
 
-    final docRef = await _db.collection('documentos').add(docData.toJson());
+    final data = docData.toJson()
+      ..['audit_trail'] = [AuditService.buildInlineEntry(action: 'created')];
+
+    final docRef = await _db.collection('documentos').add(data);
 
     return DogDocument(
       id: docRef.id,

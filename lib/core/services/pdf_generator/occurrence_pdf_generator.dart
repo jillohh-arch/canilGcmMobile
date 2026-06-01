@@ -51,7 +51,7 @@ class OccurrencePdfGenerator {
   static const _systemName = 'Sistema Canil K9 GCM';
   static const _verificationBaseUrl = String.fromEnvironment(
     'K9_VERIFICATION_BASE_URL',
-    defaultValue: 'https://canilk9.limeira.sp.gov.br/v',
+    defaultValue: 'https://canil-gcm.web.app/v',
   );
   static const _pagePadding = 30.0;
   static const _contentGap = 18.0;
@@ -78,6 +78,7 @@ class OccurrencePdfGenerator {
 
     // Download de mídia em paralelo (fotos são leves individualmente)
     final media = await _buildMediaItems(sortedEvents);
+    final finalizationMedia = await _buildFinalizationMediaItems(occurrence);
 
     // Mapas sequenciais para evitar pico de memória (tiles + composição)
     final staticMapImage = await _buildStaticMapImage(occurrence);
@@ -97,6 +98,7 @@ class OccurrencePdfGenerator {
       docId: docId,
       fonts: fonts,
       media: media,
+      finalizationMedia: finalizationMedia,
       staticMapImage: staticMapImage,
       displacementMapImage: displacementMapImage,
       locations: locations,
@@ -229,6 +231,29 @@ class OccurrencePdfGenerator {
             url: item.url,
             image: await _loadOptimizedPhoto(client, item.url),
             event: item.event,
+          ),
+        );
+      }
+    } finally {
+      client.close();
+    }
+
+    return media;
+  }
+
+  Future<List<_PdfFinalizationMediaItem>> _buildFinalizationMediaItems(
+    Occurrence occurrence,
+  ) async {
+    final client = http.Client();
+    final media = <_PdfFinalizationMediaItem>[];
+    try {
+      for (var i = 0; i < occurrence.finalizationPhotos.length; i++) {
+        final url = occurrence.finalizationPhotos[i];
+        media.add(
+          _PdfFinalizationMediaItem(
+            number: i + 1,
+            url: url,
+            image: await _loadOptimizedPhoto(client, url),
           ),
         );
       }
@@ -1826,6 +1851,7 @@ class OccurrencePdfGenerator {
   pw.Widget _buildMediaPage(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
     final visibleMedia = ctx.media;
+    final finalizationMedia = ctx.finalizationMedia;
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -1866,6 +1892,18 @@ class OccurrencePdfGenerator {
                 .map((item) => _mediaCard(item, ctx))
                 .toList(),
           ),
+        if (finalizationMedia.isNotEmpty) ...[
+          pw.SizedBox(height: 16),
+          _sectionLabel('Fotos da finalizacao', f),
+          pw.SizedBox(height: 10),
+          pw.Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: finalizationMedia
+                .map((item) => _finalizationMediaCard(item, ctx))
+                .toList(),
+          ),
+        ],
         pw.SizedBox(height: 16),
         _sectionLabel('Anexos', f),
         pw.SizedBox(height: 10),
@@ -1884,6 +1922,7 @@ class OccurrencePdfGenerator {
       child: pw.Row(
         children: [
           _mediaCountCell('Fotos', ctx.media.length.toString(), f),
+          _mediaCountCell('Final', ctx.finalizationMedia.length.toString(), f),
           _mediaCountCell('Video', '0', f),
           _mediaCountCell('Audios', '0', f),
           _mediaCountCell('Outros', _boCount(ctx.occurrence).toString(), f),
@@ -2024,6 +2063,130 @@ class OccurrencePdfGenerator {
                 pw.Expanded(
                   child: pw.Text(
                     '${_locationMain(ctx.occurrence)}\n${_gpsText(event.gpsLat, event.gpsLng, precision: 5)}',
+                    style: _body(f, size: 7.2, color: _inkSoft),
+                  ),
+                ),
+                pw.Text(
+                  _accuracyText(ctx.occurrence.gpsAccuracy),
+                  style: _mono(f, size: 7, color: _inkFaint),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _finalizationMediaCard(
+    _PdfFinalizationMediaItem item,
+    _OccurrencePdfContext ctx,
+  ) {
+    final f = ctx.fonts;
+    return pw.Container(
+      width: 258,
+      height: 198,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _line),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(9)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: pw.Row(
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: _line),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(4),
+                    ),
+                  ),
+                  child: pw.Text(
+                    item.number.toString().padLeft(2, '0'),
+                    style: _mono(f, size: 8, color: _cyanDeep),
+                  ),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'FINALIZACAO',
+                        maxLines: 1,
+                        style: _bodyBold(f, size: 9.3),
+                      ),
+                      pw.Text(
+                        'FOTO DO ENCERRAMENTO',
+                        style: _body(f, size: 6.8, color: _inkFaint),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Text(
+                  _formatTime(
+                    ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt,
+                  ),
+                  style: _mono(f, size: 8.2, color: _inkSoft),
+                ),
+              ],
+            ),
+          ),
+          pw.Container(
+            height: 110,
+            color: _mediaBg,
+            child: pw.Stack(
+              children: [
+                if (item.image != null)
+                  pw.Positioned.fill(
+                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                  )
+                else
+                  pw.Center(
+                    child: pw.Text(
+                      'imagem indisponivel',
+                      style: _body(f, size: 8, color: _inkFaint),
+                    ),
+                  ),
+                pw.Positioned(
+                  right: 8,
+                  top: 8,
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: _cyanDeep,
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(4),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'FINAL',
+                      style: _bodyBold(f, size: 6.3, color: PdfColors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: _lineSoft)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(
+                    '${_locationMain(ctx.occurrence)}\n${_gpsText(ctx.occurrence.gpsLat, ctx.occurrence.gpsLng, precision: 5)}',
                     style: _body(f, size: 7.2, color: _inkSoft),
                   ),
                 ),
@@ -2858,28 +3021,13 @@ class OccurrencePdfGenerator {
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: pw.BoxDecoration(
-              color: _amberBg,
-              border: pw.Border.all(color: _amberLine),
+              color: _greenBg,
+              border: pw.Border.all(color: _greenLine),
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
             ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 1),
-                  child: pw.Text(
-                    '!',
-                    style: _bodyBold(f, size: 7.5, color: _amber),
-                  ),
-                ),
-                pw.SizedBox(width: 6),
-                pw.Expanded(
-                  child: pw.Text(
-                    'Atenção: A consulta online deste registro pelo QR Code acima estará disponível em breve no portal da Prefeitura Municipal de Limeira.',
-                    style: _body(f, size: 7, color: _amber),
-                  ),
-                ),
-              ],
+            child: pw.Text(
+              'A consulta pelo QR Code recalcula o hash no servidor e compara com o selo armazenado no Firestore.',
+              style: _body(f, size: 7, color: _green),
             ),
           ),
         ],
@@ -3236,6 +3384,7 @@ class _OccurrencePdfContext {
   final String docId;
   final PdfFonts fonts;
   final List<_PdfMediaItem> media;
+  final List<_PdfFinalizationMediaItem> finalizationMedia;
   final pw.ImageProvider? staticMapImage;
   final pw.ImageProvider? displacementMapImage;
   final List<OccurrenceLocation> locations;
@@ -3250,6 +3399,7 @@ class _OccurrencePdfContext {
     required this.docId,
     required this.fonts,
     required this.media,
+    required this.finalizationMedia,
     required this.staticMapImage,
     required this.displacementMapImage,
     required this.locations,
@@ -3268,6 +3418,18 @@ class _PdfMediaItem {
     required this.url,
     required this.image,
     required this.event,
+  });
+}
+
+class _PdfFinalizationMediaItem {
+  final int number;
+  final String url;
+  final pw.ImageProvider? image;
+
+  const _PdfFinalizationMediaItem({
+    required this.number,
+    required this.url,
+    required this.image,
   });
 }
 

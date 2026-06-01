@@ -42,6 +42,29 @@ class AppTheme {
   /// Texto terciario (cinza escuro).
   static const Color textTertiary = Color(0xFF7A8A92);
 
+  /// Texto auxiliar em controles densos e metadados.
+  static const Color textMuted = Color(0xFF5A7280);
+
+  /// Texto auxiliar claro para empty states sobre fundo escuro.
+  static const Color textSoft = Color(0xFFA7B4BA);
+
+  /// Superficies operacionais escuras usadas em cards e headers.
+  static const Color surfacePanel = Color(0xFF0E1A1F);
+  static const Color surfacePanelSoft = Color(0xFF0A1418);
+  static const Color surfacePanelStrong = Color(0xFF06141A);
+  static const Color surfacePanelAlt = Color(0xFF1A2A30);
+  static const Color surfaceNavigation = Color(0xFF07141B);
+
+  /// Variantes translúcidas do ciano institucional.
+  static const Color primaryOverlay = Color(0x0A4DD0E1);
+  static const Color primaryDivider = Color(0x1F4DD0E1);
+  static const Color primaryChipBackground = Color(0x144DD0E1);
+  static const Color primaryChipBorder = Color(0x334DD0E1);
+
+  /// Divisores translúcidos sobre superfície escura.
+  static const Color surfaceWhiteOverlay = Color(0x0DFFFFFF);
+  static const Color surfaceWhiteBorder = Color(0x14FFFFFF);
+
   // --- Status de cao (legado mantido) ---
   static const Color statusActive = Color(0xFF1B8A4C);
   static const Color statusLeave = Color(0xFFC89200);

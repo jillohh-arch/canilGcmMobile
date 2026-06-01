@@ -1,19 +1,16 @@
 part of 'active_shift_dashboard_screen.dart';
 
-// ── Design tokens (mockup 10_dashboard) ──────────────────────────────────────
-const Color _kBorder = Color(0x14FFFFFF); // white 8%
-const Color _kBorderSubtle = Color(0x0FFFFFFF); // white 6%
+const Color _kBorder = Color(0x14FFFFFF);
+const Color _kBorderSubtle = Color(0x0FFFFFFF);
 const Color _kTextPrimary = Color(0xFFFFFFFF);
 const Color _kTextSecondary = Color(0xFFB0C4CC);
 const Color _kTextMuted = Color(0xFF5A7280);
 
-/// Section label estilo mockup: "⚠ ALERTAS ────────────"
 class _SectionLabel extends StatelessWidget {
   final String emoji;
   final String text;
-  final Widget? trailing;
 
-  const _SectionLabel({required this.emoji, required this.text, this.trailing});
+  const _SectionLabel({required this.emoji, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +31,12 @@ class _SectionLabel extends StatelessWidget {
           Expanded(
             child: Container(height: 1, color: AppTheme.primary.withAlpha(38)),
           ),
-          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         ],
       ),
     );
   }
 }
 
-/// Header compacto fiel ao mockup 10_dashboard.
 class _ShiftHeader extends StatelessWidget {
   final Dog dog;
   final String? currentRa;
@@ -61,12 +56,7 @@ class _ShiftHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final elapsed = _formatElapsed(shiftVM.shiftStartTime);
-    final vehicleLabel = shiftVM.vehicleLabel;
-    final subtitle = [
-      'Turno ativo',
-      elapsed,
-      if (vehicleLabel?.trim().isNotEmpty == true) vehicleLabel!.trim(),
-    ].join(' · ');
+    final vehicleLabel = shiftVM.vehicleLabel?.trim();
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
@@ -78,13 +68,16 @@ class _ShiftHeader extends StatelessWidget {
       ),
       child: BinomioHeader(
         dog: dog,
-        subtitle: subtitle,
+        subtitle: 'Turno ativo · $elapsed',
         subtitleColor: AppTheme.success,
         statusDotColor: AppTheme.success,
         showStatusDot: true,
         withBackground: false,
         conductorPhotoUrl: conductorPhotoUrl,
         notificationUserId: currentRa,
+        trailing: vehicleLabel?.isNotEmpty == true
+            ? _VehicleHeaderChip(label: vehicleLabel!)
+            : null,
         onSwitchDog: onSwitchDog,
         onProfileTap: onProfile,
       ),
@@ -98,5 +91,34 @@ class _ShiftHeader extends StatelessWidget {
     if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
     if (diff.inHours < 24) return 'há ${diff.inHours}h';
     return 'há ${diff.inDays}d';
+  }
+}
+
+class _VehicleHeaderChip extends StatelessWidget {
+  final String label;
+
+  const _VehicleHeaderChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(13),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(45)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(
+          color: AppTheme.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 }

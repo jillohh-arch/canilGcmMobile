@@ -212,12 +212,12 @@ class _PendingScreenState extends State<PendingScreen> {
   }
 
   bool _opensActiveOccurrence(NotificationType type) {
-    return type == NotificationType.occurrenceParticipationRequested ||
-        type == NotificationType.correctionRequested;
+    return type == NotificationType.correctionRequested;
   }
 
   bool _opensReview(NotificationType type) {
-    return type == NotificationType.signatureRequested;
+    return type == NotificationType.occurrenceParticipationRequested ||
+        type == NotificationType.signatureRequested;
   }
 }
 

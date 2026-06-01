@@ -26,7 +26,10 @@ class ShiftService {
       final data = snapshot.data();
       if (!snapshot.exists || data == null) return null;
 
-      final session = ActiveShiftSession.fromJson(data);
+      final session = ActiveShiftSession.fromJson({
+        ...data,
+        'handlerId': snapshot.id,
+      });
       if (!session.isActive) return null;
       return session;
     });

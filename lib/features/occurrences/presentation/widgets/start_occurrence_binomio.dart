@@ -88,7 +88,7 @@ class _Avatar extends StatelessWidget {
         child: imageUrl != null && imageUrl!.isNotEmpty
             ? Image.network(imageUrl!, fit: BoxFit.cover)
             : Container(
-                color: const Color(0xFF1A2A30),
+                color: AppTheme.surfacePanelAlt,
                 alignment: Alignment.center,
                 child: Text(
                   label.length > 6 ? label.substring(0, 6) : label,

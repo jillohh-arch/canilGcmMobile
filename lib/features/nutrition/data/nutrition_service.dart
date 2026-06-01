@@ -144,9 +144,15 @@ class NutritionService {
     // Encerra prescrição anterior
     final current = await getActivePrescription(dogId);
     if (current?.id != null) {
+      final entry = AuditService.buildInlineEntry(
+        action: 'updated',
+        fieldName: 'vigent_until',
+        newValue: prescription.vigentFrom.toIso8601String(),
+      );
       final updates = {
         'vigent_until': Timestamp.fromDate(prescription.vigentFrom),
         'updated_at': FieldValue.serverTimestamp(),
+        'audit_trail': FieldValue.arrayUnion([entry]),
       };
       await _prescriptionsCol(
         dogId,

@@ -38,6 +38,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool _isLoading = true;
   bool _isRequestingCorrection = false;
+  bool _isRespondingParticipation = false;
   String? _error;
   Occurrence? _occurrence;
   List<OccurrenceEvent> _events = const [];
@@ -120,6 +121,21 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         occurrence.primaryHandlerId == currentRa;
   }
 
+  bool get _canRespondParticipation {
+    final occurrence = _occurrence;
+    final currentRa = HandlerIdentityService.raFromUser(
+      FirebaseAuth.instance.currentUser,
+    );
+    if (occurrence == null || currentRa == null || !occurrence.status.isOpen) {
+      return false;
+    }
+    if (occurrence.primaryHandlerRa == currentRa ||
+        occurrence.primaryHandlerId == currentRa) {
+      return false;
+    }
+    return occurrence.pendingHandlerIds.contains(currentRa);
+  }
+
   void _showSignatureDialog() {
     final occurrence = _occurrence;
     if (occurrence == null) return;
@@ -182,6 +198,104 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         ],
       ),
     ).whenComplete(reasonController.dispose);
+  }
+
+  void _showDeclineParticipationDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Recusar participação'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            labelText: 'Motivo da recusa',
+            hintText: 'Explique por que não participou desta ocorrência',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: _isRespondingParticipation
+                ? null
+                : () {
+                    final reason = reasonController.text.trim();
+                    if (reason.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Informe o motivo da recusa.'),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext);
+                    _declineParticipation(reason);
+                  },
+            child: const Text('Recusar'),
+          ),
+        ],
+      ),
+    ).whenComplete(reasonController.dispose);
+  }
+
+  Future<void> _acceptParticipation() async {
+    setState(() => _isRespondingParticipation = true);
+    try {
+      await OccurrenceTransitionService().acceptParticipation(
+        occurrenceId: widget.occurrenceId,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) =>
+              ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
+        ),
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Participação confirmada.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao confirmar participação: $error'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isRespondingParticipation = false);
+    }
+  }
+
+  Future<void> _declineParticipation(String reason) async {
+    setState(() => _isRespondingParticipation = true);
+    try {
+      await OccurrenceTransitionService().declineParticipation(
+        occurrenceId: widget.occurrenceId,
+        reason: reason,
+      );
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Participação recusada.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao recusar participação: $error'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isRespondingParticipation = false);
+    }
   }
 
   Future<void> _requestCorrection(String reason) async {
@@ -325,9 +439,12 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                   ),
                 ),
                 _ActionBar(
+                  canRespondParticipation: _canRespondParticipation,
                   canSign: _canSign,
                   canRequestCorrection: _canRequestCorrection,
-                  isBusy: _isRequestingCorrection,
+                  isBusy: _isRequestingCorrection || _isRespondingParticipation,
+                  onAcceptParticipation: _acceptParticipation,
+                  onDeclineParticipation: _showDeclineParticipationDialog,
                   onSign: _showSignatureDialog,
                   onCorrection: _showCorrectionDialog,
                 ),
@@ -338,16 +455,22 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 }
 
 class _ActionBar extends StatelessWidget {
+  final bool canRespondParticipation;
   final bool canSign;
   final bool canRequestCorrection;
   final bool isBusy;
+  final VoidCallback onAcceptParticipation;
+  final VoidCallback onDeclineParticipation;
   final VoidCallback onSign;
   final VoidCallback onCorrection;
 
   const _ActionBar({
+    required this.canRespondParticipation,
     required this.canSign,
     required this.canRequestCorrection,
     required this.isBusy,
+    required this.onAcceptParticipation,
+    required this.onDeclineParticipation,
     required this.onSign,
     required this.onCorrection,
   });
@@ -368,19 +491,29 @@ class _ActionBar extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: canRequestCorrection && !isBusy
-                    ? onCorrection
-                    : null,
-                icon: const Icon(Icons.assignment_return_outlined),
-                label: const Text('Devolver'),
+                onPressed: canRespondParticipation
+                    ? (isBusy ? null : onDeclineParticipation)
+                    : (canRequestCorrection && !isBusy ? onCorrection : null),
+                icon: Icon(
+                  canRespondParticipation
+                      ? Icons.cancel_outlined
+                      : Icons.assignment_return_outlined,
+                ),
+                label: Text(canRespondParticipation ? 'Recusar' : 'Devolver'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                onPressed: canSign && !isBusy ? onSign : null,
-                icon: const Icon(Icons.draw_rounded),
-                label: const Text('Assinar'),
+                onPressed: canRespondParticipation
+                    ? (isBusy ? null : onAcceptParticipation)
+                    : (canSign && !isBusy ? onSign : null),
+                icon: Icon(
+                  canRespondParticipation
+                      ? Icons.check_circle_outline
+                      : Icons.draw_rounded,
+                ),
+                label: Text(canRespondParticipation ? 'Aceitar' : 'Assinar'),
               ),
             ),
           ],

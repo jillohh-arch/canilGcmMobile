@@ -117,12 +117,317 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    function hasInlineAuditOnCreate() {
+      return request.resource.data.audit_trail is list
+        && request.resource.data.audit_trail.size() > 0;
+    }
+
+    function appendsInlineAuditOnUpdate() {
+      return request.resource.data.audit_trail is list
+        && (
+          (
+            resource.data.audit_trail is list
+            && request.resource.data.audit_trail.size() > resource.data.audit_trail.size()
+          )
+          || (
+            !(resource.data.audit_trail is list)
+            && request.resource.data.audit_trail.size() > 0
+          )
+        );
+    }
+
+    function canCreateAuditedRecord() {
+      return signedIn() && hasInlineAuditOnCreate();
+    }
+
+    function canUpdateAuditedRecord() {
+      return signedIn() && appendsInlineAuditOnUpdate();
+    }
+
+    function canSoftDeleteAuditedRecord() {
+      let changed = changedKeys();
+      return signedIn()
+        && changed.hasOnly([
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.deleted_at is timestamp
+        && request.resource.data.deleted_by is string
+        && request.resource.data.delete_reason is string
+        && request.resource.data.delete_reason.size() > 0
+        && appendsInlineAuditOnUpdate();
+    }
+
+    function canUpdateAuditedOrSoftDelete() {
+      return canUpdateAuditedRecord() || canSoftDeleteAuditedRecord();
+    }
+
+    function isSelfIdentifier(value) {
+      return signedIn()
+        && value is string
+        && (
+          value == request.auth.uid
+          || value == request.auth.token.email
+          || emailMatchesRa(value)
+        );
+    }
+
+    function canCreateAuditLog() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'action',
+          'entity_type',
+          'entity_id',
+          'entity_path',
+          'summary',
+          'actor',
+          'source',
+          'client_time',
+          'performed_at',
+          'entityType',
+          'entityId',
+          'entityPath',
+          'createdAt',
+          'before',
+          'after',
+          'metadata',
+          'field_name',
+          'reason'
+        ])
+        && request.resource.data.actor is map
+        && request.resource.data.actor.uid == request.auth.uid
+        && request.resource.data.actor.email == request.auth.token.email
+        && request.resource.data.action is string
+        && request.resource.data.entity_type is string
+        && request.resource.data.entity_id is string
+        && request.resource.data.summary is string
+        && request.resource.data.source == 'mobile';
+    }
+
+    function canCreateDogDocument() {
+      return canCreateAuditedRecord()
+        && request.resource.data.keys().hasOnly([
+          'caoId',
+          'nome',
+          'descricao',
+          'tipo',
+          'url',
+          'dataUpload',
+          'emissor',
+          'audit_trail'
+        ])
+        && request.resource.data.caoId is string
+        && request.resource.data.caoId.size() > 0
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.tipo is string
+        && request.resource.data.url is string
+        && request.resource.data.dataUpload is timestamp;
+    }
+
+    function canUpdateDogProfile() {
+      let changed = changedKeys();
+      return signedIn()
+        && appendsInlineAuditOnUpdate()
+        && !changed.hasAny([
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason'
+        ])
+        && !(
+          changed.hasAny(['active'])
+          && request.resource.data.active == false
+        );
+    }
+
+    function canSoftDeleteDog() {
+      let changed = changedKeys();
+      return signedIn()
+        && changed.hasOnly([
+          'active',
+          'status',
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason',
+          'updatedAt',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.active == false
+        && request.resource.data.deleted_at is timestamp
+        && request.resource.data.deleted_by is string
+        && request.resource.data.delete_reason is string
+        && request.resource.data.delete_reason.size() > 0
+        && appendsInlineAuditOnUpdate();
+    }
+
+    function canUpdateUserProfile() {
+      let changed = changedKeys();
+      return signedIn()
+        && appendsInlineAuditOnUpdate()
+        && !changed.hasAny([
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason'
+        ])
+        && !(
+          changed.hasAny(['active'])
+          && request.resource.data.active == false
+        );
+    }
+
+    function canSoftDeleteUser() {
+      let changed = changedKeys();
+      return signedIn()
+        && changed.hasOnly([
+          'active',
+          'deleted_at',
+          'deleted_by',
+          'delete_reason',
+          'deleted_reason',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.active == false
+        && request.resource.data.deleted_at is timestamp
+        && request.resource.data.deleted_by is string
+        && request.resource.data.delete_reason is string
+        && request.resource.data.delete_reason.size() > 0
+        && appendsInlineAuditOnUpdate();
+    }
+
+    function trainingDogId(data) {
+      return data.dogId is string && data.dogId.size() > 0
+        ? data.dogId
+        : (
+          data.dog_id is string && data.dog_id.size() > 0
+            ? data.dog_id
+            : ''
+        );
+    }
+
+    function trainingHandlerId(data) {
+      return data.handlerId is string && data.handlerId.size() > 0
+        ? data.handlerId
+        : (
+          data.handler_id is string && data.handler_id.size() > 0
+            ? data.handler_id
+            : (
+              data.performed_by is string && data.performed_by.size() > 0
+                ? data.performed_by
+                : ''
+            )
+        );
+    }
+
+    function trainingPayloadMatchesDog(pathDogId, data) {
+      let payloadDogId = trainingDogId(data);
+      return payloadDogId == '' || payloadDogId == pathDogId;
+    }
+
+    function hasActiveShiftForTraining(ra, dogId) {
+      return exists(/databases/$(database)/documents/active_shifts/$(ra))
+        && get(/databases/$(database)/documents/active_shifts/$(ra)).data.status == 'active'
+        && (
+          get(/databases/$(database)/documents/active_shifts/$(ra)).data.dogId == dogId
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.service_dog_id == dogId
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.currentDogId == dogId
+        );
+    }
+
+    function activeShiftBelongsToAuth(ra) {
+      return exists(/databases/$(database)/documents/active_shifts/$(ra))
+        && (
+          emailMatchesRa(ra)
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.auth_uid == request.auth.uid
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.authUid == request.auth.uid
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.handler_email == request.auth.token.email
+          || get(/databases/$(database)/documents/active_shifts/$(ra)).data.handlerEmail == request.auth.token.email
+        );
+    }
+
+    function canWriteTrainingForDog(dogId, data) {
+      let handlerId = trainingHandlerId(data);
+      return signedIn()
+        && dogId is string
+        && dogId.size() > 0
+        && handlerId is string
+        && handlerId.size() > 0
+        && activeShiftBelongsToAuth(handlerId)
+        && hasActiveShiftForTraining(handlerId, dogId);
+    }
+
+    function canWriteRootTraining(data) {
+      return canWriteTrainingForDog(trainingDogId(data), data);
+    }
+
+    function canWriteDogTraining(pathDogId, data) {
+      return trainingPayloadMatchesDog(pathDogId, data)
+        && canWriteTrainingForDog(pathDogId, data);
+    }
+
+    function canCreateTrainingRecord() {
+      return canCreateAuditedRecord()
+        && canWriteRootTraining(request.resource.data);
+    }
+
+    function canUpdateTrainingRecord() {
+      return canUpdateAuditedRecord()
+        && canWriteRootTraining(request.resource.data)
+        && (
+          trainingDogId(resource.data) == ''
+          || trainingDogId(resource.data) == trainingDogId(request.resource.data)
+        );
+    }
+
     function isEditableStatus(data) {
       return data.status in ['in_progress', 'finalizing'];
     }
 
     function hasVehicleCrew(data) {
       return data.vehicle_id is string && data.vehicle_id.size() > 0;
+    }
+
+    function initialParticipationStateIsSafe(data) {
+      return !(data.participation_revision is int)
+        || data.participation_revision == 0
+        || (
+          data.primary_handler_ra is string
+          && data.team_handler_ids is list
+          && data.accepted_handler_ids is list
+          && data.declined_handler_ids is list
+          && data.pending_handler_ids is list
+          && data.edit_authorized_handler_ids is list
+          && data.edit_authorized_emails is list
+          && data.accepted_handler_ids.hasOnly([data.primary_handler_ra])
+          && data.accepted_handler_ids.hasAll([data.primary_handler_ra])
+          && data.edit_authorized_handler_ids.hasOnly([data.primary_handler_ra])
+          && data.edit_authorized_handler_ids.hasAll([data.primary_handler_ra])
+          && data.pending_handler_ids.hasOnly(data.team_handler_ids)
+          && !(data.primary_handler_ra in data.pending_handler_ids)
+          && data.declined_handler_ids.size() == 0
+          && data.edit_authorized_emails.hasOnly([
+            data.primary_handler_ra + '@gcm.com.br',
+            data.primary_handler_ra + '@canilgcm.com'
+          ])
+        );
+    }
+
+    function canCreateOccurrence() {
+      return signedIn()
+        && request.resource.data.status in ['in_progress', 'finalizing']
+        && (
+          request.resource.data.primary_handler_id == request.auth.uid
+          || emailMatchesRa(request.resource.data.primary_handler_ra)
+        )
+        && initialParticipationStateIsSafe(request.resource.data);
     }
 
     function canUpdateEditableOccurrence() {
@@ -478,7 +783,20 @@ service cloud.firestore {
         && request.resource.data.handler_id == handlerId
         && occ.team_handler_ids is list
         && handlerId in occ.team_handler_ids
-        && request.resource.data.status in ['included', 'accepted', 'pending']
+        && (
+          (
+            occ.primary_handler_ra is string
+            && handlerId == occ.primary_handler_ra
+            && request.resource.data.status == 'accepted'
+          )
+          || (
+            !(
+              occ.primary_handler_ra is string
+              && handlerId == occ.primary_handler_ra
+            )
+            && request.resource.data.status == 'pending'
+          )
+        )
         && request.resource.data.keys().hasOnly([
           'handler_id',
           'auth_uid',
@@ -494,18 +812,6 @@ service cloud.firestore {
           'updated_at',
           'updated_by'
         ]);
-    }
-
-    function canDeclineParticipation(occurrenceId, handlerId) {
-      let occ = occurrenceData(occurrenceId);
-      return signedIn()
-        && isEditableStatus(occ)
-        && request.resource.data.handler_id == handlerId
-        && isTeamMemberAs(occ, handlerId)
-        && resource.data.status in ['included', 'accepted', 'pending']
-        && request.resource.data.status == 'declined'
-        && request.resource.data.decline_reason is string
-        && request.resource.data.decline_reason.size() > 0;
     }
 
     function isValidActiveShiftFor(ra) {
@@ -726,7 +1032,9 @@ service cloud.firestore {
 
     match /users/{ra} {
       allow read: if signedIn();
-      allow create, update: if emailMatchesRa(ra);
+      allow create: if emailMatchesRa(ra) && canCreateAuditedRecord();
+      allow update: if emailMatchesRa(ra)
+        && (canUpdateUserProfile() || canSoftDeleteUser());
       allow delete: if false;
 
       match /devices/{deviceId} {
@@ -749,114 +1057,144 @@ service cloud.firestore {
 
     match /dogs/{dogId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateAuditedRecord();
+      allow update: if canUpdateDogProfile() || canSoftDeleteDog();
       allow delete: if false;
 
       match /weight_history/{recordId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /weight_records/{recordId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /specialties/{specialtyId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /detection_lines/{lineId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
+        allow delete: if false;
+      }
+
+      match /triagem_evaluations/{evaluationId} {
+        allow read: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedRecord();
         allow delete: if false;
       }
 
       match /guard_protection_state/{stateId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /commands/{commandId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /health_events/{eventId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /documents/{docId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /external_certifications/{certId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /training_sessions/{sessionId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord()
+          && canWriteDogTraining(dogId, request.resource.data);
+        allow update: if canWriteDogTraining(dogId, request.resource.data)
+          && (
+            trainingDogId(resource.data) == ''
+            || trainingPayloadMatchesDog(dogId, resource.data)
+          );
         allow delete: if false;
       }
 
       match /training_attempts/{attemptId} {
         allow read: if signedIn();
-        allow create: if signedIn();
+        allow create: if canCreateAuditedRecord()
+          && canWriteDogTraining(dogId, request.resource.data);
         allow update, delete: if false;
       }
 
       match /conditioning_sessions/{sessionId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord()
+          && canWriteDogTraining(dogId, request.resource.data);
+        allow update: if canUpdateAuditedOrSoftDelete()
+          && canWriteDogTraining(dogId, request.resource.data)
+          && (
+            trainingDogId(resource.data) == ''
+            || trainingPayloadMatchesDog(dogId, resource.data)
+          );
         allow delete: if false;
       }
 
       match /feedings/{feedingId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /feeding_events/{feedingId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /nutrition_prescriptions/{prescriptionId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /nutritional_prescriptions/{prescriptionId} {
         allow read: if signedIn();
-        allow create, update: if signedIn();
+        allow create: if canCreateAuditedRecord();
+        allow update: if canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
     }
 
     match /occurrences/{occurrenceId} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.status in ['in_progress', 'finalizing']
-        && (
-          request.resource.data.primary_handler_id == request.auth.uid
-          || emailMatchesRa(request.resource.data.primary_handler_ra)
-        );
+      allow create: if canCreateOccurrence();
       allow update: if canUpdateEditableOccurrence()
         || canSoftDeleteOccurrence()
         || canFinalizeDirectly()
@@ -886,7 +1224,7 @@ service cloud.firestore {
       match /participations/{handlerId} {
         allow read: if signedIn() && isParticipant(occurrenceData(occurrenceId));
         allow create: if canCreateParticipation(occurrenceId, handlerId);
-        allow update: if canDeclineParticipation(occurrenceId, handlerId);
+        allow update: if false;
         allow delete: if false;
       }
 
@@ -905,25 +1243,29 @@ service cloud.firestore {
 
     match /trainings/{trainingId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateTrainingRecord();
+      allow update: if canUpdateTrainingRecord();
       allow delete: if false;
     }
 
     match /training_sessions/{sessionId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateTrainingRecord();
+      allow update: if canUpdateTrainingRecord();
       allow delete: if false;
     }
 
     match /health_logs/{healthLogId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateAuditedRecord();
+      allow update: if canUpdateAuditedRecord();
       allow delete: if false;
     }
 
     match /incidents/{incidentId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateAuditedRecord();
+      allow update: if canUpdateAuditedOrSoftDelete();
       allow delete: if false;
     }
 
@@ -934,37 +1276,40 @@ service cloud.firestore {
 
     match /routines/{routineId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateAuditedRecord();
+      allow update: if canUpdateAuditedOrSoftDelete();
       allow delete: if false;
     }
 
     match /auditLogs/{logId} {
       allow read: if signedIn();
-      allow create: if signedIn();
+      allow create: if canCreateAuditLog();
       allow update, delete: if false;
     }
 
     match /gps_tracks/{trackId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateAuditedRecord();
+      allow update: if canUpdateAuditedOrSoftDelete();
       allow delete: if false;
     }
 
     match /generated_pdfs/{pdfId} {
       allow read: if signedIn();
-      allow create: if signedIn();
+      allow create: if false;
       allow update, delete: if false;
     }
 
     match /badges_state/{userId}/{badgeId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create, update: if isSelfIdentifier(userId);
       allow delete: if false;
     }
 
     match /documentos/{docId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if canCreateDogDocument();
+      allow update: if canUpdateAuditedOrSoftDelete();
       allow delete: if false;
     }
 

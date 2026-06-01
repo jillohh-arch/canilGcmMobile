@@ -2,15 +2,31 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum OccurrenceParticipationStatus {
   included,
+  pending,
+  accepted,
+  correctionRequested,
   declined;
 
   String toMap() => switch (this) {
     included => 'included',
+    pending => 'pending',
+    accepted => 'accepted',
+    correctionRequested => 'correction_requested',
     declined => 'declined',
   };
 
   static OccurrenceParticipationStatus fromMap(String? value) {
     final normalized = value?.trim().toLowerCase();
+    if (normalized == 'pending' || normalized == 'pendente') {
+      return OccurrenceParticipationStatus.pending;
+    }
+    if (normalized == 'accepted' || normalized == 'aceito') {
+      return OccurrenceParticipationStatus.accepted;
+    }
+    if (normalized == 'correction_requested' ||
+        normalized == 'correcao_solicitada') {
+      return OccurrenceParticipationStatus.correctionRequested;
+    }
     if (normalized == 'declined' || normalized == 'recusado') {
       return OccurrenceParticipationStatus.declined;
     }
@@ -69,7 +85,9 @@ class OccurrenceParticipation {
     };
   }
 
-  bool get isIncluded => status == OccurrenceParticipationStatus.included;
+  bool get isIncluded =>
+      status == OccurrenceParticipationStatus.included ||
+      status == OccurrenceParticipationStatus.accepted;
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;

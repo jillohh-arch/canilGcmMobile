@@ -8,7 +8,10 @@ import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/pending_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
@@ -223,46 +226,17 @@ class BinomioHeader extends StatelessWidget {
           ),
         ),
 
-        // Ações padronizadas do header
-        if (onSwitchDog != null ||
-            trailing != null ||
-            (showNotificationButton && notificationRa != null) ||
-            showProfileButton) ...[
-          const SizedBox(width: 8),
-          if (onSwitchDog != null) ...[
-            _HeaderIconButton(
-              icon: Icons.compare_arrows_rounded,
-              tooltip: 'Trocar K9',
-              onTap: onSwitchDog!,
-            ),
-            if (trailing != null ||
-                (showNotificationButton && notificationRa != null) ||
-                showProfileButton)
-              const SizedBox(width: 6),
-          ],
-          ?trailing,
-          if (trailing != null &&
-              ((showNotificationButton && notificationRa != null) ||
-                  showProfileButton))
-            const SizedBox(width: 6),
-          if (showNotificationButton && notificationRa != null) ...[
-            _HeaderNotificationButton(userId: notificationRa),
-            if (showProfileButton) const SizedBox(width: 6),
-          ],
-          if (showProfileButton) ...[
-            _HeaderIconButton(
-              icon: Icons.person_outline_rounded,
-              tooltip: 'Perfil',
-              onTap:
-                  onProfileTap ??
-                  () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                    );
-                  },
-            ),
-          ],
-        ],
+        // Ações padronizadas do header: um único menu evita duplicidade entre telas.
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        const SizedBox(width: 8),
+        _HeaderMenuButton(
+          dog: dog,
+          notificationUserId: notificationRa,
+          showNotifications: showNotificationButton,
+          showProfile: showProfileButton,
+          onProfileTap: onProfileTap,
+          onSwitchDog: onSwitchDog,
+        ),
       ],
     );
 
@@ -281,7 +255,7 @@ class BinomioHeader extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0E1A1F),
+          color: AppTheme.surfacePanel,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: dogColor.withAlpha(30)),
         ),
@@ -293,71 +267,318 @@ class BinomioHeader extends StatelessWidget {
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _HeaderIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
+class _HeaderMenuVisualButton extends StatelessWidget {
+  const _HeaderMenuVisualButton();
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withAlpha(20),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.primary.withAlpha(50)),
-          ),
-          child: Center(child: Icon(icon, color: AppTheme.primary, size: 16)),
+      message: 'Menu',
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(20),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.primary.withAlpha(50)),
+        ),
+        child: const Center(
+          child: Icon(Icons.menu_rounded, color: AppTheme.primary, size: 18),
         ),
       ),
     );
   }
 }
 
-class _HeaderNotificationButton extends StatelessWidget {
-  final String userId;
+enum _HeaderMenuAction {
+  profile,
+  team,
+  dog,
+  switchDog,
+  notifications,
+  endShift,
+  logout,
+}
 
-  const _HeaderNotificationButton({required this.userId});
+class _HeaderMenuButton extends StatelessWidget {
+  final Dog dog;
+  final String? notificationUserId;
+  final bool showNotifications;
+  final bool showProfile;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onSwitchDog;
+
+  const _HeaderMenuButton({
+    required this.dog,
+    required this.notificationUserId,
+    required this.showNotifications,
+    required this.showProfile,
+    required this.onProfileTap,
+    required this.onSwitchDog,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final userId = notificationUserId;
+    if (!showNotifications || userId == null) {
+      return _buildMenu(context, unreadCount: 0);
+    }
+
     return StreamBuilder<int>(
       stream: NotificationService().getUnreadCount(userId: userId),
       builder: (context, snapshot) {
-        final count = snapshot.data ?? 0;
-        return Badge(
-          isLabelVisible: count > 0,
-          label: Text(count > 99 ? '99+' : '$count'),
-          backgroundColor: AppTheme.warning,
-          textColor: AppTheme.background,
-          child: _HeaderIconButton(
-            icon: Icons.notifications_none_rounded,
-            tooltip: 'Pendências',
-            onTap: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(
-                  builder: (_) => PendingScreen(userId: userId),
-                ),
-              );
-            },
+        return _buildMenu(context, unreadCount: snapshot.data ?? 0);
+      },
+    );
+  }
+
+  Widget _buildMenu(BuildContext context, {required int unreadCount}) {
+    return Consumer2<ShiftViewModel, AuthViewModel>(
+      builder: (context, shiftVM, authVM, _) {
+        final hasActiveShift = shiftVM.hasActiveShift;
+        final hasCrew = shiftVM.vehicleCrewId?.trim().isNotEmpty == true;
+        final hasNotifications =
+            showNotifications && notificationUserId?.trim().isNotEmpty == true;
+
+        return PopupMenuButton<_HeaderMenuAction>(
+          tooltip: 'Menu',
+          color: AppTheme.surfacePanel,
+          elevation: 10,
+          offset: const Offset(0, 42),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppTheme.primary.withAlpha(45)),
+          ),
+          onSelected: (action) =>
+              _handleAction(context, action, shiftVM, authVM),
+          itemBuilder: (context) => [
+            _menuItem(
+              _HeaderMenuAction.profile,
+              Icons.person_outline_rounded,
+              'Meu perfil',
+              enabled: showProfile,
+            ),
+            _menuItem(
+              _HeaderMenuAction.team,
+              Icons.groups_2_outlined,
+              'Minha equipe',
+              enabled: hasCrew,
+            ),
+            _menuItem(_HeaderMenuAction.dog, Icons.pets_rounded, 'Meu K9'),
+            _menuItem(
+              _HeaderMenuAction.switchDog,
+              Icons.compare_arrows_rounded,
+              'Trocar K9',
+              enabled: hasActiveShift && onSwitchDog != null,
+            ),
+            _menuItem(
+              _HeaderMenuAction.notifications,
+              Icons.notifications_none_rounded,
+              unreadCount > 0 ? 'Notificações ($unreadCount)' : 'Notificações',
+              enabled: hasNotifications,
+            ),
+            const PopupMenuDivider(height: 10),
+            _menuItem(
+              _HeaderMenuAction.endShift,
+              Icons.power_settings_new_rounded,
+              'Encerrar turno',
+              enabled: hasActiveShift,
+              destructive: true,
+            ),
+            _menuItem(
+              _HeaderMenuAction.logout,
+              Icons.logout_rounded,
+              'Sair',
+              destructive: true,
+            ),
+          ],
+          child: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+            backgroundColor: AppTheme.warning,
+            textColor: AppTheme.background,
+            child: const _HeaderMenuVisualButton(),
           ),
         );
       },
     );
+  }
+
+  PopupMenuItem<_HeaderMenuAction> _menuItem(
+    _HeaderMenuAction action,
+    IconData icon,
+    String label, {
+    bool enabled = true,
+    bool destructive = false,
+  }) {
+    final color = destructive ? AppTheme.error : AppTheme.textPrimary;
+    return PopupMenuItem<_HeaderMenuAction>(
+      value: action,
+      enabled: enabled,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: enabled ? color : AppTheme.textTertiary),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: enabled ? color : AppTheme.textTertiary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    _HeaderMenuAction action,
+    ShiftViewModel shiftVM,
+    AuthViewModel authVM,
+  ) async {
+    HapticFeedback.lightImpact();
+    switch (action) {
+      case _HeaderMenuAction.profile:
+        if (onProfileTap != null) {
+          onProfileTap!();
+        } else {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+        }
+        break;
+      case _HeaderMenuAction.team:
+        final crewId = shiftVM.vehicleCrewId;
+        if (crewId == null || crewId.trim().isEmpty) {
+          _showSnack(context, 'Nenhuma equipe ativa no turno.');
+          return;
+        }
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => VehicleCrewProfileScreen(crewId: crewId),
+          ),
+        );
+        break;
+      case _HeaderMenuAction.dog:
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => DogProfileScreen(dog: dog)));
+        break;
+      case _HeaderMenuAction.switchDog:
+        if (onSwitchDog == null) {
+          _showSnack(context, 'Troca de K9 indisponível nesta tela.');
+          return;
+        }
+        onSwitchDog!();
+        break;
+      case _HeaderMenuAction.notifications:
+        final userId = notificationUserId;
+        if (userId == null || userId.trim().isEmpty) {
+          _showSnack(context, 'Usuário sem RA para buscar notificações.');
+          return;
+        }
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(builder: (_) => PendingScreen(userId: userId)),
+        );
+        break;
+      case _HeaderMenuAction.endShift:
+        await _confirmEndShift(context, shiftVM);
+        break;
+      case _HeaderMenuAction.logout:
+        await _confirmLogout(context, authVM);
+        break;
+    }
+  }
+
+  Future<void> _confirmEndShift(
+    BuildContext context,
+    ShiftViewModel shiftVM,
+  ) async {
+    final confirmed = await _confirm(
+      context,
+      title: 'Encerrar turno?',
+      message: 'O turno ativo será finalizado para este condutor.',
+      confirmLabel: 'Encerrar',
+    );
+    if (confirmed != true) return;
+
+    await shiftVM.endShift();
+    if (context.mounted) {
+      _showSnack(context, 'Turno encerrado.');
+    }
+  }
+
+  Future<void> _confirmLogout(
+    BuildContext context,
+    AuthViewModel authVM,
+  ) async {
+    final confirmed = await _confirm(
+      context,
+      title: 'Sair do app?',
+      message: 'Você precisará fazer login novamente.',
+      confirmLabel: 'Sair',
+    );
+    if (confirmed != true) return;
+
+    await authVM.signOut();
+    if (!context.mounted) return;
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => route.isFirst);
+  }
+
+  Future<bool?> _confirm(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfacePanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text(
+          title,
+          style: GoogleFonts.inter(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: Text(
+          message,
+          style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: AppTheme.textTertiary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              confirmLabel,
+              style: GoogleFonts.inter(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnack(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -411,7 +632,7 @@ class _BinomioAvatar extends StatelessWidget {
 
   Widget _buildFallback() {
     return Container(
-      color: const Color(0xFF1A2A30),
+      color: AppTheme.surfacePanelAlt,
       child: Center(
         child: fallbackText != null
             ? Text(

@@ -126,7 +126,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Preencher local',
           style: GoogleFonts.inter(
@@ -299,7 +299,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Ocorrência em andamento',
           style: GoogleFonts.inter(
@@ -356,7 +356,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         title: Text(
           'Descartar dados?',
           style: GoogleFonts.inter(

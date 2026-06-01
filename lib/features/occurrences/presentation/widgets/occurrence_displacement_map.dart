@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Widget que exibe o mapa de deslocamento de uma ocorrência:
 /// pinos numerados por local, trilha conectando, legenda com horários.
@@ -34,7 +35,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
               Text(
                 'DESLOCAMENTO',
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
@@ -44,7 +45,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
               Text(
                 '${locations.length} ${locations.length == 1 ? 'local' : 'locais'}',
                 style: GoogleFonts.ibmPlexMono(
-                  color: const Color(0xFF5A7280),
+                  color: AppTheme.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
@@ -55,10 +56,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
         // Map
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 200,
-            child: _buildMap(),
-          ),
+          child: SizedBox(height: 200, child: _buildMap()),
         ),
         const SizedBox(height: 10),
         // Legend
@@ -69,7 +67,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
           child: Text(
             'Cada parada marca o local onde uma ou mais ações foram registradas.',
             style: GoogleFonts.inter(
-              color: const Color(0xFF5A7280),
+              color: AppTheme.textMuted,
               fontSize: 10.5,
               height: 1.4,
             ),
@@ -107,7 +105,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
             polylines: [
               Polyline(
                 points: points,
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 strokeWidth: 2.5,
               ),
             ],
@@ -124,19 +122,12 @@ class OccurrenceDisplacementMap extends StatelessWidget {
                 onTap: () => onLocationTap?.call(loc.index),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isFirst
-                        ? const Color(0xFF2ECC71)
-                        : const Color(0xFF4DD0E1),
+                    color: isFirst ? AppTheme.success : AppTheme.primary,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF050D10),
-                      width: 2.5,
-                    ),
+                    border: Border.all(color: AppTheme.background, width: 2.5),
                     boxShadow: [
                       BoxShadow(
-                        color: (isFirst
-                                ? const Color(0xFF2ECC71)
-                                : const Color(0xFF4DD0E1))
+                        color: (isFirst ? AppTheme.success : AppTheme.primary)
                             .withAlpha(50),
                         blurRadius: 6,
                         spreadRadius: 2,
@@ -175,15 +166,11 @@ class OccurrenceDisplacementMap extends StatelessWidget {
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
-                  color: isFirst
-                      ? const Color(0xFF2ECC71)
-                      : const Color(0xFF4DD0E1),
+                  color: isFirst ? AppTheme.success : AppTheme.primary,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: (isFirst
-                              ? const Color(0xFF2ECC71)
-                              : const Color(0xFF4DD0E1))
+                      color: (isFirst ? AppTheme.success : AppTheme.primary)
                           .withAlpha(30),
                       blurRadius: 4,
                       spreadRadius: 1,
@@ -215,7 +202,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
               Text(
                 timeFormat.format(loc.arrivedAt),
                 style: GoogleFonts.ibmPlexMono(
-                  color: const Color(0xFF5A7280),
+                  color: AppTheme.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),

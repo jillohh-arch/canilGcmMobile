@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -25,15 +26,15 @@ class DetectionFormationScreen extends StatefulWidget {
 }
 
 class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
-  static const _bg = Color(0xFF050D10);
-  static const _panel = Color(0xFF0A1418);
-  static const _panelSoft = Color(0xFF0F1B20);
-  static const _cyan = Color(0xFF4DD0E1);
-  static const _yellow = Color(0xFFF1C40F);
-  static const _green = Color(0xFF2ECC71);
-  static const _red = Color(0xFFE74C3C);
+  static const _bg = AppTheme.background;
+  static const _panel = AppTheme.surfacePanelSoft;
+  static const _panelSoft = AppTheme.surfacePanel;
+  static const _cyan = AppTheme.primary;
+  static const _yellow = AppTheme.warning;
+  static const _green = AppTheme.success;
+  static const _red = AppTheme.error;
   static const _muted = Color(0xFF8FA3AD);
-  static const _mutedDark = Color(0xFF5A7280);
+  static const _mutedDark = AppTheme.textMuted;
 
   late final DetectionService _service;
 

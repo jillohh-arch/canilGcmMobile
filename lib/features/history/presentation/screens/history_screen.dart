@@ -34,15 +34,15 @@ part 'history_timeline_list.dart';
 part 'history_timeline_item.dart';
 part 'history_data_loader.dart';
 
-const Color _hBg = Color(0xFF050D10);
-const Color _hCyan = Color(0xFF4DD0E1);
-const Color _hTextPrimary = Color(0xFFFFFFFF);
-const Color _hTextSecondary = Color(0xFFB0C4CC);
-const Color _hTextMuted = Color(0xFF5A7280);
-const Color _hTextDimmed = Color(0xFF7A8A92);
-const Color _hGreen = Color(0xFF2ECC71);
-const Color _hYellow = Color(0xFFF1C40F);
-const Color _hRed = Color(0xFFE74C3C);
+const Color _hBg = AppTheme.background;
+const Color _hCyan = AppTheme.primary;
+const Color _hTextPrimary = AppTheme.textPrimary;
+const Color _hTextSecondary = AppTheme.textSecondary;
+const Color _hTextMuted = AppTheme.textMuted;
+const Color _hTextDimmed = AppTheme.textTertiary;
+const Color _hGreen = AppTheme.success;
+const Color _hYellow = AppTheme.warning;
+const Color _hRed = AppTheme.error;
 const Color _hPurple = Color(0xFF9B59B6);
 
 class HistoryScreen extends StatefulWidget {
@@ -152,9 +152,10 @@ class _HistoryScreenState extends State<HistoryScreen>
               _PageTitleRow(
                 onExport: () => _exportPdf(filteredEntries, dog, callsign),
               ),
-              _PeriodFilterChips(
-                selected: _periodFilter,
-                onSelected: (v) {
+              _HistoryFilterToolbar(
+                period: _periodFilter,
+                category: _typeFilter,
+                onPeriodSelected: (v) {
                   HapticFeedback.selectionClick();
                   if (v == 'Personalizado') {
                     _openDateRangePicker();
@@ -165,22 +166,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                     _visibleCount = 30;
                   });
                 },
-              ),
-              _CategoryFilterChips(
-                selected: _typeFilter,
-                onSelected: (v) {
+                onCategorySelected: (v) {
                   HapticFeedback.selectionClick();
                   setState(() {
                     _typeFilter = v;
                     _visibleCount = 30;
                   });
                 },
-              ),
-              _FilterSummaryRow(
-                count: filteredEntries.length,
-                days: daysCount,
                 onMoreFilters: _openFilterSheet,
               ),
+              _FilterSummaryRow(count: filteredEntries.length, days: daysCount),
               Expanded(
                 child: _HistoryTimeline(
                   groups: groupedEntries,
@@ -220,7 +215,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Nao ha registros no periodo filtrado.',
+            'Não há registros no período filtrado.',
             style: GoogleFonts.inter(fontWeight: FontWeight.w600),
           ),
           backgroundColor: _hCyan.withAlpha(200),
@@ -271,7 +266,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ),
                   pw.SizedBox(height: 4),
                   pw.Text(
-                    'Historico operacional do cao K9',
+                    'Histórico operacional do cão K9',
                     style: pw.TextStyle(
                       fontSize: 22,
                       fontWeight: pw.FontWeight.bold,
@@ -307,7 +302,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           ),
           pw.SizedBox(height: 18),
           pw.TableHelper.fromTextArray(
-            headers: const ['Data', 'Categoria', 'Registro', 'Responsavel'],
+            headers: const ['Data', 'Categoria', 'Registro', 'Responsável'],
             data: entries
                 .map(
                   (entry) => [
@@ -340,7 +335,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               style: const pw.TextStyle(fontSize: 8),
             ),
             pw.Text(
-              'Pagina ${context.pageNumber} de ${context.pagesCount}',
+              'Página ${context.pageNumber} de ${context.pagesCount}',
               style: const pw.TextStyle(fontSize: 8),
             ),
           ],
@@ -377,38 +372,43 @@ class _PageTitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
       child: Row(
         children: [
           Text(
             'Histórico',
             style: GoogleFonts.inter(
               color: _hTextPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const Spacer(),
-          GestureDetector(
+          InkWell(
             onTap: onExport,
+            borderRadius: BorderRadius.circular(13),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: _hCyan.withAlpha(26),
-                border: Border.all(color: _hCyan.withAlpha(77)),
-                borderRadius: BorderRadius.circular(9),
+                color: _hCyan.withAlpha(12),
+                border: Border.all(color: _hCyan.withAlpha(210)),
+                borderRadius: BorderRadius.circular(13),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('📄', style: TextStyle(fontSize: 12)),
-                  const SizedBox(width: 5),
+                  const Icon(
+                    Icons.description_outlined,
+                    color: _hCyan,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     'Exportar PDF',
                     style: GoogleFonts.inter(
                       color: _hCyan,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -424,13 +424,8 @@ class _PageTitleRow extends StatelessWidget {
 class _FilterSummaryRow extends StatelessWidget {
   final int count;
   final int days;
-  final VoidCallback onMoreFilters;
 
-  const _FilterSummaryRow({
-    required this.count,
-    required this.days,
-    required this.onMoreFilters,
-  });
+  const _FilterSummaryRow({required this.count, required this.days});
 
   @override
   Widget build(BuildContext context) {
@@ -455,18 +450,6 @@ class _FilterSummaryRow extends StatelessWidget {
                 ),
                 TextSpan(text: ' · $days ${days == 1 ? 'dia' : 'dias'}'),
               ],
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: onMoreFilters,
-            child: Text(
-              'Mais filtros →',
-              style: GoogleFonts.inter(
-                color: _hCyan,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],

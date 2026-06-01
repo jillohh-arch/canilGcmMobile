@@ -5,13 +5,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class DogCommand {
   final String? id;
   final String name;
-  final String category; // 'operacional' | 'posicional' | 'postural' | 'habilidade'
-  final String stage; // 'not_trained' | 'introduced' | 'developing' | 'consolidated' | 'operational'
+  final String
+  category; // 'operacional' | 'posicional' | 'postural' | 'habilidade'
+  final String
+  stage; // 'not_trained' | 'introduced' | 'developing' | 'consolidated' | 'operational'
   final String? description;
   final DateTime? learnedAt;
   final DateTime? masteredAt;
   final DateTime lastUpdatedAt;
   final String lastUpdatedBy;
+  final DateTime? deletedAt;
+  final String? deletedBy;
+  final String? deleteReason;
 
   DogCommand({
     this.id,
@@ -23,6 +28,9 @@ class DogCommand {
     this.masteredAt,
     required this.lastUpdatedAt,
     required this.lastUpdatedBy,
+    this.deletedAt,
+    this.deletedBy,
+    this.deleteReason,
   });
 
   factory DogCommand.fromJson(Map<String, dynamic> json, {String? docId}) {
@@ -36,6 +44,10 @@ class DogCommand {
       masteredAt: _toDateTime(json['mastered_at']),
       lastUpdatedAt: _toDateTime(json['last_updated_at']) ?? DateTime.now(),
       lastUpdatedBy: json['last_updated_by'] as String? ?? '',
+      deletedAt: _toDateTime(json['deleted_at']),
+      deletedBy: json['deleted_by'] as String?,
+      deleteReason:
+          json['delete_reason'] as String? ?? json['deleted_reason'] as String?,
     );
   }
 
@@ -49,6 +61,9 @@ class DogCommand {
       if (masteredAt != null) 'mastered_at': Timestamp.fromDate(masteredAt!),
       'last_updated_at': Timestamp.fromDate(lastUpdatedAt),
       'last_updated_by': lastUpdatedBy,
+      if (deletedAt != null) 'deleted_at': Timestamp.fromDate(deletedAt!),
+      if (deletedBy != null) 'deleted_by': deletedBy,
+      if (deleteReason != null) 'delete_reason': deleteReason,
     };
   }
 
@@ -62,6 +77,9 @@ class DogCommand {
     DateTime? masteredAt,
     DateTime? lastUpdatedAt,
     String? lastUpdatedBy,
+    DateTime? deletedAt,
+    String? deletedBy,
+    String? deleteReason,
   }) {
     return DogCommand(
       id: id ?? this.id,
@@ -73,8 +91,13 @@ class DogCommand {
       masteredAt: masteredAt ?? this.masteredAt,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
       lastUpdatedBy: lastUpdatedBy ?? this.lastUpdatedBy,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deletedBy: deletedBy ?? this.deletedBy,
+      deleteReason: deleteReason ?? this.deleteReason,
     );
   }
+
+  bool get isDeleted => deletedAt != null;
 
   static const List<String> stages = [
     'not_trained',

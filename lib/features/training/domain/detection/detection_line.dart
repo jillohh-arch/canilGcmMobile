@@ -184,6 +184,34 @@ class DetectionLine {
     '4c',
   ];
 
+  static const List<String> officialTypes = ['drogas', 'armas', 'cadaver'];
+
+  static String displayNameForType(String type) {
+    switch (_normalizeLineType(type)) {
+      case 'drogas':
+        return 'Drogas';
+      case 'armas':
+        return 'Armas';
+      case 'cadaver':
+        return 'Cadáver';
+      default:
+        return 'Linha';
+    }
+  }
+
+  static String iconForType(String type) {
+    switch (_normalizeLineType(type)) {
+      case 'drogas':
+        return '💊';
+      case 'armas':
+        return '🔫';
+      case 'cadaver':
+        return '🕯';
+      default:
+        return '🎯';
+    }
+  }
+
   static DateTime? _toDateTime(dynamic value) {
     if (value == null) return null;
     if (value is Timestamp) return value.toDate();

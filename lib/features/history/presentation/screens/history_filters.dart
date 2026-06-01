@@ -2,6 +2,16 @@
 
 part of 'history_screen.dart';
 
+const _periodOptions = [
+  'Hoje',
+  'Ontem',
+  'Esta semana',
+  'Este mês',
+  'Personalizado',
+];
+
+const _categoryOptions = ['Tudo', 'Nutrição', 'Saúde', 'Treino', 'Ocorrência'];
+
 extension _HistoryFilters on _HistoryScreenState {
   Future<void> _openDateRangePicker() async {
     final picked = await showDateRangePicker(
@@ -41,7 +51,7 @@ extension _HistoryFilters on _HistoryScreenState {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F2026),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
                 border: Border(top: BorderSide(color: _hCyan, width: 1)),
               ),
               child: Column(
@@ -60,24 +70,17 @@ extension _HistoryFilters on _HistoryScreenState {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'FILTROS DO HISTÓRICO',
+                    'Filtros do histórico',
                     style: GoogleFonts.inter(
-                      color: _hCyan,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.1,
+                      color: _hTextPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   _FilterSheetGroup(
                     title: 'Período',
-                    options: const [
-                      'Hoje',
-                      'Ontem',
-                      'Esta semana',
-                      'Este mês',
-                      'Personalizado',
-                    ],
+                    options: _periodOptions,
                     selected: _periodFilter,
                     onSelected: (value) {
                       HapticFeedback.selectionClick();
@@ -96,13 +99,7 @@ extension _HistoryFilters on _HistoryScreenState {
                   const SizedBox(height: 18),
                   _FilterSheetGroup(
                     title: 'Categoria',
-                    options: const [
-                      'Tudo',
-                      'Nutrição',
-                      'Saúde',
-                      'Treino',
-                      'Ocorrência',
-                    ],
+                    options: _categoryOptions,
                     selected: _typeFilter,
                     onSelected: (value) {
                       HapticFeedback.selectionClick();
@@ -168,78 +165,148 @@ extension _HistoryFilters on _HistoryScreenState {
   }
 }
 
-class _PeriodFilterChips extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onSelected;
+class _HistoryFilterToolbar extends StatelessWidget {
+  final String period;
+  final String category;
+  final ValueChanged<String> onPeriodSelected;
+  final ValueChanged<String> onCategorySelected;
+  final VoidCallback onMoreFilters;
 
-  const _PeriodFilterChips({required this.selected, required this.onSelected});
+  const _HistoryFilterToolbar({
+    required this.period,
+    required this.category,
+    required this.onPeriodSelected,
+    required this.onCategorySelected,
+    required this.onMoreFilters,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const chips = ['Hoje', 'Ontem', 'Esta semana', 'Este mês', 'Personalizado'];
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 0, 8),
-      child: SizedBox(
-        height: 32,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: chips.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 6),
-          padding: const EdgeInsets.only(right: 16),
-          itemBuilder: (context, index) {
-            final chip = chips[index];
-            final active = selected == chip;
-            return _FilterChip(
-              label: chip,
-              active: active,
-              onTap: () => onSelected(chip),
-            );
-          },
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: _PopupFilterPill(
+              label: period,
+              icon: Icons.calendar_today_outlined,
+              options: _periodOptions,
+              onSelected: onPeriodSelected,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: _PopupFilterPill(
+              label: category,
+              options: _categoryOptions,
+              onSelected: onCategorySelected,
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: onMoreFilters,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Filtros',
+                    style: GoogleFonts.inter(
+                      color: _hCyan,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: _hCyan,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _CategoryFilterChips extends StatelessWidget {
-  final String selected;
+class _PopupFilterPill extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final List<String> options;
   final ValueChanged<String> onSelected;
 
-  const _CategoryFilterChips({
-    required this.selected,
+  const _PopupFilterPill({
+    required this.label,
+    required this.options,
     required this.onSelected,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    const chips = [
-      ('Tudo', ''),
-      ('Nutrição', '🍖'),
-      ('Saúde', '⚕'),
-      ('Treino', '🎯'),
-      ('Ocorrência', '🛡'),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 0, 0),
-      child: SizedBox(
-        height: 32,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: chips.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 6),
-          padding: const EdgeInsets.only(right: 16),
-          itemBuilder: (context, index) {
-            final (value, emoji) = chips[index];
-            final active = selected == value;
-            final label = emoji.isEmpty ? value : '$emoji $value';
-            return _FilterChip(
-              label: label,
-              active: active,
-              onTap: () => onSelected(value),
-            );
-          },
+    return PopupMenuButton<String>(
+      color: const Color(0xFF0F2026),
+      elevation: 10,
+      offset: const Offset(0, 42),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _hCyan.withAlpha(45)),
+      ),
+      onSelected: onSelected,
+      itemBuilder: (context) => options
+          .map(
+            (option) => PopupMenuItem<String>(
+              value: option,
+              child: Text(
+                option,
+                style: GoogleFonts.inter(
+                  color: option == label ? _hCyan : _hTextPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withAlpha(30)),
+        ),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: _hCyan, size: 15),
+              const SizedBox(width: 7),
+            ],
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: _hTextPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: _hTextSecondary,
+              size: 19,
+            ),
+          ],
         ),
       ),
     );
@@ -259,24 +326,30 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
         decoration: BoxDecoration(
-          color: active ? _hCyan.withAlpha(31) : Colors.white.withAlpha(8),
+          color: active ? _hCyan.withAlpha(22) : Colors.white.withAlpha(5),
           border: Border.all(
-            color: active ? _hCyan : Colors.white.withAlpha(20),
+            color: active ? _hCyan : Colors.white.withAlpha(24),
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(13),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            color: active ? _hCyan : _hTextSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                color: active ? _hCyan : _hTextSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -315,31 +388,10 @@ class _FilterSheetGroup extends StatelessWidget {
           runSpacing: 8,
           children: options.map((option) {
             final isActive = option == selected;
-            return GestureDetector(
+            return _FilterChip(
+              label: option,
+              active: isActive,
               onTap: () => onSelected(option),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? _hCyan.withAlpha(31)
-                      : Colors.white.withAlpha(8),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isActive ? _hCyan : Colors.white.withAlpha(20),
-                  ),
-                ),
-                child: Text(
-                  option,
-                  style: GoogleFonts.inter(
-                    color: isActive ? _hCyan : _hTextSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
             );
           }).toList(),
         ),

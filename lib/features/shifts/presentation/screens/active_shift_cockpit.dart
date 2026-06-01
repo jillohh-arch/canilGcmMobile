@@ -52,6 +52,10 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
                   conductorPhotoUrl: conductorPhoto,
                 ),
                 const SizedBox(height: 18),
+                _QuickActionsSection(dog: dog, actions: state._quickActions),
+                const SizedBox(height: 18),
+                const _LatestRecordsSection(),
+                const SizedBox(height: 18),
                 // Alertas (condicional)
                 if (state._alerts.isNotEmpty) ...[
                   _AlertsSection(
@@ -60,11 +64,6 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Atividades de Hoje
-                _TodayActivitiesSection(dogId: dog.id, dogName: dog.name),
-                const SizedBox(height: 18),
-                // Registrar (quick actions)
-                _QuickActionsSection(dog: dog, actions: state._quickActions),
               ],
             ),
           ),

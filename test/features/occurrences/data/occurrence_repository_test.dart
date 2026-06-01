@@ -1,6 +1,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
@@ -56,6 +57,71 @@ void main() {
         expect(snap.data()!['status'], equals('in_progress'));
         expect(created.auditTrail.length, equals(1));
         expect(created.auditTrail.first['action'], equals('created'));
+      });
+
+      test('cria relator aceito e integrantes pendentes', () async {
+        final occ = Occurrence(
+          id: 'occ-team',
+          shiftId: 'shift-001',
+          primaryHandlerId: 'uid-691755',
+          primaryHandlerRa: '691755',
+          dogId: 'dog-001',
+          typeCode: 'AVERIGUACAO',
+          typeName: 'Averiguacao',
+          locationAddress: 'Rua Brasil, 100',
+          gpsLat: -22.5642,
+          gpsLng: -47.4019,
+          gpsAccuracy: 4.2,
+          startedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: OccurrenceStatus.inProgress,
+          team: [
+            OccurrenceTeamMember(
+              handlerId: '691755',
+              handlerEmail: '691755@gcm.com.br',
+              role: TeamRole.titular,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+            OccurrenceTeamMember(
+              handlerId: '691640',
+              handlerEmail: '691640@gcm.com.br',
+              role: TeamRole.integrante,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+          ],
+        );
+
+        final created = await repository.create(occ);
+        final snap = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-team')
+            .get();
+        final data = snap.data()!;
+        final titularParticipation = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-team')
+            .collection('participations')
+            .doc('691755')
+            .get();
+        final integranteParticipation = await fakeFirestore
+            .collection('occurrences')
+            .doc('occ-team')
+            .collection('participations')
+            .doc('691640')
+            .get();
+
+        expect(created.acceptedHandlerIds, equals(['691755']));
+        expect(created.pendingHandlerIds, equals(['691640']));
+        expect(created.editAuthorizedHandlerIds, equals(['691755']));
+        expect(data['participation_status'], equals('pending_acceptance'));
+        expect(data['accepted_handler_ids'], equals(['691755']));
+        expect(data['pending_handler_ids'], equals(['691640']));
+        expect(data['edit_authorized_handler_ids'], equals(['691755']));
+        expect(titularParticipation.data()!['status'], equals('accepted'));
+        expect(integranteParticipation.data()!['status'], equals('pending'));
       });
     });
 

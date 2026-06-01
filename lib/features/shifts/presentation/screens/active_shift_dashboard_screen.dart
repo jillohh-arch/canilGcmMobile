@@ -21,11 +21,9 @@ import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
-import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
-import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
@@ -90,6 +88,10 @@ class _ActiveShiftDashboardScreenState
           context,
           listen: false,
         ).loadForDog(dogId);
+        Provider.of<NutritionViewModel>(
+          context,
+          listen: false,
+        ).loadFullHistory(dogId);
 
         final dogVM = Provider.of<DogViewModel>(context, listen: false);
         final userVM = Provider.of<UserViewModel>(context, listen: false);

@@ -405,7 +405,9 @@ class Occurrence with SoftDeletable {
   List<String> get editAuthorizedEmails {
     final authorized = editAuthorizedHandlerIds.isNotEmpty
         ? editAuthorizedHandlerIds
-        : teamHandlerIds;
+        : participationRevision == 0
+        ? teamHandlerIds
+        : const <String>[];
     final emails = <String>{
       for (final member in team)
         if (authorized.contains(member.handlerId) &&

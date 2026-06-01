@@ -52,7 +52,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                 Text(
                   timeStr,
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF5A7280),
+                    color: AppTheme.textMuted,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),

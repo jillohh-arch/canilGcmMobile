@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
 
 class UserService {
@@ -11,25 +13,66 @@ class UserService {
   Stream<List<UserModel>> getUsers() {
     return _db.collection('users').snapshots().map((snapshot) {
       return snapshot.docs
+          .where((doc) => !_isDeleted(doc.data()))
           .map((doc) => UserModel.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     });
   }
 
   Future<void> saveUser(UserModel user) async {
-    await _db
-        .collection('users')
-        .doc(user.ra)
-        .set(user.toJson(), SetOptions(merge: true));
+    final docRef = _db.collection('users').doc(user.ra);
+    final snapshot = await docRef.get();
+    final entry = AuditService.buildInlineEntry(action: 'updated');
+    await docRef.set({
+      ...user.toJson(),
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': snapshot.exists ? FieldValue.arrayUnion([entry]) : [entry],
+    }, SetOptions(merge: true));
   }
 
-  Future<void> deleteUser(String ra) async {
-    await _db.collection('users').doc(ra).delete();
+  Future<void> deleteUser(
+    String ra, {
+    String reason = 'Exclusao administrativa do cadastro do usuario',
+  }) async {
+    final docRef = _db.collection('users').doc(ra);
+    final snapshot = await docRef.get();
+    final before = snapshot.data();
+    if (!snapshot.exists || before == null) return;
+
+    final entry = AuditService.buildInlineEntry(
+      action: 'deleted',
+      reason: reason,
+    );
+
+    await docRef.update({
+      'active': false,
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by': FirebaseAuth.instance.currentUser?.uid,
+      'delete_reason': reason,
+      'deleted_reason': reason,
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    });
+
+    await AuditService.log(
+      action: 'deleted',
+      entityType: 'user',
+      entityId: ra,
+      summary: 'Usuario removido do cadastro ativo: $reason',
+      before: before,
+      reason: reason,
+    );
   }
 
   Future<UserModel?> getUser(String ra) async {
     final doc = await _db.collection('users').doc(ra).get();
     if (!doc.exists) return null;
-    return UserModel.fromJson({...doc.data()!, 'id': doc.id});
+    final data = doc.data()!;
+    if (_isDeleted(data)) return null;
+    return UserModel.fromJson({...data, 'id': doc.id});
+  }
+
+  bool _isDeleted(Map<String, dynamic> data) {
+    return data['deleted_at'] != null || data['active'] == false;
   }
 }

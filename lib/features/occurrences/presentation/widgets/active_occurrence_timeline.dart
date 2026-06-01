@@ -76,10 +76,7 @@ class ActiveOccurrenceTimeline extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _TimelineConnector(
-                    isFirst: isFirst,
-                    isLast: isLast,
-                  ),
+                  _TimelineConnector(isFirst: isFirst, isLast: isLast),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ActiveOccurrenceEventCard(
@@ -118,7 +115,9 @@ class _TimelineConnector extends StatelessWidget {
           Expanded(
             child: Container(
               width: 2,
-              color: isFirst ? Colors.transparent : AppTheme.primary.withAlpha(40),
+              color: isFirst
+                  ? Colors.transparent
+                  : AppTheme.primary.withAlpha(40),
             ),
           ),
           // Dot
@@ -138,7 +137,9 @@ class _TimelineConnector extends StatelessWidget {
           Expanded(
             child: Container(
               width: 2,
-              color: isLast ? Colors.transparent : AppTheme.primary.withAlpha(40),
+              color: isLast
+                  ? Colors.transparent
+                  : AppTheme.primary.withAlpha(40),
             ),
           ),
         ],
@@ -196,15 +197,21 @@ class _ErrorState extends StatelessWidget {
               icon: const Icon(Icons.refresh_rounded, size: 16),
               label: Text(
                 'Tentar novamente',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF4DD0E1),
-                side: const BorderSide(color: Color(0xFF4DD0E1)),
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: AppTheme.primary),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
               ),
             ),
           ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 
 class QuickEventItem {
@@ -91,7 +92,7 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
                 height: 12,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.5,
-                  color: Color(0xFF4DD0E1),
+                  color: AppTheme.primary,
                 ),
               ),
             ] else ...[
@@ -101,7 +102,7 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
             Text(
               isLoading ? 'REGISTRANDO...' : 'REGISTROS RÁPIDOS',
               style: GoogleFonts.inter(
-                color: const Color(0xFF4DD0E1),
+                color: AppTheme.primary,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -140,10 +141,10 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFF4DD0E1).withAlpha(15),
+              color: AppTheme.primary.withAlpha(15),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF4DD0E1).withAlpha(100),
+                color: AppTheme.primary.withAlpha(100),
                 style: BorderStyle.solid,
               ),
             ),
@@ -153,7 +154,7 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
                 Text(
                   '+',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -162,7 +163,7 @@ class ActiveOccurrenceQuickGrid extends StatelessWidget {
                 Text(
                   'Outro evento / Central',
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF4DD0E1),
+                    color: AppTheme.primary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,

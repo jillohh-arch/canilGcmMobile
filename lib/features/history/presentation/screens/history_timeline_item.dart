@@ -13,149 +13,104 @@ class HistoryTimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final time = DateFormat('HH:mm').format(entry.time);
-    final categoryStyle = _categoryStyle(entry.type);
+    final style = _categoryStyle(entry.type);
 
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
         _navigate(context);
       },
-      child: Container(
-        color: Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Stack(
-          children: [
-            // Linha conectora vertical
-            if (!isLast)
-              Positioned(
-                left: 32 + 16 - 0.5, // time width + gap + half icon
-                top: 0,
-                bottom: 0,
-                child: Container(width: 1, color: Colors.white.withAlpha(15)),
-              ),
-            Row(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
               children: [
-                // Horário
                 SizedBox(
-                  width: 36,
+                  width: 48,
                   child: Text(
                     time,
-                    textAlign: TextAlign.right,
                     style: GoogleFonts.inter(
                       color: _hTextMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Ícone circular
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: categoryStyle.color.withAlpha(46),
-                    border: Border.all(color: _hBg, width: 2),
+                    color: style.color.withAlpha(36),
+                    boxShadow: [
+                      BoxShadow(
+                        color: style.color.withAlpha(24),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
-                  child: Center(
-                    child: Text(
-                      categoryStyle.emoji,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
+                  child: Icon(style.icon, color: style.color, size: 23),
                 ),
-                const SizedBox(width: 12),
-                // Info
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        entry.title,
+                        _displayTitle(entry),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           color: _hTextPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (entry.subtitle.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          entry.subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: _hTextDimmed,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      _buildMeta(),
+                      const SizedBox(height: 5),
+                      _MetaLine(entry: entry),
+                      const SizedBox(height: 7),
+                      _StatusBadges(entry: entry),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Chevron
-                Text(
-                  '›',
-                  style: GoogleFonts.inter(
-                    color: _hTextMuted,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                  ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _hTextMuted,
+                  size: 24,
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (!isLast)
+            Padding(
+              padding: const EdgeInsets.only(left: 104),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: Colors.white.withAlpha(13),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildMeta() {
-    final children = <Widget>[];
-
-    // Badge de autoria
-    final isYou = entry.tag == 'VOCÊ';
-    children.add(
-      _AuthorBadge(
-        label: isYou ? 'VOCÊ' : entry.author.toUpperCase(),
-        isYou: isYou,
-      ),
-    );
-
-    // Badge "EM ANDAMENTO" pulsante
-    if (entry.isInProgress) {
-      children.add(const _InProgressBadge());
+  String _displayTitle(HistoryEntry entry) {
+    var title = entry.title.trim();
+    for (final prefix in const [
+      'Ocorrência · ',
+      'Ocorrência • ',
+      'Treino · ',
+      'Treino • ',
+    ]) {
+      if (title.startsWith(prefix)) {
+        title = title.substring(prefix.length).trim();
+      }
     }
-
-    // Badge "editado"
-    if (entry.editedAt != null) {
-      final editTime = DateFormat('HH:mm').format(entry.editedAt!);
-      children.add(
-        Text(
-          'editado $editTime',
-          style: GoogleFonts.inter(
-            color: _hTextDimmed,
-            fontSize: 9,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
-    }
-
-    if (children.isEmpty) return const SizedBox.shrink();
-
-    return Wrap(
-      spacing: 4,
-      runSpacing: 2,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: children,
-    );
+    return title.isEmpty ? entry.category : title;
   }
 
   void _navigate(BuildContext context) {
@@ -177,45 +132,204 @@ class HistoryTimelineItem extends StatelessWidget {
   _CategoryStyle _categoryStyle(HistoryEntryType type) {
     switch (type) {
       case HistoryEntryType.nutrition:
-        return const _CategoryStyle(color: _hPurple, emoji: '🍖');
+        return const _CategoryStyle(
+          color: AppTheme.attention,
+          icon: Icons.restaurant_rounded,
+        );
       case HistoryEntryType.health:
-        return const _CategoryStyle(color: _hRed, emoji: '⚕');
+        return const _CategoryStyle(
+          color: _hPurple,
+          icon: Icons.medical_services_outlined,
+        );
       case HistoryEntryType.training:
-        return const _CategoryStyle(color: _hYellow, emoji: '🎯');
+        return const _CategoryStyle(
+          color: _hRed,
+          icon: Icons.gps_fixed_rounded,
+        );
       case HistoryEntryType.occurrence:
-        return const _CategoryStyle(color: _hCyan, emoji: '🛡️');
+        return const _CategoryStyle(color: _hCyan, icon: Icons.shield_outlined);
     }
+  }
+}
+
+class _MetaLine extends StatelessWidget {
+  final HistoryEntry entry;
+
+  const _MetaLine({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(children: _spans()),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  List<InlineSpan> _spans() {
+    final spans = <InlineSpan>[];
+    final parts = _parts();
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (i > 0) spans.add(_plain(' · '));
+      spans.add(part);
+    }
+    return spans;
+  }
+
+  List<InlineSpan> _parts() {
+    final parts = <InlineSpan>[];
+
+    switch (entry.type) {
+      case HistoryEntryType.occurrence:
+        final location = _firstNonEmpty([entry.location, entry.subtitle]);
+        if (location.isNotEmpty) parts.add(_plain(_shortenLocation(location)));
+        break;
+      case HistoryEntryType.training:
+        parts.add(_plain('Treino'));
+        if (entry.subtitle.trim().isNotEmpty) {
+          parts.add(_plain(entry.subtitle.trim()));
+        }
+        break;
+      case HistoryEntryType.health:
+        parts.add(_plain('Saúde'));
+        if (entry.subtitle.trim().isNotEmpty) {
+          parts.add(_plain(entry.subtitle.trim()));
+        }
+        break;
+      case HistoryEntryType.nutrition:
+        parts.add(_plain('Nutrição'));
+        if (entry.subtitle.trim().isNotEmpty) {
+          parts.add(_plain(entry.subtitle.trim()));
+        }
+        break;
+    }
+
+    if (_isYou(entry.author)) {
+      parts.add(_plain('Você', color: _hCyan, weight: FontWeight.w800));
+    } else if (entry.author.trim().isNotEmpty) {
+      parts.add(_plain(_shortAuthor(entry.author)));
+    }
+
+    if (entry.editedAt != null) {
+      parts.add(
+        _plain(
+          'editado ${DateFormat('HH:mm').format(entry.editedAt!)}',
+          style: FontStyle.italic,
+        ),
+      );
+    }
+
+    return parts;
+  }
+
+  TextSpan _plain(
+    String text, {
+    Color color = _hTextDimmed,
+    FontWeight weight = FontWeight.w600,
+    FontStyle? style,
+  }) {
+    return TextSpan(
+      text: text,
+      style: GoogleFonts.inter(
+        color: color,
+        fontSize: 13,
+        fontWeight: weight,
+        fontStyle: style,
+      ),
+    );
+  }
+
+  String _firstNonEmpty(List<String> values) {
+    for (final value in values) {
+      final trimmed = value.trim();
+      if (trimmed.isNotEmpty && trimmed != 'Local não informado') {
+        return trimmed;
+      }
+    }
+    return '';
+  }
+
+  String _shortenLocation(String value) {
+    return value.split(',').first.trim();
+  }
+
+  String _shortAuthor(String author) {
+    final clean = author.trim();
+    if (clean.toUpperCase().startsWith('GCM ') && clean.length > 12) {
+      return 'GCM';
+    }
+    return clean;
+  }
+
+  bool _isYou(String author) {
+    final normalized = author.trim().toLowerCase();
+    return normalized == 'você' || normalized == 'voce';
+  }
+}
+
+class _StatusBadges extends StatelessWidget {
+  final HistoryEntry entry;
+
+  const _StatusBadges({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = <Widget>[];
+
+    if (!_isYou(entry.author) && entry.author.trim().isNotEmpty) {
+      badges.add(_AuthorBadge(label: _badgeAuthor(entry.author)));
+    }
+
+    if (entry.isInProgress) {
+      badges.add(const _InProgressBadge());
+    }
+
+    if (badges.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(spacing: 6, runSpacing: 4, children: badges);
+  }
+
+  String _badgeAuthor(String author) {
+    final clean = author.trim();
+    if (clean.toUpperCase().startsWith('GCM ') && clean.length > 12) {
+      return 'GCM';
+    }
+    return clean.toUpperCase();
+  }
+
+  bool _isYou(String author) {
+    final normalized = author.trim().toLowerCase();
+    return normalized == 'você' || normalized == 'voce';
   }
 }
 
 class _CategoryStyle {
   final Color color;
-  final String emoji;
+  final IconData icon;
 
-  const _CategoryStyle({required this.color, required this.emoji});
+  const _CategoryStyle({required this.color, required this.icon});
 }
 
 class _AuthorBadge extends StatelessWidget {
   final String label;
-  final bool isYou;
 
-  const _AuthorBadge({required this.label, required this.isYou});
+  const _AuthorBadge({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final color = isYou ? _hCyan : const Color(0xFF95A5A6);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withAlpha(26),
+        color: Colors.white.withAlpha(10),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
         style: GoogleFonts.inter(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
+          color: _hTextSecondary,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
         ),
       ),
@@ -242,7 +356,7 @@ class _InProgressBadgeState extends State<_InProgressBadge>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 1.0, end: 0.4).animate(_controller);
+    _opacity = Tween<double>(begin: 1, end: 0.4).animate(_controller);
   }
 
   @override
@@ -254,7 +368,7 @@ class _InProgressBadgeState extends State<_InProgressBadge>
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: _hYellow.withAlpha(31),
         borderRadius: BorderRadius.circular(6),
@@ -273,14 +387,13 @@ class _InProgressBadgeState extends State<_InProgressBadge>
               ),
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 5),
           Text(
             'EM ANDAMENTO',
             style: GoogleFonts.inter(
               color: _hYellow,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

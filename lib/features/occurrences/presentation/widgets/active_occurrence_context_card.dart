@@ -281,15 +281,15 @@ class _TeamMiniAvatar extends StatelessWidget {
             shape: BoxShape.circle,
             color: member.role == TeamRole.titular
                 ? AppTheme.primary
-                : const Color(0xFF1A2A30),
-            border: Border.all(color: const Color(0xFF050D10), width: 1.5),
+                : AppTheme.surfacePanelAlt,
+            border: Border.all(color: AppTheme.background, width: 1.5),
           ),
           alignment: Alignment.center,
           child: Text(
             initials,
             style: GoogleFonts.inter(
               color: member.role == TeamRole.titular
-                  ? const Color(0xFF050D10)
+                  ? AppTheme.background
                   : AppTheme.primary,
               fontSize: 7,
               fontWeight: FontWeight.w800,
@@ -305,7 +305,7 @@ class _TeamMiniAvatar extends StatelessWidget {
               height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF050D10),
+                color: AppTheme.background,
                 border: Border.all(color: AppTheme.primary, width: 1),
               ),
               child: Icon(
@@ -370,7 +370,7 @@ class _MiniAvatar extends StatelessWidget {
       height: 28,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF1A2A30),
+        color: AppTheme.surfacePanelAlt,
         border: Border.all(color: AppTheme.primary.withAlpha(100)),
       ),
       child: ClipOval(
@@ -407,7 +407,7 @@ class _InfoRow extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.inter(
-            color: const Color(0xFF5A7280),
+            color: AppTheme.textMuted,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -447,7 +447,7 @@ class _Metric extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.inter(
-            color: const Color(0xFF5A7280),
+            color: AppTheme.textMuted,
             fontSize: 9,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.0,

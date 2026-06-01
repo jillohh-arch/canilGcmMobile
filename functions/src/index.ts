@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import {logger} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
-import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
@@ -267,14 +267,18 @@ function copyIfPresent(source: JsonMap, target: JsonMap, sourceKey: string, targ
   }
 }
 
-function eventHashPayload(eventId: string, event: JsonMap): JsonMap | null {
+function eventHashPayload(
+  eventId: string,
+  event: JsonMap,
+  includePhotoHashes: boolean,
+): JsonMap | null {
   if (event.deleted_at !== undefined && event.deleted_at !== null) return null;
   const photoMetadata = mapArray(event.photo_metadata);
   const photoHashes = photoMetadata
     .map((metadata) => stringValue(metadata.sha256))
     .filter((hash): hash is string => Boolean(hash))
     .sort();
-  return {
+  const payload: JsonMap = {
     category: event.category ?? "other",
     description: event.description ?? null,
     dog_handler_id: event.dog_handler_id ?? null,
@@ -285,19 +289,24 @@ function eventHashPayload(eventId: string, event: JsonMap): JsonMap | null {
     place_label: event.place_label ?? null,
     timestamp: normalizeForHash(event.timestamp),
     title: event.title ?? null,
-    photo_hashes: photoHashes,
   };
+  if (includePhotoHashes) payload.photo_hashes = photoHashes;
+  return payload;
 }
 
-function buildHashPayloadV4(
+function buildHashPayloadForVersion(
   occurrence: JsonMap,
   events: Array<{id: string; data: JsonMap}>,
   signatures: JsonMap[],
   participations: JsonMap[],
   correctionRequests: JsonMap[],
+  version: number,
 ): JsonMap {
+  const includePhotoHashes = version >= 2;
+  const includeTeamAndSignatures = version >= 3;
+  const includeCrewReview = version >= 4;
   const eventPayload = events
-    .map((event) => eventHashPayload(event.id, event.data))
+    .map((event) => eventHashPayload(event.id, event.data, includePhotoHashes))
     .filter((event): event is JsonMap => event !== null)
     .sort((a, b) => {
       const byTimestamp = String(a.timestamp).localeCompare(String(b.timestamp));
@@ -321,7 +330,7 @@ function buildHashPayloadV4(
     .map((request) => normalizeForHash(request) as JsonMap)
     .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
 
-  return {
+  const payload: JsonMap = {
     details: normalizeForHash(occurrence.details ?? null),
     dog_id: occurrence.dog_id ?? "",
     final_report: occurrence.final_report ?? null,
@@ -329,14 +338,12 @@ function buildHashPayloadV4(
     gps_accuracy: occurrence.gps_accuracy ?? null,
     gps_lat: occurrence.gps_lat ?? null,
     gps_lng: occurrence.gps_lng ?? null,
-    hash_version: 4,
+    hash_version: version,
     location_address: occurrence.location_address ?? null,
     primary_handler_id: occurrence.primary_handler_id ?? "",
     primary_handler_ra: occurrence.primary_handler_ra ?? null,
     results: stringArray(occurrence.results),
     shift_id: occurrence.shift_id ?? "",
-    crew_id: occurrence.crew_id ?? null,
-    service_dog_id: occurrence.service_dog_id ?? occurrence.dog_id ?? "",
     vehicle_id: occurrence.vehicle_id ?? null,
     vehicle_label: occurrence.vehicle_label ?? null,
     vehicle_model: occurrence.vehicle_model ?? null,
@@ -346,19 +353,45 @@ function buildHashPayloadV4(
     events: eventPayload,
     type_code: occurrence.type_code ?? "",
     type_name: occurrence.type_name ?? "",
-    finalization_photo_hashes: stringArray(occurrence.finalization_photo_hashes),
-    team: sortedTeam,
-    signatures: sortedSignatures,
-    accepted_handler_ids: stringArray(occurrence.accepted_handler_ids),
-    declined_handler_ids: stringArray(occurrence.declined_handler_ids),
-    edit_authorized_handler_ids: stringArray(occurrence.edit_authorized_handler_ids),
-    participation_revision: Number(occurrence.participation_revision ?? 0),
-    participation_status: occurrence.participation_status ?? null,
-    pending_handler_ids: stringArray(occurrence.pending_handler_ids),
-    signature_round: signatureRound(occurrence),
-    participations: sortedParticipations,
-    correction_requests: correctionPayload,
   };
+  if (includePhotoHashes) {
+    payload.finalization_photo_hashes = stringArray(occurrence.finalization_photo_hashes);
+  }
+  if (includeTeamAndSignatures) {
+    payload.team = sortedTeam;
+    payload.signatures = sortedSignatures;
+  }
+  if (includeCrewReview) {
+    payload.crew_id = occurrence.crew_id ?? null;
+    payload.service_dog_id = occurrence.service_dog_id ?? occurrence.dog_id ?? "";
+    payload.accepted_handler_ids = stringArray(occurrence.accepted_handler_ids);
+    payload.declined_handler_ids = stringArray(occurrence.declined_handler_ids);
+    payload.edit_authorized_handler_ids = stringArray(occurrence.edit_authorized_handler_ids);
+    payload.participation_revision = Number(occurrence.participation_revision ?? 0);
+    payload.participation_status = occurrence.participation_status ?? null;
+    payload.pending_handler_ids = stringArray(occurrence.pending_handler_ids);
+    payload.signature_round = signatureRound(occurrence);
+    payload.participations = sortedParticipations;
+    payload.correction_requests = correctionPayload;
+  }
+  return payload;
+}
+
+function buildHashPayloadV4(
+  occurrence: JsonMap,
+  events: Array<{id: string; data: JsonMap}>,
+  signatures: JsonMap[],
+  participations: JsonMap[],
+  correctionRequests: JsonMap[],
+): JsonMap {
+  return buildHashPayloadForVersion(
+    occurrence,
+    events,
+    signatures,
+    participations,
+    correctionRequests,
+    4,
+  );
 }
 
 function auditEntry(action: string, caller: CallerIdentity, reason?: string): JsonMap {
@@ -441,6 +474,18 @@ function notificationText(type: string, occurrenceTitle: string): {title: string
     return {
       title: "Ocorrência aberta",
       body: `Você foi incluído na ocorrência: ${occurrenceTitle}`,
+    };
+  }
+  if (type === "occurrence_participation_accepted") {
+    return {
+      title: "Participacao confirmada",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "occurrence_participation_declined") {
+    return {
+      title: "Participacao recusada",
+      body: occurrenceTitle,
     };
   }
   if (type === "correction_requested") {
@@ -1101,6 +1146,106 @@ export const requestOccurrenceCorrection = onCall({region}, async (request) => {
   });
 });
 
+export const acceptOccurrenceParticipation = onCall({region}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const occurrenceId = requiredString(data, "occurrence_id");
+  const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
+
+  await db.runTransaction(async (transaction) => {
+    const occurrenceSnap = await transaction.get(occurrenceRef);
+    if (!occurrenceSnap.exists) {
+      throw new HttpsError("not-found", "Ocorrencia nao encontrada.");
+    }
+    const occurrence = occurrenceSnap.data() ?? {};
+    if (!(String(occurrence.status ?? "in_progress") === "in_progress" ||
+      String(occurrence.status ?? "in_progress") === "finalizing")) {
+      throw new HttpsError("failed-precondition", "Participacao so pode ser confirmada com ocorrencia aberta.");
+    }
+    if (isPrimaryHandler(occurrence, caller)) {
+      return {status: "accepted", already_accepted: true};
+    }
+    if (!teamHandlerIds(occurrence).includes(caller.ra) ||
+        !canActAsHandler(occurrence, caller.ra, caller)) {
+      throw new HttpsError("permission-denied", "Usuario nao corresponde ao integrante.");
+    }
+
+    const participationRef = occurrenceRef.collection("participations").doc(caller.ra);
+    const participationSnap = await transaction.get(participationRef);
+    if (!participationSnap.exists) {
+      throw new HttpsError("not-found", "Participacao nao encontrada.");
+    }
+    const participation = participationSnap.data() ?? {};
+    const currentStatus = String(participation.status ?? "pending");
+    if (currentStatus === "accepted") {
+      return {status: "accepted", already_accepted: true};
+    }
+    if (currentStatus === "declined") {
+      throw new HttpsError("failed-precondition", "Participacao ja foi recusada.");
+    }
+
+    const accepted = new Set(stringArray(occurrence.accepted_handler_ids));
+    const declined = new Set(stringArray(occurrence.declined_handler_ids));
+    const pending = new Set(stringArray(occurrence.pending_handler_ids));
+    const authorized = new Set(stringArray(occurrence.edit_authorized_handler_ids));
+    const authorizedEmails = new Set(stringArray(occurrence.edit_authorized_emails));
+    accepted.add(caller.ra);
+    pending.delete(caller.ra);
+    declined.delete(caller.ra);
+    authorized.add(caller.ra);
+    [emailForRa(caller.ra), `${caller.ra.trim().toLowerCase()}@canilgcm.com`, caller.email]
+      .filter((email) => email.length > 0)
+      .forEach((email) => authorizedEmails.add(email));
+
+    const participationStatus = declined.size > 0 ?
+      "declined_present" :
+      (pending.size > 0 ? "pending_acceptance" : "accepted");
+    const entry = auditEntry("participation_accepted", caller);
+
+    transaction.set(participationRef, {
+      status: "accepted",
+      responded_at: admin.firestore.FieldValue.serverTimestamp(),
+      response_method: "in_app",
+      auth_uid: caller.uid,
+      handler_email: caller.email || emailForRa(caller.ra),
+      updated_by: caller.ra,
+    }, {merge: true});
+    transaction.update(occurrenceRef, {
+      accepted_handler_ids: Array.from(accepted).sort(),
+      declined_handler_ids: Array.from(declined).sort(),
+      pending_handler_ids: Array.from(pending).sort(),
+      edit_authorized_handler_ids: Array.from(authorized).sort(),
+      edit_authorized_emails: Array.from(authorizedEmails).sort(),
+      participation_status: participationStatus,
+      participation_revision: admin.firestore.FieldValue.increment(1),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      audit_trail: admin.firestore.FieldValue.arrayUnion(entry),
+    });
+
+    const primaryRa = stringValue(occurrence.primary_handler_ra ?? occurrence.primary_handler_id);
+    if (primaryRa && primaryRa !== caller.ra) {
+      transaction.set(
+        db.collection("notifications").doc(primaryRa).collection("items").doc(),
+        notificationPayload("occurrence_participation_accepted", occurrenceId, occurrence, "occurrence_review", caller.ra),
+      );
+    }
+
+    transaction.set(db.collection("auditLogs").doc(), {
+      action: "participation_accepted",
+      entity_type: "occurrence",
+      entity_id: occurrenceId,
+      summary: `Participacao confirmada por ${caller.ra}`,
+      actor: caller,
+      metadata: {handler_id: caller.ra},
+      source: "functions",
+      performed_at: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {status: "accepted"};
+  });
+});
+
 export const declineOccurrenceParticipation = onCall({region}, async (request) => {
   const caller = requireAuth(request.auth);
   const data = request.data as JsonMap;
@@ -1167,6 +1312,191 @@ export const declineOccurrenceParticipation = onCall({region}, async (request) =
       );
     }
   });
+});
+
+function occurrenceIdFromRequest(req: {path: string; url?: string; query: JsonMap}): string | undefined {
+  const queryId = req.query.id;
+  const fromQuery = Array.isArray(queryId) ? queryId[0] : queryId;
+  const queryText = stringValue(fromQuery);
+  if (queryText) return queryText;
+
+  const rawPath = String(req.path || req.url || "").split("?")[0];
+  const parts = rawPath.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+  const vIndex = parts.indexOf("v");
+  if (vIndex >= 0 && parts[vIndex + 1]) return parts[vIndex + 1];
+  if (parts.length > 0 && parts[0] !== "verifyOccurrence") return parts[parts.length - 1];
+  return undefined;
+}
+
+async function verifyOccurrenceDocument(occurrenceId: string): Promise<JsonMap> {
+  const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
+  const occurrenceSnap = await occurrenceRef.get();
+  const checkedAt = new Date().toISOString();
+  if (!occurrenceSnap.exists) {
+    return {
+      occurrence_id: occurrenceId,
+      checked_at: checkedAt,
+      status: "not_found",
+      found: false,
+      sealed: false,
+      intact: false,
+    };
+  }
+
+  const occurrence = occurrenceSnap.data() ?? {};
+  const storedHash = stringValue(occurrence.integrity_hash ?? occurrence.hash);
+  const rawVersion = Number(occurrence.hash_version ?? occurrence.hashVersion ?? 1);
+  const hashVersion = Number.isFinite(rawVersion) ? Math.round(rawVersion) : 1;
+  const baseResult: JsonMap = {
+    occurrence_id: occurrenceId,
+    checked_at: checkedAt,
+    found: true,
+    type_name: occurrence.type_name ?? null,
+    status_current: occurrence.status ?? null,
+    hash_version: hashVersion,
+    stored_hash: storedHash ?? null,
+    finalized_at: normalizeForHash(occurrence.finalized_at ?? occurrence.finalizedAt),
+  };
+
+  if (!storedHash) {
+    return {
+      ...baseResult,
+      status: "unsealed",
+      sealed: false,
+      intact: false,
+    };
+  }
+
+  if (hashVersion < 1 || hashVersion > 4) {
+    return {
+      ...baseResult,
+      status: "unsupported_version",
+      sealed: true,
+      intact: false,
+    };
+  }
+
+  const eventsSnap = await occurrenceRef.collection("events").get();
+  const events = eventsSnap.docs.map((doc) => ({id: doc.id, data: doc.data()}));
+  const signaturesSnap = hashVersion >= 3 ?
+    await occurrenceRef.collection("signatures").get() :
+    undefined;
+  const participationsSnap = hashVersion >= 4 ?
+    await occurrenceRef.collection("participations").get() :
+    undefined;
+  const correctionSnap = hashVersion >= 4 ?
+    await occurrenceRef.collection("correction_requests").get() :
+    undefined;
+
+  const signatures = signaturesSnap?.docs.map((doc) => ({id: doc.id, ...doc.data()})) ?? [];
+  const participations = participationsSnap?.docs.map((doc) => ({id: doc.id, ...doc.data()})) ?? [];
+  const correctionRequests = correctionSnap?.docs.map((doc) => ({id: doc.id, ...doc.data()})) ?? [];
+  const recalculatedHash = hashPayload(
+    buildHashPayloadForVersion(
+      occurrence,
+      events,
+      signatures,
+      participations,
+      correctionRequests,
+      hashVersion,
+    ),
+  );
+  const intact = storedHash === recalculatedHash;
+
+  return {
+    ...baseResult,
+    status: intact ? "intact" : "broken",
+    sealed: true,
+    intact,
+    recalculated_hash: recalculatedHash,
+    events_checked: events.length,
+    signatures_checked: signatures.length,
+    participations_checked: participations.length,
+    correction_requests_checked: correctionRequests.length,
+  };
+}
+
+function htmlEscape(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function verificationHtml(result: JsonMap): string {
+  const status = String(result.status ?? "unknown");
+  const ok = result.intact === true;
+  const title = ok ? "Selo íntegro" : "Selo não confirmado";
+  const accent = ok ? "#1f9d52" : "#b42318";
+  const message = ok ?
+    "O hash armazenado confere com o recálculo feito no servidor." :
+    status === "broken" ?
+      "O hash armazenado não confere com o recálculo do servidor." :
+      "Não foi possível confirmar a integridade deste registro.";
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verificação Canil K9</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #050d10; color: #eef7f8; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 18px; }
+    .card { border: 1px solid rgba(77,208,225,.24); border-radius: 14px; background: #0b171b; padding: 22px; }
+    .badge { display: inline-block; padding: 7px 11px; border-radius: 999px; background: ${accent}; color: #fff; font-weight: 700; }
+    h1 { margin: 18px 0 8px; font-size: 30px; }
+    p { color: #b8c9ce; line-height: 1.5; }
+    dl { display: grid; grid-template-columns: 160px 1fr; gap: 10px 14px; margin-top: 22px; }
+    dt { color: #7aa1aa; }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    code { color: #4dd0e1; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <span class="badge">${htmlEscape(title)}</span>
+      <h1>Verificação de ocorrência</h1>
+      <p>${htmlEscape(message)}</p>
+      <dl>
+        <dt>Ocorrência</dt><dd><code>${htmlEscape(result.occurrence_id)}</code></dd>
+        <dt>Natureza</dt><dd>${htmlEscape(result.type_name ?? "Não informada")}</dd>
+        <dt>Status</dt><dd>${htmlEscape(result.status_current ?? status)}</dd>
+        <dt>Versão do hash</dt><dd>${htmlEscape(result.hash_version)}</dd>
+        <dt>Hash armazenado</dt><dd><code>${htmlEscape(result.stored_hash ?? "-")}</code></dd>
+        <dt>Hash recalculado</dt><dd><code>${htmlEscape(result.recalculated_hash ?? "-")}</code></dd>
+        <dt>Verificado em</dt><dd>${htmlEscape(result.checked_at)}</dd>
+      </dl>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+export const verifyOccurrence = onRequest({region}, async (req, res) => {
+  try {
+    const occurrenceId = occurrenceIdFromRequest(req);
+    if (!occurrenceId) {
+      res.status(400).json({status: "invalid_request", message: "Informe o ID da ocorrencia."});
+      return;
+    }
+
+    const result = await verifyOccurrenceDocument(occurrenceId);
+    const wantsJson = req.query.format === "json" ||
+      String(req.headers.accept ?? "").includes("application/json");
+    const statusCode = result.status === "not_found" ? 404 : 200;
+    res.set("Cache-Control", "no-store");
+    if (wantsJson) {
+      res.status(statusCode).json(result);
+      return;
+    }
+    res.status(statusCode).send(verificationHtml(result));
+  } catch (error) {
+    logger.error("Falha na verificacao publica", {error});
+    res.status(500).json({status: "error", message: "Falha ao verificar ocorrencia."});
+  }
 });
 
 export const onNotificationCreated = onDocumentCreated(

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 
 /// Service para gerenciar histórico de peso do cão.
@@ -70,12 +71,26 @@ class WeightHistoryService {
   /// Registra nova pesagem.
   Future<String> addRecord(String dogId, WeightRecord record) async {
     final docRef = _collection(dogId).doc();
-    await docRef.set(record.toJson());
-    await _legacyCollection(dogId).doc(docRef.id).set(record.toJson());
+    final entry = AuditService.buildInlineEntry(action: 'created');
+    final data = {
+      ...record.toJson(),
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': [entry],
+    };
+    await docRef.set(data);
+    await _legacyCollection(dogId).doc(docRef.id).set(data);
 
     // Atualiza peso atual no documento principal do cão
+    final dogEntry = AuditService.buildInlineEntry(
+      action: 'updated',
+      fieldName: 'weight',
+      newValue: record.weightKg,
+    );
     await _firestore.collection('dogs').doc(dogId).update({
       'weight': record.weightKg,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([dogEntry]),
     });
 
     return docRef.id;

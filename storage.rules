@@ -14,6 +14,13 @@ service firebase.storage {
       return request.resource.contentType == 'application/pdf';
     }
 
+    function isOfficeDocument() {
+      return request.resource.contentType in [
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+    }
+
     function underMegabytes(sizeMb) {
       return request.resource.size < sizeMb * 1024 * 1024;
     }
@@ -26,76 +33,95 @@ service firebase.storage {
       return signedIn() && isPdf() && underMegabytes(sizeMb);
     }
 
+    function canWriteHealthAttachment(sizeMb) {
+      return signedIn()
+        && (isImage() || isPdf() || isOfficeDocument())
+        && underMegabytes(sizeMb);
+    }
+
     match /profile_photos/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /users/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /routines/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /trainings/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /incidents/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /health/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWriteImage(10);
-      allow delete: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
     }
 
     match /health/exams/{fileName} {
       allow read: if signedIn();
-      allow create, update: if canWritePdf(20);
-      allow delete: if signedIn();
+      allow create: if canWritePdf(20);
+      allow update, delete: if false;
     }
+
+    match /health_attachments/{dogId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteHealthAttachment(20);
+      allow update, delete: if false;
+    }
+
     match /occurrences/{occurrenceId}/events/{fileName} {
-  allow read: if signedIn();
-  allow create, update: if canWriteImage(10);
-  allow delete: if signedIn();
-}
+      allow read: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
+    }
 
-match /occurrences/{occurrenceId}/finalization/{fileName} {
-  allow read: if signedIn();
-  allow create, update: if canWriteImage(10);
-  allow delete: if signedIn();
-}
+    match /occurrences/{occurrenceId}/finalization/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
+    }
 
-match /dogs/{dogId}/feeding_photos/{fileName} {
-  allow read: if signedIn();
-  allow create, update: if canWriteImage(10);
-  allow delete: if signedIn();
-}
+    match /dogs/{dogId}/feeding_photos/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteImage(10);
+      allow update, delete: if false;
+    }
 
-match /dogs/{dogId}/training_sessions/{sessionId}/media/{fileName} {
-  allow read: if signedIn();
-  allow create, update: if canWriteImage(20);
-  allow delete: if signedIn();
-}
+    match /dogs/{dogId}/training_sessions/{sessionId}/media/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteImage(20);
+      allow update, delete: if false;
+    }
 
-match /occurrences/{occurrenceId}/{fileName} {
-  allow read: if signedIn();
-  allow create, update: if canWritePdf(20);
-  allow delete: if signedIn();
-}
+    match /documentos/{dogId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteHealthAttachment(20);
+      allow update, delete: if false;
+    }
+
+    match /occurrences/{occurrenceId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWritePdf(20);
+      allow update, delete: if false;
+    }
 
 
     match /{allPaths=**} {
