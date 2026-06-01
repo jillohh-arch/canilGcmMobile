@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/screens/training_hub_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
@@ -43,7 +44,9 @@ part 'active_shift_readiness.dart';
 part 'active_shift_dog_switcher.dart';
 
 class ActiveShiftDashboardScreen extends StatefulWidget {
-  const ActiveShiftDashboardScreen({super.key});
+  final VoidCallback? onOpenTrainingHub;
+
+  const ActiveShiftDashboardScreen({super.key, this.onOpenTrainingHub});
 
   @override
   State<ActiveShiftDashboardScreen> createState() =>

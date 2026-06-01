@@ -33,19 +33,19 @@ class _MainRootScreenState extends State<MainRootScreen> {
   int _currentIndex = 0;
   String? _lastOccurrenceWatchDogId;
   DateTime? _lastBackPress;
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      ActiveShiftDashboardScreen(onOpenTrainingHub: () => _onTabTapped(2)),
+      const HistoryScreen(),
+      const TrainingHubScreen(),
+      const DogProntuarioTabScreen(),
+    ];
     PermissionService.requestInitialPermissions();
   }
-
-  final List<Widget> _screens = [
-    const ActiveShiftDashboardScreen(),
-    const HistoryScreen(),
-    const TrainingHubScreen(),
-    const DogProntuarioTabScreen(),
-  ];
 
   void _onTabTapped(int index) {
     setState(() {

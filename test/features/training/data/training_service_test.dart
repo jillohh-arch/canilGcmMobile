@@ -165,6 +165,32 @@ void main() {
       expect(results.first.trainingType, equals('Busca e Captura'));
     });
 
+    test('busca treinos gravados com dog_id em collections raiz', () async {
+      await fakeFirestore.collection('trainings').add({
+        'dog_id': 'dog1',
+        'trainingType': 'Detecção',
+        'date': DateTime(2026, 6, 1, 15, 40).toIso8601String(),
+        'location': 'Canil',
+        'weather': '',
+        'handlerNotes': 'Sessão de teste',
+      });
+
+      await fakeFirestore.collection('training_sessions').add({
+        'dog_id': 'dog1',
+        'trainingType': 'Condicionamento',
+        'date': DateTime(2026, 6, 1, 15, 55).toIso8601String(),
+        'location': 'Pista',
+        'weather': '',
+        'handlerNotes': 'Sessão física',
+      });
+
+      final results = await service.getTrainingsForDog('dog1');
+
+      expect(results, hasLength(2));
+      expect(results.map((t) => t.trainingType), contains('Detecção'));
+      expect(results.map((t) => t.trainingType), contains('Condicionamento'));
+    });
+
     test(
       'soft delete funciona em collection alternativa (training_sessions)',
       () async {
@@ -265,6 +291,18 @@ void main() {
       expect(
         () => service.deleteTrainingSession(docRef.id, reason: 'teste'),
         throwsA(isA<Exception>()),
+      );
+    });
+
+    test('mantem obediencia e condicionamento visiveis no hub', () {
+      final data = service.buildHubData(
+        specialties: const [],
+        sessions: const [],
+      );
+
+      expect(
+        data.generalTrainings.map((training) => training.name),
+        containsAll(const ['Obediência', 'Condicionamento']),
       );
     });
   });

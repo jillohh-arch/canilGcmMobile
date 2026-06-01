@@ -853,6 +853,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
   late double _weight;
   String _selectedLocation = 'Canil';
   bool _hasPhoto = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -1085,46 +1086,63 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
 
           // Save Button
           GestureDetector(
-            onTap: () async {
-              HapticFeedback.mediumImpact();
-              final log = HealthLogModel(
-                dogId: widget.dog.id,
-                date: DateTime.now(),
-                type: 'other',
-                subtype: 'Pesagem',
-                weight: _weight,
-                healthObservations: 'Pesagem efetuada em $_selectedLocation.',
-                attachmentUrl: _hasPhoto
-                    ? 'scale_photo_comprovante_balanca.jpg'
-                    : null,
-              );
+            onTap: _isSaving
+                ? null
+                : () async {
+                    HapticFeedback.mediumImpact();
+                    final messenger = ScaffoldMessenger.of(context);
+                    final navigator = Navigator.of(context);
+                    setState(() => _isSaving = true);
+                    final log = HealthLogModel(
+                      dogId: widget.dog.id,
+                      date: DateTime.now(),
+                      type: 'other',
+                      subtype: 'Pesagem',
+                      weight: _weight,
+                      healthObservations:
+                          'Pesagem efetuada em $_selectedLocation.',
+                      attachmentUrl: _hasPhoto
+                          ? 'scale_photo_comprovante_balanca.jpg'
+                          : null,
+                    );
 
-              try {
-                await widget.healthVM.addHealthLog(log);
-                await WeightHistoryService().addRecord(
-                  widget.dog.id,
-                  WeightRecord(
-                    weightKg: _weight,
-                    measuredAt: log.date,
-                    measuredBy: log.createdBy ?? 'app_mobile',
-                    context: _selectedLocation,
-                    photoUrl: log.attachmentUrl,
-                    notes: log.healthObservations,
-                  ),
-                );
-                if (context.mounted) Navigator.of(context).pop();
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erro ao salvar pesagem: $e'),
-                      backgroundColor: AppTheme.error,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
+                    try {
+                      await widget.healthVM.addHealthLog(log);
+                      await WeightHistoryService().addRecord(
+                        widget.dog.id,
+                        WeightRecord(
+                          weightKg: _weight,
+                          measuredAt: log.date,
+                          measuredBy: log.createdBy ?? 'app_mobile',
+                          context: _selectedLocation,
+                          photoUrl: log.attachmentUrl,
+                          notes: log.healthObservations,
+                        ),
+                      );
+                      if (!mounted) return;
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Pesagem registrada: ${_weight.toStringAsFixed(1)} kg.',
+                          ),
+                          backgroundColor: AppTheme.success,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } catch (e) {
+                      if (mounted) {
+                        setState(() => _isSaving = false);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Erro ao salvar pesagem: $e'),
+                            backgroundColor: AppTheme.error,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  },
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1134,7 +1152,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
               ),
               child: Center(
                 child: Text(
-                  'SALVAR REGISTRO',
+                  _isSaving ? 'SALVANDO...' : 'SALVAR REGISTRO',
                   style: GoogleFonts.inter(
                     color: AppTheme.background,
                     fontSize: 13,

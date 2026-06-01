@@ -13,8 +13,10 @@ class TrainingRepository {
 
   Stream<List<TrainingHubSession>> watchSessionsForDog(String dogId) {
     final streams = [
-      _watchSessionCollection('training_sessions', dogId),
-      _watchSessionCollection('trainings', dogId),
+      _watchSessionCollection('training_sessions', 'dogId', dogId),
+      _watchSessionCollection('training_sessions', 'dog_id', dogId),
+      _watchSessionCollection('trainings', 'dogId', dogId),
+      _watchSessionCollection('trainings', 'dog_id', dogId),
       _watchDogTrainingSessions(dogId),
     ];
 
@@ -55,10 +57,11 @@ class TrainingRepository {
 
   Stream<List<TrainingHubSession>> _watchSessionCollection(
     String collection,
+    String dogField,
     String dogId,
   ) {
     final query = SoftDeletable.activeOnly(
-      _firestore.collection(collection).where('dogId', isEqualTo: dogId),
+      _firestore.collection(collection).where(dogField, isEqualTo: dogId),
     );
     return query
         .snapshots()
@@ -80,7 +83,9 @@ class TrainingRepository {
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => TrainingHubSession.fromJson(doc.data(), doc.id))
-              .where((session) => session.dogId == dogId)
+              .where(
+                (session) => session.dogId == dogId || session.dogId.isEmpty,
+              )
               .toList(),
         )
         .handleError((_) => <TrainingHubSession>[]);

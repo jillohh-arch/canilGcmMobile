@@ -137,6 +137,21 @@ class TrainingService {
 
     try {
       final query = SoftDeletable.activeOnly(
+        _firestore.collection('trainings').where('dog_id', isEqualTo: dogId),
+      );
+      final legacyTrainings = await query.get();
+      for (final doc in legacyTrainings.docs) {
+        final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+        if (training.dogId == dogId) {
+          byKey['${doc.reference.path}:${doc.id}'] = training;
+        }
+      }
+    } catch (e) {
+      debugPrint('[TrainingService] Erro ao buscar trainings por dog_id: $e');
+    }
+
+    try {
+      final query = SoftDeletable.activeOnly(
         _firestore
             .collection('training_sessions')
             .where('dogId', isEqualTo: dogId),
@@ -150,6 +165,25 @@ class TrainingService {
       }
     } catch (e) {
       debugPrint('[TrainingService] Erro ao buscar training_sessions: $e');
+    }
+
+    try {
+      final query = SoftDeletable.activeOnly(
+        _firestore
+            .collection('training_sessions')
+            .where('dog_id', isEqualTo: dogId),
+      );
+      final rootSessions = await query.get();
+      for (final doc in rootSessions.docs) {
+        final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
+        if (training.dogId == dogId) {
+          byKey['${doc.reference.path}:${doc.id}'] = training;
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        '[TrainingService] Erro ao buscar training_sessions por dog_id: $e',
+      );
     }
 
     try {
@@ -282,6 +316,24 @@ class TrainingService {
         sessionCount: items.length,
       );
     }).toList();
+
+    for (final defaultName in const ['Obediência', 'Condicionamento']) {
+      final key = normalizeTrainingKey(defaultName);
+      final exists = result.any(
+        (training) => normalizeTrainingKey(training.name) == key,
+      );
+      if (!exists) {
+        result.add(
+          TrainingGeneralTypeModel(
+            id: key,
+            name: defaultName,
+            status: 'Disponível',
+            lastTrainingDate: null,
+            sessionCount: 0,
+          ),
+        );
+      }
+    }
 
     result.sort((a, b) {
       final aDate =

@@ -56,7 +56,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen>
     with WidgetsBindingObserver {
-  String _periodFilter = 'Hoje';
+  String _periodFilter = 'Esta semana';
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
   String? _lastLoadedDogId;

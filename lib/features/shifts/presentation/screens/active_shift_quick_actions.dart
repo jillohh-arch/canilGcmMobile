@@ -4,8 +4,13 @@ part of 'active_shift_dashboard_screen.dart';
 class _QuickActionsSection extends StatelessWidget {
   final Dog dog;
   final List<QuickAction> actions;
+  final VoidCallback? onOpenTrainingHub;
 
-  const _QuickActionsSection({required this.dog, required this.actions});
+  const _QuickActionsSection({
+    required this.dog,
+    required this.actions,
+    this.onOpenTrainingHub,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +62,7 @@ class _QuickActionsSection extends StatelessWidget {
         icon: Icons.fitness_center_rounded,
         color: AppTheme.warning,
         label: 'Treino',
-        onTap: () => _openSheet(context, 'Treino'),
+        onTap: () => _openTrainingHub(context),
       ),
       _QuickCard(
         icon: Icons.shield_rounded,
@@ -91,6 +96,18 @@ class _QuickActionsSection extends StatelessWidget {
         dogName: dog.name,
       ),
     );
+  }
+
+  void _openTrainingHub(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    final callback = onOpenTrainingHub;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const TrainingHubScreen()));
   }
 
   void _openOccurrence(BuildContext context) {

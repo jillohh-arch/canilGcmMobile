@@ -52,7 +52,11 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
                   conductorPhotoUrl: conductorPhoto,
                 ),
                 const SizedBox(height: 18),
-                _QuickActionsSection(dog: dog, actions: state._quickActions),
+                _QuickActionsSection(
+                  dog: dog,
+                  actions: state._quickActions,
+                  onOpenTrainingHub: state.widget.onOpenTrainingHub,
+                ),
                 const SizedBox(height: 18),
                 const _LatestRecordsSection(),
                 const SizedBox(height: 18),
