@@ -1,0 +1,13 @@
+{
+  "name": "canil-gcm-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node rules_tests.mjs\"",
+    "test:direct": "node rules_tests.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.14.0"
+  }
+}
