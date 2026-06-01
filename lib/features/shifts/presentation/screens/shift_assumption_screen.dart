@@ -74,7 +74,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0E1A1F),
+        backgroundColor: AppTheme.surfacePanel,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(
           'Assumir ${dog.name} com pendências?',

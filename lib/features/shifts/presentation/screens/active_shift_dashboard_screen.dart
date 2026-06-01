@@ -182,7 +182,7 @@ class _ActiveShiftDashboardScreenState
               body: AnnotatedRegion<SystemUiOverlayStyle>(
                 value: SystemUiOverlayStyle.light.copyWith(
                   statusBarColor: Colors.transparent,
-                  systemNavigationBarColor: const Color(0xFF07141B),
+                  systemNavigationBarColor: AppTheme.surfaceNavigation,
                   systemNavigationBarIconBrightness: Brightness.light,
                 ),
                 child: _buildCockpit(context, dog, callsign),

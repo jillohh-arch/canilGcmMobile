@@ -23,7 +23,7 @@ extension _HistoryFilters on _HistoryScreenState {
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.dark(
             primary: _hCyan,
-            surface: Color(0xFF0F2026),
+            surface: _hSheetSurface,
             onSurface: _hTextPrimary,
           ),
         ),
@@ -50,7 +50,7 @@ extension _HistoryFilters on _HistoryScreenState {
             return Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
               decoration: const BoxDecoration(
-                color: Color(0xFF0F2026),
+                color: _hSheetSurface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
                 border: Border(top: BorderSide(color: _hCyan, width: 1)),
               ),
@@ -253,7 +253,7 @@ class _PopupFilterPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      color: const Color(0xFF0F2026),
+      color: _hSheetSurface,
       elevation: 10,
       offset: const Offset(0, 42),
       shape: RoundedRectangleBorder(

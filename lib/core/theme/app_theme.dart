@@ -29,9 +29,11 @@ class AppTheme {
 
   /// Vermelho - critico, saude, erros.
   static const Color error = Color(0xFFE74C3C);
+  static const Color healthAccent = Color(0xFF9B59B6);
 
   /// Cinza escuro para bordas e divisores.
   static const Color outline = Color(0xFF2C3B42);
+  static const Color outlineVariant = Color(0xFF1D2C33);
 
   /// Texto principal (branco).
   static const Color textPrimary = Color(0xFFFFFFFF);
@@ -54,6 +56,7 @@ class AppTheme {
   static const Color surfacePanelStrong = Color(0xFF06141A);
   static const Color surfacePanelAlt = Color(0xFF1A2A30);
   static const Color surfaceNavigation = Color(0xFF07141B);
+  static const Color surfaceSheet = Color(0xFF0F2026);
 
   /// Variantes translúcidas do ciano institucional.
   static const Color primaryOverlay = Color(0x0A4DD0E1);
@@ -62,7 +65,9 @@ class AppTheme {
   static const Color primaryChipBorder = Color(0x334DD0E1);
 
   /// Divisores translúcidos sobre superfície escura.
+  static const Color surfaceWhiteOverlayWeak = Color(0x07FFFFFF);
   static const Color surfaceWhiteOverlay = Color(0x0DFFFFFF);
+  static const Color surfaceWhiteBorderSubtle = Color(0x0FFFFFFF);
   static const Color surfaceWhiteBorder = Color(0x14FFFFFF);
 
   // --- Status de cao (legado mantido) ---
@@ -92,7 +97,7 @@ class AppTheme {
         surfaceContainerHighest: const Color(0xFF1A2328),
         surfaceContainerHigh: const Color(0xFF141C20),
         outline: const Color(0xFF2C3B42),
-        outlineVariant: const Color(0xFF1D2C33),
+        outlineVariant: outlineVariant,
         error: error,
         onError: Colors.white,
         tertiary: const Color(0xFF80CBC4),

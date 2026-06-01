@@ -112,7 +112,7 @@ class RegistroDetalhePage extends StatelessWidget {
             share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
             style: GoogleFonts.inter(fontWeight: FontWeight.w700),
           ),
-          backgroundColor: const Color(0xFF0F2026),
+          backgroundColor: AppTheme.surfaceSheet,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -153,7 +153,7 @@ class RegistroDetalhePage extends StatelessWidget {
               'Erro ao gerar PDF: $e',
               style: GoogleFonts.inter(fontWeight: FontWeight.w700),
             ),
-            backgroundColor: const Color(0xFFE74C3C),
+            backgroundColor: AppTheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -217,7 +217,7 @@ class RegistroDetalhePage extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          backgroundColor: const Color(0xFF0F2026),
+          backgroundColor: AppTheme.surfaceSheet,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),

@@ -43,7 +43,8 @@ const Color _hTextDimmed = AppTheme.textTertiary;
 const Color _hGreen = AppTheme.success;
 const Color _hYellow = AppTheme.warning;
 const Color _hRed = AppTheme.error;
-const Color _hPurple = Color(0xFF9B59B6);
+const Color _hPurple = AppTheme.healthAccent;
+const Color _hSheetSurface = AppTheme.surfaceSheet;
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});

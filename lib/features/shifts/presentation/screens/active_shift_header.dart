@@ -1,10 +1,10 @@
 part of 'active_shift_dashboard_screen.dart';
 
-const Color _kBorder = Color(0x14FFFFFF);
-const Color _kBorderSubtle = Color(0x0FFFFFFF);
-const Color _kTextPrimary = Color(0xFFFFFFFF);
-const Color _kTextSecondary = Color(0xFFB0C4CC);
-const Color _kTextMuted = Color(0xFF5A7280);
+const Color _kBorder = AppTheme.surfaceWhiteBorder;
+const Color _kBorderSubtle = AppTheme.surfaceWhiteBorderSubtle;
+const Color _kTextPrimary = AppTheme.textPrimary;
+const Color _kTextSecondary = AppTheme.textSecondary;
+const Color _kTextMuted = AppTheme.textMuted;
 
 class _SectionLabel extends StatelessWidget {
   final String emoji;

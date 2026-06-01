@@ -10,7 +10,9 @@ void _showDogSwitcher(BuildContext context) {
   final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
   final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-  final titularDogs = dogVM.dogs.where((d) => d.conductorRa == currentRa).toList();
+  final titularDogs = dogVM.dogs
+      .where((d) => d.conductorRa == currentRa)
+      .toList();
   final isTitularOfSingleDog = titularDogs.length <= 1;
 
   showModalBottomSheet(
@@ -23,7 +25,12 @@ void _showDogSwitcher(BuildContext context) {
     builder: (ctx) {
       return SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 8),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 8,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,14 +71,21 @@ void _showDogSwitcher(BuildContext context) {
                   decoration: BoxDecoration(
                     color: AppTheme.warning.withAlpha(15),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.warning.withAlpha(60), width: 1.5),
+                    border: Border.all(
+                      color: AppTheme.warning.withAlpha(60),
+                      width: 1.5,
+                    ),
                   ),
                   child: Column(
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 24),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppTheme.warning,
+                            size: 24,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -105,7 +119,9 @@ void _showDogSwitcher(BuildContext context) {
                         child: OutlinedButton(
                           onPressed: () => Navigator.of(ctx).pop(),
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppTheme.textSecondary.withAlpha(100)),
+                            side: BorderSide(
+                              color: AppTheme.textSecondary.withAlpha(100),
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -123,25 +139,29 @@ void _showDogSwitcher(BuildContext context) {
                   ),
                 )
               else
-                ...dogVM.dogs
-                    .where((d) => d.id != shiftVM.activeDogId)
-                    .map((dog) {
-                      final fitness = const DogFitnessService().evaluate(dog);
-                      return _DogSwitchTile(
-                        dog: dog,
-                        fitness: fitness,
-                        onTap: () async {
-                          HapticFeedback.mediumImpact();
-                          if (fitness.status != DogFitnessStatus.apt) {
-                            final confirm = await _showFitnessConfirmation(context, dog, fitness);
-                            if (!confirm) return;
-                          }
-                          if (!ctx.mounted) return;
-                          Navigator.of(ctx).pop();
-                          await shiftVM.switchDog(dog.id);
-                        },
-                      );
-                    }),
+                ...dogVM.dogs.where((d) => d.id != shiftVM.activeDogId).map((
+                  dog,
+                ) {
+                  final fitness = const DogFitnessService().evaluate(dog);
+                  return _DogSwitchTile(
+                    dog: dog,
+                    fitness: fitness,
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      if (fitness.status != DogFitnessStatus.apt) {
+                        final confirm = await _showFitnessConfirmation(
+                          context,
+                          dog,
+                          fitness,
+                        );
+                        if (!confirm) return;
+                      }
+                      if (!ctx.mounted) return;
+                      Navigator.of(ctx).pop();
+                      await shiftVM.switchDog(dog.id);
+                    },
+                  );
+                }),
               const SizedBox(height: 8),
             ],
           ),
@@ -183,11 +203,12 @@ class _DogSwitchTile extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.primary.withAlpha(80)),
-                color: const Color(0xFF1A2A30),
+                color: AppTheme.surfacePanelAlt,
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: dog.profileImageUrl != null &&
+                child:
+                    dog.profileImageUrl != null &&
                         dog.profileImageUrl!.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: dog.profileImageUrl!,
@@ -203,7 +224,9 @@ class _DogSwitchTile extends StatelessWidget {
                     : Center(
                         child: Text(
                           dog.name.isNotEmpty
-                              ? dog.name.substring(0, dog.name.length.clamp(0, 3)).toUpperCase()
+                              ? dog.name
+                                    .substring(0, dog.name.length.clamp(0, 3))
+                                    .toUpperCase()
                               : 'K9',
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w700,
@@ -340,7 +363,9 @@ Future<bool> _showFitnessConfirmation(
   Dog dog,
   DogFitnessResult fitness,
 ) async {
-  final Color color = fitness.status == DogFitnessStatus.unfit ? AppTheme.error : AppTheme.warning;
+  final Color color = fitness.status == DogFitnessStatus.unfit
+      ? AppTheme.error
+      : AppTheme.warning;
 
   final result = await showDialog<bool>(
     context: context,
@@ -389,36 +414,38 @@ Future<bool> _showFitnessConfirmation(
               ),
             ),
             const SizedBox(height: 12),
-            ...fitness.pendencies.map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        p.severity == DogPendencySeverity.critical
-                            ? Icons.error_outline_rounded
-                            : Icons.info_outline_rounded,
-                        color: p.severity == DogPendencySeverity.critical
-                            ? AppTheme.error
-                            : AppTheme.warning,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          p.label,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: p.severity == DogPendencySeverity.critical
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: AppTheme.textPrimary,
-                          ),
+            ...fitness.pendencies.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      p.severity == DogPendencySeverity.critical
+                          ? Icons.error_outline_rounded
+                          : Icons.info_outline_rounded,
+                      color: p.severity == DogPendencySeverity.critical
+                          ? AppTheme.error
+                          : AppTheme.warning,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        p.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: p.severity == DogPendencySeverity.critical
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color: AppTheme.textPrimary,
                         ),
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             Text(
               'Deseja prosseguir e assumir este cão mesmo assim?',
@@ -453,9 +480,7 @@ Future<bool> _showFitnessConfirmation(
           ),
           child: Text(
             'Sim, confirmar',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w900,
-            ),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w900),
           ),
         ),
       ],

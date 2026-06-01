@@ -24,7 +24,7 @@ class _DogSelectionCard extends StatelessWidget {
         ? AppTheme.primary
         : isTitular
         ? AppTheme.primary.withAlpha(80)
-        : const Color(0xFF1D2C33);
+        : AppTheme.outlineVariant;
 
     return GestureDetector(
       onTap: onTap,
@@ -36,7 +36,7 @@ class _DogSelectionCard extends StatelessWidget {
               ? AppTheme.primary.withAlpha(10)
               : isTitular
               ? AppTheme.primary.withAlpha(5)
-              : const Color(0xFF0E1A1F),
+              : AppTheme.surfacePanel,
           borderRadius: BorderRadius.circular(14),
           border: Border(
             left: BorderSide(
@@ -194,7 +194,7 @@ class _AvatarPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF1A2A30),
+      color: AppTheme.surfacePanelAlt,
       child: Center(
         child: Text(
           name.isNotEmpty
