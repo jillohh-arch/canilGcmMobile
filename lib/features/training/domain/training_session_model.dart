@@ -79,7 +79,13 @@ class TrainingSessionModel {
       location: _readString(json, const ['location', 'local']) ?? '',
       weather: _readString(json, const ['weather', 'clima']) ?? '',
       handlerNotes:
-          _readString(json, const ['handlerNotes', 'notes', 'observations']) ??
+          _readString(json, const [
+            'handlerNotes',
+            'handler_notes',
+            'notes',
+            'observation',
+            'observations',
+          ]) ??
           '',
       mediaAttachments: _readListMap(json['mediaAttachments'] ?? json['media']),
       metadata: metadata.isEmpty ? null : metadata,

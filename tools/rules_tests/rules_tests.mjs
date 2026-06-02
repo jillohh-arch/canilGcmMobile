@@ -7,10 +7,14 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc,
+  collection,
+  getDocs,
   getDoc,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
   arrayUnion,
   Timestamp,
@@ -824,6 +828,31 @@ test('promotion_requests: condutor solicita e Instrutor K9 decide', async () => 
   const requestRef = doc(dbFor(PRIMARY_RA), 'promotion_requests/promo-1');
 
   await assertSucceeds(setDoc(requestRef, promotionRequestPayload()));
+
+  await assertFails(
+    getDocs(
+      query(
+        collection(dbFor(PRIMARY_RA), 'promotion_requests'),
+        where('dog_id', '==', DOG_ID),
+        where('modality', '==', 'busca_captura'),
+        where('module_id', '==', 'modulo_1'),
+        where('status', '==', 'pending'),
+      ),
+    ),
+  );
+
+  await assertSucceeds(
+    getDocs(
+      query(
+        collection(dbFor(PRIMARY_RA), 'promotion_requests'),
+        where('dog_id', '==', DOG_ID),
+        where('modality', '==', 'busca_captura'),
+        where('module_id', '==', 'modulo_1'),
+        where('status', '==', 'pending'),
+        where('requester_ra', '==', PRIMARY_RA),
+      ),
+    ),
+  );
 
   await assertFails(
     setDoc(

@@ -283,7 +283,14 @@ class TrainingHubSession {
       createdAt: createdAt,
       location: _readString(json, const ['location', 'local']) ?? '',
       notes:
-          _readString(json, const ['handlerNotes', 'notes', 'description']) ??
+          _readString(json, const [
+            'handlerNotes',
+            'handler_notes',
+            'notes',
+            'observation',
+            'observations',
+            'description',
+          ]) ??
           '',
       performanceScore: _readScore(json, metadata),
       metadata: metadata,

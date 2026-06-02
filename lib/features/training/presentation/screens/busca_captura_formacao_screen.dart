@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/data/training_program_service.dart';
 import 'package:canil_gcm/features/training/data/training_promotion_service.dart';
+import 'package:canil_gcm/features/training/data/training_service.dart';
+import 'package:canil_gcm/features/training/domain/training_model.dart';
 import 'package:canil_gcm/features/training/domain/training_program.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_summary_screen.dart';
@@ -36,19 +40,24 @@ class _BuscaCapturaFormacaoScreenState
   int _activeTabIndex = 0;
   final TrainingProgramService _programService = TrainingProgramService();
   final TrainingPromotionService _promotionService = TrainingPromotionService();
+  final TrainingService _trainingService = TrainingService();
   StreamSubscription<TrainingProgram?>? _programSub;
   StreamSubscription<TrainingProgress>? _progressSub;
   StreamSubscription<List<BonusTrainingMilestone>>? _bonusSub;
+  StreamSubscription<List<TrainingHubSession>>? _sessionsSub;
   TrainingProgram? _program;
   TrainingProgress _progress = TrainingProgress.initial(_modality);
   List<BonusTrainingMilestone> _bonusMilestones =
       const <BonusTrainingMilestone>[];
+  List<TrainingHubSession> _bcSessions = const <TrainingHubSession>[];
   Object? _programError;
   Object? _progressError;
   Object? _bonusError;
+  Object? _sessionsError;
   bool _programLoaded = false;
   bool _progressLoaded = false;
   bool _bonusLoaded = false;
+  bool _sessionsLoaded = false;
   bool _initializingProgress = false;
   bool _completingModule = false;
   bool _isInstructorK9 = false;
@@ -71,6 +80,7 @@ class _BuscaCapturaFormacaoScreenState
     _subscribeProgram();
     _subscribeProgress();
     _subscribeBonusMilestones();
+    _subscribeSessions();
     unawaited(_loadInstructorRole());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_promptPendingTrailDraft());
@@ -84,6 +94,7 @@ class _BuscaCapturaFormacaoScreenState
       _pendingDraftPrompted = false;
       _subscribeProgress();
       _subscribeBonusMilestones();
+      _subscribeSessions();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_promptPendingTrailDraft());
       });
@@ -95,6 +106,7 @@ class _BuscaCapturaFormacaoScreenState
     _programSub?.cancel();
     _progressSub?.cancel();
     _bonusSub?.cancel();
+    _sessionsSub?.cancel();
     super.dispose();
   }
 
@@ -174,9 +186,41 @@ class _BuscaCapturaFormacaoScreenState
         );
   }
 
+  void _subscribeSessions() {
+    _sessionsSub?.cancel();
+    setState(() {
+      _sessionsLoaded = false;
+      _sessionsError = null;
+      _bcSessions = const <TrainingHubSession>[];
+    });
+    _sessionsSub = _trainingService
+        .watchSessionsForDog(widget.dog.id)
+        .listen(
+          (sessions) {
+            if (!mounted) return;
+            final filtered = sessions.where(_isBuscaCapturaSession).toList()
+              ..sort((a, b) => b.date.compareTo(a.date));
+            setState(() {
+              _bcSessions = filtered;
+              _sessionsLoaded = true;
+              _sessionsError = null;
+            });
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _sessionsError = error;
+              _sessionsLoaded = true;
+            });
+          },
+        );
+  }
+
   Future<void> _loadInstructorRole() async {
     try {
-      final result = await _promotionService.currentUserIsInstructorK9();
+      final result = await _promotionService.currentUserHasInstructorClaim(
+        forceRefresh: true,
+      );
       if (!mounted) return;
       setState(() => _isInstructorK9 = result);
     } catch (_) {
@@ -273,6 +317,136 @@ class _BuscaCapturaFormacaoScreenState
 
   bool _isLastModule(TrainingModule module) {
     return _modules.isNotEmpty && _modules.last.id == module.id;
+  }
+
+  bool _isBuscaCapturaSession(TrainingHubSession session) {
+    final metadata = session.metadata;
+    final values = [
+      session.trainingType,
+      session.specialty,
+      session.subtype,
+      metadata['modality'],
+      metadata['specialty'],
+      metadata['type'],
+      metadata['trainingType'],
+      metadata['training_type'],
+    ].map((value) => normalizeTrainingKey(value?.toString() ?? ''));
+    return values.any(
+      (value) =>
+          value == 'busca_captura' ||
+          value == 'busca_e_captura' ||
+          value == 'busca_captura_track',
+    );
+  }
+
+  Map<String, dynamic> _trackFor(TrainingHubSession session) {
+    final metadata = session.metadata;
+    final track = metadata['track'] ?? metadata['gps_track'];
+    if (track is Map<String, dynamic>) return track;
+    if (track is Map) return Map<String, dynamic>.from(track);
+    return const <String, dynamic>{};
+  }
+
+  double _distanceMetersFor(TrainingHubSession session) {
+    final track = _trackFor(session);
+    return _readDouble(track['distance_m'] ?? session.metadata['distance_m']);
+  }
+
+  int _durationSecondsFor(TrainingHubSession session) {
+    final track = _trackFor(session);
+    return _readInt(track['duration_s'] ?? session.metadata['duration_s']);
+  }
+
+  String _resultFor(TrainingHubSession session) {
+    final track = _trackFor(session);
+    final raw = track['result'] ?? session.metadata['result'] ?? session.status;
+    final normalized = normalizeTrainingKey(raw?.toString() ?? '');
+    if (normalized == 'completa' ||
+        normalized == 'completo' ||
+        normalized == 'completed' ||
+        normalized == 'alvo_encontrado') {
+      return 'completa';
+    }
+    if (normalized == 'sem_exito' ||
+        normalized == 'sem_sucesso' ||
+        normalized == 'perda' ||
+        normalized == 'perdeu_rastro') {
+      return 'sem_exito';
+    }
+    if (normalized == 'parcial' || normalized == 'checagem') {
+      return 'parcial';
+    }
+    return 'parcial';
+  }
+
+  String _resultLabel(String result) {
+    switch (result) {
+      case 'completa':
+        return 'Completa';
+      case 'sem_exito':
+        return 'Sem exito';
+      default:
+        return 'Parcial';
+    }
+  }
+
+  String _moduleLabelFor(TrainingHubSession session) {
+    final moduleName = session.metadata['module_name']?.toString().trim();
+    if (moduleName != null && moduleName.isNotEmpty) return moduleName;
+    final moduleId = session.metadata['module_id']?.toString().trim();
+    if (moduleId != null && moduleId.isNotEmpty) {
+      for (final module in _modules) {
+        if (module.id == moduleId) return module.name;
+      }
+      return moduleId.replaceAll('_', ' ');
+    }
+    return session.metadata['phase'] == 'maintenance'
+        ? 'Manutencao'
+        : 'Formacao';
+  }
+
+  String _milestoneLabelFor(TrainingHubSession session) {
+    final label = session.metadata['milestone_label']?.toString().trim();
+    if (label != null && label.isNotEmpty) return label;
+    final milestoneId = session.metadata['milestone_id']?.toString().trim();
+    if (milestoneId != null && milestoneId.isNotEmpty) {
+      for (final module in _modules) {
+        for (final milestone in module.activeMilestones) {
+          if (milestone.id == milestoneId) return milestone.label;
+        }
+      }
+      return milestoneId.replaceAll('_', ' ');
+    }
+    return 'Sessao operacional';
+  }
+
+  String _formatDistance(double meters) {
+    if (meters <= 0) return '--';
+    if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
+    return '${meters.round()} m';
+  }
+
+  String _formatDuration(int seconds) {
+    if (seconds <= 0) return '--';
+    final minutes = seconds / 60;
+    if (minutes < 1) return '${seconds}s';
+    if (minutes < 10) return '${minutes.toStringAsFixed(1)} min';
+    return '${minutes.round()} min';
+  }
+
+  String _formatShortDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+  }
+
+  double _readDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '.') ?? '') ?? 0;
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   @override
@@ -977,10 +1151,15 @@ class _BuscaCapturaFormacaoScreenState
   String _resolveHandlerId() {
     try {
       final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-      return shiftVM.handlerId ?? 'Condutor';
+      final handlerId = shiftVM.handlerId?.trim();
+      if (handlerId != null && handlerId.isNotEmpty) return handlerId;
     } catch (_) {
-      return 'Condutor';
+      // Sem ShiftViewModel no contexto, usa identidade autenticada.
     }
+    return HandlerIdentityService.raFromUser(
+          FirebaseAuth.instance.currentUser,
+        ) ??
+        'Condutor';
   }
 
   Future<void> _startFormationTrail(TrainingModule? module) async {
@@ -2070,100 +2249,129 @@ class _BuscaCapturaFormacaoScreenState
     );
   }
 
-  // --- ABA HISTÓRICO ---
+  // --- ABA HISTORICO ---
   Widget _buildHistoricoTab() {
-    return _buildProgramState(
-      icon: Icons.history_rounded,
-      title: 'Histórico em integração',
-      body:
-          'As sessões reais de Busca & Captura serão listadas aqui sem dados demonstrativos hardcoded.',
-    );
-  }
+    if (!_sessionsLoaded) {
+      return _buildProgramState(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Carregando historico',
+        body: 'Buscando sessoes reais de Busca & Captura.',
+      );
+    }
+    if (_sessionsError != null) {
+      return _buildProgramState(
+        icon: Icons.warning_amber_rounded,
+        title: 'Falha ao carregar historico',
+        body: _sessionsError.toString(),
+        color: AppTheme.error,
+      );
+    }
+    if (_bcSessions.isEmpty) {
+      return _buildProgramState(
+        icon: Icons.history_rounded,
+        title: 'Nenhuma sessao registrada',
+        body:
+            'Quando uma trilha de Busca & Captura for salva, ela aparece aqui com modulo, marco, resultado e metricas.',
+      );
+    }
 
-  // --- ABA ESTATÍSTICAS ---
-  Widget _buildEstatisticasTab() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
       children: [
-        // Big numbers cards
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.textPrimary.withAlpha(13),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppTheme.textPrimary.withAlpha(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '116m',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.primary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'DISTÂNCIA MÉDIA',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textTertiary,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.textPrimary.withAlpha(13),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppTheme.textPrimary.withAlpha(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '4.8 min',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.primary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'TEMPO MÉDIO',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textTertiary,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+        Text(
+          'SESSOES REGISTRADAS',
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
           ),
         ),
+        const SizedBox(height: 12),
+        ..._bcSessions.map(_buildTrailSessionCard),
+      ],
+    );
+  }
 
-        // Chart block
+  // --- ABA ESTATISTICAS ---
+  Widget _buildEstatisticasTab() {
+    if (!_sessionsLoaded) {
+      return _buildProgramState(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Carregando estatisticas',
+        body: 'Calculando metricas com as sessoes reais de B&C.',
+      );
+    }
+    if (_sessionsError != null) {
+      return _buildProgramState(
+        icon: Icons.warning_amber_rounded,
+        title: 'Falha ao carregar estatisticas',
+        body: _sessionsError.toString(),
+        color: AppTheme.error,
+      );
+    }
+    if (_bcSessions.isEmpty) {
+      return _buildProgramState(
+        icon: Icons.analytics_outlined,
+        title: 'Sem estatisticas ainda',
+        body:
+            'As medias e distribuicoes aparecem depois da primeira sessao de trilha salva.',
+      );
+    }
+
+    final sessionsWithDistance = _bcSessions
+        .where((session) => _distanceMetersFor(session) > 0)
+        .toList();
+    final sessionsWithDuration = _bcSessions
+        .where((session) => _durationSecondsFor(session) > 0)
+        .toList();
+    final avgDistance = sessionsWithDistance.isEmpty
+        ? 0.0
+        : sessionsWithDistance.map(_distanceMetersFor).reduce((a, b) => a + b) /
+              sessionsWithDistance.length;
+    final avgDuration = sessionsWithDuration.isEmpty
+        ? 0
+        : (sessionsWithDuration
+                      .map(_durationSecondsFor)
+                      .reduce((a, b) => a + b) /
+                  sessionsWithDuration.length)
+              .round();
+    final lastSeven = _bcSessions.take(7).toList().reversed.toList();
+    final maxDistance = lastSeven
+        .map(_distanceMetersFor)
+        .fold<double>(0, (max, value) => value > max ? value : max);
+    final resultCounts = <String, int>{
+      'completa': 0,
+      'parcial': 0,
+      'sem_exito': 0,
+    };
+    for (final session in _bcSessions) {
+      final result = _resultFor(session);
+      resultCounts[result] = (resultCounts[result] ?? 0) + 1;
+    }
+    final totalResults = _bcSessions.length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                value: _formatDistance(avgDistance),
+                label: 'DISTANCIA MEDIA',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildMetricCard(
+                value: _formatDuration(avgDuration),
+                label: 'TEMPO MEDIO',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -2176,7 +2384,7 @@ class _BuscaCapturaFormacaoScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'DISTÂNCIA POR SESSÃO (ÚLTIMAS 7)',
+                'DISTANCIA POR SESSAO (ULTIMAS ${lastSeven.length})',
                 style: GoogleFonts.inter(
                   color: AppTheme.primary,
                   fontSize: 10,
@@ -2185,12 +2393,11 @@ class _BuscaCapturaFormacaoScreenState
                 ),
               ),
               const SizedBox(height: 12),
-              // Y-axis label
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '150m',
+                    _formatDistance(maxDistance),
                     style: GoogleFonts.inter(
                       color: AppTheme.textMuted,
                       fontSize: 9,
@@ -2206,20 +2413,23 @@ class _BuscaCapturaFormacaoScreenState
                 ],
               ),
               const SizedBox(height: 8),
-              // Simulated bars
               SizedBox(
                 height: 100,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    _buildChartBar(height: 40),
-                    _buildChartBar(height: 60),
-                    _buildChartBar(height: 50),
-                    _buildChartBar(height: 80),
-                    _buildChartBar(height: 70),
-                    _buildChartBar(height: 90, highlight: true),
-                    _buildChartBar(height: 100, highlight: true),
-                  ],
+                  children: lastSeven.map((session) {
+                    final distance = _distanceMetersFor(session);
+                    final ratio = maxDistance <= 0
+                        ? 0.08
+                        : distance / maxDistance;
+                    final height = 10 + (ratio.clamp(0.08, 1.0) * 90);
+                    return _buildChartBar(
+                      height: height,
+                      highlight: session.date.isAfter(
+                        DateTime.now().subtract(const Duration(days: 7)),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
               const SizedBox(height: 8),
@@ -2227,14 +2437,14 @@ class _BuscaCapturaFormacaoScreenState
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '05/Mai',
+                    _formatShortDate(lastSeven.first.date),
                     style: GoogleFonts.inter(
                       color: AppTheme.textMuted,
                       fontSize: 9,
                     ),
                   ),
                   Text(
-                    'Hoje',
+                    _formatShortDate(lastSeven.last.date),
                     style: GoogleFonts.inter(
                       color: AppTheme.textMuted,
                       fontSize: 9,
@@ -2245,8 +2455,6 @@ class _BuscaCapturaFormacaoScreenState
             ],
           ),
         ),
-
-        // Distribution block
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -2258,7 +2466,7 @@ class _BuscaCapturaFormacaoScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'DISTRIBUIÇÃO DE RESULTADOS',
+                'DISTRIBUICAO DE RESULTADOS',
                 style: GoogleFonts.inter(
                   color: AppTheme.primary,
                   fontSize: 10,
@@ -2267,15 +2475,205 @@ class _BuscaCapturaFormacaoScreenState
                 ),
               ),
               const SizedBox(height: 12),
-              _buildDistributionRow('Completa', 0.75, '75%', AppTheme.success),
+              _buildDistributionRow(
+                'Completa',
+                resultCounts['completa']! / totalResults,
+                '${((resultCounts['completa']! / totalResults) * 100).round()}%',
+                AppTheme.success,
+              ),
               const SizedBox(height: 8),
-              _buildDistributionRow('Checagem', 0.15, '15%', AppTheme.warning),
+              _buildDistributionRow(
+                'Parcial',
+                resultCounts['parcial']! / totalResults,
+                '${((resultCounts['parcial']! / totalResults) * 100).round()}%',
+                AppTheme.warning,
+              ),
               const SizedBox(height: 8),
-              _buildDistributionRow('Perda', 0.10, '10%', AppTheme.attention),
+              _buildDistributionRow(
+                'Sem exito',
+                resultCounts['sem_exito']! / totalResults,
+                '${((resultCounts['sem_exito']! / totalResults) * 100).round()}%',
+                AppTheme.attention,
+              ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTrailSessionCard(TrainingHubSession session) {
+    final distance = _formatDistance(_distanceMetersFor(session));
+    final duration = _formatDuration(_durationSecondsFor(session));
+    final result = _resultFor(session);
+    final notes = session.notes.trim();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.textPrimary.withAlpha(13),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withAlpha(18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primary.withAlpha(55)),
+                ),
+                child: const Icon(
+                  Icons.route_rounded,
+                  color: AppTheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _milestoneLabelFor(session),
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_moduleLabelFor(session)} - ${_formatShortDate(session.date)}',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textMuted,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _resultColor(result).withAlpha(22),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _resultLabel(result).toUpperCase(),
+                  style: GoogleFonts.inter(
+                    color: _resultColor(result),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildSessionMeta(Icons.straighten_rounded, distance),
+              const SizedBox(width: 12),
+              _buildSessionMeta(Icons.timer_outlined, duration),
+              const SizedBox(width: 12),
+              _buildSessionMeta(
+                Icons.person_outline_rounded,
+                session.handlerId.isEmpty
+                    ? _resolveHandlerId()
+                    : session.handlerId,
+              ),
+            ],
+          ),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              notes,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionMeta(IconData icon, String value) {
+    return Expanded(
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.textMuted, size: 14),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              value,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.ibmPlexMono(
+                color: AppTheme.textSecondary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _resultColor(String result) {
+    switch (result) {
+      case 'completa':
+        return AppTheme.success;
+      case 'sem_exito':
+        return AppTheme.attention;
+      default:
+        return AppTheme.warning;
+    }
+  }
+
+  Widget _buildMetricCard({required String value, required String label}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.textPrimary.withAlpha(13),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(20)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              color: AppTheme.primary,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
