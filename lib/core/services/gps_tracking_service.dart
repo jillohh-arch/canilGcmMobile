@@ -1,26 +1,153 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'location_tracking_service.dart';
 
 /// Resultado de uma sessão de rastreamento GPS.
 class GpsTrackResult {
   final List<GpsTrackPoint> points;
+  final List<GpsFieldEvent> events;
   final double distanceMeters;
   final int durationSeconds;
   final DateTime startedAt;
   final DateTime endedAt;
+  final GpsTrackingSessionConfig? sessionConfig;
+  final String? result;
+  final String? observation;
+  final String? finishReason;
+  final String? localDraftId;
+  final String? localDraftPath;
 
   const GpsTrackResult({
     required this.points,
+    this.events = const [],
     required this.distanceMeters,
     required this.durationSeconds,
     required this.startedAt,
     required this.endedAt,
+    this.sessionConfig,
+    this.result,
+    this.observation,
+    this.finishReason,
+    this.localDraftId,
+    this.localDraftPath,
   });
+
+  static Future<List<GpsTrackResult>> loadLocalDrafts({
+    String? modality,
+    String? phase,
+    String? dogId,
+  }) async {
+    try {
+      final baseDir = await getApplicationSupportDirectory();
+      final draftsDir = Directory(
+        '${baseDir.path}${Platform.pathSeparator}gps_track_drafts',
+      );
+      if (!await draftsDir.exists()) return [];
+
+      final drafts = <GpsTrackResult>[];
+      await for (final entity in draftsDir.list()) {
+        if (entity is! File || !entity.path.endsWith('.json')) continue;
+        try {
+          final payload =
+              jsonDecode(await entity.readAsString()) as Map<String, dynamic>;
+          final draft = GpsTrackResult.fromJson(
+            payload,
+            localDraftPath: entity.path,
+          );
+          final config = draft.sessionConfig;
+          if (modality != null && config?.modality != modality) continue;
+          if (phase != null && config?.phase != phase) continue;
+          if (dogId != null && config?.dogId != dogId) continue;
+          drafts.add(draft);
+        } catch (error) {
+          debugPrint('[GpsTrackingService] Rascunho GPS invalido: $error');
+        }
+      }
+      drafts.sort((a, b) => a.endedAt.compareTo(b.endedAt));
+      return drafts;
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao carregar rascunhos GPS: $error');
+      return [];
+    }
+  }
+
+  factory GpsTrackResult.fromJson(
+    Map<String, dynamic> json, {
+    String? localDraftPath,
+  }) {
+    final rawPoints = json['points'] ?? json['path'];
+    final points = rawPoints is List
+        ? rawPoints
+              .whereType<Map>()
+              .map(
+                (point) =>
+                    GpsTrackPoint.fromJson(Map<String, dynamic>.from(point)),
+              )
+              .toList()
+        : <GpsTrackPoint>[];
+    final rawEvents = json['events'];
+    final events = rawEvents is List
+        ? rawEvents
+              .whereType<Map>()
+              .map(
+                (event) =>
+                    GpsFieldEvent.fromJson(Map<String, dynamic>.from(event)),
+              )
+              .toList()
+        : <GpsFieldEvent>[];
+    final configJson = json['session_config'];
+    final startedAt = _readDate(json['started_at']) ?? DateTime.now();
+    final endedAt =
+        _readDate(json['ended_at']) ??
+        _readDate(json['updated_at']) ??
+        startedAt;
+
+    return GpsTrackResult(
+      points: points,
+      events: events,
+      distanceMeters: _readDouble(json['distance_m']),
+      durationSeconds: _readInt(json['duration_s']),
+      startedAt: startedAt,
+      endedAt: endedAt,
+      sessionConfig: configJson is Map
+          ? GpsTrackingSessionConfig.fromJson(
+              Map<String, dynamic>.from(configJson),
+            )
+          : null,
+      result: json['result']?.toString(),
+      observation: json['observation']?.toString(),
+      finishReason: json['finish_reason']?.toString(),
+      localDraftId: json['draft_id']?.toString(),
+      localDraftPath: localDraftPath,
+    );
+  }
+
+  static DateTime? _readDate(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+    }
+    return null;
+  }
+
+  static double _readDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static int _readInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 
   double get avgSpeedKmh {
     if (durationSeconds <= 0) return 0;
@@ -44,12 +171,219 @@ class GpsTrackResult {
   Map<String, dynamic> toJson() {
     return {
       'points': points.map((p) => p.toJson()).toList(),
+      'path': points.map((p) => p.toJson()).toList(),
+      'events': events.map((event) => event.toJson()).toList(),
       'distance_m': distanceMeters.round(),
       'duration_s': durationSeconds,
       'avg_pace_s_per_km': avgPaceSecondsPerKm,
       'avg_speed_kmh': double.parse(avgSpeedKmh.toStringAsFixed(1)),
       'started_at': startedAt.toIso8601String(),
       'ended_at': endedAt.toIso8601String(),
+      'finish_reason': finishReason ?? 'manual',
+      'offline_synced': true,
+      if (sessionConfig != null) 'session_config': sessionConfig!.toJson(),
+      if (result != null) 'result': result,
+      if (observation != null && observation!.trim().isNotEmpty)
+        'observation': observation!.trim(),
+    };
+  }
+
+  GpsTrackResult copyWith({
+    List<GpsTrackPoint>? points,
+    List<GpsFieldEvent>? events,
+    double? distanceMeters,
+    int? durationSeconds,
+    DateTime? startedAt,
+    DateTime? endedAt,
+    GpsTrackingSessionConfig? sessionConfig,
+    String? result,
+    String? observation,
+    String? finishReason,
+    String? localDraftId,
+    String? localDraftPath,
+  }) {
+    return GpsTrackResult(
+      points: points ?? this.points,
+      events: events ?? this.events,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      sessionConfig: sessionConfig ?? this.sessionConfig,
+      result: result ?? this.result,
+      observation: observation ?? this.observation,
+      finishReason: finishReason ?? this.finishReason,
+      localDraftId: localDraftId ?? this.localDraftId,
+      localDraftPath: localDraftPath ?? this.localDraftPath,
+    );
+  }
+
+  Future<void> persistLocalDraft() async {
+    final path = localDraftPath;
+    if (path == null || path.isEmpty) return;
+    try {
+      final payload = {
+        'draft_id': localDraftId,
+        ...toJson(),
+        'offline_synced': false,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+      await File(path).writeAsString(jsonEncode(payload), flush: true);
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao atualizar rascunho GPS: $error');
+    }
+  }
+
+  Future<void> deleteLocalDraft() async {
+    final path = localDraftPath;
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao remover rascunho GPS: $error');
+    }
+  }
+}
+
+class GpsTrackingSessionConfig {
+  final String modality;
+  final String phase;
+  final String? dogId;
+  final String? dogName;
+  final String? moduleId;
+  final String? moduleName;
+  final String? milestoneId;
+  final String? milestoneLabel;
+  final String conductor;
+  final String figurante;
+  final String odorObject;
+  final String ambiente;
+
+  const GpsTrackingSessionConfig({
+    required this.modality,
+    required this.phase,
+    this.dogId,
+    this.dogName,
+    this.moduleId,
+    this.moduleName,
+    this.milestoneId,
+    this.milestoneLabel,
+    required this.conductor,
+    required this.figurante,
+    required this.odorObject,
+    required this.ambiente,
+  });
+
+  factory GpsTrackingSessionConfig.fromJson(Map<String, dynamic> json) {
+    return GpsTrackingSessionConfig(
+      modality: json['modality']?.toString() ?? '',
+      phase: json['phase']?.toString() ?? 'formation',
+      dogId: json['dog_id']?.toString() ?? json['dogId']?.toString(),
+      dogName: json['dog_name']?.toString() ?? json['dogName']?.toString(),
+      moduleId: json['module_id']?.toString() ?? json['moduleId']?.toString(),
+      moduleName:
+          json['module_name']?.toString() ?? json['moduleName']?.toString(),
+      milestoneId:
+          json['milestone_id']?.toString() ?? json['milestoneId']?.toString(),
+      milestoneLabel:
+          json['milestone_label']?.toString() ??
+          json['milestoneLabel']?.toString(),
+      conductor: json['conductor']?.toString() ?? '',
+      figurante: json['figurante']?.toString() ?? '',
+      odorObject:
+          json['odor_object']?.toString() ??
+          json['odorObject']?.toString() ??
+          '',
+      ambiente: json['ambiente']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'modality': modality,
+      'phase': phase,
+      if (dogId != null) 'dog_id': dogId,
+      if (dogName != null) 'dog_name': dogName,
+      if (moduleId != null) 'module_id': moduleId,
+      if (moduleName != null) 'module_name': moduleName,
+      if (milestoneId != null) 'milestone_id': milestoneId,
+      if (milestoneLabel != null) 'milestone_label': milestoneLabel,
+      'conductor': conductor,
+      'figurante': figurante,
+      'odor_object': odorObject,
+      'ambiente': ambiente,
+    };
+  }
+}
+
+enum GpsFieldEventType { caoIndicou, checagem, perdeuRastro, alvoEncontrado }
+
+extension GpsFieldEventTypeX on GpsFieldEventType {
+  String get key => switch (this) {
+    GpsFieldEventType.caoIndicou => 'cao_indicou',
+    GpsFieldEventType.checagem => 'checagem',
+    GpsFieldEventType.perdeuRastro => 'perdeu_rastro',
+    GpsFieldEventType.alvoEncontrado => 'alvo_encontrado',
+  };
+
+  String get label => switch (this) {
+    GpsFieldEventType.caoIndicou => 'Cão indicou',
+    GpsFieldEventType.checagem => 'Checagem',
+    GpsFieldEventType.perdeuRastro => 'Perdeu rastro',
+    GpsFieldEventType.alvoEncontrado => 'Alvo encontrado',
+  };
+}
+
+class GpsFieldEvent {
+  final String id;
+  final GpsFieldEventType type;
+  final DateTime timestamp;
+  final GpsTrackPoint? point;
+
+  const GpsFieldEvent({
+    required this.id,
+    required this.type,
+    required this.timestamp,
+    this.point,
+  });
+
+  factory GpsFieldEvent.fromJson(Map<String, dynamic> json) {
+    final typeKey = json['type']?.toString() ?? '';
+    final pointJson = json['position'];
+    return GpsFieldEvent(
+      id: json['id']?.toString() ?? 'event_${json['ts'] ?? ''}',
+      type: GpsFieldEventType.values.firstWhere(
+        (type) => type.key == typeKey,
+        orElse: () => GpsFieldEventType.checagem,
+      ),
+      timestamp:
+          GpsTrackResult._readDate(json['timestamp']) ??
+          GpsTrackResult._readDate(json['ts']) ??
+          DateTime.now(),
+      point: pointJson is Map
+          ? GpsTrackPoint.fromJson(Map<String, dynamic>.from(pointJson))
+          : (json['lat'] != null && json['lng'] != null
+                ? GpsTrackPoint.fromJson(json)
+                : null),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type.key,
+      'label': type.label,
+      'timestamp': timestamp.toIso8601String(),
+      'ts': timestamp.millisecondsSinceEpoch,
+      if (point != null) ...{
+        'position': point!.toJson(),
+        'lat': point!.lat,
+        'lng': point!.lng,
+        'accuracy': point!.accuracy,
+      },
     };
   }
 }
@@ -76,6 +410,16 @@ class GpsTrackPoint {
     'ts': timestamp.millisecondsSinceEpoch,
     'acc': accuracy.round(),
   };
+
+  factory GpsTrackPoint.fromJson(Map<dynamic, dynamic> json) => GpsTrackPoint(
+    lat: GpsTrackResult._readDouble(json['lat']),
+    lng: GpsTrackResult._readDouble(json['lng']),
+    timestamp:
+        GpsTrackResult._readDate(json['timestamp']) ??
+        GpsTrackResult._readDate(json['ts']) ??
+        DateTime.now(),
+    accuracy: GpsTrackResult._readDouble(json['accuracy'] ?? json['acc']),
+  );
 
   factory GpsTrackPoint.fromPosition(Position p) => GpsTrackPoint(
     lat: p.latitude,
@@ -123,6 +467,7 @@ class GpsTrackingService extends ChangeNotifier {
   // ─── Estado ──────────────────────────────────────────────────────
   GpsTrackingState _state = GpsTrackingState.idle;
   final List<GpsTrackPoint> _points = [];
+  final List<GpsFieldEvent> _events = [];
   StreamSubscription<Position>? _positionSub;
   Timer? _timer;
   Position? _lastAccepted;
@@ -132,6 +477,10 @@ class GpsTrackingService extends ChangeNotifier {
   DateTime? _startedAt;
   DateTime? _endedAt;
   String _activityLabel = '';
+  GpsTrackingSessionConfig? _sessionConfig;
+  String? _finishReason;
+  String? _localDraftId;
+  File? _localDraftFile;
 
   // ─── Getters públicos ────────────────────────────────────────────
   GpsTrackingState get state => _state;
@@ -146,8 +495,10 @@ class GpsTrackingService extends ChangeNotifier {
   int get elapsedSeconds => _elapsedSeconds;
   String get activityLabel => _activityLabel;
   DateTime? get startedAt => _startedAt;
+  GpsTrackingSessionConfig? get sessionConfig => _sessionConfig;
 
   List<GpsTrackPoint> get points => List.unmodifiable(_points);
+  List<GpsFieldEvent> get events => List.unmodifiable(_events);
   List<LatLng> get polyline =>
       _points.map((p) => LatLng(p.lat, p.lng)).toList();
 
@@ -184,11 +535,15 @@ class GpsTrackingService extends ChangeNotifier {
   // ─── Ações ───────────────────────────────────────────────────────
 
   /// Inicia o rastreamento. Retorna erro ou null se OK.
-  Future<String?> start({required String activityLabel}) async {
+  Future<String?> start({
+    required String activityLabel,
+    GpsTrackingSessionConfig? sessionConfig,
+  }) async {
     if (isActive) return null; // já está ativo
 
     _state = GpsTrackingState.preparing;
     _activityLabel = activityLabel;
+    _sessionConfig = sessionConfig;
     notifyListeners();
 
     final permError = await _locationService.validatePermissions();
@@ -208,9 +563,12 @@ class GpsTrackingService extends ChangeNotifier {
     }
 
     _reset();
+    _sessionConfig = sessionConfig;
     _startedAt = DateTime.now();
+    await _prepareLocalDraft();
     _lastAccepted = position;
     _points.add(GpsTrackPoint.fromPosition(position));
+    await _persistLocalDraft();
 
     _state = GpsTrackingState.tracking;
     _startTimer();
@@ -236,23 +594,46 @@ class GpsTrackingService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addEvent(GpsFieldEventType type) {
+    if (!isActive && !isFinished) return;
+    final timestamp = DateTime.now();
+    final point = _points.isNotEmpty ? _points.last : null;
+    _events.add(
+      GpsFieldEvent(
+        id: '${type.key}_${timestamp.microsecondsSinceEpoch}',
+        type: type,
+        timestamp: timestamp,
+        point: point,
+      ),
+    );
+    unawaited(_persistLocalDraft());
+    notifyListeners();
+  }
+
   /// Finaliza o rastreamento e retorna o resultado.
-  Future<GpsTrackResult> finish() async {
+  Future<GpsTrackResult> finish({String finishReason = 'manual'}) async {
     _timer?.cancel();
     _timer = null;
     await _positionSub?.cancel();
     _positionSub = null;
     _endedAt = DateTime.now();
+    _finishReason = finishReason;
     _state = GpsTrackingState.finished;
+    await _persistLocalDraft();
     _activeInstance = null;
     notifyListeners();
 
     return GpsTrackResult(
       points: List.from(_points),
+      events: List.from(_events),
       distanceMeters: _distanceMeters,
       durationSeconds: _elapsedSeconds,
       startedAt: _startedAt ?? DateTime.now(),
       endedAt: _endedAt!,
+      sessionConfig: _sessionConfig,
+      finishReason: _finishReason,
+      localDraftId: _localDraftId,
+      localDraftPath: _localDraftFile?.path,
     );
   }
 
@@ -260,6 +641,7 @@ class GpsTrackingService extends ChangeNotifier {
   void discard() {
     _timer?.cancel();
     _positionSub?.cancel();
+    unawaited(_deleteCurrentDraft());
     _reset();
     _state = GpsTrackingState.idle;
     _activeInstance = null;
@@ -268,6 +650,71 @@ class GpsTrackingService extends ChangeNotifier {
 
   // ─── Internos ────────────────────────────────────────────────────
 
+  Future<void> _prepareLocalDraft() async {
+    try {
+      final baseDir = await getApplicationSupportDirectory();
+      final draftsDir = Directory(
+        '${baseDir.path}${Platform.pathSeparator}gps_track_drafts',
+      );
+      if (!await draftsDir.exists()) {
+        await draftsDir.create(recursive: true);
+      }
+      final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(
+        RegExp(r'[^0-9]'),
+        '',
+      );
+      _localDraftId = 'gps_$stamp';
+      _localDraftFile = File(
+        '${draftsDir.path}${Platform.pathSeparator}$_localDraftId.json',
+      );
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao preparar rascunho GPS: $error');
+      _localDraftId = null;
+      _localDraftFile = null;
+    }
+  }
+
+  Future<void> _persistLocalDraft() async {
+    final file = _localDraftFile;
+    final draftId = _localDraftId;
+    if (file == null || draftId == null) return;
+
+    final payload = {
+      'draft_id': draftId,
+      'activity_label': _activityLabel,
+      'state': _state.name,
+      if (_sessionConfig != null) 'session_config': _sessionConfig!.toJson(),
+      'started_at': _startedAt?.toIso8601String(),
+      'ended_at': _endedAt?.toIso8601String(),
+      'distance_m': _distanceMeters.round(),
+      'duration_s': _elapsedSeconds,
+      'points': _points.map((point) => point.toJson()).toList(),
+      'path': _points.map((point) => point.toJson()).toList(),
+      'events': _events.map((event) => event.toJson()).toList(),
+      'finish_reason': _finishReason,
+      'offline_synced': false,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    try {
+      await file.writeAsString(jsonEncode(payload), flush: true);
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao persistir rascunho GPS: $error');
+    }
+  }
+
+  Future<void> _deleteCurrentDraft() async {
+    final file = _localDraftFile;
+    if (file == null) return;
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (error) {
+      debugPrint('[GpsTrackingService] Erro ao descartar rascunho GPS: $error');
+    }
+  }
+
   void _reset() {
     _points.clear();
     _distanceMeters = 0.0;
@@ -275,6 +722,11 @@ class GpsTrackingService extends ChangeNotifier {
     _startedAt = null;
     _endedAt = null;
     _lastAccepted = null;
+    _events.clear();
+    _sessionConfig = null;
+    _finishReason = null;
+    _localDraftId = null;
+    _localDraftFile = null;
   }
 
   void _startTimer() {
@@ -299,6 +751,7 @@ class GpsTrackingService extends ChangeNotifier {
     if (_lastAccepted == null) {
       _lastAccepted = position;
       _points.add(GpsTrackPoint.fromPosition(position));
+      unawaited(_persistLocalDraft());
       notifyListeners();
       return;
     }
@@ -329,6 +782,7 @@ class GpsTrackingService extends ChangeNotifier {
     _distanceMeters += distance;
     _lastAccepted = position;
     _points.add(GpsTrackPoint.fromPosition(position));
+    unawaited(_persistLocalDraft());
     notifyListeners();
   }
 

@@ -274,7 +274,7 @@ class _SignatureConfirmationDialogState
     final orderedTeam = List<OccurrenceTeamMember>.from(widget.occurrence.team)
       ..sort((a, b) => a.handlerId.compareTo(b.handlerId));
     final payload = <String, dynamic>{
-      'hash_version': 3,
+      'hash_version': widget.occurrence.hashVersion ?? 4,
       'occurrence_id': widget.occurrence.id,
       'primary_handler_id': widget.occurrence.primaryHandlerId,
       'primary_handler_ra': widget.occurrence.primaryHandlerRa,
@@ -288,6 +288,16 @@ class _SignatureConfirmationDialogState
       'vehicle_id': widget.occurrence.vehicleId,
       'vehicle_label': widget.occurrence.vehicleLabel,
       'team': orderedTeam.map((member) => member.toHashPayload()).toList(),
+      'signature_round': widget.occurrence.signatureRound,
+      'participation_status': widget.occurrence.participationStatus,
+      'accepted_handler_ids': widget.occurrence.acceptedHandlerIds,
+      'declined_handler_ids': widget.occurrence.declinedHandlerIds,
+      'pending_handler_ids': widget.occurrence.pendingHandlerIds,
+      'edit_authorized_handler_ids': widget.occurrence.editAuthorizedHandlerIds,
+      'participation_revision': widget.occurrence.participationRevision,
+      'participations': widget.occurrence.participations
+          .map((participation) => participation.toHashPayload())
+          .toList(),
     };
     return sha256.convert(utf8.encode(_canonicalJson(payload))).toString();
   }

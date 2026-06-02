@@ -127,6 +127,19 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> setK9InstructorRole({
+    required String ra,
+    required bool enabled,
+  }) async {
+    try {
+      return await _userService.setK9InstructorRole(ra: ra, enabled: enabled);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      throw Exception('Falha ao atualizar papel Instrutor K9: $e');
+    }
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();

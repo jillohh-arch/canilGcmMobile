@@ -32,6 +32,16 @@ class GpsTrackingSummaryScreen extends StatefulWidget {
 
 class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
   bool _confirmed = false;
+  String _result = 'completa';
+  final TextEditingController _observationController = TextEditingController();
+
+  bool get _hasSessionResult => widget.result.sessionConfig != null;
+
+  @override
+  void dispose() {
+    _observationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +131,21 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
               ],
             ),
           ),
-          const Spacer(),
+          if (_hasSessionResult)
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  children: [
+                    _buildLinkCard(),
+                    const SizedBox(height: 10),
+                    _buildResultCard(),
+                  ],
+                ),
+              ),
+            )
+          else
+            const Spacer(),
           // Actions
           Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomPad),
@@ -277,6 +301,147 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
     );
   }
 
+  Widget _buildLinkCard() {
+    final config = widget.result.sessionConfig;
+    if (config == null) return const SizedBox.shrink();
+    final isFormation = config.phase == 'formation';
+    final linkText = isFormation
+        ? [
+            if (config.moduleName != null) config.moduleName!,
+            if (config.milestoneLabel != null) config.milestoneLabel!,
+          ].join(' · ')
+        : 'Manutenção operacional sem vínculo a módulo';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isFormation ? 'VÍNCULO DA SESSÃO' : 'SESSÃO OPERACIONAL',
+            style: GoogleFonts.inter(
+              color: AppTheme.primary,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            linkText,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Figurante: ${config.figurante} · Odor: ${config.odorObject} · Ambiente: ${config.ambiente}',
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 10.5,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultCard() {
+    const options = {
+      'completa': 'Completa',
+      'parcial': 'Parcial',
+      'sem_exito': 'Sem êxito',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceWhiteOverlayWeak,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.surfaceWhiteBorderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'RESULTADO DA SESSÃO',
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: options.entries.map((entry) {
+              final selected = _result == entry.key;
+              return ChoiceChip(
+                selected: selected,
+                label: Text(entry.value),
+                onSelected: (_) => setState(() => _result = entry.key),
+                selectedColor: AppTheme.primary.withAlpha(45),
+                backgroundColor: AppTheme.textPrimary.withAlpha(12),
+                labelStyle: GoogleFonts.inter(
+                  color: selected ? AppTheme.primary : AppTheme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+                side: BorderSide(
+                  color: selected
+                      ? AppTheme.primary.withAlpha(100)
+                      : AppTheme.textPrimary.withAlpha(20),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _observationController,
+            minLines: 2,
+            maxLines: 4,
+            style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 12),
+            decoration: InputDecoration(
+              hintText: 'Observação opcional da sessão',
+              hintStyle: GoogleFonts.inter(
+                color: AppTheme.textMuted,
+                fontSize: 12,
+              ),
+              filled: true,
+              fillColor: AppTheme.background.withAlpha(130),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: AppTheme.textPrimary.withAlpha(20),
+                ),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: AppTheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatDateRange() {
     final start = widget.result.startedAt;
     final end = widget.result.endedAt;
@@ -299,16 +464,26 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  void _onConfirm(BuildContext context) {
-    if (_confirmed) return; // Previne múltiplos cliques
+  Future<void> _onConfirm(BuildContext context) async {
+    if (_confirmed) return;
     setState(() => _confirmed = true);
     HapticFeedback.heavyImpact();
-    // Retorna o resultado para o caller (formulário de condicionamento)
-    Navigator.of(context).pop(widget.result);
+    var result = widget.result;
+    if (_hasSessionResult) {
+      result = result.copyWith(
+        result: _result,
+        observation: _observationController.text.trim(),
+      );
+      await result.persistLocalDraft();
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).pop(result);
   }
 
-  void _onDiscard(BuildContext context) {
+  Future<void> _onDiscard(BuildContext context) async {
     HapticFeedback.mediumImpact();
+    await widget.result.deleteLocalDraft();
+    if (!context.mounted) return;
     // Retorna null — descartou o rastreamento
     Navigator.of(context).pop(null);
   }

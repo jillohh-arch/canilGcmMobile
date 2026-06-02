@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
+import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
 void main() {
@@ -22,6 +23,8 @@ void main() {
     vm = OccurrenceViewModel(
       repository: occurrenceRepo,
       eventRepository: eventRepo,
+      signatureRepository: SignatureRepository(firestore: fakeFirestore),
+      sendTeamNotifications: false,
     );
   });
 

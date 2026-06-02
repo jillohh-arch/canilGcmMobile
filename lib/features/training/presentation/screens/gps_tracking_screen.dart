@@ -20,6 +20,8 @@ class GpsTrackingScreen extends StatefulWidget {
   final String dogName;
   final String handlerName;
   final GpsTrackingService trackingService;
+  final GpsTrackingSessionConfig? sessionConfig;
+  final bool enableFieldEvents;
 
   const GpsTrackingScreen({
     super.key,
@@ -27,6 +29,8 @@ class GpsTrackingScreen extends StatefulWidget {
     required this.dogName,
     required this.handlerName,
     required this.trackingService,
+    this.sessionConfig,
+    this.enableFieldEvents = false,
   });
 
   @override
@@ -49,7 +53,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
 
   Future<void> _startIfNeeded() async {
     if (_service.isActive) return; // já está rastreando (voltou da background)
-    final error = await _service.start(activityLabel: widget.activityLabel);
+    final error = await _service.start(
+      activityLabel: widget.activityLabel,
+      sessionConfig: widget.sessionConfig,
+    );
     if (error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: AppTheme.error),
@@ -85,9 +92,9 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     }
   }
 
-  Future<void> _onFinishTap() async {
+  Future<void> _onFinishTap({String finishReason = 'manual'}) async {
     HapticFeedback.heavyImpact();
-    final result = await _service.finish();
+    final result = await _service.finish(finishReason: finishReason);
     if (!mounted) return;
     // Navega para o summary e aguarda o resultado (confirm ou discard)
     final confirmed = await Navigator.of(context).push<GpsTrackResult?>(
@@ -103,6 +110,14 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     if (!mounted) return;
     // Retorna o resultado (ou null se descartou) para o caller
     Navigator.of(context).pop(confirmed);
+  }
+
+  Future<void> _onFieldEventTap(GpsFieldEventType type) async {
+    HapticFeedback.mediumImpact();
+    _service.addEvent(type);
+    if (type == GpsFieldEventType.alvoEncontrado) {
+      await _onFinishTap(finishReason: type.key);
+    }
   }
 
   @override
@@ -293,6 +308,30 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
                       ),
                     ),
                   ),
+                ..._service.events
+                    .where((event) => event.point != null)
+                    .map(
+                      (event) => Marker(
+                        point: event.point!.latLng,
+                        width: 28,
+                        height: 28,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _eventColor(event.type),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppTheme.background,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            _eventIcon(event.type),
+                            color: AppTheme.background,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
               ],
             ),
           ],
@@ -390,6 +429,10 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          if (widget.enableFieldEvents) ...[
+            _buildFieldEventPanel(),
+            const SizedBox(height: 14),
+          ],
           // Controls
           Row(
             children: [
@@ -430,7 +473,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
               // Finish
               Expanded(
                 child: GestureDetector(
-                  onTap: _onFinishTap,
+                  onTap: () => _onFinishTap(),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
@@ -458,6 +501,69 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFieldEventPanel() {
+    const events = [
+      GpsFieldEventType.caoIndicou,
+      GpsFieldEventType.checagem,
+      GpsFieldEventType.perdeuRastro,
+      GpsFieldEventType.alvoEncontrado,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'EVENTOS DE CAMPO',
+          style: GoogleFonts.inter(
+            color: AppTheme.textMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: events.map((type) {
+            final count = _service.events
+                .where((event) => event.type == type)
+                .length;
+            return GestureDetector(
+              onTap: () => _onFieldEventTap(type),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _eventColor(type).withAlpha(30),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _eventColor(type).withAlpha(90)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_eventIcon(type), color: _eventColor(type), size: 15),
+                    const SizedBox(width: 6),
+                    Text(
+                      count > 0 ? '${type.label} ($count)' : type.label,
+                      style: GoogleFonts.inter(
+                        color: _eventColor(type),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -497,5 +603,23 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
         ),
       ),
     );
+  }
+
+  Color _eventColor(GpsFieldEventType type) {
+    return switch (type) {
+      GpsFieldEventType.caoIndicou => AppTheme.primary,
+      GpsFieldEventType.checagem => AppTheme.warning,
+      GpsFieldEventType.perdeuRastro => AppTheme.error,
+      GpsFieldEventType.alvoEncontrado => AppTheme.success,
+    };
+  }
+
+  IconData _eventIcon(GpsFieldEventType type) {
+    return switch (type) {
+      GpsFieldEventType.caoIndicou => Icons.flag_outlined,
+      GpsFieldEventType.checagem => Icons.search_rounded,
+      GpsFieldEventType.perdeuRastro => Icons.report_problem_outlined,
+      GpsFieldEventType.alvoEncontrado => Icons.check_circle_outline_rounded,
+    };
   }
 }

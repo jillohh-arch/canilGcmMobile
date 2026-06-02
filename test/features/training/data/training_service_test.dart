@@ -46,6 +46,72 @@ void main() {
             .get();
         expect(snap.data()?['handlerId'], '691755');
         expect(snap.data()?['dogId'], 'dog-do-turno');
+        expect(snap.data(), containsPair('deleted_at', null));
+      },
+    );
+
+    test(
+      'grava trilha B&C em dogs/{dogId}/training_sessions com vinculo e eventos',
+      () async {
+        await fakeFirestore.collection('active_shifts').doc('691755').set({
+          'handlerId': '691755',
+          'dogId': 'dog1',
+          'service_dog_id': 'dog1',
+          'status': 'active',
+        });
+
+        final session = TrainingSessionModel(
+          dogId: 'dog1',
+          dogName: 'Bono',
+          handlerId: '691755',
+          date: DateTime(2026, 6, 1, 9, 30),
+          trainingType: 'Busca & Captura',
+          location: 'Urbano',
+          weather: '',
+          handlerNotes: 'Boa indicacao.',
+          metadata: {
+            'specialty': 'busca_captura',
+            'modality': 'busca_captura',
+            'type': 'busca_captura_track',
+            'phase': 'formation',
+            'module_id': 'modulo_1',
+            'milestone_id': 'marco_1',
+            'result': 'parcial',
+            'track': {
+              'distance_m': 120,
+              'duration_s': 360,
+              'events': [
+                {
+                  'type': 'cao_indicou',
+                  'timestamp': '2026-06-01T09:32:00.000',
+                  'lat': -22.56,
+                  'lng': -47.4,
+                },
+              ],
+              'path': [],
+              'offline_synced': true,
+            },
+          },
+        );
+
+        await service.addDogTrainingSession(session);
+
+        final snap = await fakeFirestore
+            .collection('dogs')
+            .doc('dog1')
+            .collection('training_sessions')
+            .get();
+
+        expect(snap.docs, hasLength(1));
+        final data = snap.docs.single.data();
+        expect(data['modality'], 'busca_captura');
+        expect(data['phase'], 'formation');
+        expect(data['module_id'], 'modulo_1');
+        expect(data['milestone_id'], 'marco_1');
+        expect(data['result'], 'parcial');
+        expect(data['track']['events'], hasLength(1));
+        expect(data['audit_trail'], isNotEmpty);
+        expect(data, containsPair('deleted_at', null));
       },
     );
 

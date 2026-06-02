@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,7 +10,9 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_summary_screen.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/widgets/bc_trail_config_sheet.dart';
 
 class BuscaCapturaManutencaoScreen extends StatefulWidget {
   final Dog dog;
@@ -27,6 +31,7 @@ class _BuscaCapturaManutencaoScreenState
   String _odorObject = 'Camiseta';
   String _ambiente = 'Urbano';
   String _desempenho = 'Bom';
+  bool _pendingDraftPrompted = false;
   final TextEditingController _notesController = TextEditingController();
 
   final List<String> _allReinforcedItems = [
@@ -43,6 +48,25 @@ class _BuscaCapturaManutencaoScreenState
     'Indicação passiva',
     'Contenção',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_promptPendingTrailDraft());
+    });
+  }
+
+  @override
+  void didUpdateWidget(BuscaCapturaManutencaoScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dog.id != widget.dog.id) {
+      _pendingDraftPrompted = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_promptPendingTrailDraft());
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -762,8 +786,32 @@ class _BuscaCapturaManutencaoScreenState
                           onPressed: () async {
                             HapticFeedback.mediumImpact();
                             if (_useGpsTracker) {
-                              final trackingService = GpsTrackingService();
                               final handlerId = _resolveHandlerId();
+                              final config =
+                                  await showModalBottomSheet<
+                                    GpsTrackingSessionConfig
+                                  >(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    useSafeArea: true,
+                                    backgroundColor: AppTheme.surfacePanel,
+                                    builder: (_) => BcTrailConfigSheet(
+                                      phase: 'maintenance',
+                                      dogId: widget.dog.id,
+                                      dogName: widget.dog.name,
+                                      conductor: handlerId,
+                                      initialFigurante: _figurante,
+                                      initialOdorObject: _odorObject,
+                                      initialAmbiente: _ambiente,
+                                    ),
+                                  );
+                              if (config == null || !context.mounted) return;
+                              setState(() {
+                                _figurante = config.figurante;
+                                _odorObject = config.odorObject;
+                                _ambiente = config.ambiente;
+                              });
+                              final trackingService = GpsTrackingService();
                               final result = await Navigator.of(context)
                                   .push<GpsTrackResult?>(
                                     MaterialPageRoute(
@@ -773,11 +821,13 @@ class _BuscaCapturaManutencaoScreenState
                                         dogName: widget.dog.name,
                                         handlerName: handlerId,
                                         trackingService: trackingService,
+                                        sessionConfig: config,
+                                        enableFieldEvents: true,
                                       ),
                                     ),
                                   );
                               if (result != null && context.mounted) {
-                                await _persistBcSession(result);
+                                await _persistBcSession(result, config);
                               }
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1054,31 +1104,97 @@ class _BuscaCapturaManutencaoScreenState
     }
   }
 
-  Future<void> _persistBcSession(GpsTrackResult result) async {
+  Future<void> _promptPendingTrailDraft() async {
+    if (_pendingDraftPrompted || !mounted) return;
+    _pendingDraftPrompted = true;
+    final drafts = await GpsTrackResult.loadLocalDrafts(
+      modality: 'busca_captura',
+      phase: 'maintenance',
+      dogId: widget.dog.id,
+    );
+    if (!mounted || drafts.isEmpty) return;
+    final draft = drafts.last;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Ha uma trilha B&C de manutencao nao salva neste aparelho.',
+        ),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'REVISAR',
+          onPressed: () => unawaited(_reviewPendingTrailDraft(draft)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reviewPendingTrailDraft(GpsTrackResult draft) async {
+    final config = draft.sessionConfig;
+    if (config == null || !mounted) return;
+    final result = await Navigator.of(context).push<GpsTrackResult?>(
+      MaterialPageRoute(
+        builder: (_) => GpsTrackingSummaryScreen(
+          result: draft,
+          activityLabel: 'Busca & Captura - Manutencao pendente',
+          dogName: widget.dog.name,
+          handlerName: config.conductor.isNotEmpty
+              ? config.conductor
+              : _resolveHandlerId(),
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _persistBcSession(result, config);
+  }
+
+  Future<void> _persistBcSession(
+    GpsTrackResult result,
+    GpsTrackingSessionConfig config,
+  ) async {
+    final track = result.toJson();
     final session = TrainingSessionModel(
       dogId: widget.dog.id,
       dogName: widget.dog.name,
-      date: DateTime.now(),
+      handlerId: config.conductor,
+      date: result.startedAt,
       trainingType: 'Busca & Captura',
-      location: '',
+      location: config.ambiente,
       weather: '',
-      handlerNotes: '',
+      handlerNotes: result.observation ?? _notesController.text.trim(),
       metadata: {
         'specialty': 'busca_captura',
+        'modality': 'busca_captura',
+        'type': 'busca_captura_track',
         'mode': 'manutencao',
-        'ambiente': _ambiente,
-        'figurante': _figurante,
-        'odor_object': _odorObject,
+        'phase': 'maintenance',
+        ...config.toJson(),
+        'result': result.result ?? 'completa',
+        'reinforced_items': _selectedReinforcedItems.toList(),
+        'desempenho': _desempenho,
         'gps': true,
-        'gps_track': result.toJson(),
+        'track': track,
+        'gps_track': track,
       },
     );
 
     try {
       final vm = Provider.of<TrainingViewModel>(context, listen: false);
-      await vm.addTrainingSession(session);
-    } catch (_) {
-      // Silently fail — data is saved locally via GPS service
+      await vm.addDogTrainingSession(session);
+      await result.deleteLocalDraft();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessão de B&C registrada com sucesso.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Falha ao salvar a sessão. A trilha local foi preservada. $e',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
     }
   }
 }

@@ -21,11 +21,6 @@ part 'training_log_session_widgets.dart';
 part 'training_session_card_parts.dart';
 part 'training_session_card_details.dart';
 part 'training_session_detail_parts.dart';
-part 'training_new_form.dart';
-part 'training_new_form_widgets.dart';
-part 'training_new_form_actions.dart';
-part 'training_new_form_fields.dart';
-part 'training_new_form_selectors.dart';
 
 const _hudBackground = AppTheme.background;
 const _hudPanel = AppTheme.surfacePanel;

@@ -8,6 +8,7 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/active_occur
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/training_promotion_request_screen.dart';
 
 class PendingScreen extends StatefulWidget {
   final String userId;
@@ -177,6 +178,16 @@ class _PendingScreenState extends State<PendingScreen> {
     }
 
     if (!mounted) return;
+    if (notification.isTrainingPromotionNotification) {
+      final requestId = notification.additionalData?.trim();
+      if (requestId == null || requestId.isEmpty) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TrainingPromotionRequestScreen(requestId: requestId),
+        ),
+      );
+      return;
+    }
     if (notification.isVehicleCrewNotification) {
       final crewId = notification.additionalData?.trim();
       if (crewId == null || crewId.isEmpty) return;
@@ -354,6 +365,14 @@ class _NotificationCard extends StatelessWidget {
         return Icons.verified;
       case NotificationType.amendmentCreated:
         return Icons.edit_note;
+      case NotificationType.trainingPromotionRequested:
+        return Icons.school;
+      case NotificationType.trainingPromotionApproved:
+        return Icons.verified;
+      case NotificationType.trainingPromotionRejected:
+        return Icons.assignment_late;
+      case NotificationType.trainingBonusMilestoneAvailable:
+        return Icons.add_task;
     }
   }
 
@@ -385,6 +404,14 @@ class _NotificationCard extends StatelessWidget {
         return Theme.of(context).colorScheme.secondary;
       case NotificationType.amendmentCreated:
         return Theme.of(context).colorScheme.tertiary;
+      case NotificationType.trainingPromotionRequested:
+        return AppTheme.primary;
+      case NotificationType.trainingPromotionApproved:
+        return AppTheme.success;
+      case NotificationType.trainingPromotionRejected:
+        return Theme.of(context).colorScheme.error;
+      case NotificationType.trainingBonusMilestoneAvailable:
+        return AppTheme.warning;
     }
   }
 
@@ -416,11 +443,27 @@ class _NotificationCard extends StatelessWidget {
         return 'Ocorrência Finalizada';
       case NotificationType.amendmentCreated:
         return 'Aditamento Criado';
+      case NotificationType.trainingPromotionRequested:
+        return 'Validacao de Treino';
+      case NotificationType.trainingPromotionApproved:
+        return 'Evolucao Aprovada';
+      case NotificationType.trainingPromotionRejected:
+        return 'Evolucao Reprovada';
+      case NotificationType.trainingBonusMilestoneAvailable:
+        return 'Marco-bonus Disponivel';
     }
   }
 
   String _getMessage() {
     switch (notification.type) {
+      case NotificationType.trainingPromotionRequested:
+        return 'Um condutor solicitou validacao de evolucao: "${notification.occurrenceTitle}"';
+      case NotificationType.trainingPromotionApproved:
+        return 'A evolucao de treino foi aprovada: "${notification.occurrenceTitle}"';
+      case NotificationType.trainingPromotionRejected:
+        return 'A evolucao de treino foi reprovada: "${notification.occurrenceTitle}"';
+      case NotificationType.trainingBonusMilestoneAvailable:
+        return 'Novo marco-bonus disponivel para treino: "${notification.occurrenceTitle}"';
       case NotificationType.vehicleCrewInvitation:
         return 'Você recebeu um convite para compor a guarnição "${notification.occurrenceTitle}".';
       case NotificationType.vehicleCrewInvitationAccepted:

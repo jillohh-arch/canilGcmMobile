@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,9 +8,15 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/training/data/training_program_service.dart';
+import 'package:canil_gcm/features/training/data/training_promotion_service.dart';
+import 'package:canil_gcm/features/training/domain/training_program.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_summary_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/gps_tracking_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/busca_captura_manutencao_screen.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
+import 'package:canil_gcm/features/training/presentation/widgets/bc_trail_config_sheet.dart';
 
 class BuscaCapturaFormacaoScreen extends StatefulWidget {
   final Dog dog;
@@ -22,7 +30,33 @@ class BuscaCapturaFormacaoScreen extends StatefulWidget {
 
 class _BuscaCapturaFormacaoScreenState
     extends State<BuscaCapturaFormacaoScreen> {
+  static const _modality = 'busca_captura';
+
+  int _activeModeIndex = 0;
   int _activeTabIndex = 0;
+  final TrainingProgramService _programService = TrainingProgramService();
+  final TrainingPromotionService _promotionService = TrainingPromotionService();
+  StreamSubscription<TrainingProgram?>? _programSub;
+  StreamSubscription<TrainingProgress>? _progressSub;
+  StreamSubscription<List<BonusTrainingMilestone>>? _bonusSub;
+  TrainingProgram? _program;
+  TrainingProgress _progress = TrainingProgress.initial(_modality);
+  List<BonusTrainingMilestone> _bonusMilestones =
+      const <BonusTrainingMilestone>[];
+  Object? _programError;
+  Object? _progressError;
+  Object? _bonusError;
+  bool _programLoaded = false;
+  bool _progressLoaded = false;
+  bool _bonusLoaded = false;
+  bool _initializingProgress = false;
+  bool _completingModule = false;
+  bool _isInstructorK9 = false;
+  bool _pendingDraftPrompted = false;
+  final Set<String> _savingMilestoneIds = <String>{};
+  final Set<String> _savingBonusMilestoneIds = <String>{};
+
+  final List<String> _modeTabs = ['Formacao', 'Operacional'];
 
   final List<String> _tabs = [
     'Roadmap',
@@ -32,7 +66,218 @@ class _BuscaCapturaFormacaoScreenState
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _subscribeProgram();
+    _subscribeProgress();
+    _subscribeBonusMilestones();
+    unawaited(_loadInstructorRole());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_promptPendingTrailDraft());
+    });
+  }
+
+  @override
+  void didUpdateWidget(BuscaCapturaFormacaoScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dog.id != widget.dog.id) {
+      _pendingDraftPrompted = false;
+      _subscribeProgress();
+      _subscribeBonusMilestones();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_promptPendingTrailDraft());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _programSub?.cancel();
+    _progressSub?.cancel();
+    _bonusSub?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeProgram() {
+    _programSub?.cancel();
+    _programSub = _programService
+        .watchProgram(_modality)
+        .listen(
+          (program) {
+            if (!mounted) return;
+            setState(() {
+              _program = program;
+              _programLoaded = true;
+              _programError = null;
+            });
+            _ensureProgressInitializedIfNeeded();
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _programError = error;
+              _programLoaded = true;
+            });
+          },
+        );
+  }
+
+  void _subscribeProgress() {
+    _progressSub?.cancel();
+    _progressSub = _programService
+        .watchProgress(widget.dog.id, _modality)
+        .listen(
+          (progress) {
+            if (!mounted) return;
+            setState(() {
+              _progress = progress;
+              _progressLoaded = true;
+              _progressError = null;
+            });
+            _ensureProgressInitializedIfNeeded();
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _progressError = error;
+              _progressLoaded = true;
+            });
+          },
+        );
+  }
+
+  void _subscribeBonusMilestones() {
+    _bonusSub?.cancel();
+    setState(() {
+      _bonusLoaded = false;
+      _bonusError = null;
+      _bonusMilestones = const <BonusTrainingMilestone>[];
+    });
+    _bonusSub = _programService
+        .watchBonusMilestones(widget.dog.id, _modality)
+        .listen(
+          (items) {
+            if (!mounted) return;
+            setState(() {
+              _bonusMilestones = items;
+              _bonusLoaded = true;
+              _bonusError = null;
+            });
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _bonusError = error;
+              _bonusLoaded = true;
+            });
+          },
+        );
+  }
+
+  Future<void> _loadInstructorRole() async {
+    try {
+      final result = await _promotionService.currentUserIsInstructorK9();
+      if (!mounted) return;
+      setState(() => _isInstructorK9 = result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isInstructorK9 = false);
+    }
+  }
+
+  Future<void> _ensureProgressInitializedIfNeeded() async {
+    final program = _program;
+    if (!_programLoaded ||
+        !_progressLoaded ||
+        _initializingProgress ||
+        _progress.exists ||
+        program == null ||
+        program.activeModules.isEmpty) {
+      return;
+    }
+
+    setState(() => _initializingProgress = true);
+    try {
+      await _programService.ensureProgressInitialized(
+        dogId: widget.dog.id,
+        program: program,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(
+        'Falha ao inicializar progressao de B&C. $error',
+        AppTheme.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _initializingProgress = false);
+      }
+    }
+  }
+
+  List<TrainingModule> get _modules => _program?.activeModules ?? const [];
+
+  TrainingModule? get _currentModule {
+    if (_progress.isOperational) return null;
+    if (_modules.isEmpty) return null;
+    final currentId = _progress.currentModuleId;
+    if (currentId != null) {
+      for (final module in _modules) {
+        if (module.id == currentId) return module;
+      }
+    }
+    for (final module in _modules) {
+      if (!_progress.completedModuleIds.contains(module.id)) return module;
+    }
+    return _modules.last;
+  }
+
+  bool _isCompleted(TrainingModule module) {
+    return _progress.completedModuleIds.contains(module.id) ||
+        _progress.isOperational;
+  }
+
+  bool _isActive(TrainingModule module) {
+    return !_progress.isOperational && _currentModule?.id == module.id;
+  }
+
+  bool _isLocked(TrainingModule module) {
+    final current = _currentModule;
+    if (current == null || _progress.isOperational) return false;
+    return !_isCompleted(module) && module.order > current.order;
+  }
+
+  int _achievedCount(TrainingModule module) {
+    return module.activeMilestones
+        .where(
+          (milestone) => _progress.isMilestoneAchieved(module.id, milestone.id),
+        )
+        .length;
+  }
+
+  int _requiredMissingCount(TrainingModule module) {
+    return module.activeMilestones
+        .where(
+          (milestone) =>
+              milestone.isRequired &&
+              !_progress.isMilestoneAchieved(module.id, milestone.id),
+        )
+        .length;
+  }
+
+  bool _canCompleteModule(TrainingModule module) {
+    return _isActive(module) &&
+        !_completingModule &&
+        _requiredMissingCount(module) == 0;
+  }
+
+  bool _isLastModule(TrainingModule module) {
+    return _modules.isNotEmpty && _modules.last.id == module.id;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final currentModule = _currentModule;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -171,16 +416,28 @@ class _BuscaCapturaFormacaoScreenState
                                           color: AppTheme.textSecondary,
                                           fontSize: 10,
                                         ),
-                                        children: const [
-                                          TextSpan(text: 'Em formação no '),
+                                        children: [
                                           TextSpan(
-                                            text: 'Módulo 2',
-                                            style: TextStyle(
+                                            text: _progress.isOperational
+                                                ? 'Operacional'
+                                                : 'Em formação no ',
+                                          ),
+                                          TextSpan(
+                                            text: currentModule == null
+                                                ? (_progress.isOperational
+                                                      ? ''
+                                                      : 'currículo')
+                                                : 'Módulo ${currentModule.order}',
+                                            style: const TextStyle(
                                               color: AppTheme.warning,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          TextSpan(text: ' · desde 12/03'),
+                                          TextSpan(
+                                            text: _program == null
+                                                ? ' · aguardando seed'
+                                                : ' · currículo v${_program!.version}',
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -194,71 +451,22 @@ class _BuscaCapturaFormacaoScreenState
                     ),
                   ),
 
-                  // Tabs Row
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: AppTheme.textPrimary.withAlpha(16),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(_tabs.length, (index) {
-                        final isActive = _activeTabIndex == index;
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _activeTabIndex = index;
-                            });
-                          },
-                          child: Container(
-                            height: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: isActive
-                                      ? AppTheme.primary
-                                      : AppTheme.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              _tabs[index],
-                              style: GoogleFonts.inter(
-                                color: isActive
-                                    ? AppTheme.primary
-                                    : AppTheme.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
+                  _buildModeTabs(),
+                  if (_activeModeIndex == 0) _buildFormationTabs(),
 
                   // Tab Content Area
                   Expanded(
-                    child: IndexedStack(
-                      index: _activeTabIndex,
-                      children: [
-                        _buildRoadmapTab(),
-                        _buildModuloAtualTab(),
-                        _buildHistoricoTab(),
-                        _buildEstatisticasTab(),
-                      ],
-                    ),
+                    child: _activeModeIndex == 0
+                        ? IndexedStack(
+                            index: _activeTabIndex,
+                            children: [
+                              _buildRoadmapTab(),
+                              _buildModuloAtualTab(),
+                              _buildHistoricoTab(),
+                              _buildEstatisticasTab(),
+                            ],
+                          )
+                        : _buildOperacionalTab(),
                   ),
                 ],
               ),
@@ -281,55 +489,19 @@ class _BuscaCapturaFormacaoScreenState
                     ),
                   ),
                   child: ElevatedButton(
-                    onPressed: () async {
-                      HapticFeedback.mediumImpact();
-                      final trackingService = GpsTrackingService();
-                      String handlerId = 'Condutor';
-                      try {
-                        final shiftVM = Provider.of<ShiftViewModel>(
-                          context,
-                          listen: false,
-                        );
-                        handlerId = shiftVM.handlerId ?? 'Condutor';
-                      } catch (_) {}
-                      final result = await Navigator.of(context)
-                          .push<GpsTrackResult?>(
-                            MaterialPageRoute(
-                              builder: (_) => GpsTrackingScreen(
-                                activityLabel: 'Busca & Captura · Formação',
-                                dogName: widget.dog.name,
-                                handlerName: handlerId,
-                                trackingService: trackingService,
-                              ),
-                            ),
-                          );
-                      if (result != null && context.mounted) {
-                        final session = TrainingSessionModel(
-                          dogId: widget.dog.id,
-                          dogName: widget.dog.name,
-                          date: DateTime.now(),
-                          trainingType: 'Busca & Captura',
-                          location: '',
-                          weather: '',
-                          handlerNotes: '',
-                          metadata: {
-                            'specialty': 'busca_captura',
-                            'mode': 'formacao',
-                            'gps': true,
-                            'gps_track': result.toJson(),
+                    onPressed: _activeModeIndex == 1 && !_progress.isOperational
+                        ? null
+                        : () async {
+                            if (_activeModeIndex == 1) {
+                              _openMaintenance();
+                              return;
+                            }
+                            await _startFormationTrail(currentModule);
                           },
-                        );
-                        try {
-                          final vm = Provider.of<TrainingViewModel>(
-                            context,
-                            listen: false,
-                          );
-                          await vm.addTrainingSession(session);
-                        } catch (_) {}
-                      }
-                    },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: _activeModeIndex == 1
+                          ? AppTheme.success
+                          : AppTheme.primary,
                       foregroundColor: AppTheme.background,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -340,10 +512,17 @@ class _BuscaCapturaFormacaoScreenState
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.play_arrow_rounded, size: 20),
+                        Icon(
+                          _activeModeIndex == 1
+                              ? Icons.verified_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          'INICIAR SESSÃO DE TREINO',
+                          _activeModeIndex == 1
+                              ? 'ABRIR OPERACIONAL'
+                              : 'INICIAR SESSÃO DE TREINO',
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -362,83 +541,814 @@ class _BuscaCapturaFormacaoScreenState
     );
   }
 
+  Widget _buildModeTabs() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppTheme.textPrimary.withAlpha(16)),
+        ),
+      ),
+      child: Row(
+        children: List.generate(_modeTabs.length, (index) {
+          final isActive = _activeModeIndex == index;
+          final isOperationalTab = index == 1;
+          final locked = isOperationalTab && !_progress.isOperational;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _activeModeIndex = index);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: EdgeInsets.only(left: index == 0 ? 0 : 6),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppTheme.primary.withAlpha(28)
+                      : AppTheme.textPrimary.withAlpha(8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActive
+                        ? AppTheme.primary.withAlpha(80)
+                        : AppTheme.textPrimary.withAlpha(18),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (locked) ...[
+                      const Icon(
+                        Icons.lock_outline_rounded,
+                        color: AppTheme.textMuted,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(
+                      _modeTabs[index],
+                      style: GoogleFonts.inter(
+                        color: isActive
+                            ? AppTheme.primary
+                            : locked
+                            ? AppTheme.textMuted
+                            : AppTheme.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildFormationTabs() {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppTheme.textPrimary.withAlpha(16)),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(_tabs.length, (index) {
+          final isActive = _activeTabIndex == index;
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _activeTabIndex = index);
+            },
+            child: Container(
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: isActive ? AppTheme.primary : AppTheme.transparent,
+                    width: 2,
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                _tabs[index],
+                style: GoogleFonts.inter(
+                  color: isActive ? AppTheme.primary : AppTheme.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildOperacionalTab() {
+    if (!_progress.isOperational) {
+      return _buildProgramState(
+        title: 'Operacional travado',
+        body:
+            'Conclua os modulos sequenciais de Formacao para destravar a manutencao operacional.',
+        icon: Icons.lock_outline_rounded,
+        color: AppTheme.warning,
+      );
+    }
+
+    final program = _program;
+    final bonusOffers = program == null
+        ? const <TrainingBonusOffer>[]
+        : _programService.bonusOffersFor(
+            program: program,
+            progress: _progress,
+            completedBonuses: _bonusMilestones,
+          );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.success.withAlpha(18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.success.withAlpha(70)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.verified_rounded,
+                    color: AppTheme.success,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${widget.dog.name} operacional em Busca & Captura',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A Formacao foi concluida pelo snapshot dos modulos. A manutencao registra a evolucao operacional e continua auditavel.',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _openMaintenance,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('ABRIR MANUTENCAO OPERACIONAL'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.success,
+                    side: const BorderSide(color: AppTheme.success),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBonusMilestonesSection(bonusOffers),
+      ],
+    );
+  }
+
+  Widget _buildBonusMilestonesSection(List<TrainingBonusOffer> offers) {
+    if (!_bonusLoaded) {
+      return _buildInlineOperationalCard(
+        icon: Icons.sync_rounded,
+        title: 'Verificando marcos-bonus',
+        body: 'Comparando o curriculo atual com o snapshot de formacao.',
+        color: AppTheme.primary,
+      );
+    }
+    if (_bonusError != null) {
+      return _buildInlineOperationalCard(
+        icon: Icons.error_outline_rounded,
+        title: 'Falha ao carregar bonus',
+        body: _bonusError.toString(),
+        color: AppTheme.error,
+      );
+    }
+
+    final children = <Widget>[
+      _buildInlineOperationalCard(
+        icon: offers.isEmpty ? Icons.task_alt_rounded : Icons.add_task_rounded,
+        title: offers.isEmpty
+            ? 'Nenhum marco-bonus pendente'
+            : 'Marcos-bonus disponiveis',
+        body: offers.isEmpty
+            ? 'Se o curriculo ganhar novo marco, ele aparece aqui como camada aditiva, sem rebaixar o cao operacional.'
+            : 'Novos marcos foram adicionados ao curriculo depois da formacao. Registrar aqui soma ao historico sem alterar snapshots antigos.',
+        color: offers.isEmpty ? AppTheme.success : AppTheme.warning,
+      ),
+    ];
+
+    for (final offer in offers) {
+      children.add(_buildBonusOfferCard(offer));
+    }
+    if (_bonusMilestones.isNotEmpty) {
+      children.add(_buildCompletedBonusHeader());
+      children.addAll(_bonusMilestones.map(_buildCompletedBonusCard));
+    }
+    return Column(children: children);
+  }
+
+  Widget _buildInlineOperationalCard({
+    required IconData icon,
+    required String title,
+    required String body,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(55)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBonusOfferCard(TrainingBonusOffer offer) {
+    final saving = _savingBonusMilestoneIds.contains(offer.id);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withAlpha(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withAlpha(45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.control_point_duplicate_rounded,
+                color: AppTheme.warning,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      offer.milestone.label,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${offer.module.name} · curriculo v${_program?.version ?? '-'}',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: saving ? null : () => _completeBonusMilestone(offer),
+              icon: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: Text(saving ? 'REGISTRANDO...' : 'REGISTRAR BONUS'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.warning,
+                side: const BorderSide(color: AppTheme.warning),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedBonusHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'BONUS CONCLUIDOS',
+          style: GoogleFonts.inter(
+            color: AppTheme.primary,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.3,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompletedBonusCard(BonusTrainingMilestone item) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.success.withAlpha(10),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: AppTheme.success.withAlpha(38)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.task_alt_rounded, color: AppTheme.success, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.label,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${item.moduleName} · por ${item.completedBy ?? 'condutor'}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openMaintenance() {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => BuscaCapturaManutencaoScreen(dog: widget.dog),
+      ),
+    );
+  }
+
+  String _resolveHandlerId() {
+    try {
+      final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+      return shiftVM.handlerId ?? 'Condutor';
+    } catch (_) {
+      return 'Condutor';
+    }
+  }
+
+  Future<void> _startFormationTrail(TrainingModule? module) async {
+    if (module == null) {
+      _showSnackBar(
+        'Nenhum modulo atual disponivel para trilha.',
+        AppTheme.error,
+      );
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    final handlerId = _resolveHandlerId();
+    final config = await showModalBottomSheet<GpsTrackingSessionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppTheme.surfacePanel,
+      builder: (_) => BcTrailConfigSheet(
+        phase: 'formation',
+        dogId: widget.dog.id,
+        dogName: widget.dog.name,
+        conductor: handlerId,
+        module: module,
+        milestones: module.activeMilestones,
+      ),
+    );
+    if (config == null || !mounted) return;
+
+    final trackingService = GpsTrackingService();
+    final result = await Navigator.of(context).push<GpsTrackResult?>(
+      MaterialPageRoute(
+        builder: (_) => GpsTrackingScreen(
+          activityLabel: 'Busca & Captura · Formação',
+          dogName: widget.dog.name,
+          handlerName: handlerId,
+          trackingService: trackingService,
+          sessionConfig: config,
+          enableFieldEvents: true,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _persistBcTrailSession(result, config);
+    if (!mounted) return;
+    _offerManualMilestoneMark(module, config);
+  }
+
+  Future<void> _promptPendingTrailDraft() async {
+    if (_pendingDraftPrompted || !mounted) return;
+    _pendingDraftPrompted = true;
+    final drafts = await GpsTrackResult.loadLocalDrafts(
+      modality: _modality,
+      phase: 'formation',
+      dogId: widget.dog.id,
+    );
+    if (!mounted || drafts.isEmpty) return;
+    final draft = drafts.last;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Ha uma trilha B&C de formacao nao salva neste aparelho.',
+        ),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'REVISAR',
+          onPressed: () => unawaited(_reviewPendingTrailDraft(draft)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reviewPendingTrailDraft(GpsTrackResult draft) async {
+    final config = draft.sessionConfig;
+    if (config == null || !mounted) return;
+    final result = await Navigator.of(context).push<GpsTrackResult?>(
+      MaterialPageRoute(
+        builder: (_) => GpsTrackingSummaryScreen(
+          result: draft,
+          activityLabel: 'Busca & Captura - Formacao pendente',
+          dogName: widget.dog.name,
+          handlerName: config.conductor.isNotEmpty
+              ? config.conductor
+              : _resolveHandlerId(),
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _persistBcTrailSession(result, config);
+
+    TrainingModule? module;
+    for (final candidate in _program?.modules ?? const <TrainingModule>[]) {
+      if (candidate.id == config.moduleId) {
+        module = candidate;
+        break;
+      }
+    }
+    if (module != null && mounted) {
+      _offerManualMilestoneMark(module, config);
+    }
+  }
+
+  Future<void> _persistBcTrailSession(
+    GpsTrackResult result,
+    GpsTrackingSessionConfig config,
+  ) async {
+    final track = result.toJson();
+    final metadata = {
+      'specialty': 'busca_captura',
+      'modality': _modality,
+      'type': 'busca_captura_track',
+      'mode': 'formacao',
+      'phase': 'formation',
+      if (_program != null) 'program_version': _program!.version,
+      ...config.toJson(),
+      'result': result.result ?? 'completa',
+      'gps': true,
+      'track': track,
+      'gps_track': track,
+    };
+    final session = TrainingSessionModel(
+      dogId: widget.dog.id,
+      dogName: widget.dog.name,
+      handlerId: config.conductor,
+      date: result.startedAt,
+      trainingType: 'Busca & Captura',
+      location: config.ambiente,
+      weather: '',
+      handlerNotes: result.observation ?? '',
+      metadata: metadata,
+    );
+
+    try {
+      final vm = Provider.of<TrainingViewModel>(context, listen: false);
+      await vm.addDogTrainingSession(session);
+      await result.deleteLocalDraft();
+      if (!mounted) return;
+      _showSnackBar('Sessao de trilha B&C registrada.', AppTheme.success);
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(
+        'Falha ao salvar a sessao. O rascunho local foi preservado. $error',
+        AppTheme.error,
+      );
+    }
+  }
+
+  void _offerManualMilestoneMark(
+    TrainingModule module,
+    GpsTrackingSessionConfig config,
+  ) {
+    final milestoneId = config.milestoneId;
+    if (milestoneId == null) return;
+    TrainingMilestone? milestone;
+    for (final item in module.activeMilestones) {
+      if (item.id == milestoneId) {
+        milestone = item;
+        break;
+      }
+    }
+    if (milestone == null) return;
+    final selectedMilestone = milestone;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Trabalhou "${selectedMilestone.label}". Marcar como atingido agora?',
+        ),
+        backgroundColor: AppTheme.success,
+        action: SnackBarAction(
+          label: 'MARCAR',
+          textColor: AppTheme.background,
+          onPressed: () => _toggleMilestone(module, selectedMilestone, true),
+        ),
+      ),
+    );
+  }
+
   // --- ABA ROADMAP ---
   Widget _buildRoadmapTab() {
+    if (!_programLoaded) {
+      return _buildProgramState(
+        title: 'Carregando currículo',
+        body: 'Buscando módulos de Busca & Captura no Firebase.',
+        icon: Icons.cloud_sync_rounded,
+      );
+    }
+    if (_programError != null) {
+      return _buildProgramState(
+        title: 'Falha ao carregar currículo',
+        body: _programError.toString(),
+        icon: Icons.error_outline_rounded,
+        color: AppTheme.error,
+      );
+    }
+    if (_program == null || _modules.isEmpty) {
+      return _buildProgramState(
+        title: 'Currículo não semeado',
+        body:
+            'Rode o seed de training_programs/busca_captura para liberar os módulos no app.',
+        icon: Icons.inventory_2_outlined,
+        color: AppTheme.warning,
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
       children: [
-        // M1
-        _buildModuleCard(
-          number: '1',
-          title: 'Pareamento de Odor',
-          subtitle:
-              'Associação primária entre o artigo de referência e a recompensa.',
-          status: 'CONCLUÍDO',
-          progress: 1.0,
-          isCompleted: true,
-          isActive: false,
-          progressText: '10 marcos atingidos',
-        ),
-        // M2
-        _buildModuleCard(
-          number: '2',
-          title: 'Indicações Estruturais',
-          subtitle:
-              'Persistência na indicação em fontes de odor com barreiras simples.',
-          status: 'EM TREINO',
-          progress: 0.7,
-          isCompleted: false,
-          isActive: true,
-          progressText: '7/10 marcos · 14 sessões',
-        ),
-        // M3
-        _buildModuleCard(
-          number: '3',
-          title: 'Operacional Urbano',
-          subtitle:
-              'Rastreamento em vias públicas com alto nível de distrações e ruídos.',
-          status: 'BLOQUEADO',
-          progress: 0.0,
-          isCompleted: false,
-          isActive: false,
-          progressText: 'Requer Módulo 2 completo',
-        ),
-        // Final evaluation card
-        Container(
-          margin: const EdgeInsets.only(top: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppTheme.textPrimary.withAlpha(5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppTheme.textPrimary.withAlpha(26),
-              width: 1,
-              style: BorderStyle.solid,
+        _buildCurriculumInfoCard(),
+        ..._modules.map(_buildProgramModuleCard),
+        _buildOperationalUnlockCard(),
+      ],
+    );
+  }
+
+  Widget _buildProgramModuleCard(TrainingModule module) {
+    final completed = _isCompleted(module);
+    final active = _isActive(module);
+    final locked = _isLocked(module);
+    final milestones = module.activeMilestones;
+    final achievedCount = _achievedCount(module);
+    final progress = completed
+        ? 1.0
+        : milestones.isEmpty
+        ? 0.0
+        : achievedCount / milestones.length;
+    final status = completed
+        ? 'CONCLUÍDO'
+        : active
+        ? 'EM TREINO'
+        : locked
+        ? 'BLOQUEADO'
+        : 'A INICIAR';
+    final progressText = completed
+        ? '${milestones.length} marcos congelados no histórico'
+        : active
+        ? '$achievedCount/${milestones.length} marcos atingidos'
+        : locked
+        ? 'Disponível após concluir o módulo anterior'
+        : '${milestones.length} marcos cadastrados';
+
+    return _buildModuleCard(
+      number: completed ? '✓' : module.order.toString(),
+      title: module.name,
+      subtitle: module.description,
+      status: status,
+      progress: progress,
+      isCompleted: completed,
+      isActive: active,
+      progressText: progressText,
+    );
+  }
+
+  Widget _buildCurriculumInfoCard() {
+    final program = _program!;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withAlpha(40)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.cloud_done_rounded,
+            color: AppTheme.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${program.name} · currículo v${program.version} · ${program.activeModules.length} módulos ativos',
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+                height: 1.4,
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOperationalUnlockCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.textPrimary.withAlpha(5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.textPrimary.withAlpha(26), width: 1),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.verified_outlined,
+            color: AppTheme.textMuted,
+            size: 24,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Conclusão do último módulo',
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'A aprovação do último módulo pelo instrutor certifica o cão como operacional. Prova formal, se houver, deve ser marco obrigatório do último módulo.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 11,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgramState({
+    required String title,
+    required String body,
+    required IconData icon,
+    Color color = AppTheme.primary,
+    bool compact = false,
+  }) {
+    return ListView(
+      padding: compact
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(16, 24, 16, 90),
+      shrinkWrap: compact,
+      physics: compact
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: color.withAlpha(18),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withAlpha(55)),
           ),
           child: Column(
             children: [
-              const Icon(
-                Icons.assignment_turned_in_outlined,
-                color: AppTheme.textMuted,
-                size: 24,
-              ),
-              const SizedBox(height: 6),
+              Icon(icon, color: color, size: compact ? 20 : 26),
+              const SizedBox(height: 8),
               Text(
-                'Avaliação de Aptidão Final',
+                title,
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                  color: AppTheme.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                  fontSize: compact ? 12 : 14,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 5),
               Text(
-                'Após concluir os 3 módulos, o binômio passará pelo teste final de certificação operacional.',
+                body,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: AppTheme.textMuted,
-                  fontSize: 11,
+                  fontSize: compact ? 10 : 11,
                   height: 1.4,
                 ),
               ),
@@ -447,6 +1357,106 @@ class _BuscaCapturaFormacaoScreenState
         ),
       ],
     );
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+  }
+
+  Future<void> _toggleMilestone(
+    TrainingModule module,
+    TrainingMilestone milestone,
+    bool achieved,
+  ) async {
+    final program = _program;
+    if (program == null) return;
+    setState(() => _savingMilestoneIds.add(milestone.id));
+    try {
+      await _programService.setMilestoneAchievement(
+        dogId: widget.dog.id,
+        program: program,
+        module: module,
+        milestone: milestone,
+        achieved: achieved,
+      );
+      if (!mounted) return;
+      _showSnackBar(
+        achieved ? 'Marco atingido registrado.' : 'Marco desmarcado.',
+        AppTheme.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('Falha ao salvar marco. $error', AppTheme.error);
+    } finally {
+      if (mounted) {
+        setState(() => _savingMilestoneIds.remove(milestone.id));
+      }
+    }
+  }
+
+  Future<void> _completeBonusMilestone(TrainingBonusOffer offer) async {
+    final program = _program;
+    if (program == null) return;
+    setState(() => _savingBonusMilestoneIds.add(offer.id));
+    try {
+      await _programService.completeBonusMilestone(
+        dogId: widget.dog.id,
+        program: program,
+        module: offer.module,
+        milestone: offer.milestone,
+      );
+      if (!mounted) return;
+      _showSnackBar(
+        'Marco-bonus registrado sem alterar a formacao original.',
+        AppTheme.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('Falha ao registrar marco-bonus. $error', AppTheme.error);
+    } finally {
+      if (mounted) {
+        setState(() => _savingBonusMilestoneIds.remove(offer.id));
+      }
+    }
+  }
+
+  Future<void> _requestModulePromotion(TrainingModule module) async {
+    final program = _program;
+    if (program == null || _completingModule) return;
+    setState(() => _completingModule = true);
+    try {
+      final requestId = await _promotionService.requestPromotion(
+        dog: widget.dog,
+        program: program,
+        progress: _progress,
+        module: module,
+        requesterRa: _resolveHandlerId(),
+        requesterName: _resolveHandlerId(),
+        directInstructor: _isInstructorK9,
+      );
+      if (_isInstructorK9) {
+        await _promotionService.decideRequest(
+          requestId: requestId,
+          approve: true,
+        );
+      }
+      if (!mounted) return;
+      _showSnackBar(
+        _isInstructorK9
+            ? 'Aprovacao enviada. A Function vai aplicar a progressao.'
+            : 'Solicitacao enviada aos Instrutores K9.',
+        _isInstructorK9 ? AppTheme.success : AppTheme.primary,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('Falha ao solicitar evolucao. $error', AppTheme.error);
+    } finally {
+      if (mounted) {
+        setState(() => _completingModule = false);
+      }
+    }
   }
 
   Widget _buildModuleCard({
@@ -616,6 +1626,57 @@ class _BuscaCapturaFormacaoScreenState
 
   // --- ABA MÓDULO ATUAL ---
   Widget _buildModuloAtualTab() {
+    if (!_programLoaded) {
+      return _buildProgramState(
+        title: 'Carregando currículo',
+        body: 'Buscando módulo atual no Firebase.',
+        icon: Icons.cloud_sync_rounded,
+      );
+    }
+    if (_programError != null) {
+      return _buildProgramState(
+        title: 'Falha ao carregar currículo',
+        body: _programError.toString(),
+        icon: Icons.error_outline_rounded,
+        color: AppTheme.error,
+      );
+    }
+    if (_progressError != null) {
+      return _buildProgramState(
+        title: 'Falha ao carregar progressao',
+        body: _progressError.toString(),
+        icon: Icons.error_outline_rounded,
+        color: AppTheme.error,
+      );
+    }
+    if (!_progressLoaded || _initializingProgress) {
+      return _buildProgramState(
+        title: 'Preparando progressao',
+        body: 'Sincronizando dogs/${widget.dog.id}/training/$_modality.',
+        icon: Icons.sync_rounded,
+      );
+    }
+    if (_progress.isOperational) {
+      return _buildProgramState(
+        title: 'Formacao concluida',
+        body:
+            'Este cao ja esta operacional em Busca & Captura. Use a aba Operacional para manutencao.',
+        icon: Icons.verified_rounded,
+        color: AppTheme.success,
+      );
+    }
+    final module = _currentModule;
+    if (_program == null || module == null) {
+      return _buildProgramState(
+        title: 'Sem módulo ativo',
+        body:
+            'O currículo de Busca & Captura ainda não foi semeado ou não tem módulos ativos.',
+        icon: Icons.inventory_2_outlined,
+        color: AppTheme.warning,
+      );
+    }
+
+    final milestones = module.activeMilestones;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
       children: [
@@ -642,7 +1703,7 @@ class _BuscaCapturaFormacaoScreenState
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      '2',
+                      module.order.toString(),
                       style: GoogleFonts.inter(
                         color: AppTheme.warning,
                         fontWeight: FontWeight.w700,
@@ -652,7 +1713,7 @@ class _BuscaCapturaFormacaoScreenState
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Indicações Estruturais',
+                    module.name,
                     style: GoogleFonts.inter(
                       color: AppTheme.textPrimary,
                       fontSize: 14,
@@ -663,7 +1724,7 @@ class _BuscaCapturaFormacaoScreenState
               ),
               const SizedBox(height: 8),
               Text(
-                'Consolidar indicações diretas e persistentes em fontes de odor variadas com barreiras simples.',
+                module.description,
                 style: GoogleFonts.inter(
                   color: AppTheme.textSecondary,
                   fontSize: 11,
@@ -683,11 +1744,21 @@ class _BuscaCapturaFormacaoScreenState
                 ),
                 child: Row(
                   children: [
-                    _buildDetailMetaItem('SESSÕES', '14'),
+                    _buildDetailMetaItem('VERSÃO', 'v${_program!.version}'),
                     const SizedBox(width: 24),
-                    _buildDetailMetaItem('ACERTOS', '82%'),
+                    _buildDetailMetaItem(
+                      'MARCOS',
+                      milestones.length.toString(),
+                    ),
                     const SizedBox(width: 24),
-                    _buildDetailMetaItem('FOCO', 'Persistência'),
+                    _buildDetailMetaItem(
+                      'STATUS',
+                      _isLocked(module)
+                          ? 'Bloqueado'
+                          : _isCompleted(module)
+                          ? 'Concluído'
+                          : 'Atual',
+                    ),
                   ],
                 ),
               ),
@@ -713,29 +1784,42 @@ class _BuscaCapturaFormacaoScreenState
         ),
         const SizedBox(height: 10),
 
-        // Marcos list items
-        _buildMarcoItem(
-          title: 'Indicação sentada de 5s',
-          subtitle: 'Manter a posição de indicação focada por 5 segundos.',
-          isAtingido: true,
-          sessionsCount: '14 sessões',
-        ),
-        _buildMarcoItem(
-          title: 'Desprezar distrações leves',
-          subtitle: 'Ignorar pequenos objetos ou ruídos próximos à fonte.',
-          isAtingido: true,
-          sessionsCount: '8 sessões',
-        ),
-        _buildMarcoItem(
-          title: 'Persistência em fonte oculta',
-          subtitle:
-              'Indicação clara em fonte totalmente escondida sob entulho.',
-          isAtingido: false,
-          sessionsCount: '3 sessões',
-        ),
+        if (milestones.isEmpty)
+          _buildProgramState(
+            title: 'Sem marcos ativos',
+            body: 'Cadastre marcos neste módulo do currículo Firebase.',
+            icon: Icons.flag_outlined,
+            compact: true,
+          )
+        else
+          ...milestones.map((milestone) {
+            final achieved = _progress.isMilestoneAchieved(
+              module.id,
+              milestone.id,
+            );
+            final saving = _savingMilestoneIds.contains(milestone.id);
+            return _buildMarcoItem(
+              title: milestone.label,
+              subtitle: milestone.isRequired
+                  ? 'Marco obrigatório do currículo'
+                  : 'Marco opcional do currículo',
+              isAtingido: achieved,
+              sessionsCount: saving
+                  ? 'Salvando'
+                  : milestone.isRequired
+                  ? 'Obrigatório'
+                  : 'Opcional',
+              isSaving: saving,
+              enabled: _isActive(module) && !_completingModule,
+              onTap: () => _toggleMilestone(module, milestone, !achieved),
+            );
+          }),
 
         const SizedBox(height: 10),
-        // Odor info banner
+        if (_isActive(module)) ...[
+          _buildCompleteModuleCard(module),
+          const SizedBox(height: 10),
+        ],
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -751,19 +1835,103 @@ class _BuscaCapturaFormacaoScreenState
                 height: 1.5,
               ),
               children: const [
-                TextSpan(text: 'Objeto de odor atual: '),
+                TextSpan(text: 'Fonte: '),
                 TextSpan(
-                  text: 'Artigo pessoal (camiseta/meia/chave)',
+                  text: 'training_programs/busca_captura',
                   style: TextStyle(
                     color: AppTheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                TextSpan(text: ' · editar no Firebase reflete nesta tela.'),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCompleteModuleCard(TrainingModule module) {
+    final missing = _requiredMissingCount(module);
+    final achieved = _achievedCount(module);
+    final total = module.activeMilestones.length;
+    final canComplete = _canCompleteModule(module);
+    final isLast = _isLastModule(module);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: canComplete
+            ? AppTheme.success.withAlpha(14)
+            : AppTheme.warning.withAlpha(12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: canComplete
+              ? AppTheme.success.withAlpha(65)
+              : AppTheme.warning.withAlpha(55),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isLast ? 'Certificar operacional' : 'Solicitar evolucao',
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            missing == 0
+                ? '$achieved/$total marcos atingidos. O snapshot sera enviado para validacao.'
+                : '$missing marco(s) obrigatorio(s) ainda pendente(s).',
+            style: GoogleFonts.inter(
+              color: AppTheme.textSecondary,
+              fontSize: 11,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: canComplete
+                  ? () => _requestModulePromotion(module)
+                  : null,
+              icon: _completingModule
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.background,
+                      ),
+                    )
+                  : Icon(
+                      isLast
+                          ? Icons.verified_rounded
+                          : Icons.arrow_forward_rounded,
+                      size: 18,
+                    ),
+              label: Text(
+                _isInstructorK9
+                    ? (isLast
+                          ? 'VALIDAR E TORNAR OPERACIONAL'
+                          : 'VALIDAR EVOLUCAO')
+                    : 'SOLICITAR EVOLUCAO',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isLast ? AppTheme.success : AppTheme.primary,
+                foregroundColor: AppTheme.background,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -797,8 +1965,11 @@ class _BuscaCapturaFormacaoScreenState
     required String subtitle,
     required bool isAtingido,
     required String sessionsCount,
+    required VoidCallback onTap,
+    bool isSaving = false,
+    bool enabled = true,
   }) {
-    return Container(
+    final content = Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -829,11 +2000,22 @@ class _BuscaCapturaFormacaoScreenState
               color: isAtingido ? AppTheme.success : AppTheme.transparent,
             ),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.check_rounded,
-              color: isAtingido ? AppTheme.background : AppTheme.transparent,
-              size: 14,
-            ),
+            child: isSaving
+                ? const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.success,
+                    ),
+                  )
+                : Icon(
+                    Icons.check_rounded,
+                    color: isAtingido
+                        ? AppTheme.background
+                        : AppTheme.transparent,
+                    size: 14,
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -843,7 +2025,7 @@ class _BuscaCapturaFormacaoScreenState
                 Text(
                   title,
                   style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
+                    color: enabled ? AppTheme.textPrimary : AppTheme.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -878,168 +2060,23 @@ class _BuscaCapturaFormacaoScreenState
         ],
       ),
     );
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.62,
+      child: GestureDetector(
+        onTap: enabled && !isSaving ? onTap : null,
+        child: content,
+      ),
+    );
   }
 
   // --- ABA HISTÓRICO ---
   Widget _buildHistoricoTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-      children: [
-        _buildSessionCard(
-          date: '23 Mai · 10:45',
-          marco: 'Indicações Estruturais · Persistência',
-          result: 'COMPLETA',
-          distance: '150m',
-          duration: '4m 12s',
-          conductor: 'GCM Ragonha',
-          resultClass: 'completa',
-        ),
-        _buildSessionCard(
-          date: '18 Mai · 15:30',
-          marco: 'Indicações Estruturais · Distrações',
-          result: 'CHECAGEM',
-          distance: '120m',
-          duration: '5m 45s',
-          conductor: 'GCM Ragonha',
-          resultClass: 'checagem',
-        ),
-        _buildSessionCard(
-          date: '12 Mai · 09:15',
-          marco: 'Pareamento de Odor · Fonte Oculta',
-          result: 'COMPLETA',
-          distance: '80m',
-          duration: '2m 10s',
-          conductor: 'GCM Ragonha',
-          resultClass: 'completa',
-        ),
-        _buildSessionCard(
-          date: '05 Mai · 14:20',
-          marco: 'Pareamento de Odor · Distrações',
-          result: 'PERDA',
-          distance: '100m',
-          duration: '7m 30s',
-          conductor: 'GCM Ragonha',
-          resultClass: 'perda',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSessionCard({
-    required String date,
-    required String marco,
-    required String result,
-    required String distance,
-    required String duration,
-    required String conductor,
-    required String resultClass,
-  }) {
-    Color resultColor = AppTheme.success;
-    Color resultBg = AppTheme.success.withAlpha(31);
-
-    if (resultClass == 'checagem') {
-      resultColor = AppTheme.warning;
-      resultBg = AppTheme.warning.withAlpha(31);
-    } else if (resultClass == 'perda') {
-      resultColor = AppTheme.attention;
-      resultBg = AppTheme.attention.withAlpha(31);
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.textPrimary.withAlpha(13),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.textPrimary.withAlpha(20), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      date,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      marco,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: resultBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  result,
-                  style: GoogleFonts.inter(
-                    color: resultColor,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: AppTheme.textPrimary.withAlpha(13),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                _buildSessionStatItem(Icons.straighten_rounded, distance),
-                const SizedBox(width: 16),
-                _buildSessionStatItem(Icons.schedule_rounded, duration),
-                const SizedBox(width: 16),
-                _buildSessionStatItem(Icons.person_outline_rounded, conductor),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionStatItem(IconData icon, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppTheme.primary, size: 12),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            color: AppTheme.textSecondary,
-            fontSize: 10.5,
-          ),
-        ),
-      ],
+    return _buildProgramState(
+      icon: Icons.history_rounded,
+      title: 'Histórico em integração',
+      body:
+          'As sessões reais de Busca & Captura serão listadas aqui sem dados demonstrativos hardcoded.',
     );
   }
 

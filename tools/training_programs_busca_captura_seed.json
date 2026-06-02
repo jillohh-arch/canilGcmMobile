@@ -1,0 +1,152 @@
+{
+  "program": {
+    "id": "busca_captura",
+    "name": "Busca & Captura",
+    "modality": "busca_captura",
+    "version": 1,
+    "active": true,
+    "updated_by": "seed:parte13",
+    "source": "temp/mockups/padrao_treino_formacao_operacional.html"
+  },
+  "modules": [
+    {
+      "id": "modulo_1",
+      "order": 1,
+      "name": "Módulo 1 — Pareamento e indicação",
+      "description": "Mata fechada · odor forte · distância progressiva",
+      "active": true,
+      "milestones": [
+        {
+          "id": "pareamento_artigo_referencia",
+          "order": 1,
+          "label": "Pareamento com artigo de referência",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "odor_forte_curta_distancia",
+          "order": 2,
+          "label": "Busca com odor forte em curta distância",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_passiva_mata_fechada",
+          "order": 3,
+          "label": "Indicação passiva em mata fechada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "distancia_progressiva",
+          "order": 4,
+          "label": "Aumento progressivo de distância",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_2",
+      "order": 2,
+      "name": "Módulo 2 — Indicações estruturais",
+      "description": "Vegetação rasteira · objetos médios · obstáculos urbanos",
+      "active": true,
+      "milestones": [
+        {
+          "id": "indicacao_muro_pulado",
+          "order": 1,
+          "label": "Indicação de muro pulado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_porta_atravessada",
+          "order": 2,
+          "label": "Indicação de porta atravessada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_carro_porta_malas",
+          "order": 3,
+          "label": "Indicação de carro (porta-malas)",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_telhado",
+          "order": 4,
+          "label": "Indicação em telhado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_entulho",
+          "order": 5,
+          "label": "Indicação em entulho",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_altura",
+          "order": 6,
+          "label": "Indicação em altura",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "mudanca_calcada_grama",
+          "order": 7,
+          "label": "Mudança calçada/grama",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "distracao_figurante",
+          "order": 8,
+          "label": "Distração com figurante",
+          "required": false,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_3",
+      "order": 3,
+      "name": "Módulo 3 — Operacional urbano",
+      "description": "Cenário real · vestígios mínimos · todas as variáveis",
+      "active": true,
+      "milestones": [
+        {
+          "id": "cenario_real_urbano",
+          "order": 1,
+          "label": "Busca em cenário real urbano",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "vestigios_minimos",
+          "order": 2,
+          "label": "Trabalho com vestígios mínimos",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "variaveis_ambientais",
+          "order": 3,
+          "label": "Execução com variáveis ambientais",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "simulado_operacional_instrutor",
+          "order": 4,
+          "label": "Simulado operacional validado pelo instrutor",
+          "required": true,
+          "active": true
+        }
+      ]
+    }
+  ]
+}
