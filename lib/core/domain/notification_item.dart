@@ -13,7 +13,11 @@ enum NotificationType {
   correctionRequested,
   deadlineWarning,
   occurrenceFinalized,
-  amendmentCreated;
+  amendmentCreated,
+  trainingPromotionRequested,
+  trainingPromotionApproved,
+  trainingPromotionRejected,
+  trainingBonusMilestoneAvailable;
 
   String toMap() => switch (this) {
     vehicleCrewInvitation => 'vehicle_crew_invitation',
@@ -29,6 +33,10 @@ enum NotificationType {
     deadlineWarning => 'deadline_warning',
     occurrenceFinalized => 'occurrence_finalized',
     amendmentCreated => 'amendment_created',
+    trainingPromotionRequested => 'training_promotion_requested',
+    trainingPromotionApproved => 'training_promotion_approved',
+    trainingPromotionRejected => 'training_promotion_rejected',
+    trainingBonusMilestoneAvailable => 'training_bonus_milestone_available',
   };
 
   static NotificationType fromMap(String? value) {
@@ -74,6 +82,18 @@ enum NotificationType {
     }
     if (normalized == 'amendment_created') {
       return NotificationType.amendmentCreated;
+    }
+    if (normalized == 'training_promotion_requested') {
+      return NotificationType.trainingPromotionRequested;
+    }
+    if (normalized == 'training_promotion_approved') {
+      return NotificationType.trainingPromotionApproved;
+    }
+    if (normalized == 'training_promotion_rejected') {
+      return NotificationType.trainingPromotionRejected;
+    }
+    if (normalized == 'training_bonus_milestone_available') {
+      return NotificationType.trainingBonusMilestoneAvailable;
     }
     return NotificationType.signatureRequested;
   }
@@ -138,6 +158,14 @@ class NotificationItem {
     NotificationType.vehicleCrewInvitation ||
     NotificationType.vehicleCrewInvitationAccepted ||
     NotificationType.vehicleCrewInvitationDeclined => true,
+    _ => false,
+  };
+
+  bool get isTrainingPromotionNotification => switch (type) {
+    NotificationType.trainingPromotionRequested ||
+    NotificationType.trainingPromotionApproved ||
+    NotificationType.trainingPromotionRejected ||
+    NotificationType.trainingBonusMilestoneAvailable => true,
     _ => false,
   };
 }

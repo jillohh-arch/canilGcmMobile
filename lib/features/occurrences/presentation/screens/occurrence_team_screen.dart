@@ -61,7 +61,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gerenciar Equipe'),
+        title: const Text('Participação da Guarnição'),
         actions: [
           // Botão para adicionar membro
           // Botão para fechar para assinaturas

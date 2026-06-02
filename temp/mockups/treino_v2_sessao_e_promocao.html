@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Treino v2 — sessão de trilha + promoção co-validada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;flex-wrap:wrap;padding:24px 20px;gap:26px;}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;}
+  .phone-label{color:#4dd0e1;font-size:11px;font-weight:600;letter-spacing:1.2px;margin-bottom:10px;text-align:center;}
+  .phone-label small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .phone{width:390px;height:844px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;flex-shrink:0;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .scroll{flex:1;overflow-y:auto;padding:0 16px 20px;}
+  .scroll::-webkit-scrollbar{width:0;}
+
+  .top{display:flex;align-items:center;gap:11px;padding:6px 2px 12px;}
+  .back-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;background:rgba(255,255,255,.04);border-radius:9px;flex-shrink:0;}
+  .top-ic{width:40px;height:40px;border-radius:11px;background:rgba(77,208,225,.1);border:1px solid rgba(77,208,225,.25);display:flex;align-items:center;justify-content:center;font-size:19px;}
+  .top-tt .k{color:#5a7280;font-size:9px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;}
+  .top-tt .n{color:#fff;font-size:16px;font-weight:700;margin-top:1px;}
+
+  .sec{display:flex;align-items:center;gap:9px;margin:14px 2px 10px;}
+  .sec .t{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;white-space:nowrap;}
+  .sec .ln{flex:1;height:1px;background:rgba(255,255,255,.07);}
+
+  .chk{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 13px;margin-bottom:7px;}
+  .chk .i{font-size:16px;width:22px;text-align:center;}
+  .chk .nm{color:#fff;font-size:12.5px;font-weight:600;}
+  .chk .ds{color:#7a8a92;font-size:10.5px;margin-top:1px;}
+  .chk .st{margin-left:auto;font-size:9px;font-weight:700;padding:4px 9px;border-radius:9px;letter-spacing:.4px;}
+  .st-ok{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);color:#2ecc71;}
+  .st-warn{background:rgba(241,196,15,.1);border:1px solid rgba(241,196,15,.3);color:#f1c40f;}
+
+  .cfg{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 13px;margin-bottom:7px;}
+  .cfg .i{font-size:15px;width:22px;text-align:center;}
+  .cfg .k{color:#5a7280;font-size:8.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;}
+  .cfg .v{color:#fff;font-size:12.5px;font-weight:600;margin-top:1px;}
+  .cfg .ar{margin-left:auto;color:#5a7280;font-size:16px;}
+  .warn-box{display:flex;gap:9px;background:rgba(241,196,15,.05);border:1px solid rgba(241,196,15,.2);border-radius:10px;padding:11px;margin-top:10px;color:#c9b35a;font-size:10.5px;line-height:1.45;}
+  .cta{position:absolute;bottom:0;left:0;right:0;padding:14px 16px 22px;background:linear-gradient(to top,#050d10 70%,transparent);}
+  .big{width:100%;border:none;border-radius:13px;padding:15px;font-size:14px;font-weight:800;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .big-cyan{background:#4dd0e1;color:#04181d;}
+  .big-green{background:#2ecc71;color:#04140a;}
+
+  /* AO VIVO */
+  .live-bar{display:flex;align-items:center;gap:9px;background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.25);border-radius:11px;padding:10px 13px;margin-bottom:11px;}
+  .live-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;box-shadow:0 0 0 0 rgba(231,76,60,.5);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(231,76,60,.5)}70%{box-shadow:0 0 0 8px rgba(231,76,60,0)}100%{box-shadow:0 0 0 0 rgba(231,76,60,0)}}
+  .live-bar .t{color:#e74c3c;font-size:11px;font-weight:800;letter-spacing:.5px;}
+  .live-bar .b{margin-left:auto;color:#b0c4cc;font-size:11px;font-family:'IBM Plex Mono',monospace;}
+  .map{height:230px;border-radius:14px;overflow:hidden;border:1px solid rgba(77,208,225,.15);background:linear-gradient(160deg,#0a1a1f,#0c2228);position:relative;margin-bottom:11px;}
+  .map svg{width:100%;height:100%;}
+  .pin{position:absolute;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid #050d10;}
+  .metrics{display:flex;gap:8px;margin-bottom:12px;}
+  .met{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px;text-align:center;}
+  .met .l{color:#7a8a92;font-size:8.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;}
+  .met .v{color:#fff;font-size:21px;font-weight:800;font-family:'IBM Plex Mono',monospace;margin-top:3px;}
+  .met .v.cyan{color:#4dd0e1;}
+  .metabar{display:flex;justify-content:center;gap:12px;color:#7a8a92;font-size:10px;font-family:'IBM Plex Mono',monospace;margin-bottom:13px;}
+  .actions-grid{display:flex;gap:8px;margin-bottom:9px;}
+  .act{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 6px;text-align:center;font-family:inherit;}
+  .act .ic{font-size:22px;}
+  .act .lb{color:#cfe0e6;font-size:10px;font-weight:600;margin-top:5px;line-height:1.2;}
+  .act.cyan{border-color:rgba(77,208,225,.3);}
+  .act.yellow{border-color:rgba(241,196,15,.3);}
+  .act.orange{border-color:rgba(230,126,34,.3);}
+  .end-row{display:flex;gap:8px;margin-top:3px;}
+  .end-btn{flex:1;border-radius:12px;padding:14px;font-size:12.5px;font-weight:800;font-family:inherit;border:none;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .end-target{background:#2ecc71;color:#04140a;}
+  .end-stop{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);color:#e74c3c;}
+
+  /* resumo / promoção */
+  .stat-row{display:flex;gap:8px;margin-bottom:12px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px;text-align:center;}
+  .stat .v{color:#4dd0e1;font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .stat .l{color:#7a8a92;font-size:8.5px;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+  .result-row{display:flex;gap:8px;margin:4px 0 6px;}
+  .rb{flex:1;border-radius:11px;padding:12px;text-align:center;font-size:12px;font-weight:700;font-family:inherit;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#b0c4cc;}
+  .rb.sel{border-color:#2ecc71;border-width:2px;background:rgba(46,204,113,.08);color:#2ecc71;}
+  .marks{display:flex;flex-direction:column;gap:6px;}
+  .mark{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#b0c4cc;}
+  .mk{width:15px;height:15px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;}
+  .mk-on{background:rgba(46,204,113,.15);border:1px solid #2ecc71;color:#2ecc71;}
+  .mk-off{border:1px solid #44565e;}
+  .declare{background:rgba(77,208,225,.05);border:1px solid rgba(77,208,225,.2);border-radius:12px;padding:13px;margin:11px 0 8px;}
+  .declare .tx{color:#cfe0e6;font-size:12px;line-height:1.5;}
+  .declare .tx b{color:#4dd0e1;}
+  .swipe{margin-top:13px;background:rgba(77,208,225,.08);border:1px solid rgba(77,208,225,.3);border-radius:30px;height:54px;display:flex;align-items:center;padding:5px;}
+  .knob{width:44px;height:44px;border-radius:50%;background:#4dd0e1;color:#04181d;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+  .swipe .tx{flex:1;text-align:center;color:#4dd0e1;font-size:12px;font-weight:700;}
+  .note{color:#7a8a92;font-size:10px;line-height:1.5;margin-top:10px;text-align:center;}
+  .note b{color:#b0c4cc;}
+
+  /* instrutor */
+  .reqcard{background:rgba(241,196,15,.05);border:1px solid rgba(241,196,15,.25);border-radius:14px;padding:14px;margin-bottom:11px;}
+  .reqcard .who{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .av{width:34px;height:34px;border-radius:50%;background:#16242a;border:1.5px solid #4dd0e1;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#4dd0e1;}
+  .reqcard .ttl{color:#fff;font-size:13px;font-weight:700;}
+  .reqcard .sb{color:#9a8a52;font-size:10.5px;font-family:'IBM Plex Mono',monospace;}
+  .reqcard .bd{color:#cfe0e6;font-size:12px;line-height:1.5;}
+  .inst-acts{display:flex;flex-direction:column;gap:9px;margin-top:6px;}
+  .ibtn{width:100%;border-radius:12px;padding:14px;font-size:13px;font-weight:700;font-family:inherit;border:none;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .ibtn-ok{background:#2ecc71;color:#04140a;}
+  .ibtn-no{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);color:#e74c3c;}
+  .faltou{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px;color:#5a7280;font-size:11px;font-style:italic;margin-top:9px;}
+
+  .design-notes{width:100%;max-width:1280px;margin:8px auto 0;color:#9aa7af;font-size:13px;line-height:1.6;}
+  .design-notes h3{color:#4dd0e1;font-size:14px;margin:16px 0 9px;}
+  .design-notes ul{list-style:none;padding-left:0;}
+  .design-notes li{padding:4px 0 4px 20px;position:relative;}
+  .design-notes li:before{content:"→";position:absolute;left:0;color:#4dd0e1;}
+  .design-notes b{color:#b0c4cc;}
+  .lesson{background:rgba(77,208,225,.04);border-left:3px solid #4dd0e1;border-radius:8px;padding:12px 14px;margin:6px 0;color:#b0c4cc;font-size:12px;line-height:1.55;}
+  .lesson b{color:#4dd0e1;}
+</style>
+</head>
+<body>
+
+<!-- T1 — TRILHA: ANTES DE INICIAR -->
+<div class="phone-wrap">
+  <div class="phone-label">T1 — SESSÃO · ANTES<small>verificação + configuração da trilha</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:14</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll" style="padding-bottom:96px">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">📡</div><div class="top-tt"><div class="k">Rastreador · Busca &amp; Captura</div><div class="n">Nova trilha</div></div></div>
+      <div class="sec"><span class="t">Verificação do sistema</span><span class="ln"></span></div>
+      <div class="chk"><span class="i">📍</span><div><div class="nm">GPS</div><div class="ds">Sinal preciso · ±3m</div></div><span class="st st-ok">PRONTO</span></div>
+      <div class="chk"><span class="i">🔋</span><div><div class="nm">Bateria</div><div class="ds">82% · suficiente pra trilha longa</div></div><span class="st st-ok">OK</span></div>
+      <div class="chk"><span class="i">📶</span><div><div class="nm">Conexão</div><div class="ds">4G fraco · trilha salva localmente</div></div><span class="st st-warn">OFFLINE</span></div>
+      <div class="sec"><span class="t">Configuração da trilha</span><span class="ln"></span></div>
+      <div class="cfg"><span class="i">🎯</span><div><div class="k">Marco trabalhado</div><div class="v">M2 · Indicação em telhado</div></div><span class="ar">›</span></div>
+      <div class="cfg"><span class="i">👤</span><div><div class="k">Figurante</div><div class="v">Fig. Souza (3ª vez)</div></div><span class="ar">›</span></div>
+      <div class="cfg"><span class="i">🧥</span><div><div class="k">Objeto de odor</div><div class="v">Camiseta usada</div></div><span class="ar">›</span></div>
+      <div class="cfg"><span class="i">🌳</span><div><div class="k">Ambiente</div><div class="v">Vegetação rasteira</div></div><span class="ar">›</span></div>
+      <div class="warn-box"><span>⚠</span><span>GPS contínuo consome 15–25% de bateria em trilhas de 30–60min. Tenha carregador em campo.</span></div>
+    </div>
+    <div class="cta"><button class="big big-cyan">▶ INICIAR TRILHA</button></div>
+  </div>
+</div>
+
+<!-- T2 — TRILHA AO VIVO (rastreamento) -->
+<div class="phone-wrap">
+  <div class="phone-label">T2 — SESSÃO · AO VIVO ★<small>rastreamento + botões de ação — o coração da sessão</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:23</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋 67%</span></div></div>
+    <div class="scroll">
+      <div class="live-bar"><span class="live-dot"></span><span class="t">GRAVANDO TRILHA</span><span class="b">Thor · Silva</span></div>
+      <div class="map">
+        <svg viewBox="0 0 360 230" preserveAspectRatio="xMidYMid slice">
+          <path d="M 40 200 Q 70 150, 110 150 T 180 110 Q 220 90, 250 70 T 320 45" stroke="rgba(77,208,225,0.25)" stroke-width="11" fill="none" stroke-linecap="round"/>
+          <path d="M 40 200 Q 70 150, 110 150 T 180 110 Q 220 90, 250 70 T 320 45" stroke="#4dd0e1" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <circle cx="40" cy="200" r="6" fill="#2ecc71" stroke="#050d10" stroke-width="2"/>
+          <circle cx="320" cy="45" r="6" fill="#fff" stroke="#050d10" stroke-width="2"/>
+        </svg>
+        <div class="pin" style="background:#4dd0e1;left:48%;top:46%">🐕</div>
+        <div class="pin" style="background:#f1c40f;left:30%;top:62%">❓</div>
+      </div>
+      <div class="metrics">
+        <div class="met"><div class="l">Distância</div><div class="v cyan">187<span style="font-size:12px;color:#7a8a92">m</span></div></div>
+        <div class="met"><div class="l">Tempo</div><div class="v">09:42</div></div>
+      </div>
+      <div class="metabar"><span>📏 1.9 km/h</span><span>📍 ±3m</span><span>🎯 2 eventos</span></div>
+      <div class="sec"><span class="t">Marcar evento na trilha</span><span class="ln"></span></div>
+      <div class="actions-grid">
+        <button class="act cyan"><div class="ic">🐕</div><div class="lb">Cão indicou</div></button>
+        <button class="act yellow"><div class="ic">❓</div><div class="lb">Checagem</div></button>
+        <button class="act orange"><div class="ic">⚠</div><div class="lb">Perdeu rastro</div></button>
+      </div>
+      <div class="end-row">
+        <button class="end-btn end-target">🎯 ALVO ENCONTRADO</button>
+        <button class="end-btn end-stop">⏹ ENCERRAR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- T3 — TRILHA RESUMO (pós) -->
+<div class="phone-wrap">
+  <div class="phone-label">T3 — SESSÃO · RESUMO<small>resultado + vínculo ao marco trabalhado</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:34</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll" style="padding-bottom:96px">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">✓</div><div class="top-tt"><div class="k">Trilha concluída</div><div class="n">Resumo da sessão</div></div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="v">312m</div><div class="l">distância</div></div>
+        <div class="stat"><div class="v">14:08</div><div class="l">tempo</div></div>
+        <div class="stat"><div class="v">3</div><div class="l">eventos</div></div>
+      </div>
+      <div class="sec"><span class="t">Resultado</span><span class="ln"></span></div>
+      <div class="result-row">
+        <div class="rb sel">✓ Completa</div>
+        <div class="rb">Parcial</div>
+        <div class="rb">Sem êxito</div>
+      </div>
+      <div class="sec"><span class="t">Vínculo</span><span class="ln"></span></div>
+      <div class="cfg"><span class="i">🎯</span><div><div class="k">Marco trabalhado</div><div class="v">M2 · Indicação em telhado</div></div></div>
+      <div class="cfg"><span class="i">📡</span><div><div class="k">Trilha GPS</div><div class="v">Trajeto e distância registrados</div></div></div>
+      <div class="faltou" style="font-style:normal;color:#8aa0a8">＋ Observação técnica da sessão (opcional)</div>
+    </div>
+    <div class="cta"><button class="big big-cyan">Salvar sessão</button></div>
+  </div>
+</div>
+
+<!-- T4 — SOLICITAR EVOLUÇÃO (condutor) -->
+<div class="phone-wrap">
+  <div class="phone-label">T4 — SOLICITAR EVOLUÇÃO<small>condutor anota e pede o aval do instrutor</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:36</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">🎯</div><div class="top-tt"><div class="k">Módulo 2 · Indicações estruturais</div><div class="n">Solicitar evolução</div></div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="v">18</div><div class="l">sessões</div></div>
+        <div class="stat"><div class="v">9/12</div><div class="l">marcos</div></div>
+        <div class="stat"><div class="v">2m</div><div class="l">no módulo</div></div>
+      </div>
+      <div class="sec"><span class="t">Marcos (do currículo)</span><span class="ln"></span></div>
+      <div class="marks">
+        <div class="mark"><span class="mk mk-on">✓</span> Indicação em telhado</div>
+        <div class="mark"><span class="mk mk-on">✓</span> Indicação em entulho</div>
+        <div class="mark"><span class="mk mk-on">✓</span> Indicação em altura</div>
+        <div class="mark"><span class="mk mk-off"></span> Distração com figurante <span style="color:#5a7280;font-size:10px">(opcional)</span></div>
+      </div>
+      <div class="declare"><div class="tx"><b>GCM Silva</b> solicita evoluir <b>Thor</b> para o Módulo 3. Vai para o instrutor avalizar.</div></div>
+      <div class="swipe"><div class="knob">→</div><div class="tx">Arraste para solicitar ao instrutor</div></div>
+      <div class="note">Os marcos vêm do <b>currículo do canil</b> (painel web). Ao avalizar, o app <b>congela o que valia agora</b> — quem conduziu, quem aprovou, quais marcos.</div>
+    </div>
+  </div>
+</div>
+
+<!-- T5 — INSTRUTOR APROVA / APONTA -->
+<div class="phone-wrap">
+  <div class="phone-label">T5 — INSTRUTOR AVALIZA<small>aprova e libera, ou aponta o que faltou</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>09:41</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">🎓</div><div class="top-tt"><div class="k">Aprovação de evolução</div><div class="n">Thor → Módulo 3</div></div></div>
+      <div class="reqcard">
+        <div class="who"><div class="av">SIL</div><div><div class="ttl">GCM Silva solicitou</div><div class="sb">há 5 min · Busca &amp; Captura</div></div></div>
+        <div class="bd">Evoluir <b>Thor</b> do Módulo 2 (Indicações estruturais) para o Módulo 3. 18 sessões · 9 de 12 marcos.</div>
+      </div>
+      <div class="sec"><span class="t">O instrutor decide</span><span class="ln"></span></div>
+      <div class="inst-acts">
+        <button class="ibtn ibtn-ok">✓ Aprovar e liberar Módulo 3</button>
+        <button class="ibtn ibtn-no">Apontar o que faltou</button>
+      </div>
+      <div class="faltou">Ao discordar, o instrutor escreve o que faltou ou falhou — volta ao condutor como orientação do que reforçar. (motivo obrigatório)</div>
+      <div class="note">Quem aprovar fica registrado. A promoção passa a ter <b>dois nomes</b>: quem conduziu e quem avalizou — defende a formação em auditoria.</div>
+    </div>
+  </div>
+</div>
+
+<div class="design-notes">
+  <div class="lesson"><b>A sessão de campo, do início ao registro.</b> Antes (verificação + config) → ao vivo (rastreamento com botões de ação) → resumo (resultado + vínculo ao marco). O rastreamento é o centro: mapa em tempo real, distância/tempo, e marcação de eventos (cão indicou, checagem, perdeu rastro) sem tirar o olho do cão.</div>
+  <h3>Promoção co-validada (igual a co-assinatura da ocorrência)</h3>
+  <ul>
+    <li><b>Condutor</b> conduz a sessão, marca os marcos e <b>solicita</b> a evolução (T4).</li>
+    <li><b>Instrutor</b> recebe a notificação e <b>aprova</b> (libera o próximo módulo) ou <b>aponta o que faltou</b> (motivo obrigatório, volta como orientação) (T5).</li>
+    <li>Se quem conduz já é instrutor/adestrador, conclui direto — tem a alçada.</li>
+    <li>A promoção fica com <b>dois nomes</b> e congela o <b>snapshot do currículo</b> da época.</li>
+  </ul>
+  <h3>Marcos vêm do Firebase</h3>
+  <ul>
+    <li>Currículo <b>institucional único</b>, cadastrado por instrutor/adestrador no <b>painel web</b>; o app só consome.</li>
+    <li>Conclusão <b>congela</b> os marcos da versão vigente — histórico intacto mesmo que o currículo mude depois.</li>
+    <li>Marco novo num cão já formado → notificação de <b>fase bônus</b> opcional; aditivo, nunca rebaixa.</li>
+  </ul>
+</div>
+
+</body>
+</html>

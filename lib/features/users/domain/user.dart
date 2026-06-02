@@ -5,6 +5,8 @@ class UserModel {
   final String unit;
   final String accessLevel; // 'Admin' ou 'Condutor'
   final String? photoUrl;
+  final bool isK9Instructor;
+  final String? trainingRole;
 
   UserModel({
     required this.ra,
@@ -13,6 +15,8 @@ class UserModel {
     required this.unit,
     this.accessLevel = 'Condutor',
     this.photoUrl,
+    this.isK9Instructor = false,
+    this.trainingRole,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +27,10 @@ class UserModel {
       unit: json['unit'] ?? '',
       accessLevel: json['accessLevel'] ?? 'Condutor',
       photoUrl: json['photoUrl'] ?? json['image_url'],
+      isK9Instructor:
+          json['is_k9_instructor'] == true ||
+          json['training_role'] == 'instrutor_k9',
+      trainingRole: json['training_role'],
     );
   }
 
@@ -34,6 +42,8 @@ class UserModel {
       'unit': unit,
       'accessLevel': accessLevel,
       'photoUrl': photoUrl,
+      'is_k9_instructor': isK9Instructor,
+      'training_role': trainingRole,
     };
   }
 
@@ -44,6 +54,8 @@ class UserModel {
     String? unit,
     String? accessLevel,
     Object? photoUrl = _sentinel,
+    bool? isK9Instructor,
+    Object? trainingRole = _sentinel,
   }) {
     return UserModel(
       ra: ra ?? this.ra,
@@ -52,6 +64,10 @@ class UserModel {
       unit: unit ?? this.unit,
       accessLevel: accessLevel ?? this.accessLevel,
       photoUrl: photoUrl == _sentinel ? this.photoUrl : photoUrl as String?,
+      isK9Instructor: isK9Instructor ?? this.isK9Instructor,
+      trainingRole: trainingRole == _sentinel
+          ? this.trainingRole
+          : trainingRole as String?,
     );
   }
 

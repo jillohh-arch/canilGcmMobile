@@ -1,7 +1,7 @@
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import {logger} from "firebase-functions";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 
 admin.initializeApp();
@@ -75,6 +75,10 @@ function requiredString(data: JsonMap, key: string): string {
   return value;
 }
 
+function boolValue(value: unknown): boolean {
+  return value === true || value === "true";
+}
+
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return Array.from(
@@ -91,6 +95,30 @@ function stringList(value: unknown): string[] {
   return value
     .map((item) => stringValue(item))
     .filter((item): item is string => Boolean(item));
+}
+
+function customClaimRoles(token: admin.auth.DecodedIdToken): string[] {
+  return Array.isArray(token.roles) ? token.roles.map((item) => String(item)) : [];
+}
+
+function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
+  return token.admin === true ||
+    token.role === "admin" ||
+    customClaimRoles(token).includes("admin");
+}
+
+async function requireAdmin(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+): Promise<CallerIdentity> {
+  const caller = requireAuth(auth);
+  if (auth && isAdminToken(auth.token)) return caller;
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const user = userSnap.data() ?? {};
+  const accessLevel = String(user.accessLevel ?? user.access_level ?? "").trim().toLowerCase();
+  if (accessLevel === "admin") return caller;
+
+  throw new HttpsError("permission-denied", "Somente Admin pode alterar papel Instrutor K9.");
 }
 
 function mapArray(value: unknown): JsonMap[] {
@@ -635,6 +663,30 @@ function notificationText(type: string, occurrenceTitle: string): {title: string
       body: occurrenceTitle,
     };
   }
+  if (type === "training_promotion_requested") {
+    return {
+      title: "Validacao de treino",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "training_promotion_approved") {
+    return {
+      title: "Evolucao aprovada",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "training_promotion_rejected") {
+    return {
+      title: "Evolucao reprovada",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "training_bonus_milestone_available") {
+    return {
+      title: "Marco-bonus disponivel",
+      body: occurrenceTitle,
+    };
+  }
   return {
     title: "Canil K9",
     body: occurrenceTitle,
@@ -659,6 +711,637 @@ function crewNotificationPayload(
     additional_data: additionalData ?? crewId,
   };
 }
+
+function trainingRequestTitle(request: JsonMap): string {
+  const dogName = stringValue(request.dog_name) ?? "K9";
+  const moduleName = stringValue(request.module_name) ?? "Modulo";
+  return `${dogName} - ${moduleName}`;
+}
+
+function trainingNotificationPayload(
+  type: string,
+  requestId: string,
+  request: JsonMap,
+): JsonMap {
+  return {
+    type,
+    occurrence_id: "",
+    occurrence_title: trainingRequestTitle(request),
+    target_screen: "training_promotion_request",
+    action_required: type === "training_promotion_requested",
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+    read_at: null,
+    resolved_at: null,
+    additional_data: requestId,
+    promotion_request_id: requestId,
+    dog_id: stringValue(request.dog_id) ?? "",
+    modality: stringValue(request.modality) ?? "",
+    module_id: stringValue(request.module_id) ?? "",
+    decision_reason: stringValue(request.decision_reason) ?? "",
+  };
+}
+
+function trainingBonusNotificationPayload(data: {
+  dogId: string;
+  dogName: string;
+  modality: string;
+  moduleId: string;
+  moduleName: string;
+  milestoneId: string;
+  milestoneLabel: string;
+  programVersion: number;
+}): JsonMap {
+  const additionalData = [
+    data.dogId,
+    data.modality,
+    data.moduleId,
+    data.milestoneId,
+  ].join("|");
+  return {
+    type: "training_bonus_milestone_available",
+    occurrence_id: "",
+    occurrence_title: `${data.dogName} - ${data.milestoneLabel}`,
+    target_screen: "training_bonus_milestone",
+    action_required: true,
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+    read_at: null,
+    resolved_at: null,
+    additional_data: additionalData,
+    dog_id: data.dogId,
+    dog_name: data.dogName,
+    modality: data.modality,
+    module_id: data.moduleId,
+    module_name: data.moduleName,
+    milestone_id: data.milestoneId,
+    milestone_label: data.milestoneLabel,
+    program_version: data.programVersion,
+  };
+}
+
+export const setK9InstructorRole = onCall({region}, async (request) => {
+  const caller = await requireAdmin(request.auth);
+  const data = request.data as JsonMap;
+  const ra = requiredString(data, "ra");
+  const enabled = boolValue(data.enabled);
+  const userRef = db.collection("users").doc(ra);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "Usuario nao encontrado.");
+  }
+
+  const userData = userSnap.data() ?? {};
+  const uidFromDoc = stringValue(userData.auth_uid) ?? stringValue(userData.authUid) ?? stringValue(userData.uid);
+  const email = stringValue(userData.email) ?? emailForRa(ra);
+  let userRecord: admin.auth.UserRecord;
+  if (uidFromDoc) {
+    userRecord = await admin.auth().getUser(uidFromDoc);
+  } else {
+    userRecord = await admin.auth().getUserByEmail(email);
+  }
+
+  const existingClaims = userRecord.customClaims ?? {};
+  const roles = new Set<string>(Array.isArray(existingClaims.roles) ? existingClaims.roles.map(String) : []);
+  if (enabled) {
+    roles.add("instrutor_k9");
+  } else {
+    roles.delete("instrutor_k9");
+  }
+  const nextClaims: JsonMap = {
+    ...existingClaims,
+    roles: Array.from(roles),
+  };
+  if (enabled) {
+    nextClaims.role = "instrutor_k9";
+    nextClaims.instrutor_k9 = true;
+    nextClaims.training_role = "instrutor_k9";
+    nextClaims.training_instructor = true;
+  } else {
+    delete nextClaims.instrutor_k9;
+    delete nextClaims.training_role;
+    delete nextClaims.training_instructor;
+    if (nextClaims.role === "instrutor_k9") delete nextClaims.role;
+  }
+
+  await admin.auth().setCustomUserClaims(userRecord.uid, nextClaims);
+  await userRef.set({
+    auth_uid: userRecord.uid,
+    email,
+    is_k9_instructor: enabled,
+    training_role: enabled ? "instrutor_k9" : null,
+    claim_role: enabled ? "instrutor_k9" : null,
+    claim_refresh_required: true,
+    claim_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    audit_trail: admin.firestore.FieldValue.arrayUnion(auditEntry(
+      enabled ? "k9_instructor_role_granted" : "k9_instructor_role_revoked",
+      caller,
+    )),
+  }, {merge: true});
+
+  return {
+    ra,
+    uid: userRecord.uid,
+    enabled,
+    token_refresh_required: true,
+  };
+});
+
+interface TrainingMilestoneSnapshot {
+  id: string;
+  order: number;
+  label: string;
+  required: boolean;
+}
+
+interface TrainingModuleSnapshot {
+  id: string;
+  order: number;
+  name: string;
+  milestones: TrainingMilestoneSnapshot[];
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function trainingDecisionCaller(request: JsonMap): CallerIdentity {
+  const ra = stringValue(request.decision_by) ?? "instrutor_k9";
+  const uid = stringValue(request.decision_by_uid) ?? ra;
+  const email = stringValue(request.decision_by_email) ?? emailForRa(ra);
+  return {
+    uid,
+    email,
+    ra,
+    name: stringValue(request.decision_by_name) ?? ra,
+  };
+}
+
+function achievementFor(progress: JsonMap, moduleId: string, milestoneId: string): JsonMap | undefined {
+  const achievedByModule = isPlainObject(progress.achieved_milestones) ?
+    progress.achieved_milestones[moduleId] :
+    undefined;
+  if (!isPlainObject(achievedByModule)) return undefined;
+  const achievement = achievedByModule[milestoneId];
+  return isPlainObject(achievement) ? achievement : undefined;
+}
+
+async function trainingProgramSnapshot(
+  transaction: admin.firestore.Transaction,
+  modality: string,
+): Promise<{program: JsonMap; modules: TrainingModuleSnapshot[]}> {
+  const programRef = db.collection("training_programs").doc(modality);
+  const programSnap = await transaction.get(programRef);
+  if (!programSnap.exists) {
+    throw new HttpsError("not-found", "Curriculo de treino nao encontrado.");
+  }
+
+  const modulesSnap = await transaction.get(programRef.collection("modules").orderBy("order"));
+  const modules: TrainingModuleSnapshot[] = [];
+  for (const moduleDoc of modulesSnap.docs) {
+    const moduleData = moduleDoc.data();
+    if (moduleData.active === false) continue;
+    const milestonesSnap = await transaction.get(moduleDoc.ref.collection("milestones").orderBy("order"));
+    const milestones = milestonesSnap.docs
+      .map((milestoneDoc) => {
+        const milestoneData = milestoneDoc.data();
+        if (milestoneData.active === false) return undefined;
+        return {
+          id: milestoneDoc.id,
+          order: numberValue(milestoneData.order),
+          label: stringValue(milestoneData.label) ?? milestoneDoc.id,
+          required: milestoneData.required !== false,
+        };
+      })
+      .filter((item): item is TrainingMilestoneSnapshot => item !== undefined)
+      .sort((a, b) => a.order - b.order);
+    modules.push({
+      id: moduleDoc.id,
+      order: numberValue(moduleData.order),
+      name: stringValue(moduleData.name) ?? moduleDoc.id,
+      milestones,
+    });
+  }
+  modules.sort((a, b) => a.order - b.order);
+  return {
+    program: programSnap.data() ?? {},
+    modules,
+  };
+}
+
+async function specialtyRefForTraining(
+  transaction: admin.firestore.Transaction,
+  dogId: string,
+  modality: string,
+): Promise<{ref: admin.firestore.DocumentReference; exists: boolean}> {
+  const collection = db.collection("dogs").doc(dogId).collection("specialties");
+  const existing = await transaction.get(collection.where("type", "==", modality).limit(1));
+  if (!existing.empty) {
+    return {
+      ref: existing.docs[0].ref,
+      exists: true,
+    };
+  }
+  return {
+    ref: collection.doc(modality),
+    exists: false,
+  };
+}
+
+function completedModuleSnapshot(
+  request: JsonMap,
+  module: TrainingModuleSnapshot,
+  progress: JsonMap,
+  completedAt: admin.firestore.Timestamp,
+): JsonMap {
+  const programVersion = numberValue(request.program_version, 1);
+  const caller = trainingDecisionCaller(request);
+  return {
+    module_id: module.id,
+    module_order: module.order,
+    module_name: module.name,
+    program_version: programVersion,
+    completed_at: completedAt,
+    completed_by: caller.ra,
+    completed_by_uid: caller.uid,
+    milestones: module.milestones.map((milestone) => {
+      const achievement = achievementFor(progress, module.id, milestone.id);
+      return {
+        milestone_id: milestone.id,
+        order: milestone.order,
+        label: milestone.label,
+        required: milestone.required,
+        achieved: achievement?.achieved === true,
+        achieved_at: achievement?.achieved_at ?? null,
+        achieved_by: stringValue(achievement?.achieved_by) ?? null,
+        program_version: programVersion,
+      };
+    }),
+  };
+}
+
+async function notifyK9Instructors(requestId: string, request: JsonMap): Promise<void> {
+  const recipients = new Set<string>();
+  const [byFlag, byRole] = await Promise.all([
+    db.collection("users").where("is_k9_instructor", "==", true).get(),
+    db.collection("users").where("training_role", "==", "instrutor_k9").get(),
+  ]);
+  for (const doc of [...byFlag.docs, ...byRole.docs]) {
+    const ra = stringValue(doc.data().ra) ?? doc.id;
+    if (ra) recipients.add(ra);
+  }
+
+  if (recipients.size === 0) {
+    logger.warn("Nenhum Instrutor K9 encontrado para notificacao de promocao.", {requestId});
+    return;
+  }
+
+  const batch = db.batch();
+  for (const ra of recipients) {
+    batch.set(
+      db.collection("notifications").doc(ra).collection("items").doc(),
+      trainingNotificationPayload("training_promotion_requested", requestId, request),
+    );
+  }
+  await batch.commit();
+}
+
+async function notifyPromotionRequester(
+  type: "training_promotion_approved" | "training_promotion_rejected",
+  requestId: string,
+  request: JsonMap,
+): Promise<void> {
+  const requesterRa = stringValue(request.requester_ra);
+  if (!requesterRa) {
+    logger.warn("Solicitacao de promocao sem requester_ra.", {requestId});
+    return;
+  }
+  await db.collection("notifications").doc(requesterRa).collection("items").doc().set(
+    trainingNotificationPayload(type, requestId, request),
+  );
+}
+
+async function applyApprovedTrainingPromotion(requestId: string, request: JsonMap): Promise<void> {
+  await db.runTransaction(async (transaction) => {
+    const requestRef = db.collection("promotion_requests").doc(requestId);
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists) {
+      throw new HttpsError("not-found", "Solicitacao de evolucao nao encontrada.");
+    }
+
+    const currentRequest = requestSnap.data() ?? {};
+    if (currentRequest.status !== "approved" || currentRequest.processed_at) {
+      return;
+    }
+
+    const dogId = requiredString(currentRequest, "dog_id");
+    const modality = requiredString(currentRequest, "modality");
+    const moduleId = requiredString(currentRequest, "module_id");
+    const progressRef = db.collection("dogs").doc(dogId).collection("training").doc(modality);
+    const progressSnap = await transaction.get(progressRef);
+    if (!progressSnap.exists) {
+      throw new HttpsError("failed-precondition", "Progresso de treino nao encontrado.");
+    }
+    const progress = progressSnap.data() ?? {};
+    if (progress.status === "operational") {
+      throw new HttpsError("failed-precondition", "Cao ja esta operacional nesta modalidade.");
+    }
+
+    const {program, modules} = await trainingProgramSnapshot(transaction, modality);
+    if (modules.length === 0) {
+      throw new HttpsError("failed-precondition", "Curriculo sem modulos ativos.");
+    }
+    const requestedProgramVersion = numberValue(currentRequest.program_version, 1);
+    const activeProgramVersion = numberValue(program.version, requestedProgramVersion);
+    if (activeProgramVersion !== requestedProgramVersion) {
+      throw new HttpsError("failed-precondition", "Curriculo mudou desde a solicitacao. Gere nova rodada.");
+    }
+    const moduleIndex = modules.findIndex((item) => item.id === moduleId);
+    if (moduleIndex < 0) {
+      throw new HttpsError("not-found", "Modulo aprovado nao existe no curriculo ativo.");
+    }
+    const module = modules[moduleIndex];
+    const currentModuleId =
+      stringValue(progress.current_module) ??
+      stringValue(progress.current_module_id) ??
+      modules[0].id;
+    if (currentModuleId !== module.id) {
+      throw new HttpsError("failed-precondition", "Somente o modulo atual pode ser aprovado.");
+    }
+
+    const missingRequired = module.milestones.filter((milestone) =>
+      milestone.required && achievementFor(progress, module.id, milestone.id)?.achieved !== true,
+    );
+    if (missingRequired.length > 0) {
+      throw new HttpsError("failed-precondition", "Marcos obrigatorios ainda nao atingidos.");
+    }
+
+    const completedAt = admin.firestore.Timestamp.now();
+    const completedIds = new Set<string>(stringArray(progress.completed_module_ids));
+    completedIds.add(module.id);
+    const completedModules = mapArray(progress.completed_modules)
+      .filter((item) => stringValue(item.module_id) !== module.id);
+    completedModules.push(completedModuleSnapshot(currentRequest, module, progress, completedAt));
+
+    const nextModule = moduleIndex < modules.length - 1 ? modules[moduleIndex + 1] : undefined;
+    const isOperational = nextModule === undefined;
+    const status = isOperational ? "operational" : "in_formation";
+    const caller = trainingDecisionCaller(currentRequest);
+    const entry = auditEntry("training_module_promotion_approved", caller);
+    const programVersion = activeProgramVersion;
+    const progressPercent = isOperational ? 100 : Math.round((completedIds.size / modules.length) * 100);
+
+    const {ref: specialtyRef, exists: specialtyExists} = await specialtyRefForTraining(transaction, dogId, modality);
+    const specialtyPayload: JsonMap = {
+      type: modality,
+      name: stringValue(program.name) ?? stringValue(currentRequest.modality) ?? modality,
+      status,
+      state: status,
+      program_version: programVersion,
+      current_module: nextModule?.id ?? null,
+      current_phase: nextModule?.id ?? null,
+      progress_percentage: progressPercent,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      audit_trail: specialtyExists ? admin.firestore.FieldValue.arrayUnion(entry) : [entry],
+    };
+    if (!specialtyExists) {
+      specialtyPayload.created_at = admin.firestore.FieldValue.serverTimestamp();
+      specialtyPayload.started_at = admin.firestore.FieldValue.serverTimestamp();
+    }
+    if (isOperational) {
+      specialtyPayload.operational_since = completedAt;
+    }
+
+    transaction.set(progressRef, {
+      modality,
+      status,
+      current_module: nextModule?.id ?? null,
+      current_module_id: nextModule?.id ?? null,
+      program_version: programVersion,
+      completed_module_ids: Array.from(completedIds),
+      completed_modules: completedModules,
+      operational_since: isOperational ? completedAt : null,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      audit_trail: admin.firestore.FieldValue.arrayUnion(entry),
+    }, {merge: true});
+
+    transaction.set(specialtyRef, specialtyPayload, {merge: true});
+    transaction.set(
+      db.collection("notifications")
+        .doc(requiredString(currentRequest, "requester_ra"))
+        .collection("items")
+        .doc(),
+      trainingNotificationPayload("training_promotion_approved", requestId, currentRequest),
+    );
+    transaction.set(requestRef, {
+      processed_at: admin.firestore.FieldValue.serverTimestamp(),
+      processing_status: "completed",
+      resulting_status: status,
+      next_module: nextModule?.id ?? null,
+      operational: isOperational,
+    }, {merge: true});
+  });
+}
+
+export const onTrainingPromotionRequestCreated = onDocumentCreated(
+  {
+    document: "promotion_requests/{requestId}",
+    region,
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+    const request = snapshot.data() ?? {};
+    if (request.status !== "pending") return;
+    if (request.direct_instructor === true) return;
+    await notifyK9Instructors(event.params.requestId, request);
+  },
+);
+
+export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
+  {
+    document: "promotion_requests/{requestId}",
+    region,
+  },
+  async (event) => {
+    const change = event.data;
+    if (!change) return;
+    const before = change.before.data() ?? {};
+    const after = change.after.data() ?? {};
+    if (before.status !== "pending") return;
+
+    if (after.status === "approved") {
+      try {
+        await applyApprovedTrainingPromotion(event.params.requestId, after);
+      } catch (error) {
+        logger.error("Falha ao aplicar promocao de treino.", {
+          requestId: event.params.requestId,
+          error: errorMessage(error),
+        });
+        await change.after.ref.set({
+          processed_at: admin.firestore.FieldValue.serverTimestamp(),
+          processing_status: "error",
+          processing_error: errorMessage(error),
+        }, {merge: true});
+      }
+      return;
+    }
+
+    if (after.status === "rejected") {
+      await notifyPromotionRequester("training_promotion_rejected", event.params.requestId, after);
+      await change.after.ref.set({
+        processed_at: admin.firestore.FieldValue.serverTimestamp(),
+        processing_status: "completed",
+      }, {merge: true});
+    }
+  },
+);
+
+function dogDisplayName(dogId: string, dog: JsonMap): string {
+  return stringValue(dog.name) ?? stringValue(dog.nome) ?? dogId;
+}
+
+function handlerRaFromDogOrProgress(dog: JsonMap, progress: JsonMap): string | undefined {
+  return stringValue(dog.conductorRa) ??
+    stringValue(dog.conductor_ra) ??
+    stringValue(dog.handler_ra) ??
+    stringValue(dog.handlerId) ??
+    stringValue(dog.handler_id) ??
+    stringValue(dog.current_handler_ra) ??
+    stringValue(dog.primary_handler_ra) ??
+    stringValue(progress.conductor_ra) ??
+    stringValue(progress.handler_ra) ??
+    stringValue(progress.handlerId) ??
+    stringValue(progress.handler_id);
+}
+
+async function activeShiftHandlersForDog(dogId: string): Promise<string[]> {
+  const recipients = new Set<string>();
+  const byServiceDog = await db
+    .collection("active_shifts")
+    .where("service_dog_id", "==", dogId)
+    .where("status", "==", "active")
+    .get();
+  const byDogId = await db
+    .collection("active_shifts")
+    .where("dogId", "==", dogId)
+    .where("status", "==", "active")
+    .get();
+  for (const doc of [...byServiceDog.docs, ...byDogId.docs]) {
+    const data = doc.data();
+    const ra = stringValue(data.handlerId) ??
+      stringValue(data.handler_id) ??
+      stringValue(data.ra) ??
+      doc.id;
+    if (ra) recipients.add(ra);
+  }
+  return Array.from(recipients).sort();
+}
+
+async function bonusMilestoneRecipients(
+  dogId: string,
+  dog: JsonMap,
+  progress: JsonMap,
+): Promise<string[]> {
+  const recipients = new Set<string>();
+  const fromDog = handlerRaFromDogOrProgress(dog, progress);
+  if (fromDog) recipients.add(fromDog);
+  for (const ra of await activeShiftHandlersForDog(dogId)) {
+    recipients.add(ra);
+  }
+  return Array.from(recipients).sort();
+}
+
+export const onTrainingProgramMilestoneCreated = onDocumentCreated(
+  {
+    document: "training_programs/{programId}/modules/{moduleId}/milestones/{milestoneId}",
+    region,
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+    const milestone = snapshot.data() ?? {};
+    if (milestone.active === false) return;
+
+    const {programId, moduleId, milestoneId} = event.params;
+    const [programSnap, moduleSnap, dogsSnap] = await Promise.all([
+      db.collection("training_programs").doc(programId).get(),
+      db.collection("training_programs").doc(programId).collection("modules").doc(moduleId).get(),
+      db.collection("dogs").get(),
+    ]);
+    const program = programSnap.data() ?? {};
+    const moduleData = moduleSnap.data() ?? {};
+    if (program.active === false || moduleData.active === false) return;
+
+    const milestoneLabel = stringValue(milestone.label) ?? milestoneId;
+    const moduleName = stringValue(moduleData.name) ?? moduleId;
+    const programVersion = numberValue(program.version, numberValue(milestone.program_version, 1));
+    let batch = db.batch();
+    let writes = 0;
+
+    async function commitIfNeeded(force = false): Promise<void> {
+      if (writes === 0) return;
+      if (!force && writes < 400) return;
+      await batch.commit();
+      batch = db.batch();
+      writes = 0;
+    }
+
+    for (const dogDoc of dogsSnap.docs) {
+      const dog = dogDoc.data() ?? {};
+      if (dog.deleted_at || dog.active === false) continue;
+
+      const progressRef = dogDoc.ref.collection("training").doc(programId);
+      const progressSnap = await progressRef.get();
+      if (!progressSnap.exists) continue;
+      const progress = progressSnap.data() ?? {};
+      if (progress.status !== "operational") continue;
+
+      const bonusId = `${moduleId}__${milestoneId}`;
+      const bonusSnap = await progressRef.collection("bonus_milestones").doc(bonusId).get();
+      if (bonusSnap.exists) continue;
+
+      const recipients = await bonusMilestoneRecipients(dogDoc.id, dog, progress);
+      if (recipients.length === 0) {
+        logger.warn("Cao operacional sem condutor para notificacao de marco-bonus.", {
+          dogId: dogDoc.id,
+          modality: programId,
+          moduleId,
+          milestoneId,
+        });
+        continue;
+      }
+
+      for (const ra of recipients) {
+        batch.set(
+          db.collection("notifications").doc(ra).collection("items").doc(),
+          trainingBonusNotificationPayload({
+            dogId: dogDoc.id,
+            dogName: dogDisplayName(dogDoc.id, dog),
+            modality: programId,
+            moduleId,
+            moduleName,
+            milestoneId,
+            milestoneLabel,
+            programVersion,
+          }),
+        );
+        writes++;
+        await commitIfNeeded();
+      }
+    }
+
+    await commitIfNeeded(true);
+  },
+);
 
 function activeCrewMemberCount(members: JsonMap[]): number {
   return members.filter((member) =>
@@ -1715,6 +2398,10 @@ export const onNotificationCreated = onDocumentCreated(
         target_screen: String(notification.target_screen ?? ""),
         additional_data: String(notification.additional_data ?? ""),
         crew_id: String(notification.additional_data ?? ""),
+        promotion_request_id: String(notification.promotion_request_id ?? notification.additional_data ?? ""),
+        dog_id: String(notification.dog_id ?? ""),
+        modality: String(notification.modality ?? ""),
+        module_id: String(notification.module_id ?? ""),
         click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
       android: {

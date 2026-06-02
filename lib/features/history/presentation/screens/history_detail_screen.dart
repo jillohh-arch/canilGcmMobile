@@ -40,13 +40,6 @@ const Color _green = AppTheme.success;
 const Color _amber = AppTheme.warning;
 const Color _red = AppTheme.error;
 
-class HistoryDetailScreen extends StatelessWidget {
-  final HistoryEntry entry;
-  const HistoryDetailScreen({super.key, required this.entry});
-  @override
-  Widget build(BuildContext context) => RegistroDetalhePage(entry: entry);
-}
-
 class RegistroDetalhePage extends StatelessWidget {
   final HistoryEntry entry;
   const RegistroDetalhePage({super.key, required this.entry});
@@ -692,7 +685,7 @@ class HistoryDetailScaffold extends StatelessWidget {
       blockBody = Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Text(
-          'Este registro de ${detail.typeLabel} está homologado e sincronizado com os servidores do Canil Municipal K9 de Limeira. Não requer criptografia individual.',
+          'Este registro de ${detail.typeLabel} esta sincronizado e auditavel pela trilha operacional. Nao requer criptografia individual.',
           style: GoogleFonts.inter(
             color: _textSecondary,
             fontSize: 11.5,

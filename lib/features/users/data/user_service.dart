@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/users/domain/user.dart';
@@ -9,6 +10,9 @@ class UserService {
     : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'southamerica-east1',
+  );
 
   Stream<List<UserModel>> getUsers() {
     return _db.collection('users').snapshots().map((snapshot) {
@@ -70,6 +74,25 @@ class UserService {
     final data = doc.data()!;
     if (_isDeleted(data)) return null;
     return UserModel.fromJson({...data, 'id': doc.id});
+  }
+
+  Future<Map<String, dynamic>> setK9InstructorRole({
+    required String ra,
+    required bool enabled,
+  }) async {
+    final callable = _functions.httpsCallable('setK9InstructorRole');
+    final result = await callable.call<Map<String, dynamic>>({
+      'ra': ra,
+      'enabled': enabled,
+    });
+    final currentRa = FirebaseAuth.instance.currentUser?.email
+        ?.replaceAll('@canilgcm.com', '')
+        .replaceAll('@gcm.com.br', '')
+        .trim();
+    if (currentRa == ra) {
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+    }
+    return result.data;
   }
 
   bool _isDeleted(Map<String, dynamic> data) {

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Padrão de treino — Formação / Operacional (Busca & Captura)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;flex-wrap:wrap;padding:24px 20px;gap:26px;}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;}
+  .phone-label{color:#4dd0e1;font-size:11px;font-weight:600;letter-spacing:1.2px;margin-bottom:10px;text-align:center;}
+  .phone-label small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .phone{width:390px;height:844px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;flex-shrink:0;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .scroll{flex:1;overflow-y:auto;padding:0 16px 24px;}
+  .scroll::-webkit-scrollbar{width:0;}
+
+  .top{display:flex;align-items:center;gap:11px;padding:6px 2px 12px;}
+  .back-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;background:rgba(255,255,255,.04);border-radius:9px;flex-shrink:0;}
+  .top-ic{width:40px;height:40px;border-radius:11px;background:rgba(77,208,225,.1);border:1px solid rgba(77,208,225,.25);display:flex;align-items:center;justify-content:center;font-size:19px;}
+  .top-tt .k{color:#5a7280;font-size:9px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;}
+  .top-tt .n{color:#fff;font-size:16px;font-weight:700;margin-top:1px;}
+
+  /* abas */
+  .tabs{display:flex;gap:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:5px;margin:4px 2px 16px;}
+  .tab{flex:1;text-align:center;padding:11px;border-radius:9px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .tab.on{background:#4dd0e1;color:#04181d;}
+  .tab.off{color:#8aa0a8;}
+  .tab.locked{color:#5a7280;}
+
+  .dog-row{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:12px;margin-bottom:8px;}
+  .dog-av{width:42px;height:42px;border-radius:50%;background:#16242a;border:2px solid #2ecc71;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#2ecc71;flex-shrink:0;}
+  .dog-av.cyan{border-color:#4dd0e1;color:#4dd0e1;}
+  .dog-nm{color:#fff;font-size:14px;font-weight:700;}
+  .dog-mt{color:#7a8a92;font-size:11px;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+
+  .prog{display:flex;align-items:center;gap:9px;margin:14px 2px 12px;}
+  .prog .t{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;}
+  .prog .ln{flex:1;height:1px;background:rgba(255,255,255,.07);}
+  .prog .c{color:#4dd0e1;font-size:10px;font-family:'IBM Plex Mono',monospace;}
+
+  .mod{border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);position:relative;}
+  .mod.done{border-color:rgba(46,204,113,.25);}
+  .mod.active{border-color:rgba(77,208,225,.3);background:rgba(77,208,225,.05);}
+  .mod.locked{opacity:.5;}
+  .mod-h{display:flex;align-items:flex-start;gap:11px;}
+  .mod-badge{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;}
+  .mb-done{background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.4);color:#2ecc71;}
+  .mb-active{background:rgba(77,208,225,.15);border:1px solid rgba(77,208,225,.4);color:#4dd0e1;}
+  .mb-locked{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#5a7280;}
+  .mod-tt{flex:1;}
+  .mod-nm{color:#fff;font-size:13.5px;font-weight:700;line-height:1.25;}
+  .mod-de{color:#8aa0a8;font-size:11px;margin-top:3px;line-height:1.4;}
+  .mod-st{font-size:9px;font-weight:700;letter-spacing:.6px;padding:3px 8px;border-radius:9px;white-space:nowrap;}
+  .st-done{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);color:#2ecc71;}
+  .st-active{background:rgba(77,208,225,.12);border:1px solid rgba(77,208,225,.3);color:#4dd0e1;}
+  .st-locked{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#5a7280;}
+  .mod-meta{color:#7a8a92;font-size:10px;margin-top:9px;font-family:'IBM Plex Mono',monospace;padding-top:9px;border-top:1px solid rgba(255,255,255,.06);}
+
+  /* marcos */
+  .marks{margin-top:11px;display:flex;flex-direction:column;gap:6px;}
+  .mark{display:flex;align-items:center;gap:8px;font-size:11px;color:#b0c4cc;}
+  .mk-box{width:15px;height:15px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;}
+  .mk-on{background:rgba(46,204,113,.15);border:1px solid #2ecc71;color:#2ecc71;}
+  .mk-off{border:1px solid #44565e;color:transparent;}
+  .mod-acts{display:flex;gap:8px;margin-top:13px;}
+  .ma{flex:1;border-radius:10px;padding:11px;font-size:12px;font-weight:700;text-align:center;font-family:inherit;border:none;}
+  .ma-ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:#cfe0e6;}
+  .ma-cyan{background:#4dd0e1;color:#04181d;}
+
+  .final{display:flex;align-items:center;gap:11px;padding:13px;border-radius:13px;border:1px dashed rgba(241,196,15,.3);background:rgba(241,196,15,.04);margin-top:4px;}
+  .final .i{font-size:18px;}
+  .final .t{color:#f1c40f;font-size:12.5px;font-weight:700;}
+  .final .s{color:#9a8a52;font-size:10px;margin-top:1px;}
+
+  /* tela concluir */
+  .panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:15px;margin-bottom:11px;}
+  .panel-h{color:#fff;font-size:13px;font-weight:700;margin-bottom:11px;}
+  .stat-row{display:flex;gap:8px;margin-bottom:12px;}
+  .stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;text-align:center;}
+  .stat .v{color:#4dd0e1;font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .stat .l{color:#7a8a92;font-size:9px;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+  .declare{background:rgba(46,204,113,.05);border:1px solid rgba(46,204,113,.2);border-radius:12px;padding:13px;margin-bottom:8px;}
+  .declare .tx{color:#cfe6d8;font-size:12px;line-height:1.5;}
+  .declare .tx b{color:#2ecc71;}
+  .obs{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px;color:#5a7280;font-size:11px;margin-top:9px;font-style:italic;}
+
+  .swipe{margin-top:14px;background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.3);border-radius:30px;height:56px;display:flex;align-items:center;padding:5px;position:relative;}
+  .swipe-knob{width:46px;height:46px;border-radius:50%;background:#2ecc71;color:#04140a;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;box-shadow:0 2px 10px rgba(46,204,113,.4);}
+  .swipe-tx{flex:1;text-align:center;color:#2ecc71;font-size:12.5px;font-weight:700;letter-spacing:.3px;}
+  .audit-note{color:#7a8a92;font-size:10px;line-height:1.5;margin-top:11px;text-align:center;}
+  .audit-note b{color:#b0c4cc;}
+
+  /* operacional */
+  .op-status{background:linear-gradient(135deg,rgba(46,204,113,.1),rgba(46,204,113,.02));border:1px solid rgba(46,204,113,.25);border-radius:16px;padding:16px;margin-bottom:11px;}
+  .op-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.4);color:#2ecc71;font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 11px;border-radius:11px;}
+  .op-stats{display:flex;gap:8px;margin-top:13px;}
+  .op-rec{display:flex;align-items:center;gap:11px;background:rgba(241,196,15,.05);border:1px solid rgba(241,196,15,.2);border-radius:12px;padding:12px;margin-bottom:11px;}
+  .op-rec .i{font-size:18px;}
+  .op-rec .t{color:#f1c40f;font-size:12px;font-weight:700;}
+  .op-rec .s{color:#9a8a52;font-size:10.5px;margin-top:1px;line-height:1.4;}
+  .big-btn{width:100%;border:none;border-radius:13px;padding:15px;font-size:14px;font-weight:800;font-family:inherit;background:#4dd0e1;color:#04181d;display:flex;align-items:center;justify-content:center;gap:8px;}
+
+  .design-notes{width:100%;max-width:1280px;margin:8px auto 0;color:#9aa7af;font-size:13px;line-height:1.6;}
+  .design-notes h3{color:#4dd0e1;font-size:14px;margin:16px 0 9px;letter-spacing:.5px;}
+  .design-notes ul{list-style:none;padding-left:0;}
+  .design-notes li{padding:4px 0 4px 20px;position:relative;}
+  .design-notes li:before{content:"→";position:absolute;left:0;color:#4dd0e1;}
+  .design-notes b{color:#b0c4cc;}
+  .lesson{background:rgba(77,208,225,.04);border-left:3px solid #4dd0e1;border-radius:8px;padding:12px 14px;margin:6px 0;color:#b0c4cc;font-size:12px;line-height:1.55;}
+  .lesson b{color:#4dd0e1;}
+</style>
+</head>
+<body>
+
+<!-- ===== T1 — FORMAÇÃO (abas, roadmap de módulos) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T1 — ABA FORMAÇÃO<small>módulos que abrem em sequência · Operacional travada</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>14:32</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">🎯</div><div class="top-tt"><div class="k">Treinamento</div><div class="n">Busca &amp; Captura</div></div></div>
+
+      <div class="tabs">
+        <div class="tab on">Formação</div>
+        <div class="tab locked">🔒 Operacional</div>
+      </div>
+
+      <div class="dog-row"><div class="dog-av cyan">THOR</div><div><div class="dog-nm">Thor · GCM Silva</div><div class="dog-mt">em formação há 2 meses</div></div></div>
+
+      <div class="prog"><span class="t">Roadmap</span><span class="ln"></span><span class="c">módulo 2 de 3</span></div>
+
+      <div class="mod done">
+        <div class="mod-h"><div class="mod-badge mb-done">✓</div><div class="mod-tt"><div class="mod-nm">Módulo 1 — Pareamento e indicação</div><div class="mod-de">Mata fechada · odor forte · distância progressiva</div></div><span class="mod-st st-done">CONCLUÍDO</span></div>
+        <div class="mod-meta">concluído 15/04/2026 · 24 sessões · promovido por GCM Silva</div>
+      </div>
+
+      <div class="mod active">
+        <div class="mod-h"><div class="mod-badge mb-active">2</div><div class="mod-tt"><div class="mod-nm">Módulo 2 — Indicações estruturais</div><div class="mod-de">Vegetação rasteira · objetos médios · obstáculos urbanos</div></div><span class="mod-st st-active">EM TREINO</span></div>
+        <div class="marks">
+          <div class="mark"><span class="mk-box mk-on">✓</span> Indicação em telhado</div>
+          <div class="mark"><span class="mk-box mk-on">✓</span> Indicação em entulho</div>
+          <div class="mark"><span class="mk-box mk-off"></span> Indicação em altura</div>
+          <div class="mark"><span class="mk-box mk-off"></span> Distração com figurante</div>
+        </div>
+        <div class="mod-meta">6 de 12 marcos · 18 sessões · última há 3 dias</div>
+        <div class="mod-acts"><button class="ma ma-ghost">+ Nova sessão</button><button class="ma ma-cyan">Avaliar e concluir</button></div>
+      </div>
+
+      <div class="mod locked">
+        <div class="mod-h"><div class="mod-badge mb-locked">🔒</div><div class="mod-tt"><div class="mod-nm">Módulo 3 — Operacional urbano</div><div class="mod-de">Cenário real · vestígios mínimos · todas as variáveis</div></div><span class="mod-st st-locked">A INICIAR</span></div>
+        <div class="mod-meta">disponível após concluir o Módulo 2</div>
+      </div>
+
+      <div class="final"><span class="i">🏅</span><div><div class="t">Conclusão → cão Operacional</div><div class="s">ao concluir o Módulo 3, a aba Operacional destrava</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T2 — AVALIAR E CONCLUIR MÓDULO ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T2 — AVALIAR E CONCLUIR<small>marco auditado · libera o próximo módulo</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>14:34</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">🎯</div><div class="top-tt"><div class="k">Concluir módulo 2</div><div class="n">Indicações estruturais</div></div></div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="v">18</div><div class="l">sessões</div></div>
+        <div class="stat"><div class="v">9/12</div><div class="l">marcos</div></div>
+        <div class="stat"><div class="v">2m</div><div class="l">no módulo</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">Marcos do módulo</div>
+        <div class="marks">
+          <div class="mark"><span class="mk-box mk-on">✓</span> Indicação em telhado</div>
+          <div class="mark"><span class="mk-box mk-on">✓</span> Indicação em entulho</div>
+          <div class="mark"><span class="mk-box mk-on">✓</span> Indicação em altura</div>
+          <div class="mark"><span class="mk-box mk-off"></span> Distração com figurante <span style="color:#5a7280;font-size:10px">(opcional)</span></div>
+        </div>
+      </div>
+
+      <div class="declare">
+        <div class="tx"><b>Declaração do instrutor.</b> Atesto que <b>Thor</b> demonstrou desempenho consistente no Módulo 2 e está apto a evoluir para o Módulo 3.</div>
+        <div class="obs">＋ adicionar observação técnica (opcional)</div>
+      </div>
+
+      <div class="swipe"><div class="swipe-knob">→</div><div class="swipe-tx">Arraste para concluir e liberar o Módulo 3</div></div>
+      <div class="audit-note">Registra <b>quem promoveu, quando e com base em quais marcos</b>. Fica no histórico do cão — não pode ser apagado, só corrigido com trilha.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== T3 — OPERACIONAL (destravada após formar) ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">T3 — ABA OPERACIONAL<small>destrava quando a formação conclui · vira manutenção</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>14:36</span><div class="status-icons"><span>4G</span><span>•••</span><span>🔋</span></div></div>
+    <div class="scroll">
+      <div class="top"><div class="back-btn">‹</div><div class="top-ic">🎯</div><div class="top-tt"><div class="k">Treinamento</div><div class="n">Busca &amp; Captura</div></div></div>
+
+      <div class="tabs">
+        <div class="tab off">✓ Formação</div>
+        <div class="tab on">Operacional</div>
+      </div>
+
+      <div class="dog-row"><div class="dog-av">BONO</div><div><div class="dog-nm">Bono · GCM Ragonha</div><div class="dog-mt">matrícula 0042</div></div></div>
+
+      <div class="op-status">
+        <span class="op-badge">● OPERACIONAL HÁ 18 MESES</span>
+        <div class="op-stats">
+          <div class="stat" style="background:rgba(255,255,255,.04)"><div class="v">87</div><div class="l">sessões</div></div>
+          <div class="stat" style="background:rgba(255,255,255,.04)"><div class="v">7d</div><div class="l">última</div></div>
+          <div class="stat" style="background:rgba(255,255,255,.04)"><div class="v">42km</div><div class="l">dist. total</div></div>
+        </div>
+      </div>
+
+      <div class="op-rec"><span class="i">⏰</span><div><div class="t">Recomendado treino semanal</div><div class="s">Última manutenção há 7 dias. Mantenha a rotina pra preservar o cão afiado.</div></div></div>
+
+      <div class="prog"><span class="t">Manutenção</span><span class="ln"></span></div>
+      <div style="color:#8aa0a8;font-size:12px;line-height:1.5;margin:0 2px 14px">Registra sessões de manutenção do que já foi formado — com rastreador GPS, figurante, objeto de odor e ambiente. Não há mais módulos a abrir; o foco é manter.</div>
+
+      <button class="big-btn">📡 Nova sessão de manutenção</button>
+    </div>
+  </div>
+</div>
+
+<div class="design-notes">
+  <div class="lesson"><b>Um padrão para detecção, busca &amp; captura e guarda &amp; proteção.</b> Duas abas: <b>Formação</b> (módulos que abrem em sequência) e <b>Operacional</b> (manutenção, travada até formar). Cada modalidade só preenche seus próprios módulos e marcos — a mecânica é a mesma.</div>
+  <h3>Como a formação avança</h3>
+  <ul>
+    <li><b>Módulos sequenciais:</b> só o atual fica aberto; os seguintes ficam 🔒 até o anterior concluir.</li>
+    <li><b>Sessões livres:</b> o módulo aceita quantas sessões precisar — sem trava por número.</li>
+    <li><b>Marcos são guia, não cadeado:</b> mostram progresso, mas quem decide a evolução é o instrutor.</li>
+    <li><b>Concluir = marco auditado:</b> botão "Avaliar e concluir" → avaliação + declaração → swipe-to-confirm. Registra quem, quando e com base em quê. Não é um swipe solto.</li>
+    <li><b>Concluir o último módulo</b> → cão vira <b>Operacional</b> → a aba Operacional destrava.</li>
+  </ul>
+  <h3>A definir com você (por modalidade)</h3>
+  <ul>
+    <li>Os <b>módulos e marcos</b> de cada modalidade (detecção já tem os seus; B&amp;C tem 3 acima; G&amp;P falta definir).</li>
+    <li><b>Erro reseta a fase?</b> A detecção tem essa regra (Parte 4_1). Vale pra B&amp;C e G&amp;P, ou cada uma tem sua regra de recuo?</li>
+    <li>A <b>Avaliação Final</b> (prova de certificação) é opcional, obrigatória, ou some?</li>
+  </ul>
+</div>
+
+</body>
+</html>

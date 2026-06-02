@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
 
 class TrainingRepository {
@@ -60,13 +59,14 @@ class TrainingRepository {
     String dogField,
     String dogId,
   ) {
-    final query = SoftDeletable.activeOnly(
-      _firestore.collection(collection).where(dogField, isEqualTo: dogId),
-    );
+    final query = _firestore
+        .collection(collection)
+        .where(dogField, isEqualTo: dogId);
     return query
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
+              .where((doc) => !_isSoftDeleted(doc.data()))
               .map((doc) => TrainingHubSession.fromJson(doc.data(), doc.id))
               .where((session) => session.dogId == dogId)
               .toList(),
@@ -75,13 +75,15 @@ class TrainingRepository {
   }
 
   Stream<List<TrainingHubSession>> _watchDogTrainingSessions(String dogId) {
-    final query = SoftDeletable.activeOnly(
-      _firestore.collection('dogs').doc(dogId).collection('training_sessions'),
-    );
+    final query = _firestore
+        .collection('dogs')
+        .doc(dogId)
+        .collection('training_sessions');
     return query
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
+              .where((doc) => !_isSoftDeleted(doc.data()))
               .map((doc) => TrainingHubSession.fromJson(doc.data(), doc.id))
               .where(
                 (session) => session.dogId == dogId || session.dogId.isEmpty,
@@ -168,5 +170,9 @@ class TrainingRepository {
     );
 
     return controller.stream;
+  }
+
+  bool _isSoftDeleted(Map<String, dynamic> data) {
+    return data['deleted_at'] != null;
   }
 }

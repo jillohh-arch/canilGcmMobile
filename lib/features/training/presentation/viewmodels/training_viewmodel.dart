@@ -61,6 +61,43 @@ class TrainingViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> addDogTrainingSession(TrainingSessionModel session) async {
+    try {
+      _setLoading(true);
+
+      final newSession = await _trainingService.addDogTrainingSession(session);
+
+      try {
+        await _dogService.updateDogDates(
+          newSession.dogId,
+          lastTrainingDate: newSession.date,
+        );
+      } catch (e) {
+        developer.log(
+          'Dog-scoped training saved, but dog lastTrainingDate update failed: $e',
+          name: 'TrainingViewModel',
+          error: e,
+        );
+      }
+
+      _trainings.insert(0, newSession);
+      developer.log(
+        'Dog-scoped training session added: ${newSession.id}',
+        name: 'TrainingViewModel',
+      );
+
+      _setLoading(false);
+    } catch (e) {
+      _setLoading(false);
+      developer.log(
+        'Error adding dog-scoped training session: $e',
+        name: 'TrainingViewModel',
+        error: e,
+      );
+      throw Exception('Falha ao salvar treino do cao: $e');
+    }
+  }
+
   // Update an existing training session
   Future<void> updateTrainingSession(TrainingSessionModel session) async {
     if (session.id == null) return;

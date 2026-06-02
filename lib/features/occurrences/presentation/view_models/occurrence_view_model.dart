@@ -25,14 +25,17 @@ class OccurrenceViewModel extends ChangeNotifier {
   final OccurrenceRepository _repository;
   final OccurrenceEventRepository _eventRepository;
   final SignatureRepository _signatureRepository;
+  final bool _sendTeamNotifications;
 
   OccurrenceViewModel({
     required OccurrenceRepository repository,
     required OccurrenceEventRepository eventRepository,
     SignatureRepository? signatureRepository,
+    bool sendTeamNotifications = true,
   }) : _repository = repository,
        _eventRepository = eventRepository,
-       _signatureRepository = signatureRepository ?? SignatureRepository();
+       _signatureRepository = signatureRepository ?? SignatureRepository(),
+       _sendTeamNotifications = sendTeamNotifications;
 
   // ─── Estado ─────────────────────────────────────────────────────────
 
@@ -233,6 +236,8 @@ class OccurrenceViewModel extends ChangeNotifier {
   // ─── Evento Inicial ─────────────────────────────────────────────────
 
   Future<void> _notifyTeamOccurrenceOpened(Occurrence occurrence) async {
+    if (!_sendTeamNotifications) return;
+
     final notificationService = NotificationService();
     final primaryRa = occurrence.primaryHandlerRa?.trim();
     final recipients = occurrence.team.where((member) {

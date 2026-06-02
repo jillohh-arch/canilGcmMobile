@@ -6,6 +6,254 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isTrainingInstructor() {
+      return signedIn()
+        && (
+          (
+            'instrutor' in request.auth.token
+            && request.auth.token.instrutor == true
+          )
+          || (
+            'adestrador' in request.auth.token
+            && request.auth.token.adestrador == true
+          )
+          || (
+            'instrutor_k9' in request.auth.token
+            && request.auth.token.instrutor_k9 == true
+          )
+          || (
+            'role' in request.auth.token
+            && request.auth.token.role == 'instrutor_k9'
+          )
+          || (
+            'training_instructor' in request.auth.token
+            && request.auth.token.training_instructor == true
+          )
+          || (
+            'training_role' in request.auth.token
+            && request.auth.token.training_role in ['instrutor', 'adestrador', 'instrutor_k9']
+          )
+          || (
+            'roles' in request.auth.token
+            &&
+            request.auth.token.roles is list
+            && request.auth.token.roles.hasAny(['instrutor', 'adestrador', 'instrutor_k9'])
+          )
+        );
+    }
+
+    function validTrainingProgress(modality) {
+      return request.resource.data.modality == modality
+        && request.resource.data.status in ['in_formation', 'operational']
+        && request.resource.data.program_version is int
+        && request.resource.data.completed_module_ids is list
+        && request.resource.data.completed_modules is list
+        && (
+          !('current_module' in request.resource.data)
+          || request.resource.data.current_module is string
+          || request.resource.data.current_module == null
+        )
+        && (
+          !('operational_since' in request.resource.data)
+          || request.resource.data.operational_since is timestamp
+          || request.resource.data.operational_since == null
+        );
+    }
+
+    function canUpdateTrainingProgressMarks(modality) {
+      return canUpdateAuditedRecord()
+        && resource.data.get('modality', null) == modality
+        && validTrainingProgress(modality)
+        && changedKeys().hasOnly([
+          'achieved_milestones',
+          'program_version',
+          'updated_at',
+          'audit_trail'
+        ]);
+    }
+
+    function isLegacyTrainingProgress() {
+      return !(resource.data.get('modality', null) is string)
+        || !(resource.data.get('status', null) is string)
+        || !(resource.data.get('program_version', null) is int)
+        || !(resource.data.get('completed_module_ids', null) is list)
+        || !(resource.data.get('completed_modules', null) is list)
+        || !(resource.data.get('achieved_milestones', null) is map);
+    }
+
+    function safeNormalizedTrainingStatus() {
+      let currentStatus = resource.data.get('status', null);
+      return (
+          currentStatus == null
+          && request.resource.data.status == 'in_formation'
+        )
+        || (
+          currentStatus == 'operational'
+          && request.resource.data.status == 'operational'
+        )
+        || (
+          currentStatus != null
+          && currentStatus != 'operational'
+          && request.resource.data.status == 'in_formation'
+        );
+    }
+
+    function canNormalizeBuscaCapturaTrainingProgress(modality) {
+      return modality == 'busca_captura'
+        && canUpdateAuditedRecord()
+        && resource.data.get('modality', modality) == modality
+        && validTrainingProgress(modality)
+        && isLegacyTrainingProgress()
+        && safeNormalizedTrainingStatus()
+        && request.resource.data.completed_module_ids.size() == 0
+        && request.resource.data.completed_modules.size() == 0
+        && changedKeys().hasOnly([
+          'modality',
+          'status',
+          'current_module',
+          'current_module_id',
+          'program_version',
+          'completed_module_ids',
+          'completed_modules',
+          'achieved_milestones',
+          'operational_since',
+          'updated_at',
+          'audit_trail'
+        ]);
+    }
+
+    function canCreateBonusTrainingMilestone(dogId, modality, bonusId) {
+      let parentProgress = get(/databases/$(database)/documents/dogs/$(dogId)/training/$(modality)).data;
+      return canCreateAuditedRecord()
+        && parentProgress.status == 'operational'
+        && request.resource.data.keys().hasOnly([
+          'module_id',
+          'module_order',
+          'module_name',
+          'milestone_id',
+          'milestone_order',
+          'label',
+          'required',
+          'program_version',
+          'completed_at',
+          'by',
+          'completed_by',
+          'created_at',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.module_id is string
+        && request.resource.data.milestone_id is string
+        && bonusId == request.resource.data.module_id + '__' + request.resource.data.milestone_id
+        && request.resource.data.label is string
+        && request.resource.data.program_version is int
+        && request.resource.data.completed_at is timestamp
+        && request.resource.data.by is string
+        && request.resource.data.completed_by == request.resource.data.by
+        && emailMatchesRa(request.resource.data.by);
+    }
+
+    function canCreateCompletedModuleCorrection(dogId, modality) {
+      let parentProgress = get(/databases/$(database)/documents/dogs/$(dogId)/training/$(modality)).data;
+      return isTrainingInstructor()
+        && canCreateAuditedRecord()
+        && request.resource.data.keys().hasOnly([
+          'module_id',
+          'correction_type',
+          'reason',
+          'before_snapshot',
+          'after_snapshot',
+          'requested_changes',
+          'corrected_by',
+          'corrected_by_uid',
+          'corrected_by_email',
+          'corrected_by_name',
+          'created_at',
+          'updated_at',
+          'audit_trail'
+        ])
+        && parentProgress.completed_module_ids is list
+        && parentProgress.completed_module_ids.hasAny([request.resource.data.module_id])
+        && request.resource.data.module_id is string
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.before_snapshot is map
+        && request.resource.data.corrected_by is string
+        && emailMatchesRa(request.resource.data.corrected_by)
+        && request.resource.data.created_at is timestamp;
+    }
+
+    function directInstructorFlagIsSafe() {
+      return !('direct_instructor' in request.resource.data)
+        || request.resource.data.direct_instructor == false
+        || isTrainingInstructor();
+    }
+
+    function canCreatePromotionRequest() {
+      return canCreateAuditedRecord()
+        && request.resource.data.keys().hasOnly([
+          'dog_id',
+          'dog_name',
+          'modality',
+          'program_id',
+          'program_version',
+          'module_id',
+          'module_name',
+          'module_order',
+          'status',
+          'direct_instructor',
+          'requester_ra',
+          'requester_name',
+          'requested_by_uid',
+          'requested_by_email',
+          'requested_at',
+          'created_at',
+          'updated_at',
+          'marks_snapshot',
+          'audit_trail'
+        ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.dog_id is string
+        && request.resource.data.modality is string
+        && request.resource.data.module_id is string
+        && request.resource.data.program_version is int
+        && request.resource.data.marks_snapshot is list
+        && request.resource.data.requester_ra is string
+        && emailMatchesRa(request.resource.data.requester_ra)
+        && request.resource.data.requested_by_uid == request.auth.uid
+        && request.resource.data.requested_by_email == request.auth.token.email
+        && directInstructorFlagIsSafe();
+    }
+
+    function canDecidePromotionRequest() {
+      return isTrainingInstructor()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['approved', 'rejected']
+        && changedKeys().hasOnly([
+          'status',
+          'decision',
+          'decision_by',
+          'decision_by_uid',
+          'decision_by_email',
+          'decision_reason',
+          'decided_at',
+          'updated_at',
+          'audit_trail'
+        ])
+        && request.resource.data.decision_by is string
+        && request.resource.data.decision_by_uid == request.auth.uid
+        && request.resource.data.decision_by_email == request.auth.token.email
+        && emailMatchesRa(request.resource.data.decision_by)
+        && (
+          request.resource.data.status == 'approved'
+          || (
+            request.resource.data.decision_reason is string
+            && request.resource.data.decision_reason.size() > 0
+          )
+        )
+        && appendsInlineAuditOnUpdate();
+    }
+
     function emailMatchesRa(ra) {
       return signedIn()
         && ra is string
@@ -123,14 +371,15 @@ service cloud.firestore {
     }
 
     function appendsInlineAuditOnUpdate() {
+      let previousAudit = resource.data.get('audit_trail', []);
       return request.resource.data.audit_trail is list
         && (
           (
-            resource.data.audit_trail is list
-            && request.resource.data.audit_trail.size() > resource.data.audit_trail.size()
+            previousAudit is list
+            && request.resource.data.audit_trail.size() > previousAudit.size()
           )
           || (
-            !(resource.data.audit_trail is list)
+            !(previousAudit is list)
             && request.resource.data.audit_trail.size() > 0
           )
         );
@@ -340,6 +589,35 @@ service cloud.firestore {
           || get(/databases/$(database)/documents/active_shifts/$(ra)).data.service_dog_id == dogId
           || get(/databases/$(database)/documents/active_shifts/$(ra)).data.currentDogId == dogId
         );
+    }
+
+    function isAuthenticatedTrainingHandler(data) {
+      let handlerId = trainingHandlerId(data);
+      return handlerId is string
+        && handlerId.size() > 0
+        && emailMatchesRa(handlerId);
+    }
+
+    function isBuscaCapturaSession(data) {
+      return (
+          data.modality == 'busca_captura'
+          || data.specialty == 'busca_captura'
+          || data.type == 'busca_captura_track'
+          || data.trainingType == 'Busca & Captura'
+          || data.training_type == 'Busca & Captura'
+        )
+        && data.phase in ['formation', 'maintenance']
+        && data.track is map;
+    }
+
+    function canWriteBuscaCapturaSession(pathDogId, data) {
+      return signedIn()
+        && pathDogId is string
+        && pathDogId.size() > 0
+        && exists(/databases/$(database)/documents/dogs/$(pathDogId))
+        && trainingPayloadMatchesDog(pathDogId, data)
+        && isAuthenticatedTrainingHandler(data)
+        && isBuscaCapturaSession(data);
     }
 
     function activeShiftBelongsToAuth(ra) {
@@ -1082,6 +1360,27 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /training/{modality} {
+        allow read: if signedIn();
+        allow create: if canCreateAuditedRecord()
+          && validTrainingProgress(modality);
+        allow update: if canUpdateTrainingProgressMarks(modality)
+          || canNormalizeBuscaCapturaTrainingProgress(modality);
+        allow delete: if false;
+
+        match /bonus_milestones/{bonusId} {
+          allow read: if signedIn();
+          allow create: if canCreateBonusTrainingMilestone(dogId, modality, bonusId);
+          allow update, delete: if false;
+        }
+
+        match /completed_module_corrections/{correctionId} {
+          allow read: if signedIn();
+          allow create: if canCreateCompletedModuleCorrection(dogId, modality);
+          allow update, delete: if false;
+        }
+      }
+
       match /detection_lines/{lineId} {
         allow read: if signedIn();
         allow create: if canCreateAuditedRecord();
@@ -1134,8 +1433,15 @@ service cloud.firestore {
       match /training_sessions/{sessionId} {
         allow read: if signedIn();
         allow create: if canCreateAuditedRecord()
-          && canWriteDogTraining(dogId, request.resource.data);
-        allow update: if canWriteDogTraining(dogId, request.resource.data)
+          && (
+            canWriteDogTraining(dogId, request.resource.data)
+            || canWriteBuscaCapturaSession(dogId, request.resource.data)
+          );
+        allow update: if canUpdateAuditedOrSoftDelete()
+          && (
+            canWriteDogTraining(dogId, request.resource.data)
+            || canWriteBuscaCapturaSession(dogId, request.resource.data)
+          )
           && (
             trainingDogId(resource.data) == ''
             || trainingPayloadMatchesDog(dogId, resource.data)
@@ -1272,6 +1578,35 @@ service cloud.firestore {
     match /occurrence_natures/{natureId} {
       allow read: if signedIn();
       allow create, update, delete: if false;
+    }
+
+    match /training_programs/{programId} {
+      allow read: if signedIn();
+      allow create: if isTrainingInstructor() && canCreateAuditedRecord();
+      allow update: if isTrainingInstructor() && canUpdateAuditedRecord();
+      allow delete: if false;
+
+      match /modules/{moduleId} {
+        allow read: if signedIn();
+        allow create: if isTrainingInstructor() && canCreateAuditedRecord();
+        allow update: if isTrainingInstructor() && canUpdateAuditedRecord();
+        allow delete: if false;
+
+        match /milestones/{milestoneId} {
+          allow read: if signedIn();
+          allow create: if isTrainingInstructor() && canCreateAuditedRecord();
+          allow update: if isTrainingInstructor() && canUpdateAuditedRecord();
+          allow delete: if false;
+        }
+      }
+    }
+
+    match /promotion_requests/{requestId} {
+      allow read: if isTrainingInstructor()
+        || emailMatchesRa(resource.data.requester_ra);
+      allow create: if canCreatePromotionRequest();
+      allow update: if canDecidePromotionRequest();
+      allow delete: if false;
     }
 
     match /routines/{routineId} {

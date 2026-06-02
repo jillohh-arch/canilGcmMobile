@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 import 'package:canil_gcm/core/services/active_shift_identity_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
@@ -29,6 +28,7 @@ class TrainingService {
 
     await docRef.set({
       ...after,
+      ..._activeSoftDeleteFields(),
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
       'audit_trail': [entry],
@@ -40,6 +40,77 @@ class TrainingService {
       entityId: docRef.id,
       summary: _summaryFor(session, 'Treino registrado'),
       after: after,
+    );
+
+    return TrainingSessionModel.fromJson(after, docRef.id);
+  }
+
+  Future<TrainingSessionModel> addDogTrainingSession(
+    TrainingSessionModel session,
+  ) async {
+    final payload = await _trainingPayload(session);
+    final dogId = (payload['dogId'] ?? payload['dog_id'] ?? session.dogId)
+        .toString();
+    final docRef = _firestore
+        .collection('dogs')
+        .doc(dogId)
+        .collection('training_sessions')
+        .doc();
+    final entry = AuditService.buildInlineEntry(action: 'created');
+    final metadata = Map<String, dynamic>.from(session.metadata ?? const {});
+    final track = metadata['track'] ?? metadata['gps_track'];
+    final handlerId = (payload['handlerId'] ?? payload['handler_id'] ?? '')
+        .toString();
+    final after = {
+      ...payload,
+      'id': docRef.id,
+      'dogId': dogId,
+      'dog_id': dogId,
+      'handlerId': handlerId,
+      'handler_id': handlerId,
+      'conductor': metadata['conductor'] ?? handlerId,
+      'type': metadata['type'] ?? 'busca_captura_track',
+      'trainingType': session.trainingType,
+      'training_type': session.trainingType,
+      'specialty': metadata['specialty'] ?? metadata['modality'],
+      'modality': metadata['modality'],
+      'phase': metadata['phase'],
+      if (metadata['module_id'] != null) 'module_id': metadata['module_id'],
+      if (metadata['module_name'] != null)
+        'module_name': metadata['module_name'],
+      if (metadata['milestone_id'] != null)
+        'milestone_id': metadata['milestone_id'],
+      if (metadata['milestone_label'] != null)
+        'milestone_label': metadata['milestone_label'],
+      'date': Timestamp.fromDate(session.date),
+      'result': metadata['result'] ?? 'completa',
+      'track': track,
+      'gps_track': track,
+      'observation': session.handlerNotes,
+      'observations': session.handlerNotes,
+      'sync_status': 'synced',
+      'metadata': metadata,
+    };
+
+    await docRef.set({
+      ...after,
+      ..._activeSoftDeleteFields(),
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': [entry],
+    });
+
+    await AuditService.log(
+      action: 'created',
+      entityType: 'training_session',
+      entityId: docRef.id,
+      summary: _summaryFor(session, 'Sessao B&C registrada'),
+      after: after,
+      metadata: {
+        'collection': 'dogs/$dogId/training_sessions',
+        'modality': metadata['modality'],
+        'phase': metadata['phase'],
+      },
     );
 
     return TrainingSessionModel.fromJson(after, docRef.id);
@@ -121,11 +192,12 @@ class TrainingService {
 
     // Buscar de cada collection independentemente para resiliência
     try {
-      final query = SoftDeletable.activeOnly(
-        _firestore.collection('trainings').where('dogId', isEqualTo: dogId),
-      );
+      final query = _firestore
+          .collection('trainings')
+          .where('dogId', isEqualTo: dogId);
       final legacyTrainings = await query.get();
       for (final doc in legacyTrainings.docs) {
+        if (_isSoftDeleted(doc.data())) continue;
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
           byKey['${doc.reference.path}:${doc.id}'] = training;
@@ -136,11 +208,12 @@ class TrainingService {
     }
 
     try {
-      final query = SoftDeletable.activeOnly(
-        _firestore.collection('trainings').where('dog_id', isEqualTo: dogId),
-      );
+      final query = _firestore
+          .collection('trainings')
+          .where('dog_id', isEqualTo: dogId);
       final legacyTrainings = await query.get();
       for (final doc in legacyTrainings.docs) {
+        if (_isSoftDeleted(doc.data())) continue;
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
           byKey['${doc.reference.path}:${doc.id}'] = training;
@@ -151,13 +224,12 @@ class TrainingService {
     }
 
     try {
-      final query = SoftDeletable.activeOnly(
-        _firestore
-            .collection('training_sessions')
-            .where('dogId', isEqualTo: dogId),
-      );
+      final query = _firestore
+          .collection('training_sessions')
+          .where('dogId', isEqualTo: dogId);
       final rootSessions = await query.get();
       for (final doc in rootSessions.docs) {
+        if (_isSoftDeleted(doc.data())) continue;
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
           byKey['${doc.reference.path}:${doc.id}'] = training;
@@ -168,13 +240,12 @@ class TrainingService {
     }
 
     try {
-      final query = SoftDeletable.activeOnly(
-        _firestore
-            .collection('training_sessions')
-            .where('dog_id', isEqualTo: dogId),
-      );
+      final query = _firestore
+          .collection('training_sessions')
+          .where('dog_id', isEqualTo: dogId);
       final rootSessions = await query.get();
       for (final doc in rootSessions.docs) {
+        if (_isSoftDeleted(doc.data())) continue;
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId) {
           byKey['${doc.reference.path}:${doc.id}'] = training;
@@ -187,14 +258,13 @@ class TrainingService {
     }
 
     try {
-      final query = SoftDeletable.activeOnly(
-        _firestore
-            .collection('dogs')
-            .doc(dogId)
-            .collection('training_sessions'),
-      );
+      final query = _firestore
+          .collection('dogs')
+          .doc(dogId)
+          .collection('training_sessions');
       final dogSessions = await query.get();
       for (final doc in dogSessions.docs) {
+        if (_isSoftDeleted(doc.data())) continue;
         final training = TrainingSessionModel.fromJson(doc.data(), doc.id);
         if (training.dogId == dogId || training.dogId.isEmpty) {
           // dogId pode estar vazio em subcollection (implícito pelo path)
@@ -213,9 +283,9 @@ class TrainingService {
   }
 
   Future<List<TrainingSessionModel>> getAllTrainings() async {
-    final query = SoftDeletable.activeOnly(_firestore.collection('trainings'));
-    final snapshot = await query.get();
+    final snapshot = await _firestore.collection('trainings').get();
     final trainings = snapshot.docs
+        .where((doc) => !_isSoftDeleted(doc.data()))
         .map((doc) => TrainingSessionModel.fromJson(doc.data(), doc.id))
         .toList();
     trainings.sort((a, b) => b.date.compareTo(a.date));
@@ -464,5 +534,18 @@ class TrainingService {
     } catch (_) {
       return null;
     }
+  }
+
+  Map<String, dynamic> _activeSoftDeleteFields() {
+    return {
+      'deleted_at': null,
+      'deleted_by': null,
+      'delete_reason': null,
+      'deleted_reason': null,
+    };
+  }
+
+  bool _isSoftDeleted(Map<String, dynamic> data) {
+    return data['deleted_at'] != null;
   }
 }

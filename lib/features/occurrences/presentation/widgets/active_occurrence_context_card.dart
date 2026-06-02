@@ -107,7 +107,7 @@ class ActiveOccurrenceContextCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _InfoRow(
-            label: 'Equipe:',
+            label: 'Guarnição:',
             value: '',
             trailing: Expanded(
               child: _TeamSummaryAction(
@@ -183,7 +183,7 @@ class _TeamSummaryAction extends StatelessWidget {
         ? hasServiceDog
               ? '${team.length} condutor${team.length == 1 ? '' : 'es'} + K9'
               : '${team.length}/$teamSizeMax condutores'
-        : 'Definir equipe';
+        : 'Guarnição não vinculada';
 
     return Material(
       color: AppTheme.transparent,
@@ -200,7 +200,7 @@ class _TeamSummaryAction extends StatelessWidget {
                 const SizedBox(width: 8),
               ] else ...[
                 Icon(
-                  Icons.group_add_outlined,
+                  Icons.groups_2_outlined,
                   color: AppTheme.primary,
                   size: 16,
                 ),
