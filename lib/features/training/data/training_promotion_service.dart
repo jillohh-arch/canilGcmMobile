@@ -41,12 +41,14 @@ class TrainingPromotionService {
     required String dogId,
     required String modality,
     required String moduleId,
+    required String requesterRa,
   }) async {
     final snapshot = await _requests
         .where('dog_id', isEqualTo: dogId)
         .where('modality', isEqualTo: modality)
         .where('module_id', isEqualTo: moduleId)
         .where('status', isEqualTo: 'pending')
+        .where('requester_ra', isEqualTo: requesterRa)
         .limit(1)
         .get();
     if (snapshot.docs.isEmpty) return null;
@@ -66,6 +68,7 @@ class TrainingPromotionService {
       dogId: dog.id,
       modality: program.modality,
       moduleId: module.id,
+      requesterRa: requesterRa,
     );
     if (existing != null) {
       throw StateError('Ja existe solicitacao pendente para este modulo.');
@@ -91,7 +94,7 @@ class TrainingPromotionService {
       'requester_ra': requesterRa,
       'requester_name': requesterName,
       'requested_by_uid': _auth.currentUser?.uid,
-      'requested_by_email': _auth.currentUser?.email,
+      'requested_by_email': _auth.currentUser?.email?.trim().toLowerCase(),
       'requested_at': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
@@ -141,6 +144,15 @@ class TrainingPromotionService {
     final data = doc.data() ?? const <String, dynamic>{};
     return data['is_k9_instructor'] == true ||
         data['training_role'] == 'instrutor_k9';
+  }
+
+  Future<bool> currentUserHasInstructorClaim({
+    bool forceRefresh = false,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    final token = await user.getIdTokenResult(forceRefresh);
+    return _claimMarksInstructor(token.claims ?? const <String, dynamic>{});
   }
 
   Future<Map<String, dynamic>> setK9InstructorRole({
