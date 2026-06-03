@@ -52,6 +52,20 @@ extension _HistoryDataLoader on _HistoryScreenState {
           debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
         });
 
+    WeightHistoryService()
+        .getHistory(dogId, limit: 200)
+        .then((records) {
+          if (!mounted) return;
+          setState(() => _weightRecords = records);
+          debugPrint(
+            '[History] Pesagens canônicas carregadas: ${records.length}',
+          );
+        })
+        .catchError((e) {
+          if (!mounted) return;
+          setState(() => _weightRecords = const []);
+          debugPrint('[History] ERRO ao carregar pesagens canônicas: $e');
+        });
     // Observar ocorrências (stream real-time)
     Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
     debugPrint('[History] watchByDog iniciado para dogId=$dogId');
@@ -69,6 +83,10 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
     for (final log in healthVM.healthLogs) {
       if (log.dogId == dogId) entries.add(_buildHealthEntry(log, dogName));
+    }
+
+    for (final record in _weightRecords) {
+      entries.add(_buildWeightRecordEntry(record, dogName));
     }
 
     for (final occ in occurrenceVM.occurrences) {
@@ -140,6 +158,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
       details: {
         'Cão': dogName,
         'Tipo': log.logType,
+        '_healthKind': isWeight ? 'weight' : log.type,
         if (log.weight != null) 'Peso': '${log.weight!.toStringAsFixed(1)} kg',
         if (log.vaccines.isNotEmpty) 'Vacinas': log.vaccines.join(', '),
         if (log.healthObservations.trim().isNotEmpty)
@@ -147,6 +166,31 @@ extension _HistoryDataLoader on _HistoryScreenState {
         if (log.vetName?.trim().isNotEmpty == true) 'Responsável': log.vetName,
         if (log.mediaAttachments?.isNotEmpty == true)
           '_mediaAttachments': log.mediaAttachments,
+      },
+    );
+  }
+
+  HistoryEntry _buildWeightRecordEntry(WeightRecord record, String dogName) {
+    return HistoryEntry(
+      id: record.id ?? 'weight_${record.measuredAt.millisecondsSinceEpoch}',
+      type: HistoryEntryType.health,
+      title: 'Pesagem operacional registrada',
+      subtitle: 'Peso atual: ${record.weightKg.toStringAsFixed(1)} kg',
+      time: record.measuredAt,
+      author: _resolveAuthorName(record.measuredBy),
+      authorId: record.measuredBy,
+      tag: 'PESO',
+      icon: Icons.monitor_weight_rounded,
+      color: _hPurple,
+      originalModel: record,
+      details: {
+        'Cão': dogName,
+        'Tipo': 'Pesagem',
+        '_healthKind': 'weight',
+        'Peso': '${record.weightKg.toStringAsFixed(1)} kg',
+        if (record.context.trim().isNotEmpty) 'Contexto': record.context,
+        if (record.notes?.trim().isNotEmpty == true)
+          'Observações': record.notes,
       },
     );
   }

@@ -137,6 +137,14 @@ class BinomioHeader extends StatelessWidget {
 
     Widget content = Row(
       children: [
+        _HeaderMenuButton(
+          dog: dog,
+          showProfile: showProfileButton,
+          onProfileTap: onProfileTap,
+          onSwitchDog: onSwitchDog,
+        ),
+        const SizedBox(width: 10),
+
         // Avatares sobrepostos
         SizedBox(
           width: avatarSize * 1.7,
@@ -226,17 +234,13 @@ class BinomioHeader extends StatelessWidget {
           ),
         ),
 
-        // Ações padronizadas do header: um único menu evita duplicidade entre telas.
+        // Ações padronizadas do header: sino separado do menu para pendências.
         if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        if (showNotificationButton && notificationRa != null) ...[
+          const SizedBox(width: 8),
+          _HeaderNotificationBell(userId: notificationRa),
+        ],
         const SizedBox(width: 8),
-        _HeaderMenuButton(
-          dog: dog,
-          notificationUserId: notificationRa,
-          showNotifications: showNotificationButton,
-          showProfile: showProfileButton,
-          onProfileTap: onProfileTap,
-          onSwitchDog: onSwitchDog,
-        ),
       ],
     );
 
@@ -290,28 +294,82 @@ class _HeaderMenuVisualButton extends StatelessWidget {
   }
 }
 
-enum _HeaderMenuAction {
-  profile,
-  team,
-  dog,
-  switchDog,
-  notifications,
-  endShift,
-  logout,
+class _HeaderNotificationBell extends StatelessWidget {
+  final String userId;
+
+  const _HeaderNotificationBell({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    final notificationService = NotificationService();
+
+    return StreamBuilder<int>(
+      stream: notificationService.getOpenActionCount(userId: userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        final label = count > 99 ? '99+' : '$count';
+
+        return Semantics(
+          button: true,
+          label: count > 0 ? '$label pendencias requerem acao' : 'Notificacoes',
+          child: Tooltip(
+            message: count > 0
+                ? '$label pendencias requerem acao'
+                : 'Notificacoes',
+            child: Badge(
+              isLabelVisible: count > 0,
+              backgroundColor: AppTheme.warning,
+              textColor: AppTheme.background,
+              label: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => PendingScreen(userId: userId),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfacePanelAlt,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.primary.withAlpha(45)),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: AppTheme.primary,
+                    size: 19,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
+
+enum _HeaderMenuAction { profile, team, dog, switchDog, endShift, logout }
 
 class _HeaderMenuButton extends StatelessWidget {
   final Dog dog;
-  final String? notificationUserId;
-  final bool showNotifications;
   final bool showProfile;
   final VoidCallback? onProfileTap;
   final VoidCallback? onSwitchDog;
 
   const _HeaderMenuButton({
     required this.dog,
-    required this.notificationUserId,
-    required this.showNotifications,
     required this.showProfile,
     required this.onProfileTap,
     required this.onSwitchDog,
@@ -319,26 +377,14 @@ class _HeaderMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userId = notificationUserId;
-    if (!showNotifications || userId == null) {
-      return _buildMenu(context, unreadCount: 0);
-    }
-
-    return StreamBuilder<int>(
-      stream: NotificationService().getUnreadCount(userId: userId),
-      builder: (context, snapshot) {
-        return _buildMenu(context, unreadCount: snapshot.data ?? 0);
-      },
-    );
+    return _buildMenu(context);
   }
 
-  Widget _buildMenu(BuildContext context, {required int unreadCount}) {
+  Widget _buildMenu(BuildContext context) {
     return Consumer2<ShiftViewModel, AuthViewModel>(
       builder: (context, shiftVM, authVM, _) {
         final hasActiveShift = shiftVM.hasActiveShift;
         final hasCrew = shiftVM.vehicleCrewId?.trim().isNotEmpty == true;
-        final hasNotifications =
-            showNotifications && notificationUserId?.trim().isNotEmpty == true;
 
         return PopupMenuButton<_HeaderMenuAction>(
           tooltip: 'Menu',
@@ -371,12 +417,6 @@ class _HeaderMenuButton extends StatelessWidget {
               'Trocar K9',
               enabled: hasActiveShift && onSwitchDog != null,
             ),
-            _menuItem(
-              _HeaderMenuAction.notifications,
-              Icons.notifications_none_rounded,
-              unreadCount > 0 ? 'Notificações ($unreadCount)' : 'Notificações',
-              enabled: hasNotifications,
-            ),
             const PopupMenuDivider(height: 10),
             _menuItem(
               _HeaderMenuAction.endShift,
@@ -392,13 +432,7 @@ class _HeaderMenuButton extends StatelessWidget {
               destructive: true,
             ),
           ],
-          child: Badge(
-            isLabelVisible: unreadCount > 0,
-            label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
-            backgroundColor: AppTheme.warning,
-            textColor: AppTheme.background,
-            child: const _HeaderMenuVisualButton(),
-          ),
+          child: const _HeaderMenuVisualButton(),
         );
       },
     );
@@ -472,16 +506,6 @@ class _HeaderMenuButton extends StatelessWidget {
           return;
         }
         onSwitchDog!();
-        break;
-      case _HeaderMenuAction.notifications:
-        final userId = notificationUserId;
-        if (userId == null || userId.trim().isEmpty) {
-          _showSnack(context, 'Usuário sem RA para buscar notificações.');
-          return;
-        }
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(builder: (_) => PendingScreen(userId: userId)),
-        );
         break;
       case _HeaderMenuAction.endShift:
         await _confirmEndShift(context, shiftVM);

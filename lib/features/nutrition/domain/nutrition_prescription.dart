@@ -14,6 +14,7 @@ class NutritionPrescription with SoftDeletable {
   final String? laudoPdfUrl;
   final DateTime vigentFrom;
   final DateTime? vigentUntil;
+  final String? hydrationNotes;
   final String? notes;
   final List<Map<String, dynamic>> auditTrail;
 
@@ -35,6 +36,7 @@ class NutritionPrescription with SoftDeletable {
     this.laudoPdfUrl,
     required this.vigentFrom,
     this.vigentUntil,
+    this.hydrationNotes,
     this.notes,
     this.auditTrail = const [],
     this.deletedAt,
@@ -69,6 +71,7 @@ class NutritionPrescription with SoftDeletable {
       laudoPdfUrl: json['laudo_pdf_url'] as String?,
       vigentFrom: _toDateTime(json['vigent_from']) ?? DateTime.now(),
       vigentUntil: _toDateTime(json['vigent_until']),
+      hydrationNotes: json['hydration_notes'] as String?,
       notes: json['notes'] as String?,
       auditTrail:
           (json['audit_trail'] as List<dynamic>?)
@@ -96,6 +99,7 @@ class NutritionPrescription with SoftDeletable {
       if (laudoPdfUrl != null) 'laudo_pdf_url': laudoPdfUrl,
       'vigent_from': Timestamp.fromDate(vigentFrom),
       if (vigentUntil != null) 'vigent_until': Timestamp.fromDate(vigentUntil!),
+      if (hydrationNotes != null) 'hydration_notes': hydrationNotes,
       if (notes != null) 'notes': notes,
       'audit_trail': auditTrail,
       ...softDeleteFields(),

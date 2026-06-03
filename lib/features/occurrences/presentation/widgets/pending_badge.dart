@@ -11,7 +11,7 @@ class PendingBadge extends StatelessWidget {
     final notificationService = NotificationService();
 
     return StreamBuilder<int>(
-      stream: notificationService.getUnreadCount(userId: userId),
+      stream: notificationService.getOpenActionCount(userId: userId),
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
 

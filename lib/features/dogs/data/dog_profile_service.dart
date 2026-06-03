@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
+import 'package:canil_gcm/core/services/storage_service.dart';
 
 /// Modelo de vacina vindo do Firestore.
 class VaccineRecord {
@@ -291,13 +291,16 @@ class DogProfileService {
     required File file,
     String? emissor,
   }) async {
-    final storage = FirebaseStorage.instance;
     final ext = file.path.split('.').last.toLowerCase();
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
-    final ref = storage.ref('documentos/$dogId/$fileName');
-
-    await ref.putFile(file);
-    final url = await ref.getDownloadURL();
+    final url = await StorageService().uploadFile(
+      file,
+      'documentos/$dogId',
+      mimeType: ext == 'pdf' ? 'application/pdf' : null,
+      extension: ext,
+    );
+    if (url == null) {
+      throw Exception('Upload do documento não retornou URL.');
+    }
 
     final docData = DogDocument(
       id: '',

@@ -11,6 +11,12 @@ const region = "southamerica-east1";
 
 type JsonMap = Record<string, unknown>;
 
+const ACTION_REQUIRED_NOTIFICATION_TYPES = new Set([
+  "vehicle_crew_invitation",
+  "signature_requested",
+  "training_promotion_requested",
+]);
+
 interface ExpectedMedia {
   label: string;
   url: string;
@@ -77,6 +83,10 @@ function requiredString(data: JsonMap, key: string): string {
 
 function boolValue(value: unknown): boolean {
   return value === true || value === "true";
+}
+
+function isActionRequiredNotification(type: string): boolean {
+  return ACTION_REQUIRED_NOTIFICATION_TYPES.has(type);
 }
 
 function stringArray(value: unknown): string[] {
@@ -584,7 +594,7 @@ function notificationPayload(
     occurrence_id: occurrenceId,
     occurrence_title: String(occurrence.type_name ?? "Ocorrência"),
     target_screen: targetScreen,
-    action_required: targetScreen !== "none",
+    action_required: isActionRequiredNotification(type),
     created_at: admin.firestore.FieldValue.serverTimestamp(),
     read_at: null,
     resolved_at: null,
@@ -704,7 +714,7 @@ function crewNotificationPayload(
     occurrence_id: "",
     occurrence_title: vehicleLabel,
     target_screen: "vehicle_crew",
-    action_required: type === "vehicle_crew_invitation",
+    action_required: isActionRequiredNotification(type),
     created_at: admin.firestore.FieldValue.serverTimestamp(),
     read_at: null,
     resolved_at: null,
@@ -728,7 +738,7 @@ function trainingNotificationPayload(
     occurrence_id: "",
     occurrence_title: trainingRequestTitle(request),
     target_screen: "training_promotion_request",
-    action_required: type === "training_promotion_requested",
+    action_required: isActionRequiredNotification(type),
     created_at: admin.firestore.FieldValue.serverTimestamp(),
     read_at: null,
     resolved_at: null,
@@ -762,7 +772,7 @@ function trainingBonusNotificationPayload(data: {
     occurrence_id: "",
     occurrence_title: `${data.dogName} - ${data.milestoneLabel}`,
     target_screen: "training_bonus_milestone",
-    action_required: true,
+    action_required: false,
     created_at: admin.firestore.FieldValue.serverTimestamp(),
     read_at: null,
     resolved_at: null,
@@ -776,6 +786,139 @@ function trainingBonusNotificationPayload(data: {
     milestone_label: data.milestoneLabel,
     program_version: data.programVersion,
   };
+}
+
+interface NotificationResolutionOptions {
+  type: string;
+  resolutionAction: string;
+  actor?: CallerIdentity;
+  occurrenceId?: string;
+  additionalData?: string;
+  promotionRequestId?: string;
+  metadata?: JsonMap;
+}
+
+function notificationResolutionPatch(options: NotificationResolutionOptions): JsonMap {
+  const actor = options.actor;
+  return {
+    resolved_at: admin.firestore.FieldValue.serverTimestamp(),
+    read_at: admin.firestore.FieldValue.serverTimestamp(),
+    resolution_source: "function",
+    resolution_action: options.resolutionAction,
+    resolution_actor_uid: actor?.uid ?? null,
+    resolution_actor_ra: actor?.ra ?? null,
+    resolution_actor_name: actor?.name ?? null,
+    resolution_metadata: options.metadata ?? {},
+  };
+}
+
+function matchesNotificationResolution(data: JsonMap, options: NotificationResolutionOptions): boolean {
+  if (String(data.type ?? "") !== options.type) return false;
+  if (data.resolved_at !== null && data.resolved_at !== undefined) return false;
+  if (options.occurrenceId && String(data.occurrence_id ?? "") !== options.occurrenceId) {
+    return false;
+  }
+  if (options.additionalData && String(data.additional_data ?? "") !== options.additionalData) {
+    return false;
+  }
+  if (options.promotionRequestId) {
+    const requestId =
+      stringValue(data.promotion_request_id) ??
+      stringValue(data.additional_data);
+    if (requestId !== options.promotionRequestId) return false;
+  }
+  return true;
+}
+
+async function resolveUserActionNotificationsInTransaction(
+  transaction: admin.firestore.Transaction,
+  userId: string | undefined,
+  options: NotificationResolutionOptions,
+): Promise<number> {
+  const resolvedUserId = stringValue(userId);
+  if (!resolvedUserId) return 0;
+
+  let query: admin.firestore.Query = db
+    .collection("notifications")
+    .doc(resolvedUserId)
+    .collection("items");
+  if (options.occurrenceId) {
+    query = query.where("occurrence_id", "==", options.occurrenceId);
+  } else if (options.additionalData) {
+    query = query.where("additional_data", "==", options.additionalData);
+  } else if (options.promotionRequestId) {
+    query = query.where("promotion_request_id", "==", options.promotionRequestId);
+  } else {
+    query = query.where("type", "==", options.type);
+  }
+
+  const snapshot = await transaction.get(query);
+  let resolved = 0;
+  for (const doc of snapshot.docs) {
+    const data = doc.data() ?? {};
+    if (!matchesNotificationResolution(data, options)) continue;
+    transaction.set(doc.ref, notificationResolutionPatch(options), {merge: true});
+    resolved += 1;
+  }
+  return resolved;
+}
+
+async function resolveTrainingPromotionRequestNotifications(
+  requestId: string,
+  resolutionAction: string,
+  metadata: JsonMap,
+): Promise<number> {
+  const snapshots: admin.firestore.QuerySnapshot[] = [
+    await db.collectionGroup("items").where("promotion_request_id", "==", requestId).get(),
+  ];
+  try {
+    snapshots.push(
+      await db.collectionGroup("items").where("additional_data", "==", requestId).get(),
+    );
+  } catch (error) {
+    logger.warn("Fallback additional_data ignorado ao resolver notificacoes de promocao.", {
+      requestId,
+      error: errorMessage(error),
+    });
+  }
+  const seen = new Set<string>();
+  let batch = db.batch();
+  let pendingWrites = 0;
+  let resolved = 0;
+  const patch = notificationResolutionPatch({
+    type: "training_promotion_requested",
+    promotionRequestId: requestId,
+    resolutionAction,
+    metadata,
+  });
+
+  for (const snapshot of snapshots) {
+    for (const doc of snapshot.docs) {
+      if (seen.has(doc.ref.path)) continue;
+      seen.add(doc.ref.path);
+      const data = doc.data() ?? {};
+      if (!matchesNotificationResolution(data, {
+        type: "training_promotion_requested",
+        promotionRequestId: requestId,
+        resolutionAction,
+      })) {
+        continue;
+      }
+      batch.set(doc.ref, patch, {merge: true});
+      pendingWrites += 1;
+      resolved += 1;
+      if (pendingWrites >= 450) {
+        await batch.commit();
+        batch = db.batch();
+        pendingWrites = 0;
+      }
+    }
+  }
+
+  if (pendingWrites > 0) {
+    await batch.commit();
+  }
+  return resolved;
 }
 
 export const setK9InstructorRole = onCall({region}, async (request) => {
@@ -1179,9 +1322,11 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
     if (before.status !== "pending") return;
 
     if (after.status === "approved") {
+      let processingStatus = "completed";
       try {
         await applyApprovedTrainingPromotion(event.params.requestId, after);
       } catch (error) {
+        processingStatus = "error";
         logger.error("Falha ao aplicar promocao de treino.", {
           requestId: event.params.requestId,
           error: errorMessage(error),
@@ -1192,6 +1337,15 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
           processing_error: errorMessage(error),
         }, {merge: true});
       }
+      await resolveTrainingPromotionRequestNotifications(
+        event.params.requestId,
+        "training_promotion_approved",
+        {
+          request_id: event.params.requestId,
+          status: "approved",
+          processing_status: processingStatus,
+        },
+      );
       return;
     }
 
@@ -1201,6 +1355,14 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
         processed_at: admin.firestore.FieldValue.serverTimestamp(),
         processing_status: "completed",
       }, {merge: true});
+      await resolveTrainingPromotionRequestNotifications(
+        event.params.requestId,
+        "training_promotion_rejected",
+        {
+          request_id: event.params.requestId,
+          status: "rejected",
+        },
+      );
     }
   },
 );
@@ -1479,6 +1641,16 @@ export const respondVehicleCrewInvitation = onCall({region}, async (request) => 
       if (activeShiftIsActive && otherCrew && otherCrew !== crewId) {
         throw new HttpsError("failed-precondition", "Condutor ja esta em outra viatura.");
       }
+      await resolveUserActionNotificationsInTransaction(transaction, caller.ra, {
+        type: "vehicle_crew_invitation",
+        additionalData: crewId,
+        resolutionAction: accept ? "vehicle_crew_invitation_accepted" : "vehicle_crew_invitation_declined",
+        actor: caller,
+        metadata: {
+          crew_id: crewId,
+          result: "accepted",
+        },
+      });
       const vehicleFields = {
         vehicle_id: crew.vehicle_id ?? crewId,
         vehicle_label: crew.vehicle_label ?? crewId,
@@ -1512,6 +1684,17 @@ export const respondVehicleCrewInvitation = onCall({region}, async (request) => 
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
     } else {
+      await resolveUserActionNotificationsInTransaction(transaction, caller.ra, {
+        type: "vehicle_crew_invitation",
+        additionalData: crewId,
+        resolutionAction: "vehicle_crew_invitation_declined",
+        actor: caller,
+        metadata: {
+          crew_id: crewId,
+          result: "declined",
+          reason: reason ?? null,
+        },
+      });
       transaction.set(memberRef, {
         status: "declined",
         decline_reason: reason,
@@ -1823,6 +2006,17 @@ export const signOccurrence = onCall({region}, async (request) => {
     const existingSignatures: JsonMap[] = signaturesSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
     const previousSignature = existingSignatures.find((signature) => signature.id === signatureId);
     if (previousSignature?.["status"] === "signed") {
+      await resolveUserActionNotificationsInTransaction(transaction, handlerId, {
+        type: "signature_requested",
+        occurrenceId,
+        resolutionAction: "signature_already_signed",
+        actor: caller,
+        metadata: {
+          occurrence_id: occurrenceId,
+          handler_id: handlerId,
+          signature_round: round,
+        },
+      });
       return {
         status: "signed",
         signature_round: round,
@@ -1836,6 +2030,18 @@ export const signOccurrence = onCall({region}, async (request) => {
       `${handlerId.trim().toLowerCase()}@canilgcm.com`,
       caller.email,
     ].filter((email) => email.length > 0));
+
+    await resolveUserActionNotificationsInTransaction(transaction, handlerId, {
+      type: "signature_requested",
+      occurrenceId,
+      resolutionAction: "signature_added",
+      actor: caller,
+      metadata: {
+        occurrence_id: occurrenceId,
+        handler_id: handlerId,
+        signature_round: round,
+      },
+    });
 
     transaction.set(signatureRef, {
       handler_id: handlerId,

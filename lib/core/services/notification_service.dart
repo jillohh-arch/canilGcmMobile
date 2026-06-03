@@ -46,6 +46,7 @@ class NotificationService {
     }
     if (actionRequired) {
       data['action_required'] = true;
+      data['resolved_at'] = null;
     }
 
     if (deduplicate) {
@@ -99,6 +100,23 @@ class NotificationService {
   }
 
   /// Obtém as notificações não lidas de um usuário.
+  Future<void> archiveNotice({
+    required String userId,
+    required NotificationItem notification,
+  }) async {
+    if (!notification.canBeArchived) {
+      throw StateError('Pendencia aberta nao pode ser limpa.');
+    }
+
+    await _notificationsCollection
+        .doc(userId)
+        .collection('items')
+        .doc(notification.id)
+        .update({'archived_at': FieldValue.serverTimestamp()});
+
+    debugPrint('[NotificationService] Aviso arquivado: ${notification.id}');
+  }
+
   Stream<List<NotificationItem>> getUnreadNotifications({
     required String userId,
   }) {
@@ -113,6 +131,30 @@ class NotificationService {
               .map((doc) => NotificationItem.fromJson(doc.data(), doc.id))
               .toList(),
         );
+  }
+
+  /// Obtém notificações visíveis para a central.
+  ///
+  /// Avisos arquivados ficam fora da caixa de entrada, mas o registro
+  /// operacional original permanece intacto na entidade de origem.
+  Stream<List<NotificationItem>> getVisibleNotifications({
+    required String userId,
+  }) {
+    return getAllNotifications(
+      userId: userId,
+    ).map((items) => items.where((item) => !item.isArchived).toList());
+  }
+
+  /// Obtém pendências acionáveis ainda não resolvidas.
+  ///
+  /// Este stream é propositalmente derivado do modelo em memória, sem query
+  /// composta, para evitar depender de índice enquanto a migração/backfill roda.
+  Stream<List<NotificationItem>> getOpenActionNotifications({
+    required String userId,
+  }) {
+    return getVisibleNotifications(
+      userId: userId,
+    ).map((items) => items.where((item) => item.isOpenAction).toList());
   }
 
   /// Obtém todas as notificações de um usuário.
@@ -139,28 +181,27 @@ class NotificationService {
         .map((snapshot) => snapshot.docs.length);
   }
 
-  /// Remove notificações antigas.
+  /// Conta somente pendências reais: action_required == true && resolved_at == null.
+  Stream<int> getOpenActionCount({required String userId}) {
+    return getOpenActionNotifications(
+      userId: userId,
+    ).map((items) => items.length);
+  }
+
+  /// Mantido temporariamente por compatibilidade.
+  ///
+  /// Parte 14: notificações não devem ser deletadas pelo app. O fluxo de
+  /// limpeza será `archived_at` apenas para avisos, com rules próprias.
+  @Deprecated(
+    'Use soft-archive com archived_at; notificacoes nao sao deletadas.',
+  )
   Future<void> cleanupOldNotifications({
     required String userId,
     required Duration olderThan,
   }) async {
-    final cutoff = DateTime.now().subtract(olderThan);
-    final notifications = await _notificationsCollection
-        .doc(userId)
-        .collection('items')
-        .where('created_at', isLessThan: Timestamp.fromDate(cutoff))
-        .get();
-
-    final batch = FirebaseFirestore.instance.batch();
-    for (final doc in notifications.docs) {
-      batch.delete(doc.reference);
-    }
-
-    if (notifications.docs.isNotEmpty) {
-      await batch.commit();
-      debugPrint(
-        '[NotificationService] ${notifications.docs.length} notificações antigas removidas',
-      );
-    }
+    debugPrint(
+      '[NotificationService] cleanupOldNotifications bloqueado para $userId '
+      '(${olderThan.inDays}d): Parte 14 exige archived_at, nunca delete.',
+    );
   }
 }

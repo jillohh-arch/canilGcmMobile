@@ -47,11 +47,11 @@ extension _MainRootActions on _MainRootScreenState {
               child: Row(
                 children: [
                   _buildNavItem(0, Icons.home_outlined, 'Turno'),
-                  _buildNavItem(1, Icons.history_rounded, 'Histórico'),
+                  _buildNavItem(1, Icons.fitness_center_rounded, 'Treino'),
                   // Spacer for FAB
                   const SizedBox(width: 72),
-                  _buildNavItem(2, Icons.fitness_center_rounded, 'Treino'),
-                  _buildNavItem(3, Icons.pets_rounded, 'Cão'),
+                  _buildNavItem(2, Icons.health_and_safety_rounded, 'Saúde'),
+                  _buildNavItem(3, Icons.history_rounded, 'Histórico'),
                 ],
               ),
             ),

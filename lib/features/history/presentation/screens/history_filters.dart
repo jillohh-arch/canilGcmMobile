@@ -12,6 +12,14 @@ const _periodOptions = [
 
 const _categoryOptions = ['Tudo', 'Nutrição', 'Saúde', 'Treino', 'Ocorrência'];
 
+const _healthProntuarioCategoryOptions = [
+  'Todos',
+  'Vacinas',
+  'Peso',
+  'Exames',
+  'Nutrição',
+];
+
 extension _HistoryFilters on _HistoryScreenState {
   Future<void> _openDateRangePicker() async {
     final picked = await showDateRangePicker(
@@ -99,7 +107,9 @@ extension _HistoryFilters on _HistoryScreenState {
                   const SizedBox(height: 18),
                   _FilterSheetGroup(
                     title: 'Categoria',
-                    options: _categoryOptions,
+                    options: widget.mode == HistoryScreenMode.healthProntuario
+                        ? _healthProntuarioCategoryOptions
+                        : _categoryOptions,
                     selected: _typeFilter,
                     onSelected: (value) {
                       HapticFeedback.selectionClick();
@@ -166,6 +176,7 @@ extension _HistoryFilters on _HistoryScreenState {
 }
 
 class _HistoryFilterToolbar extends StatelessWidget {
+  final HistoryScreenMode mode;
   final String period;
   final String category;
   final ValueChanged<String> onPeriodSelected;
@@ -173,6 +184,7 @@ class _HistoryFilterToolbar extends StatelessWidget {
   final VoidCallback onMoreFilters;
 
   const _HistoryFilterToolbar({
+    required this.mode,
     required this.period,
     required this.category,
     required this.onPeriodSelected,
@@ -182,6 +194,10 @@ class _HistoryFilterToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final categoryOptions = mode == HistoryScreenMode.healthProntuario
+        ? _healthProntuarioCategoryOptions
+        : _categoryOptions;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       child: Row(
@@ -200,7 +216,7 @@ class _HistoryFilterToolbar extends StatelessWidget {
             flex: 2,
             child: _PopupFilterPill(
               label: category,
-              options: _categoryOptions,
+              options: categoryOptions,
               onSelected: onCategorySelected,
             ),
           ),
