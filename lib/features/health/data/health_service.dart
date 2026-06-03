@@ -27,17 +27,23 @@ class HealthService {
 
   Future<void> updateHealthLog(HealthLogModel log) async {
     if (log.id == null) return;
-    final entry = AuditService.buildInlineEntry(action: 'updated');
-    await _firestore
+    final docRef = _firestore
         .collection('dogs')
         .doc(log.dogId)
         .collection('health_events')
-        .doc(log.id)
-        .set({
-          ...log.toJson(),
-          'updated_at': FieldValue.serverTimestamp(),
-          'audit_trail': FieldValue.arrayUnion([entry]),
-        }, SetOptions(merge: true));
+        .doc(log.id);
+    final before = (await docRef.get()).data();
+    final after = log.toJson();
+    final entry = AuditService.buildInlineEntry(
+      action: 'updated',
+      oldValue: before == null ? null : _auditHealthSnapshot(before),
+      newValue: _auditHealthSnapshot(after),
+    );
+    await docRef.set({
+      ...after,
+      'updated_at': FieldValue.serverTimestamp(),
+      'audit_trail': FieldValue.arrayUnion([entry]),
+    }, SetOptions(merge: true));
   }
 
   Future<void> deleteHealthLog({
@@ -80,5 +86,29 @@ class HealthService {
         .toList();
     logs.sort((a, b) => b.date.compareTo(a.date));
     return logs;
+  }
+
+  Map<String, dynamic> _auditHealthSnapshot(Map<String, dynamic> data) {
+    return {
+      if (data['dogId'] != null) 'dogId': data['dogId'],
+      if (data['dogName'] != null) 'dogName': data['dogName'],
+      if (data['date'] != null) 'date': data['date'],
+      if (data['type'] != null) 'type': data['type'],
+      if (data['subtype'] != null) 'subtype': data['subtype'],
+      if (data['weight'] != null) 'weight': data['weight'],
+      if (data['healthObservations'] != null)
+        'healthObservations': data['healthObservations'],
+      if (data['nextDueDate'] != null) 'nextDueDate': data['nextDueDate'],
+      if (data['professionalCrmv'] != null)
+        'professionalCrmv': data['professionalCrmv'],
+      if (data['professionalClinic'] != null)
+        'professionalClinic': data['professionalClinic'],
+      if (data['attachmentUrl'] != null) 'attachmentUrl': data['attachmentUrl'],
+      if (data['costBrl'] != null) 'costBrl': data['costBrl'],
+      if (data['createdBy'] != null) 'createdBy': data['createdBy'],
+      if (data['vetName'] != null) 'vetName': data['vetName'],
+      if (data['mediaAttachments'] != null)
+        'mediaAttachments': data['mediaAttachments'],
+    };
   }
 }

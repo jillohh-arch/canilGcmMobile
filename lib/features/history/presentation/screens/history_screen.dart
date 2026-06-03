@@ -12,7 +12,9 @@ import 'package:canil_gcm/core/services/pdf_generator/pdf_colors.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
@@ -47,8 +49,12 @@ const Color _hRed = AppTheme.error;
 const Color _hPurple = AppTheme.healthAccent;
 const Color _hSheetSurface = AppTheme.surfaceSheet;
 
+enum HistoryScreenMode { full, healthProntuario }
+
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final HistoryScreenMode mode;
+
+  const HistoryScreen({super.key, this.mode = HistoryScreenMode.full});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -61,10 +67,15 @@ class _HistoryScreenState extends State<HistoryScreen>
   DateTimeRange? _customRange;
   String? _lastLoadedDogId;
   int _visibleCount = 30;
+  List<WeightRecord> _weightRecords = const [];
 
   @override
   void initState() {
     super.initState();
+    if (widget.mode == HistoryScreenMode.healthProntuario) {
+      _periodFilter = 'Este mês';
+      _typeFilter = 'Todos';
+    }
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllData());
   }
@@ -152,9 +163,15 @@ class _HistoryScreenState extends State<HistoryScreen>
                 shiftStartTime: shiftVM.shiftStartTime,
               ),
               _PageTitleRow(
+                title: widget.mode == HistoryScreenMode.healthProntuario
+                    ? 'Histórico do prontuário'
+                    : 'Histórico',
+                showBack: widget.mode == HistoryScreenMode.healthProntuario,
+                onBack: () => Navigator.of(context).maybePop(),
                 onExport: () => _exportPdf(filteredEntries, dog, callsign),
               ),
               _HistoryFilterToolbar(
+                mode: widget.mode,
                 period: _periodFilter,
                 category: _typeFilter,
                 onPeriodSelected: (v) {
@@ -201,11 +218,40 @@ class _HistoryScreenState extends State<HistoryScreen>
     return entries.where((entry) {
       final inRange =
           !entry.time.isBefore(range.start) && entry.time.isBefore(range.end);
-      final typeMatches =
-          _typeFilter == 'Tudo' || entry.category == _typeFilter;
+      final typeMatches = widget.mode == HistoryScreenMode.healthProntuario
+          ? _healthProntuarioTypeMatches(entry)
+          : _typeFilter == 'Tudo' || entry.category == _typeFilter;
 
-      return inRange && typeMatches;
+      return inRange &&
+          typeMatches &&
+          (widget.mode != HistoryScreenMode.healthProntuario ||
+              _isHealthProntuarioEntry(entry));
     }).toList()..sort((a, b) => b.time.compareTo(a.time));
+  }
+
+  bool _isHealthProntuarioEntry(HistoryEntry entry) {
+    return entry.type == HistoryEntryType.health ||
+        entry.type == HistoryEntryType.nutrition;
+  }
+
+  bool _healthProntuarioTypeMatches(HistoryEntry entry) {
+    if (_typeFilter == 'Todos') return true;
+    if (_typeFilter == 'Nutrição') {
+      return entry.type == HistoryEntryType.nutrition;
+    }
+    if (entry.type != HistoryEntryType.health) return false;
+
+    final kind = entry.details['_healthKind']?.toString();
+    switch (_typeFilter) {
+      case 'Vacinas':
+        return kind == 'vaccination';
+      case 'Peso':
+        return kind == 'weight';
+      case 'Exames':
+        return kind == 'exam';
+      default:
+        return false;
+    }
   }
 
   Future<void> _exportPdf(
@@ -370,9 +416,17 @@ class _HistoryScreenState extends State<HistoryScreen>
 }
 
 class _PageTitleRow extends StatelessWidget {
+  final String title;
+  final bool showBack;
+  final VoidCallback? onBack;
   final VoidCallback onExport;
 
-  const _PageTitleRow({required this.onExport});
+  const _PageTitleRow({
+    required this.title,
+    required this.onExport,
+    this.showBack = false,
+    this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -380,12 +434,33 @@ class _PageTitleRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
       child: Row(
         children: [
+          if (showBack) ...[
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onBack,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: _hCyan.withAlpha(12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _hCyan.withAlpha(70)),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _hCyan,
+                  size: 17,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Text(
-            'Histórico',
+            title,
             style: GoogleFonts.inter(
               color: _hTextPrimary,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
+              fontSize: showBack ? 21 : 26,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const Spacer(),

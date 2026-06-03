@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
+import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 
@@ -38,11 +39,15 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   final _amountController = TextEditingController();
   final _observationsController = TextEditingController();
   final _divergenceReasonController = TextEditingController();
+  final _supplementNameController = TextEditingController();
+  final _supplementDoseController = TextEditingController();
+  final _supplementReasonController = TextEditingController();
   bool _saving = false;
   File? _photoFile;
   DateTime _selectedTime = DateTime.now();
   String _timeOption = 'agora'; // 'agora' | '5min' | '15min' | 'custom'
   bool _isCompliant = true;
+  int _selectedRegistrationTab = 0;
 
   @override
   void initState() {
@@ -82,6 +87,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     _amountController.dispose();
     _observationsController.dispose();
     _divergenceReasonController.dispose();
+    _supplementNameController.dispose();
+    _supplementDoseController.dispose();
+    _supplementReasonController.dispose();
     super.dispose();
   }
 
@@ -104,7 +112,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Registrar Alimentação',
+          'Registrar Nutrição',
           style: GoogleFonts.inter(
             color: _nutritionColor,
             fontSize: 14,
@@ -126,29 +134,26 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                     // Dog name badge
                     _buildDogBadge(),
                     const SizedBox(height: 20),
-                    // Período selector
-                    _buildPeriodSelector(),
+                    _buildRegistrationTabSelector(),
                     const SizedBox(height: 20),
-                    // Compliance toggle
-                    if (prescription != null)
-                      _buildComplianceCheckbox(prescription),
-                    // Quantidade
-                    _buildAmountField(prescription),
-                    const SizedBox(height: 20),
-                    // Divergência condicional
-                    if (!_isCompliant) _buildDivergenceField(prescription),
-                    // Horário
-                    _buildTimeSelector(),
-                    const SizedBox(height: 20),
-                    // Foto
-                    _buildPhotoField(),
-                    const SizedBox(height: 20),
-                    // Observações
-                    _buildObservationsField(),
-                    const SizedBox(height: 16),
-                    // Info de prescrição
-                    if (prescription != null)
-                      _buildPrescriptionInfo(prescription),
+                    if (_selectedRegistrationTab == 0) ...[
+                      _buildPeriodSelector(),
+                      const SizedBox(height: 20),
+                      if (prescription != null)
+                        _buildComplianceCheckbox(prescription),
+                      _buildAmountField(prescription),
+                      const SizedBox(height: 20),
+                      if (!_isCompliant) _buildDivergenceField(prescription),
+                      _buildTimeSelector(),
+                      const SizedBox(height: 20),
+                      _buildPhotoField(),
+                      const SizedBox(height: 20),
+                      _buildObservationsField(),
+                      const SizedBox(height: 16),
+                      if (prescription != null)
+                        _buildPrescriptionInfo(prescription),
+                    ] else
+                      _buildSupplementFields(),
                   ],
                 ),
               ),
@@ -191,6 +196,142 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRegistrationTabSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.textPrimary.withValues(alpha: 0.04),
+        border: Border.all(color: AppTheme.textPrimary.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildRegistrationTab(0, 'Alimentação', Icons.restaurant_rounded),
+          const SizedBox(width: 6),
+          _buildRegistrationTab(1, 'Suplementos', Icons.medication_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegistrationTab(int index, String label, IconData icon) {
+    final selected = _selectedRegistrationTab == index;
+    final color = selected ? _nutritionColor : AppTheme.textTertiary;
+    return Expanded(
+      child: GestureDetector(
+        onTap: _saving
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                setState(() => _selectedRegistrationTab = index);
+              },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? _nutritionColor.withValues(alpha: 0.16)
+                : AppTheme.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? _nutritionColor.withValues(alpha: 0.42)
+                  : AppTheme.transparent,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupplementFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'SUPLEMENTO',
+          style: GoogleFonts.inter(
+            color: AppTheme.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildTextInput(
+          controller: _supplementNameController,
+          label: 'Nome do produto *',
+          hint: 'Ex.: Ômega 3',
+          icon: Icons.medication_liquid_outlined,
+        ),
+        const SizedBox(height: 14),
+        _buildTextInput(
+          controller: _supplementDoseController,
+          label: 'Quantidade / dose *',
+          hint: 'Ex.: 1 cápsula ao dia',
+          icon: Icons.scale_rounded,
+        ),
+        const SizedBox(height: 14),
+        _buildTextInput(
+          controller: _supplementReasonController,
+          label: 'Motivo *',
+          hint: 'Ex.: suporte articular, pelagem, recuperação',
+          icon: Icons.notes_rounded,
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextInput({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      enabled: !_saving,
+      style: GoogleFonts.inter(color: AppTheme.textPrimary, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, color: _nutritionColor, size: 18),
+        labelStyle: GoogleFonts.inter(color: AppTheme.textSecondary),
+        hintStyle: GoogleFonts.inter(color: AppTheme.textTertiary),
+        filled: true,
+        fillColor: AppTheme.textPrimary.withValues(alpha: 0.04),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(
+            color: AppTheme.textPrimary.withValues(alpha: 0.12),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: _nutritionColor),
+        ),
       ),
     );
   }
@@ -793,6 +934,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
   }
 
   Widget _buildSaveButton(NutritionViewModel vm) {
+    final isSupplementTab = _selectedRegistrationTab == 1;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -806,7 +948,9 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
         ),
       ),
       child: GestureDetector(
-        onTap: _saving ? null : () => _save(vm),
+        onTap: _saving
+            ? null
+            : () => isSupplementTab ? _saveSupplement(vm) : _save(vm),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -843,7 +987,11 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
                 ),
               const SizedBox(width: 8),
               Text(
-                _saving ? 'SALVANDO...' : 'REGISTRAR ALIMENTAÇÃO',
+                _saving
+                    ? 'SALVANDO...'
+                    : isSupplementTab
+                    ? 'REGISTRAR SUPLEMENTO'
+                    : 'REGISTRAR ALIMENTAÇÃO',
                 style: GoogleFonts.inter(
                   color: AppTheme.background,
                   fontSize: 13,
@@ -920,6 +1068,52 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
     } catch (e) {
       if (!mounted) return;
       _showError('Erro ao salvar: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveSupplement(NutritionViewModel vm) async {
+    final name = _supplementNameController.text.trim();
+    final dose = _supplementDoseController.text.trim();
+    final reason = _supplementReasonController.text.trim();
+
+    if (name.isEmpty) {
+      _showError('Informe o nome do suplemento');
+      return;
+    }
+    if (dose.isEmpty) {
+      _showError('Informe a quantidade/dose');
+      return;
+    }
+    if (reason.isEmpty) {
+      _showError('Informe o motivo do suplemento');
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final authVM = Provider.of<AuthViewModel>(context, listen: false);
+      final createdBy = authVM.user?.uid ?? 'unknown';
+
+      await vm.addSupplement(
+        widget.dogId,
+        NutritionSupplement(
+          name: name,
+          dose: dose,
+          startedAt: DateTime.now(),
+          notes: reason,
+          createdBy: createdBy,
+        ),
+      );
+
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Erro ao salvar suplemento: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

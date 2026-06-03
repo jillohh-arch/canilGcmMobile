@@ -232,7 +232,7 @@ function auditLogPayload({spoof = false} = {}) {
   };
 }
 
-function notificationPayload(occurrenceId = 'occ-notification') {
+function notificationPayload(occurrenceId = 'occ-notification', overrides = {}) {
   return {
     type: 'signature_requested',
     occurrence_id: occurrenceId,
@@ -241,6 +241,7 @@ function notificationPayload(occurrenceId = 'occ-notification') {
     read_at: null,
     target_screen: 'occurrence_review',
     action_required: true,
+    ...overrides,
   };
 }
 
@@ -1244,6 +1245,61 @@ test('notificacao so pode ser lida e marcada pelo proprio destinatario', async (
   );
 });
 
+test('notificacao permite arquivar avisos mas bloqueia pendencia aberta', async () => {
+  const occId = 'occ-notification-archive';
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(
+      doc(adminDb, 'occurrences', occId),
+      occurrencePayload({
+        id: occId,
+        accepted: [PRIMARY_RA, MEMBER_RA],
+        pending: [],
+      }),
+    );
+    await setDoc(
+      doc(adminDb, 'notifications', MEMBER_RA, 'items', 'notice'),
+      notificationPayload(occId, {
+        type: 'signature_completed',
+        action_required: false,
+        resolved_at: now(),
+      }),
+    );
+    await setDoc(
+      doc(adminDb, 'notifications', MEMBER_RA, 'items', 'open-action'),
+      notificationPayload(occId, {
+        type: 'signature_requested',
+        action_required: true,
+        resolved_at: null,
+      }),
+    );
+  });
+
+  await assertSucceeds(
+    updateDoc(doc(dbFor(MEMBER_RA), 'notifications', MEMBER_RA, 'items', 'notice'), {
+      archived_at: now(),
+    }),
+  );
+
+  await assertFails(
+    updateDoc(
+      doc(dbFor(PRIMARY_RA), 'notifications', MEMBER_RA, 'items', 'notice'),
+      {
+        archived_at: now(),
+      },
+    ),
+  );
+
+  await assertFails(
+    updateDoc(
+      doc(dbFor(MEMBER_RA), 'notifications', MEMBER_RA, 'items', 'open-action'),
+      {
+        archived_at: now(),
+      },
+    ),
+  );
+});
+
 test('Storage permite upload valido mas recusa exclusao de evidencia', async () => {
   const storage = storageFor(PRIMARY_RA);
   const imageRef = ref(storage, 'occurrences/occ-storage/events/foto.jpg');
@@ -1271,7 +1327,7 @@ try {
     console.log(`ok - ${name}`);
   }
 
-  assert.equal(tests.length, 23);
+  assert.equal(tests.length, 24);
   console.log(`\n${tests.length} testes de rules concluidos com sucesso.`);
 } finally {
   await testEnv.cleanup();

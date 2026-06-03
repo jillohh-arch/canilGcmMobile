@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
+import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
 
 /// ViewModel de nutrição — gerencia prescrição vigente, refeições do dia,
 /// histórico de refeições, conformidade alimentar e prescrições.
@@ -14,6 +15,9 @@ class NutritionViewModel extends ChangeNotifier {
   // ─── Estado base ───────────────────────────────────────────────────
   NutritionPrescription? _prescription;
   NutritionPrescription? get prescription => _prescription;
+
+  List<NutritionSupplement> _supplements = [];
+  List<NutritionSupplement> get supplements => _supplements;
 
   List<Feeding> _todayFeedings = [];
   List<Feeding> get todayFeedings => _todayFeedings;
@@ -74,8 +78,10 @@ class NutritionViewModel extends ChangeNotifier {
     try {
       // Carrega prescrição vigente
       _prescription = await _service.getActivePrescription(dogId);
+      _supplements = await _service.getSupplements(dogId);
     } catch (e) {
       _prescription = null;
+      _supplements = [];
       debugPrint('[NutritionVM] Erro ao carregar prescrição: $e');
     }
 
@@ -113,10 +119,12 @@ class NutritionViewModel extends ChangeNotifier {
       final results = await Future.wait([
         _service.getFeedings(dogId, from: from90d),
         _service.getPrescriptionHistory(dogId),
+        _service.getSupplements(dogId),
       ]);
 
       _historyFeedings = results[0] as List<Feeding>;
       _prescriptionHistory = results[1] as List<NutritionPrescription>;
+      _supplements = results[2] as List<NutritionSupplement>;
 
       // Calcula conformidade 90 dias
       _totalFeedings90d = _historyFeedings.length;
@@ -135,6 +143,7 @@ class NutritionViewModel extends ChangeNotifier {
       _historyFeedings = [];
       _prescriptionHistory = [];
       _filteredFeedings = [];
+      _supplements = [];
     }
 
     _historyLoading = false;
@@ -168,6 +177,15 @@ class NutritionViewModel extends ChangeNotifier {
   }
 
   // ─── Filtros ───────────────────────────────────────────────────────
+
+  Future<void> addSupplement(
+    String dogId,
+    NutritionSupplement supplement,
+  ) async {
+    await _service.addSupplement(dogId, supplement);
+    _supplements = await _service.getSupplements(dogId);
+    notifyListeners();
+  }
 
   void setFilterType(String type) {
     _filterType = type;

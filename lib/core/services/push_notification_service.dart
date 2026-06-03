@@ -14,14 +14,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
-import 'package:canil_gcm/features/dogs/data/dog_service.dart';
-import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_transition_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/busca_captura_formacao_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_promotion_request_screen.dart';
 
 const String _operationsChannelId = 'canil_k9_operations';
@@ -311,8 +309,7 @@ class PushNotificationService {
 
     _pendingNavigationData = null;
     final target = _targetScreen(data);
-    if (target == 'training_promotion_request' ||
-        _isTrainingPromotionType(data)) {
+    if (_opensTrainingPromotionRequest(data)) {
       final requestId = _promotionRequestIdFromPayload(data);
       if (requestId == null) return;
       navigator.push(
@@ -322,13 +319,15 @@ class PushNotificationService {
       );
       return;
     }
-    if (target == 'training_bonus_milestone' || _isTrainingBonusType(data)) {
+    if (_opensTrainingHistory(data, target)) {
       final dogId = _stringValue(data['dog_id']);
-      final modality = _stringValue(data['modality']);
-      if (dogId == null || modality != 'busca_captura') return;
+      if (dogId == null) return;
       navigator.push(
         MaterialPageRoute(
-          builder: (_) => _TrainingBonusMilestoneRoute(dogId: dogId),
+          builder: (_) => TrainingLogScreen(
+            dogId: dogId,
+            dogName: _dogNameFromPayload(data) ?? '',
+          ),
         ),
       );
       return;
@@ -592,18 +591,34 @@ bool _isVehicleCrewType(Map<String, dynamic> data) {
   return (_stringValue(data['type']) ?? '').startsWith('vehicle_crew_');
 }
 
-bool _isTrainingPromotionType(Map<String, dynamic> data) {
-  return (_stringValue(data['type']) ?? '').startsWith('training_promotion_');
+bool _opensTrainingPromotionRequest(Map<String, dynamic> data) {
+  final type = _stringValue(data['type']) ?? '';
+  final target = _targetScreen(data);
+  return type == 'training_promotion_requested' ||
+      (type.isEmpty && target == 'training_promotion_request');
 }
 
-bool _isTrainingBonusType(Map<String, dynamic> data) {
-  return (_stringValue(data['type']) ?? '') ==
-      'training_bonus_milestone_available';
+bool _opensTrainingHistory(Map<String, dynamic> data, String target) {
+  final type = _stringValue(data['type']) ?? '';
+  return type == 'training_promotion_approved' ||
+      type == 'training_promotion_rejected' ||
+      type == 'training_bonus_milestone_available' ||
+      target == 'training_bonus_milestone';
 }
 
 String? _promotionRequestIdFromPayload(Map<String, dynamic> data) {
   return _stringValue(data['promotion_request_id']) ??
       _stringValue(data['additional_data']);
+}
+
+String? _dogNameFromPayload(Map<String, dynamic> data) {
+  final direct = _stringValue(data['dog_name']);
+  if (direct != null) return direct;
+  final title = _stringValue(data['occurrence_title']);
+  if (title == null) return null;
+  final separator = title.indexOf(' - ');
+  if (separator <= 0) return title;
+  return title.substring(0, separator).trim();
 }
 
 bool _opensActiveOccurrence(Map<String, dynamic> data) {
@@ -623,45 +638,6 @@ bool _opensSignatureReview(Map<String, dynamic> data) {
 String? _stringValue(Object? value) {
   final text = value?.toString().trim();
   return text == null || text.isEmpty ? null : text;
-}
-
-class _TrainingBonusMilestoneRoute extends StatelessWidget {
-  const _TrainingBonusMilestoneRoute({required this.dogId});
-
-  final String dogId;
-
-  @override
-  Widget build(BuildContext context) {
-    final dogService = DogService();
-    return StreamBuilder<Dog?>(
-      stream: dogService.watchDog(dogId),
-      builder: (context, snapshot) {
-        final dog = snapshot.data;
-        if (dog != null) {
-          return BuscaCapturaFormacaoScreen(dog: dog);
-        }
-        if (snapshot.hasError) {
-          return Scaffold(
-            backgroundColor: AppTheme.background,
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Falha ao abrir o treino do cao. ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                ),
-              ),
-            ),
-          );
-        }
-        return const Scaffold(
-          backgroundColor: AppTheme.background,
-          body: Center(child: CircularProgressIndicator()),
-        );
-      },
-    );
-  }
 }
 
 int _notificationIdFor(Map<String, dynamic> data) {

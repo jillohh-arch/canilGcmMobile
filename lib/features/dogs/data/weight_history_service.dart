@@ -82,12 +82,16 @@ class WeightHistoryService {
     await _legacyCollection(dogId).doc(docRef.id).set(data);
 
     // Atualiza peso atual no documento principal do cão
+    final dogRef = _firestore.collection('dogs').doc(dogId);
+    final dogSnapshot = await dogRef.get();
+    final oldWeight = (dogSnapshot.data()?['weight'] as num?)?.toDouble();
     final dogEntry = AuditService.buildInlineEntry(
       action: 'updated',
       fieldName: 'weight',
+      oldValue: oldWeight,
       newValue: record.weightKg,
     );
-    await _firestore.collection('dogs').doc(dogId).update({
+    await dogRef.update({
       'weight': record.weightKg,
       'updatedAt': FieldValue.serverTimestamp(),
       'audit_trail': FieldValue.arrayUnion([dogEntry]),

@@ -6,6 +6,7 @@ import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
+import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
 
 /// Service para gerenciar alimentação e prescrições nutricionais.
 class NutritionService {
@@ -19,6 +20,12 @@ class NutritionService {
 
   CollectionReference<Map<String, dynamic>> _legacyFeedingsCol(String dogId) =>
       _firestore.collection('dogs').doc(dogId).collection('feedings');
+
+  CollectionReference<Map<String, dynamic>> _supplementsCol(String dogId) =>
+      _firestore
+          .collection('dogs')
+          .doc(dogId)
+          .collection('nutrition_supplements');
 
   /// Stream de refeições do dia.
   Stream<List<Feeding>> watchTodayFeedings(String dogId) {
@@ -76,9 +83,17 @@ class NutritionService {
     String feedingId,
     String photoUrl,
   ) async {
+    final primaryDoc = await _feedingsCol(dogId).doc(feedingId).get();
+    final legacyDoc = primaryDoc.exists
+        ? null
+        : await _legacyFeedingsCol(dogId).doc(feedingId).get();
+    final oldPhotoUrl =
+        primaryDoc.data()?['photo_balance_url'] ??
+        legacyDoc?.data()?['photo_balance_url'];
     final entry = AuditService.buildInlineEntry(
       action: 'updated',
       fieldName: 'photo_balance_url',
+      oldValue: oldPhotoUrl,
       newValue: photoUrl,
     );
     final updates = {
@@ -147,6 +162,7 @@ class NutritionService {
       final entry = AuditService.buildInlineEntry(
         action: 'updated',
         fieldName: 'vigent_until',
+        oldValue: current!.vigentUntil?.toIso8601String(),
         newValue: prescription.vigentFrom.toIso8601String(),
       );
       final updates = {
@@ -156,7 +172,7 @@ class NutritionService {
       };
       await _prescriptionsCol(
         dogId,
-      ).doc(current!.id).set(updates, SetOptions(merge: true));
+      ).doc(current.id).set(updates, SetOptions(merge: true));
       await _legacyPrescriptionsCol(
         dogId,
       ).doc(current.id).set(updates, SetOptions(merge: true));
@@ -208,6 +224,32 @@ class NutritionService {
     if (feedings.isEmpty) return 0.0;
     final conformCount = feedings.where((f) => f.isConform).length;
     return (conformCount / feedings.length) * 100;
+  }
+
+  Future<List<NutritionSupplement>> getSupplements(String dogId) async {
+    final snap = await _supplementsCol(
+      dogId,
+    ).orderBy('started_at', descending: true).get();
+    return snap.docs
+        .map((doc) => NutritionSupplement.fromJson(doc.data(), docId: doc.id))
+        .where((supplement) => !supplement.isDeleted)
+        .toList();
+  }
+
+  Future<String> addSupplement(
+    String dogId,
+    NutritionSupplement supplement,
+  ) async {
+    final docRef = _supplementsCol(dogId).doc();
+    final entry = AuditService.buildInlineEntry(action: 'created');
+    final data = {
+      ...supplement.toJson(),
+      'audit_trail': [entry],
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+    await docRef.set(data);
+    return docRef.id;
   }
 
   Future<List<Feeding>> _getFeedingsFrom(

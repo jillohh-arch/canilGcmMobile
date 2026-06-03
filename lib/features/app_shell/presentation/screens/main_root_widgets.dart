@@ -29,6 +29,34 @@ class _ActiveOccurrenceBanner extends StatelessWidget {
   }
 }
 
+class _MainRootHealthTab extends StatelessWidget {
+  const _MainRootHealthTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final shiftVM = Provider.of<ShiftViewModel>(context);
+    final dogId = shiftVM.activeDogId;
+
+    if (!shiftVM.hasActiveShift || dogId == null || dogId.trim().isEmpty) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        body: Center(
+          child: Text(
+            'Nenhum cão ativo.\nInicie um turno para acessar Saúde.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppTheme.textPrimary.withAlpha(138),
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DogHealthProntuarioScreen(dogId: dogId);
+  }
+}
+
 class _ActiveOperationBannerFrame extends StatelessWidget {
   final String label;
   final String title;

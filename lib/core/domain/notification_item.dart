@@ -106,7 +106,20 @@ class NotificationItem {
   final String occurrenceTitle;
   final DateTime createdAt;
   DateTime? readAt;
-  final String? additionalData; // Para dados extras como handlerId, etc.
+  final DateTime? resolvedAt;
+  final DateTime? archivedAt;
+  final bool actionRequired;
+  final String? targetScreen;
+  final String? additionalData;
+  final String? promotionRequestId;
+  final String? dogId;
+  final String? dogName;
+  final String? modality;
+  final String? moduleId;
+  final String? moduleName;
+  final String? milestoneId;
+  final String? milestoneLabel;
+  final String? decisionReason;
 
   NotificationItem({
     required this.id,
@@ -115,30 +128,76 @@ class NotificationItem {
     required this.occurrenceTitle,
     required this.createdAt,
     this.readAt,
+    this.resolvedAt,
+    this.archivedAt,
+    this.actionRequired = false,
+    this.targetScreen,
     this.additionalData,
+    this.promotionRequestId,
+    this.dogId,
+    this.dogName,
+    this.modality,
+    this.moduleId,
+    this.moduleName,
+    this.milestoneId,
+    this.milestoneLabel,
+    this.decisionReason,
   });
 
   factory NotificationItem.fromJson(Map<String, dynamic> json, String id) {
     return NotificationItem(
       id: id,
       type: NotificationType.fromMap(json['type']),
-      occurrenceId: json['occurrence_id'] ?? '',
-      occurrenceTitle: json['occurrence_title'] ?? '',
-      createdAt: json['created_at']?.toDate() ?? DateTime.now(),
-      readAt: json['read_at']?.toDate(),
-      additionalData: json['additional_data'],
+      occurrenceId: _stringValue(json['occurrence_id']) ?? '',
+      occurrenceTitle: _stringValue(json['occurrence_title']) ?? '',
+      createdAt: _dateValue(json['created_at']) ?? DateTime.now(),
+      readAt: _dateValue(json['read_at']),
+      resolvedAt: _dateValue(json['resolved_at']),
+      archivedAt: _dateValue(json['archived_at']),
+      actionRequired: _boolValue(json['action_required']),
+      targetScreen: _stringValue(json['target_screen']),
+      additionalData: _stringValue(json['additional_data']),
+      promotionRequestId: _stringValue(json['promotion_request_id']),
+      dogId: _stringValue(json['dog_id']),
+      dogName: _stringValue(json['dog_name']),
+      modality: _stringValue(json['modality']),
+      moduleId: _stringValue(json['module_id']),
+      moduleName: _stringValue(json['module_name']),
+      milestoneId: _stringValue(json['milestone_id']),
+      milestoneLabel: _stringValue(json['milestone_label']),
+      decisionReason: _stringValue(json['decision_reason']),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'type': type.toMap(),
       'occurrence_id': occurrenceId,
       'occurrence_title': occurrenceTitle,
       'created_at': Timestamp.fromDate(createdAt),
       'read_at': readAt != null ? Timestamp.fromDate(readAt!) : null,
+      'action_required': actionRequired,
       'additional_data': additionalData,
     };
+    if (resolvedAt != null) {
+      data['resolved_at'] = Timestamp.fromDate(resolvedAt!);
+    }
+    if (archivedAt != null) {
+      data['archived_at'] = Timestamp.fromDate(archivedAt!);
+    }
+    if (targetScreen != null) data['target_screen'] = targetScreen;
+    if (promotionRequestId != null) {
+      data['promotion_request_id'] = promotionRequestId;
+    }
+    if (dogId != null) data['dog_id'] = dogId;
+    if (dogName != null) data['dog_name'] = dogName;
+    if (modality != null) data['modality'] = modality;
+    if (moduleId != null) data['module_id'] = moduleId;
+    if (moduleName != null) data['module_name'] = moduleName;
+    if (milestoneId != null) data['milestone_id'] = milestoneId;
+    if (milestoneLabel != null) data['milestone_label'] = milestoneLabel;
+    if (decisionReason != null) data['decision_reason'] = decisionReason;
+    return data;
   }
 
   NotificationItem markAsRead() {
@@ -149,11 +208,43 @@ class NotificationItem {
       occurrenceTitle: occurrenceTitle,
       createdAt: createdAt,
       readAt: DateTime.now(),
+      resolvedAt: resolvedAt,
+      archivedAt: archivedAt,
+      actionRequired: actionRequired,
+      targetScreen: targetScreen,
       additionalData: additionalData,
+      promotionRequestId: promotionRequestId,
+      dogId: dogId,
+      dogName: dogName,
+      modality: modality,
+      moduleId: moduleId,
+      moduleName: moduleName,
+      milestoneId: milestoneId,
+      milestoneLabel: milestoneLabel,
+      decisionReason: decisionReason,
     );
   }
 
   bool get isUnread => readAt == null;
+  bool get isResolved => resolvedAt != null;
+  bool get isArchived => archivedAt != null;
+
+  /// Pendencia real para badge/tela: requer acao e ainda nao foi resolvida.
+  ///
+  /// Nao depende de `readAt`: marcar como lida so tira realce visual.
+  /// Nao depende de `archivedAt`: pendencia aberta nao deve ser arquivavel.
+  bool get isOpenAction => actionRequired && resolvedAt == null;
+
+  bool get isNotice => !isOpenAction;
+  bool get canBeArchived => !isOpenAction;
+
+  String? get vehicleCrewId => _firstNonEmpty([additionalData, occurrenceId]);
+
+  String? get resolvedPromotionRequestId => _firstNonEmpty([
+    promotionRequestId,
+    type == NotificationType.trainingPromotionRequested ? additionalData : null,
+  ]);
+
   bool get isVehicleCrewNotification => switch (type) {
     NotificationType.vehicleCrewInvitation ||
     NotificationType.vehicleCrewInvitationAccepted ||
@@ -168,4 +259,34 @@ class NotificationItem {
     NotificationType.trainingBonusMilestoneAvailable => true,
     _ => false,
   };
+
+  static DateTime? _dateValue(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  static bool _boolValue(Object? value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
+  static String? _stringValue(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
+  }
+
+  static String? _firstNonEmpty(Iterable<String?> values) {
+    for (final value in values) {
+      final text = _stringValue(value);
+      if (text != null) return text;
+    }
+    return null;
+  }
 }

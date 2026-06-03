@@ -5,9 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/permission_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
-import 'package:canil_gcm/features/dogs/presentation/screens/dog_prontuario_tab_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
@@ -39,10 +39,10 @@ class _MainRootScreenState extends State<MainRootScreen> {
   void initState() {
     super.initState();
     _screens = [
-      ActiveShiftDashboardScreen(onOpenTrainingHub: () => _onTabTapped(2)),
-      const HistoryScreen(),
+      ActiveShiftDashboardScreen(onOpenTrainingHub: () => _onTabTapped(1)),
       const TrainingHubScreen(),
-      const DogProntuarioTabScreen(),
+      const _MainRootHealthTab(),
+      const HistoryScreen(),
     ];
     PermissionService.requestInitialPermissions();
   }

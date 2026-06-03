@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notificações — Canil K9 GCM (v2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{background:#0a1418;font-family:'Inter',sans-serif;min-height:100vh;display:flex;justify-content:center;flex-wrap:wrap;padding:24px 20px;gap:26px;}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;}
+  .phone-label{color:#4dd0e1;font-size:11px;font-weight:700;letter-spacing:1.2px;margin-bottom:10px;text-align:center;}
+  .phone-label small{display:block;color:#5a7280;font-size:10px;font-weight:400;margin-top:2px;}
+  .phone{width:390px;height:760px;background:#050d10;border-radius:40px;overflow:hidden;position:relative;border:8px solid #1a1a1a;box-shadow:0 0 40px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+  .status-bar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;color:#fff;font-size:14px;font-weight:600;flex-shrink:0;}
+  .status-icons{display:flex;gap:5px;align-items:center;font-size:12px;}
+  .scroll{flex:1;overflow-y:auto;padding:0 16px 24px;}
+  .scroll::-webkit-scrollbar{width:0;}
+
+  /* header do dashboard (demo do acesso) */
+  .dash-top{display:flex;align-items:center;gap:12px;padding:8px 4px 0;}
+  .ic-btn{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;font-size:19px;color:#cfe0e6;position:relative;}
+  .ic-btn.bell{background:rgba(77,208,225,.08);border-color:rgba(77,208,225,.22);color:#4dd0e1;}
+  .dash-tt{flex:1;}
+  .dash-tt .k{color:#4dd0e1;font-size:9px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;}
+  .dash-tt .n{color:#fff;font-size:18px;font-weight:700;}
+  .bell-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;border-radius:10px;background:#f1c40f;color:#1a1400;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #050d10;}
+  .demo-note{margin:22px 6px 0;padding:14px;border:1px dashed rgba(77,208,225,.3);border-radius:13px;color:#9fc3cb;font-size:12px;line-height:1.5;}
+  .demo-note b{color:#4dd0e1;}
+  .ghost-card{height:80px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:16px;margin-top:14px;}
+
+  /* tela notificações */
+  .header{display:flex;align-items:center;gap:11px;padding:6px 2px 14px;}
+  .back-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px;background:rgba(255,255,255,.04);border-radius:10px;flex-shrink:0;}
+  .htitle{flex:1;}
+  .htitle .h-main{color:#fff;font-size:18px;font-weight:700;}
+  .htitle .h-sub{color:#7a8a92;font-size:11px;margin-top:1px;}
+  .mark{color:#4dd0e1;font-size:11px;font-weight:600;text-align:right;line-height:1.3;}
+
+  .sec-label{display:flex;align-items:center;gap:9px;margin:14px 2px 11px;}
+  .sec-label .t{color:#5a7280;font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;}
+  .sec-label .t.alert{color:#f1c40f;}
+  .sec-label .ln{flex:1;height:1px;background:rgba(255,255,255,.07);}
+  .sec-label .clear{color:#7a8a92;font-size:10px;font-weight:600;}
+
+  .ncard{display:flex;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px;margin-bottom:9px;position:relative;}
+  .ncard.act-red{border-color:rgba(231,76,60,.3);background:rgba(231,76,60,.05);}
+  .ncard.act-amber{border-color:rgba(241,196,15,.3);background:rgba(241,196,15,.05);}
+  .ncard.act-cyan{border-color:rgba(77,208,225,.28);background:rgba(77,208,225,.05);}
+  .ncard.read{opacity:.7;}
+  .n-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .ic-red{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.3);}
+  .ic-amber{background:rgba(241,196,15,.12);border:1px solid rgba(241,196,15,.3);}
+  .ic-cyan{background:rgba(77,208,225,.12);border:1px solid rgba(77,208,225,.3);}
+  .ic-green{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);}
+  .ic-grey{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);}
+  .n-body{flex:1;min-width:0;}
+  .n-top{display:flex;align-items:flex-start;gap:8px;}
+  .n-title{color:#fff;font-size:13.5px;font-weight:700;flex:1;line-height:1.3;}
+  .n-when{color:#5a7280;font-size:9.5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+  .n-desc{color:#aebcc4;font-size:11.5px;line-height:1.45;margin-top:4px;}
+  .n-desc .mono{font-family:'IBM Plex Mono',monospace;color:#9fc3cb;font-size:11px;}
+  .n-actions{display:flex;gap:8px;margin-top:11px;}
+  .nbtn{border-radius:9px;padding:9px 14px;font-size:12px;font-weight:700;font-family:inherit;border:none;flex:1;text-align:center;}
+  .nbtn-red{background:#e74c3c;color:#fff;}
+  .nbtn-cyan{background:#4dd0e1;color:#04181d;}
+  .nbtn-green{background:#2ecc71;color:#04140a;}
+  .nbtn-ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#b0c4cc;}
+  .udot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+  .ud-red{background:#e74c3c;}.ud-amber{background:#f1c40f;}.ud-cyan{background:#4dd0e1;}
+
+  .design-notes{width:100%;max-width:900px;margin:14px auto 0;color:#9aa7af;font-size:13.5px;line-height:1.65;}
+  .design-notes h3{color:#4dd0e1;font-size:13px;margin:16px 0 8px;letter-spacing:.4px;text-transform:uppercase;}
+  .design-notes ul{list-style:none;padding-left:0;}
+  .design-notes li{padding:5px 0 5px 22px;position:relative;}
+  .design-notes li:before{content:"→";position:absolute;left:0;color:#4dd0e1;}
+  .design-notes b{color:#cfe0e6;}
+  .lesson{background:rgba(241,196,15,.05);border-left:3px solid #f1c40f;border-radius:8px;padding:13px 15px;margin:10px 0;color:#cfd8c0;font-size:12.5px;line-height:1.6;}
+  .lesson b{color:#f1c40f;}
+</style>
+</head>
+<body>
+
+<!-- ===== ACESSO — sino no header ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">ACESSO · sino no header<small>o badge migra do ☰ pro 🔔</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>18:29</span><span class="status-icons">📶 🛜 🔋</span></div>
+    <div class="scroll">
+      <div class="dash-top">
+        <div class="ic-btn">☰</div>
+        <div class="dash-tt"><div class="k">GCM Limeira</div><div class="n">Canil K9</div></div>
+        <div class="ic-btn bell">🔔<span class="bell-badge">3</span></div>
+      </div>
+      <div class="demo-note">O <b>sino</b> fica sempre visível e abre as notificações em <b>um toque</b>. O contador conta só o que <b>requer ação</b> (3) — não os avisos. O hamburguer volta a ser só ações/config, <b>sem badge</b>.</div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA DE NOTIFICAÇÕES ===== -->
+<div class="phone-wrap">
+  <div class="phone-label">NOTIFICAÇÕES<small>requer ação no topo · avisos embaixo</small></div>
+  <div class="phone">
+    <div class="status-bar"><span>18:29</span><span class="status-icons">📶 🛜 🔋</span></div>
+    <div class="scroll">
+      <div class="header">
+        <div class="back-btn">‹</div>
+        <div class="htitle"><div class="h-main">Notificações</div><div class="h-sub">3 requerem ação · 2 avisos</div></div>
+        <div class="mark">Marcar<br>lidas</div>
+      </div>
+
+      <div class="sec-label"><span class="t alert">⚠ Requer ação · 3</span><span class="ln"></span></div>
+
+      <!-- Assinatura (mais urgente) -->
+      <div class="ncard act-red">
+        <div class="n-ic ic-red">✍️</div>
+        <div class="n-body">
+          <div class="n-top"><span class="udot ud-red"></span><div class="n-title">Assinatura necessária</div><div class="n-when">há 4 min</div></div>
+          <div class="n-desc">A ocorrência <span class="mono">#2026-0142</span> aguarda sua assinatura pra ser selada.</div>
+          <div class="n-actions"><button class="nbtn nbtn-red">Revisar e assinar</button></div>
+        </div>
+      </div>
+
+      <!-- Convite guarnição -->
+      <div class="ncard act-amber">
+        <div class="n-ic ic-amber">🚓</div>
+        <div class="n-body">
+          <div class="n-top"><span class="udot ud-amber"></span><div class="n-title">Convite para a guarnição</div><div class="n-when">há 12 min</div></div>
+          <div class="n-desc">GCM Silva te convidou para a <span class="mono">VTR 04</span> · turno noite.</div>
+          <div class="n-actions"><button class="nbtn nbtn-green">Aceitar</button><button class="nbtn nbtn-ghost">Recusar</button></div>
+        </div>
+      </div>
+
+      <!-- Evolução de treino (pro instrutor) -->
+      <div class="ncard act-cyan">
+        <div class="n-ic ic-cyan">🎓</div>
+        <div class="n-body">
+          <div class="n-top"><span class="udot ud-cyan"></span><div class="n-title">Evolução para avaliar</div><div class="n-when">há 1 h</div></div>
+          <div class="n-desc">GCM Souza solicitou evolução do <b>Bono</b> — Busca &amp; Captura, <span class="mono">Módulo 2</span>.</div>
+          <div class="n-actions"><button class="nbtn nbtn-cyan">Avaliar</button></div>
+        </div>
+      </div>
+
+      <div class="sec-label"><span class="t">Avisos · 2</span><span class="ln"></span><span class="clear">🗑 Limpar</span></div>
+
+      <!-- Evolução aprovada (pro condutor) -->
+      <div class="ncard read">
+        <div class="n-ic ic-green">✓</div>
+        <div class="n-body">
+          <div class="n-top"><div class="n-title">Evolução aprovada</div><div class="n-when">há 2 h</div></div>
+          <div class="n-desc">O <b>Apolo</b> avançou para o <span class="mono">Módulo 3</span>. Aprovado por GCM Ragonha.</div>
+        </div>
+      </div>
+
+      <!-- Convite aceito -->
+      <div class="ncard read">
+        <div class="n-ic ic-grey">👥</div>
+        <div class="n-body">
+          <div class="n-top"><div class="n-title">Convite aceito</div><div class="n-when">ontem</div></div>
+          <div class="n-desc">GCM Lima entrou na <span class="mono">VTR 04</span>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="design-notes">
+  <h3>As três notificações, cada uma com seu lado</h3>
+  <ul>
+    <li><b>Convite de guarnição</b> → pra quem recebe: Aceitar/Recusar (requer ação). Pra quem convidou: "Fulano aceitou" (aviso).</li>
+    <li><b>Assinatura</b> → "Revisar e assinar" (requer ação, a mais urgente — trava o fechamento). Quando todos assinam: "Ocorrência selada" (aviso).</li>
+    <li><b>Evolução de treino</b> → pro instrutor: "Avaliar" (requer ação). Pro condutor: "Aprovada / Recusada com motivo" (aviso).</li>
+  </ul>
+
+  <h3>O comportamento dos botões</h3>
+  <ul>
+    <li><b>Sino + badge:</b> o contador conta só "requer ação" (3), não os avisos — o número reflete o que realmente te cobra.</li>
+    <li><b>Marcar lidas:</b> tira o realce de não-lida, mas <b>não some</b> com a pendência — ela continua no topo até ser resolvida.</li>
+    <li><b>Limpar:</b> só na seção <b>Avisos</b>. As pendências não têm "limpar" de propósito.</li>
+    <li><b>Voltar (‹):</b> volta pra tela de onde você abriu o sino.</li>
+  </ul>
+
+  <div class="lesson"><b>Por que pendência não se limpa:</b> se o condutor pudesse apagar uma assinatura pendente, ele apagaria, esqueceria, e a ocorrência ficaria sem fechar — o buraco que o app existe pra tapar. Pendência só sai da lista quando <b>resolvida</b>. Aviso é só informação: pode limpar à vontade.</div>
+</div>
+
+</body>
+</html>
