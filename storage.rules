@@ -6,6 +6,68 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function claimListHas(key, value) {
+      return signedIn()
+        && request.auth.token.get(key, []) is list
+        && request.auth.token.get(key, []).hasAny([value]);
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (
+          request.auth.token.get('admin', false) == true
+          || request.auth.token.get('role', '') in ['admin', 'administrador']
+          || claimListHas('roles', 'admin')
+          || claimListHas('roles', 'administrador')
+        );
+    }
+
+    function hasRaClaim() {
+      return signedIn()
+        && request.auth.token.get('ra', '') is string
+        && request.auth.token.get('ra', '').size() > 0;
+    }
+
+    function tokenAccessProfileId() {
+      return request.auth.token.get('access_profile_id', '') is string
+        && request.auth.token.get('access_profile_id', '').size() > 0
+        ? request.auth.token.get('access_profile_id', '')
+        : 'condutor';
+    }
+
+    function currentAccessProfileId() {
+      let user = firestore.get(
+        /databases/(default)/documents/users/$(request.auth.token.ra)
+      ).data;
+      let mirrorProfileId = user.get(
+        'access_profile_id',
+        user.get('accessProfileId', ''),
+      );
+      return mirrorProfileId is string && mirrorProfileId.size() > 0
+        ? mirrorProfileId
+        : tokenAccessProfileId();
+    }
+
+    function activeProfileGrants(profileId, moduleId, action) {
+      let profilePath = /databases/(default)/documents/access_profiles/$(profileId);
+      return firestore.exists(profilePath)
+        && firestore.get(profilePath).data.status == 'active'
+        && firestore.get(profilePath).data.permissions.get(moduleId, {}).get(action, false) == true;
+    }
+
+    function hasAccessPermission(moduleId, action) {
+      return isAdmin()
+        || (
+          hasRaClaim()
+          && activeProfileGrants(currentAccessProfileId(), moduleId, action)
+        );
+    }
+
+    function canCreateOrEdit(moduleId) {
+      return hasAccessPermission(moduleId, 'create')
+        || hasAccessPermission(moduleId, 'edit');
+    }
+
     function isImage() {
       return request.resource.contentType.matches('image/.*');
     }
@@ -39,9 +101,61 @@ service firebase.storage {
         && underMegabytes(sizeMb);
     }
 
+    function isHumanProfilePhoto(fileName) {
+      return fileName.matches('human-[0-9]{4,12}-.*');
+    }
+
+    function canWriteProfilePhoto(fileName) {
+      return canWriteImage(10)
+        && (
+          (
+            isHumanProfilePhoto(fileName)
+            && canCreateOrEdit('humans')
+          )
+          || (
+            !isHumanProfilePhoto(fileName)
+            && canCreateOrEdit('k9')
+          )
+        );
+    }
+
+    function canWriteAdminAttachment(moduleId, sizeMb) {
+      return canWriteHealthAttachment(sizeMb) && canCreateOrEdit(moduleId);
+    }
+
     match /profile_photos/{fileName} {
       allow read: if signedIn();
-      allow create: if canWriteImage(10);
+      allow create: if canWriteProfilePhoto(fileName);
+      allow update, delete: if false;
+    }
+
+    match /human_documents/{ra}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteAdminAttachment('humans', 20);
+      allow update, delete: if false;
+    }
+
+    match /vehicle_photos/{vehicleId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteImage(10) && canCreateOrEdit('vehicles');
+      allow update, delete: if false;
+    }
+
+    match /vehicle_documents/{vehicleId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteAdminAttachment('vehicles', 20);
+      allow update, delete: if false;
+    }
+
+    match /binomial_documents/{binomialId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteAdminAttachment('binomials', 20);
+      allow update, delete: if false;
+    }
+
+    match /inventory_items/{itemId}/{fileName} {
+      allow read: if signedIn();
+      allow create: if canWriteAdminAttachment('inventory', 20);
       allow update, delete: if false;
     }
 

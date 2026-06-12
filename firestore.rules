@@ -6,6 +6,95 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function claimListHas(key, value) {
+      return signedIn()
+        && request.auth.token.get(key, []) is list
+        && request.auth.token.get(key, []).hasAny([value]);
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && (
+          request.auth.token.get('role', '') == role
+          || claimListHas('roles', role)
+        );
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (
+          request.auth.token.get('admin', false) == true
+          || request.auth.token.get('role', '') in ['admin', 'administrador']
+          || claimListHas('roles', 'admin')
+          || claimListHas('roles', 'administrador')
+        );
+    }
+
+    function isInventoryManager() {
+      return isAdmin()
+        || request.auth.token.get('inventory_manager', false) == true
+        || hasRole('inventory_manager');
+    }
+
+    function canAccessMobile() {
+      return signedIn()
+        && (
+          request.auth.token.get('mobile_access', true) == true
+          || claimListHas('app_access', 'mobile')
+        );
+    }
+
+    function canAccessWeb() {
+      return signedIn()
+        && (
+          request.auth.token.get('web_access', true) == true
+          || claimListHas('app_access', 'web')
+        );
+    }
+
+    function canReadAccessProfile() {
+      return canAccessWeb();
+    }
+
+    function hasRaClaim() {
+      return signedIn()
+        && request.auth.token.get('ra', '') is string
+        && request.auth.token.get('ra', '').size() > 0;
+    }
+
+    function tokenAccessProfileId() {
+      return request.auth.token.get('access_profile_id', '') is string
+        && request.auth.token.get('access_profile_id', '').size() > 0
+        ? request.auth.token.get('access_profile_id', '')
+        : 'condutor';
+    }
+
+    function currentAccessProfileId() {
+      let user = get(/databases/$(database)/documents/users/$(request.auth.token.ra)).data;
+      let mirrorProfileId = user.get(
+        'access_profile_id',
+        user.get('accessProfileId', ''),
+      );
+      return mirrorProfileId is string && mirrorProfileId.size() > 0
+        ? mirrorProfileId
+        : tokenAccessProfileId();
+    }
+
+    function activeProfileGrants(profileId, moduleId, action) {
+      let profilePath = /databases/$(database)/documents/access_profiles/$(profileId);
+      return exists(profilePath)
+        && get(profilePath).data.status == 'active'
+        && get(profilePath).data.permissions.get(moduleId, {}).get(action, false) == true;
+    }
+
+    function hasAccessPermission(moduleId, action) {
+      return isAdmin()
+        || (
+          hasRaClaim()
+          && activeProfileGrants(currentAccessProfileId(), moduleId, action)
+        );
+    }
+
     function isTrainingInstructor() {
       return signedIn()
         && (
@@ -1227,6 +1316,16 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if signedIn();
       allow create, update, delete: if false;
+
+      match /events/{eventId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+
+      match /documents/{documentId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
     }
 
     match /vehicle_crews/{crewId} {
@@ -1337,6 +1436,16 @@ service cloud.firestore {
         && (canUpdateUserProfile() || canSoftDeleteUser());
       allow delete: if false;
 
+      match /certifications/{recordId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+
+      match /documents/{recordId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+
       match /devices/{deviceId} {
         allow read: if emailMatchesRa(ra);
         allow create, update: if emailMatchesRa(ra)
@@ -1355,10 +1464,63 @@ service cloud.firestore {
       }
     }
 
+    match /access_profiles/{profileId} {
+      allow read: if canReadAccessProfile();
+      allow create, update, delete: if false;
+    }
+
+    match /effective_movements/{movementId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /inventory_categories/{categoryId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /inventory_items/{itemId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /inventory_movements/{movementId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /binomials/{binomialId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+
+      match /documents/{documentId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+
+      match /evaluations/{evaluationId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
     match /dogs/{dogId} {
       allow read: if signedIn();
-      allow create: if canCreateAuditedRecord();
-      allow update: if canUpdateDogProfile() || canSoftDeleteDog();
+      allow create: if hasAccessPermission('k9', 'create')
+        && canCreateAuditedRecord();
+      allow update: if (
+          hasAccessPermission('k9', 'edit')
+          && canUpdateDogProfile()
+        )
+        || (
+          hasAccessPermission('k9', 'archive')
+          && canSoftDeleteDog()
+        );
       allow delete: if false;
 
       match /weight_history/{recordId} {
@@ -1632,6 +1794,10 @@ service cloud.firestore {
 
     match /promotion_requests/{requestId} {
       allow read: if isTrainingInstructor()
+        || hasAccessPermission('training', 'approve')
+        || hasAccessPermission('training', 'audit')
+        || hasAccessPermission('training_matrix', 'approve')
+        || hasAccessPermission('training_matrix', 'audit')
         || emailMatchesRa(resource.data.requester_ra);
       allow create: if canCreatePromotionRequest();
       allow update: if canDecidePromotionRequest();

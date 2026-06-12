@@ -1300,6 +1300,46 @@ test('notificacao permite arquivar avisos mas bloqueia pendencia aberta', async 
   );
 });
 
+test('access_profiles tem leitura web autenticada e escrita direta bloqueada', async () => {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'access_profiles', 'condutor'), {
+      id: 'condutor',
+      name: 'Condutor',
+      status: 'active',
+      permissions: {
+        dashboard: {view: true},
+      },
+      seed_version: 1,
+    });
+  });
+
+  await assertSucceeds(
+    getDoc(doc(dbFor(PRIMARY_RA), 'access_profiles', 'condutor')),
+  );
+
+  await assertFails(
+    getDoc(doc(dbFor(PRIMARY_RA, {web_access: false}), 'access_profiles', 'condutor')),
+  );
+
+  await assertFails(
+    setDoc(doc(dbFor(PRIMARY_RA), 'access_profiles', 'novo'), {
+      id: 'novo',
+      name: 'Novo perfil',
+      status: 'active',
+      permissions: {},
+      seed_version: 1,
+      audit_trail: audit(),
+    }),
+  );
+
+  await assertFails(
+    updateDoc(doc(dbFor(PRIMARY_RA), 'access_profiles', 'condutor'), {
+      name: 'Condutor alterado',
+      audit_trail: audit(),
+    }),
+  );
+});
+
 test('Storage permite upload valido mas recusa exclusao de evidencia', async () => {
   const storage = storageFor(PRIMARY_RA);
   const imageRef = ref(storage, 'occurrences/occ-storage/events/foto.jpg');
@@ -1327,7 +1367,7 @@ try {
     console.log(`ok - ${name}`);
   }
 
-  assert.equal(tests.length, 24);
+  assert.equal(tests.length, 25);
   console.log(`\n${tests.length} testes de rules concluidos com sucesso.`);
 } finally {
   await testEnv.cleanup();
