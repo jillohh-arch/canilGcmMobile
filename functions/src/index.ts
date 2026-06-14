@@ -179,6 +179,7 @@ function accessClaimsForProfile(
   ra: string,
   profileId: string | null,
   roleKeys: string[],
+  accessScope: "global" | "own_records" = "global",
 ): JsonMap {
   const profileKey = normalizedKey(profileId);
   const profileRoles = new Set([
@@ -233,6 +234,7 @@ function accessClaimsForProfile(
     ...existingClaims,
     ra,
     access_profile_id: profileKey || null,
+    access_scope: accessScope,
     admin: isAdminProfile,
     app_access: appAccess,
     mobile_access: mobileAccess,
@@ -266,12 +268,19 @@ function humanClaims(
   accessLevel: string,
   accessProfileId: string | null,
   isK9Instructor: boolean,
+  accessScope: "global" | "own_records" = "global",
 ): JsonMap {
   const roleKeys = normalizedRoleKeys(
     [accessLevel, accessProfileId],
     isK9Instructor ? ["instrutor_k9"] : [],
   );
-  return accessClaimsForProfile(existingClaims, ra, accessProfileId, roleKeys);
+  return accessClaimsForProfile(
+    existingClaims,
+    ra,
+    accessProfileId,
+    roleKeys,
+    accessScope,
+  );
 }
 
 function isActionRequiredNotification(type: string): boolean {
@@ -313,6 +322,7 @@ type AccessModule =
   | "humans"
   | "inventory"
   | "k9"
+  | "training"
   | "vehicles";
 
 type AccessAction = "view" | "create" | "edit" | "archive" | "approve";
@@ -324,32 +334,27 @@ function legacyAccessProfileId(value: unknown): string | null {
     "admin",
     "administrador",
     "admin_master",
-    "gestor_comando",
   ].includes(normalized)) {
     return "administrador";
   }
   if ([
-    "almoxarifado",
-    "almoxarifado_estoque",
-    "estoque",
-    "inventory_manager",
-  ].includes(normalized)) {
-    return "almoxarifado";
-  }
-  if ([
     "gestor",
+    "comando",
+    "comando_canil",
     "supervisor",
     "supervisor_operacional",
     "subinspetor",
     "inspetor",
-    "subinspetor_inspetor",
+    "gestor_canil",
+    "coordenador",
   ].includes(normalized)) {
-    return "subinspetor_inspetor";
+    return "gestor";
   }
   if ([
     "instrutor",
     "instrutor_k9",
     "adestrador",
+    "adestrador_k9",
     "k9_instructor",
   ].includes(normalized)) {
     return "instrutor_k9";
@@ -359,8 +364,11 @@ function legacyAccessProfileId(value: unknown): string | null {
     "handler",
     "mobile_user",
     "operador_mobile",
+    "operador",
+    "operador_k9",
+    "guarda_k9",
   ].includes(normalized)) {
-    return "condutor";
+    return "operador_k9";
   }
   return normalized;
 }
@@ -399,7 +407,7 @@ function accessProfileIdFrom(
   ) {
     return "instrutor_k9";
   }
-  return "condutor";
+  return "operador_k9";
 }
 
 function profileGrantsPermission(
@@ -463,6 +471,64 @@ async function requireAnyAccessPermission(
   throw lastError ?? new HttpsError(
     "permission-denied",
     `Perfil sem permissao para ${moduleId}.`,
+  );
+}
+
+async function accessScopeForCaller(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+): Promise<"global" | "own_records"> {
+  if (auth && isAdminToken(auth.token)) return "global";
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const user = userSnap.data() ?? {};
+  const profileId = accessProfileIdFrom(auth?.token, user);
+  const profileSnap = await db.collection("access_profiles").doc(profileId).get();
+  const profileScope = stringValue(profileSnap.data()?.scope);
+  if (profileScope === "own_records") return "own_records";
+  if (profileScope === "global") return "global";
+
+  const mirroredScope =
+    stringValue(user.access_scope) ??
+    stringValue(user.accessScope) ??
+    stringValue(auth?.token.access_scope);
+  return mirroredScope === "own_records" ? "own_records" : "global";
+}
+
+function dogHandlerRa(dog: JsonMap): string | null {
+  return (
+    stringValue(dog.conductorRa) ??
+    stringValue(dog.conductor_ra) ??
+    stringValue(dog.handlerId) ??
+    stringValue(dog.handler_id) ??
+    null
+  );
+}
+
+async function callerHasActiveDog(caller: CallerIdentity, dogId: string) {
+  const shiftSnap = await db.collection("active_shifts").doc(caller.ra).get();
+  if (!shiftSnap.exists) return false;
+  const shift = shiftSnap.data() ?? {};
+  const activeDogId =
+    stringValue(shift.currentDogId) ??
+    stringValue(shift.service_dog_id) ??
+    stringValue(shift.dogId);
+  return stringValue(shift.status) === "active" && activeDogId === dogId;
+}
+
+async function requireDogRecordAccess(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+  dogId: string,
+  dog: JsonMap,
+) {
+  if ((await accessScopeForCaller(auth, caller)) === "global") return;
+  if (dogHandlerRa(dog) === caller.ra) return;
+  if (await callerHasActiveDog(caller, dogId)) return;
+
+  throw new HttpsError(
+    "permission-denied",
+    "Seu perfil permite registrar dados apenas para o K9 vinculado ou em turno ativo.",
   );
 }
 
@@ -1315,6 +1381,63 @@ async function resolveTrainingPromotionRequestNotifications(
   return resolved;
 }
 
+export const decidePromotionRequest = onCall({region}, async (request) => {
+  const caller = await requireAccessPermission(request.auth, "training", "approve");
+  const data = request.data as JsonMap;
+  const requestId = requiredString(data, "requestId");
+  const decisionValue = requiredString(data, "decision");
+  if (decisionValue !== "approved" && decisionValue !== "rejected") {
+    throw new HttpsError("invalid-argument", "Decisao invalida.");
+  }
+  const reason = stringValue(data.reason);
+  const note = stringValue(data.note);
+  assertDocumentId(requestId, "Identificador da solicitacao");
+
+  const ref = db.collection("promotion_requests").doc(requestId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "Solicitacao nao encontrada.");
+  }
+  const current = snap.data() ?? {};
+  if (current.status !== "pending") {
+    throw new HttpsError(
+      "failed-precondition",
+      `Solicitacao ja foi decidida como "${current.status}".`,
+    );
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const decisionBy = caller.ra || caller.uid;
+  const entry: JsonMap = {
+    action: `training_module_promotion_${decisionValue}`,
+    at: now,
+    by: caller.uid,
+    by_name: caller.name,
+    by_ra: decisionBy,
+    performed_by: caller.uid,
+    performed_at: now,
+  };
+  if (note) entry.note = note;
+  if (decisionValue === "rejected" && reason) entry.reason = reason;
+
+  const update: JsonMap = {
+    audit_trail: admin.firestore.FieldValue.arrayUnion(entry),
+    decided_at: now,
+    decision: decisionValue,
+    decision_by: decisionBy,
+    decision_by_email: caller.email,
+    decision_by_uid: caller.uid,
+    status: decisionValue,
+    updated_at: now,
+  };
+  if (decisionValue === "rejected" && reason) {
+    update.decision_reason = reason;
+  }
+
+  await ref.set(update, {merge: true});
+  return {id: requestId, status: decisionValue};
+});
+
 export const adminSaveAccessProfile = onCall({region}, async (request) => {
   const data = request.data as JsonMap;
   const source = (data.profile ?? {}) as JsonMap;
@@ -1432,6 +1555,8 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   }
   const profileName = stringValue(profile.name) ?? profileId;
   const seedVersion = optionalNumberValue(profile.seed_version) ?? null;
+  const accessScope =
+    stringValue(profile.scope) === "own_records" ? "own_records" : "global";
   const roleKeys = normalizedRoleKeys(profile.role_keys, [profileId]);
   const roleSet = new Set(roleKeys);
   const isAdminProfile = roleSet.has("admin") ||
@@ -1477,7 +1602,13 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   if (authUser) {
     await admin.auth().setCustomUserClaims(
       authUser.uid,
-      accessClaimsForProfile(authUser.customClaims ?? {}, ra, profileId, roleKeys),
+      accessClaimsForProfile(
+        authUser.customClaims ?? {},
+        ra,
+        profileId,
+        roleKeys,
+        accessScope,
+      ),
     );
   }
 
@@ -1488,6 +1619,8 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
       access_profile: profileName,
       accessProfile: profileName,
       accessProfileId: profileId,
+      access_scope: accessScope,
+      accessScope,
       admin: isAdminProfile,
       app_access: appAccess,
       claim_role: isAdminProfile
@@ -2070,6 +2203,7 @@ export const adminCreateHealthEvent = onCall({region}, async (request) => {
     throw new HttpsError("invalid-argument", "Custo nao pode ser negativo.");
   }
   const dog = dogSnapshot.data() ?? {};
+  await requireDogRecordAccess(request.auth, caller, dogId, dog);
   const dogName = k9Text(dog, "name", "nome") || dogId;
   const eventRef = dogRef.collection("health_events").doc();
   const now = admin.firestore.FieldValue.serverTimestamp();
@@ -2143,6 +2277,7 @@ export const adminCreateK9WeightRecord = onCall({region}, async (request) => {
     throw new HttpsError("not-found", "K9 nao encontrado.");
   }
   const dog = dogSnapshot.data() ?? {};
+  await requireDogRecordAccess(request.auth, caller, dogId, dog);
   const dogName = k9Text(dog, "name", "nome") || dogId;
   const recordRef = dogRef.collection("weight_records").doc();
   const legacyRef = dogRef.collection("weight_history").doc(recordRef.id);
@@ -2208,6 +2343,7 @@ export const adminCreateK9HealthDocument = onCall({region}, async (request) => {
   const name = requiredString(payload, "name");
   const type = requiredString(payload, "type");
   const dog = dogSnapshot.data() ?? {};
+  await requireDogRecordAccess(request.auth, caller, dogId, dog);
   const dogName = k9Text(dog, "name", "nome") || dogId;
   const documentRef = db.collection("documentos").doc();
   const uploadedAt = admin.firestore.Timestamp.now();
@@ -2285,6 +2421,13 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     isK9Instructor ? ["instrutor_k9"] : [],
   );
   const profileRoleSet = new Set(profileRoleKeys);
+  const accessProfileSnapshot = accessProfileId
+    ? await db.collection("access_profiles").doc(accessProfileId).get()
+    : null;
+  const accessScope =
+    stringValue(accessProfileSnapshot?.data()?.scope) === "own_records"
+      ? "own_records"
+      : "global";
   const isAdminProfile = profileRoleSet.has("admin") ||
     profileRoleSet.has("administrador") ||
     profileRoleSet.has("admin_master");
@@ -2380,6 +2523,7 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     accessLevel,
     accessProfileId,
     isK9Instructor,
+    accessScope,
   );
   await admin.auth().setCustomUserClaims(authUser.uid, claims);
 
@@ -2408,6 +2552,8 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     access_profile: accessProfileName,
     accessProfileId: accessProfileId,
     access_profile_id: accessProfileId,
+    accessScope,
+    access_scope: accessScope,
     access_role: accessRole,
     admin: isAdminProfile,
     app_access: mobileAccess ? ["web", "mobile"] : ["web"],
