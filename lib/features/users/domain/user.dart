@@ -7,6 +7,10 @@ class UserModel {
   final String? photoUrl;
   final bool isK9Instructor;
   final String? trainingRole;
+  final String? shiftGroupId;
+  final String? shiftGroupName;
+  final int? shiftGroupStartHour;
+  final int? shiftGroupEndHour;
 
   UserModel({
     required this.ra,
@@ -17,6 +21,10 @@ class UserModel {
     this.photoUrl,
     this.isK9Instructor = false,
     this.trainingRole,
+    this.shiftGroupId,
+    this.shiftGroupName,
+    this.shiftGroupStartHour,
+    this.shiftGroupEndHour,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +39,10 @@ class UserModel {
           json['is_k9_instructor'] == true ||
           json['training_role'] == 'instrutor_k9',
       trainingRole: json['training_role'],
+      shiftGroupId: json['shift_group_id'],
+      shiftGroupName: json['shift_group_name'],
+      shiftGroupStartHour: json['shift_group_start_hour'],
+      shiftGroupEndHour: json['shift_group_end_hour'],
     );
   }
 
@@ -44,6 +56,10 @@ class UserModel {
       'photoUrl': photoUrl,
       'is_k9_instructor': isK9Instructor,
       'training_role': trainingRole,
+      'shift_group_id': shiftGroupId,
+      'shift_group_name': shiftGroupName,
+      'shift_group_start_hour': shiftGroupStartHour,
+      'shift_group_end_hour': shiftGroupEndHour,
     };
   }
 
@@ -56,6 +72,10 @@ class UserModel {
     Object? photoUrl = _sentinel,
     bool? isK9Instructor,
     Object? trainingRole = _sentinel,
+    Object? shiftGroupId = _sentinel,
+    Object? shiftGroupName = _sentinel,
+    Object? shiftGroupStartHour = _sentinel,
+    Object? shiftGroupEndHour = _sentinel,
   }) {
     return UserModel(
       ra: ra ?? this.ra,
@@ -68,7 +88,26 @@ class UserModel {
       trainingRole: trainingRole == _sentinel
           ? this.trainingRole
           : trainingRole as String?,
+      shiftGroupId: shiftGroupId == _sentinel
+          ? this.shiftGroupId
+          : shiftGroupId as String?,
+      shiftGroupName: shiftGroupName == _sentinel
+          ? this.shiftGroupName
+          : shiftGroupName as String?,
+      shiftGroupStartHour: shiftGroupStartHour == _sentinel
+          ? this.shiftGroupStartHour
+          : shiftGroupStartHour as int?,
+      shiftGroupEndHour: shiftGroupEndHour == _sentinel
+          ? this.shiftGroupEndHour
+          : shiftGroupEndHour as int?,
     );
+  }
+
+  String? get shiftScheduleDisplay {
+    if (shiftGroupStartHour == null || shiftGroupEndHour == null) return null;
+    final start = shiftGroupStartHour.toString().padLeft(2, '0');
+    final end = shiftGroupEndHour.toString().padLeft(2, '0');
+    return '$start:00 - $end:00';
   }
 
   static const _sentinel = Object();
