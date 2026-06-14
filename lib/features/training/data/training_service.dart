@@ -371,7 +371,7 @@ class TrainingService {
         continue;
       }
 
-      final key = normalizeTrainingKey(session.trainingType);
+      final key = _generalTrainingKey(session.trainingType);
       grouped.putIfAbsent(key, () => []).add(session);
     }
 
@@ -387,11 +387,13 @@ class TrainingService {
       );
     }).toList();
 
-    for (final defaultName in const ['Obediência', 'Condicionamento']) {
-      final key = normalizeTrainingKey(defaultName);
-      final exists = result.any(
-        (training) => normalizeTrainingKey(training.name) == key,
-      );
+    for (final defaultName in const ['Obediência', 'Condicionamento Físico']) {
+      final key = _generalTrainingKey(defaultName);
+      final exists =
+          result.any((training) => _generalTrainingKey(training.name) == key) ||
+          specialties.any(
+            (specialty) => _generalTrainingKey(specialty.name) == key,
+          );
       if (!exists) {
         result.add(
           TrainingGeneralTypeModel(
@@ -414,6 +416,14 @@ class TrainingService {
     });
 
     return result;
+  }
+
+  String _generalTrainingKey(String value) {
+    final key = normalizeTrainingKey(value);
+    if (key == 'condicionamento' || key == 'condicionamento_fisico') {
+      return 'condicionamento';
+    }
+    return key;
   }
 
   bool _matchesSpecialty(

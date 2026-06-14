@@ -17,8 +17,14 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 class DetectionFormationScreen extends StatefulWidget {
   final Dog dog;
   final DetectionService? service;
+  final String? initialLineType;
 
-  const DetectionFormationScreen({super.key, required this.dog, this.service});
+  const DetectionFormationScreen({
+    super.key,
+    required this.dog,
+    this.service,
+    this.initialLineType,
+  });
 
   @override
   State<DetectionFormationScreen> createState() =>
@@ -97,7 +103,10 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         handlerId: actor.ra,
         handlerName: actor.name,
       );
-      final selected = _resolveSelectedLine(lines, keepLineType);
+      final selected = _resolveSelectedLine(
+        lines,
+        keepLineType ?? widget.initialLineType,
+      );
       if (!mounted) return;
       setState(() {
         _lines = lines;

@@ -95,38 +95,119 @@ service cloud.firestore {
         );
     }
 
-    function isTrainingInstructor() {
+    function hasOwnRecordsScope() {
       return signedIn()
+        && !isAdmin()
+        && request.auth.token.get('access_scope', 'global') == 'own_records';
+    }
+
+    function dogAssignedToAuth(data) {
+      let ra = request.auth.token.get('ra', '');
+      return hasRaClaim()
         && (
-          (
-            'instrutor' in request.auth.token
-            && request.auth.token.instrutor == true
+          data.get('conductorRa', '') == ra
+          || data.get('conductor_ra', '') == ra
+          || data.get('handlerId', '') == ra
+          || data.get('handler_id', '') == ra
+        );
+    }
+
+    function activeShiftDogMatches(dogId) {
+      let ra = request.auth.token.get('ra', '');
+      let shiftPath = /databases/$(database)/documents/active_shifts/$(ra);
+      return hasRaClaim()
+        && exists(shiftPath)
+        && get(shiftPath).data.get('status', '') == 'active'
+        && (
+          get(shiftPath).data.get('dogId', '') == dogId
+          || get(shiftPath).data.get('service_dog_id', '') == dogId
+          || get(shiftPath).data.get('currentDogId', '') == dogId
+        );
+    }
+
+    function canAccessDogRecord(dogId) {
+      let dogPath = /databases/$(database)/documents/dogs/$(dogId);
+      return !hasOwnRecordsScope()
+        || (
+          exists(dogPath)
+          && dogAssignedToAuth(get(dogPath).data)
+        )
+        || activeShiftDogMatches(dogId);
+    }
+
+    function recordDogId(data) {
+      return data.get('dogId', '') is string && data.get('dogId', '').size() > 0
+        ? data.get('dogId', '')
+        : (
+          data.get('dog_id', '') is string && data.get('dog_id', '').size() > 0
+            ? data.get('dog_id', '')
+            : data.get('caoId', '')
+        );
+    }
+
+    function canAccessDogData(data) {
+      let dogId = recordDogId(data);
+      return !hasOwnRecordsScope()
+        || (
+          dogId is string
+          && dogId.size() > 0
+          && canAccessDogRecord(dogId)
+        );
+    }
+
+    function canReadTrainingData(data) {
+      let handlerId = trainingHandlerId(data);
+      return !hasOwnRecordsScope()
+        || emailMatchesRa(handlerId)
+        || canAccessDogData(data);
+    }
+
+    function canReadAuditRecord(data) {
+      return !hasOwnRecordsScope()
+        || (
+          data.get('actor', {}) is map
+          && (
+            data.get('actor', {}).get('uid', '') == request.auth.uid
+            || emailMatchesRa(data.get('actor', {}).get('ra', ''))
           )
-          || (
-            'adestrador' in request.auth.token
-            && request.auth.token.adestrador == true
-          )
-          || (
-            'instrutor_k9' in request.auth.token
-            && request.auth.token.instrutor_k9 == true
-          )
-          || (
-            'role' in request.auth.token
-            && request.auth.token.role == 'instrutor_k9'
-          )
-          || (
-            'training_instructor' in request.auth.token
-            && request.auth.token.training_instructor == true
-          )
-          || (
-            'training_role' in request.auth.token
-            && request.auth.token.training_role in ['instrutor', 'adestrador', 'instrutor_k9']
-          )
-          || (
-            'roles' in request.auth.token
-            &&
-            request.auth.token.roles is list
-            && request.auth.token.roles.hasAny(['instrutor', 'adestrador', 'instrutor_k9'])
+        );
+    }
+
+    function isTrainingInstructor() {
+      return isAdmin()
+        || (
+          signedIn()
+          && (
+            (
+              'instrutor' in request.auth.token
+              && request.auth.token.instrutor == true
+            )
+            || (
+              'adestrador' in request.auth.token
+              && request.auth.token.adestrador == true
+            )
+            || (
+              'instrutor_k9' in request.auth.token
+              && request.auth.token.instrutor_k9 == true
+            )
+            || (
+              'role' in request.auth.token
+              && request.auth.token.role == 'instrutor_k9'
+            )
+            || (
+              'training_instructor' in request.auth.token
+              && request.auth.token.training_instructor == true
+            )
+            || (
+              'training_role' in request.auth.token
+              && request.auth.token.training_role in ['instrutor', 'adestrador', 'instrutor_k9']
+            )
+            || (
+              'roles' in request.auth.token
+              &&
+              request.auth.token.roles is list
+              && request.auth.token.roles.hasAny(['instrutor', 'adestrador', 'instrutor_k9'])
+            )
           )
         );
     }
@@ -1524,104 +1605,112 @@ service cloud.firestore {
       allow delete: if false;
 
       match /weight_history/{recordId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /weight_records/{recordId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /specialties/{specialtyId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /training/{modality} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord()
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId)
+          && canCreateAuditedRecord()
           && validTrainingProgress(modality);
-        allow update: if canUpdateTrainingProgressMarks(modality)
-          || canNormalizeBuscaCapturaTrainingProgress(modality);
+        allow update: if canAccessDogRecord(dogId)
+          && (
+            canUpdateTrainingProgressMarks(modality)
+            || canNormalizeBuscaCapturaTrainingProgress(modality)
+          );
         allow delete: if false;
 
         match /bonus_milestones/{bonusId} {
-          allow read: if signedIn();
-          allow create: if canCreateBonusTrainingMilestone(dogId, modality, bonusId);
+          allow read: if signedIn() && canAccessDogRecord(dogId);
+          allow create: if canAccessDogRecord(dogId)
+            && canCreateBonusTrainingMilestone(dogId, modality, bonusId);
           allow update, delete: if false;
         }
 
         match /completed_module_corrections/{correctionId} {
-          allow read: if signedIn();
-          allow create: if canCreateCompletedModuleCorrection(dogId, modality);
+          allow read: if signedIn() && canAccessDogRecord(dogId);
+          allow create: if canAccessDogRecord(dogId)
+            && canCreateCompletedModuleCorrection(dogId, modality);
           allow update, delete: if false;
         }
       }
 
       match /detection_lines/{lineId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /triagem_evaluations/{evaluationId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedRecord();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedRecord();
         allow delete: if false;
       }
 
       match /guard_protection_state/{stateId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /commands/{commandId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /health_events/{eventId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /documents/{docId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /external_certifications/{certId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /training_sessions/{sessionId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord()
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId)
+          && canCreateAuditedRecord()
           && (
             canWriteDogTraining(dogId, request.resource.data)
             || canWriteBuscaCapturaSession(dogId, request.resource.data)
           );
-        allow update: if canUpdateAuditedOrSoftDelete()
+        allow update: if canAccessDogRecord(dogId)
+          && canUpdateAuditedOrSoftDelete()
           && (
             canWriteDogTraining(dogId, request.resource.data)
             || canWriteBuscaCapturaSession(dogId, request.resource.data)
@@ -1634,17 +1723,20 @@ service cloud.firestore {
       }
 
       match /training_attempts/{attemptId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord()
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId)
+          && canCreateAuditedRecord()
           && canWriteDogTraining(dogId, request.resource.data);
         allow update, delete: if false;
       }
 
       match /conditioning_sessions/{sessionId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord()
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId)
+          && canCreateAuditedRecord()
           && canWriteDogTraining(dogId, request.resource.data);
-        allow update: if canUpdateAuditedOrSoftDelete()
+        allow update: if canAccessDogRecord(dogId)
+          && canUpdateAuditedOrSoftDelete()
           && canWriteDogTraining(dogId, request.resource.data)
           && (
             trainingDogId(resource.data) == ''
@@ -1654,37 +1746,37 @@ service cloud.firestore {
       }
 
       match /feedings/{feedingId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /feeding_events/{feedingId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /nutrition_prescriptions/{prescriptionId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /nutritional_prescriptions/{prescriptionId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
 
       match /nutrition_supplements/{supplementId} {
-        allow read: if signedIn();
-        allow create: if canCreateAuditedRecord();
-        allow update: if canUpdateAuditedOrSoftDelete();
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create: if canAccessDogRecord(dogId) && canCreateAuditedRecord();
+        allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
     }
@@ -1739,23 +1831,25 @@ service cloud.firestore {
     }
 
     match /trainings/{trainingId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadTrainingData(resource.data);
       allow create: if canCreateTrainingRecord();
       allow update: if canUpdateTrainingRecord();
       allow delete: if false;
     }
 
     match /training_sessions/{sessionId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadTrainingData(resource.data);
       allow create: if canCreateTrainingRecord();
       allow update: if canUpdateTrainingRecord();
       allow delete: if false;
     }
 
     match /health_logs/{healthLogId} {
-      allow read: if signedIn();
-      allow create: if canCreateAuditedRecord();
-      allow update: if canUpdateAuditedRecord();
+      allow read: if signedIn() && canAccessDogData(resource.data);
+      allow create: if canAccessDogData(request.resource.data)
+        && canCreateAuditedRecord();
+      allow update: if canAccessDogData(request.resource.data)
+        && canUpdateAuditedRecord();
       allow delete: if false;
     }
 
@@ -1812,7 +1906,7 @@ service cloud.firestore {
     }
 
     match /auditLogs/{logId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && canReadAuditRecord(resource.data);
       allow create: if canCreateAuditLog();
       allow update, delete: if false;
     }
@@ -1837,9 +1931,11 @@ service cloud.firestore {
     }
 
     match /documentos/{docId} {
-      allow read: if signedIn();
-      allow create: if canCreateDogDocument();
-      allow update: if canUpdateAuditedOrSoftDelete();
+      allow read: if signedIn() && canAccessDogData(resource.data);
+      allow create: if canAccessDogData(request.resource.data)
+        && canCreateDogDocument();
+      allow update: if canAccessDogData(request.resource.data)
+        && canUpdateAuditedOrSoftDelete();
       allow delete: if false;
     }
 

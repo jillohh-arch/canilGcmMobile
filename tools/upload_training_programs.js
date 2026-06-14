@@ -6,7 +6,10 @@ const firebaseAuth = require('C:/npm-global/node_modules/firebase-tools/lib/auth
 const PROJECT_ID = 'canil-gcm';
 const DATABASE = '(default)';
 const COLLECTION = 'training_programs';
-const SEED_FILE = path.join(__dirname, 'training_programs_busca_captura_seed.json');
+const requestedSeed = process.argv[2];
+const SEED_FILE = requestedSeed
+  ? path.resolve(process.cwd(), requestedSeed)
+  : path.join(__dirname, 'training_programs_busca_captura_seed.json');
 
 function firestoreValue(value) {
   if (value === null || value === undefined) return {nullValue: null};

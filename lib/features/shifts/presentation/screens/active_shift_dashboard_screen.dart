@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -30,8 +31,6 @@ import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_regist
 import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
 import 'package:canil_gcm/core/services/dog_fitness_service.dart';
 
-import 'dynamic_activity_sheet.dart';
-
 part 'active_shift_header.dart';
 part 'active_shift_indicators_card.dart';
 part 'active_shift_quick_actions.dart';
@@ -45,8 +44,13 @@ part 'active_shift_dog_switcher.dart';
 
 class ActiveShiftDashboardScreen extends StatefulWidget {
   final VoidCallback? onOpenTrainingHub;
+  final VoidCallback? onOpenHealthTab;
 
-  const ActiveShiftDashboardScreen({super.key, this.onOpenTrainingHub});
+  const ActiveShiftDashboardScreen({
+    super.key,
+    this.onOpenTrainingHub,
+    this.onOpenHealthTab,
+  });
 
   @override
   State<ActiveShiftDashboardScreen> createState() =>

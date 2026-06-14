@@ -189,12 +189,19 @@ class DetectionEntryScreen extends StatelessWidget {
       case 'not_started':
       case 'triagem':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => DetectionTriagemScreen(dog: dog)),
+          MaterialPageRoute(
+            builder: (_) => DetectionTriagemScreen(dog: dog, line: line),
+          ),
         );
         break;
       case 'in_formation':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => DetectionFormationScreen(dog: dog)),
+          MaterialPageRoute(
+            builder: (_) => DetectionFormationScreen(
+              dog: dog,
+              initialLineType: line.normalizedType,
+            ),
+          ),
         );
         break;
       case 'operational':
@@ -206,7 +213,9 @@ class DetectionEntryScreen extends StatelessWidget {
         break;
       default:
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => DetectionTriagemScreen(dog: dog)),
+          MaterialPageRoute(
+            builder: (_) => DetectionTriagemScreen(dog: dog, line: line),
+          ),
         );
     }
   }

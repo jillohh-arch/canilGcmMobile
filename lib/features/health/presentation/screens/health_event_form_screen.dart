@@ -889,7 +889,8 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
 
   Widget _buildAttachmentField(ColorScheme cs) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      constraints: const BoxConstraints(minHeight: 58),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
@@ -897,41 +898,39 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       ),
       child: Row(
         children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(18),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: const Icon(
+              Icons.attach_file_rounded,
+              color: AppTheme.primary,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: _attachmentName != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _attachmentName!,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Arquivo pronto para envio',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppTheme.textTertiary,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    'Nenhum anexo selecionado',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: AppTheme.textTertiary,
-                    ),
-                  ),
+            child: Text(
+              _attachmentName ?? 'Nenhum anexo selecionado',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: _attachmentName != null
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+                color: _attachmentName != null
+                    ? AppTheme.primary
+                    : AppTheme.textTertiary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           if (_attachmentName != null)
             IconButton(
+              visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.close_rounded, color: AppTheme.error),
               onPressed: () {
                 setState(() {
@@ -945,6 +944,8 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.textPrimary.withAlpha(31),
               foregroundColor: AppTheme.textPrimary,
+              minimumSize: const Size(90, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

@@ -100,6 +100,7 @@ class TrainingRepository {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
+              .where((doc) => !_isSoftDeleted(doc.data()))
               .map((doc) => TrainingSpecialtyModel.fromJson(doc.data(), doc.id))
               .where(
                 (specialty) =>
@@ -118,6 +119,7 @@ class TrainingRepository {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
+              .where((doc) => !_isSoftDeleted(doc.data()))
               .map(
                 (doc) => TrainingSpecialtyModel.fromDogSpecialty(
                   doc.data(),
@@ -173,6 +175,8 @@ class TrainingRepository {
   }
 
   bool _isSoftDeleted(Map<String, dynamic> data) {
-    return data['deleted_at'] != null;
+    return data['deleted_at'] != null ||
+        data['archived_at'] != null ||
+        data['active'] == false;
   }
 }

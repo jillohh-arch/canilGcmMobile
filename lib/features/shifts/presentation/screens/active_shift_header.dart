@@ -42,6 +42,7 @@ class _ShiftHeader extends StatelessWidget {
   final String? currentRa;
   final String? conductorPhotoUrl;
   final VoidCallback onSwitchDog;
+  final VoidCallback? onDogHealth;
   final VoidCallback? onProfile;
 
   const _ShiftHeader({
@@ -49,6 +50,7 @@ class _ShiftHeader extends StatelessWidget {
     this.currentRa,
     this.conductorPhotoUrl,
     required this.onSwitchDog,
+    this.onDogHealth,
     this.onProfile,
   });
 
@@ -80,6 +82,7 @@ class _ShiftHeader extends StatelessWidget {
             : null,
         onSwitchDog: onSwitchDog,
         onProfileTap: onProfile,
+        onDogHealthTap: onDogHealth,
       ),
     );
   }

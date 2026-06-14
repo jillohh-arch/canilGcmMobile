@@ -173,7 +173,7 @@ class DetectionService {
     required String handlerId,
     required String handlerName,
   }) async {
-    if (line.status != 'not_started') return line;
+    if (line.status != 'not_started' && line.status != 'triagem') return line;
 
     final now = DateTime.now();
     final docId = line.id ?? line.normalizedType;

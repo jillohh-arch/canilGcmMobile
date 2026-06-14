@@ -39,7 +39,10 @@ class _MainRootScreenState extends State<MainRootScreen> {
   void initState() {
     super.initState();
     _screens = [
-      ActiveShiftDashboardScreen(onOpenTrainingHub: () => _onTabTapped(1)),
+      ActiveShiftDashboardScreen(
+        onOpenTrainingHub: () => _onTabTapped(1),
+        onOpenHealthTab: () => _onTabTapped(2),
+      ),
       const TrainingHubScreen(),
       const _MainRootHealthTab(),
       const HistoryScreen(),

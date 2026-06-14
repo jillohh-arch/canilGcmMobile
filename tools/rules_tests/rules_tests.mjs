@@ -332,6 +332,22 @@ test('curriculo de treino tem leitura autenticada e escrita por claim tecnico', 
     ),
   );
 
+  await assertSucceeds(
+    setDoc(
+      doc(
+        dbFor(PRIMARY_RA, {role: 'admin'}),
+        'training_programs/administrador_teste',
+      ),
+      {
+        name: 'Curriculo administrativo',
+        modality: 'administrador_teste',
+        version: 1,
+        active: true,
+        audit_trail: audit('created'),
+      },
+    ),
+  );
+
   await assertFails(
     updateDoc(
       doc(

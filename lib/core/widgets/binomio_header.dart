@@ -8,7 +8,7 @@ import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/features/dogs/presentation/screens/dog_profile_screen.dart';
+import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/pending_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -57,6 +57,9 @@ class BinomioHeader extends StatelessWidget {
   /// Callback customizado para abrir o perfil do condutor.
   final VoidCallback? onProfileTap;
 
+  /// Callback customizado para abrir a aba/tela de saude do K9.
+  final VoidCallback? onDogHealthTap;
+
   /// Se true, mostra o sino de pendências/notificações.
   final bool showNotificationButton;
 
@@ -93,6 +96,7 @@ class BinomioHeader extends StatelessWidget {
     this.trailing,
     this.onSwitchDog,
     this.onProfileTap,
+    this.onDogHealthTap,
     this.showNotificationButton = true,
     this.notificationUserId,
     this.showStatusDot = false,
@@ -141,6 +145,7 @@ class BinomioHeader extends StatelessWidget {
           dog: dog,
           showProfile: showProfileButton,
           onProfileTap: onProfileTap,
+          onDogHealthTap: onDogHealthTap,
           onSwitchDog: onSwitchDog,
         ),
         const SizedBox(width: 10),
@@ -366,12 +371,14 @@ class _HeaderMenuButton extends StatelessWidget {
   final Dog dog;
   final bool showProfile;
   final VoidCallback? onProfileTap;
+  final VoidCallback? onDogHealthTap;
   final VoidCallback? onSwitchDog;
 
   const _HeaderMenuButton({
     required this.dog,
     required this.showProfile,
     required this.onProfileTap,
+    required this.onDogHealthTap,
     required this.onSwitchDog,
   });
 
@@ -496,9 +503,15 @@ class _HeaderMenuButton extends StatelessWidget {
         );
         break;
       case _HeaderMenuAction.dog:
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => DogProfileScreen(dog: dog)));
+        if (onDogHealthTap != null) {
+          onDogHealthTap!();
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DogHealthProntuarioScreen(dogId: dog.id),
+            ),
+          );
+        }
         break;
       case _HeaderMenuAction.switchDog:
         if (onSwitchDog == null) {

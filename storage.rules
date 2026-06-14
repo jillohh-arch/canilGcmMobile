@@ -68,6 +68,44 @@ service firebase.storage {
         || hasAccessPermission(moduleId, 'edit');
     }
 
+    function hasOwnRecordsScope() {
+      return signedIn()
+        && !isAdmin()
+        && request.auth.token.get('access_scope', 'global') == 'own_records';
+    }
+
+    function dogAssignedToAuth(dogId) {
+      let ra = request.auth.token.get('ra', '');
+      let dogPath = /databases/(default)/documents/dogs/$(dogId);
+      return hasRaClaim()
+        && firestore.exists(dogPath)
+        && (
+          firestore.get(dogPath).data.get('conductorRa', '') == ra
+          || firestore.get(dogPath).data.get('conductor_ra', '') == ra
+          || firestore.get(dogPath).data.get('handlerId', '') == ra
+          || firestore.get(dogPath).data.get('handler_id', '') == ra
+        );
+    }
+
+    function activeShiftDogMatches(dogId) {
+      let ra = request.auth.token.get('ra', '');
+      let shiftPath = /databases/(default)/documents/active_shifts/$(ra);
+      return hasRaClaim()
+        && firestore.exists(shiftPath)
+        && firestore.get(shiftPath).data.get('status', '') == 'active'
+        && (
+          firestore.get(shiftPath).data.get('dogId', '') == dogId
+          || firestore.get(shiftPath).data.get('service_dog_id', '') == dogId
+          || firestore.get(shiftPath).data.get('currentDogId', '') == dogId
+        );
+    }
+
+    function canAccessDogRecord(dogId) {
+      return !hasOwnRecordsScope()
+        || dogAssignedToAuth(dogId)
+        || activeShiftDogMatches(dogId);
+    }
+
     function isImage() {
       return request.resource.contentType.matches('image/.*');
     }
@@ -196,8 +234,9 @@ service firebase.storage {
     }
 
     match /health_attachments/{dogId}/{fileName} {
-      allow read: if signedIn();
-      allow create: if canWriteHealthAttachment(20);
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create: if canAccessDogRecord(dogId)
+        && canWriteHealthAttachment(20);
       allow update, delete: if false;
     }
 
@@ -214,20 +253,21 @@ service firebase.storage {
     }
 
     match /dogs/{dogId}/feeding_photos/{fileName} {
-      allow read: if signedIn();
-      allow create: if canWriteImage(10);
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create: if canAccessDogRecord(dogId) && canWriteImage(10);
       allow update, delete: if false;
     }
 
     match /dogs/{dogId}/training_sessions/{sessionId}/media/{fileName} {
-      allow read: if signedIn();
-      allow create: if canWriteImage(20);
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create: if canAccessDogRecord(dogId) && canWriteImage(20);
       allow update, delete: if false;
     }
 
     match /documentos/{dogId}/{fileName} {
-      allow read: if signedIn();
-      allow create: if canWriteHealthAttachment(20);
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create: if canAccessDogRecord(dogId)
+        && canWriteHealthAttachment(20);
       allow update, delete: if false;
     }
 

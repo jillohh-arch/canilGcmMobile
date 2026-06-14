@@ -1,0 +1,303 @@
+{
+  "program": {
+    "id": "guarda_protecao",
+    "name": "Guarda & Proteção",
+    "modality": "guarda_protecao",
+    "version": 1,
+    "active": true,
+    "updated_by": "seed:parte13_gp",
+    "source": "conversa:curriculo_gp_2026-06-05"
+  },
+  "modules": [
+    {
+      "id": "modulo_1_caca_mordida_tecnica",
+      "order": 1,
+      "name": "Módulo 1 — Caça e mordida técnica",
+      "description": "Base prazerosa · caça como impulso dominante · mordida técnica sem pressão",
+      "active": true,
+      "milestones": [
+        {
+          "id": "interesse_consistente_material",
+          "order": 1,
+          "label": "Interesse consistente pelo material de caça",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "perseguicao_captura_controlada",
+          "order": 2,
+          "label": "Perseguição e captura controlada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "mordida_firme",
+          "order": 3,
+          "label": "Mordida firme",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "boca_cheia",
+          "order": 4,
+          "label": "Boca cheia",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "estabilizacao_inicial",
+          "order": 5,
+          "label": "Estabilização inicial da mordida",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "pagamento_caca_registrado",
+          "order": 6,
+          "label": "Pagamento em caça registrado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "encerramento_positivo_sem_conflito",
+          "order": 7,
+          "label": "Encerramento positivo sem conflito",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_2_defesa_controlada",
+      "order": 2,
+      "name": "Módulo 2 — Defesa controlada",
+      "description": "Introdução gradual de pressão conforme maturidade · defesa sempre equilibrada por retorno à caça",
+      "active": true,
+      "milestones": [
+        {
+          "id": "maturidade_para_pressao",
+          "order": 1,
+          "label": "Maturidade física e mental registrada antes de elevar pressão",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "pressao_leve_aceita",
+          "order": 2,
+          "label": "Aceita pressão leve com figurante controlado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "mordida_sob_pressao_moderada",
+          "order": 3,
+          "label": "Mantém mordida sob pressão moderada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "sem_antecipacao_sem_comando",
+          "order": 4,
+          "label": "Não antecipa sem comando do condutor",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "retorno_caca_apos_defesa",
+          "order": 5,
+          "label": "Retorno para caça após defesa como reequilíbrio",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "equilibrio_emocional_figurante",
+          "order": 6,
+          "label": "Figurante avalia equilíbrio emocional como adequado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "falhas_controle_orientadas",
+          "order": 7,
+          "label": "Falhas de controle registradas com orientação",
+          "required": false,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_3_comandos_especializados",
+      "order": 3,
+      "name": "Módulo 3 — Comandos especializados",
+      "description": "Controle sobre impulso já construído · soltura, atenção e reengajamento sob comando",
+      "active": true,
+      "milestones": [
+        {
+          "id": "larga_baixa_excitacao",
+          "order": 1,
+          "label": "Larga funcional em baixa excitação",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "larga_media_excitacao",
+          "order": 2,
+          "label": "Larga funcional em média excitação",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "reengajamento_sob_comando",
+          "order": 3,
+          "label": "Reengajamento somente sob comando",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "atencao_latido_controlado",
+          "order": 4,
+          "label": "Atenção/latido controlado sem mordida",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "interrupcao_segura_sessao",
+          "order": 5,
+          "label": "Interrupção segura da sessão",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "condutor_leitura_cao",
+          "order": 6,
+          "label": "Condutor demonstra leitura do cão sob excitação",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_4_cenarios_operacionais_simulados",
+      "order": 4,
+      "name": "Módulo 4 — Cenários operacionais simulados",
+      "description": "Aplicação controlada em cenários variados · decisão do condutor e encerramento seguro",
+      "active": true,
+      "milestones": [
+        {
+          "id": "abordagem_simulada_figurante",
+          "order": 1,
+          "label": "Abordagem simulada com figurante",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "protecao_condutor",
+          "order": 2,
+          "label": "Proteção do condutor em cenário controlado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "guarda_posicao_perimetro",
+          "order": 3,
+          "label": "Guarda de posição ou perímetro",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "ambiente_diferente",
+          "order": 4,
+          "label": "Trabalho em ambiente diferente do habitual",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "equipamento_adequado_cenario",
+          "order": 5,
+          "label": "Equipamento adequado ao cenário registrado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "figurante_diferente",
+          "order": 6,
+          "label": "Sessão com figurante diferente do habitual",
+          "required": false,
+          "active": true
+        },
+        {
+          "id": "encerramento_seguro",
+          "order": 7,
+          "label": "Encerramento seguro do cenário",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "decisao_condutor_registrada",
+          "order": 8,
+          "label": "Tomada de decisão do condutor registrada",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "modulo_5_certificacao",
+      "order": 5,
+      "name": "Módulo 5 — Certificação",
+      "description": "Validação final por Instrutor K9 · controle, estabilidade e uso proporcional",
+      "active": true,
+      "milestones": [
+        {
+          "id": "sessao_final_instrutor_k9",
+          "order": 1,
+          "label": "Sessão final acompanhada por Instrutor K9",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "figurante_identificado",
+          "order": 2,
+          "label": "Figurante identificado no registro",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "controle_aprovado",
+          "order": 3,
+          "label": "Controle do cão aprovado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "estabilidade_aprovada",
+          "order": 4,
+          "label": "Estabilidade emocional aprovada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "soltura_aprovada",
+          "order": 5,
+          "label": "Soltura aprovada",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "uso_proporcional_seguro",
+          "order": 6,
+          "label": "Uso proporcional e seguro aprovado",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "parecer_final_instrutor",
+          "order": 7,
+          "label": "Parecer final do Instrutor K9 registrado",
+          "required": true,
+          "active": true
+        }
+      ]
+    }
+  ]
+}

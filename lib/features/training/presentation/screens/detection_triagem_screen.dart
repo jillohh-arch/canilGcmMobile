@@ -10,6 +10,8 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/dogs/data/dog_specialty_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog_specialty.dart';
+import 'package:canil_gcm/features/training/data/detection_service.dart';
+import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -18,8 +20,9 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 
 class DetectionTriagemScreen extends StatefulWidget {
   final Dog dog;
+  final DetectionLine? line;
 
-  const DetectionTriagemScreen({super.key, required this.dog});
+  const DetectionTriagemScreen({super.key, required this.dog, this.line});
 
   @override
   State<DetectionTriagemScreen> createState() => _DetectionTriagemScreenState();
@@ -233,6 +236,16 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
         await specialtyService.updateSpecialty(dogId, updatedSpecialty);
       } else {
         await specialtyService.addSpecialty(dogId, updatedSpecialty);
+      }
+
+      final selectedLine = widget.line;
+      if (selectedLine != null && newStatus == 'in_formation') {
+        await DetectionService().ensureLineStarted(
+          dogId: dogId,
+          line: selectedLine,
+          handlerId: currentRa,
+          handlerName: handlerName,
+        );
       }
 
       // 4. Log audit trails

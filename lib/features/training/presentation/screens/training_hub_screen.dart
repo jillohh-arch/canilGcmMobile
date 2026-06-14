@@ -16,7 +16,7 @@ import 'package:canil_gcm/features/training/data/training_service.dart';
 import 'package:canil_gcm/features/training/domain/training_model.dart';
 import 'package:canil_gcm/features/training/presentation/screens/conditioning_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/detection_entry_screen.dart';
-import 'package:canil_gcm/features/training/presentation/screens/guard_protection_screen.dart';
+import 'package:canil_gcm/features/training/presentation/screens/guard_protection_curriculum_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/obedience_training_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
@@ -227,7 +227,9 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
 
     if (lowerCat.contains('guarda') || lowerCat.contains('protec')) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => GuardProtectionScreen(dog: dog)),
+        MaterialPageRoute(
+          builder: (_) => GuardProtectionCurriculumScreen(dog: dog),
+        ),
       );
       return;
     }

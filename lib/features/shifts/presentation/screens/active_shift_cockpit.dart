@@ -25,6 +25,7 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
           currentRa: currentRa,
           conductorPhotoUrl: conductorPhoto,
           onSwitchDog: () => _showDogSwitcher(context),
+          onDogHealth: state.widget.onOpenHealthTab,
           onProfile: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const HandlerProfilePage(showBottomNav: false),
@@ -52,10 +53,13 @@ Widget _buildCockpit(BuildContext context, Dog dog, String callsign) {
                   conductorPhotoUrl: conductorPhoto,
                 ),
                 const SizedBox(height: 18),
+                const _OperationalPulseSection(),
+                const SizedBox(height: 18),
                 _QuickActionsSection(
                   dog: dog,
                   actions: state._quickActions,
                   onOpenTrainingHub: state.widget.onOpenTrainingHub,
+                  onOpenHealthTab: state.widget.onOpenHealthTab,
                 ),
                 const SizedBox(height: 18),
                 const _LatestRecordsSection(),

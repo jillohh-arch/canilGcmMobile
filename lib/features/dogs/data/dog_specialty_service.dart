@@ -14,6 +14,7 @@ class DogSpecialtyService {
   Stream<List<DogSpecialty>> watchSpecialties(String dogId) {
     return _collection(dogId).snapshots().map(
       (snap) => snap.docs
+          .where((doc) => !_isDeleted(doc.data()))
           .map((doc) => DogSpecialty.fromJson(doc.data(), docId: doc.id))
           .toList(),
     );
@@ -23,6 +24,7 @@ class DogSpecialtyService {
   Future<List<DogSpecialty>> getSpecialties(String dogId) async {
     final snap = await _collection(dogId).get();
     return snap.docs
+        .where((doc) => !_isDeleted(doc.data()))
         .map((doc) => DogSpecialty.fromJson(doc.data(), docId: doc.id))
         .toList();
   }
@@ -32,10 +34,13 @@ class DogSpecialtyService {
     final snap = await _collection(
       dogId,
     ).where('type', isEqualTo: type).limit(1).get();
-    if (snap.docs.isEmpty) return null;
+    final activeDocs = snap.docs
+        .where((doc) => !_isDeleted(doc.data()))
+        .toList();
+    if (activeDocs.isEmpty) return null;
     return DogSpecialty.fromJson(
-      snap.docs.first.data(),
-      docId: snap.docs.first.id,
+      activeDocs.first.data(),
+      docId: activeDocs.first.id,
     );
   }
 
@@ -67,5 +72,11 @@ class DogSpecialtyService {
   Future<int> countActive(String dogId) async {
     final specialties = await getSpecialties(dogId);
     return specialties.where((s) => s.isOperational || s.isInFormation).length;
+  }
+
+  bool _isDeleted(Map<String, dynamic> data) {
+    return data['deleted_at'] != null ||
+        data['archived_at'] != null ||
+        data['active'] == false;
   }
 }
