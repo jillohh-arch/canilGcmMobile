@@ -2,6 +2,7 @@ import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import {logger} from "firebase-functions";
 import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {
   CallableRequest,
   HttpsError,
@@ -5495,5 +5496,110 @@ export const checkOpenShiftsAndNotify = onCall(
       checked: openShiftsSnap.size,
       notified: notifications.length,
     };
+  },
+);
+
+// ─── Scheduled Reminders ─────────────────────────────────────────────────────────
+
+/**
+ * Scheduled task que roda a cada hora para verificar turnos abertos.
+ * Requer Cloud Scheduler configurado no projeto Firebase.
+ */
+export const scheduledCheckOpenShifts = onSchedule(
+  {
+    region,
+    schedule: "every 1 hours",
+    timeZone: "America/Sao_Paulo",
+  },
+  async () => {
+    logger.info("Running scheduled check for open shifts");
+    const now = new Date();
+    const maxOpenHours = 12;
+    const threshold = new Date(now.getTime() - maxOpenHours * 60 * 60 * 1000);
+
+    const openShiftsSnap = await db
+      .collection("active_shifts")
+      .where("status", "==", "active")
+      .where("startedAt", "<", threshold)
+      .get();
+
+    logger.info(`Found ${openShiftsSnap.size} open shifts over ${maxOpenHours}h`);
+
+    let notified = 0;
+
+    for (const shiftDoc of openShiftsSnap.docs) {
+      const shiftData = shiftDoc.data();
+      const handlerId = shiftData.handlerId ?? shiftDoc.id;
+      const startedAt = shiftData.startedAt?.toDate?.() ?? new Date(shiftData.startedAt);
+      const hoursOpen = Math.floor(
+        (now.getTime() - startedAt.getTime()) / (1000 * 60 * 60),
+      );
+
+      // Verificar se já recebeu notificação nas últimas 4h
+      const recentNotif = await db
+        .collection("notifications")
+        .doc(handlerId)
+        .collection("items")
+        .where("type", "==", "shift_open_reminder")
+        .where("created_at", ">", new Date(now.getTime() - 4 * 60 * 60 * 1000))
+        .limit(1)
+        .get();
+
+      if (!recentNotif.empty) {
+        continue;
+      }
+
+      // Obter tokens FCM
+      const userDoc = await db.collection("users").doc(handlerId).get();
+      const userData = userDoc.data();
+      const tokens: string[] = [];
+      if (userData?.fcmTokens) {
+        const tokenMap = userData.fcmTokens as Record<string, boolean>;
+        for (const [token, enabled] of Object.entries(tokenMap)) {
+          if (enabled) tokens.push(token);
+        }
+      }
+
+      // Criar notificação
+      const notifRef = db
+        .collection("notifications")
+        .doc(handlerId)
+        .collection("items")
+        .doc();
+
+      const notifData = {
+        type: "shift_open_reminder",
+        title: "Turno pendente de encerramento",
+        body: `Seu turno está aberto há ${hoursOpen}h. Clique para encerrar.`,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        archived_at: null,
+        shift_id: shiftDoc.id,
+        hours_open: hoursOpen,
+        read: false,
+        action_required: true,
+      };
+
+      await notifRef.set(notifData);
+
+      // Enviar FCM se tiver tokens
+      if (tokens.length > 0) {
+        try {
+          await admin.messaging().sendEachForMulticast({
+            notification: { title: notifData.title, body: notifData.body },
+            data: {
+              type: "shift_open_reminder",
+              shift_id: shiftDoc.id,
+              hours_open: String(hoursOpen),
+            },
+            tokens,
+          });
+          notified++;
+        } catch (e) {
+          logger.error("Failed to send FCM for shift reminder", { handlerId, error: e });
+        }
+      }
+    }
+
+    logger.info(`Scheduled task complete. Notified ${notified} users.`);
   },
 );
