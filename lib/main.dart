@@ -16,6 +16,7 @@ import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_group_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/push_notification_service.dart';
@@ -54,6 +55,7 @@ void main() async {
           },
         ),
         ChangeNotifierProvider(create: (_) => ShiftViewModel()),
+        ChangeNotifierProvider(create: (_) => ShiftGroupViewModel()),
         ChangeNotifierProvider(create: (_) => NutritionViewModel()),
       ],
       child: const GcmK9App(),

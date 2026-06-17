@@ -66,7 +66,7 @@ service cloud.firestore {
       return request.auth.token.get('access_profile_id', '') is string
         && request.auth.token.get('access_profile_id', '').size() > 0
         ? request.auth.token.get('access_profile_id', '')
-        : 'condutor';
+        : 'operador_k9';
     }
 
     function currentAccessProfileId() {
@@ -1382,6 +1382,22 @@ service cloud.firestore {
     match /active_shifts/{ra} {
       allow read: if signedIn();
       allow create, update: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
+      allow delete: if false;
+    }
+
+    match /shift_groups/{groupId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || hasAccessPermission('shifts', 'create');
+      allow update: if isAdmin()
+        || hasAccessPermission('shifts', 'edit')
+        || hasAccessPermission('shifts', 'archive');
+      allow delete: if false;
+    }
+
+    match /user_shift_assignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        || hasAccessPermission('shifts', 'edit');
       allow delete: if false;
     }
 

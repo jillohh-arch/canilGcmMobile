@@ -21,6 +21,9 @@ const ACTION_REQUIRED_NOTIFICATION_TYPES = new Set([
   "vehicle_crew_invitation",
   "signature_requested",
   "training_promotion_requested",
+  "shift_start_reminder",
+  "shift_end_reminder",
+  "shift_overdue_reminder",
 ]);
 
 interface ExpectedMedia {
@@ -202,7 +205,11 @@ function accessClaimsForProfile(
     profileRoles.has("subinspetor_inspetor");
   const isHandlerProfile = profileRoles.has("condutor") ||
     profileRoles.has("handler") ||
-    profileRoles.has("mobile_user");
+    profileRoles.has("mobile_user") ||
+    profileRoles.has("operacional") ||
+    profileRoles.has("operador") ||
+    profileRoles.has("operador_k9") ||
+    profileRoles.has("guarda_k9");
   const mobileAccess = isAdminProfile || isInstructorProfile || isHandlerProfile;
   const webAccess = true;
   const preservedRoles = Array.isArray(existingClaims.roles) ?
@@ -307,13 +314,18 @@ function stringList(value: unknown): string[] {
 }
 
 function customClaimRoles(token: admin.auth.DecodedIdToken): string[] {
-  return Array.isArray(token.roles) ? token.roles.map((item) => String(item)) : [];
+  return Array.isArray(token.roles) ?
+    token.roles.map((item) => normalizedKey(item)) :
+    [];
 }
 
 function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
+  const role = normalizedKey(token.role);
   return token.admin === true ||
-    token.role === "admin" ||
-    customClaimRoles(token).includes("admin");
+    ["admin", "administrador", "admin_master"].includes(role) ||
+    customClaimRoles(token).some((item) =>
+      ["admin", "administrador", "admin_master"].includes(item),
+    );
 }
 
 type AccessModule =
@@ -345,6 +357,7 @@ function legacyAccessProfileId(value: unknown): string | null {
     "supervisor",
     "supervisor_operacional",
     "subinspetor",
+    "subinspetor_inspetor",
     "inspetor",
     "gestor_canil",
     "coordenador",
@@ -577,6 +590,7 @@ function accessProfilePayload(
     slug: optionalString(source, "slug") ?? profileId,
     status,
     tone: optionalString(source, "tone") ?? "cyan",
+    ui_hidden: source.ui_hidden === true,
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
     updated_by: caller.ra,
     audit_trail: options.exists
@@ -1158,6 +1172,24 @@ function notificationText(type: string, occurrenceTitle: string): {title: string
       body: occurrenceTitle,
     };
   }
+  if (type === "shift_start_reminder") {
+    return {
+      title: "Plantao em breve",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "shift_end_reminder") {
+    return {
+      title: "Hora de encerrar o turno",
+      body: occurrenceTitle,
+    };
+  }
+  if (type === "shift_overdue_reminder" || type === "shift_open_reminder") {
+    return {
+      title: "Turno aberto alem do previsto",
+      body: occurrenceTitle,
+    };
+  }
   return {
     title: "Canil K9",
     body: occurrenceTitle,
@@ -1577,7 +1609,11 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     isInstructorProfile ||
     roleSet.has("condutor") ||
     roleSet.has("handler") ||
-    roleSet.has("mobile_user");
+    roleSet.has("mobile_user") ||
+    roleSet.has("operacional") ||
+    roleSet.has("operador") ||
+    roleSet.has("operador_k9") ||
+    roleSet.has("guarda_k9");
   const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
   const userData = userSnap.data() ?? {};
   const authUid =
@@ -2411,7 +2447,7 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   const accessProfileId =
     optionalString(profile, "accessProfileId") ??
     optionalString(profile, "access_profile_id");
-  const unit = requiredString(profile, "unit");
+  const unit = optionalString(profile, "unit");
   const active = profile.active !== false;
   const isK9Instructor =
     boolValue(profile.isK9Instructor) ||
@@ -2443,7 +2479,11 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     isK9Instructor ||
     profileRoleSet.has("condutor") ||
     profileRoleSet.has("handler") ||
-    profileRoleSet.has("mobile_user");
+    profileRoleSet.has("mobile_user") ||
+    profileRoleSet.has("operacional") ||
+    profileRoleSet.has("operador") ||
+    profileRoleSet.has("operador_k9") ||
+    profileRoleSet.has("guarda_k9");
   const accessRole = isAdminProfile
     ? "admin"
     : isK9Instructor
@@ -4488,6 +4528,901 @@ export const respondVehicleCrewInvitation = onCall({region}, async (request) => 
   });
 });
 
+const OCCURRENCE_AI_PROMPT_VERSION = "occurrence-final-report-v1";
+const OCCURRENCE_AI_FALLBACK_MODEL = "local_occurrence_template_v1";
+const OCCURRENCE_AI_MAX_EVENTS = 40;
+
+interface OccurrenceAiContext {
+  occurrenceId: string;
+  occurrence: JsonMap;
+  events: JsonMap[];
+  rawReport: string;
+  caller: CallerIdentity;
+}
+
+interface OccurrenceAiDraft {
+  draftText: string;
+  attentionPoints: string[];
+  sourceSummary: JsonMap;
+  usedAi: boolean;
+  model: string;
+}
+
+type FetchLike = (
+  input: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }
+) => Promise<{
+  ok: boolean;
+  status: number;
+  text: () => Promise<string>;
+}>;
+
+function occurrenceAiEnv(name: string): string | undefined {
+  const env = process.env as Record<string, string | undefined>;
+  return stringValue(env[name]);
+}
+
+function occurrenceAiTimestamp(value: unknown): string | null {
+  if (value instanceof admin.firestore.Timestamp) return value.toDate().toISOString();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    return value.trim();
+  }
+  return null;
+}
+
+function occurrenceAiEvent(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    category: stringValue(data.category) ?? "other",
+    title: stringValue(data.title) ?? "",
+    description: stringValue(data.description) ?? "",
+    place_label: stringValue(data.place_label) ?? "",
+    timestamp: occurrenceAiTimestamp(data.timestamp),
+    gps_lat: optionalNumberValue(data.gps_lat),
+    gps_lng: optionalNumberValue(data.gps_lng),
+    photo_count: Array.isArray(data.photo_urls) ? data.photo_urls.length : 0,
+  };
+}
+
+function occurrenceAiSourceSummary(context: OccurrenceAiContext): JsonMap {
+  const occurrence = context.occurrence;
+  return {
+    occurrence_id: context.occurrenceId,
+    type_name: stringValue(occurrence.type_name) ?? "",
+    status: stringValue(occurrence.status) ?? "",
+    started_at: occurrenceAiTimestamp(occurrence.started_at),
+    location_address: stringValue(occurrence.location_address) ?? "",
+    vehicle: stringValue(occurrence.vehicle_label) ??
+      stringValue(occurrence.vehicle_prefix) ??
+      "",
+    dog_id: stringValue(occurrence.service_dog_id) ??
+      stringValue(occurrence.dog_id) ??
+      "",
+    primary_handler_ra: stringValue(occurrence.primary_handler_ra) ?? "",
+    event_count: context.events.length,
+    raw_report_chars: context.rawReport.length,
+  };
+}
+
+function occurrenceAiFallbackDraft(context: OccurrenceAiContext): OccurrenceAiDraft {
+  const occurrence = context.occurrence;
+  const typeName = stringValue(occurrence.type_name) ?? "natureza nao informada";
+  const startedAt = occurrenceAiTimestamp(occurrence.started_at) ?? "data e hora nao informadas";
+  const location = stringValue(occurrence.location_address) ?? "local nao informado";
+  const vehicle = stringValue(occurrence.vehicle_label) ??
+    stringValue(occurrence.vehicle_prefix) ??
+    "viatura nao informada";
+  const dogId = stringValue(occurrence.service_dog_id) ??
+    stringValue(occurrence.dog_id) ??
+    "cao nao informado";
+  const eventLines = context.events
+    .slice(0, 12)
+    .map((event, index) => {
+      const stamp = stringValue(event.timestamp) ?? "horario nao registrado";
+      const title = stringValue(event.title) ?? stringValue(event.category) ?? "evento";
+      const description = stringValue(event.description);
+      return `${index + 1}. ${stamp} - ${title}${description ? `: ${description}` : ""}`;
+    });
+  const timelineText = eventLines.length > 0 ?
+    `\n\nLinha do tempo registrada:\n${eventLines.join("\n")}` :
+    "";
+  const draftText = [
+    `Em ${startedAt}, a equipe K9 registrou atendimento de ${typeName}, no local ${location}, com apoio da ${vehicle} e cao de servico ${dogId}.`,
+    `Conforme relato do condutor, ${context.rawReport}`,
+    timelineText.trim().length > 0 ? timelineText : "",
+    "O presente relato consolida os dados operacionais registrados no sistema, preservando a sequencia cronologica dos eventos e a necessidade de revisao final pelo responsavel antes do fechamento da ocorrencia.",
+  ].filter((line) => line.trim().length > 0).join("\n\n");
+
+  return {
+    draftText,
+    attentionPoints: [
+      "Minuta local gerada porque a IA generativa nao esta configurada ou ficou indisponivel.",
+      "Revise datas, local, resultados e encaminhamentos antes de finalizar.",
+    ],
+    sourceSummary: occurrenceAiSourceSummary(context),
+    usedAi: false,
+    model: OCCURRENCE_AI_FALLBACK_MODEL,
+  };
+}
+
+function occurrenceAiPrompt(context: OccurrenceAiContext): string {
+  return [
+    "Voce auxilia a GCM na redacao institucional de uma ocorrencia K9.",
+    "Regras obrigatorias:",
+    "- Nao invente fatos, qualificacoes criminais, nomes, quantidades ou encaminhamentos.",
+    "- Use apenas o relato bruto e a linha do tempo fornecidos.",
+    "- Organize em linguagem objetiva, cronologica e institucional.",
+    "- Preserve incertezas e lacunas como pontos de atencao.",
+    "- Nao substitua a revisao humana: o condutor precisa revisar antes do fechamento.",
+    "",
+    "Retorne somente JSON valido no formato:",
+    "{\"draft_text\":\"...\",\"attention_points\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
+    "",
+    `Contexto: ${JSON.stringify({
+      source: occurrenceAiSourceSummary(context),
+      raw_report: context.rawReport,
+      events: context.events,
+    })}`,
+  ].join("\n");
+}
+
+function geminiDraftFromResponse(payload: unknown): Omit<OccurrenceAiDraft, "usedAi" | "model"> | null {
+  if (!isPlainObject(payload) || !Array.isArray(payload.candidates)) return null;
+  for (const candidate of payload.candidates) {
+    if (!isPlainObject(candidate) || !isPlainObject(candidate.content)) continue;
+    const parts = candidate.content.parts;
+    if (!Array.isArray(parts)) continue;
+    const text = parts
+      .map((part) => isPlainObject(part) ? stringValue(part.text) : undefined)
+      .filter((part): part is string => Boolean(part))
+      .join("\n")
+      .trim();
+    if (!text) continue;
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) continue;
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
+      if (!isPlainObject(parsed)) continue;
+      const draftText = stringValue(parsed.draft_text);
+      if (!draftText) continue;
+      const attentionPoints = Array.isArray(parsed.attention_points) ?
+        parsed.attention_points
+          .map((point) => stringValue(point))
+          .filter((point): point is string => Boolean(point)) :
+        [];
+      const sourceSummary = isPlainObject(parsed.source_summary) ? parsed.source_summary : {};
+      return {draftText, attentionPoints, sourceSummary};
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+async function occurrenceAiGeminiDraft(context: OccurrenceAiContext): Promise<OccurrenceAiDraft | null> {
+  const apiKey = occurrenceAiEnv("GEMINI_API_KEY") ?? occurrenceAiEnv("GOOGLE_GENAI_API_KEY");
+  const fetchLike = (globalThis as unknown as {fetch?: FetchLike}).fetch;
+  if (!apiKey || !fetchLike) return null;
+
+  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  const modelPath = model.startsWith("models/") ? model : `models/${model}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetchLike(endpoint, {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{text: occurrenceAiPrompt(context)}],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+  const responseText = await response.text();
+  if (!response.ok) {
+    logger.warn("Gemini occurrence draft failed", {
+      occurrence_id: context.occurrenceId,
+      status: response.status,
+      body: responseText.slice(0, 500),
+    });
+    return null;
+  }
+  const parsed = JSON.parse(responseText) as unknown;
+  const draft = geminiDraftFromResponse(parsed);
+  if (!draft) return null;
+  return {
+    ...draft,
+    usedAi: true,
+    model,
+  };
+}
+
+export const generateOccurrenceAiDraft = onCall({region, timeoutSeconds: 60}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const occurrenceId = requiredString(data, "occurrence_id");
+  const rawReport = requiredString(data, "raw_report");
+  const occurrenceRef = db.collection("occurrences").doc(occurrenceId);
+  const occurrenceSnap = await occurrenceRef.get();
+  if (!occurrenceSnap.exists) {
+    throw new HttpsError("not-found", "Ocorrencia nao encontrada.");
+  }
+  const occurrence = occurrenceSnap.data() ?? {};
+  const status = stringValue(occurrence.status) ?? "in_progress";
+  if (!(status === "in_progress" || status === "finalizing")) {
+    throw new HttpsError("failed-precondition", "A minuta assistida so pode ser gerada antes do fechamento.");
+  }
+  if (!isParticipant(occurrence, caller)) {
+    throw new HttpsError("permission-denied", "Usuario fora da equipe da ocorrencia.");
+  }
+
+  const eventsSnap = await occurrenceRef
+    .collection("events")
+    .orderBy("timestamp", "asc")
+    .limit(OCCURRENCE_AI_MAX_EVENTS)
+    .get();
+  const events = eventsSnap.docs
+    .filter((doc) => !doc.data().deleted_at)
+    .map(occurrenceAiEvent);
+  const context: OccurrenceAiContext = {
+    occurrenceId,
+    occurrence,
+    events,
+    rawReport,
+    caller,
+  };
+
+  let draft = occurrenceAiFallbackDraft(context);
+  try {
+    draft = await occurrenceAiGeminiDraft(context) ?? draft;
+  } catch (error) {
+    logger.warn("Occurrence AI draft fallback used", {
+      occurrence_id: occurrenceId,
+      error: errorMessage(error),
+    });
+  }
+
+  const draftRef = occurrenceRef.collection("ai_drafts").doc();
+  const rawReportHash = crypto.createHash("sha256").update(rawReport).digest("hex");
+  await draftRef.set({
+    prompt_version: OCCURRENCE_AI_PROMPT_VERSION,
+    model: draft.model,
+    used_ai: draft.usedAi,
+    raw_report_hash: rawReportHash,
+    raw_report: rawReport,
+    draft_text: draft.draftText,
+    attention_points: draft.attentionPoints,
+    source_summary: draft.sourceSummary,
+    requested_by: caller,
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await occurrenceRef.update({
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    audit_trail: admin.firestore.FieldValue.arrayUnion(
+      auditEntry("ai_draft_generated", caller),
+    ),
+  });
+
+  return {
+    draft_id: draftRef.id,
+    draft_text: draft.draftText,
+    attention_points: draft.attentionPoints,
+    source_summary: draft.sourceSummary,
+    used_ai: draft.usedAi,
+    model: draft.model,
+    prompt_version: OCCURRENCE_AI_PROMPT_VERSION,
+  };
+});
+
+const NUTRITION_AI_PROMPT_VERSION = "nutrition-operational-insight-v1";
+const NUTRITION_AI_FALLBACK_MODEL = "local_nutrition_analysis_v1";
+const NUTRITION_AI_MAX_PERIOD_DAYS = 90;
+
+interface NutritionAiContext {
+  dogId: string;
+  dog: JsonMap;
+  periodDays: number;
+  prescription: JsonMap | null;
+  feedings: JsonMap[];
+  supplements: JsonMap[];
+  trainings: JsonMap[];
+  weightRecords: JsonMap[];
+  healthEvents: JsonMap[];
+  caller: CallerIdentity;
+}
+
+interface NutritionAiInsight {
+  summary: string;
+  recommendationLevel: string;
+  foodAdjustment: string;
+  supplementNotes: string[];
+  hydrationNotes: string[];
+  operationalFactors: string[];
+  dataGaps: string[];
+  veterinaryWarnings: string[];
+  nextActions: string[];
+  sourceSummary: JsonMap;
+  usedAi: boolean;
+  model: string;
+}
+
+function clampPeriodDays(value: unknown): number {
+  const parsed = optionalNumberValue(value);
+  if (parsed === null) return 30;
+  return Math.max(7, Math.min(NUTRITION_AI_MAX_PERIOD_DAYS, Math.round(parsed)));
+}
+
+function nutritionDate(value: unknown): Date | null {
+  if (value instanceof admin.firestore.Timestamp) return value.toDate();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function compactFeeding(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    amount_grams: optionalNumberValue(data.amount_grams) ?? 0,
+    prescription_at_time: optionalNumberValue(data.prescription_at_time) ?? 0,
+    divergence_percent: optionalNumberValue(data.divergence_percent) ?? 0,
+    period: stringValue(data.period) ?? "",
+    fed_at: occurrenceAiTimestamp(data.fed_at),
+    observations: stringValue(data.observations) ?? "",
+  };
+}
+
+function compactSupplement(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    name: stringValue(data.name) ?? "",
+    dose: stringValue(data.dose) ?? "",
+    status: stringValue(data.status) ?? "",
+    started_at: occurrenceAiTimestamp(data.started_at),
+    ended_at: occurrenceAiTimestamp(data.ended_at),
+    notes: stringValue(data.notes) ?? "",
+  };
+}
+
+function compactTraining(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  const metadata = isPlainObject(data.metadata) ? data.metadata : {};
+  const date = data.date ??
+    data.performedAt ??
+    data.performed_at ??
+    data.startedAt ??
+    data.started_at ??
+    data.createdAt ??
+    data.created_at;
+  return {
+    id: doc.id,
+    date: occurrenceAiTimestamp(date),
+    training_type: stringValue(data.trainingType) ??
+      stringValue(data.training_type) ??
+      stringValue(metadata.trainingType) ??
+      stringValue(metadata.training_type) ??
+      stringValue(data.type) ??
+      "",
+    result: stringValue(data.result) ?? stringValue(metadata.result) ?? "",
+    duration_seconds: optionalNumberValue(data.duration_seconds ?? data.searchDuration) ?? null,
+    observation: stringValue(data.observation) ??
+      stringValue(data.observations) ??
+      stringValue(data.notes) ??
+      stringValue(data.handlerNotes) ??
+      "",
+  };
+}
+
+function compactWeightRecord(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    weight_kg: optionalNumberValue(data.weight_kg ?? data.weight),
+    measured_at: occurrenceAiTimestamp(data.measured_at ?? data.date),
+    notes: stringValue(data.notes) ?? "",
+  };
+}
+
+function compactHealthEvent(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    type: stringValue(data.type) ?? "",
+    subtype: stringValue(data.subtype) ?? "",
+    date: occurrenceAiTimestamp(data.date ?? data.event_date ?? data.created_at),
+    notes: stringValue(data.notes ?? data.observations) ?? "",
+  };
+}
+
+function notDeleted(data: JsonMap): boolean {
+  return data.deleted_at === undefined && data.deletedAt === undefined;
+}
+
+function itemDateWithin(item: JsonMap, keys: string[], from: Date): boolean {
+  for (const key of keys) {
+    const date = nutritionDate(item[key]);
+    if (date) return date.getTime() >= from.getTime();
+  }
+  return true;
+}
+
+async function loadActiveNutritionPrescription(
+  dogRef: admin.firestore.DocumentReference,
+): Promise<JsonMap | null> {
+  const now = admin.firestore.Timestamp.now();
+  const readFrom = async (collectionName: string) => {
+    const snap = await dogRef
+      .collection(collectionName)
+      .where("vigent_from", "<=", now)
+      .orderBy("vigent_from", "desc")
+      .limit(1)
+      .get();
+    if (snap.empty) return null;
+    const data = snap.docs[0].data();
+    if (!notDeleted(data)) return null;
+    const until = nutritionDate(data.vigent_until);
+    if (until && until.getTime() < Date.now()) return null;
+    return {id: snap.docs[0].id, ...data};
+  };
+  return await readFrom("nutritional_prescriptions") ??
+    await readFrom("nutrition_prescriptions");
+}
+
+async function loadNutritionFeedings(
+  dogRef: admin.firestore.DocumentReference,
+  from: Date,
+): Promise<JsonMap[]> {
+  const readFrom = async (collectionName: string) => {
+    const snap = await dogRef
+      .collection(collectionName)
+      .where("fed_at", ">=", admin.firestore.Timestamp.fromDate(from))
+      .orderBy("fed_at", "desc")
+      .limit(120)
+      .get();
+    return snap.docs
+      .filter((doc) => notDeleted(doc.data()))
+      .map(compactFeeding);
+  };
+  const [primary, legacy] = await Promise.all([
+    readFrom("feeding_events"),
+    readFrom("feedings"),
+  ]);
+  const byKey = new Map<string, JsonMap>();
+  for (const item of [...primary, ...legacy]) {
+    byKey.set(String(item.id ?? JSON.stringify(item)), item);
+  }
+  return Array.from(byKey.values()).sort((a, b) =>
+    String(b.fed_at ?? "").localeCompare(String(a.fed_at ?? "")),
+  );
+}
+
+async function loadNutritionSupplements(
+  dogRef: admin.firestore.DocumentReference,
+): Promise<JsonMap[]> {
+  const snap = await dogRef
+    .collection("nutrition_supplements")
+    .orderBy("started_at", "desc")
+    .limit(30)
+    .get();
+  return snap.docs
+    .filter((doc) => notDeleted(doc.data()))
+    .map(compactSupplement);
+}
+
+async function loadWeightRecords(
+  dogRef: admin.firestore.DocumentReference,
+  from: Date,
+): Promise<JsonMap[]> {
+  const snap = await dogRef
+    .collection("weight_records")
+    .orderBy("measured_at", "desc")
+    .limit(40)
+    .get();
+  return snap.docs
+    .filter((doc) => notDeleted(doc.data()))
+    .map(compactWeightRecord)
+    .filter((item) => itemDateWithin(item, ["measured_at"], from));
+}
+
+async function loadHealthEvents(
+  dogRef: admin.firestore.DocumentReference,
+  from: Date,
+): Promise<JsonMap[]> {
+  const snap = await dogRef
+    .collection("health_events")
+    .orderBy("date", "desc")
+    .limit(40)
+    .get();
+  return snap.docs
+    .filter((doc) => notDeleted(doc.data()))
+    .map(compactHealthEvent)
+    .filter((item) => itemDateWithin(item, ["date"], from));
+}
+
+async function loadTrainingSessionsForNutrition(dogId: string, from: Date): Promise<JsonMap[]> {
+  const dogRef = db.collection("dogs").doc(dogId);
+  const collected: JsonMap[] = [];
+  const append = (docs: admin.firestore.QueryDocumentSnapshot[]) => {
+    for (const doc of docs) {
+      const data = doc.data();
+      if (!notDeleted(data)) continue;
+      const item = compactTraining(doc);
+      if (itemDateWithin(item, ["date"], from)) collected.push(item);
+    }
+  };
+
+  const dogSessions = await dogRef.collection("training_sessions").limit(80).get();
+  append(dogSessions.docs);
+
+  const rootByDogId = await db
+    .collection("training_sessions")
+    .where("dogId", "==", dogId)
+    .limit(80)
+    .get();
+  append(rootByDogId.docs);
+
+  const rootByDogSnake = await db
+    .collection("training_sessions")
+    .where("dog_id", "==", dogId)
+    .limit(80)
+    .get();
+  append(rootByDogSnake.docs);
+
+  const byKey = new Map<string, JsonMap>();
+  for (const item of collected) {
+    byKey.set(`${item.id ?? ""}:${item.date ?? ""}:${item.training_type ?? ""}`, item);
+  }
+  return Array.from(byKey.values()).sort((a, b) =>
+    String(b.date ?? "").localeCompare(String(a.date ?? "")),
+  ).slice(0, 80);
+}
+
+function nutritionSourceSummary(context: NutritionAiContext): JsonMap {
+  const prescriptionAmount = optionalNumberValue(context.prescription?.amount_grams_per_day);
+  const totalConsumed = context.feedings.reduce(
+    (sum, item) => sum + (optionalNumberValue(item.amount_grams) ?? 0),
+    0,
+  );
+  const daysWithFeeding = new Set(
+    context.feedings
+      .map((item) => String(item.fed_at ?? "").slice(0, 10))
+      .filter((item) => item.length === 10),
+  ).size;
+  const averageDaily = daysWithFeeding > 0 ? Math.round(totalConsumed / daysWithFeeding) : 0;
+  const divergentFeedings = context.feedings.filter((item) =>
+    Math.abs(optionalNumberValue(item.divergence_percent) ?? 0) > 10,
+  ).length;
+  const latestWeight = context.weightRecords[0]?.weight_kg ?? context.dog.weight ?? null;
+  return {
+    dog_id: context.dogId,
+    dog_name: dogDisplayName(context.dogId, context.dog),
+    period_days: context.periodDays,
+    prescription_amount_grams_per_day: prescriptionAmount,
+    feedings_count: context.feedings.length,
+    average_consumed_grams_per_recorded_day: averageDaily,
+    divergent_feedings_count: divergentFeedings,
+    training_sessions_count: context.trainings.length,
+    active_supplements_count: context.supplements.filter((item) =>
+      stringValue(item.status) !== "suspenso" && !item.ended_at,
+    ).length,
+    latest_weight_kg: latestWeight,
+    ideal_weight_min: optionalNumberValue(context.dog.idealWeightMin ?? context.dog.ideal_weight_min),
+    ideal_weight_max: optionalNumberValue(context.dog.idealWeightMax ?? context.dog.ideal_weight_max),
+    health_events_count: context.healthEvents.length,
+  };
+}
+
+function nutritionFallbackInsight(context: NutritionAiContext): NutritionAiInsight {
+  const summary = nutritionSourceSummary(context);
+  const prescribed = optionalNumberValue(summary.prescription_amount_grams_per_day);
+  const average = optionalNumberValue(summary.average_consumed_grams_per_recorded_day) ?? 0;
+  const trainingCount = optionalNumberValue(summary.training_sessions_count) ?? 0;
+  const latestWeight = optionalNumberValue(summary.latest_weight_kg);
+  const idealMin = optionalNumberValue(summary.ideal_weight_min);
+  const idealMax = optionalNumberValue(summary.ideal_weight_max);
+  const dataGaps: string[] = [];
+  if (!prescribed || prescribed <= 0) dataGaps.push("Nao ha plano alimentar vigente com quantidade diaria.");
+  if (context.feedings.length === 0) dataGaps.push("Nao ha refeicoes registradas no periodo analisado.");
+  if (latestWeight === null) dataGaps.push("Nao ha pesagem recente no periodo analisado.");
+  if (idealMin === null || idealMax === null) dataGaps.push("Faixa de peso ideal nao cadastrada.");
+
+  let recommendationLevel = "manter_monitorando";
+  let foodAdjustment = "Manter a prescricao atual e acompanhar registros de alimentacao, peso e carga de treino.";
+  if (prescribed && average > 0) {
+    const delta = ((average - prescribed) / prescribed) * 100;
+    if (delta < -12 && trainingCount >= 3) {
+      recommendationLevel = "avaliar_aumento";
+      foodAdjustment = "Consumo registrado abaixo da prescricao em periodo com treinos. Avaliar pequeno ajuste para cima com responsavel tecnico.";
+    } else if (delta > 12) {
+      recommendationLevel = "avaliar_reducao";
+      foodAdjustment = "Consumo registrado acima da prescricao. Avaliar ajuste para baixo ou revisar divergencias de registro.";
+    }
+  }
+  if (latestWeight !== null && idealMin !== null && idealMax !== null) {
+    if (latestWeight < idealMin) {
+      recommendationLevel = "avaliar_aumento";
+      foodAdjustment = "Peso abaixo da faixa ideal cadastrada. Avaliar reforco alimentar e acompanhamento veterinario.";
+    } else if (latestWeight > idealMax) {
+      recommendationLevel = "avaliar_reducao";
+      foodAdjustment = "Peso acima da faixa ideal cadastrada. Avaliar controle de quantidade e rotina de condicionamento.";
+    }
+  }
+
+  return {
+    summary: `Analise de ${context.periodDays} dias para ${dogDisplayName(context.dogId, context.dog)} com ${context.feedings.length} refeicoes, ${trainingCount} treinos e ${context.weightRecords.length} pesagem(ns).`,
+    recommendationLevel,
+    foodAdjustment,
+    supplementNotes: [
+      context.supplements.length > 0 ?
+        "Manter conferencia dos suplementos em uso e registrar motivo/periodo de administracao." :
+        "Sem suplementos ativos registrados; nao iniciar suplementacao sem responsavel tecnico.",
+    ],
+    hydrationNotes: [
+      stringValue(context.prescription?.hydration_notes) ??
+        "Garantir agua fresca disponivel, especialmente em dias de treino ou calor.",
+    ],
+    operationalFactors: [
+      trainingCount > 0 ?
+        `Carga operacional registrada: ${trainingCount} treino(s) no periodo.` :
+        "Sem treinos registrados no periodo; interprete consumo e peso com cautela.",
+    ],
+    dataGaps,
+    veterinaryWarnings: [
+      "Sugestao assistiva: qualquer ajuste de dieta, suplemento ou manejo clinico deve ser validado por responsavel tecnico/veterinario.",
+    ],
+    nextActions: [
+      "Revisar pesagem recente e faixa ideal antes de alterar quantidade.",
+      "Conferir se todas as refeicoes do periodo foram registradas.",
+      "Se houver perda/ganho de peso ou queda de desempenho, encaminhar avaliacao tecnica.",
+    ],
+    sourceSummary: summary,
+    usedAi: false,
+    model: NUTRITION_AI_FALLBACK_MODEL,
+  };
+}
+
+function nutritionAiPrompt(context: NutritionAiContext): string {
+  return [
+    "Voce auxilia uma unidade K9 com uma analise operacional de nutricao.",
+    "Regras obrigatorias:",
+    "- Nao faca diagnostico veterinario.",
+    "- Nao prescreva medicamento, suplemento ou quantidade como ordem definitiva.",
+    "- Use somente os dados fornecidos.",
+    "- Escreva em portugues claro para condutor/gestor.",
+    "- Quando faltar dado, aponte como lacuna.",
+    "- Sugestoes de alimento/suplemento devem ser orientacoes para avaliacao tecnica, nunca prescricao.",
+    "",
+    "Retorne somente JSON valido no formato:",
+    "{\"summary\":\"...\",\"recommendation_level\":\"manter_monitorando|avaliar_aumento|avaliar_reducao|atenção_clinica\",\"food_adjustment\":\"...\",\"supplement_notes\":[\"...\"],\"hydration_notes\":[\"...\"],\"operational_factors\":[\"...\"],\"data_gaps\":[\"...\"],\"veterinary_warnings\":[\"...\"],\"next_actions\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
+    "",
+    `Contexto: ${JSON.stringify({
+      source: nutritionSourceSummary(context),
+      dog: {
+        id: context.dogId,
+        name: dogDisplayName(context.dogId, context.dog),
+        breed: context.dog.breed ?? context.dog.raca ?? "",
+        sex: context.dog.sex ?? "",
+        weight: context.dog.weight ?? null,
+        idealWeightMin: context.dog.idealWeightMin ?? context.dog.ideal_weight_min ?? null,
+        idealWeightMax: context.dog.idealWeightMax ?? context.dog.ideal_weight_max ?? null,
+      },
+      prescription: context.prescription,
+      feedings: context.feedings,
+      supplements: context.supplements,
+      trainings: context.trainings,
+      weight_records: context.weightRecords,
+      health_events: context.healthEvents,
+    })}`,
+  ].join("\n");
+}
+
+function stringArrayFromAi(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => stringValue(item))
+    .filter((item): item is string => Boolean(item));
+}
+
+function nutritionInsightFromResponse(payload: unknown): Omit<NutritionAiInsight, "usedAi" | "model"> | null {
+  if (!isPlainObject(payload) || !Array.isArray(payload.candidates)) return null;
+  for (const candidate of payload.candidates) {
+    if (!isPlainObject(candidate) || !isPlainObject(candidate.content)) continue;
+    const parts = candidate.content.parts;
+    if (!Array.isArray(parts)) continue;
+    const text = parts
+      .map((part) => isPlainObject(part) ? stringValue(part.text) : undefined)
+      .filter((part): part is string => Boolean(part))
+      .join("\n")
+      .trim();
+    if (!text) continue;
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) continue;
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
+      if (!isPlainObject(parsed)) continue;
+      const summary = stringValue(parsed.summary);
+      const foodAdjustment = stringValue(parsed.food_adjustment);
+      if (!summary || !foodAdjustment) continue;
+      return {
+        summary,
+        recommendationLevel: stringValue(parsed.recommendation_level) ?? "manter_monitorando",
+        foodAdjustment,
+        supplementNotes: stringArrayFromAi(parsed.supplement_notes),
+        hydrationNotes: stringArrayFromAi(parsed.hydration_notes),
+        operationalFactors: stringArrayFromAi(parsed.operational_factors),
+        dataGaps: stringArrayFromAi(parsed.data_gaps),
+        veterinaryWarnings: stringArrayFromAi(parsed.veterinary_warnings),
+        nextActions: stringArrayFromAi(parsed.next_actions),
+        sourceSummary: isPlainObject(parsed.source_summary) ? parsed.source_summary : {},
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+async function nutritionGeminiInsight(context: NutritionAiContext): Promise<NutritionAiInsight | null> {
+  const apiKey = occurrenceAiEnv("GEMINI_API_KEY") ?? occurrenceAiEnv("GOOGLE_GENAI_API_KEY");
+  const fetchLike = (globalThis as unknown as {fetch?: FetchLike}).fetch;
+  if (!apiKey || !fetchLike) return null;
+  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  const modelPath = model.startsWith("models/") ? model : `models/${model}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetchLike(endpoint, {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{text: nutritionAiPrompt(context)}],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+  const responseText = await response.text();
+  if (!response.ok) {
+    logger.warn("Gemini nutrition insight failed", {
+      dog_id: context.dogId,
+      status: response.status,
+      body: responseText.slice(0, 500),
+    });
+    return null;
+  }
+  const parsed = JSON.parse(responseText) as unknown;
+  const insight = nutritionInsightFromResponse(parsed);
+  if (!insight) return null;
+  return {
+    ...insight,
+    sourceSummary: Object.keys(insight.sourceSummary).length > 0 ?
+      insight.sourceSummary :
+      nutritionSourceSummary(context),
+    usedAi: true,
+    model,
+  };
+}
+
+export const generateNutritionAiInsight = onCall({region, timeoutSeconds: 60}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const dogId = requiredString(data, "dog_id");
+  const periodDays = clampPeriodDays(data.period_days);
+  const dogRef = db.collection("dogs").doc(dogId);
+  const dogSnap = await dogRef.get();
+  if (!dogSnap.exists) {
+    throw new HttpsError("not-found", "K9 nao encontrado.");
+  }
+  const dog = dogSnap.data() ?? {};
+  await requireDogRecordAccess(request.auth, caller, dogId, dog);
+
+  const from = new Date(Date.now() - (periodDays * 24 * 60 * 60 * 1000));
+  const [
+    prescription,
+    feedings,
+    supplements,
+    trainings,
+    weightRecords,
+    healthEvents,
+  ] = await Promise.all([
+    loadActiveNutritionPrescription(dogRef),
+    loadNutritionFeedings(dogRef, from),
+    loadNutritionSupplements(dogRef),
+    loadTrainingSessionsForNutrition(dogId, from),
+    loadWeightRecords(dogRef, from),
+    loadHealthEvents(dogRef, from),
+  ]);
+  const context: NutritionAiContext = {
+    dogId,
+    dog,
+    periodDays,
+    prescription,
+    feedings,
+    supplements,
+    trainings,
+    weightRecords,
+    healthEvents,
+    caller,
+  };
+
+  let insight = nutritionFallbackInsight(context);
+  try {
+    insight = await nutritionGeminiInsight(context) ?? insight;
+  } catch (error) {
+    logger.warn("Nutrition AI fallback used", {
+      dog_id: dogId,
+      error: errorMessage(error),
+    });
+  }
+
+  const insightRef = dogRef.collection("nutrition_ai_insights").doc();
+  await insightRef.set({
+    prompt_version: NUTRITION_AI_PROMPT_VERSION,
+    model: insight.model,
+    used_ai: insight.usedAi,
+    period_days: periodDays,
+    summary: insight.summary,
+    recommendation_level: insight.recommendationLevel,
+    food_adjustment: insight.foodAdjustment,
+    supplement_notes: insight.supplementNotes,
+    hydration_notes: insight.hydrationNotes,
+    operational_factors: insight.operationalFactors,
+    data_gaps: insight.dataGaps,
+    veterinary_warnings: insight.veterinaryWarnings,
+    next_actions: insight.nextActions,
+    source_summary: insight.sourceSummary,
+    requested_by: caller,
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await dogRef.update({
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    audit_trail: admin.firestore.FieldValue.arrayUnion(
+      auditEntry("nutrition_ai_insight_generated", caller),
+    ),
+  });
+
+  return {
+    insight_id: insightRef.id,
+    prompt_version: NUTRITION_AI_PROMPT_VERSION,
+    model: insight.model,
+    used_ai: insight.usedAi,
+    period_days: periodDays,
+    summary: insight.summary,
+    recommendation_level: insight.recommendationLevel,
+    food_adjustment: insight.foodAdjustment,
+    supplement_notes: insight.supplementNotes,
+    hydration_notes: insight.hydrationNotes,
+    operational_factors: insight.operationalFactors,
+    data_gaps: insight.dataGaps,
+    veterinary_warnings: insight.veterinaryWarnings,
+    next_actions: insight.nextActions,
+    source_summary: insight.sourceSummary,
+  };
+});
+
 export const sealOccurrenceV4 = onCall({region}, async (request) => {
   const caller = requireAuth(request.auth);
   const data = request.data as JsonMap;
@@ -5345,7 +6280,11 @@ export const onNotificationCreated = onDocumentCreated(
     }
 
     const occurrenceTitle = String(notification.occurrence_title ?? "Ocorrência");
-    const text = notificationText(String(notification.type ?? ""), occurrenceTitle);
+    const customTitle = stringValue(notification.title);
+    const customBody = stringValue(notification.body);
+    const text = customTitle && customBody ?
+      {title: customTitle, body: customBody} :
+      notificationText(String(notification.type ?? ""), occurrenceTitle);
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
       data: {
@@ -5361,6 +6300,9 @@ export const onNotificationCreated = onDocumentCreated(
         dog_id: String(notification.dog_id ?? ""),
         modality: String(notification.modality ?? ""),
         module_id: String(notification.module_id ?? ""),
+        shift_id: String(notification.shift_id ?? ""),
+        shift_group_id: String(notification.shift_group_id ?? ""),
+        shift_group_label: String(notification.shift_group_label ?? ""),
         click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
       android: {
@@ -5389,6 +6331,620 @@ export const onNotificationCreated = onDocumentCreated(
  *
  * shifts aberto há mais de 12h sem encerramento → notificação de "turno pendente"
  */
+const SHIFT_REMINDER_TIME_ZONE = "America/Sao_Paulo";
+const SHIFT_REMINDER_TOLERANCE_MINUTES = 16;
+const SHIFT_REMINDER_MAX_OPEN_HOURS = 12;
+const MS_PER_DAY = 86_400_000;
+
+type ShiftReminderType =
+  | "shift_start_reminder"
+  | "shift_end_reminder"
+  | "shift_overdue_reminder";
+
+interface LocalDateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+interface ShiftReminderSettings {
+  endReminderEnabled: boolean;
+  overdueAfterMinutes: number;
+  overdueReminderEnabled: boolean;
+  overdueRepeatMinutes: number;
+  startLeadMinutes: number;
+  startReminderEnabled: boolean;
+}
+
+interface ShiftGroupSchedule {
+  id: string;
+  code: string;
+  name: string;
+  scheduleType: string;
+  expectedStartHour: number;
+  expectedEndHour: number;
+  anchorDate: LocalDateParts | null;
+  workPattern: number[];
+  notifications: ShiftReminderSettings;
+  active: boolean;
+}
+
+interface ShiftAssignmentSchedule {
+  id: string;
+  userId: string;
+  shiftGroupId: string;
+}
+
+interface ShiftWindowSchedule {
+  start: Date;
+  end: Date;
+  key: string;
+}
+
+interface ActiveShiftSchedule {
+  id: string;
+  handlerId: string;
+  startedAt: Date | null;
+}
+
+interface ShiftReminderStats {
+  assignments: number;
+  checked: number;
+  endReminders: number;
+  groups: number;
+  overdueReminders: number;
+  skippedWithoutGroup: number;
+  startReminders: number;
+}
+
+function numberWithFallback(value: unknown, fallback: number): number {
+  const parsed = optionalNumberValue(value);
+  return parsed === null ? fallback : parsed;
+}
+
+function boolWithFallback(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = normalizedKey(value);
+    if (["true", "1", "sim", "yes", "active", "ativo"].includes(normalized)) return true;
+    if (["false", "0", "nao", "no", "inactive", "inativo"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function dateValue(value: unknown): Date | null {
+  if (value instanceof admin.firestore.Timestamp) return value.toDate();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+function parseHour(value: unknown, fallback: number): number {
+  const numeric = optionalNumberValue(value);
+  if (numeric !== null) return Math.max(0, Math.min(23, Math.floor(numeric)));
+  const match = String(value ?? "").match(/^(\d{1,2})/);
+  if (!match) return fallback;
+  return Math.max(0, Math.min(23, Number(match[1])));
+}
+
+function parseLocalDate(value: unknown): LocalDateParts | null {
+  if (typeof value === "string") {
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3]),
+      };
+    }
+  }
+  const date = dateValue(value);
+  return date ? saoPauloDateParts(date) : null;
+}
+
+function saoPauloDateParts(date: Date): LocalDateParts {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHIFT_REMINDER_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+  return {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+  };
+}
+
+function addLocalDays(parts: LocalDateParts, days: number): LocalDateParts {
+  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days, 12));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+function localDayNumber(parts: LocalDateParts): number {
+  return Math.floor(Date.UTC(parts.year, parts.month - 1, parts.day) / MS_PER_DAY);
+}
+
+function localWeekday(parts: LocalDateParts): number {
+  const day = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+function timeZoneOffsetMs(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: SHIFT_REMINDER_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const asUtc = Date.UTC(
+    value("year"),
+    value("month") - 1,
+    value("day"),
+    value("hour"),
+    value("minute"),
+    value("second"),
+  );
+  return asUtc - date.getTime();
+}
+
+function saoPauloLocalToUtc(parts: LocalDateParts, hour: number): Date {
+  const guess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, hour, 0, 0));
+  const firstOffset = timeZoneOffsetMs(guess);
+  const first = new Date(guess.getTime() - firstOffset);
+  const secondOffset = timeZoneOffsetMs(first);
+  return new Date(guess.getTime() - secondOffset);
+}
+
+function parseShiftReminderSettings(value: unknown): ShiftReminderSettings {
+  const data = value && typeof value === "object" ? value as JsonMap : {};
+  return {
+    endReminderEnabled: boolWithFallback(
+      data.endReminderEnabled ?? data.end_reminder_enabled,
+      true,
+    ),
+    overdueAfterMinutes: Math.max(
+      1,
+      Math.floor(numberWithFallback(data.overdueAfterMinutes ?? data.overdue_after_minutes, 30)),
+    ),
+    overdueReminderEnabled: boolWithFallback(
+      data.overdueReminderEnabled ?? data.overdue_reminder_enabled,
+      true,
+    ),
+    overdueRepeatMinutes: Math.max(
+      15,
+      Math.floor(numberWithFallback(data.overdueRepeatMinutes ?? data.overdue_repeat_minutes, 60)),
+    ),
+    startLeadMinutes: Math.max(
+      0,
+      Math.floor(numberWithFallback(data.startLeadMinutes ?? data.start_lead_minutes, 15)),
+    ),
+    startReminderEnabled: boolWithFallback(
+      data.startReminderEnabled ?? data.start_reminder_enabled,
+      true,
+    ),
+  };
+}
+
+function parseShiftGroupSchedule(id: string, data: JsonMap): ShiftGroupSchedule | null {
+  const active = boolWithFallback(data.active, true);
+  if (!active) return null;
+  const type = normalizedKey(data.type);
+  const scheduleType = normalizedKey(data.scheduleType ?? data.schedule_type) ||
+    (type === "administrative" ? "weekdays" : "two_by_two");
+  const rawWorkPattern = data.workPattern ?? data.work_pattern;
+  const workPattern = Array.isArray(rawWorkPattern) ?
+    rawWorkPattern
+      .map((item) => Math.floor(Number(item)))
+      .filter((item) => Number.isFinite(item) && item >= 0 && item <= 3) :
+    [0, 1];
+  return {
+    id,
+    code: stringValue(data.code) ?? id,
+    name: stringValue(data.name) ?? id,
+    scheduleType,
+    expectedStartHour: parseHour(data.expectedStartHour ?? data.expected_start_hour ?? data.start_time, 7),
+    expectedEndHour: parseHour(data.expectedEndHour ?? data.expected_end_hour ?? data.end_time, 19),
+    anchorDate: parseLocalDate(data.anchorDate ?? data.anchor_date),
+    workPattern: workPattern.length > 0 ? workPattern : [0, 1],
+    notifications: parseShiftReminderSettings(data.notifications),
+    active,
+  };
+}
+
+function parseShiftAssignmentSchedule(id: string, data: JsonMap): ShiftAssignmentSchedule | null {
+  const active = boolWithFallback(data.active, true);
+  if (!active) return null;
+  const userId = stringValue(data.userId ?? data.user_id ?? data.user_ra);
+  const shiftGroupId = stringValue(data.shiftGroupId ?? data.shift_group_id);
+  if (!userId || !shiftGroupId) return null;
+  return {id, userId, shiftGroupId};
+}
+
+function isShiftWorkDay(group: ShiftGroupSchedule, parts: LocalDateParts): boolean {
+  if (!group.active) return false;
+  if (group.scheduleType === "weekdays") {
+    const weekday = localWeekday(parts);
+    return weekday >= 1 && weekday <= 5;
+  }
+  if (group.scheduleType === "two_by_two") {
+    if (!group.anchorDate) return false;
+    const cycleIndex = ((localDayNumber(parts) - localDayNumber(group.anchorDate)) % 4 + 4) % 4;
+    return group.workPattern.includes(cycleIndex);
+  }
+  return false;
+}
+
+function expectedShiftWindowForDate(
+  group: ShiftGroupSchedule,
+  parts: LocalDateParts,
+): ShiftWindowSchedule | null {
+  if (!isShiftWorkDay(group, parts)) return null;
+  const start = saoPauloLocalToUtc(parts, group.expectedStartHour);
+  const endParts = group.expectedStartHour >= group.expectedEndHour ?
+    addLocalDays(parts, 1) :
+    parts;
+  const end = saoPauloLocalToUtc(endParts, group.expectedEndHour);
+  return {
+    start,
+    end,
+    key: `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`,
+  };
+}
+
+function shiftWindowsNear(group: ShiftGroupSchedule, now: Date): ShiftWindowSchedule[] {
+  const today = saoPauloDateParts(now);
+  return [-1, 0, 1]
+    .map((offset) => expectedShiftWindowForDate(group, addLocalDays(today, offset)))
+    .filter((item): item is ShiftWindowSchedule => Boolean(item));
+}
+
+function shouldFireAt(now: Date, dueAt: Date): boolean {
+  const deltaMs = now.getTime() - dueAt.getTime();
+  return deltaMs >= 0 && deltaMs < SHIFT_REMINDER_TOLERANCE_MINUTES * 60 * 1000;
+}
+
+function repeatBucket(now: Date, firstDueAt: Date, repeatMinutes: number): number | null {
+  const deltaMinutes = Math.floor((now.getTime() - firstDueAt.getTime()) / 60000);
+  if (deltaMinutes < 0) return null;
+  const bucket = Math.floor(deltaMinutes / repeatMinutes);
+  const bucketDueAt = new Date(firstDueAt.getTime() + bucket * repeatMinutes * 60 * 1000);
+  return shouldFireAt(now, bucketDueAt) ? bucket : null;
+}
+
+function formatShiftHour(date: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: SHIFT_REMINDER_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function shiftReminderTitle(type: ShiftReminderType): string {
+  if (type === "shift_start_reminder") return "Plantao em breve";
+  if (type === "shift_end_reminder") return "Hora de encerrar o turno";
+  return "Turno aberto alem do previsto";
+}
+
+function shiftReminderBody(
+  type: ShiftReminderType,
+  group: ShiftGroupSchedule,
+  window: ShiftWindowSchedule,
+  activeShift?: ActiveShiftSchedule,
+): string {
+  if (type === "shift_start_reminder") {
+    return `${group.name} comeca as ${formatShiftHour(window.start)}. Toque para assumir o turno.`;
+  }
+  if (type === "shift_end_reminder") {
+    return `${group.name} encerra as ${formatShiftHour(window.end)}. Se ainda estiver em ocorrencia, encerre quando finalizar.`;
+  }
+  const startedAt = activeShift?.startedAt;
+  const hoursOpen = startedAt ?
+    Math.floor((Date.now() - startedAt.getTime()) / (60 * 60 * 1000)) :
+    null;
+  return hoursOpen === null ?
+    `${group.name} continua aberto alem do horario previsto.` :
+    `${group.name} esta aberto ha ${hoursOpen}h. Encerre quando o trabalho operacional terminar.`;
+}
+
+function shiftReminderDocId(
+  type: ShiftReminderType,
+  userId: string,
+  groupId: string,
+  window: ShiftWindowSchedule,
+  repeatIndex = 0,
+): string {
+  return normalizedKey(`${type}_${userId}_${groupId}_${window.key}_${window.start.getTime()}_${repeatIndex}`)
+    .slice(0, 180);
+}
+
+async function createShiftReminderNotification(data: {
+  activeShift?: ActiveShiftSchedule;
+  group: ShiftGroupSchedule;
+  repeatIndex?: number;
+  type: ShiftReminderType;
+  userId: string;
+  window: ShiftWindowSchedule;
+}): Promise<boolean> {
+  const notificationId = shiftReminderDocId(
+    data.type,
+    data.userId,
+    data.group.id,
+    data.window,
+    data.repeatIndex ?? 0,
+  );
+  const docRef = db
+    .collection("notifications")
+    .doc(data.userId)
+    .collection("items")
+    .doc(notificationId);
+  const existing = await docRef.get();
+  if (existing.exists) return false;
+
+  const title = shiftReminderTitle(data.type);
+  const body = shiftReminderBody(data.type, data.group, data.window, data.activeShift);
+  await docRef.set({
+    type: data.type,
+    title,
+    body,
+    occurrence_id: "",
+    occurrence_title: body,
+    target_screen: data.type === "shift_start_reminder" ? "shift_assumption" : "active_shift",
+    action_required: true,
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+    read_at: null,
+    resolved_at: null,
+    archived_at: null,
+    additional_data: data.group.id,
+    shift_group_id: data.group.id,
+    shift_group_code: data.group.code,
+    shift_group_label: data.group.name,
+    shift_id: data.activeShift?.id ?? data.userId,
+    expected_start_at: admin.firestore.Timestamp.fromDate(data.window.start),
+    expected_end_at: admin.firestore.Timestamp.fromDate(data.window.end),
+    reminder_repeat_index: data.repeatIndex ?? 0,
+    notification_key: notificationId,
+  });
+  return true;
+}
+
+async function loadShiftGroupsForReminder(): Promise<Map<string, ShiftGroupSchedule>> {
+  const snapshot = await db.collection("shift_groups").where("active", "==", true).get();
+  const groups = new Map<string, ShiftGroupSchedule>();
+  for (const doc of snapshot.docs) {
+    const group = parseShiftGroupSchedule(doc.id, doc.data() ?? {});
+    if (group) groups.set(group.id, group);
+  }
+  return groups;
+}
+
+async function loadAssignmentsForReminder(): Promise<ShiftAssignmentSchedule[]> {
+  const snapshot = await db.collection("user_shift_assignments").where("active", "==", true).get();
+  return snapshot.docs
+    .map((doc) => parseShiftAssignmentSchedule(doc.id, doc.data() ?? {}))
+    .filter((item): item is ShiftAssignmentSchedule => Boolean(item));
+}
+
+async function loadActiveShiftsForReminder(): Promise<Map<string, ActiveShiftSchedule>> {
+  const snapshot = await db.collection("active_shifts").where("status", "==", "active").get();
+  const shifts = new Map<string, ActiveShiftSchedule>();
+  for (const doc of snapshot.docs) {
+    const data = doc.data() ?? {};
+    const handlerId = stringValue(data.handlerId ?? data.handler_id) ?? doc.id;
+    shifts.set(handlerId, {
+      id: stringValue(data.shiftId ?? data.shift_id) ?? doc.id,
+      handlerId,
+      startedAt: dateValue(data.startedAt ?? data.started_at),
+    });
+  }
+  return shifts;
+}
+
+async function runShiftReminderScan(now: Date): Promise<ShiftReminderStats> {
+  const [groups, assignments, activeShifts] = await Promise.all([
+    loadShiftGroupsForReminder(),
+    loadAssignmentsForReminder(),
+    loadActiveShiftsForReminder(),
+  ]);
+  const stats: ShiftReminderStats = {
+    assignments: assignments.length,
+    checked: 0,
+    endReminders: 0,
+    groups: groups.size,
+    overdueReminders: 0,
+    skippedWithoutGroup: 0,
+    startReminders: 0,
+  };
+
+  for (const assignment of assignments) {
+    stats.checked += 1;
+    const group = groups.get(assignment.shiftGroupId);
+    if (!group) {
+      stats.skippedWithoutGroup += 1;
+      continue;
+    }
+    const activeShift = activeShifts.get(assignment.userId);
+    const windows = shiftWindowsNear(group, now);
+
+    if (!activeShift && group.notifications.startReminderEnabled) {
+      for (const window of windows) {
+        const dueAt = new Date(window.start.getTime() - group.notifications.startLeadMinutes * 60 * 1000);
+        if (!shouldFireAt(now, dueAt)) continue;
+        const created = await createShiftReminderNotification({
+          group,
+          type: "shift_start_reminder",
+          userId: assignment.userId,
+          window,
+        });
+        if (created) stats.startReminders += 1;
+      }
+    }
+
+    if (activeShift && group.notifications.endReminderEnabled) {
+      for (const window of windows) {
+        if (!shouldFireAt(now, window.end)) continue;
+        const created = await createShiftReminderNotification({
+          activeShift,
+          group,
+          type: "shift_end_reminder",
+          userId: assignment.userId,
+          window,
+        });
+        if (created) stats.endReminders += 1;
+      }
+    }
+
+    if (activeShift && group.notifications.overdueReminderEnabled) {
+      let createdScheduledOverdue = false;
+      for (const window of windows) {
+        const firstDueAt = new Date(window.end.getTime() + group.notifications.overdueAfterMinutes * 60 * 1000);
+        const bucket = repeatBucket(now, firstDueAt, group.notifications.overdueRepeatMinutes);
+        if (bucket === null) continue;
+        const created = await createShiftReminderNotification({
+          activeShift,
+          group,
+          repeatIndex: bucket,
+          type: "shift_overdue_reminder",
+          userId: assignment.userId,
+          window,
+        });
+        if (created) stats.overdueReminders += 1;
+        createdScheduledOverdue = createdScheduledOverdue || created;
+      }
+
+      if (!createdScheduledOverdue && activeShift.startedAt) {
+        const firstDueAt = new Date(
+          activeShift.startedAt.getTime() + SHIFT_REMINDER_MAX_OPEN_HOURS * 60 * 60 * 1000,
+        );
+        const bucket = repeatBucket(now, firstDueAt, group.notifications.overdueRepeatMinutes);
+        if (bucket !== null) {
+          const fallbackWindow = {
+            start: activeShift.startedAt,
+            end: firstDueAt,
+            key: `legacy_${activeShift.startedAt.getTime()}`,
+          };
+          const created = await createShiftReminderNotification({
+            activeShift,
+            group,
+            repeatIndex: bucket,
+            type: "shift_overdue_reminder",
+            userId: assignment.userId,
+            window: fallbackWindow,
+          });
+          if (created) stats.overdueReminders += 1;
+        }
+      }
+    }
+  }
+
+  logger.info("Shift reminder scan complete", stats);
+  return stats;
+}
+
+async function resolveShiftReminderNotifications(
+  userId: string,
+  types: ShiftReminderType[],
+  resolutionAction: string,
+  metadata: JsonMap = {},
+): Promise<number> {
+  let resolved = 0;
+  let batch = db.batch();
+  let pendingWrites = 0;
+  for (const type of types) {
+    const snapshot = await db
+      .collection("notifications")
+      .doc(userId)
+      .collection("items")
+      .where("type", "==", type)
+      .where("resolved_at", "==", null)
+      .get();
+    for (const doc of snapshot.docs) {
+      batch.set(doc.ref, notificationResolutionPatch({
+        type,
+        resolutionAction,
+        metadata,
+      }), {merge: true});
+      pendingWrites += 1;
+      resolved += 1;
+      if (pendingWrites >= 450) {
+        await batch.commit();
+        batch = db.batch();
+        pendingWrites = 0;
+      }
+    }
+  }
+  if (pendingWrites > 0) await batch.commit();
+  return resolved;
+}
+
+export const onActiveShiftCreatedResolveReminders = onDocumentCreated(
+  {
+    document: "active_shifts/{handlerId}",
+    region,
+  },
+  async (event) => {
+    const data = event.data?.data() ?? {};
+    if (String(data.status ?? "") !== "active") return;
+    await resolveShiftReminderNotifications(
+      event.params.handlerId,
+      ["shift_start_reminder"],
+      "shift_started",
+      {shift_id: stringValue(data.shiftId ?? data.shift_id) ?? event.params.handlerId},
+    );
+  },
+);
+
+export const onActiveShiftUpdatedResolveReminders = onDocumentUpdated(
+  {
+    document: "active_shifts/{handlerId}",
+    region,
+  },
+  async (event) => {
+    const before = event.data?.before.data() ?? {};
+    const after = event.data?.after.data() ?? {};
+    const handlerId = event.params.handlerId;
+    const wasActive = String(before.status ?? "") === "active";
+    const isActive = String(after.status ?? "") === "active";
+    const endedAt = dateValue(after.endedAt ?? after.ended_at);
+
+    if (!wasActive && isActive) {
+      await resolveShiftReminderNotifications(
+        handlerId,
+        ["shift_start_reminder"],
+        "shift_started",
+        {shift_id: stringValue(after.shiftId ?? after.shift_id) ?? handlerId},
+      );
+      return;
+    }
+
+    if (wasActive && (!isActive || endedAt !== null)) {
+      await resolveShiftReminderNotifications(
+        handlerId,
+        ["shift_end_reminder", "shift_overdue_reminder"],
+        "shift_ended",
+        {
+          shift_id: stringValue(after.shiftId ?? after.shift_id) ?? handlerId,
+          ended_at: endedAt?.toISOString() ?? new Date().toISOString(),
+        },
+      );
+    }
+  },
+);
+
 export const checkOpenShiftsAndNotify = onCall(
   {region, secrets: []},
   async (request: CallableRequest) => {
@@ -5396,6 +6952,8 @@ export const checkOpenShiftsAndNotify = onCall(
     if (!caller) {
       throw new HttpsError("unauthenticated", "Requer autenticação.");
     }
+
+    return runShiftReminderScan(new Date());
 
     const now = new Date();
     const maxOpenHours = 12;
@@ -5442,7 +7000,7 @@ export const checkOpenShiftsAndNotify = onCall(
 
       // Buscar tokens FCM (simplificado - ajuste conforme seu padrão)
       if (userData?.fcmTokens) {
-        const tokenMap = userData.fcmTokens as Record<string, boolean>;
+        const tokenMap = userData?.fcmTokens as Record<string, boolean>;
         for (const [token, enabled] of Object.entries(tokenMap)) {
           if (enabled) tokens.push(token);
         }
@@ -5508,10 +7066,13 @@ export const checkOpenShiftsAndNotify = onCall(
 export const scheduledCheckOpenShifts = onSchedule(
   {
     region,
-    schedule: "every 1 hours",
+    schedule: "every 15 minutes",
     timeZone: "America/Sao_Paulo",
   },
   async () => {
+    await runShiftReminderScan(new Date());
+    return;
+
     logger.info("Running scheduled check for open shifts");
     const now = new Date();
     const maxOpenHours = 12;
@@ -5554,7 +7115,7 @@ export const scheduledCheckOpenShifts = onSchedule(
       const userData = userDoc.data();
       const tokens: string[] = [];
       if (userData?.fcmTokens) {
-        const tokenMap = userData.fcmTokens as Record<string, boolean>;
+        const tokenMap = userData?.fcmTokens as Record<string, boolean>;
         for (const [token, enabled] of Object.entries(tokenMap)) {
           if (enabled) tokens.push(token);
         }

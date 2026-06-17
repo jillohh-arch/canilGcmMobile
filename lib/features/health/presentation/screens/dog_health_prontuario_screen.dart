@@ -20,6 +20,7 @@ import 'package:canil_gcm/features/health/data/health_service.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
@@ -504,7 +505,10 @@ class _HealthProntuarioBody extends StatelessWidget {
       case _HealthProntuarioTab.peso:
         return _HealthWeightTab(dog: dog, data: data);
       case _HealthProntuarioTab.nutricao:
-        return _HealthNutritionTab(vm: context.watch<NutritionViewModel>());
+        return _HealthNutritionTab(
+          dog: dog,
+          vm: context.watch<NutritionViewModel>(),
+        );
       case _HealthProntuarioTab.docs:
         return _HealthDocsTab(
           documents: documents,
@@ -1140,13 +1144,199 @@ class _HealthWeightTab extends StatelessWidget {
   }
 }
 
-class _HealthNutritionTab extends StatelessWidget {
+class _HealthNutritionTab extends StatefulWidget {
+  final Dog dog;
   final NutritionViewModel vm;
 
-  const _HealthNutritionTab({required this.vm});
+  const _HealthNutritionTab({required this.dog, required this.vm});
+
+  @override
+  State<_HealthNutritionTab> createState() => _HealthNutritionTabState();
+}
+
+class _HealthNutritionTabState extends State<_HealthNutritionTab> {
+  final _aiService = NutritionAiService();
+  int _periodDays = 30;
+  bool _loadingAi = false;
+
+  Future<void> _generateInsight() async {
+    if (_loadingAi) return;
+    setState(() => _loadingAi = true);
+    HapticFeedback.selectionClick();
+
+    try {
+      final insight = await _aiService.generateInsight(
+        dogId: widget.dog.id,
+        periodDays: _periodDays,
+      );
+      if (!mounted) return;
+      await _showNutritionInsightSheet(insight);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Falha ao gerar analise nutricional: $e',
+            style: GoogleFonts.inter(),
+          ),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingAi = false);
+    }
+  }
+
+  Future<void> _showNutritionInsightSheet(NutritionAiInsight insight) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.86,
+          minChildSize: 0.48,
+          maxChildSize: 0.96,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceSheet,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                border: Border.all(color: AppTheme.attention.withAlpha(60)),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppTheme.attention.withAlpha(22),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppTheme.attention.withAlpha(80),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.psychology_alt_rounded,
+                            color: AppTheme.attention,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Analise nutricional assistida',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${insight.periodDays} dias - ${insight.usedAi ? 'IA generativa' : 'analise local'}',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    _InsightHighlight(
+                      label: _nutritionLevelLabel(insight.recommendationLevel),
+                      text: insight.summary,
+                    ),
+                    const SizedBox(height: 14),
+                    _InsightBlock(
+                      title: 'Ajuste alimentar',
+                      icon: Icons.restaurant_menu_rounded,
+                      color: AppTheme.attention,
+                      items: [insight.foodAdjustment],
+                    ),
+                    _InsightBlock(
+                      title: 'Fatores operacionais',
+                      icon: Icons.fitness_center_rounded,
+                      color: AppTheme.primary,
+                      items: insight.operationalFactors,
+                    ),
+                    _InsightBlock(
+                      title: 'Suplementos e hidratacao',
+                      icon: Icons.medication_liquid_rounded,
+                      color: AppTheme.healthAccent,
+                      items: [
+                        ...insight.supplementNotes,
+                        ...insight.hydrationNotes,
+                      ],
+                    ),
+                    if (insight.dataGaps.isNotEmpty)
+                      _InsightBlock(
+                        title: 'Dados faltantes',
+                        icon: Icons.playlist_add_check_circle_rounded,
+                        color: AppTheme.warning,
+                        items: insight.dataGaps,
+                      ),
+                    _InsightBlock(
+                      title: 'Proximos passos',
+                      icon: Icons.task_alt_rounded,
+                      color: AppTheme.success,
+                      items: insight.nextActions,
+                    ),
+                    _InsightBlock(
+                      title: 'Cautela tecnica',
+                      icon: Icons.health_and_safety_rounded,
+                      color: AppTheme.error,
+                      items: insight.veterinaryWarnings.isEmpty
+                          ? [
+                              'Sugestao assistiva: valide alteracoes de dieta, suplemento ou manejo clinico com responsavel tecnico.',
+                            ]
+                          : insight.veterinaryWarnings,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.attention,
+                        ),
+                        child: Text(
+                          'ENTENDI',
+                          style: GoogleFonts.inter(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = widget.vm;
     final prescription = vm.prescription;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1173,7 +1363,274 @@ class _HealthNutritionTab extends StatelessWidget {
           prescription: prescription,
           conformityPercent: vm.conformityPercent,
         ),
+        const SizedBox(height: 18),
+        _SectionLabel(title: 'INTELIGENCIA ALIMENTAR'),
+        const SizedBox(height: 10),
+        _NutritionAiCard(
+          periodDays: _periodDays,
+          loading: _loadingAi,
+          onPeriodChanged: (value) => setState(() => _periodDays = value),
+          onGenerate: _generateInsight,
+        ),
       ],
+    );
+  }
+}
+
+class _NutritionAiCard extends StatelessWidget {
+  final int periodDays;
+  final bool loading;
+  final ValueChanged<int> onPeriodChanged;
+  final VoidCallback onGenerate;
+
+  const _NutritionAiCard({
+    required this.periodDays,
+    required this.loading,
+    required this.onPeriodChanged,
+    required this.onGenerate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _panelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.attention.withAlpha(26),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.attention,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.psychology_alt_rounded,
+                        color: AppTheme.attention,
+                        size: 21,
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loading ? 'Analisando dados...' : 'Sugestao assistida',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Cruza alimentacao, treinos, peso, saude e suplementos.',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [7, 30, 60].map((days) {
+              final selected = periodDays == days;
+              return GestureDetector(
+                onTap: loading ? null : () => onPeriodChanged(days),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppTheme.attention.withAlpha(38)
+                        : AppTheme.textPrimary.withAlpha(6),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: selected
+                          ? AppTheme.attention
+                          : AppTheme.surfaceWhiteBorder,
+                    ),
+                  ),
+                  child: Text(
+                    '$days dias',
+                    style: GoogleFonts.inter(
+                      color: selected
+                          ? AppTheme.textPrimary
+                          : AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: loading ? null : onGenerate,
+              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: Text(
+                loading ? 'GERANDO ANALISE' : 'GERAR ANALISE',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w900),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.attention,
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: AppTheme.textPrimary.withAlpha(30),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'A IA nao prescreve dieta. Use como apoio para revisar o manejo com o responsavel tecnico.',
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightHighlight extends StatelessWidget {
+  final String label;
+  final String text;
+
+  const _InsightHighlight({required this.label, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.attention.withAlpha(18),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.attention.withAlpha(70)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StatusPill(label: label, color: AppTheme.attention),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 13,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightBlock extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<String> items;
+
+  const _InsightBlock({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = items.where((item) => item.trim().isNotEmpty).toList();
+    if (visibleItems.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: _panelDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...visibleItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '-',
+                      style: GoogleFonts.inter(
+                        color: color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -4214,6 +4671,20 @@ Color _colorForHealthType(String type) {
       return AppTheme.attention;
     default:
       return AppTheme.textMuted;
+  }
+}
+
+String _nutritionLevelLabel(String level) {
+  switch (level) {
+    case 'avaliar_aumento':
+      return 'Avaliar aumento';
+    case 'avaliar_reducao':
+      return 'Avaliar reducao';
+    case 'atencao_clinica':
+    case 'atenção_clinica':
+      return 'Atencao clinica';
+    default:
+      return 'Manter monitoramento';
   }
 }
 

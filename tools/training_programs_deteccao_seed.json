@@ -1,0 +1,600 @@
+{
+  "program": {
+    "id": "deteccao",
+    "name": "Detecção — Protocolo Ragonha",
+    "label": "Detecção — Protocolo Ragonha",
+    "modality": "deteccao",
+    "version": 1,
+    "active": true,
+    "updated_by": "seed:protocolo_ragonha",
+    "source": "temp/docs/ESPEC_TECNICA_PARTE_4_1.md",
+    "description": "Currículo institucional da formação de detecção pelo Protocolo Ragonha. As linhas Drogas, Armas e Cadáver evoluem de forma independente; a Triagem/Fase 0 é pré-requisito antes da formação.",
+    "line_scope": {
+      "independent_lines": true,
+      "lines": [
+        "drogas",
+        "armas",
+        "cadaver"
+      ],
+      "screening_required": true,
+      "screening_label": "Triagem/Fase 0"
+    },
+    "audit_trail": [
+      {
+        "action": "seed_program",
+        "by_name": "seed:protocolo_ragonha",
+        "source": "k9_ops_seed",
+        "reason": "Publicação inicial do currículo institucional de Detecção."
+      }
+    ]
+  },
+  "modules": [
+    {
+      "id": "fase_1b_resposta",
+      "order": 1,
+      "name": "Fase 1b — Resposta",
+      "title": "Fase 1b — Resposta",
+      "description": "Uma caixa-alvo com odor e bola. Ensina a indicação passiva inicial e o pagamento com a bola.",
+      "active": true,
+      "detection_phase": {
+        "code": "1b",
+        "box_count": 1,
+        "odor_position_mode": "fixed_last",
+        "used_ball": true,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos"
+        ],
+        "notes": "Avança quando o cão chega e senta sozinho 3 vezes seguidas."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "caixa_unica_com_odor_e_bola",
+          "order": 1,
+          "label": "Caixa única configurada com odor e bola",
+          "title": "Caixa única configurada com odor e bola",
+          "description": "O alvo deve estar claramente pareado com odor e recompensa.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_passiva_inicial",
+          "order": 2,
+          "label": "Indicação passiva inicial",
+          "title": "Indicação passiva inicial",
+          "description": "O cão aprende a sentar na caixa-alvo como resposta-padrão.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 3,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Um erro reinicia a sequência dentro da sessão.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "material_linha_registrados",
+          "order": 4,
+          "label": "Linha e material de odor registrados",
+          "title": "Linha e material de odor registrados",
+          "description": "Registrar se a linha trabalhada é Drogas, Armas ou Cadáver e qual material foi usado.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_2b_processo_busca",
+      "order": 2,
+      "name": "Fase 2b — Processo de busca",
+      "title": "Fase 2b — Processo de busca",
+      "description": "Duas caixas, odor fixo na última, ainda com bola. Ensina a sequência de busca.",
+      "active": true,
+      "detection_phase": {
+        "code": "2b",
+        "box_count": 2,
+        "odor_position_mode": "fixed_last",
+        "used_ball": true,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos"
+        ],
+        "notes": "O cão deve percorrer a sequência e indicar a última caixa, sem decorar por auxílio do condutor."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "duas_caixas_montadas",
+          "order": 1,
+          "label": "Duas caixas montadas em sequência",
+          "title": "Duas caixas montadas em sequência",
+          "description": "Primeira vazia e última como caixa-alvo.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "odor_fixo_ultima_caixa",
+          "order": 2,
+          "label": "Odor fixo na última caixa",
+          "title": "Odor fixo na última caixa",
+          "description": "A posição fixa ensina o processo antes da variação.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "varredura_em_ordem",
+          "order": 3,
+          "label": "Varredura em ordem",
+          "title": "Varredura em ordem",
+          "description": "O cão deve procurar em sequência até a caixa-alvo.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 4,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Critério objetivo da fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_2v_generalizacao_busca",
+      "order": 3,
+      "name": "Fase 2v — Generalização em duas caixas",
+      "title": "Fase 2v — Generalização em duas caixas",
+      "description": "Duas caixas com odor variando entre as posições. O cão passa a farejar de fato, sem decorar a última caixa.",
+      "active": true,
+      "detection_phase": {
+        "code": "2v",
+        "box_count": 2,
+        "odor_position_mode": "variable",
+        "used_ball": true,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos",
+          "odor_variavel"
+        ],
+        "notes": "A posição do odor deve variar e ser registrada antes de cada repetição."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "odor_variavel_entre_duas_caixas",
+          "order": 1,
+          "label": "Odor variável entre as duas caixas",
+          "title": "Odor variável entre as duas caixas",
+          "description": "A caixa-alvo muda de posição entre as repetições.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "posicao_alvo_registrada",
+          "order": 2,
+          "label": "Posição do alvo registrada antes do resultado",
+          "title": "Posição do alvo registrada antes do resultado",
+          "description": "O registro precisa mostrar onde o odor estava em cada repetição.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indica_sem_decorar_posicao",
+          "order": 3,
+          "label": "Indicação sem decorar posição",
+          "title": "Indicação sem decorar posição",
+          "description": "O cão deve responder ao odor, não à posição anterior.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 4,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Critério objetivo da fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_3b_independencia_odor_fixo",
+      "order": 4,
+      "name": "Fase 3b — Independência com odor fixo",
+      "title": "Fase 3b — Independência com odor fixo",
+      "description": "Três caixas, odor fixo na última, ainda com bola. O instrutor começa a reduzir auxílio e se afastar.",
+      "active": true,
+      "detection_phase": {
+        "code": "3b",
+        "box_count": 3,
+        "odor_position_mode": "fixed_last",
+        "used_ball": true,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos",
+          "afastamento_instrutor"
+        ],
+        "notes": "Fase de transição para independência; a bola ainda está presente."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "tres_caixas_montadas",
+          "order": 1,
+          "label": "Três caixas montadas em sequência",
+          "title": "Três caixas montadas em sequência",
+          "description": "Aumenta o esforço de busca mantendo odor fixo.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "instrutor_reduz_auxilio",
+          "order": 2,
+          "label": "Instrutor reduz auxílio durante a indicação",
+          "title": "Instrutor reduz auxílio durante a indicação",
+          "description": "O cão começa a sustentar a resposta com menos dependência.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "independencia_inicial",
+          "order": 3,
+          "label": "Independência inicial observada",
+          "title": "Independência inicial observada",
+          "description": "O cão executa busca e indicação com menor condução.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 4,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Critério objetivo da fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_3v_independencia_total",
+      "order": 5,
+      "name": "Fase 3v — Independência total",
+      "title": "Fase 3v — Independência total",
+      "description": "Três caixas, odor variável, sem bola. Ponto de virada do protocolo: o cão caça odor puro, sem decorar posição.",
+      "active": true,
+      "detection_phase": {
+        "code": "3v",
+        "box_count": 3,
+        "odor_position_mode": "variable",
+        "used_ball": false,
+        "target_consecutive_hits": 10
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "10_acertos_consecutivos",
+          "sem_bola",
+          "odor_variavel"
+        ],
+        "notes": "Fase crítica: 10 acertos consecutivos, sem bola. Um erro reinicia a sequência."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "bola_removida",
+          "order": 1,
+          "label": "Bola removida da caixa-alvo",
+          "title": "Bola removida da caixa-alvo",
+          "description": "A partir desta fase, o cão trabalha odor puro.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "odor_variavel_tres_caixas",
+          "order": 2,
+          "label": "Odor variável em três caixas",
+          "title": "Odor variável em três caixas",
+          "description": "O odor deve alternar entre as posições possíveis.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "indicacao_sem_reforco_visual",
+          "order": 3,
+          "label": "Indicação sem reforço visual ou bola",
+          "title": "Indicação sem reforço visual ou bola",
+          "description": "O cão deve sustentar indicação pela leitura do odor.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "dez_consecutivas_sem_erro",
+          "order": 4,
+          "label": "10 acertos consecutivos sem erro",
+          "title": "10 acertos consecutivos sem erro",
+          "description": "Critério especial desta fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_4b_distancia_comando_busca",
+      "order": 6,
+      "name": "Fase 4b — Distância e comando Busca",
+      "title": "Fase 4b — Distância e comando Busca",
+      "description": "Quatro caixas, odor fixo na última, sem bola. Introduz distância e consolida o comando verbal de busca.",
+      "active": true,
+      "detection_phase": {
+        "code": "4b",
+        "box_count": 4,
+        "odor_position_mode": "fixed_last",
+        "used_ball": false,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos",
+          "comando_busca",
+          "distancia_progressiva"
+        ],
+        "notes": "O cão deve iniciar a busca por comando verbal, com aumento controlado de distância."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "quatro_caixas_montadas",
+          "order": 1,
+          "label": "Quatro caixas montadas",
+          "title": "Quatro caixas montadas",
+          "description": "Aumenta o cenário para quatro caixas.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "comando_busca_introduzido",
+          "order": 2,
+          "label": "Comando verbal Busca introduzido",
+          "title": "Comando verbal Busca introduzido",
+          "description": "O cão inicia o trabalho sob comando.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "distancia_progressiva",
+          "order": 3,
+          "label": "Distância progressiva registrada",
+          "title": "Distância progressiva registrada",
+          "description": "A distância entre condutor/instrutor e caixas deve aumentar de forma controlada.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 4,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Critério objetivo da fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_4v_generalizacao_quatro_caixas",
+      "order": 7,
+      "name": "Fase 4v — Generalização em quatro caixas",
+      "title": "Fase 4v — Generalização em quatro caixas",
+      "description": "Quatro caixas, odor variável em qualquer posição, sem bola. Consolida generalização antes da busca circular.",
+      "active": true,
+      "detection_phase": {
+        "code": "4v",
+        "box_count": 4,
+        "odor_position_mode": "variable",
+        "used_ball": false,
+        "target_consecutive_hits": 3
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_acertos_consecutivos",
+          "odor_variavel",
+          "quatro_caixas"
+        ],
+        "notes": "A posição do odor deve variar em qualquer uma das quatro caixas."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "odor_variavel_quatro_caixas",
+          "order": 1,
+          "label": "Odor variável em quatro caixas",
+          "title": "Odor variável em quatro caixas",
+          "description": "O cão deve indicar corretamente sem previsibilidade de posição.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "posicao_alvo_registrada",
+          "order": 2,
+          "label": "Posição do alvo registrada antes do resultado",
+          "title": "Posição do alvo registrada antes do resultado",
+          "description": "Cada repetição precisa guardar a posição real do odor.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "busca_por_comando",
+          "order": 3,
+          "label": "Busca iniciada por comando",
+          "title": "Busca iniciada por comando",
+          "description": "O comando verbal deve acionar a busca sem auxílio indevido.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_consecutivas_sem_erro",
+          "order": 4,
+          "label": "3 acertos consecutivos sem erro",
+          "title": "3 acertos consecutivos sem erro",
+          "description": "Critério objetivo da fase.",
+          "required": true,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "fase_4c_busca_circular",
+      "order": 8,
+      "name": "Fase 4c — Busca circular",
+      "title": "Fase 4c — Busca circular",
+      "description": "Quatro caixas em quadrado, odor variável, sem bola. Última fase da formação: sentido horário e anti-horário.",
+      "active": true,
+      "detection_phase": {
+        "code": "4c",
+        "box_count": 4,
+        "odor_position_mode": "square",
+        "used_ball": false,
+        "target_consecutive_hits": 3,
+        "directions": [
+          "clockwise",
+          "counter_clockwise"
+        ]
+      },
+      "promotion_criteria": {
+        "instructor_approval_required": true,
+        "min_sessions": 1,
+        "min_success_rate": 100,
+        "required_events": [
+          "3_horario",
+          "3_anti_horario",
+          "odor_variavel",
+          "quadrado"
+        ],
+        "notes": "Concluir 3 acertos no sentido horário e 3 no anti-horário. Ao concluir a 4c, a linha passa para operacional."
+      },
+      "audit_trail": [
+        {
+          "action": "seed_module",
+          "by_name": "seed:protocolo_ragonha",
+          "source": "k9_ops_seed"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "quatro_caixas_em_quadrado",
+          "order": 1,
+          "label": "Quatro caixas em quadrado",
+          "title": "Quatro caixas em quadrado",
+          "description": "Layout circular com instrutor no centro, conforme protocolo.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_horario",
+          "order": 2,
+          "label": "3 acertos consecutivos no sentido horário",
+          "title": "3 acertos consecutivos no sentido horário",
+          "description": "Primeira etapa da fase 4c.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "tres_anti_horario",
+          "order": 3,
+          "label": "3 acertos consecutivos no sentido anti-horário",
+          "title": "3 acertos consecutivos no sentido anti-horário",
+          "description": "Segunda etapa da fase 4c.",
+          "required": true,
+          "active": true
+        },
+        {
+          "id": "linha_operacional_apos_4c",
+          "order": 4,
+          "label": "Linha apta para manutenção operacional",
+          "title": "Linha apta para manutenção operacional",
+          "description": "Concluir a 4c encerra a formação da linha; o trabalho seguinte é manutenção.",
+          "required": true,
+          "active": true
+        }
+      ]
+    }
+  ]
+}

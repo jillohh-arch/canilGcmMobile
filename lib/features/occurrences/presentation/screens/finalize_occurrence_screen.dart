@@ -13,6 +13,7 @@ import 'package:canil_gcm/core/services/occurrence_finalization_service.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/occurrences/data/occurrence_ai_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
@@ -49,10 +50,12 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   final _pageController = PageController();
   final _reportController = TextEditingController();
   final _speechService = SpeechDictationService();
+  final _occurrenceAiService = OccurrenceAiService();
 
   int _currentStep = 0;
   bool _isListening = false;
   bool _isFinalizing = false;
+  bool _isGeneratingAiDraft = false;
   bool _draftLoaded = false;
   Timer? _draftDebounce;
   Occurrence? _occurrence;
@@ -178,6 +181,202 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         );
       }
     }
+  }
+
+  Future<void> _generateAiDraft() async {
+    final rawReport = _reportController.text.trim();
+    if (rawReport.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Digite ou grave o relato antes de usar a IA assistiva.',
+            style: GoogleFonts.inter(),
+          ),
+          backgroundColor: AppTheme.warning,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isGeneratingAiDraft = true);
+    HapticFeedback.selectionClick();
+
+    try {
+      final draft = await _occurrenceAiService.generateInstitutionalDraft(
+        occurrenceId: widget.occurrenceId,
+        rawReport: rawReport,
+      );
+      if (!mounted) return;
+      final useDraft = await _showAiDraftReviewSheet(draft);
+      if (useDraft == true && mounted) {
+        _reportController.text = draft.draftText.trim();
+        _reportController.selection = TextSelection.collapsed(
+          offset: _reportController.text.length,
+        );
+        setState(() {});
+        _scheduleDraftSave();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Falha ao gerar minuta assistida: $e',
+            style: GoogleFonts.inter(),
+          ),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGeneratingAiDraft = false);
+    }
+  }
+
+  Future<bool?> _showAiDraftReviewSheet(OccurrenceAiDraft draft) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.82,
+          minChildSize: 0.45,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceSheet,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                border: Border.all(color: AppTheme.primary.withAlpha(45)),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withAlpha(18),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppTheme.primary.withAlpha(70),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Minuta institucional',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                draft.usedAi
+                                    ? 'Gerada por IA assistiva. Revise antes de usar.'
+                                    : 'Gerada por modelo local. Revise antes de usar.',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    if (draft.attentionPoints.isNotEmpty) ...[
+                      _AiAttentionBox(points: draft.attentionPoints),
+                      const SizedBox(height: 16),
+                    ],
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background.withAlpha(170),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.textPrimary.withAlpha(22),
+                        ),
+                      ),
+                      child: Text(
+                        draft.draftText,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontSize: 14,
+                          height: 1.55,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'A IA nao finaliza a ocorrencia. Ela apenas organiza o texto; o responsavel precisa revisar e assumir o relato antes de continuar.',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () =>
+                                Navigator.of(sheetContext).pop(false),
+                            child: Text(
+                              'CANCELAR',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () =>
+                                Navigator.of(sheetContext).pop(true),
+                            child: Text(
+                              'USAR MINUTA',
+                              style: GoogleFonts.inter(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // ─── Results ────────────────────────────────────────────────────────
@@ -1014,6 +1213,83 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   // ─── Step 1: Relato ─────────────────────────────────────────────────
 
+  Widget _buildAiDraftAction() {
+    final enabled =
+        _reportController.text.trim().isNotEmpty && !_isGeneratingAiDraft;
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: GestureDetector(
+        onTap: enabled ? _generateAiDraft : null,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withAlpha(12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.primary.withAlpha(55)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _isGeneratingAiDraft
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primary,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: AppTheme.primary,
+                        size: 21,
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isGeneratingAiDraft
+                          ? 'Gerando minuta...'
+                          : 'Aprimorar relato com IA',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Organiza o texto sem finalizar: voce revisa antes de aplicar.',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: AppTheme.primary,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStep1() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1145,6 +1421,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               fontSize: 11,
             ),
           ),
+          const SizedBox(height: 12),
+          _buildAiDraftAction(),
         ],
       ),
     );
@@ -1777,6 +2055,78 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     ],
     _ => [],
   };
+}
+
+class _AiAttentionBox extends StatelessWidget {
+  final List<String> points;
+
+  const _AiAttentionBox({required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withAlpha(14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.warning.withAlpha(70)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.report_gmailerrorred_rounded,
+                color: AppTheme.warning,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Pontos de atencao',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...points.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '-',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.warning,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DetailField {

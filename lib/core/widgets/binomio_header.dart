@@ -12,6 +12,7 @@ import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontu
 import 'package:canil_gcm/features/occurrences/presentation/screens/pending_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/shift_group_widgets.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dart';
 
@@ -235,6 +236,8 @@ class BinomioHeader extends StatelessWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 4),
+              const ShiftGroupBadge(compact: true),
             ],
           ),
         ),

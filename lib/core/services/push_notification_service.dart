@@ -18,6 +18,8 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/active_occur
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_transition_service.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_promotion_request_screen.dart';
@@ -342,6 +344,19 @@ class PushNotificationService {
       );
       return;
     }
+    if (_opensShiftScreen(data, target)) {
+      final type = _stringValue(data['type']) ?? '';
+      final opensAssumption =
+          target == 'shift_assumption' || type == 'shift_start_reminder';
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => opensAssumption
+              ? const ShiftAssumptionScreen()
+              : const ActiveShiftDashboardScreen(),
+        ),
+      );
+      return;
+    }
 
     final occurrenceId = _stringValue(data['occurrence_id']);
     if (occurrenceId == null) return;
@@ -604,6 +619,16 @@ bool _opensTrainingHistory(Map<String, dynamic> data, String target) {
       type == 'training_promotion_rejected' ||
       type == 'training_bonus_milestone_available' ||
       target == 'training_bonus_milestone';
+}
+
+bool _opensShiftScreen(Map<String, dynamic> data, String target) {
+  final type = _stringValue(data['type']) ?? '';
+  return target == 'shift_assumption' ||
+      target == 'active_shift' ||
+      type == 'shift_start_reminder' ||
+      type == 'shift_end_reminder' ||
+      type == 'shift_overdue_reminder' ||
+      type == 'shift_open_reminder';
 }
 
 String? _promotionRequestIdFromPayload(Map<String, dynamic> data) {

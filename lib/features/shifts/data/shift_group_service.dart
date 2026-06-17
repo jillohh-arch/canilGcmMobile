@@ -15,15 +15,27 @@ class ShiftGroupService {
   }
 
   Future<ShiftAssignmentModel?> getUserShiftAssignment(String userId) async {
-    final snapshot = await _db
+    final byUserId = await _db
         .collection('user_shift_assignments')
         .where('userId', isEqualTo: userId)
         .where('active', isEqualTo: true)
         .limit(1)
         .get();
 
-    if (snapshot.docs.isEmpty) return null;
-    final doc = snapshot.docs.first;
+    if (byUserId.docs.isNotEmpty) {
+      final doc = byUserId.docs.first;
+      return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+    }
+
+    final byUserRa = await _db
+        .collection('user_shift_assignments')
+        .where('user_ra', isEqualTo: userId)
+        .where('active', isEqualTo: true)
+        .limit(1)
+        .get();
+
+    if (byUserRa.docs.isEmpty) return null;
+    final doc = byUserRa.docs.first;
     return ShiftAssignmentModel.fromJson(doc.id, doc.data());
   }
 
@@ -33,7 +45,6 @@ class ShiftGroupService {
     return getShiftGroup(assignment.shiftGroupId);
   }
 
-  /// Returns the user's shift info enriched from both assignment and group data
   Future<UserShiftInfo?> getUserShiftInfo(String userId) async {
     final assignment = await getUserShiftAssignment(userId);
     if (assignment == null) return null;
@@ -41,14 +52,7 @@ class ShiftGroupService {
     final group = await getShiftGroup(assignment.shiftGroupId);
     if (group == null) return null;
 
-    return UserShiftInfo(
-      groupId: group.id,
-      groupName: group.name,
-      groupType: group.type,
-      expectedStartHour: group.expectedStartHour,
-      expectedEndHour: group.expectedEndHour,
-      rotationOffset: assignment.rotationOffset,
-    );
+    return UserShiftInfo(assignment: assignment, group: group);
   }
 
   Stream<ShiftAssignmentModel?> watchUserShiftAssignment(String userId) {
@@ -58,70 +62,52 @@ class ShiftGroupService {
         .where('active', isEqualTo: true)
         .limit(1)
         .snapshots()
-        .map((snapshot) {
-      if (snapshot.docs.isEmpty) return null;
-      return ShiftAssignmentModel.fromJson(
-        snapshot.docs.first.id,
-        snapshot.docs.first.data(),
-      );
+        .asyncMap((snapshot) async {
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+      }
+
+      final fallback = await _db
+          .collection('user_shift_assignments')
+          .where('user_ra', isEqualTo: userId)
+          .where('active', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (fallback.docs.isEmpty) return null;
+      final doc = fallback.docs.first;
+      return ShiftAssignmentModel.fromJson(doc.id, doc.data());
     });
   }
 }
 
-/// Enriched shift info combining assignment + group data
 class UserShiftInfo {
-  final String groupId;
-  final String groupName;
-  final String groupType;
-  final int expectedStartHour;
-  final int expectedEndHour;
-  final int rotationOffset;
+  final ShiftAssignmentModel assignment;
+  final ShiftGroupModel group;
 
   UserShiftInfo({
-    required this.groupId,
-    required this.groupName,
-    required this.groupType,
-    required this.expectedStartHour,
-    required this.expectedEndHour,
-    required this.rotationOffset,
+    required this.assignment,
+    required this.group,
   });
 
-  String get scheduleDisplay {
-    final start = expectedStartHour.toString().padLeft(2, '0');
-    final end = expectedEndHour.toString().padLeft(2, '0');
-    return '$start:00 - $end:00';
-  }
+  String get groupId => group.id;
+  String get groupName => group.name;
+  String get groupType => group.type;
+  int get expectedStartHour => group.expectedStartHour;
+  int get expectedEndHour => group.expectedEndHour;
+  String get scheduleDisplay => group.scheduleDisplay;
 
-  /// Returns true if current time is within expected shift hours
   bool isWithinShiftHours() {
-    final now = DateTime.now();
-    final currentHour = now.hour;
-
-    if (expectedStartHour < expectedEndHour) {
-      // Normal day shift (e.g., 7-19)
-      return currentHour >= expectedStartHour && currentHour < expectedEndHour;
-    } else {
-      // Overnight shift (e.g., 19-7)
-      return currentHour >= expectedStartHour || currentHour < expectedEndHour;
-    }
+    return group.isOnDutyAt(DateTime.now());
   }
 
-  /// Returns true if it's time to start shift (passed expected start by more than 30 min)
   bool shouldStartShift({int graceMinutes = 30}) {
     final now = DateTime.now();
-    final currentHour = now.hour;
-    final currentMinute = now.minute;
+    final window = group.expectedWindowForDate(now);
+    if (window == null) return false;
 
-    // Check if we're past the expected start time + grace period
-    if (currentHour > expectedStartHour) return true;
-    if (currentHour == expectedStartHour && currentMinute > graceMinutes) return true;
-
-    // For overnight shifts, also check if we're close to the end
-    if (expectedStartHour > expectedEndHour) {
-      // We're in the "next day" part of overnight
-      if (currentHour < expectedEndHour) return true;
-    }
-
-    return false;
+    final reminderTime = window.start.add(Duration(minutes: graceMinutes));
+    return now.isAfter(reminderTime) && now.isBefore(window.end);
   }
 }

@@ -17,7 +17,10 @@ enum NotificationType {
   trainingPromotionRequested,
   trainingPromotionApproved,
   trainingPromotionRejected,
-  trainingBonusMilestoneAvailable;
+  trainingBonusMilestoneAvailable,
+  shiftStartReminder,
+  shiftEndReminder,
+  shiftOverdueReminder;
 
   String toMap() => switch (this) {
     vehicleCrewInvitation => 'vehicle_crew_invitation',
@@ -37,6 +40,9 @@ enum NotificationType {
     trainingPromotionApproved => 'training_promotion_approved',
     trainingPromotionRejected => 'training_promotion_rejected',
     trainingBonusMilestoneAvailable => 'training_bonus_milestone_available',
+    shiftStartReminder => 'shift_start_reminder',
+    shiftEndReminder => 'shift_end_reminder',
+    shiftOverdueReminder => 'shift_overdue_reminder',
   };
 
   static NotificationType fromMap(String? value) {
@@ -94,6 +100,16 @@ enum NotificationType {
     }
     if (normalized == 'training_bonus_milestone_available') {
       return NotificationType.trainingBonusMilestoneAvailable;
+    }
+    if (normalized == 'shift_start_reminder') {
+      return NotificationType.shiftStartReminder;
+    }
+    if (normalized == 'shift_end_reminder') {
+      return NotificationType.shiftEndReminder;
+    }
+    if (normalized == 'shift_overdue_reminder' ||
+        normalized == 'shift_open_reminder') {
+      return NotificationType.shiftOverdueReminder;
     }
     return NotificationType.signatureRequested;
   }
@@ -257,6 +273,13 @@ class NotificationItem {
     NotificationType.trainingPromotionApproved ||
     NotificationType.trainingPromotionRejected ||
     NotificationType.trainingBonusMilestoneAvailable => true,
+    _ => false,
+  };
+
+  bool get isShiftReminderNotification => switch (type) {
+    NotificationType.shiftStartReminder ||
+    NotificationType.shiftEndReminder ||
+    NotificationType.shiftOverdueReminder => true,
     _ => false,
   };
 

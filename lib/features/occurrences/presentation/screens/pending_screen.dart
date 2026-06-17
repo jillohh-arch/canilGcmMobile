@@ -9,6 +9,8 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/active_occur
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_transition_service.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_log_screen.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_promotion_request_screen.dart';
@@ -372,6 +374,19 @@ class _PendingScreenState extends State<PendingScreen> {
         await _openDogTrainingHistory(notification);
         return;
 
+      case NotificationType.shiftStartReminder:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ShiftAssumptionScreen()),
+        );
+        return;
+
+      case NotificationType.shiftEndReminder:
+      case NotificationType.shiftOverdueReminder:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ActiveShiftDashboardScreen()),
+        );
+        return;
+
       case NotificationType.vehicleCrewInvitation:
       case NotificationType.vehicleCrewInvitationAccepted:
       case NotificationType.vehicleCrewInvitationDeclined:
@@ -509,8 +524,11 @@ class _PendingScreenState extends State<PendingScreen> {
     return switch (item.type) {
       NotificationType.signatureRequested => 0,
       NotificationType.vehicleCrewInvitation => 1,
-      NotificationType.trainingPromotionRequested => 2,
-      _ => 3,
+      NotificationType.shiftEndReminder ||
+      NotificationType.shiftOverdueReminder => 2,
+      NotificationType.shiftStartReminder => 3,
+      NotificationType.trainingPromotionRequested => 4,
+      _ => 5,
     };
   }
 }
@@ -853,6 +871,9 @@ class _NotificationCard extends StatelessWidget {
         Icons.assignment_late_rounded,
       NotificationType.trainingBonusMilestoneAvailable =>
         Icons.add_task_rounded,
+      NotificationType.shiftStartReminder => Icons.login_rounded,
+      NotificationType.shiftEndReminder => Icons.logout_rounded,
+      NotificationType.shiftOverdueReminder => Icons.timer_off_rounded,
     };
   }
 
@@ -862,6 +883,9 @@ class _NotificationCard extends StatelessWidget {
         NotificationType.signatureRequested => AppTheme.error,
         NotificationType.vehicleCrewInvitation => AppTheme.warning,
         NotificationType.trainingPromotionRequested => AppTheme.primary,
+        NotificationType.shiftStartReminder ||
+        NotificationType.shiftEndReminder ||
+        NotificationType.shiftOverdueReminder => AppTheme.warning,
         _ => AppTheme.warning,
       };
     }
@@ -876,6 +900,7 @@ class _NotificationCard extends StatelessWidget {
       NotificationType.vehicleCrewInvitationDeclined ||
       NotificationType.occurrenceParticipationDeclined => AppTheme.error,
       NotificationType.trainingBonusMilestoneAvailable => AppTheme.warning,
+      NotificationType.shiftOverdueReminder => AppTheme.warning,
       _ => AppTheme.primary,
     };
   }
@@ -904,6 +929,9 @@ class _NotificationCard extends StatelessWidget {
       NotificationType.trainingPromotionRejected => 'Evolucao reprovada',
       NotificationType.trainingBonusMilestoneAvailable =>
         'Marco-bonus disponivel',
+      NotificationType.shiftStartReminder => 'Assumir turno',
+      NotificationType.shiftEndReminder => 'Encerrar turno',
+      NotificationType.shiftOverdueReminder => 'Turno em atraso',
     };
   }
 
@@ -920,6 +948,12 @@ class _NotificationCard extends StatelessWidget {
       ),
       NotificationType.trainingBonusMilestoneAvailable =>
         'Novo marco-bonus disponivel para treino.',
+      NotificationType.shiftStartReminder =>
+        'Seu plantao esta perto de iniciar. Abra o app para assumir o turno.',
+      NotificationType.shiftEndReminder =>
+        'O horario previsto terminou. Encerre o turno quando o trabalho operacional permitir.',
+      NotificationType.shiftOverdueReminder =>
+        'O turno segue aberto alem do horario previsto.',
       NotificationType.vehicleCrewInvitation =>
         'Voce recebeu um convite para compor a guarnicao.',
       NotificationType.vehicleCrewInvitationAccepted =>
@@ -969,6 +1003,9 @@ class _NotificationCard extends StatelessWidget {
       NotificationType.trainingPromotionApproved ||
       NotificationType.trainingPromotionRejected ||
       NotificationType.trainingBonusMilestoneAvailable => 'Ver historico',
+      NotificationType.shiftStartReminder => 'Assumir turno',
+      NotificationType.shiftEndReminder ||
+      NotificationType.shiftOverdueReminder => 'Abrir turno',
       NotificationType.occurrenceParticipationRequested => 'Revisar',
       NotificationType.occurrenceParticipationAccepted ||
       NotificationType.occurrenceParticipationDeclined => 'Ver equipe',
@@ -1006,6 +1043,12 @@ class _NotificationCard extends StatelessWidget {
       }
       if (requestId != null) values.add('REQ $requestId');
       if (values.isEmpty && title.isNotEmpty) values.add(title);
+      return values;
+    }
+    if (notification.isShiftReminderNotification) {
+      if (title.isNotEmpty) values.add(title);
+      final extra = notification.additionalData?.trim();
+      if (extra != null && extra.isNotEmpty) values.add('PLANTAO $extra');
       return values;
     }
     if (title.isNotEmpty) values.add(title);
