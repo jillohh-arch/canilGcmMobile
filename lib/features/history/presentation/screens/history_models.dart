@@ -507,17 +507,68 @@ class RecordDetail {
         _parseAuditTimestamp(raw['created_at']) ??
         fallbackTime;
 
-    final label = switch (action) {
-      'created' => 'Criado por',
-      'updated' when fieldName.isNotEmpty => 'Alterou $fieldName por',
-      'updated' => 'Editado por',
-      'finalized' => 'Finalizado por',
-      'deleted' => 'Excluído por',
-      'restored' => 'Restaurado por',
-      _ => action.isEmpty ? 'Registrado por' : '$action por',
-    };
+    final label = _auditActionLabel(action, fieldName);
 
     return AuditEvent(timestamp: timestamp, action: label, user: user);
+  }
+
+  static String _auditActionLabel(String action, String fieldName) {
+    final fieldLabel = _auditFieldLabel(fieldName);
+    return switch (action) {
+      'created' => 'Criado por',
+      'updated' when fieldLabel.isNotEmpty => 'Alterou $fieldLabel por',
+      'updated' => 'Editado por',
+      'finalized' => 'Finalizado por',
+      'finalized_with_pending' => 'Finalizado com pendência por',
+      'closed_for_signatures' => 'Enviado para assinatura por',
+      'signature_added' => 'Assinatura registrada por',
+      'signature_completed' => 'Assinaturas concluídas por',
+      'correction_requested' => 'Correção solicitada por',
+      'ai_draft_generated' => 'Relato por IA gerado por',
+      'event_created' => 'Evento registrado por',
+      'event_updated' when fieldLabel.isNotEmpty =>
+        'Ajustou $fieldLabel do evento por',
+      'event_updated' => 'Evento ajustado por',
+      'event_deleted' => 'Evento arquivado por',
+      'deleted' => 'Arquivado por',
+      'restored' => 'Restaurado por',
+      _ => action.isEmpty ? 'Registrado por' : 'Registro atualizado por',
+    };
+  }
+
+  static String _auditFieldLabel(String fieldName) {
+    if (fieldName.isEmpty) return '';
+    final normalized = fieldName
+        .split('.')
+        .where((part) => !_looksLikeGeneratedId(part))
+        .lastOrNull;
+    final key = normalized ?? fieldName;
+    return switch (key) {
+      'duration_so_far' => 'duração da ocorrência',
+      'final_report' => 'relato institucional',
+      'finalization_photos' => 'fotos de finalização',
+      'finalization_photo_hashes' => 'metadados das fotos',
+      'location_address' => 'endereço',
+      'place_label' => 'local do evento',
+      'gps_lat' || 'gps_lng' || 'gps_accuracy' => 'coordenada GPS',
+      'photo_urls' || 'photo_metadata' => 'mídias',
+      'results' => 'resultado',
+      'details' => 'detalhes',
+      'team' => 'equipe',
+      'signature_deadline' => 'prazo de assinatura',
+      'signature_round' => 'rodada de assinatura',
+      'participation_status' => 'ciência da guarnição',
+      'description' => 'descrição',
+      'title' => 'título',
+      'category' => 'tipo',
+      'timestamp' => 'horário',
+      _ => '',
+    };
+  }
+
+  static bool _looksLikeGeneratedId(String value) {
+    if (value.length < 12) return false;
+    return RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value);
   }
 
   static DateTime? _parseAuditTimestamp(dynamic value) {

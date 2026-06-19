@@ -382,13 +382,17 @@ class OccurrenceFinalizationService {
       payload['pending_handler_ids'] = _stringArray(
         occurrence.pendingHandlerIds,
       );
-      payload['signature_round'] = occurrence.signatureRound;
+      payload['signature_round'] = _signatureRoundForHash(occurrence);
       payload['participations'] = sortedParticipations
           .map((participation) => participation.toHashPayload())
           .toList();
       payload['correction_requests'] = correctionPayload;
     }
     return payload;
+  }
+
+  static int _signatureRoundForHash(Occurrence occurrence) {
+    return occurrence.signatureRound > 0 ? occurrence.signatureRound : 1;
   }
 
   Future<List<OccurrenceParticipation>> _loadParticipations(
