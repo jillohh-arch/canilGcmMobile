@@ -67,11 +67,14 @@ class OccurrenceLocationService {
       final cluster = clusters[i];
       // Usar place_label do primeiro evento do cluster se disponível
       final existingLabel = cluster.events
-          .where((e) => e.placeLabel != null && e.placeLabel!.isNotEmpty)
-          .map((e) => e.placeLabel!)
+          .map((e) => _usableLabel(e.placeLabel))
+          .whereType<String>()
           .firstOrNull;
-      final label =
+      final resolvedLabel =
           existingLabel ?? await _resolveLabel(cluster.lat, cluster.lng);
+      final label =
+          _usableLabel(resolvedLabel) ??
+          'Local ${i + 1} - endereço não identificado';
       locations.add(
         OccurrenceLocation(
           index: i + 1,
@@ -123,14 +126,14 @@ class OccurrenceLocationService {
       final cluster = entry.value;
       // Usar place_label do primeiro evento do cluster se disponível
       final existingLabel = cluster.events
-          .where((e) => e.placeLabel != null && e.placeLabel!.isNotEmpty)
-          .map((e) => e.placeLabel!)
+          .map((e) => _usableLabel(e.placeLabel))
+          .whereType<String>()
           .firstOrNull;
       return OccurrenceLocation(
         index: i + 1,
         lat: cluster.lat,
         lng: cluster.lng,
-        label: existingLabel ?? 'Local ${i + 1}',
+        label: existingLabel ?? 'Local ${i + 1} - endereço não identificado',
         arrivedAt: cluster.events.first.timestamp,
         events: cluster.events,
       );
@@ -143,21 +146,19 @@ class OccurrenceLocationService {
       final placemarks = await placemarkFromCoordinates(lat, lng);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        // Prioridade: nome do local > rua > bairro
-        if (p.name != null && p.name!.isNotEmpty && p.name != p.postalCode) {
-          return p.name!;
-        }
+        final name = _usableLabel(p.name == p.postalCode ? null : p.name);
+        final street = _usableLabel(p.thoroughfare);
+        final neighborhood = _usableLabel(
+          p.subLocality ?? p.subAdministrativeArea,
+        );
+        final locality = _usableLabel(p.locality);
+
         final parts = <String>[];
-        if (p.thoroughfare != null && p.thoroughfare!.isNotEmpty) {
-          parts.add(p.thoroughfare!);
-        }
-        if (p.subLocality != null && p.subLocality!.isNotEmpty) {
-          parts.add(p.subLocality!);
-        }
+        if (street != null) parts.add(street);
+        if (neighborhood != null) parts.add(neighborhood);
         if (parts.isNotEmpty) return parts.join(', ');
-        if (p.locality != null && p.locality!.isNotEmpty) {
-          return p.locality!;
-        }
+        if (name != null) return name;
+        if (locality != null) return locality;
       }
     } catch (_) {
       // Fallback silencioso
@@ -183,6 +184,18 @@ class OccurrenceLocationService {
   }
 
   static double _toRad(double deg) => deg * pi / 180;
+
+  static String? _usableLabel(String? value) {
+    final label = value?.trim();
+    if (label == null || label.isEmpty) return null;
+    if (label.toLowerCase() == 'local') return null;
+    if (RegExp(r'^\d+([a-zA-Z])?$').hasMatch(label)) return null;
+    if (RegExp(r'^\d{2,}[-\s]?\d*$').hasMatch(label)) return null;
+    if (RegExp(r'^-?\d+([.,]\d+)?\s*,\s*-?\d+([.,]\d+)?$').hasMatch(label)) {
+      return null;
+    }
+    return label;
+  }
 }
 
 class _Cluster {

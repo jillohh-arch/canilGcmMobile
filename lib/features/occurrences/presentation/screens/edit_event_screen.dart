@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
@@ -49,10 +51,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final List<String> _removedPhotoUrls = [];
 
   bool _isSaving = false;
+  String? _saveStatus;
   bool _auditExpanded = false;
   double? _gpsLat;
   double? _gpsLng;
   String? _gpsAddress;
+  String? _locationSource;
   bool _isUpdatingGps = false;
 
   bool get _isEditing => widget.existingEvent != null;
@@ -92,6 +96,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
       }
       _gpsLat = e.gpsLat;
       _gpsLng = e.gpsLng;
+      _gpsAddress = e.placeLabel;
+      _locationSource = e.locationSource;
       _selectedTimeChip = -1;
       _resolveExistingGpsAddress();
     } else {
@@ -103,6 +109,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   Future<void> _resolveExistingGpsAddress() async {
     if (_gpsLat == null || _gpsLng == null) return;
+    if (_gpsAddress?.trim().isNotEmpty == true) return;
     try {
       final address = await _locationService.addressForPoint(
         LatLng(_gpsLat!, _gpsLng!),
@@ -137,6 +144,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
           setState(() {
             _gpsLat = refreshed.gpsLat;
             _gpsLng = refreshed.gpsLng;
+            _gpsAddress = refreshed.placeLabel;
+            _locationSource = refreshed.locationSource;
           });
           _resolveExistingGpsAddress();
         }
@@ -151,6 +160,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         title: _titleController.text,
         gpsLat: _gpsLat,
         gpsLng: _gpsLng,
+        placeLabel: _gpsAddress,
+        locationSource: _locationSource,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -171,6 +182,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
           _gpsLat = result.lat;
           _gpsLng = result.lng;
           _gpsAddress = result.label;
+          _locationSource = result.source;
         });
       }
     }
@@ -237,6 +249,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _gpsLat = loc.point.latitude;
         _gpsLng = loc.point.longitude;
         _gpsAddress = loc.address;
+        _locationSource = 'gps_atual';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -407,30 +420,37 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
+
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Título é obrigatório', style: GoogleFonts.inter()),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
+      AppFeedback.warning(
+        context,
+        'Informe um título para registrar o evento.',
+        title: 'Campo obrigatório',
       );
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveStatus = _newPhotos.isNotEmpty
+          ? 'Preparando fotos...'
+          : 'Salvando evento...';
+    });
     HapticFeedback.mediumImpact();
 
     try {
       final uploadResults = await _uploadNewPhotos();
       final newUrls = uploadResults.map((r) => r.url).toList();
-      // Adicionar novos hashes ao mapa
       for (final r in uploadResults) {
         _photoHashMap[r.url] = r.sha256Hash;
       }
       final allPhotoUrls = [..._existingPhotoUrls, ...newUrls];
 
+      if (mounted) {
+        setState(() => _saveStatus = 'Salvando evento...');
+      }
       if (_isEditing) {
         await _updateEvent(allPhotoUrls);
       } else {
@@ -440,26 +460,46 @@ class _EditEventScreenState extends State<EditEventScreen> {
       if (mounted) Navigator.of(context).pop('saved');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao salvar: $e'),
-            backgroundColor: AppTheme.error,
-          ),
+        AppFeedback.error(
+          context,
+          e,
+          fallback:
+              'Não foi possível salvar o evento. Verifique a conexão e tente novamente.',
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveStatus = null;
+        });
+      }
     }
   }
 
   Future<List<UploadResult>> _uploadNewPhotos() async {
     final results = <UploadResult>[];
-    for (final file in _newPhotos) {
-      final result = await _storageService.uploadImageWithHash(
-        file,
-        'occurrences/${widget.occurrenceId}/events',
-      );
-      if (result != null) results.add(result);
+    for (var i = 0; i < _newPhotos.length; i++) {
+      if (mounted) {
+        setState(
+          () => _saveStatus = 'Enviando foto ${i + 1}/${_newPhotos.length}...',
+        );
+      }
+      final result = await _storageService
+          .uploadImageWithHash(
+            _newPhotos[i],
+            'occurrences/${widget.occurrenceId}/events',
+          )
+          .timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw TimeoutException(
+              'Tempo excedido ao enviar a foto. Verifique o sinal e tente novamente.',
+            ),
+          );
+      if (result == null) {
+        throw StateError('A foto ${i + 1} não foi enviada. Tente novamente.');
+      }
+      results.add(result);
     }
     return results;
   }
@@ -476,6 +516,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         final loc = await _locationService.currentHighAccuracy();
         _gpsLat = loc.point.latitude;
         _gpsLng = loc.point.longitude;
+        _gpsAddress = loc.address;
+        _locationSource = 'gps_atual';
       } catch (_) {}
     }
 
@@ -496,6 +538,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
           : null,
       gpsLat: _gpsLat,
       gpsLng: _gpsLng,
+      placeLabel: _gpsAddress,
+      locationSource: _locationSource,
       createdAt: now,
       updatedAt: now,
     );
@@ -535,6 +579,16 @@ class _EditEventScreenState extends State<EditEventScreen> {
       updates['gps_lat'] = _gpsLat;
       updates['gps_lng'] = _gpsLng;
     }
+    if ((_gpsAddress ?? '').trim() != (e.placeLabel ?? '').trim()) {
+      updates['place_label'] = _gpsAddress?.trim().isNotEmpty == true
+          ? _gpsAddress!.trim()
+          : null;
+    }
+    if ((_locationSource ?? '').trim() != (e.locationSource ?? '').trim()) {
+      updates['location_source'] = _locationSource?.trim().isNotEmpty == true
+          ? _locationSource!.trim()
+          : null;
+    }
 
     if (updates.isNotEmpty) {
       await vm.updateEvent(widget.occurrenceId, e.id, updates);
@@ -544,7 +598,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
   List<Map<String, dynamic>> _buildPhotoMetadata(List<String> photoUrls) {
     return photoUrls.map((url) {
       final hash = _photoHashMap[url];
-      return {'url': url, 'type': 'image', 'sha256': ?hash};
+      return {
+        'url': url,
+        'type': 'image',
+        if (hash != null && hash.isNotEmpty) 'sha256': hash,
+      };
     }).toList();
   }
 
@@ -1141,13 +1199,32 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           ),
           child: _isSaving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppTheme.textPrimary,
-                  ),
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        _saveStatus ?? 'Salvando evento...',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
                 )
               : Text(
                   'SALVAR EVENTO',

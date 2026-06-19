@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/dogs/data/dog_specialty_service.dart';
@@ -140,15 +141,9 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
     if (_isSaving) return;
 
     if (_hasDivergence && _obsController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Observações/Justificativa obrigatória devido à divergência entre a recomendação automática e a decisão manual.',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppFeedback.warning(
+        context,
+        'Informe a justificativa para registrar uma decisão diferente da recomendação automática.',
       );
       return;
     }
@@ -272,29 +267,15 @@ class _DetectionTriagemScreenState extends State<DetectionTriagemScreen> {
 
       if (mounted) {
         HapticFeedback.heavyImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Avaliação de triagem salva com sucesso!',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppFeedback.success(context, 'Avaliação de triagem salva com sucesso.');
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Erro ao salvar avaliação: $e',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
+        AppFeedback.error(
+          context,
+          e,
+          fallback: 'Não foi possível salvar a avaliação de triagem.',
         );
       }
     } finally {

@@ -4528,9 +4528,10 @@ export const respondVehicleCrewInvitation = onCall({region}, async (request) => 
   });
 });
 
-const OCCURRENCE_AI_PROMPT_VERSION = "occurrence-final-report-v1";
+const OCCURRENCE_AI_PROMPT_VERSION = "occurrence-final-report-v2";
 const OCCURRENCE_AI_FALLBACK_MODEL = "local_occurrence_template_v1";
 const OCCURRENCE_AI_MAX_EVENTS = 40;
+const OCCURRENCE_AI_TIME_ZONE = "America/Sao_Paulo";
 
 interface OccurrenceAiContext {
   occurrenceId: string;
@@ -4538,6 +4539,12 @@ interface OccurrenceAiContext {
   events: JsonMap[];
   rawReport: string;
   caller: CallerIdentity;
+  handlerRa: string;
+  handlerName: string;
+  dogName: string;
+  vehicleLabel: string;
+  locationAddress: string;
+  startedAtDisplay: string;
 }
 
 interface OccurrenceAiDraft {
@@ -4566,26 +4573,189 @@ function occurrenceAiEnv(name: string): string | undefined {
   return stringValue(env[name]);
 }
 
-function occurrenceAiTimestamp(value: unknown): string | null {
-  if (value instanceof admin.firestore.Timestamp) return value.toDate().toISOString();
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+function occurrenceAiDate(value: unknown): Date | null {
+  if (value instanceof admin.firestore.Timestamp) return value.toDate();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
   if (typeof value === "string" && value.trim().length > 0) {
     const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-    return value.trim();
+    if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return null;
 }
 
+function occurrenceAiTimestamp(value: unknown): string | null {
+  const date = occurrenceAiDate(value);
+  if (date) return date.toISOString();
+  return stringValue(value) ?? null;
+}
+
+function occurrenceAiDisplayDateTime(value: unknown): string {
+  const date = occurrenceAiDate(value);
+  if (!date) return stringValue(value) ?? "data e horário não informados";
+  const day = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: OCCURRENCE_AI_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: OCCURRENCE_AI_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+  return `${day}, às ${time}`;
+}
+
+function occurrenceAiDisplayTime(value: unknown): string {
+  const date = occurrenceAiDate(value);
+  if (!date) return stringValue(value) ?? "horário não registrado";
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: OCCURRENCE_AI_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function occurrenceAiCategoryLabel(category: string | undefined): string {
+  switch (category) {
+  case "opening":
+    return "Início da ocorrência";
+  case "arrival":
+    return "Chegada ao local";
+  case "approach":
+    return "Abordagem";
+  case "dog_work":
+    return "Emprego do cão";
+  case "positive_indication":
+    return "Indicação positiva";
+  case "seizure":
+    return "Apreensão";
+  case "closure":
+    return "Encerramento";
+  default:
+    return "Registro operacional";
+  }
+}
+
+function occurrenceAiFirstString(values: unknown[]): string | null {
+  for (const value of values) {
+    const parsed = stringValue(value);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+function occurrenceAiTeamMembers(occurrence: JsonMap): JsonMap[] {
+  const raw = occurrence.team;
+  if (Array.isArray(raw)) return raw.filter(isPlainObject);
+  if (isPlainObject(raw)) {
+    const conductors = raw.conductors;
+    const members = Array.isArray(conductors) ? conductors.filter(isPlainObject) : [];
+    const serviceDog = raw.service_dog;
+    if (isPlainObject(serviceDog)) members.push(serviceDog);
+    return members;
+  }
+  return [];
+}
+
+function occurrenceAiHandlerNameFromTeam(occurrence: JsonMap, handlerRa: string): string | null {
+  const normalizedRa = handlerRa.trim();
+  for (const member of occurrenceAiTeamMembers(occurrence)) {
+    const memberRa = occurrenceAiFirstString([
+      member.handler_id,
+      member.handlerId,
+      member.handler_ra,
+      member.ra,
+    ]);
+    if (memberRa !== normalizedRa) continue;
+    return occurrenceAiFirstString([
+      member.display_name,
+      member.displayName,
+      member.handler_name,
+      member.name,
+    ]);
+  }
+  return null;
+}
+
+function occurrenceAiDogNameFromTeam(occurrence: JsonMap): string | null {
+  for (const member of occurrenceAiTeamMembers(occurrence)) {
+    const dogName = occurrenceAiFirstString([
+      member.dog_name,
+      member.dogName,
+      member.name,
+    ]);
+    if (dogName) return dogName;
+  }
+  return null;
+}
+
+async function occurrenceAiResolvedFields(
+  occurrence: JsonMap,
+  caller: CallerIdentity,
+): Promise<Omit<OccurrenceAiContext, "occurrenceId" | "occurrence" | "events" | "rawReport" | "caller">> {
+  const handlerRa = occurrenceAiFirstString([occurrence.primary_handler_ra, caller.ra]) ?? caller.ra;
+  const dogId = occurrenceAiFirstString([occurrence.service_dog_id, occurrence.dog_id]) ?? "";
+
+  let userData: JsonMap = {};
+  if (handlerRa) {
+    const userSnap = await db.collection("users").doc(handlerRa).get();
+    if (userSnap.exists) userData = userSnap.data() ?? {};
+  }
+
+  let dogData: JsonMap = {};
+  if (dogId) {
+    const dogSnap = await db.collection("dogs").doc(dogId).get();
+    if (dogSnap.exists) dogData = dogSnap.data() ?? {};
+  }
+
+  const handlerName = occurrenceAiFirstString([
+    occurrenceAiHandlerNameFromTeam(occurrence, handlerRa),
+    userData.callsign,
+    userData.callSign,
+    userData.name,
+    userData.full_name,
+    caller.name,
+  ]) ?? handlerRa;
+
+  const dogName = occurrenceAiFirstString([
+    occurrenceAiDogNameFromTeam(occurrence),
+    dogData.name,
+    dogData.dog_name,
+  ]) ?? "cão de serviço não informado";
+
+  return {
+    handlerRa,
+    handlerName,
+    dogName,
+    vehicleLabel: occurrenceAiFirstString([
+      occurrence.vehicle_label,
+      occurrence.vehicle_prefix,
+      occurrence.vehicle_id,
+    ]) ?? "viatura não informada",
+    locationAddress: occurrenceAiFirstString([occurrence.location_address]) ?? "local não informado",
+    startedAtDisplay: occurrenceAiDisplayDateTime(occurrence.started_at),
+  };
+}
+
 function occurrenceAiEvent(doc: admin.firestore.QueryDocumentSnapshot): JsonMap {
   const data = doc.data();
+  const category = stringValue(data.category) ?? "other";
+  const title = occurrenceAiFirstString([
+    data.title,
+    occurrenceAiCategoryLabel(category),
+  ]) ?? "Registro operacional";
   return {
     id: doc.id,
-    category: stringValue(data.category) ?? "other",
-    title: stringValue(data.title) ?? "",
+    category,
+    title,
     description: stringValue(data.description) ?? "",
     place_label: stringValue(data.place_label) ?? "",
     timestamp: occurrenceAiTimestamp(data.timestamp),
+    timestamp_display: occurrenceAiDisplayDateTime(data.timestamp),
+    time_display: occurrenceAiDisplayTime(data.timestamp),
     gps_lat: optionalNumberValue(data.gps_lat),
     gps_lng: optionalNumberValue(data.gps_lng),
     photo_count: Array.isArray(data.photo_urls) ? data.photo_urls.length : 0,
@@ -4599,52 +4769,67 @@ function occurrenceAiSourceSummary(context: OccurrenceAiContext): JsonMap {
     type_name: stringValue(occurrence.type_name) ?? "",
     status: stringValue(occurrence.status) ?? "",
     started_at: occurrenceAiTimestamp(occurrence.started_at),
-    location_address: stringValue(occurrence.location_address) ?? "",
-    vehicle: stringValue(occurrence.vehicle_label) ??
-      stringValue(occurrence.vehicle_prefix) ??
-      "",
-    dog_id: stringValue(occurrence.service_dog_id) ??
-      stringValue(occurrence.dog_id) ??
-      "",
-    primary_handler_ra: stringValue(occurrence.primary_handler_ra) ?? "",
+    started_at_display: context.startedAtDisplay,
+    location_address: context.locationAddress,
+    vehicle: context.vehicleLabel,
+    dog_name: context.dogName,
+    primary_handler_ra: context.handlerRa,
+    primary_handler_name: context.handlerName,
     event_count: context.events.length,
     raw_report_chars: context.rawReport.length,
   };
 }
 
+function occurrenceAiNarrativeContext(context: OccurrenceAiContext): JsonMap {
+  const occurrence = context.occurrence;
+  return {
+    natureza: stringValue(occurrence.type_name) ?? "natureza não informada",
+    data_hora_inicio: context.startedAtDisplay,
+    local: context.locationAddress,
+    viatura_apoio: context.vehicleLabel,
+    condutor: {
+      nome_operacional: context.handlerName,
+      ra: context.handlerRa,
+    },
+    cao_servico: context.dogName,
+    relato_bruto_condutor: context.rawReport,
+    linha_do_tempo: context.events.map((event, index) => ({
+      ordem: index + 1,
+      horario: stringValue(event.time_display) ?? "horário não registrado",
+      data_hora: stringValue(event.timestamp_display) ?? "",
+      evento: stringValue(event.title) ?? "Registro operacional",
+      descricao: stringValue(event.description) ?? "",
+      local: stringValue(event.place_label) ?? "",
+      midias: event.photo_count ?? 0,
+    })),
+  };
+}
+
 function occurrenceAiFallbackDraft(context: OccurrenceAiContext): OccurrenceAiDraft {
   const occurrence = context.occurrence;
-  const typeName = stringValue(occurrence.type_name) ?? "natureza nao informada";
-  const startedAt = occurrenceAiTimestamp(occurrence.started_at) ?? "data e hora nao informadas";
-  const location = stringValue(occurrence.location_address) ?? "local nao informado";
-  const vehicle = stringValue(occurrence.vehicle_label) ??
-    stringValue(occurrence.vehicle_prefix) ??
-    "viatura nao informada";
-  const dogId = stringValue(occurrence.service_dog_id) ??
-    stringValue(occurrence.dog_id) ??
-    "cao nao informado";
+  const typeName = stringValue(occurrence.type_name) ?? "natureza não informada";
   const eventLines = context.events
-    .slice(0, 12)
+    .slice(0, 10)
     .map((event, index) => {
-      const stamp = stringValue(event.timestamp) ?? "horario nao registrado";
-      const title = stringValue(event.title) ?? stringValue(event.category) ?? "evento";
+      const stamp = stringValue(event.time_display) ?? "horário não registrado";
+      const title = stringValue(event.title) ?? "registro operacional";
       const description = stringValue(event.description);
-      return `${index + 1}. ${stamp} - ${title}${description ? `: ${description}` : ""}`;
+      return `${index + 1}. Às ${stamp}, ${title.toLowerCase()}${description ? `: ${description}` : "."}`;
     });
   const timelineText = eventLines.length > 0 ?
-    `\n\nLinha do tempo registrada:\n${eventLines.join("\n")}` :
+    `\n\nNa linha do tempo do atendimento, constam os seguintes registros principais:\n${eventLines.join("\n")}` :
     "";
   const draftText = [
-    `Em ${startedAt}, a equipe K9 registrou atendimento de ${typeName}, no local ${location}, com apoio da ${vehicle} e cao de servico ${dogId}.`,
+    `No dia ${context.startedAtDisplay}, a equipe K9 registrou atendimento de ${typeName}, no local ${context.locationAddress}. O registro teve como responsável o GCM ${context.handlerName} (RA ${context.handlerRa}), com apoio da ${context.vehicleLabel} e emprego do cão de serviço ${context.dogName}.`,
     `Conforme relato do condutor, ${context.rawReport}`,
     timelineText.trim().length > 0 ? timelineText : "",
-    "O presente relato consolida os dados operacionais registrados no sistema, preservando a sequencia cronologica dos eventos e a necessidade de revisao final pelo responsavel antes do fechamento da ocorrencia.",
+    "O presente relato consolida os dados operacionais registrados no sistema e deve ser revisado pelo responsável antes do fechamento definitivo da ocorrência.",
   ].filter((line) => line.trim().length > 0).join("\n\n");
 
   return {
     draftText,
     attentionPoints: [
-      "Minuta local gerada porque a IA generativa nao esta configurada ou ficou indisponivel.",
+      "Minuta local gerada porque a IA generativa não está configurada ou ficou indisponível.",
       "Revise datas, local, resultados e encaminhamentos antes de finalizar.",
     ],
     sourceSummary: occurrenceAiSourceSummary(context),
@@ -4655,22 +4840,22 @@ function occurrenceAiFallbackDraft(context: OccurrenceAiContext): OccurrenceAiDr
 
 function occurrenceAiPrompt(context: OccurrenceAiContext): string {
   return [
-    "Voce auxilia a GCM na redacao institucional de uma ocorrencia K9.",
+    "Você auxilia a GCM na redação institucional de uma ocorrência K9.",
     "Regras obrigatorias:",
-    "- Nao invente fatos, qualificacoes criminais, nomes, quantidades ou encaminhamentos.",
+    "- Não invente fatos, qualificações criminais, nomes, quantidades ou encaminhamentos.",
     "- Use apenas o relato bruto e a linha do tempo fornecidos.",
-    "- Organize em linguagem objetiva, cronologica e institucional.",
-    "- Preserve incertezas e lacunas como pontos de atencao.",
-    "- Nao substitua a revisao humana: o condutor precisa revisar antes do fechamento.",
+    "- Organize em linguagem objetiva, cronológica e institucional, como relato operacional da GCM.",
+    "- Use data e horário no formato brasileiro já fornecido no contexto.",
+    "- Use o nome operacional do GCM e o nome do K9 exatamente como fornecidos.",
+    "- Não cite IDs técnicos, caminhos de banco, hashes, nomes de coleção, ISO date cru, latitude ou longitude no texto final.",
+    "- Não transforme a linha do tempo em lista técnica longa; sintetize os principais atos em parágrafos claros.",
+    "- Preserve incertezas e lacunas como pontos de atenção.",
+    "- Não substitua a revisão humana: o condutor precisa revisar antes do fechamento.",
     "",
-    "Retorne somente JSON valido no formato:",
+    "Retorne somente JSON válido no formato:",
     "{\"draft_text\":\"...\",\"attention_points\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
     "",
-    `Contexto: ${JSON.stringify({
-      source: occurrenceAiSourceSummary(context),
-      raw_report: context.rawReport,
-      events: context.events,
-    })}`,
+    `Contexto narrativo: ${JSON.stringify(occurrenceAiNarrativeContext(context))}`,
   ].join("\n");
 }
 
@@ -4778,12 +4963,14 @@ export const generateOccurrenceAiDraft = onCall({region, timeoutSeconds: 60}, as
   const events = eventsSnap.docs
     .filter((doc) => !doc.data().deleted_at)
     .map(occurrenceAiEvent);
+  const resolvedFields = await occurrenceAiResolvedFields(occurrence, caller);
   const context: OccurrenceAiContext = {
     occurrenceId,
     occurrence,
     events,
     rawReport,
     caller,
+    ...resolvedFields,
   };
 
   let draft = occurrenceAiFallbackDraft(context);

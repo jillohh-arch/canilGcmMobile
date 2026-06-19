@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -89,7 +90,10 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     );
   }
 
-  Future<void> _loadLines({String? keepLineType}) async {
+  Future<void> _loadLines({
+    String? keepLineType,
+    bool preserveOnError = false,
+  }) async {
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -115,6 +119,11 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+      if (preserveOnError) {
+        debugPrint('[DetectionFormation] Refresh pós-salvamento falhou: $e');
+        setState(() => _loading = false);
+        return;
+      }
       setState(() {
         _error = 'Falha ao carregar formação: $e';
         _loading = false;
@@ -1542,7 +1551,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         _completionDialogOpen = false;
       });
       _showMessage('Sessão encerrada sem conclusão de fase.');
-      await _loadLines(keepLineType: keepLineType);
+      await _loadLines(keepLineType: keepLineType, preserveOnError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -1590,7 +1599,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
         _selectedOdorBox = null;
         _completionDialogOpen = false;
       });
-      await _loadLines(keepLineType: keepLineType);
+      await _loadLines(keepLineType: keepLineType, preserveOnError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1706,13 +1715,18 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
 
   void _showMessage(String message, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? _red : _panelSoft,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (error) {
+      AppFeedback.show(
+        context,
+        AppFeedbackText.fromError(
+          message,
+          fallback: 'Não foi possível concluir a ação.',
+        ),
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+    AppFeedback.show(context, message, type: AppFeedbackType.info);
   }
 
   _Actor _resolveActor() {

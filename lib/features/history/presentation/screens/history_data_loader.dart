@@ -55,15 +55,13 @@ extension _HistoryDataLoader on _HistoryScreenState {
     WeightHistoryService()
         .getHistory(dogId, limit: 200)
         .then((records) {
-          if (!mounted) return;
-          setState(() => _weightRecords = records);
+          _replaceWeightRecords(records);
           debugPrint(
             '[History] Pesagens canônicas carregadas: ${records.length}',
           );
         })
         .catchError((e) {
-          if (!mounted) return;
-          setState(() => _weightRecords = const []);
+          _replaceWeightRecords(const []);
           debugPrint('[History] ERRO ao carregar pesagens canônicas: $e');
         });
     // Observar ocorrências (stream real-time)

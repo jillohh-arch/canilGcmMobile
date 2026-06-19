@@ -310,13 +310,34 @@ class DetectionService {
     required String handlerId,
     required String handlerName,
   }) async {
+    final lastRep = recorder.repetitions.isNotEmpty
+        ? recorder.repetitions.last
+        : null;
+    final auditTrail = [
+      ...session.auditTrail,
+      _auditEntry(
+        action: 'repetition_autosaved',
+        handlerId: handlerId,
+        handlerName: handlerName,
+        reason: 'Repetição de formação registrada.',
+        metadata: {
+          'phase': phase.code,
+          'total_reps': recorder.totalReps,
+          'current_streak': recorder.currentStreak,
+          if (lastRep != null) 'repetition_order': lastRep.order,
+          if (lastRep != null) 'result': lastRep.resultValue,
+          if (lastRep != null) 'odor_box': lastRep.odorBox,
+          if (lastRep?.direction != null) 'direction': lastRep!.direction,
+        },
+      ),
+    ];
     final updated = _buildSessionFromRecorder(
       session: session,
       phase: phase,
       recorder: recorder,
       status: DetectionFormationStatus.inProgress,
       phaseAdvanced: false,
-      auditTrail: session.auditTrail,
+      auditTrail: auditTrail,
     );
 
     await _sessionsCol(

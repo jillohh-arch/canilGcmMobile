@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:canil_gcm/core/services/pdf_attachment_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/data/dog_profile_service.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
@@ -286,15 +287,15 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
       );
       if (!mounted) return false;
       _refresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Laudo anexado ao prontuário.')),
-      );
+      AppFeedback.success(context, 'Laudo anexado ao prontuário.');
       return true;
     } catch (e) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(
+      AppFeedback.error(
         context,
-      ).showSnackBar(SnackBar(content: Text('Falha ao anexar laudo: $e')));
+        e,
+        fallback: 'Não foi possível anexar o laudo.',
+      );
       return false;
     } finally {
       if (mounted) {
@@ -306,17 +307,13 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   Future<void> _openDocument(_ProntuarioDocumentItem item) async {
     final uri = Uri.tryParse(item.url);
     if (uri == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('URL do documento inválida.')),
-      );
+      AppFeedback.warning(context, 'URL do documento inválida.');
       return;
     }
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!mounted) return;
     if (!opened) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível abrir o documento.')),
-      );
+      AppFeedback.warning(context, 'Não foi possível abrir o documento.');
     }
   }
 }
@@ -1173,15 +1170,10 @@ class _HealthNutritionTabState extends State<_HealthNutritionTab> {
       await _showNutritionInsightSheet(insight);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Falha ao gerar analise nutricional: $e',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 4),
-        ),
+      AppFeedback.error(
+        context,
+        e,
+        fallback: 'Não foi possível gerar a análise nutricional.',
       );
     } finally {
       if (mounted) setState(() => _loadingAi = false);
@@ -3462,11 +3454,10 @@ class _WeightRegistrationSheetState extends State<_WeightRegistrationSheet> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Falha ao registrar pesagem: $e'),
-          backgroundColor: AppTheme.error,
-        ),
+      AppFeedback.error(
+        context,
+        e,
+        fallback: 'Não foi possível registrar a pesagem.',
       );
     } finally {
       if (mounted) setState(() => _saving = false);

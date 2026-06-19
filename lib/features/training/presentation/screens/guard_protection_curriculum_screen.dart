@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/data/training_program_service.dart';
@@ -268,7 +269,7 @@ class _GuardProtectionCurriculumScreenState
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Falha ao salvar marco. $error', AppTheme.error);
+      _showError(error, 'Não foi possível salvar o marco.');
     } finally {
       if (mounted) setState(() => _savingMilestoneIds.remove(milestone.id));
     }
@@ -332,7 +333,7 @@ class _GuardProtectionCurriculumScreenState
       }
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Falha ao solicitar evolução. $error', AppTheme.error);
+      _showError(error, 'Não foi possível solicitar a evolução.');
     } finally {
       if (mounted) setState(() => _requestingPromotion = false);
     }
@@ -367,9 +368,22 @@ class _GuardProtectionCurriculumScreenState
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+    AppFeedback.show(context, message, type: _feedbackTypeFor(color));
+  }
+
+  void _showError(Object error, String fallback) {
+    AppFeedback.error(context, error, fallback: fallback);
+  }
+
+  AppFeedbackType _feedbackTypeFor(Color color) {
+    if (color == AppTheme.success) return AppFeedbackType.success;
+    if (color == AppTheme.error || color == AppTheme.errorStrong) {
+      return AppFeedbackType.error;
+    }
+    if (color == AppTheme.warning || color == AppTheme.warningAccent) {
+      return AppFeedbackType.warning;
+    }
+    return AppFeedbackType.info;
   }
 
   @override

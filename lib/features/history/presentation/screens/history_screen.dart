@@ -86,6 +86,11 @@ class _HistoryScreenState extends State<HistoryScreen>
     super.dispose();
   }
 
+  void _replaceWeightRecords(List<WeightRecord> records) {
+    if (!mounted) return;
+    setState(() => _weightRecords = records);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Recarregar dados quando o app volta do background

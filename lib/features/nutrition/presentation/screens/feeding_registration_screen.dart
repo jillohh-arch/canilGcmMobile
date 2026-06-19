@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
@@ -1067,7 +1068,7 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      _showError('Erro ao salvar: $e');
+      _showError(e, fallback: 'Não foi possível registrar a alimentação.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1113,20 +1114,21 @@ class _FeedingRegistrationScreenState extends State<FeedingRegistrationScreen> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      _showError('Erro ao salvar suplemento: $e');
+      _showError(e, fallback: 'Não foi possível registrar o suplemento.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.inter(fontSize: 12)),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+  void _showError(Object error, {String? fallback}) {
+    if (fallback == null && error is String) {
+      AppFeedback.warning(context, error);
+      return;
+    }
+    AppFeedback.error(
+      context,
+      error,
+      fallback: fallback ?? 'Não foi possível concluir a ação.',
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,9 @@ class UploadResult {
 }
 
 class StorageService {
+  static const Duration _uploadTimeout = Duration(seconds: 75);
+  static const Duration _downloadUrlTimeout = Duration(seconds: 20);
+
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final Uuid _uuid = const Uuid();
 
@@ -59,14 +63,20 @@ class StorageService {
         SettableMetadata(contentType: resolvedMime),
       );
 
-      final TaskSnapshot snapshot = await uploadTask;
+      final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL();
+        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
+          _downloadUrlTimeout,
+        );
         return downloadUrl;
       } else {
         throw Exception('O upload não foi concluído com sucesso.');
       }
+    } on TimeoutException {
+      throw TimeoutException(
+        'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
+      );
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
         debugPrint(
@@ -108,14 +118,20 @@ class StorageService {
         SettableMetadata(contentType: resolvedMime),
       );
 
-      final TaskSnapshot snapshot = await uploadTask;
+      final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL();
+        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
+          _downloadUrlTimeout,
+        );
         return UploadResult(url: downloadUrl, sha256Hash: hash);
       } else {
         throw Exception('O upload não foi concluído com sucesso.');
       }
+    } on TimeoutException {
+      throw TimeoutException(
+        'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
+      );
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
         debugPrint(
@@ -139,9 +155,13 @@ class StorageService {
     if (url.trim().isEmpty) return null;
     try {
       final Reference ref = _storage.refFromURL(url.trim());
-      final bytes = await ref.getData(maxBytes);
+      final bytes = await ref.getData(maxBytes).timeout(_downloadUrlTimeout);
       if (bytes == null) return null;
       return sha256.convert(bytes).toString();
+    } on TimeoutException {
+      throw TimeoutException(
+        'Tempo excedido ao baixar arquivo. Verifique o sinal e tente novamente.',
+      );
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
         debugPrint(
@@ -174,11 +194,15 @@ class StorageService {
         SettableMetadata(contentType: mimeType),
       );
 
-      final TaskSnapshot snapshot = await uploadTask;
+      final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
       if (snapshot.state == TaskState.success) {
-        return snapshot.ref.getDownloadURL();
+        return snapshot.ref.getDownloadURL().timeout(_downloadUrlTimeout);
       }
       throw Exception('O upload não foi concluído com sucesso.');
+    } on TimeoutException {
+      throw TimeoutException(
+        'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
+      );
     } on FirebaseException catch (e) {
       if (e.code == 'object-not-found') {
         debugPrint(
@@ -197,6 +221,16 @@ class StorageService {
   String _extensionFromPath(String path) {
     final parts = path.split('.');
     return parts.length > 1 ? parts.last.toLowerCase() : 'bin';
+  }
+
+  Future<TaskSnapshot> _awaitUpload(UploadTask task) {
+    return task.timeout(
+      _uploadTimeout,
+      onTimeout: () {
+        unawaited(task.cancel());
+        throw TimeoutException('Tempo excedido ao enviar arquivo.');
+      },
+    );
   }
 
   String _mimeTypeFromExtension(String ext) {

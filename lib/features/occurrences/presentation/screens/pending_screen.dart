@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
@@ -487,12 +488,18 @@ class _PendingScreenState extends State<PendingScreen> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? AppTheme.error : AppTheme.surfacePanel,
-      ),
-    );
+    if (isError) {
+      AppFeedback.show(
+        context,
+        AppFeedbackText.fromError(
+          message,
+          fallback: 'Não foi possível concluir a ação.',
+        ),
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+    AppFeedback.success(context, message);
   }
 
   bool _isProcessing(NotificationItem notification) {

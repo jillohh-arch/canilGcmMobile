@@ -143,10 +143,12 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     final handlerRa = HandlerIdentityService.raFromUser(authVM.user);
 
     double? lat, lng;
+    String? placeLabel;
     try {
       final loc = await _locationService.currentHighAccuracy();
       lat = loc.point.latitude;
       lng = loc.point.longitude;
+      placeLabel = loc.address;
     } catch (_) {
       // GPS indisponível — continua sem coordenadas
     }
@@ -162,6 +164,8 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
           : null,
       gpsLat: lat,
       gpsLng: lng,
+      placeLabel: placeLabel,
+      locationSource: lat != null && lng != null ? 'gps_atual' : null,
       createdAt: now,
       updatedAt: now,
     );

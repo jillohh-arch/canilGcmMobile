@@ -63,6 +63,7 @@ class _ActiveShiftDashboardScreenState
   final DashboardService _dashboardService = DashboardService();
   final VehicleService _vehicleService = VehicleService();
   String? _lastFetchedDogId;
+  bool _recoveringMissingDog = false;
 
   // Dados dinâmicos carregados do Firestore
   List<QuickAction> _quickActions = [];
@@ -167,21 +168,37 @@ class _ActiveShiftDashboardScreenState
           ra: currentRa,
           firebaseUser: fbUser,
         );
-        final dogId = shiftVM.activeDogId!;
+        final dogId = shiftVM.activeDogId;
+
+        if (dogId == null || dogId.trim().isEmpty) {
+          return _MissingShiftDogState(
+            recovering: _recoveringMissingDog,
+            onRecover: () => _recoverMissingShiftDog(context),
+          );
+        }
 
         return StreamBuilder<Dog?>(
           stream: _dogService.watchDog(dogId),
           builder: (context, snapshot) {
             final dog = snapshot.data ?? _localDogFallback(dogVM, dogId);
-            if (dog == null) {
-              return Scaffold(
+            final stillLoading =
+                snapshot.connectionState == ConnectionState.waiting ||
+                dogVM.isLoading;
+
+            if (dog == null && stillLoading) {
+              return const Scaffold(
                 backgroundColor: AppTheme.background,
                 body: Center(
-                  child: Text(
-                    'K9 do turno não encontrado.',
-                    style: GoogleFonts.inter(color: AppTheme.textSecondary),
-                  ),
+                  child: CircularProgressIndicator(color: AppTheme.primary),
                 ),
+              );
+            }
+
+            if (dog == null) {
+              return _MissingShiftDogState(
+                dogId: dogId,
+                recovering: _recoveringMissingDog,
+                onRecover: () => _recoverMissingShiftDog(context),
               );
             }
             return Scaffold(
@@ -198,6 +215,161 @@ class _ActiveShiftDashboardScreenState
           },
         );
       },
+    );
+  }
+
+  Future<void> _recoverMissingShiftDog(BuildContext context) async {
+    if (_recoveringMissingDog) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _recoveringMissingDog = true);
+
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+    await shiftVM.endShift();
+
+    if (!mounted) return;
+    setState(() => _recoveringMissingDog = false);
+
+    final error = shiftVM.error;
+    if (error != null && error.trim().isNotEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Não foi possível limpar o turno anterior. Tente novamente.',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+}
+
+class _MissingShiftDogState extends StatelessWidget {
+  final String? dogId;
+  final bool recovering;
+  final VoidCallback onRecover;
+
+  const _MissingShiftDogState({
+    this.dogId,
+    required this.recovering,
+    required this.onRecover,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: AppTheme.surfacePanel,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppTheme.warning.withAlpha(120)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.warning.withAlpha(22),
+                    blurRadius: 28,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withAlpha(24),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppTheme.warning.withAlpha(130),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.pets_rounded,
+                      color: AppTheme.warning,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Turno anterior precisa ser revisado',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    dogId?.trim().isNotEmpty == true
+                        ? 'O turno ativo aponta para um K9 que não está mais disponível no cadastro. Isso pode acontecer após limpeza do banco ou alteração administrativa.'
+                        : 'O turno ativo não possui um K9 de serviço válido. Encerre este registro antigo para escolher o cão e a viatura novamente.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: recovering ? null : onRecover,
+                      icon: recovering
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.background,
+                              ),
+                            )
+                          : const Icon(Icons.restart_alt_rounded),
+                      label: Text(
+                        recovering
+                            ? 'Limpando turno...'
+                            : 'Escolher K9 e viatura novamente',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: AppTheme.background,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: GoogleFonts.inter(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'O histórico preservado no servidor não será apagado.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textTertiary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

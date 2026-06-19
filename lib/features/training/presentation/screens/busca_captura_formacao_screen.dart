@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/data/training_program_service.dart';
 import 'package:canil_gcm/features/training/data/training_promotion_service.dart';
@@ -248,10 +249,7 @@ class _BuscaCapturaFormacaoScreenState
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(
-        'Falha ao inicializar progressao de B&C. $error',
-        AppTheme.error,
-      );
+      _showError(error, 'Não foi possível inicializar a progressão de B&C.');
     } finally {
       if (mounted) {
         setState(() => _initializingProgress = false);
@@ -1299,9 +1297,9 @@ class _BuscaCapturaFormacaoScreenState
       _showSnackBar('Sessao de trilha B&C registrada.', AppTheme.success);
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(
-        'Falha ao salvar a sessao. O rascunho local foi preservado. $error',
-        AppTheme.error,
+      _showError(
+        error,
+        'Não foi possível salvar a sessão. O rascunho local foi preservado.',
       );
     }
   }
@@ -1539,9 +1537,22 @@ class _BuscaCapturaFormacaoScreenState
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+    AppFeedback.show(context, message, type: _feedbackTypeFor(color));
+  }
+
+  void _showError(Object error, String fallback) {
+    AppFeedback.error(context, error, fallback: fallback);
+  }
+
+  AppFeedbackType _feedbackTypeFor(Color color) {
+    if (color == AppTheme.success) return AppFeedbackType.success;
+    if (color == AppTheme.error || color == AppTheme.errorStrong) {
+      return AppFeedbackType.error;
+    }
+    if (color == AppTheme.warning || color == AppTheme.warningAccent) {
+      return AppFeedbackType.warning;
+    }
+    return AppFeedbackType.info;
   }
 
   Future<void> _toggleMilestone(
@@ -1567,7 +1578,7 @@ class _BuscaCapturaFormacaoScreenState
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Falha ao salvar marco. $error', AppTheme.error);
+      _showError(error, 'Não foi possível salvar o marco.');
     } finally {
       if (mounted) {
         setState(() => _savingMilestoneIds.remove(milestone.id));
@@ -1593,7 +1604,7 @@ class _BuscaCapturaFormacaoScreenState
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Falha ao registrar marco-bonus. $error', AppTheme.error);
+      _showError(error, 'Não foi possível registrar o marco-bônus.');
     } finally {
       if (mounted) {
         setState(() => _savingBonusMilestoneIds.remove(offer.id));
@@ -1630,7 +1641,7 @@ class _BuscaCapturaFormacaoScreenState
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Falha ao solicitar evolucao. $error', AppTheme.error);
+      _showError(error, 'Não foi possível solicitar a evolução.');
     } finally {
       if (mounted) {
         setState(() => _completingModule = false);

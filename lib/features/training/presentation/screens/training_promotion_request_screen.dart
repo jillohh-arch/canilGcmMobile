@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/training/data/training_promotion_service.dart';
 import 'package:canil_gcm/features/training/domain/training_promotion_request.dart';
 
@@ -309,21 +310,17 @@ class _TrainingPromotionRequestScreenState
         reason: reason,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            approve ? 'Aprovacao registrada.' : 'Reprova registrada.',
-          ),
-          backgroundColor: approve ? AppTheme.success : AppTheme.warning,
-        ),
+      AppFeedback.show(
+        context,
+        approve ? 'Aprovação registrada.' : 'Reprovação registrada.',
+        type: approve ? AppFeedbackType.success : AppFeedbackType.warning,
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Nao foi possivel decidir a solicitacao: $error'),
-          backgroundColor: AppTheme.error,
-        ),
+      AppFeedback.error(
+        context,
+        error,
+        fallback: 'Não foi possível decidir a solicitação.',
       );
     } finally {
       if (mounted) setState(() => _deciding = false);
