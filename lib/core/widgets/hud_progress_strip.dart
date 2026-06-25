@@ -70,8 +70,8 @@ class HudProgressStrip extends StatelessWidget {
                       width: 30,
                       height: 30,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         color: color.withAlpha(30),
+                        borderRadius: BorderRadius.circular(15),
                         border: Border.all(
                           color: color.withAlpha(130),
                           width: 1.2,

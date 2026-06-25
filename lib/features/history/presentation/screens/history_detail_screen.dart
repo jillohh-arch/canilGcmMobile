@@ -500,8 +500,8 @@ class HistoryDetailScaffold extends StatelessWidget {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
                   color: AppTheme.surfacePanelAlt,
+                  borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: _green, width: 1.5),
                 ),
                 child: Center(
@@ -523,8 +523,8 @@ class HistoryDetailScaffold extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
                     color: AppTheme.surfacePanelAlt,
+                    borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: _cyan, width: 1.5),
                   ),
                   child: Center(
@@ -1727,10 +1727,10 @@ class HistoryDetectionBody extends StatelessWidget {
                       height: 24,
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         color: item == 'hit'
                             ? _green.withAlpha(40)
                             : _red.withAlpha(40),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: item == 'hit' ? _green : _red,
                         ),
@@ -1866,8 +1866,8 @@ class HistoryDetectionBody extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
                       color: bg,
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: border, width: 2),
                     ),
                     child: Center(
@@ -3606,8 +3606,8 @@ class _OccurrenceTimelineSectionState
                           width: 10,
                           height: 10,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
                             color: nodeColor,
+                            borderRadius: BorderRadius.circular(5),
                             border: Border.all(color: _bg, width: 2),
                           ),
                         ),
@@ -3678,8 +3678,8 @@ class _StartDot extends StatelessWidget {
       width: 12,
       height: 12,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
         color: _amber,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: _bg, width: 2),
       ),
     );

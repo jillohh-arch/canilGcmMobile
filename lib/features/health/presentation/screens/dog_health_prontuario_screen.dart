@@ -650,8 +650,8 @@ class _DogPhoto extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
             color: AppTheme.surfacePanelAlt,
+            borderRadius: BorderRadius.circular(size / 2),
             border: Border.all(color: AppTheme.primary, width: 3),
           ),
           child: ClipOval(
@@ -672,7 +672,7 @@ class _DogPhoto extends StatelessWidget {
             height: 22,
             decoration: BoxDecoration(
               color: AppTheme.success,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(11),
               border: Border.all(color: AppTheme.background, width: 2),
             ),
             child: const Icon(
@@ -2330,7 +2330,7 @@ class _WeightTrendInsight extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               color: color.withAlpha(22),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(22),
             ),
             child: Icon(Icons.trending_up_rounded, color: color, size: 22),
           ),

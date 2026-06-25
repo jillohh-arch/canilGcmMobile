@@ -290,6 +290,132 @@ test('turno ativo so pode ser gravado pelo proprio RA autenticado', async () => 
   );
 });
 
+test('inicio de turno com viatura pode reabrir guarnicao encerrada', async () => {
+  const db = dbFor(PRIMARY_RA);
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'active_shifts', PRIMARY_RA), {
+      ...activeShiftPayload(PRIMARY_RA),
+      vehicle_id: '1075',
+      vehicle_crew_id: '1075',
+      crew_id: '1075',
+      crew_role: 'titular',
+      crew_status: 'titular',
+      vehicle_label: 'Canil 1075',
+      vehicle_prefix: '1075',
+      vehicle_model: 'Toyota Hilux',
+      vehicle_unit: 'Limeira/SP',
+      vehicle_joined_at: now(),
+      endedAt: now(),
+      status: 'ended',
+    });
+    await setDoc(doc(adminDb, 'vehicle_crews', '1075'), {
+      id: '1075',
+      vehicle_id: '1075',
+      vehicle_label: 'Canil 1075',
+      vehicle_prefix: '1075',
+      vehicle_model: 'Toyota Hilux',
+      vehicle_unit: 'Limeira/SP',
+      crew_size: 4,
+      service_dog_id: DOG_ID,
+      titular_handler_id: PRIMARY_RA,
+      active: false,
+      created_at: now(),
+      updated_at: now(),
+      ended_at: now(),
+    });
+    await setDoc(doc(adminDb, 'vehicle_crews', '1075', 'members', PRIMARY_RA), {
+      handler_id: PRIMARY_RA,
+      auth_uid: `uid-${PRIMARY_RA}`,
+      handler_email: `${PRIMARY_RA}@gcm.com.br`,
+      role: 'titular',
+      status: 'ended',
+      joined_at: now(),
+      responded_at: now(),
+      left_at: now(),
+      updated_at: now(),
+    });
+  });
+
+  const logRef = doc(collection(db, 'shift_logs'));
+  const activeRef = doc(db, 'active_shifts', PRIMARY_RA);
+  const crewRef = doc(db, 'vehicle_crews', '1075');
+  const memberRef = doc(db, 'vehicle_crews', '1075', 'members', PRIMARY_RA);
+  const batch = writeBatch(db);
+  const vehicleFields = {
+    vehicle_id: '1075',
+    vehicle_crew_id: '1075',
+    crew_id: '1075',
+    crew_role: 'titular',
+    crew_status: 'titular',
+    vehicle_label: 'Canil 1075',
+    vehicle_prefix: '1075',
+    vehicle_model: 'Toyota Hilux',
+    vehicle_unit: 'Limeira/SP',
+    vehicle_joined_at: serverTimestamp(),
+  };
+
+  batch.set(logRef, {
+    id: logRef.id,
+    handlerId: PRIMARY_RA,
+    auth_uid: `uid-${PRIMARY_RA}`,
+    handler_email: `${PRIMARY_RA}@gcm.com.br`,
+    shift_group_id: 'charlie',
+    shift_group_code: 'CHARLIE',
+    shift_group_label: 'Plantao Charlie',
+    initialDogId: DOG_ID,
+    currentDogId: DOG_ID,
+    service_dog_id: DOG_ID,
+    ...vehicleFields,
+    status: 'active',
+    startedAt: now(),
+    endedAt: null,
+    dogSwitches: [],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(activeRef, {
+    shiftId: logRef.id,
+    handlerId: PRIMARY_RA,
+    auth_uid: `uid-${PRIMARY_RA}`,
+    handler_email: `${PRIMARY_RA}@gcm.com.br`,
+    shift_group_id: 'charlie',
+    shift_group_code: 'CHARLIE',
+    shift_group_label: 'Plantao Charlie',
+    dogId: DOG_ID,
+    service_dog_id: DOG_ID,
+    ...vehicleFields,
+    status: 'active',
+    startedAt: now(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(crewRef, {
+    id: '1075',
+    vehicle_id: '1075',
+    vehicle_label: 'Canil 1075',
+    vehicle_prefix: '1075',
+    vehicle_model: 'Toyota Hilux',
+    vehicle_unit: 'Limeira/SP',
+    crew_size: 4,
+    service_dog_id: DOG_ID,
+    titular_handler_id: PRIMARY_RA,
+    active: true,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  }, {merge: true});
+  batch.set(memberRef, {
+    handler_id: PRIMARY_RA,
+    auth_uid: `uid-${PRIMARY_RA}`,
+    handler_email: `${PRIMARY_RA}@gcm.com.br`,
+    role: 'titular',
+    status: 'titular',
+    joined_at: serverTimestamp(),
+    responded_at: serverTimestamp(),
+  }, {merge: true});
+
+  await assertSucceeds(batch.commit());
+});
+
 test('treino para K9 diferente do turno ativo e recusado', async () => {
   const db = dbFor(PRIMARY_RA);
 
@@ -1383,7 +1509,7 @@ try {
     console.log(`ok - ${name}`);
   }
 
-  assert.equal(tests.length, 25);
+  assert.equal(tests.length, 26);
   console.log(`\n${tests.length} testes de rules concluidos com sucesso.`);
 } finally {
   await testEnv.cleanup();

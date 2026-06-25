@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
@@ -11,6 +12,9 @@ class NotificationService {
   final CollectionReference _notificationsCollection = FirebaseFirestore
       .instance
       .collection('notifications');
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'southamerica-east1',
+  );
 
   /// Cria uma nova notificação para um usuário.
   Future<String> createNotification({
@@ -115,6 +119,15 @@ class NotificationService {
         .update({'archived_at': FieldValue.serverTimestamp()});
 
     debugPrint('[NotificationService] Aviso arquivado: ${notification.id}');
+  }
+
+  Future<void> resolveShiftReminderNotification({
+    required String notificationId,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'resolveShiftReminderNotification',
+    );
+    await callable.call<void>({'notification_id': notificationId});
   }
 
   Stream<List<NotificationItem>> getUnreadNotifications({

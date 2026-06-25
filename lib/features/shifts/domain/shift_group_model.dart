@@ -38,7 +38,10 @@ class ShiftGroupModel {
       code: _string(json['code'], fallback: id).toUpperCase(),
       name: _string(json['name']),
       type: type,
-      scheduleType: _scheduleType(json['scheduleType'] ?? json['schedule_type'], type),
+      scheduleType: _scheduleType(
+        json['scheduleType'] ?? json['schedule_type'],
+        type,
+      ),
       expectedStartHour: _hour(
         json['expectedStartHour'] ?? json['expected_start_hour'],
         json['start_time'],
@@ -89,7 +92,8 @@ class ShiftGroupModel {
     if (scheduleType == 'two_by_two') {
       final anchor = anchorDate;
       if (anchor == null) return false;
-      final diff = _startOfDay(date).millisecondsSinceEpoch -
+      final diff =
+          _startOfDay(date).millisecondsSinceEpoch -
           _startOfDay(anchor).millisecondsSinceEpoch;
       final days = diff ~/ _millisecondsPerDay;
       final cycleIndex = ((days % 4) + 4) % 4;
@@ -103,18 +107,8 @@ class ShiftGroupModel {
     if (!isWorkDay(date)) return null;
 
     final day = _startOfDay(date);
-    final start = DateTime(
-      day.year,
-      day.month,
-      day.day,
-      expectedStartHour,
-    );
-    var end = DateTime(
-      day.year,
-      day.month,
-      day.day,
-      expectedEndHour,
-    );
+    final start = DateTime(day.year, day.month, day.day, expectedStartHour);
+    var end = DateTime(day.year, day.month, day.day, expectedEndHour);
     if (isOvernight) {
       end = end.add(const Duration(days: 1));
     }
@@ -142,7 +136,13 @@ class ShiftAssignmentModel {
   factory ShiftAssignmentModel.fromJson(String id, Map<String, dynamic> json) {
     return ShiftAssignmentModel(
       id: id,
-      userId: _string(json['userId'] ?? json['user_id'] ?? json['user_ra']),
+      userId: _string(
+        json['user_ra'] ??
+            json['ra'] ??
+            json['handlerId'] ??
+            json['userId'] ??
+            json['user_id'],
+      ),
       shiftGroupId: _string(json['shiftGroupId'] ?? json['shift_group_id']),
       active: _bool(json['active'], fallback: true),
       assignedAt: _date(json['assignedAt'] ?? json['assigned_at']),
@@ -287,11 +287,12 @@ String _string(dynamic value, {String fallback = ''}) {
 
 List<int> _workPattern(dynamic value) {
   final raw = value is List ? value : const [0, 1];
-  final parsed = raw
-      .map((item) => _int(item, fallback: -1))
-      .where((item) => item >= 0 && item <= 3)
-      .toSet()
-      .toList()
-    ..sort();
+  final parsed =
+      raw
+          .map((item) => _int(item, fallback: -1))
+          .where((item) => item >= 0 && item <= 3)
+          .toSet()
+          .toList()
+        ..sort();
   return parsed.isEmpty ? [0, 1] : parsed;
 }

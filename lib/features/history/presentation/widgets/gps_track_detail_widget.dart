@@ -101,7 +101,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppTheme.success,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(7),
                   border: Border.all(color: AppTheme.background, width: 2),
                 ),
               ),
@@ -114,7 +114,7 @@ class GpsTrackDetailWidget extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppTheme.error,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(7),
                   border: Border.all(color: AppTheme.background, width: 2),
                 ),
               ),

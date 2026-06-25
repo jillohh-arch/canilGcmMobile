@@ -919,7 +919,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: AppTheme.textPrimary.withValues(alpha: 0.06),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: AppTheme.textPrimary.withValues(alpha: 0.12),
                     ),
@@ -987,7 +987,7 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: AppTheme.textPrimary.withValues(alpha: 0.06),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: AppTheme.textPrimary.withValues(alpha: 0.12),
                     ),

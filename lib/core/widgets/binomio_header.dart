@@ -644,8 +644,8 @@ class _BinomioAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
         color: AppTheme.background,
+        borderRadius: BorderRadius.circular(size / 2),
         border: Border.all(color: borderColor, width: 2.5),
         boxShadow: [
           BoxShadow(

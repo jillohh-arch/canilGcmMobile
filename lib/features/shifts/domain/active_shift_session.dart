@@ -20,6 +20,9 @@ class ActiveShiftSession {
   final String? vehicleCrewId;
   final String? crewRole;
   final String? crewStatus;
+  final String? shiftGroupId;
+  final String? shiftGroupCode;
+  final String? shiftGroupLabel;
   final String status;
 
   const ActiveShiftSession({
@@ -42,19 +45,28 @@ class ActiveShiftSession {
     this.vehicleCrewId,
     this.crewRole,
     this.crewStatus,
+    this.shiftGroupId,
+    this.shiftGroupCode,
+    this.shiftGroupLabel,
     this.status = 'active',
   });
 
   factory ActiveShiftSession.fromJson(Map<String, dynamic> json) {
+    final resolvedDogId = _parseString(
+      json['service_dog_id'] ??
+          json['serviceDogId'] ??
+          json['dogId'] ??
+          json['currentDogId'] ??
+          json['initialDogId'],
+    );
+
     return ActiveShiftSession(
       shiftId: json['shiftId'] as String?,
       handlerId: json['handlerId'] as String? ?? '',
       authUid: _parseString(json['auth_uid'] ?? json['authUid']),
       handlerEmail: _parseString(json['handler_email'] ?? json['handlerEmail']),
-      dogId: json['dogId'] as String? ?? '',
-      serviceDogId: _parseString(
-        json['service_dog_id'] ?? json['serviceDogId'],
-      ),
+      dogId: resolvedDogId ?? '',
+      serviceDogId: resolvedDogId,
       startedAt: _parseDate(json['startedAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']),
       endedAt: _parseDate(json['endedAt']),
@@ -74,6 +86,15 @@ class ActiveShiftSession {
       ),
       crewRole: _parseString(json['crew_role'] ?? json['crewRole']),
       crewStatus: _parseString(json['crew_status'] ?? json['crewStatus']),
+      shiftGroupId: _parseString(
+        json['shift_group_id'] ?? json['shiftGroupId'],
+      ),
+      shiftGroupCode: _parseString(
+        json['shift_group_code'] ?? json['shiftGroupCode'],
+      ),
+      shiftGroupLabel: _parseString(
+        json['shift_group_label'] ?? json['shiftGroupLabel'],
+      ),
       status: json['status'] as String? ?? 'active',
     );
   }
@@ -98,6 +119,9 @@ class ActiveShiftSession {
     String? vehicleCrewId,
     String? crewRole,
     String? crewStatus,
+    String? shiftGroupId,
+    String? shiftGroupCode,
+    String? shiftGroupLabel,
     String? status,
   }) {
     return ActiveShiftSession(
@@ -120,11 +144,14 @@ class ActiveShiftSession {
       vehicleCrewId: vehicleCrewId ?? this.vehicleCrewId,
       crewRole: crewRole ?? this.crewRole,
       crewStatus: crewStatus ?? this.crewStatus,
+      shiftGroupId: shiftGroupId ?? this.shiftGroupId,
+      shiftGroupCode: shiftGroupCode ?? this.shiftGroupCode,
+      shiftGroupLabel: shiftGroupLabel ?? this.shiftGroupLabel,
       status: status ?? this.status,
     );
   }
 
-  bool get isActive => status == 'active' && dogId.isNotEmpty;
+  bool get isActive => status == 'active' && effectiveServiceDogId.isNotEmpty;
   bool get hasVehicle => vehicleId?.trim().isNotEmpty == true;
   String get effectiveServiceDogId =>
       serviceDogId?.trim().isNotEmpty == true ? serviceDogId!.trim() : dogId;

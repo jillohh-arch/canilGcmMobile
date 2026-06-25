@@ -120,7 +120,7 @@ class DogService {
 
   Dog _dogFromData(Map<String, dynamic> data, String id) {
     final json = Map<String, dynamic>.from(data);
-    json['id'] ??= id;
+    json['id'] = id;
     return Dog.fromJson(json);
   }
 

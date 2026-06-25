@@ -4,7 +4,7 @@ import 'package:canil_gcm/features/shifts/domain/shift_group_model.dart';
 
 class ShiftGroupService {
   ShiftGroupService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -15,28 +15,32 @@ class ShiftGroupService {
   }
 
   Future<ShiftAssignmentModel?> getUserShiftAssignment(String userId) async {
-    final byUserId = await _db
-        .collection('user_shift_assignments')
-        .where('userId', isEqualTo: userId)
-        .where('active', isEqualTo: true)
-        .limit(1)
-        .get();
+    for (final field in const [
+      'user_ra',
+      'ra',
+      'handlerId',
+      'userId',
+      'user_id',
+    ]) {
+      final snapshot = await _db
+          .collection('user_shift_assignments')
+          .where(field, isEqualTo: userId)
+          .where('active', isEqualTo: true)
+          .limit(1)
+          .get();
 
-    if (byUserId.docs.isNotEmpty) {
-      final doc = byUserId.docs.first;
-      return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+      }
     }
 
-    final byUserRa = await _db
+    final doc = await _db
         .collection('user_shift_assignments')
-        .where('user_ra', isEqualTo: userId)
-        .where('active', isEqualTo: true)
-        .limit(1)
+        .doc(userId)
         .get();
-
-    if (byUserRa.docs.isEmpty) return null;
-    final doc = byUserRa.docs.first;
-    return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+    if (!doc.exists || doc.data()?['active'] == false) return null;
+    return ShiftAssignmentModel.fromJson(doc.id, doc.data()!);
   }
 
   Future<ShiftGroupModel?> getUserShiftGroup(String userId) async {
@@ -58,27 +62,18 @@ class ShiftGroupService {
   Stream<ShiftAssignmentModel?> watchUserShiftAssignment(String userId) {
     return _db
         .collection('user_shift_assignments')
-        .where('userId', isEqualTo: userId)
+        .where('user_ra', isEqualTo: userId)
         .where('active', isEqualTo: true)
         .limit(1)
         .snapshots()
         .asyncMap((snapshot) async {
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
-        return ShiftAssignmentModel.fromJson(doc.id, doc.data());
-      }
+          if (snapshot.docs.isNotEmpty) {
+            final doc = snapshot.docs.first;
+            return ShiftAssignmentModel.fromJson(doc.id, doc.data());
+          }
 
-      final fallback = await _db
-          .collection('user_shift_assignments')
-          .where('user_ra', isEqualTo: userId)
-          .where('active', isEqualTo: true)
-          .limit(1)
-          .get();
-
-      if (fallback.docs.isEmpty) return null;
-      final doc = fallback.docs.first;
-      return ShiftAssignmentModel.fromJson(doc.id, doc.data());
-    });
+          return getUserShiftAssignment(userId);
+        });
   }
 }
 
@@ -86,10 +81,7 @@ class UserShiftInfo {
   final ShiftAssignmentModel assignment;
   final ShiftGroupModel group;
 
-  UserShiftInfo({
-    required this.assignment,
-    required this.group,
-  });
+  UserShiftInfo({required this.assignment, required this.group});
 
   String get groupId => group.id;
   String get groupName => group.name;

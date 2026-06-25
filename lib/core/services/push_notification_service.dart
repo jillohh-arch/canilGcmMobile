@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
@@ -28,6 +30,9 @@ const String _operationsChannelId = 'canil_k9_operations';
 const String _operationsChannelName = 'Operações K9';
 const String _crewAcceptActionId = 'vehicle_crew_accept';
 const String _crewDeclineActionId = 'vehicle_crew_decline';
+const int _shiftEndReminderNotificationId = 910101;
+const int _shiftOverdueReminderNotificationId = 910102;
+const String _shiftTimeZone = 'America/Sao_Paulo';
 
 @pragma('vm:entry-point')
 Future<void> canilK9FirebaseMessagingBackgroundHandler(
@@ -64,6 +69,7 @@ class PushNotificationService {
   GlobalKey<NavigatorState>? _navigatorKey;
   Map<String, dynamic>? _pendingNavigationData;
   bool _localNotificationsReady = false;
+  bool _timeZonesReady = false;
 
   Future<void> initialize({GlobalKey<NavigatorState>? navigatorKey}) async {
     _navigatorKey = navigatorKey ?? _navigatorKey;
@@ -156,6 +162,7 @@ class PushNotificationService {
 
   static Future<void> handleBackgroundMessage(RemoteMessage message) async {
     await _ensureFirebaseForBackground();
+    if (message.notification != null) return;
     final plugin = FlutterLocalNotificationsPlugin();
     await _configureLocalNotifications(plugin);
     await _showRemoteNotificationWith(plugin, message);
@@ -240,6 +247,118 @@ class PushNotificationService {
   Future<void> _showRemoteNotification(RemoteMessage message) async {
     if (!_localNotificationsReady) return;
     await _showRemoteNotificationWith(_localNotifications, message);
+  }
+
+  Future<void> scheduleShiftEndReminders({
+    required DateTime expectedEndAt,
+    required String shiftId,
+    required String shiftGroupLabel,
+    Duration overdueAfter = const Duration(minutes: 30),
+  }) async {
+    await _ensureLocalNotificationsReady();
+    _ensureTimeZonesReady();
+
+    await cancelShiftEndReminders();
+
+    final now = DateTime.now();
+    final title = 'Hora de encerrar o turno';
+    final body =
+        '$shiftGroupLabel encerra às ${_formatLocalTime(expectedEndAt)}. '
+        'Se ainda estiver em ocorrência, encerre quando finalizar.';
+    if (expectedEndAt.isAfter(now.add(const Duration(minutes: 1)))) {
+      await _scheduleShiftLocalNotification(
+        id: _shiftEndReminderNotificationId,
+        type: 'shift_end_reminder',
+        title: title,
+        body: body,
+        scheduledAt: expectedEndAt,
+        shiftId: shiftId,
+        shiftGroupLabel: shiftGroupLabel,
+      );
+    }
+
+    final overdueAt = expectedEndAt.add(overdueAfter);
+    if (overdueAt.isAfter(now.add(const Duration(minutes: 1)))) {
+      await _scheduleShiftLocalNotification(
+        id: _shiftOverdueReminderNotificationId,
+        type: 'shift_overdue_reminder',
+        title: 'Turno aberto além do previsto',
+        body:
+            '$shiftGroupLabel continua aberto. Toque para revisar o turno ativo.',
+        scheduledAt: overdueAt,
+        shiftId: shiftId,
+        shiftGroupLabel: shiftGroupLabel,
+      );
+    }
+  }
+
+  Future<void> cancelShiftEndReminders() async {
+    await _ensureLocalNotificationsReady();
+    await _localNotifications.cancel(id: _shiftEndReminderNotificationId);
+    await _localNotifications.cancel(id: _shiftOverdueReminderNotificationId);
+  }
+
+  Future<void> _ensureLocalNotificationsReady() async {
+    if (_localNotificationsReady) return;
+    await _configureLocalNotifications(
+      _localNotifications,
+      onResponse: _handleNotificationResponse,
+      backgroundResponse: canilK9NotificationTapBackground,
+    );
+    _localNotificationsReady = true;
+    await _requestAndroidNotificationPermission();
+  }
+
+  void _ensureTimeZonesReady() {
+    if (_timeZonesReady) return;
+    tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation(_shiftTimeZone));
+    _timeZonesReady = true;
+  }
+
+  Future<void> _scheduleShiftLocalNotification({
+    required int id,
+    required String type,
+    required String title,
+    required String body,
+    required DateTime scheduledAt,
+    required String shiftId,
+    required String shiftGroupLabel,
+  }) {
+    final payload = jsonEncode({
+      'type': type,
+      'title': title,
+      'body': body,
+      'target_screen': 'active_shift',
+      'shift_id': shiftId,
+      'shift_group_label': shiftGroupLabel,
+      'notification_id': 'local_$type',
+    });
+
+    return _localNotifications.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: tz.TZDateTime.from(scheduledAt, tz.local),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _operationsChannelId,
+          _operationsChannelName,
+          channelDescription: 'Alertas operacionais do Canil K9',
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.reminder,
+        ),
+      ),
+      payload: payload,
+    );
+  }
+
+  String _formatLocalTime(DateTime value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 
   void _handleRemoteMessageNavigation(RemoteMessage message) {
@@ -348,6 +467,9 @@ class PushNotificationService {
       final type = _stringValue(data['type']) ?? '';
       final opensAssumption =
           target == 'shift_assumption' || type == 'shift_start_reminder';
+      if (!opensAssumption && _isShiftEndReminderPayload(data)) {
+        unawaited(_resolveShiftReminderFromPayload(data));
+      }
       navigator.push(
         MaterialPageRoute(
           builder: (_) => opensAssumption
@@ -400,7 +522,11 @@ Future<void> _configureLocalNotifications(
   DidReceiveNotificationResponseCallback? onResponse,
   DidReceiveBackgroundNotificationResponseCallback? backgroundResponse,
 }) async {
-  const androidSettings = AndroidInitializationSettings('ic_launcher');
+  // `flutter_local_notifications` não aceita adaptive icons (mipmap/ic_launcher
+  // em mipmap-anydpi-v26) como DrawableResource no momento do initialize.
+  // Apontamos para um drawable bitmap que resolve para o mipmap legacy PNG.
+  const androidSettings =
+      AndroidInitializationSettings('drawable/ic_launcher');
   final initializationSettings = InitializationSettings(
     android: androidSettings,
     iOS: DarwinInitializationSettings(
@@ -629,6 +755,27 @@ bool _opensShiftScreen(Map<String, dynamic> data, String target) {
       type == 'shift_end_reminder' ||
       type == 'shift_overdue_reminder' ||
       type == 'shift_open_reminder';
+}
+
+bool _isShiftEndReminderPayload(Map<String, dynamic> data) {
+  final type = _stringValue(data['type']);
+  return type == 'shift_end_reminder' ||
+      type == 'shift_overdue_reminder' ||
+      type == 'shift_open_reminder';
+}
+
+Future<void> _resolveShiftReminderFromPayload(Map<String, dynamic> data) async {
+  final notificationId = _stringValue(data['notification_id']);
+  if (notificationId == null || notificationId.startsWith('local_')) return;
+  try {
+    await NotificationService().resolveShiftReminderNotification(
+      notificationId: notificationId,
+    );
+  } catch (error) {
+    debugPrint(
+      '[PushNotificationService] Falha ao resolver lembrete de turno: $error',
+    );
+  }
 }
 
 String? _promotionRequestIdFromPayload(Map<String, dynamic> data) {

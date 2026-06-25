@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/dog_fitness_service.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
@@ -61,11 +62,11 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     setState(() => _startingDogId = null);
 
     if (shiftVM.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(shiftVM.error!),
-          backgroundColor: AppTheme.error,
-        ),
+      AppFeedback.error(
+        context,
+        shiftVM.error!,
+        fallback:
+            'Nao foi possivel iniciar o turno. Confira sua conexao e tente novamente.',
       );
     }
   }

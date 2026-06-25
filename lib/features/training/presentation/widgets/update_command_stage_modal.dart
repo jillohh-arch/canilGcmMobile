@@ -142,10 +142,10 @@ class _UpdateCommandStageModalState extends State<UpdateCommandStageModal> {
                       width: 24,
                       height: 24,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         color: isSelected
                             ? AppTheme.primary
                             : AppTheme.transparent,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
                               ? AppTheme.primary

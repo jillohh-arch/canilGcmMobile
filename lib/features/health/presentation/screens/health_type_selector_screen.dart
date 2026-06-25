@@ -448,7 +448,7 @@ class _HealthHubDogCard extends StatelessWidget {
             height: 96,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(48),
               border: Border.all(color: AppTheme.primary, width: 2),
               boxShadow: [
                 BoxShadow(

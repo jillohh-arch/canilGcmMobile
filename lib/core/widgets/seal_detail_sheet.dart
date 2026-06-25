@@ -88,7 +88,7 @@ class _SealIcon extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         color: color.withAlpha(25),
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: color.withAlpha(80), width: 2),
       ),
       child: Icon(seal.icon, color: color, size: 24),

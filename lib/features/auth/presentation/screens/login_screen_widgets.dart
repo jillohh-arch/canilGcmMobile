@@ -12,8 +12,8 @@ class _LoginBrand extends StatelessWidget {
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
               color: AppTheme.primary.withAlpha(12),
+              borderRadius: BorderRadius.circular(35),
               border: Border.all(
                 color: AppTheme.primary.withAlpha(60),
                 width: 2,

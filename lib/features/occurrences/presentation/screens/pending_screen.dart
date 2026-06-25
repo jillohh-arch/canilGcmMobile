@@ -383,6 +383,8 @@ class _PendingScreenState extends State<PendingScreen> {
 
       case NotificationType.shiftEndReminder:
       case NotificationType.shiftOverdueReminder:
+        await _resolveShiftReminder(notification);
+        if (!mounted) return;
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const ActiveShiftDashboardScreen()),
         );
@@ -429,6 +431,20 @@ class _PendingScreenState extends State<PendingScreen> {
         builder: (_) => VehicleCrewProfileScreen(crewId: crewId),
       ),
     );
+  }
+
+  Future<void> _resolveShiftReminder(NotificationItem notification) async {
+    if (!notification.isOpenAction) return;
+    try {
+      await _notificationService.resolveShiftReminderNotification(
+        notificationId: notification.id,
+      );
+    } catch (error) {
+      _showSnack(
+        'Nao foi possivel atualizar o aviso de turno agora.',
+        isError: true,
+      );
+    }
   }
 
   Future<void> _openDogTrainingHistory(NotificationItem notification) async {
@@ -1012,7 +1028,7 @@ class _NotificationCard extends StatelessWidget {
       NotificationType.trainingBonusMilestoneAvailable => 'Ver historico',
       NotificationType.shiftStartReminder => 'Assumir turno',
       NotificationType.shiftEndReminder ||
-      NotificationType.shiftOverdueReminder => 'Abrir turno',
+      NotificationType.shiftOverdueReminder => 'Encerrar turno',
       NotificationType.occurrenceParticipationRequested => 'Revisar',
       NotificationType.occurrenceParticipationAccepted ||
       NotificationType.occurrenceParticipationDeclined => 'Ver equipe',

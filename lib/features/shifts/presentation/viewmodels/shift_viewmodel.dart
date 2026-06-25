@@ -5,14 +5,19 @@ import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/data/auth_service.dart';
+import 'package:canil_gcm/core/services/push_notification_service.dart';
+import 'package:canil_gcm/features/shifts/data/shift_group_service.dart';
 import 'package:canil_gcm/features/shifts/data/shift_service.dart';
 import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
+import 'package:canil_gcm/features/shifts/domain/shift_group_model.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 
 class ShiftViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final ShiftService _shiftService = ShiftService();
+  final ShiftGroupService _shiftGroupService = ShiftGroupService();
+  final PushNotificationService _pushNotifications = PushNotificationService();
 
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<ActiveShiftSession?>? _shiftSubscription;
@@ -55,19 +60,23 @@ class ShiftViewModel extends ChangeNotifier {
     final startedAt = DateTime.now();
 
     _error = null;
-    _setLoading(true);
+    notifyListeners();
 
     if (resolvedHandlerId == null) {
       _error = 'Usuario nao autenticado para iniciar turno.';
-      _setLoading(false);
+      notifyListeners();
       return;
     }
 
     try {
+      final shiftInfo = await _safeUserShiftInfo(resolvedHandlerId);
       await _shiftService.startShift(
         handlerId: resolvedHandlerId,
         handlerAuthUid: currentUser?.uid,
         handlerEmail: currentUser?.email,
+        shiftGroupId: shiftInfo?.group.id,
+        shiftGroupCode: shiftInfo?.group.code,
+        shiftGroupLabel: shiftInfo?.group.name,
         dogId: dogId,
         startedAt: startedAt,
         vehicle: vehicle,
@@ -88,7 +97,11 @@ class ShiftViewModel extends ChangeNotifier {
         vehicleCrewId: vehicle?.id,
         crewRole: vehicle == null ? null : 'titular',
         crewStatus: vehicle == null ? null : 'titular',
+        shiftGroupId: shiftInfo?.group.id,
+        shiftGroupCode: shiftInfo?.group.code,
+        shiftGroupLabel: shiftInfo?.group.name,
       );
+      unawaited(_scheduleEndReminderFor(_session!, shiftInfo: shiftInfo));
 
       AuditService.log(
         action: 'create',
@@ -106,10 +119,10 @@ class ShiftViewModel extends ChangeNotifier {
         },
       );
 
-      _setLoading(false);
+      notifyListeners();
     } catch (e) {
       _error = 'Falha ao sincronizar turno: $e';
-      _setLoading(false);
+      notifyListeners();
     }
   }
 
@@ -209,6 +222,7 @@ class ShiftViewModel extends ChangeNotifier {
 
     try {
       await _shiftService.endShift(resolvedHandlerId);
+      unawaited(_pushNotifications.cancelShiftEndReminders());
 
       AuditService.log(
         action: 'update',
@@ -263,6 +277,11 @@ class ShiftViewModel extends ChangeNotifier {
             _initialShiftTimer?.cancel();
             _initialShiftTimer = null;
             _session = session;
+            if (session == null) {
+              unawaited(_pushNotifications.cancelShiftEndReminders());
+            } else {
+              unawaited(_scheduleEndReminderFor(session));
+            }
             _isLoading = false;
             _error = null;
             notifyListeners();
@@ -285,9 +304,81 @@ class ShiftViewModel extends ChangeNotifier {
 
   void _clearSession({bool notify = true}) {
     _session = null;
+    // best-effort: falha de plugin de notificação não pode impedir o
+    // notifyListeners que vem em seguida.
+    unawaited(_safeCancelReminders());
     if (notify) {
       notifyListeners();
     }
+  }
+
+  Future<void> _safeCancelReminders() async {
+    try {
+      await _pushNotifications.cancelShiftEndReminders();
+    } catch (e) {
+      debugPrint('[ShiftViewModel] falha ao cancelar lembretes: $e');
+    }
+  }
+
+  Future<void> _scheduleEndReminderFor(
+    ActiveShiftSession session, {
+    UserShiftInfo? shiftInfo,
+  }) async {
+    shiftInfo ??= await _safeUserShiftInfo(session.handlerId);
+    final group = shiftInfo?.group;
+    final window = group == null
+        ? null
+        : _windowForActiveSession(group, session);
+    final expectedEndAt =
+        window?.end ?? session.startedAt.add(const Duration(hours: 12));
+    final overdueAfter = Duration(
+      minutes: group?.notifications.overdueAfterMinutes ?? 30,
+    );
+    try {
+      await _pushNotifications.scheduleShiftEndReminders(
+        expectedEndAt: expectedEndAt,
+        shiftId: session.shiftId ?? session.handlerId,
+        shiftGroupLabel: group?.name ?? 'Turno K9',
+        overdueAfter: overdueAfter,
+      );
+    } catch (e, st) {
+      // Notificações locais são best-effort: nunca devem derrubar a sessão
+      // do turno. O sintoma típico é `ic_launcher` ausente no Android,
+      // mas qualquer falha do plugin de notificações cai aqui.
+      debugPrint('[ShiftViewModel] falha ao agendar lembrete: $e');
+      debugPrintStack(stackTrace: st, maxFrames: 4);
+    }
+  }
+
+  Future<UserShiftInfo?> _safeUserShiftInfo(String handlerId) async {
+    try {
+      return await _shiftGroupService.getUserShiftInfo(handlerId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ShiftWindow? _windowForActiveSession(
+    ShiftGroupModel group,
+    ActiveShiftSession session,
+  ) {
+    final now = DateTime.now();
+    final candidates = <DateTime>[
+      now,
+      now.subtract(const Duration(days: 1)),
+      session.startedAt,
+      session.startedAt.subtract(const Duration(days: 1)),
+    ];
+
+    for (final date in candidates) {
+      final window = group.expectedWindowForDate(date);
+      if (window == null) continue;
+      if (window.contains(now) || window.contains(session.startedAt)) {
+        return window;
+      }
+    }
+
+    return null;
   }
 
   void _setLoading(bool value) {

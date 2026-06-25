@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -1376,38 +1377,7 @@ class OccurrencePdfGenerator {
           ],
         ),
         pw.SizedBox(height: 10),
-        // Mapa estático (se disponível)
-        if (ctx.displacementMapImage != null)
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _line),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-            ),
-            child: pw.ClipRRect(
-              horizontalRadius: 8,
-              verticalRadius: 8,
-              child: pw.Image(
-                ctx.displacementMapImage!,
-                width: double.infinity,
-                height: 200,
-                fit: pw.BoxFit.cover,
-              ),
-            ),
-          ),
-        if (ctx.displacementMapImage == null)
-          pw.Container(
-            height: 60,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _line),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              color: PdfInstitutionalColors.darkSurface,
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Text(
-              'Mapa indisponivel (sem conexao ao gerar o PDF)',
-              style: _body(f, size: 8, color: _inkSoft),
-            ),
-          ),
+        _displacementMapFrame(ctx, height: 200),
         pw.SizedBox(height: 12),
         // Legenda numerada
         ...locations.map((loc) {
@@ -1460,6 +1430,222 @@ class OccurrencePdfGenerator {
           style: _body(f, size: 7.5, color: _inkSoft),
         ),
       ],
+    );
+  }
+
+  pw.Widget _displacementMapFrame(
+    _OccurrencePdfContext ctx, {
+    required double height,
+  }) {
+    final f = ctx.fonts;
+    return pw.LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints?.maxWidth ?? 535.0;
+        final width = maxWidth.isFinite && maxWidth > 0 ? maxWidth : 535.0;
+        final points = _buildDisplacementPoints(ctx.locations, width, height);
+        final hasRasterMap = ctx.displacementMapImage != null;
+
+        return pw.Container(
+          height: height,
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _line),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+          ),
+          child: pw.ClipRRect(
+            horizontalRadius: 8,
+            verticalRadius: 8,
+            child: pw.Stack(
+              children: [
+                if (hasRasterMap)
+                  pw.Positioned.fill(
+                    child: pw.Image(
+                      ctx.displacementMapImage!,
+                      fit: pw.BoxFit.cover,
+                    ),
+                  )
+                else
+                  pw.Positioned.fill(child: pw.Container(color: _mapBg)),
+                pw.Positioned.fill(
+                  child: pw.CustomPaint(
+                    painter: (canvas, size) => _paintDisplacementMap(
+                      canvas,
+                      size,
+                      points,
+                      drawBaseMap: !hasRasterMap,
+                    ),
+                  ),
+                ),
+                for (final point in points)
+                  _displacementPin(point, f, width: width, height: height),
+                pw.Positioned(
+                  right: 10,
+                  top: 10,
+                  child: pw.Column(
+                    children: [
+                      pw.Text('N', style: _mono(f, size: 7, color: _inkSoft)),
+                      pw.Text('^', style: _mono(f, size: 10, color: _cyan)),
+                    ],
+                  ),
+                ),
+                if (!hasRasterMap)
+                  pw.Positioned(
+                    left: 12,
+                    bottom: 10,
+                    child: pw.Text(
+                      'Mapa esquematico gerado a partir dos pontos GPS registrados',
+                      style: _body(f, size: 7, color: _inkSoft),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<_PdfDisplacementPoint> _buildDisplacementPoints(
+    List<OccurrenceLocation> locations,
+    double width,
+    double height,
+  ) {
+    if (locations.isEmpty) return const [];
+    if (locations.length == 1) {
+      return [
+        _PdfDisplacementPoint(
+          location: locations.first,
+          x: width / 2,
+          y: height / 2,
+        ),
+      ];
+    }
+
+    final minLat = locations.map((l) => l.lat).reduce(math.min);
+    final maxLat = locations.map((l) => l.lat).reduce(math.max);
+    final minLng = locations.map((l) => l.lng).reduce(math.min);
+    final maxLng = locations.map((l) => l.lng).reduce(math.max);
+    final latSpan = maxLat - minLat;
+    final lngSpan = maxLng - minLng;
+    final paddingX = math.min(width * .12, 42.0);
+    final paddingY = math.min(height * .18, 30.0);
+    final usableWidth = math.max(1.0, width - (paddingX * 2));
+    final usableHeight = math.max(1.0, height - (paddingY * 2));
+
+    return locations.map((location) {
+      final x = lngSpan.abs() < 0.000001
+          ? width / 2
+          : paddingX + ((location.lng - minLng) / lngSpan) * usableWidth;
+      final y = latSpan.abs() < 0.000001
+          ? height / 2
+          : paddingY + ((location.lat - minLat) / latSpan) * usableHeight;
+      return _PdfDisplacementPoint(location: location, x: x, y: y);
+    }).toList();
+  }
+
+  void _paintDisplacementMap(
+    PdfGraphics canvas,
+    PdfPoint size,
+    List<_PdfDisplacementPoint> points, {
+    required bool drawBaseMap,
+  }) {
+    final width = size.x;
+    final height = size.y;
+
+    if (drawBaseMap) {
+      canvas
+        ..setFillColor(_mapBg)
+        ..drawRect(0, 0, width, height)
+        ..fillPath()
+        ..setLineWidth(.45)
+        ..setStrokeColor(_lineSoft);
+
+      for (var i = 1; i < 5; i++) {
+        final x = width * i / 5;
+        canvas.drawLine(x, 0, x, height);
+      }
+      for (var i = 1; i < 4; i++) {
+        final y = height * i / 4;
+        canvas.drawLine(0, y, width, y);
+      }
+      canvas.strokePath();
+
+      canvas
+        ..setLineCap(PdfLineCap.round)
+        ..setLineWidth(7)
+        ..setStrokeColor(PdfInstitutionalColors.dividerStrong)
+        ..drawLine(0, height * .23, width, height * .32)
+        ..drawLine(width * .12, 0, width * .48, height)
+        ..drawLine(width * .52, 0, width * .92, height * .72)
+        ..strokePath()
+        ..setLineWidth(3)
+        ..setStrokeColor(PdfInstitutionalColors.white)
+        ..drawLine(0, height * .23, width, height * .32)
+        ..drawLine(width * .12, 0, width * .48, height)
+        ..drawLine(width * .52, 0, width * .92, height * .72)
+        ..strokePath();
+    }
+
+    if (points.length < 2) return;
+
+    canvas
+      ..setLineCap(PdfLineCap.round)
+      ..setLineJoin(PdfLineJoin.round)
+      ..setLineWidth(7)
+      ..setStrokeColor(PdfInstitutionalColors.white)
+      ..moveTo(points.first.x, points.first.y);
+    for (final point in points.skip(1)) {
+      canvas.lineTo(point.x, point.y);
+    }
+    canvas.strokePath();
+
+    canvas
+      ..setLineWidth(3)
+      ..setStrokeColor(_cyan)
+      ..moveTo(points.first.x, points.first.y);
+    for (final point in points.skip(1)) {
+      canvas.lineTo(point.x, point.y);
+    }
+    canvas.strokePath();
+  }
+
+  pw.Widget _displacementPin(
+    _PdfDisplacementPoint point,
+    PdfFonts fonts, {
+    required double width,
+    required double height,
+  }) {
+    final radius = point.location.index == 1 ? 10.0 : 9.0;
+    final color = point.location.index == 1
+        ? PdfInstitutionalColors.greenBright
+        : PdfInstitutionalColors.cyanAccent;
+    final left = (point.x - radius)
+        .clamp(3.0, math.max(3.0, width - (radius * 2) - 3))
+        .toDouble();
+    final top = (height - point.y - radius)
+        .clamp(3.0, math.max(3.0, height - (radius * 2) - 3))
+        .toDouble();
+
+    return pw.Positioned(
+      left: left,
+      top: top,
+      child: pw.Container(
+        width: radius * 2,
+        height: radius * 2,
+        decoration: pw.BoxDecoration(
+          color: color,
+          shape: pw.BoxShape.circle,
+          border: pw.Border.all(color: PdfInstitutionalColors.white, width: 2),
+        ),
+        alignment: pw.Alignment.center,
+        child: pw.Text(
+          '${point.location.index}',
+          style: _bodyBold(
+            fonts,
+            size: 8,
+            color: PdfInstitutionalColors.darkSurfaceDeep,
+          ),
+        ),
+      ),
     );
   }
 
@@ -3445,6 +3631,18 @@ class OccurrencePdfGenerator {
       ),
     );
   }
+}
+
+class _PdfDisplacementPoint {
+  final OccurrenceLocation location;
+  final double x;
+  final double y;
+
+  const _PdfDisplacementPoint({
+    required this.location,
+    required this.x,
+    required this.y,
+  });
 }
 
 class _OccurrencePdfContext {

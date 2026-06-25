@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Drawable usado pelo flutter_local_notifications como ícone de notificação.
+    Aponta para o PNG legacy em mipmap para garantir compatibilidade com
+    android.resource:// lookup do plugin (mipmap/ic_launcher.xml adaptive
+    não é aceito como DrawableResource em runtime).
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher"
+    android:gravity="fill" />

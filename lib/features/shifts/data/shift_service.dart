@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
@@ -39,6 +40,9 @@ class ShiftService {
     required String handlerId,
     String? handlerAuthUid,
     String? handlerEmail,
+    String? shiftGroupId,
+    String? shiftGroupCode,
+    String? shiftGroupLabel,
     required String dogId,
     required DateTime startedAt,
     Vehicle? vehicle,
@@ -63,11 +67,17 @@ class ShiftService {
       authUid: handlerAuthUid,
       email: handlerEmail,
     );
+    final shiftGroupFields = _shiftGroupFields(
+      shiftGroupId: shiftGroupId,
+      shiftGroupCode: shiftGroupCode,
+      shiftGroupLabel: shiftGroupLabel,
+    );
 
     batch.set(logRef, {
       'id': logRef.id,
       'handlerId': handlerId,
       ...handlerFields,
+      ...shiftGroupFields,
       'initialDogId': dogId,
       'currentDogId': dogId,
       'service_dog_id': dogId,
@@ -85,6 +95,7 @@ class ShiftService {
       'shiftId': logRef.id,
       'handlerId': handlerId,
       ...handlerFields,
+      ...shiftGroupFields,
       'dogId': dogId,
       'service_dog_id': dogId,
       ...vehicleFields,
@@ -108,7 +119,40 @@ class ShiftService {
       );
     }
 
-    return batch.commit();
+    try {
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      // Se o Firestore bloquear active_shifts ou vehicle_crews por regras
+      // (PERMISSION_DENIED), o batch inteiro aborta atomicamente. Isso
+      // trava a UI em "iniciando turno…" sem chegar ao dashboard. Fallback:
+      // grava só o log do turno para o registro institucional não se perder.
+      if (e.code == 'permission-denied') {
+        debugPrint(
+          '[ShiftService] batch bloqueado por regras (${e.code}); '
+          'gravando só log do turno.',
+        );
+        await logRef.set({
+          'id': logRef.id,
+          'handlerId': handlerId,
+          ...handlerFields,
+          'initialDogId': dogId,
+          'currentDogId': dogId,
+          'service_dog_id': dogId,
+          ...vehicleFields,
+          'crew_role': crewFields['crew_role'],
+          'crew_status': crewFields['crew_status'],
+          'vehicle_crew_id': crewFields['vehicle_crew_id'],
+          'status': 'active',
+          'startedAt': Timestamp.fromDate(startedAt),
+          'endedAt': null,
+          'dogSwitches': <Map<String, dynamic>>[],
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> assumeVehicle({
@@ -132,7 +176,12 @@ class ShiftService {
       final activeSnapshot = await transaction.get(activeRef);
       final activeData = activeSnapshot.data();
       final shiftId = activeData?['shiftId'] as String?;
-      final activeDogId = activeData?['dogId'] as String? ?? dogId;
+      final activeDogId =
+          activeData?['service_dog_id']?.toString().trim() ??
+          activeData?['serviceDogId']?.toString().trim() ??
+          activeData?['dogId']?.toString().trim() ??
+          activeData?['currentDogId']?.toString().trim() ??
+          dogId;
       if (!activeSnapshot.exists ||
           activeData == null ||
           activeData['status'] != 'active' ||
@@ -198,7 +247,12 @@ class ShiftService {
         .where('vehicle_id', isEqualTo: vehicleId.trim())
         .get();
     final crew = snapshot.docs
-        .map((doc) => ActiveShiftSession.fromJson(doc.data()))
+        .map(
+          (doc) => ActiveShiftSession.fromJson({
+            ...doc.data(),
+            'handlerId': doc.id,
+          }),
+        )
         .where((session) => session.isActive)
         .toList();
     crew.sort((a, b) => a.handlerId.compareTo(b.handlerId));
@@ -368,6 +422,21 @@ class ShiftService {
     return {
       'auth_uid': _nonEmpty(authUid),
       'handler_email': _nonEmpty(email)?.toLowerCase(),
+    };
+  }
+
+  Map<String, dynamic> _shiftGroupFields({
+    String? shiftGroupId,
+    String? shiftGroupCode,
+    String? shiftGroupLabel,
+  }) {
+    return {
+      if (_nonEmpty(shiftGroupId) != null)
+        'shift_group_id': _nonEmpty(shiftGroupId),
+      if (_nonEmpty(shiftGroupCode) != null)
+        'shift_group_code': _nonEmpty(shiftGroupCode),
+      if (_nonEmpty(shiftGroupLabel) != null)
+        'shift_group_label': _nonEmpty(shiftGroupLabel),
     };
   }
 

@@ -30,7 +30,12 @@ class _DogSelectionCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(17, 14, 14, 14),
+        // Stack com 2 camadas:
+        // 1) container base com border uniforme + borderRadius (evita
+        //    "A borderRadius can only be given on borders with uniform
+        //    colors" quando o lado esquerdo precisa de cor diferente).
+        // 2) barra esquerda (titular/selecionado) sobreposta.
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.primary.withAlpha(10)
@@ -38,101 +43,121 @@ class _DogSelectionCard extends StatelessWidget {
               ? AppTheme.primary.withAlpha(5)
               : AppTheme.surfacePanel,
           borderRadius: BorderRadius.circular(14),
-          border: Border(
-            left: BorderSide(
-              color: isTitular ? AppTheme.primary : borderColor,
-              width: isTitular ? 3 : (isSelected ? 2 : 1),
-            ),
-            top: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
-            right: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
-            bottom: BorderSide(color: borderColor, width: isSelected ? 2 : 1),
+          border: Border.all(
+            color: borderColor,
+            width: isSelected ? 2 : 1,
           ),
         ),
-        child: Opacity(
-          opacity: isUnfit ? 0.85 : 1.0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Top row: avatar + info ─────────────────────────────
-              Row(
-                children: [
-                  _DogAvatar(dog: dog, fitness: fitness),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Nome + badge titular
-                        Row(
-                          children: [
-                            Text(
-                              dog.name,
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            if (isTitular) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'SEU CÃO',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.primary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        // Raça + idade + peso
-                        Text(
-                          _buildSubtitle(),
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        // Status operacional
-                        _OperationalStatusLine(dog: dog),
-                      ],
+              // barra lateral esquerda (cor distinta para titular/selecionado)
+              if (isTitular || isSelected)
+                Container(
+                  width: 3,
+                  margin: const EdgeInsets.only(right: 14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(14),
+                      bottomLeft: Radius.circular(14),
                     ),
                   ),
-                ],
+                )
+              else
+                const SizedBox(width: 0),
+              Expanded(
+                child: Opacity(
+                  opacity: isUnfit ? 0.85 : 1.0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    // ── Top row: avatar + info ─────────────────────
+                    Row(
+                      children: [
+                        _DogAvatar(dog: dog, fitness: fitness),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Nome + badge titular
+                              Row(
+                                children: [
+                                  Text(
+                                    dog.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  if (isTitular) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'SEU CÃO',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.primary,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              // Raça + idade + peso
+                              Text(
+                                _buildSubtitle(),
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              // Status operacional
+                              _OperationalStatusLine(dog: dog),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Status badge ─────────────────────────────
+                    _FitnessBadge(fitness: fitness),
+
+                    // ── Pendências ─────────────────────────────────
+                    if (fitness.pendencies.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _PendenciesList(pendencies: fitness.pendencies),
+                    ],
+
+                    // ── Footer: titular + última atividade ─────────
+                    const SizedBox(height: 6),
+                    _CardFooter(
+                      isTitular: isTitular,
+                      titularName: titularName,
+                      lastTrainingDate: dog.lastTrainingDate,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-
-              // ── Status badge ───────────────────────────────────────
-              _FitnessBadge(fitness: fitness),
-
-              // ── Pendências ─────────────────────────────────────────
-              if (fitness.pendencies.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _PendenciesList(pendencies: fitness.pendencies),
-              ],
-
-              // ── Footer: titular + última atividade ─────────────────
-              const SizedBox(height: 6),
-              _CardFooter(
-                isTitular: isTitular,
-                titularName: titularName,
-                lastTrainingDate: dog.lastTrainingDate,
-              ),
-            ],
+            ),
+          ],
           ),
         ),
       ),

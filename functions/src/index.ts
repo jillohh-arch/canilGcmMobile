@@ -1174,7 +1174,7 @@ function notificationText(type: string, occurrenceTitle: string): {title: string
   }
   if (type === "shift_start_reminder") {
     return {
-      title: "Plantao em breve",
+      title: "Plantão em breve",
       body: occurrenceTitle,
     };
   }
@@ -1186,7 +1186,7 @@ function notificationText(type: string, occurrenceTitle: string): {title: string
   }
   if (type === "shift_overdue_reminder" || type === "shift_open_reminder") {
     return {
-      title: "Turno aberto alem do previsto",
+      title: "Turno aberto além do previsto",
       body: occurrenceTitle,
     };
   }
@@ -6474,6 +6474,10 @@ export const onNotificationCreated = onDocumentCreated(
       notificationText(String(notification.type ?? ""), occurrenceTitle);
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
+      notification: {
+        title: text.title,
+        body: text.body,
+      },
       data: {
         notification_id: notificationId,
         type: String(notification.type ?? ""),
@@ -6558,6 +6562,7 @@ interface ShiftGroupSchedule {
 
 interface ShiftAssignmentSchedule {
   id: string;
+  lookupIds: string[];
   userId: string;
   shiftGroupId: string;
 }
@@ -6572,6 +6577,7 @@ interface ActiveShiftSchedule {
   id: string;
   handlerId: string;
   startedAt: Date | null;
+  shiftGroupId: string | null;
 }
 
 interface ShiftReminderStats {
@@ -6631,6 +6637,21 @@ function parseLocalDate(value: unknown): LocalDateParts | null {
   }
   const date = dateValue(value);
   return date ? saoPauloDateParts(date) : null;
+}
+
+function reminderIdentityKeys(...values: unknown[]): string[] {
+  const keys = new Set<string>();
+  for (const raw of values) {
+    const value = stringValue(raw);
+    if (!value) continue;
+    keys.add(value);
+    if (value.includes("@")) {
+      keys.add(value.toLowerCase());
+      const localPart = value.split("@")[0]?.trim();
+      if (localPart && /^\d+$/.test(localPart)) keys.add(localPart);
+    }
+  }
+  return Array.from(keys);
 }
 
 function saoPauloDateParts(date: Date): LocalDateParts {
@@ -6756,10 +6777,29 @@ function parseShiftGroupSchedule(id: string, data: JsonMap): ShiftGroupSchedule 
 function parseShiftAssignmentSchedule(id: string, data: JsonMap): ShiftAssignmentSchedule | null {
   const active = boolWithFallback(data.active, true);
   if (!active) return null;
-  const userId = stringValue(data.userId ?? data.user_id ?? data.user_ra);
+  const lookupIds = reminderIdentityKeys(
+    data.user_ra,
+    data.ra,
+    data.handlerId,
+    data.handler_id,
+    data.userId,
+    data.user_id,
+    data.auth_uid,
+    data.authUid,
+    data.handler_email,
+    data.email,
+    id,
+  );
+  const userId = stringValue(data.user_ra ?? data.ra ?? data.handlerId ?? data.handler_id) ??
+    stringValue(data.userId ?? data.user_id ?? data.auth_uid ?? data.authUid ?? id);
   const shiftGroupId = stringValue(data.shiftGroupId ?? data.shift_group_id);
   if (!userId || !shiftGroupId) return null;
-  return {id, userId, shiftGroupId};
+  return {
+    id,
+    lookupIds: reminderIdentityKeys(userId, ...lookupIds),
+    userId,
+    shiftGroupId,
+  };
 }
 
 function isShiftWorkDay(group: ShiftGroupSchedule, parts: LocalDateParts): boolean {
@@ -6800,6 +6840,24 @@ function shiftWindowsNear(group: ShiftGroupSchedule, now: Date): ShiftWindowSche
     .filter((item): item is ShiftWindowSchedule => Boolean(item));
 }
 
+function momentInsideWindowInclusive(moment: Date, window: ShiftWindowSchedule): boolean {
+  return moment.getTime() >= window.start.getTime() && moment.getTime() <= window.end.getTime();
+}
+
+function activeShiftWindowsNear(
+  group: ShiftGroupSchedule,
+  now: Date,
+  activeShift: ActiveShiftSchedule,
+): ShiftWindowSchedule[] {
+  const windows = shiftWindowsNear(group, now);
+  if (!activeShift.startedAt) return windows;
+  const filtered = windows.filter((window) =>
+    momentInsideWindowInclusive(activeShift.startedAt as Date, window) ||
+    momentInsideWindowInclusive(now, window),
+  );
+  return filtered.length > 0 ? filtered : [];
+}
+
 function shouldFireAt(now: Date, dueAt: Date): boolean {
   const deltaMs = now.getTime() - dueAt.getTime();
   return deltaMs >= 0 && deltaMs < SHIFT_REMINDER_TOLERANCE_MINUTES * 60 * 1000;
@@ -6822,9 +6880,9 @@ function formatShiftHour(date: Date): string {
 }
 
 function shiftReminderTitle(type: ShiftReminderType): string {
-  if (type === "shift_start_reminder") return "Plantao em breve";
+  if (type === "shift_start_reminder") return "Plantão em breve";
   if (type === "shift_end_reminder") return "Hora de encerrar o turno";
-  return "Turno aberto alem do previsto";
+  return "Turno aberto além do previsto";
 }
 
 function shiftReminderBody(
@@ -6834,18 +6892,18 @@ function shiftReminderBody(
   activeShift?: ActiveShiftSchedule,
 ): string {
   if (type === "shift_start_reminder") {
-    return `${group.name} comeca as ${formatShiftHour(window.start)}. Toque para assumir o turno.`;
+    return `${group.name} começa às ${formatShiftHour(window.start)}. Toque para assumir o turno.`;
   }
   if (type === "shift_end_reminder") {
-    return `${group.name} encerra as ${formatShiftHour(window.end)}. Se ainda estiver em ocorrencia, encerre quando finalizar.`;
+    return `${group.name} encerra às ${formatShiftHour(window.end)}. Se ainda estiver em ocorrência, encerre quando finalizar.`;
   }
   const startedAt = activeShift?.startedAt;
   const hoursOpen = startedAt ?
     Math.floor((Date.now() - startedAt.getTime()) / (60 * 60 * 1000)) :
     null;
   return hoursOpen === null ?
-    `${group.name} continua aberto alem do horario previsto.` :
-    `${group.name} esta aberto ha ${hoursOpen}h. Encerre quando o trabalho operacional terminar.`;
+    `${group.name} continua aberto além do horário previsto.` :
+    `${group.name} está aberto há ${hoursOpen}h. Encerre quando o trabalho operacional terminar.`;
 }
 
 function shiftReminderDocId(
@@ -6931,14 +6989,39 @@ async function loadActiveShiftsForReminder(): Promise<Map<string, ActiveShiftSch
   const shifts = new Map<string, ActiveShiftSchedule>();
   for (const doc of snapshot.docs) {
     const data = doc.data() ?? {};
-    const handlerId = stringValue(data.handlerId ?? data.handler_id) ?? doc.id;
-    shifts.set(handlerId, {
+    const handlerId = stringValue(data.handlerId ?? data.handler_id ?? data.user_ra ?? data.ra) ?? doc.id;
+    const shift: ActiveShiftSchedule = {
       id: stringValue(data.shiftId ?? data.shift_id) ?? doc.id,
       handlerId,
       startedAt: dateValue(data.startedAt ?? data.started_at),
-    });
+      shiftGroupId: stringValue(data.shiftGroupId ?? data.shift_group_id) ?? null,
+    };
+    const keys = reminderIdentityKeys(
+      doc.id,
+      handlerId,
+      data.handlerId,
+      data.handler_id,
+      data.user_ra,
+      data.ra,
+      data.auth_uid,
+      data.authUid,
+      data.handler_email,
+      data.email,
+    );
+    for (const key of keys) shifts.set(key, shift);
   }
   return shifts;
+}
+
+function activeShiftForAssignment(
+  activeShifts: Map<string, ActiveShiftSchedule>,
+  assignment: ShiftAssignmentSchedule,
+): ActiveShiftSchedule | null {
+  for (const key of assignment.lookupIds) {
+    const shift = activeShifts.get(key);
+    if (shift) return shift;
+  }
+  return activeShifts.get(assignment.userId) ?? null;
 }
 
 async function runShiftReminderScan(now: Date): Promise<ShiftReminderStats> {
@@ -6959,13 +7042,25 @@ async function runShiftReminderScan(now: Date): Promise<ShiftReminderStats> {
 
   for (const assignment of assignments) {
     stats.checked += 1;
-    const group = groups.get(assignment.shiftGroupId);
-    if (!group) {
+    const assignedGroup = groups.get(assignment.shiftGroupId);
+    if (!assignedGroup) {
       stats.skippedWithoutGroup += 1;
       continue;
     }
-    const activeShift = activeShifts.get(assignment.userId);
-    const windows = shiftWindowsNear(group, now);
+    const activeShift = activeShiftForAssignment(activeShifts, assignment);
+    const group = activeShift?.shiftGroupId ? (groups.get(activeShift.shiftGroupId) ?? assignedGroup) : assignedGroup;
+    const windows = activeShift ?
+      activeShiftWindowsNear(group, now, activeShift) :
+      shiftWindowsNear(group, now);
+
+    if (activeShift) {
+      await resolveShiftReminderNotificationsForKeys(
+        reminderIdentityKeys(assignment.userId, ...assignment.lookupIds, activeShift.handlerId),
+        ["shift_start_reminder"],
+        "shift_started",
+        {shift_id: activeShift.id},
+      );
+    }
 
     if (!activeShift && group.notifications.startReminderEnabled) {
       for (const window of windows) {
@@ -7078,6 +7173,71 @@ async function resolveShiftReminderNotifications(
   return resolved;
 }
 
+async function resolveShiftReminderNotificationsForKeys(
+  userIds: string[],
+  types: ShiftReminderType[],
+  resolutionAction: string,
+  metadata: JsonMap = {},
+): Promise<number> {
+  let resolved = 0;
+  const uniqueUserIds = Array.from(new Set(userIds.filter((id) => id.trim().length > 0)));
+  for (const userId of uniqueUserIds) {
+    resolved += await resolveShiftReminderNotifications(userId, types, resolutionAction, metadata);
+  }
+  return resolved;
+}
+
+function activeShiftNotificationKeys(handlerId: string, data: JsonMap): string[] {
+  return reminderIdentityKeys(
+    handlerId,
+    data.handlerId,
+    data.handler_id,
+    data.user_ra,
+    data.ra,
+    data.auth_uid,
+    data.authUid,
+    data.handler_email,
+    data.email,
+  );
+}
+
+export const resolveShiftReminderNotification = onCall({region}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data && typeof request.data === "object" ? request.data as JsonMap : {};
+  const notificationId = requiredString(data, "notification_id");
+  const ref = db
+    .collection("notifications")
+    .doc(caller.ra)
+    .collection("items")
+    .doc(notificationId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return {resolved: false, reason: "not_found"};
+  }
+
+  const notification = snapshot.data() ?? {};
+  const type = String(notification.type ?? "");
+  if (!["shift_end_reminder", "shift_overdue_reminder", "shift_open_reminder"].includes(type)) {
+    throw new HttpsError("failed-precondition", "Notificacao nao e lembrete de encerramento de turno.");
+  }
+  if (notification.resolved_at !== null && notification.resolved_at !== undefined) {
+    return {resolved: false, reason: "already_resolved"};
+  }
+
+  await ref.set(notificationResolutionPatch({
+    type,
+    actor: caller,
+    resolutionAction: "shift_reminder_opened",
+    metadata: {
+      notification_id: notificationId,
+      shift_id: stringValue(notification.shift_id) ?? null,
+      shift_group_id: stringValue(notification.shift_group_id) ?? null,
+    },
+  }), {merge: true});
+
+  return {resolved: true};
+});
+
 export const onActiveShiftCreatedResolveReminders = onDocumentCreated(
   {
     document: "active_shifts/{handlerId}",
@@ -7086,8 +7246,8 @@ export const onActiveShiftCreatedResolveReminders = onDocumentCreated(
   async (event) => {
     const data = event.data?.data() ?? {};
     if (String(data.status ?? "") !== "active") return;
-    await resolveShiftReminderNotifications(
-      event.params.handlerId,
+    await resolveShiftReminderNotificationsForKeys(
+      activeShiftNotificationKeys(event.params.handlerId, data),
       ["shift_start_reminder"],
       "shift_started",
       {shift_id: stringValue(data.shiftId ?? data.shift_id) ?? event.params.handlerId},
@@ -7109,8 +7269,8 @@ export const onActiveShiftUpdatedResolveReminders = onDocumentUpdated(
     const endedAt = dateValue(after.endedAt ?? after.ended_at);
 
     if (!wasActive && isActive) {
-      await resolveShiftReminderNotifications(
-        handlerId,
+      await resolveShiftReminderNotificationsForKeys(
+        activeShiftNotificationKeys(handlerId, after),
         ["shift_start_reminder"],
         "shift_started",
         {shift_id: stringValue(after.shiftId ?? after.shift_id) ?? handlerId},
@@ -7119,8 +7279,8 @@ export const onActiveShiftUpdatedResolveReminders = onDocumentUpdated(
     }
 
     if (wasActive && (!isActive || endedAt !== null)) {
-      await resolveShiftReminderNotifications(
-        handlerId,
+      await resolveShiftReminderNotificationsForKeys(
+        activeShiftNotificationKeys(handlerId, after),
         ["shift_end_reminder", "shift_overdue_reminder"],
         "shift_ended",
         {

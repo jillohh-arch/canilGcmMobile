@@ -139,8 +139,8 @@ extension _MainRootActions on _MainRootScreenState {
             width: _fabSize,
             height: _fabSize,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
               color: _fabColor,
+              borderRadius: BorderRadius.circular(27),
               border: Border.all(color: _fabRingColor, width: 4),
               boxShadow: [
                 BoxShadow(
