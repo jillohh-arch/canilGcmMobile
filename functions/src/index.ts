@@ -5196,9 +5196,22 @@ export const generateOccurrenceAiDraft = onCall({region, timeoutSeconds: 60}, as
   };
 });
 
-const NUTRITION_AI_PROMPT_VERSION = "nutrition-operational-insight-v1";
+const NUTRITION_AI_PROMPT_VERSION = "nutrition-operational-insight-v2";
 const NUTRITION_AI_FALLBACK_MODEL = "local_nutrition_analysis_v1";
 const NUTRITION_AI_MAX_PERIOD_DAYS = 90;
+
+const nutritionAiSystemInstruction = `Você é um assistente de análise nutricional operacional de uma unidade K9. Seu leitor é o condutor/gestor de campo, NÃO um veterinário: escreva em português do Brasil, com acentuação correta, em linguagem simples, prática e direta ao ponto. Traduza a ciência em ação — evite jargão técnico cru no texto final. Você não diagnostica nem prescreve; suas sugestões são orientações para avaliação técnica.`;
+
+// Princípios técnicos anônimos de nutrição de cão de detecção (fundamentação da IA).
+const NUTRITION_KNOWLEDGE_BASE = [
+  "Base de conhecimento (use para raciocinar; escreva a saída em linguagem simples):",
+  "- Calibragem central: o efeito da nutrição sobre o faro é REFINADOR e PREVENTIVO, não milagroso. A dieta melhora a consistência das buscas, a probabilidade de acerto e preserva a janela de trabalho útil, mas NÃO expande o limiar absoluto de detecção do cão. Nunca prometa que ração aumenta ou melhora o faro como milagre; enquadre como manutenção de desempenho e prevenção de fadiga térmica.",
+  "- Gordura: a fonte importa mais que a quantidade. Gordura de boa qualidade, rica em insaturados (ex.: ômega-3), favorece a consistência das buscas; gordura saturada de baixa qualidade tende a reduzir a acuidade olfativa. Para o condutor: \"a qualidade da gordura da ração influencia mais que a quantidade\".",
+  "- Proteína x calor: proteína em excesso, com balanço ruim de gordura, faz o organismo gerar mais calor para digerir, antecipando o ofego durante o trabalho. O ofego compete com o farejar (cão que ofega fareja menos). Reduzir levemente a proteína e equilibrar a gordura ajuda o cão a recuperar a temperatura mais rápido e preserva a janela de trabalho. Para o condutor: \"proteína demais esquenta mais o cão e encurta o tempo útil de faro\".",
+  "- Ômega-3 (DHA e EPA): mantém a saúde das membranas dos neurônios do olfato; incorpora-se em curto prazo via dieta ou suplementação. Para o condutor: \"ômega-3 (óleo de peixe) ajuda a manter a saúde do olfato\".",
+  "- Hidratação e calor (clima brasileiro): o cão dissipa calor quase só por ofego, não sua. Desidratação resseca a mucosa nasal e prejudica a captação de odor. Exercício intenso em cão não condicionado reduz a sensibilidade olfativa logo após o esforço. Hidratar antes, durante e depois, e condicionar o cão, preserva o faro em dias quentes. Para o condutor: \"cão hidratado e condicionado fareja melhor por mais tempo no calor\".",
+  "- Sinais que pedem nível atencao_clinica: variação de peso fora da faixa ideal de forma persistente; queda de consumo combinada com aumento de carga de trabalho; qualquer sinal que sugira problema de saúde (recomende avaliação veterinária, sem diagnosticar).",
+].join("\n");
 
 interface NutritionAiContext {
   dogId: string;
@@ -5567,19 +5580,78 @@ function nutritionFallbackInsight(context: NutritionAiContext): NutritionAiInsig
   };
 }
 
+function nutritionDogAgeYears(dog: JsonMap): number | null {
+  const birth = nutritionDate(dog.dateOfBirth ?? dog.birthDate ?? dog.birth_date);
+  if (!birth) return null;
+  const now = new Date();
+  let years = now.getFullYear() - birth.getFullYear();
+  const hadBirthday =
+    now.getMonth() > birth.getMonth() ||
+    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
+  if (!hadBirthday) years -= 1;
+  return years >= 0 ? years : null;
+}
+
+// ponytail: carga de treino inferida por frequência/contagem; intensidade e clima
+// reais não existem no schema de sessão -> tratados como lacuna, nunca inventados.
+function classifyTrainingLoad(context: NutritionAiContext): JsonMap {
+  const sessions = context.trainings.length;
+  const days = context.periodDays > 0 ? context.periodDays : 1;
+  const sessionsPerWeek = (sessions / days) * 7;
+  let level = "baixa";
+  if (sessions === 0) {
+    level = "sem_registro";
+  } else if (sessionsPerWeek >= 4) {
+    level = "alta";
+  } else if (sessionsPerWeek >= 2) {
+    level = "moderada";
+  }
+  const withDuration = context.trainings.filter(
+    (item) => optionalNumberValue(item.duration_seconds) !== null,
+  );
+  const totalSeconds = withDuration.reduce(
+    (sum, item) => sum + (optionalNumberValue(item.duration_seconds) ?? 0),
+    0,
+  );
+  return {
+    inferred_level: level,
+    sessions_count: sessions,
+    sessions_per_week: Math.round(sessionsPerWeek * 10) / 10,
+    sessions_with_duration: withDuration.length,
+    average_duration_minutes: withDuration.length > 0 ?
+      Math.round(totalSeconds / withDuration.length / 60) :
+      null,
+    intensity_recorded: false,
+    weather_recorded: false,
+    note: "Intensidade real e clima não são registrados na sessão; carga inferida apenas pela frequência. Tratar intensidade e temperatura como lacuna.",
+  };
+}
+
 function nutritionAiPrompt(context: NutritionAiContext): string {
+  const ageYears = nutritionDogAgeYears(context.dog);
+  const trainingLoad = classifyTrainingLoad(context);
   return [
-    "Voce auxilia uma unidade K9 com uma analise operacional de nutricao.",
-    "Regras obrigatorias:",
-    "- Nao faca diagnostico veterinario.",
-    "- Nao prescreva medicamento, suplemento ou quantidade como ordem definitiva.",
-    "- Use somente os dados fornecidos.",
-    "- Escreva em portugues claro para condutor/gestor.",
-    "- Quando faltar dado, aponte como lacuna.",
-    "- Sugestoes de alimento/suplemento devem ser orientacoes para avaliacao tecnica, nunca prescricao.",
+    "Você auxilia uma unidade K9 com uma análise operacional de nutrição por período (retrospectiva).",
     "",
-    "Retorne somente JSON valido no formato:",
-    "{\"summary\":\"...\",\"recommendation_level\":\"manter_monitorando|avaliar_aumento|avaliar_reducao|atenção_clinica\",\"food_adjustment\":\"...\",\"supplement_notes\":[\"...\"],\"hydration_notes\":[\"...\"],\"operational_factors\":[\"...\"],\"data_gaps\":[\"...\"],\"veterinary_warnings\":[\"...\"],\"next_actions\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
+    NUTRITION_KNOWLEDGE_BASE,
+    "",
+    "Como usar os princípios:",
+    "- Raciocine com a base de conhecimento, mas escreva a saída em linguagem simples para o condutor (sem jargão cru).",
+    "- A idade do cão muda a necessidade energética e as recomendações; considere a fase de vida quando a idade existir.",
+    "- A carga de treino (campo training_load) foi inferida pela frequência de sessões. Intensidade real e clima NÃO são registrados: trate-os como lacuna em data_gaps e recomende registrá-los. NUNCA invente uma temperatura ou intensidade não informada.",
+    "",
+    "Regras obrigatórias:",
+    "- Não faça diagnóstico veterinário.",
+    "- Não prescreva medicamento, suplemento ou quantidade como ordem definitiva.",
+    "- Use somente os dados fornecidos; nunca invente números, datas ou medições.",
+    "- Quando faltar dado, aponte como lacuna em data_gaps.",
+    "- Sugestões de alimento/suplemento são orientações para avaliação técnica, nunca prescrição.",
+    "- Mantenha a calibragem: a nutrição refina e previne (consistência, janela de trabalho, prevenção de fadiga térmica); não prometa ganho de faro como milagre.",
+    "",
+    "O campo recommendation_level DEVE ser exatamente um destes quatro literais (sem acento): manter_monitorando, avaliar_aumento, avaliar_reducao, atencao_clinica.",
+    "",
+    "Retorne somente JSON válido no formato:",
+    "{\"summary\":\"...\",\"recommendation_level\":\"manter_monitorando|avaliar_aumento|avaliar_reducao|atencao_clinica\",\"food_adjustment\":\"...\",\"supplement_notes\":[\"...\"],\"hydration_notes\":[\"...\"],\"operational_factors\":[\"...\"],\"data_gaps\":[\"...\"],\"veterinary_warnings\":[\"...\"],\"next_actions\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
     "",
     `Contexto: ${JSON.stringify({
       source: nutritionSourceSummary(context),
@@ -5588,10 +5660,14 @@ function nutritionAiPrompt(context: NutritionAiContext): string {
         name: dogDisplayName(context.dogId, context.dog),
         breed: context.dog.breed ?? context.dog.raca ?? "",
         sex: context.dog.sex ?? "",
+        // ponytail: idade incluída quando há dateOfBirth no doc do cão; ausente vira null
+        age_years: ageYears,
         weight: context.dog.weight ?? null,
         idealWeightMin: context.dog.idealWeightMin ?? context.dog.ideal_weight_min ?? null,
         idealWeightMax: context.dog.idealWeightMax ?? context.dog.ideal_weight_max ?? null,
       },
+      // ponytail: intensidade/clima inferidos por frequência; cruzar com dado real quando os campos existirem
+      training_load: trainingLoad,
       prescription: context.prescription,
       feedings: context.feedings,
       supplements: context.supplements,
@@ -5653,7 +5729,8 @@ async function nutritionGeminiInsight(context: NutritionAiContext): Promise<Nutr
   const apiKey = occurrenceAiEnv("GEMINI_API_KEY") ?? occurrenceAiEnv("GOOGLE_GENAI_API_KEY");
   const fetchLike = (globalThis as unknown as {fetch?: FetchLike}).fetch;
   if (!apiKey || !fetchLike) return null;
-  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  // ponytail: 3.5-flash p/ qualidade+velocidade; GEMINI_MODEL faz override
+  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-3.5-flash";
   const modelPath = model.startsWith("models/") ? model : `models/${model}`;
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const response = await fetchLike(endpoint, {
@@ -5666,9 +5743,14 @@ async function nutritionGeminiInsight(context: NutritionAiContext): Promise<Nutr
           parts: [{text: nutritionAiPrompt(context)}],
         },
       ],
+      systemInstruction: {
+        parts: [{text: nutritionAiSystemInstruction}],
+      },
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.4,
+        maxOutputTokens: 1536,
         responseMimeType: "application/json",
+        thinkingConfig: {thinkingLevel: "medium"},
       },
     }),
   });
