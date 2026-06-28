@@ -102,3 +102,6 @@ local.settings.json
 functions/node_modules/
 functions/.npm-cache/
 functions/lib/
+
+# planilhas pessoais que cairam na pasta da skill
+.claude/skills/ponytail/*.xlsx

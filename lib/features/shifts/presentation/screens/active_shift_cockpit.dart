@@ -95,12 +95,11 @@ void _assumeVehicleDuringShift(BuildContext context, Vehicle vehicle) async {
   await shiftVM.assumeVehicle(vehicle);
   if (!context.mounted) return;
   final error = shiftVM.error;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(error ?? 'Viatura ${vehicle.label} assumida.'),
-      backgroundColor: error == null ? AppTheme.primary : AppTheme.error,
-    ),
-  );
+  if (error != null) {
+    AppFeedback.error(context, error);
+  } else {
+    AppFeedback.success(context, 'Viatura ${vehicle.label} assumida.');
+  }
 }
 
 class _VehicleAssumptionPrompt extends StatelessWidget {

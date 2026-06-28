@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 
 class AddCommandModal extends StatefulWidget {
@@ -276,9 +277,7 @@ class _AddCommandModalState extends State<AddCommandModal> {
 
     final cmdName = _nameController.text.trim();
     // Simulate save success
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Comando "$cmdName" cadastrado com sucesso!')),
-    );
+    AppFeedback.success(context, 'Comando "$cmdName" cadastrado com sucesso!');
     Navigator.of(context).pop(true);
   }
 }

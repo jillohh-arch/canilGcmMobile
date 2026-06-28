@@ -366,13 +366,8 @@ class ShiftService {
           },
           SetOptions(merge: true),
         );
-        if (activeData?['crew_role'] == 'titular') {
-          transaction.set(_vehicleCrews.doc(crewId), {
-            'active': false,
-            'ended_at': endedAt,
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
+        //ponytail: crew deactivation movido para trigger onActiveShiftUpdated no index.ts —
+//          mais seguro que checar papel dentro da transacao (evita query dentro de transaction)
       }
     });
   }

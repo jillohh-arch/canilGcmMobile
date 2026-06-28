@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
@@ -83,21 +84,11 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
 
   Future<void> _saveSession() async {
     if (_selectedCommands.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione ao menos um comando trabalhado'),
-          backgroundColor: AppTheme.attention,
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione ao menos um comando trabalhado');
       return;
     }
     if (_selectedRating == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione o desempenho geral'),
-          backgroundColor: AppTheme.attention,
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione o desempenho geral');
       return;
     }
 
@@ -125,18 +116,11 @@ class _ObedienceTrainingScreenState extends State<ObedienceTrainingScreen> {
       await vm.addTrainingSession(session);
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sessão de obediência salva!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      AppFeedback.success(context, 'Sessão de obediência salva!');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
-      );
+      AppFeedback.error(context, e);
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -257,13 +258,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
           GestureDetector(
             onTap: () {
               Clipboard.setData(ClipboardData(text: data.integrityHash));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Hash copiado', style: GoogleFonts.inter()),
-                  backgroundColor: AppTheme.primary,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              AppFeedback.info(context, 'Hash copiado');
             },
             child: Row(
               children: [
@@ -354,41 +349,35 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
 
   Future<void> _generateAndPreviewPdf(BuildContext context) async {
     HapticFeedback.lightImpact();
-    _showLoadingSnackbar(context, 'Gerando PDF...');
+    AppFeedback.loading(context, 'Gerando PDF...');
 
     try {
       final bytes = await _buildPdfBytes(context, auditAction: 'pdf_previewed');
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
       await Printing.layoutPdf(
         onLayout: (_) => bytes,
         name: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _showErrorSnackbar(context, 'Erro ao gerar PDF: $e');
+      AppFeedback.error(context, 'Erro ao gerar PDF: $e');
     }
   }
 
   Future<void> _generateAndSharePdf(BuildContext context) async {
     HapticFeedback.lightImpact();
-    _showLoadingSnackbar(context, 'Preparando PDF...');
+    AppFeedback.loading(context, 'Preparando PDF...');
 
     try {
       final bytes = await _buildPdfBytes(context, auditAction: 'pdf_shared');
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
       await Printing.sharePdf(
         bytes: bytes,
         filename: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _showErrorSnackbar(context, 'Erro ao compartilhar: $e');
+      AppFeedback.error(context, 'Erro ao compartilhar: $e');
     }
   }
 
@@ -479,38 +468,32 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     }
   }
 
-  void _showLoadingSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(message, style: GoogleFonts.inter()),
-          ],
-        ),
-        backgroundColor: AppTheme.primary,
-        duration: const Duration(seconds: 30),
-      ),
-    );
-  }
-
-  void _showErrorSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: GoogleFonts.inter()),
-        backgroundColor: AppTheme.error,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
+  // TODO migração manual: _showLoadingSnackbar possuía SnackBar com widget Row
+  // customizado (CircularProgressIndicator + texto). AppFeedback.loading()
+  // cobre o caso de uso, mas o visual difere do original.
+  //
+  // void _showLoadingSnackbar(BuildContext context, String message) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //       content: Row(
+  //         children: [
+  //           const SizedBox(
+  //             width: 16,
+  //             height: 16,
+  //             child: CircularProgressIndicator(
+  //               strokeWidth: 2,
+  //               color: AppTheme.textPrimary,
+  //             ),
+  //           ),
+  //           const SizedBox(width: 12),
+  //           Text(message, style: GoogleFonts.inter()),
+  //         ],
+  //       ),
+  //       backgroundColor: AppTheme.primary,
+  //       duration: const Duration(seconds: 30),
+  //     ),
+  //   );
+  // }
 
   Widget _buildBottomCta(BuildContext context) {
     return Container(

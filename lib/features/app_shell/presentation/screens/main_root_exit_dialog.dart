@@ -26,6 +26,7 @@ extension _MainRootExitDialog on _MainRootScreenState {
     _lastBackPress = now;
 
     if (!context.mounted) return;
+    // TODO migração manual: SnackBar com styling customizado
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

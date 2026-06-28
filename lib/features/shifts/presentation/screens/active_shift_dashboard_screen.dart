@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
@@ -224,7 +225,6 @@ class _ActiveShiftDashboardScreenState
     setState(() => _recoveringMissingDog = true);
 
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-    final messenger = ScaffoldMessenger.of(context);
     await shiftVM.endShift();
 
     if (!mounted) return;
@@ -232,16 +232,7 @@ class _ActiveShiftDashboardScreenState
 
     final error = shiftVM.error;
     if (error != null && error.trim().isNotEmpty) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Não foi possível limpar o turno anterior. Tente novamente.',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-          ),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.error(context, error);
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
@@ -2493,12 +2494,7 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
 
   Future<void> _saveSession() async {
     if (_selectedImpulse == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione o impulso trabalhado'),
-          backgroundColor: AppTheme.attention,
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione o impulso trabalhado');
       return;
     }
 
@@ -2537,18 +2533,11 @@ class _SessionFormScreenState extends State<_SessionFormScreen> {
       await vm.addTrainingSession(session);
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Sessão de guarda & proteção salva!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      AppFeedback.success(context, 'Sessão de guarda & proteção salva!');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
-      );
+      AppFeedback.error(context, e);
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/osm_geocoding_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
@@ -142,9 +143,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
         if (requested == LocationPermission.denied ||
             requested == LocationPermission.deniedForever) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Permissão de localização negada')),
-            );
+            AppFeedback.warning(context, 'Permissão de localização negada');
           }
           return;
         }
@@ -173,9 +172,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao obter localização: $e')),
-        );
+        AppFeedback.error(context, 'Erro ao obter localização: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoadingGps = false);
@@ -234,9 +231,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
+        AppFeedback.error(context, 'Erro ao salvar: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

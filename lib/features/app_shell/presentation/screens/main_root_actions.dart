@@ -180,11 +180,7 @@ extension _MainRootActions on _MainRootScreenState {
   ) async {
     HapticFeedback.mediumImpact();
     if (dogId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inicie um turno para registrar ocorrência.'),
-        ),
-      );
+      AppFeedback.warning(context, 'Inicie um turno para registrar ocorrência.');
       return;
     }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/main.dart' show globalScaffoldMessengerKey;
 
 enum AppFeedbackType { success, error, warning, info, loading }
 
@@ -61,8 +62,16 @@ class AppFeedback {
     AppFeedbackType type = AppFeedbackType.info,
     String? title,
     Duration duration = const Duration(seconds: 4),
+    SnackBarAction? action,
   }) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
+    // Fallback no messenger global: ao encerrar turno (ou outra ação que troca
+    // de tela), o widget de origem é desmontado antes do snackbar renderizar.
+    // Tocar em ScaffoldMessenger.maybeOf com um contexto desmontado lança
+    // exceção, então só consultamos o contexto se ele ainda estiver montado;
+    // caso contrário caímos no messenger global, que sobrevive à navegação.
+    final messenger =
+        (context.mounted ? ScaffoldMessenger.maybeOf(context) : null) ??
+        globalScaffoldMessengerKey.currentState;
     if (messenger == null) return;
     final visual = _visualFor(type);
     messenger.clearSnackBars();
@@ -76,6 +85,7 @@ class AppFeedback {
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
         padding: EdgeInsets.zero,
         backgroundColor: Colors.transparent,
+        action: action,
         content: Container(
           decoration: BoxDecoration(
             color: AppTheme.surfaceSnack.withValues(alpha: 0.98),

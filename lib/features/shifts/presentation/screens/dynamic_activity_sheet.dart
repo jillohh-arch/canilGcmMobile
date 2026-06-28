@@ -20,6 +20,7 @@ import 'package:canil_gcm/core/controllers/media_attachment_rows.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/dynamic_subtype_fields.dart';
 import 'package:canil_gcm/features/training/presentation/widgets/training_activity_fields.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_activity_fields.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/widgets/quick_location_actions.dart';
 import 'package:canil_gcm/features/shifts/presentation/widgets/activity_card_catalog.dart';
 import 'package:canil_gcm/features/shifts/presentation/widgets/activity_category_menu_sheet.dart';

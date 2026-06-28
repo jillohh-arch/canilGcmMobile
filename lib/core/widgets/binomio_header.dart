@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
@@ -545,9 +546,11 @@ class _HeaderMenuButton extends StatelessWidget {
     if (confirmed != true) return;
 
     await shiftVM.endShift();
-    if (context.mounted) {
-      _showSnack(context, 'Turno encerrado.');
-    }
+    // Sem guard de mounted: ao encerrar o turno o app troca de tela e desmonta
+    // este widget. O AppFeedback detecta isso e roteia para o messenger global,
+    // que sobrevive à navegação.
+    // ignore: use_build_context_synchronously
+    AppFeedback.success(context, 'Expediente finalizado. Bom descanso, GCM!', title: 'Até logo');
   }
 
   Future<void> _confirmLogout(
@@ -616,9 +619,7 @@ class _HeaderMenuButton extends StatelessWidget {
   }
 
   void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.info(context, message);
   }
 }
 

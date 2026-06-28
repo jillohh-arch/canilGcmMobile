@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -842,12 +843,7 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
   Future<void> _saveSession() async {
     if (_isSaving) return; // Previne múltiplos cliques
     if (_selectedIntensity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione a intensidade'),
-          backgroundColor: AppTheme.attention,
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione a intensidade');
       return;
     }
 
@@ -948,20 +944,13 @@ class _ConditioningFormViewState extends State<_ConditioningFormView> {
       await vm.addTrainingSession(session);
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sessão de ${widget.exercise.name} salva com sucesso!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      AppFeedback.success(context, 'Sessão de ${widget.exercise.name} salva com sucesso!');
       // Volta para a tela anterior (overview de condicionamento)
       widget.onBack();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
-      );
+      AppFeedback.error(context, e);
     }
   }
 

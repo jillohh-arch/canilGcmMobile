@@ -121,6 +121,48 @@ class NotificationService {
     debugPrint('[NotificationService] Aviso arquivado: ${notification.id}');
   }
 
+  /// Arquiva todos os avisos elegiveis de uma lista pre-filtrada em memoria.
+  ///
+  /// Parte 14: notificacoes nunca sao deletadas. Apenas soft-archive via
+  /// [archived_at]. Pendencias abertas ([isOpenAction]) sao excluidas.
+  /// Fragmenta em blocos de ate 400 operacoes por batch.
+  Future<int> archiveAllNotices({
+    required String userId,
+    required List<NotificationItem> notifications,
+  }) async {
+    final toArchive = notifications
+        .where((n) => n.canBeArchived && !n.isArchived)
+        .toList();
+
+    if (toArchive.isEmpty) return 0;
+
+    int archived = 0;
+    const batchSize = 400;
+
+    for (var i = 0; i < toArchive.length; i += batchSize) {
+      final batch = FirebaseFirestore.instance.batch();
+      final chunk = toArchive.skip(i).take(batchSize);
+
+      for (final notice in chunk) {
+        batch.update(
+          _notificationsCollection
+              .doc(userId)
+              .collection('items')
+              .doc(notice.id),
+          {'archived_at': FieldValue.serverTimestamp()},
+        );
+      }
+
+      await batch.commit();
+      archived += chunk.length;
+    }
+
+    debugPrint(
+      '[NotificationService] $archived avisos arquivados para $userId',
+    );
+    return archived;
+  }
+
   Future<void> resolveShiftReminderNotification({
     required String notificationId,
   }) async {

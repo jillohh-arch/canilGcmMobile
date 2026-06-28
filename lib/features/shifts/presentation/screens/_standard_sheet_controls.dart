@@ -1,5 +1,9 @@
 part of 'dynamic_activity_sheet.dart';
 
+// TODO migração manual: _openLiveTracking exibe SnackBar com backgroundColor
+// AppTheme.successOperational arbitrário. AppFeedback.success cobre o caso,
+// mas com visual diferente. Avalie se a cor verde operacional é essencial.
+
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _StandardSheetControls on _DynamicActivitySheetState {
@@ -163,12 +167,7 @@ extension _StandardSheetControls on _DynamicActivitySheetState {
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Rastreamento finalizado. Distância e tempo calculados.'),
-        backgroundColor: AppTheme.successOperational,
-      ),
-    );
+    AppFeedback.success(context, 'Rastreamento finalizado. Distância e tempo calculados.');
   }
 
   void _setFormDataValue(String label, String? value) {

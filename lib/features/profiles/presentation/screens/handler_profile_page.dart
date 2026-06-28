@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -144,11 +145,10 @@ class HandlerProfilePage extends StatelessWidget {
   Future<void> _endShift(BuildContext context, ShiftViewModel shiftVM) async {
     HapticFeedback.mediumImpact();
     await shiftVM.endShift();
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Expediente encerrado')));
-    }
+    // Sem guard de mounted: ao encerrar o turno a tela é trocada e este widget
+    // é desmontado. AppFeedback cai no messenger global nesse caso.
+    // ignore: use_build_context_synchronously
+    AppFeedback.success(context, 'Expediente encerrado. Obrigado pelo serviço!', title: 'Até logo');
   }
 
   Future<void> _logout(BuildContext context, AuthViewModel authVM) async {

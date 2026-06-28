@@ -28,4 +28,12 @@ class VehicleCrewTransitionService {
       'reason': reason,
     });
   }
+
+  Future<void> cancelInvitation({
+    required String crewId,
+    required String handlerId,
+  }) async {
+    final callable = _functions.httpsCallable('cancelVehicleCrewInvitation');
+    await callable.call<void>({'crew_id': crewId, 'handler_id': handlerId});
+  }
 }

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -177,12 +178,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar evento: $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppFeedback.error(context, e);
       }
     } finally {
       if (mounted) setState(() => _isAddingEvent = false);
@@ -667,20 +663,16 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   }
 
   void _showLockedForSignaturesMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Ocorrência fechada para assinaturas. Use a tela de equipe.',
-        ),
-      ),
+    AppFeedback.warning(
+      context,
+      'Ocorrência fechada para assinaturas. Use a tela de equipe.',
     );
   }
 
   void _showNotEditableMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sem permissão de edição para esta ocorrência.'),
-      ),
+    AppFeedback.warning(
+      context,
+      'Sem permissão de edição para esta ocorrência.',
     );
   }
 

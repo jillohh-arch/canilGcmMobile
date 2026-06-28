@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -192,16 +193,7 @@ class VaccinationHistoryScreen extends StatelessWidget {
           );
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Erro ao gerar PDF: $e',
-                  style: GoogleFonts.inter(fontSize: 12),
-                ),
-                backgroundColor: AppTheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            AppFeedback.error(context, e);
           }
         }
       },

@@ -32,6 +32,7 @@ class _PendingScreenState extends State<PendingScreen> {
   late Stream<List<NotificationItem>> _notificationsStream;
   final Set<String> _processingNotifications = <String>{};
   bool _markingAllAsRead = false;
+  bool _clearingAllNotices = false;
 
   @override
   void initState() {
@@ -206,6 +207,8 @@ class _PendingScreenState extends State<PendingScreen> {
             count: notices.length,
             accent: AppTheme.primary,
             emptyMessage: 'Nenhum aviso ativo.',
+            onClearAll: notices.isNotEmpty ? () => _clearAllNotices(notices) : null,
+            clearingAll: _clearingAllNotices,
             children: notices
                 .map(
                   (notification) => _NotificationCard(
@@ -330,6 +333,70 @@ class _PendingScreenState extends State<PendingScreen> {
       _showSnack('Falha ao limpar aviso: $error', isError: true);
     } finally {
       _setProcessing(notification, false);
+    }
+  }
+
+  int _countArchivableNotices(List<NotificationItem> notices) {
+    return notices.where((n) => n.canBeArchived && !n.isArchived).length;
+  }
+
+  Future<void> _clearAllNotices(List<NotificationItem> notices) async {
+    final archivableCount = _countArchivableNotices(notices);
+    if (archivableCount == 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfacePanel,
+        title: Text(
+          'Limpar todos os avisos',
+          style: GoogleFonts.inter(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          '$archivableCount aviso${archivableCount > 1 ? 's' : ''} será${archivableCount == 1 ? '' : 'ão'} removido${archivableCount == 1 ? '' : 's'} da caixa de entrada.\n\nPendências que requerem ação não são afetadas.',
+          style: GoogleFonts.inter(
+            color: AppTheme.textSecondary,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+            ),
+            child: const Text('Limpar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _clearingAllNotices = true);
+    try {
+      final archived = await _notificationService.archiveAllNotices(
+        userId: widget.userId,
+        notifications: notices,
+      );
+      if (mounted) {
+        AppFeedback.success(
+          context,
+          '$archived aviso${archived > 1 ? 's' : ''} limpo${archived == 1 ? '' : 's'}.',
+        );
+      }
+    } catch (error) {
+      _showSnack('Falha ao limpar avisos: $error', isError: true);
+    } finally {
+      if (mounted) setState(() => _clearingAllNotices = false);
     }
   }
 
@@ -563,6 +630,8 @@ class _NotificationSection extends StatelessWidget {
   final Color accent;
   final String emptyMessage;
   final List<Widget> children;
+  final VoidCallback? onClearAll;
+  final bool clearingAll;
 
   const _NotificationSection({
     required this.title,
@@ -571,6 +640,8 @@ class _NotificationSection extends StatelessWidget {
     required this.accent,
     required this.emptyMessage,
     required this.children,
+    this.onClearAll,
+    this.clearingAll = false,
   });
 
   @override
@@ -595,15 +666,32 @@ class _NotificationSection extends StatelessWidget {
                 letterSpacing: 1.4,
               ),
             ),
-            const Spacer(),
-            Text(
-              '$count',
-              style: GoogleFonts.ibmPlexMono(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.surfacePanel,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppTheme.textTertiary.withAlpha(40)),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.ibmPlexMono(
+                  color: AppTheme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
+            const Spacer(),
+            if (title == 'Avisos' && onClearAll != null)
+              clearingAll
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : _ClearAllButton(onTap: onClearAll!),
           ],
         ),
         const SizedBox(height: 4),
@@ -1150,6 +1238,39 @@ class _ActionPill extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _ClearAllButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ClearAllButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withAlpha(18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppTheme.primary.withAlpha(60)),
+          ),
+          child: Text(
+            'Limpar todos',
+            style: GoogleFonts.ibmPlexMono(
+              color: AppTheme.primary,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );

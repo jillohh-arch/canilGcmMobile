@@ -7,7 +7,7 @@ import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
-import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_event_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
@@ -148,9 +148,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         onSuccess: () async {
           await _load();
           if (!mounted) return;
-          ScaffoldMessenger.of(this.context).showSnackBar(
-            const SnackBar(content: Text('Assinatura registrada.')),
-          );
+          AppFeedback.success(context, 'Assinatura registrada.');
         },
       ),
     );
@@ -183,11 +181,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                 : () {
                     final reason = reasonController.text.trim();
                     if (reason.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Informe o motivo da devolução.'),
-                        ),
-                      );
+                      AppFeedback.warning(context, 'Informe o motivo da devolução.');
                       return;
                     }
                     Navigator.pop(dialogContext);
@@ -227,11 +221,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                 : () {
                     final reason = reasonController.text.trim();
                     if (reason.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Informe o motivo da recusa.'),
-                        ),
-                      );
+                      AppFeedback.warning(context, 'Informe o motivo da recusa.');
                       return;
                     }
                     Navigator.pop(dialogContext);
@@ -257,17 +247,10 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
               ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
         ),
       );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Participação confirmada.')));
+      AppFeedback.success(context, 'Participação confirmada.');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao confirmar participação: $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error);
     } finally {
       if (mounted) setState(() => _isRespondingParticipation = false);
     }
@@ -282,17 +265,10 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       );
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Participação recusada.')));
+      AppFeedback.success(context, 'Participação recusada.');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao recusar participação: $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error);
     } finally {
       if (mounted) setState(() => _isRespondingParticipation = false);
     }
@@ -312,17 +288,10 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
               ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
         ),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ocorrência devolvida para correção.')),
-      );
+      AppFeedback.success(context, 'Ocorrência devolvida para correção.');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao devolver para correção: $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error);
     } finally {
       if (mounted) setState(() => _isRequestingCorrection = false);
     }

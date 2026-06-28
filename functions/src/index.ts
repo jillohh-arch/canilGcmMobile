@@ -4528,7 +4528,70 @@ export const respondVehicleCrewInvitation = onCall({region}, async (request) => 
   });
 });
 
-const OCCURRENCE_AI_PROMPT_VERSION = "occurrence-final-report-v2";
+export const cancelVehicleCrewInvitation = onCall({region}, async (request) => {
+  const caller = requireAuth(request.auth);
+  const data = request.data as JsonMap;
+  const crewId = requiredString(data, "crew_id");
+  const handlerId = requiredString(data, "handler_id");
+
+  const crewRef = db.collection("vehicle_crews").doc(crewId);
+  const memberRef = crewRef.collection("members").doc(handlerId);
+
+  await db.runTransaction(async (transaction) => {
+    const [crewSnap, memberSnap] = await Promise.all([
+      transaction.get(crewRef),
+      transaction.get(memberRef),
+    ]);
+    if (!crewSnap.exists || !memberSnap.exists) {
+      throw new HttpsError("not-found", "Convite de guarnição não encontrado.");
+    }
+    const crew = crewSnap.data() ?? {};
+    const member = memberSnap.data() ?? {};
+    if (member.status !== "pending") {
+      throw new HttpsError("failed-precondition", "Convite ja respondido ou cancelado.");
+    }
+    const titularRa = stringValue(crew.titular_handler_id);
+    if (caller.ra !== titularRa) {
+      throw new HttpsError("permission-denied", "Apenas o titular pode cancelar convite.");
+    }
+
+    // IMPORTANTE: todas as leituras antes das escritas. resolveUserActionNotifications
+    // faz transaction.get internamente, entao precisa rodar antes do update do membro.
+    await resolveUserActionNotificationsInTransaction(transaction, handlerId, {
+      type: "vehicle_crew_invitation",
+      additionalData: crewId,
+      resolutionAction: "vehicle_crew_invitation_cancelled",
+      actor: caller,
+      metadata: {
+        crew_id: crewId,
+        result: "cancelled",
+        cancelled_by: caller.ra,
+      },
+    });
+
+    transaction.update(memberRef, {
+      status: "cancelled",
+      cancelled_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    transaction.set(db.collection("auditLogs").doc(), {
+      action: "vehicle_crew_invitation_cancelled",
+      entity_type: "vehicle_crew",
+      entity_id: crewId,
+      summary: `Convite cancelado por ${caller.ra} para ${handlerId}`,
+      actor: caller,
+      metadata: {
+        handler_id: handlerId,
+      },
+      source: "functions",
+      performed_at: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+});
+
+const OCCURRENCE_AI_PROMPT_VERSION = "occurrence-final-report-v3";
 const OCCURRENCE_AI_FALLBACK_MODEL = "local_occurrence_template_v1";
 const OCCURRENCE_AI_MAX_EVENTS = 40;
 const OCCURRENCE_AI_TIME_ZONE = "America/Sao_Paulo";
@@ -4838,24 +4901,136 @@ function occurrenceAiFallbackDraft(context: OccurrenceAiContext): OccurrenceAiDr
   };
 }
 
+const occurrenceAiSystemInstruction = `Você é um assistente de redação institucional da GCM de Limeira, unidade K9. Seu papel é redigir minutas de ocorrência policial em português do Brasil, registro policial-administrativo, com base nos relatos e dados fornecidos pelo condutor.
+
+Regras de comportamento:
+- Use SOMENTE informações do relato bruto e da linha do tempo fornecidos. NÃO invente nomes, CPFs, motivações, testemunhas, viaturas, hospitais, ou qualquer fato não mencionado.
+- Preserve incertezas e lacunas como pontos de atenção no campo attention_points.
+- NÃO substitua a revisão humana: o condutor precisa revisar e editar antes do fechamento.
+- Nunca use placeholders como [NOME] ou [COLCHETE] no corpo do texto. Dados faltantes vão para attention_points.
+- Não cite IDs técnicos, caminhos de banco, hashes, nomes de coleção, ISO date cru, latitude ou longitude no texto final.
+- Não tagarelar, tutorar ou incluir dicas no retorno. Retorne SOMENTE o JSON.`;
+
+// Few-shot examples (EXEMPLOS_FEWSHOT_OCORRENCIA.md)
+const OCCURRENCE_AI_FEW_SHOT_EXAMPLES = `
+## EXEMPLO 1 — Acidente de trânsito com socorro (texto corrido)
+
+**RELATO BRUTO:**
+Em patrulhamento pela Avenida Major José Levi Sobrinho, próximo ao restaurante Vila Grill, nos deparamos com um acidente de trânsito. O motoqueiro estava caído na calçada, com muita dor na perna. No local estavam o motorista do veículo (Toyota Corolla) e o motociclista. Segundo o motorista, ele freou levemente devido ao fluxo intenso de carros e o motoqueiro, em velocidade, colidiu na traseira e caiu. O motociclista está consciente mas alega muita dor na perna, possível fratura, pois a moto caiu sobre ele. Foi feito contato com a central solicitando Samu ou Corpo de Bombeiros.
+
+**MINUTA IDEAL:**
+A equipe, em patrulhamento preventivo pela Avenida Major José Levi Sobrinho, nas proximidades do restaurante Vila Grill, deparou-se com um acidente de trânsito envolvendo o veículo Toyota Corolla, conduzido por Eduardo de Oliveira, e a motocicleta Honda, conduzida por Kleber Rodrigues Beckmann.
+
+No local, constatou-se que o condutor da motocicleta encontrava-se caído na calçada, consciente, porém apresentando fortes dores na região da perna direita (possível fratura), após a motocicleta cair sobre seu membro inferior em decorrência da colisão.
+
+Em conversa com o condutor do Corolla, este relata que trafegava pela via quando, devido ao intenso fluxo de veículos, necessitou realizar uma freada brusca, momento em que a motocicleta colidiu na traseira de seu veículo, resultando na queda do motociclista ao solo.
+
+Diante do estado da vítima, foi solicitado socorro médico via Central. Compareceu ao local a unidade de resgate do Corpo de Bombeiros, prefixo UR 16119, que prestou os primeiros socorros e removeu a vítima ao pronto-socorro. Posteriormente, a ocorrência foi apresentada no Plantão Policial para as devidas providências legais.
+
+## EXEMPLO 2 — Tentativa de feminicídio, K9 na mata, arma (blocos)
+
+**RELATO BRUTO:**
+Ocorrência onde um indivíduo atirou na ex-esposa (em atendimento médico) e fugiu. Localizamos o indivíduo após extensas buscas pela área verde com o K9, juntamente com o armamento. A arma estava com 4 munições deflagradas, calibre .38.
+
+**MINUTA IDEAL:**
+**1. Da situação da vítima e primeiros socorros**
+A equipe foi acionada para atendimento de ocorrência de disparo de arma de fogo. No local, a vítima apresentava ferimentos provocados por projétil de arma de fogo, sendo priorizado o socorro e o encaminhamento para atendimento médico, onde permaneceu sob cuidados.
+
+**2. Das diligências e localização do autor**
+Diante da informação de que o autor teria se evadido a pé em direção a área de mata adjacente, esta equipe iniciou diligências e incursão na referida área verde. Após extensas buscas, com o emprego do cão de faro K9 Bono, logramos êxito em localizar o indivíduo homiziado em meio à vegetação.
+
+**3. Da materialidade**
+Foi localizado o armamento utilizado: um revólver calibre .38, contendo 04 (quatro) estojos deflagrados no tambor.
+
+**4. Do desfecho**
+Foi dada voz de prisão ao autor, conduzido e apresentado à Autoridade Policial de Plantão, com apreensão da arma de fogo, para as providências cabíveis.
+
+## EXEMPLO 3 — Tráfico, apreensão com K9 (texto corrido)
+
+**RELATO BRUTO:**
+Em patrulhamento pelo bairro Olindo de Luca, dois indivíduos avistaram a viatura e correram para a mata. Tentamos localizá-los sem sucesso. Por ser ponto de tráfico, passamos o K9 Bono na mata, que após uns 5 minutos localizou uma sacola dentro de um buraco em uma árvore, com entorpecentes. Conduzido ao plantão, contabilizou 86 pinos de cocaína e 47 porções de maconha. Feita a apreensão.
+
+**MINUTA IDEAL:**
+Durante patrulhamento preventivo pelo bairro Olindo de Luca, local conhecido pelos índices de tráfico de entorpecentes, a guarnição avistou dois indivíduos em atitude suspeita que, ao perceberem a aproximação da viatura, empreenderam fuga em direção a área de mata adjacente. Foi realizado o cerco e a incursão na área para localização dos suspeitos, que não foram alcançados.
+
+Considerando o histórico do local, procedeu-se a busca minuciosa com o emprego do cão de faro K9 Bono. Após aproximadamente cinco minutos, o K9 indicou a presença de substâncias ilícitas no oco de uma árvore, onde foi localizada uma sacola contendo 86 (oitenta e seis) pinos de substância análoga à cocaína e 47 (quarenta e sete) porções de substância análoga à maconha.
+
+Diante do exposto, todo o material apreendido foi recolhido e encaminhado ao Plantão Policial para a elaboração do boletim de ocorrência e demais providências legais.
+
+## EXEMPLO 4 — Abordagem múltipla, versões conflitantes (texto corrido)
+
+**RELATO BRUTO:**
+Patrulhamento, esquina com rua Vicente Magaldi, dois indivíduos numa moto (Partes 01 e 02) recebendo algo da Parte 03. Ao ver a viatura, Partes 01 e 02 se deslocaram mas pararam a 10m e foram abordados, a Parte 03 na esquina. Revista: localizada quantia em espécie dividida em 3 lotes com 01 e 02 e um celular. Eles disseram que cobravam a Parte 03 por furto do celular. Na Parte 03: 3 pinos de substância análoga à cocaína. A Parte 03 informou que 01 e 02 recolhiam o dinheiro do tráfico dele, que já vendeu duas mulas e que eles passaram várias vezes de manhã recolhendo. Conduzidos ao 4º DP.
+
+**MINUTA IDEAL:**
+Durante patrulhamento ostensivo, a equipe visualizou, no cruzamento com a rua Vicente Magaldi, três indivíduos em atitude suspeita: dois ocupantes de uma motocicleta (Partes 01 e 02) realizando uma transação com um terceiro indivíduo (Parte 03). Ao notarem a aproximação da viatura, as Partes 01 e 02 tentaram se evadir, sendo abordadas a aproximadamente 10 metros do local, enquanto a Parte 03 foi abordada na esquina.
+
+Durante a busca pessoal, foi localizada com as Partes 01 e 02 quantia em espécie fracionada em três montantes distintos, além de um aparelho celular. Questionados, alegaram inicialmente que realizavam a cobrança da Parte 03 por um suposto furto do celular. Em revista pessoal na Parte 03, foram encontrados 03 (três) pinos contendo substância análoga à cocaína.
+
+Indagada sobre a dinâmica dos fatos, a Parte 03 declarou que as Partes 01 e 02 realizavam a coleta sistemática de valores provenientes da comercialização de entorpecentes por ele, afirmando ainda que já havia vendido dois invólucros e que os ocupantes da motocicleta compareceram ao local diversas vezes durante a manhã para o recolhimento dos valores. Diante dos fatos, as partes foram conduzidas ao 4º Distrito Policial para os procedimentos de polícia judiciária.
+
+## EXEMPLO 5 — Desdobramento social, Conselho Tutelar (texto corrido / bloco final)
+
+**RELATO BRUTO:**
+(mesma ocorrência do Exemplo 4, acrescido de:) na revista a quantia foi R$ 337,00. Como ambas as partes ficaram detidas, foi acionado o Conselho Tutelar, pois a filha da senhora Milady estava na escola Benedito de Toledo e não havia contatos para buscar a criança. Contato com a conselheira Ana Paula, que informou que tomaria as providências quanto à criança.
+
+**MINUTA IDEAL:**
+Durante a busca pessoal, foi localizada com as Partes 01 e 02 a quantia de R$ 337,00 (trezentos e trinta e sete reais), fracionada em três montantes distintos, além de um aparelho celular. [...]
+
+Diante dos fatos, todas as partes foram conduzidas ao 4º Distrito Policial para a apresentação da ocorrência. Considerando a detenção dos responsáveis legais, foi necessária a intervenção do Conselho Tutelar, uma vez que a filha da Sra. Milady encontrava-se na Escola Benedito de Toledo e não havia responsáveis disponíveis para seu recolhimento. Foi estabelecido contato com a conselheira tutelar de plantão, Sra. Ana Paula, que assumiu as providências cabíveis para o acolhimento e a proteção da criança.`;
+
+// Regras de estilo (usadas no prompt)
+const OCCURRENCE_AI_STYLE_RULES = `
+IDIOMA E REGISTRO:
+- Português do BRASIL, registro policial-administrativo brasileiro.
+- Proibir termos de Portugal: usar "placa" (não "matrícula"), "calçada" (não "passeio"), "freada brusca" (não "travagem"), "fatos" (não "factos"), "equipe" (não "equipa"), "a seguir" (não "de seguida"), "registrados" (não "registados").
+- 3ª pessoa, voz institucional. Tempo verbal no pretérito.
+
+ESTRUTURA-ALVO (FORMATO ADAPTATIVO):
+- Ocorrência simples (um fato central, até ~3 atos): TEXTO CORRIDO em parágrafos.
+- Ocorrência complexa (vítima + autor + arma + prisão; ou múltiplas partes; ou desdobramentos como menor/Conselho Tutelar; ou prisão em flagrante formal): BLOCOS com subtítulos numerados.
+- Espinha dorsal: abertura institucional → desenvolvimento cronológico → [emprego do K9, se houver] → desfecho com encaminhamento/registro.
+
+ATUAÇÃO DO K9 (REGRA FORTE):
+- SEMPRE que o cão tiver atuado, dar destaque com ênfase própria (parágrafo ou bloco dedicado), nomeando o cão e descrevendo a atuação ("com o emprego do cão de faro K9 [nome], que indicou a presença de...").
+
+REGRAS TÉCNICO-JURÍDICAS:
+- A GCM não faz perícia: usar "substância análoga à cocaína/maconha", nunca afirmar a substância como certa.
+- Quantidades por extenso + numeral: "86 (oitenta e seis) pinos"; valores: "R$ 337,00 (trezentos e trinta e sete reais)".
+- Declarações das partes como declaração, não como fato provado: "alegou", "declarou", "informou" — nunca endossar.
+- Múltiplos envolvidos não-qualificados: usar "Parte 01", "Parte 02", etc.
+- Vocabulário de elevação quando o fato existir (sem forçar): "patrulhamento ostensivo/preventivo", "atitude suspeita", "diligências", "incursão", "logramos êxito em localizar", "voz de prisão em flagrante delito", "procedimentos de polícia judiciária".
+
+PROIBIÇÕES:
+- NÃO inventar nada: nem COPOM, nem testemunhas, nem motivação, nem hospital.
+- NÃO usar placeholders tipo [NOME]/[COLCHETE] no corpo do texto.
+- NÃO tagarelar/tutorar: nada de "Aqui está a sugestão", "Principais melhorias", dicas ou perguntas.
+- NÃO deixar placeholders ruidosos do contexto ("natureza não informada", "viatura não informada") aparecerem no texto.
+`;
+
 function occurrenceAiPrompt(context: OccurrenceAiContext): string {
+  const narrativeContext = occurrenceAiNarrativeContext(context);
+  // ponytail: contexto limitado ao texto livre; enriquecer quando houver campos estruturados de apreensão/encaminhamento
+
   return [
-    "Você auxilia a GCM na redação institucional de uma ocorrência K9.",
-    "Regras obrigatorias:",
-    "- Não invente fatos, qualificações criminais, nomes, quantidades ou encaminhamentos.",
-    "- Use apenas o relato bruto e a linha do tempo fornecidos.",
-    "- Organize em linguagem objetiva, cronológica e institucional, como relato operacional da GCM.",
-    "- Use data e horário no formato brasileiro já fornecido no contexto.",
-    "- Use o nome operacional do GCM e o nome do K9 exatamente como fornecidos.",
-    "- Não cite IDs técnicos, caminhos de banco, hashes, nomes de coleção, ISO date cru, latitude ou longitude no texto final.",
-    "- Não transforme a linha do tempo em lista técnica longa; sintetize os principais atos em parágrafos claros.",
-    "- Preserve incertezas e lacunas como pontos de atenção.",
-    "- Não substitua a revisão humana: o condutor precisa revisar antes do fechamento.",
+    "TAREFA: Redija uma minuta de ocorrência da GCM K9 com base no relato e dados abaixo.",
+    "A minuta deve ser em português do Brasil, voz institucional, 3ª pessoa, pretérito.",
     "",
-    "Retorne somente JSON válido no formato:",
-    "{\"draft_text\":\"...\",\"attention_points\":[\"...\"],\"source_summary\":{\"...\":\"...\"}}",
+    "FORMATO ADAPTATIVO:",
+    "- Simples (até ~3 atos): texto corrido em parágrafos.",
+    "- Complexa (vítima+autor+arma+prisão; múltiplas partes; desdobramentos): blocos numerados.",
     "",
-    `Contexto narrativo: ${JSON.stringify(occurrenceAiNarrativeContext(context))}`,
+    "REGRAS DE ESTILO:",
+    OCCURRENCE_AI_STYLE_RULES.trim(),
+    "",
+    "EXEMPLOS FEW-SHOT:",
+    OCCURRENCE_AI_FEW_SHOT_EXAMPLES.trim(),
+    "",
+    "CONTEXTO DA OCORRÊNCIA:",
+    JSON.stringify(narrativeContext, null, 2),
+    "",
+    "Retorne SOMENTE JSON válido:",
+    '{"draft_text":"...","attention_points":["..."],"source_summary":{}}',
   ].join("\n");
 }
 
@@ -4898,7 +5073,8 @@ async function occurrenceAiGeminiDraft(context: OccurrenceAiContext): Promise<Oc
   const fetchLike = (globalThis as unknown as {fetch?: FetchLike}).fetch;
   if (!apiKey || !fetchLike) return null;
 
-  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  // ponytail: 3.5-flash p/ qualidade+velocidade; GEMINI_MODEL faz override
+  const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-3.5-flash";
   const modelPath = model.startsWith("models/") ? model : `models/${model}`;
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const response = await fetchLike(endpoint, {
@@ -4911,9 +5087,14 @@ async function occurrenceAiGeminiDraft(context: OccurrenceAiContext): Promise<Oc
           parts: [{text: occurrenceAiPrompt(context)}],
         },
       ],
+      systemInstruction: {
+        parts: [{text: occurrenceAiSystemInstruction}],
+      },
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.45,
+        maxOutputTokens: 2048,
         responseMimeType: "application/json",
+        thinkingConfig: {thinkingLevel: "medium"},
       },
     }),
   });
@@ -7288,9 +7469,46 @@ export const onActiveShiftUpdatedResolveReminders = onDocumentUpdated(
           ended_at: endedAt?.toISOString() ?? new Date().toISOString(),
         },
       );
+      // Recalcular estado da crew quando um membro encerra turno
+      const crewId = stringValue(after.vehicle_crew_id ?? after.crew_id);
+      if (crewId) {
+        await recalculateCrewActiveStatus(crewId);
+      }
     }
   },
 );
+
+/** Recalcula active/ended_at da crew com base nos membros restantes com turno ativo. */
+async function recalculateCrewActiveStatus(crewId: string): Promise<void> {
+  if (!crewId) return;
+  try {
+    const crewRef = db.collection("vehicle_crews").doc(crewId);
+    const membersSnap = await db
+      .collection("vehicle_crews").doc(crewId)
+      .collection("members")
+      .where("status", "in", ["accepted", "integrante"])
+      .get();
+    const activeMemberIds = membersSnap.docs.map((doc) => doc.id);
+    let hasActiveMember = false;
+    for (const memberId of activeMemberIds) {
+      const shiftSnap = await db.collection("active_shifts").doc(memberId).get();
+      if (shiftSnap.exists && shiftSnap.data()?.status === "active") {
+        hasActiveMember = true;
+        break;
+      }
+    }
+    if (!hasActiveMember) {
+      await crewRef.update({
+        active: false,
+        ended_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      logger.info(`Crew ${crewId} deactivated — no active members remaining.`);
+    }
+  } catch (e) {
+    logger.error("Failed to recalculate crew active status", { crewId, error: e });
+  }
+}
 
 export const checkOpenShiftsAndNotify = onCall(
   {region, secrets: []},
@@ -7419,95 +7637,5 @@ export const scheduledCheckOpenShifts = onSchedule(
   async () => {
     await runShiftReminderScan(new Date());
     return;
-
-    logger.info("Running scheduled check for open shifts");
-    const now = new Date();
-    const maxOpenHours = 12;
-    const threshold = new Date(now.getTime() - maxOpenHours * 60 * 60 * 1000);
-
-    const openShiftsSnap = await db
-      .collection("active_shifts")
-      .where("status", "==", "active")
-      .where("startedAt", "<", threshold)
-      .get();
-
-    logger.info(`Found ${openShiftsSnap.size} open shifts over ${maxOpenHours}h`);
-
-    let notified = 0;
-
-    for (const shiftDoc of openShiftsSnap.docs) {
-      const shiftData = shiftDoc.data();
-      const handlerId = shiftData.handlerId ?? shiftDoc.id;
-      const startedAt = shiftData.startedAt?.toDate?.() ?? new Date(shiftData.startedAt);
-      const hoursOpen = Math.floor(
-        (now.getTime() - startedAt.getTime()) / (1000 * 60 * 60),
-      );
-
-      // Verificar se já recebeu notificação nas últimas 4h
-      const recentNotif = await db
-        .collection("notifications")
-        .doc(handlerId)
-        .collection("items")
-        .where("type", "==", "shift_open_reminder")
-        .where("created_at", ">", new Date(now.getTime() - 4 * 60 * 60 * 1000))
-        .limit(1)
-        .get();
-
-      if (!recentNotif.empty) {
-        continue;
-      }
-
-      // Obter tokens FCM
-      const userDoc = await db.collection("users").doc(handlerId).get();
-      const userData = userDoc.data();
-      const tokens: string[] = [];
-      if (userData?.fcmTokens) {
-        const tokenMap = userData?.fcmTokens as Record<string, boolean>;
-        for (const [token, enabled] of Object.entries(tokenMap)) {
-          if (enabled) tokens.push(token);
-        }
-      }
-
-      // Criar notificação
-      const notifRef = db
-        .collection("notifications")
-        .doc(handlerId)
-        .collection("items")
-        .doc();
-
-      const notifData = {
-        type: "shift_open_reminder",
-        title: "Turno pendente de encerramento",
-        body: `Seu turno está aberto há ${hoursOpen}h. Clique para encerrar.`,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-        archived_at: null,
-        shift_id: shiftDoc.id,
-        hours_open: hoursOpen,
-        read: false,
-        action_required: true,
-      };
-
-      await notifRef.set(notifData);
-
-      // Enviar FCM se tiver tokens
-      if (tokens.length > 0) {
-        try {
-          await admin.messaging().sendEachForMulticast({
-            notification: { title: notifData.title, body: notifData.body },
-            data: {
-              type: "shift_open_reminder",
-              shift_id: shiftDoc.id,
-              hours_open: String(hoursOpen),
-            },
-            tokens,
-          });
-          notified++;
-        } catch (e) {
-          logger.error("Failed to send FCM for shift reminder", { handlerId, error: e });
-        }
-      }
-    }
-
-    logger.info(`Scheduled task complete. Notified ${notified} users.`);
   },
 );

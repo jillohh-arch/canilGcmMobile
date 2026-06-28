@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/live_tracking_viewmodel.dart';
 
@@ -63,10 +64,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     final result = await _viewModel.startTracking();
     if (!result.isSuccess) {
-      if (mounted && result.errorMessage != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(result.errorMessage!)));
+      if (result.errorMessage != null) {
+        AppFeedback.error(context, result.errorMessage!);
       }
       return;
     }

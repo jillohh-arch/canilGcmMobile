@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
@@ -97,18 +98,11 @@ class RegistroDetalhePage extends StatelessWidget {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-          ),
-          backgroundColor: AppTheme.surfaceSheet,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    messenger.hideCurrentSnackBar();
+    AppFeedback.info(
+      context,
+      share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
+    );
 
     final occurrenceVM = context.read<OccurrenceViewModel>();
     final dogVM = context.read<DogViewModel>();
@@ -138,18 +132,8 @@ class RegistroDetalhePage extends StatelessWidget {
       }
     } catch (e) {
       if (!context.mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Erro ao gerar PDF: $e',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            ),
-            backgroundColor: AppTheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      messenger.hideCurrentSnackBar();
+      AppFeedback.error(context, e, fallback: 'Erro ao gerar PDF.');
     }
   }
 
@@ -199,22 +183,7 @@ class RegistroDetalhePage extends StatelessWidget {
   }
 
   void _notify(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: GoogleFonts.inter(
-              color: _textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          backgroundColor: AppTheme.surfaceSheet,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+    AppFeedback.info(context, message);
   }
 }
 

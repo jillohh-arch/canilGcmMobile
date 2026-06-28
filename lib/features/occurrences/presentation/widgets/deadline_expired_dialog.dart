@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:intl/intl.dart';
 
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
@@ -163,14 +164,12 @@ class _DeadlineExpiredDialogState extends State<DeadlineExpiredDialog> {
   }
 
   void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.primary,
-      ),
-    );
+    if (!mounted) return;
+    if (isError) {
+      AppFeedback.error(context, message);
+    } else {
+      AppFeedback.success(context, message);
+    }
   }
 }
 

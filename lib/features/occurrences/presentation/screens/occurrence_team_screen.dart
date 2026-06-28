@@ -6,6 +6,7 @@ import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -284,11 +285,9 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
   void _showSignatureDialog() {
     final occurrence = _viewModel.occurrence;
     if (occurrence == null || !_canCurrentUserSign(_viewModel)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Não há assinatura pendente para este usuário.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
+      AppFeedback.warning(
+        context,
+        'Não há assinatura pendente para este usuário.',
       );
       return;
     }
@@ -472,20 +471,10 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
       handlerEmail: handler['email']?.toString(),
       authUid: handler['authUid']?.toString(),
       onSuccess: (message) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
-        );
+        AppFeedback.success(context, message);
       },
       onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $error'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppFeedback.error(context, 'Erro: $error');
       },
     );
   }
@@ -494,20 +483,10 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     _viewModel.removeTeamMember(
       handlerId: handlerId,
       onSuccess: (message) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
-        );
+        AppFeedback.success(context, message);
       },
       onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $error'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppFeedback.error(context, 'Erro: $error');
       },
     );
   }
@@ -519,14 +498,11 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
 
   void _showSnackMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.primary,
-      ),
-    );
+    if (isError) {
+      AppFeedback.error(context, message);
+    } else {
+      AppFeedback.success(context, message);
+    }
   }
 
   bool _canCurrentUserManageTeam() {

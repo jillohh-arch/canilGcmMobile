@@ -1,5 +1,11 @@
 part of 'dynamic_activity_sheet.dart';
 
+// TODO migração manual: _showOperationalSnack usa SnackBar customizado com
+// backgroundColor/foregroundColor/icon dinâmicos via Row children.
+// O padrão AppFeedback não suporta cores arbitrárias nem ícones dinâmicos.
+// Migre manualmente ou avalie se os casos de uso podem ser cobertos por
+// AppFeedback.success/warning/info/error puros.
+
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _DynamicActivitySheetStatus on _DynamicActivitySheetState {

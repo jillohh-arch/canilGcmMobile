@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
@@ -91,6 +92,10 @@ class _VehicleCrewProfileScreenState extends State<VehicleCrewProfileScreen> {
                         member: member,
                         user: userVM.findByRa(member.handlerId),
                         isCurrentUser: member.handlerId == currentRa,
+                        isTitular: isTitular,
+                        onCancelInvite: isTitular && member.isPending
+                            ? () => _cancelInvitation(member.handlerId)
+                            : null,
                       ),
                     ),
                   ),
@@ -174,17 +179,10 @@ class _VehicleCrewProfileScreenState extends State<VehicleCrewProfileScreen> {
         handlerId: selected.ra,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Convite enviado para RA ${selected.ra}.')),
-      );
+      AppFeedback.success(context, 'Convite enviado para RA ${selected.ra}.');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Não foi possível enviar o convite: $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -202,23 +200,15 @@ class _VehicleCrewProfileScreenState extends State<VehicleCrewProfileScreen> {
         reason: reason,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            accept
-                ? 'Você entrou na guarnição.'
-                : 'Convite recusado com justificativa.',
-          ),
-        ),
+      AppFeedback.success(
+        context,
+        accept
+            ? 'Você entrou na guarnição.'
+            : 'Convite recusado com justificativa.',
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Não foi possível responder ao convite: $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -258,6 +248,47 @@ class _VehicleCrewProfileScreenState extends State<VehicleCrewProfileScreen> {
     controller.dispose();
     if (reason == null || !mounted) return;
     await _respondToInvitation(accept: false, reason: reason);
+  }
+
+  Future<void> _cancelInvitation(String handlerId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfacePanel,
+        title: const Text('Cancelar convite?'),
+        content: Text(
+          'O convite enviado para RA $handlerId será cancelado.',
+          style: GoogleFonts.inter(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Manter'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Cancelar convite'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      await _transitionService.cancelInvitation(
+        crewId: widget.crewId,
+        handlerId: handlerId,
+      );
+      if (!mounted) return;
+      AppFeedback.success(context, 'Convite cancelado.');
+      // StreamBuilder atualiza automaticamente via watchMembers
+    } catch (error) {
+      if (!mounted) return;
+      AppFeedback.error(context, error);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   VehicleCrewMember? _memberFor(
@@ -417,11 +448,15 @@ class _MemberCard extends StatelessWidget {
   final VehicleCrewMember member;
   final UserModel? user;
   final bool isCurrentUser;
+  final bool isTitular;
+  final VoidCallback? onCancelInvite;
 
   const _MemberCard({
     required this.member,
     required this.user,
     required this.isCurrentUser,
+    required this.isTitular,
+    this.onCancelInvite,
   });
 
   @override
@@ -487,6 +522,17 @@ class _MemberCard extends StatelessWidget {
                 : 'NA EQUIPE',
             color: isCurrentUser ? AppTheme.primary : statusColor,
           ),
+          if (member.isPending && isTitular && onCancelInvite != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: onCancelInvite,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              color: AppTheme.error,
+              tooltip: 'Cancelar convite',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ],
         ],
       ),
     );

@@ -8,6 +8,7 @@ import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/location_resolution_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -250,15 +251,9 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Horário não pode ser no futuro',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
+      AppFeedback.warning(
+        context,
+        'Horário não pode ser no futuro',
       );
       return;
     }
@@ -561,12 +556,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao criar ocorrência: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, 'Erro ao criar ocorrência: $e');
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }

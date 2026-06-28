@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/pdf_generator/pdf_colors.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
@@ -265,16 +266,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     String handlerName,
   ) async {
     if (entries.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Não há registros no período filtrado.',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: _hCyan.withAlpha(200),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppFeedback.info(context, 'Não há registros no período filtrado.');
       return;
     }
 

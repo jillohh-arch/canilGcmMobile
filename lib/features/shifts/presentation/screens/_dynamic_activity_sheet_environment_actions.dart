@@ -13,9 +13,7 @@ extension _DynamicActivitySheetEnvironmentActions
       HapticFeedback.mediumImpact();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao obter endereço: $e')));
+        AppFeedback.error(context, e);
       }
     }
   }
@@ -38,19 +36,12 @@ extension _DynamicActivitySheetEnvironmentActions
         });
         HapticFeedback.mediumImpact();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Clima atualizado com sucesso!'),
-              backgroundColor: AppTheme.successOperational,
-            ),
-          );
+          AppFeedback.success(context, 'Clima atualizado com sucesso!');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao coletar clima: $e')));
+        AppFeedback.error(context, e);
       }
     }
   }

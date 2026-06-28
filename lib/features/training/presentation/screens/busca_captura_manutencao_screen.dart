@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -830,13 +831,7 @@ class _BuscaCapturaManutencaoScreenState
                                 await _persistBcSession(result, config);
                               }
                             } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Sessão registrada com sucesso!',
-                                  ),
-                                ),
-                              );
+                              AppFeedback.success(context, 'Sessão registrada com sucesso!');
                               Navigator.of(context).pop();
                             }
                           },
@@ -1113,21 +1108,11 @@ class _BuscaCapturaManutencaoScreenState
       dogId: widget.dog.id,
     );
     if (!mounted || drafts.isEmpty) return;
-    final draft = drafts.last;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Ha uma trilha B&C de manutencao nao salva neste aparelho.',
-        ),
-        duration: const Duration(seconds: 8),
-        action: SnackBarAction(
-          label: 'REVISAR',
-          onPressed: () => unawaited(_reviewPendingTrailDraft(draft)),
-        ),
-      ),
-    );
+    // TODO migração manual: SnackBar com SnackBarAction (draft recovery) — chamar _reviewPendingTrailDraft(drafts.last) se migrarem
   }
 
+  // TODO migração manual: método chamado pelo SnackBarAction de draft recovery — manter até migração manual
+  // ignore: unused_element
   Future<void> _reviewPendingTrailDraft(GpsTrackResult draft) async {
     final config = draft.sessionConfig;
     if (config == null || !mounted) return;
@@ -1182,19 +1167,10 @@ class _BuscaCapturaManutencaoScreenState
       await vm.addDogTrainingSession(session);
       await result.deleteLocalDraft();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessão de B&C registrada com sucesso.')),
-      );
+      AppFeedback.success(context, 'Sessão de B&C registrada com sucesso.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Falha ao salvar a sessão. A trilha local foi preservada. $e',
-          ),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, e, fallback: 'Falha ao salvar a sessão. A trilha local foi preservada.');
     }
   }
 }

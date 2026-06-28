@@ -1160,21 +1160,11 @@ class _GuardProtectionSessionFormScreenState
     try {
       await context.read<TrainingViewModel>().addTrainingSession(session);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sessão de Guarda & Proteção registrada.'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      AppFeedback.success(context, 'Sessão de Guarda & Proteção registrada.');
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Falha ao salvar sessão. $error'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(context, error, fallback: 'Falha ao salvar sessão.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

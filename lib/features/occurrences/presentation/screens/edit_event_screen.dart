@@ -222,15 +222,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Horário não pode ser no futuro',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
+      AppFeedback.warning(
+        context,
+        'Horário não pode ser no futuro',
       );
       return;
     }
@@ -252,23 +246,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
         _locationSource = 'gps_atual';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('GPS atualizado', style: GoogleFonts.inter()),
-            backgroundColor: AppTheme.success,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppFeedback.success(context, 'GPS atualizado');
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('GPS indisponível', style: GoogleFonts.inter()),
-            backgroundColor: AppTheme.error,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppFeedback.error(context, 'GPS indisponível');
       }
     } finally {
       if (mounted) setState(() => _isUpdatingGps = false);

@@ -28,6 +28,11 @@ import 'package:canil_gcm/features/auth/presentation/screens/splash_screen.dart'
 final GlobalKey<NavigatorState> globalNavigatorKey =
     GlobalKey<NavigatorState>();
 
+/// Messenger global para feedback que sobrevive à troca de tela (ex.: ao
+/// encerrar turno, o widget de origem é desmontado antes do snackbar aparecer).
+final GlobalKey<ScaffoldMessengerState> globalScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -96,6 +101,7 @@ class GcmK9App extends StatelessWidget {
       title: 'Canil K9',
       theme: AppTheme.darkTheme,
       navigatorKey: globalNavigatorKey,
+      scaffoldMessengerKey: globalScaffoldMessengerKey,
       builder: (context, child) {
         return child ?? const SizedBox.shrink();
       },

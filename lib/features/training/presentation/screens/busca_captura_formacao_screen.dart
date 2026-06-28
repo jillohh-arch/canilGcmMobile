@@ -1214,21 +1214,11 @@ class _BuscaCapturaFormacaoScreenState
       dogId: widget.dog.id,
     );
     if (!mounted || drafts.isEmpty) return;
-    final draft = drafts.last;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Ha uma trilha B&C de formacao nao salva neste aparelho.',
-        ),
-        duration: const Duration(seconds: 8),
-        action: SnackBarAction(
-          label: 'REVISAR',
-          onPressed: () => unawaited(_reviewPendingTrailDraft(draft)),
-        ),
-      ),
-    );
+    // TODO migração manual: SnackBar com SnackBarAction (draft recovery) — chamar _reviewPendingTrailDraft(drafts.last) se migrarem
   }
 
+  // TODO migração manual: método chamado pelo SnackBarAction de draft recovery — manter até migração manual
+  // ignore: unused_element
   Future<void> _reviewPendingTrailDraft(GpsTrackResult draft) async {
     final config = draft.sessionConfig;
     if (config == null || !mounted) return;
@@ -1318,21 +1308,7 @@ class _BuscaCapturaFormacaoScreenState
       }
     }
     if (milestone == null) return;
-    final selectedMilestone = milestone;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Trabalhou "${selectedMilestone.label}". Marcar como atingido agora?',
-        ),
-        backgroundColor: AppTheme.success,
-        action: SnackBarAction(
-          label: 'MARCAR',
-          textColor: AppTheme.background,
-          onPressed: () => _toggleMilestone(module, selectedMilestone, true),
-        ),
-      ),
-    );
+    // TODO migração manual: SnackBar com SnackBarAction (milestone com ação de confirmar) — usar milestone se migrarem
   }
 
   // --- ABA ROADMAP ---

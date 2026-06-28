@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
@@ -89,12 +90,7 @@ class _DetectionMaintenanceScreenState
 
   Future<void> _saveSession() async {
     if (_selectedRating == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione o resultado da sessão'),
-          backgroundColor: AppTheme.attention,
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione o resultado da sessão');
       return;
     }
 
@@ -123,18 +119,11 @@ class _DetectionMaintenanceScreenState
       await vm.addTrainingSession(session);
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sessão de detecção salva!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      AppFeedback.success(context, 'Sessão de detecção salva!');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppTheme.error),
-      );
+      AppFeedback.error(context, e);
     }
   }
 

@@ -13,6 +13,7 @@ import 'package:canil_gcm/core/services/occurrence_finalization_service.dart';
 import 'package:canil_gcm/core/services/speech_dictation_service.dart';
 import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_ai_service.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
@@ -108,29 +109,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   void _goNext() {
     if (_currentStep == 0 && _reportController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Preencha o relato para avançar',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppFeedback.warning(context, 'Preencha o relato para avançar');
       return;
     }
     if (_currentStep == 1 && _selectedResults.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Selecione pelo menos um resultado',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppFeedback.warning(context, 'Selecione pelo menos um resultado');
       return;
     }
     if (_currentStep < 2) {
@@ -169,16 +152,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         onListeningStopped: () => setState(() => _isListening = false),
       );
       if (!started && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Microfone não disponível',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppTheme.error,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppFeedback.error(context, 'Microfone não disponível');
       }
     }
   }
@@ -186,15 +160,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   Future<void> _generateAiDraft() async {
     final rawReport = _reportController.text.trim();
     if (rawReport.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Digite ou grave o relato antes de usar a IA assistiva.',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.warning,
-          duration: const Duration(seconds: 3),
-        ),
+      AppFeedback.warning(
+        context,
+        'Digite ou grave o relato antes de usar a IA assistiva.',
       );
       return;
     }
@@ -219,16 +187,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Falha ao gerar minuta assistida: $e',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      AppFeedback.error(context, 'Falha ao gerar minuta assistida: $e');
     } finally {
       if (mounted) setState(() => _isGeneratingAiDraft = false);
     }
@@ -584,13 +543,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
     _draftDebounce?.cancel();
     final missing = _missingDetailMessage();
     if (missing != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(missing, style: GoogleFonts.inter()),
-          backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppFeedback.error(context, missing);
       return;
     }
 
@@ -612,10 +565,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
           ),
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ocorrencia ja esta aguardando assinaturas.'),
-          ),
+        AppFeedback.info(
+          context,
+          'Ocorrência já está aguardando assinaturas.',
         );
         return;
       }
@@ -652,10 +604,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
             ),
           );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ocorrência fechada para assinaturas.'),
-            ),
+          AppFeedback.success(
+            context,
+            'Ocorrência fechada para assinaturas.',
           );
         }
         return;
@@ -727,22 +678,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       }
     } on TimeoutException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message ?? 'Tempo limite excedido'),
-            backgroundColor: AppTheme.error,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        AppFeedback.error(context, e.message ?? 'Tempo limite excedido');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao finalizar: $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppFeedback.error(context, 'Erro ao finalizar: $e');
       }
     } finally {
       if (mounted) setState(() => _isFinalizing = false);
@@ -1712,9 +1652,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         status = await Permission.storage.request();
       }
       if (!status.isGranted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permissão negada para acessar mídia')),
-        );
+        AppFeedback.warning(context, 'Permissão negada para acessar mídia');
         return;
       }
 
@@ -1728,9 +1666,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       setState(() => _finalizationPhotos.add(File(picked.path)));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao capturar foto: $e')));
+        AppFeedback.error(context, 'Erro ao capturar foto: $e');
       }
     }
   }

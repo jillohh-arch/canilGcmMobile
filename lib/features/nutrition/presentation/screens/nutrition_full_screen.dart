@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
@@ -224,16 +225,7 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
           );
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Erro ao gerar PDF: $e',
-                  style: GoogleFonts.inter(fontSize: 12),
-                ),
-                backgroundColor: AppTheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            AppFeedback.error(context, e);
           }
         }
       },

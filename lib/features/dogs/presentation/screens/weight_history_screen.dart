@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -199,16 +200,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
           );
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Erro ao gerar PDF: $e',
-                  style: GoogleFonts.inter(fontSize: 12),
-                ),
-                backgroundColor: AppTheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            AppFeedback.error(context, e);
           }
         }
       },
@@ -1090,7 +1082,6 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                 ? null
                 : () async {
                     HapticFeedback.mediumImpact();
-                    final messenger = ScaffoldMessenger.of(context);
                     final navigator = Navigator.of(context);
                     setState(() => _isSaving = true);
                     final log = HealthLogModel(
@@ -1121,25 +1112,14 @@ class _WeighFormSheetState extends State<_WeighFormSheet> {
                       );
                       if (!mounted) return;
                       navigator.pop();
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Pesagem registrada: ${_weight.toStringAsFixed(1)} kg.',
-                          ),
-                          backgroundColor: AppTheme.success,
-                          behavior: SnackBarBehavior.floating,
-                        ),
+                      AppFeedback.success(
+                        context,
+                        'Pesagem registrada: ${_weight.toStringAsFixed(1)} kg.',
                       );
                     } catch (e) {
                       if (mounted) {
                         setState(() => _isSaving = false);
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Erro ao salvar pesagem: $e'),
-                            backgroundColor: AppTheme.error,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        AppFeedback.error(context, e);
                       }
                     }
                   },

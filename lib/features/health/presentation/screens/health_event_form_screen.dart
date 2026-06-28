@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
@@ -293,21 +294,18 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       await healthVM.addHealthLog(log);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Registro de ${log.logType} salvo com sucesso!'),
-          backgroundColor: AppTheme.success,
-        ),
+      AppFeedback.success(
+        context,
+        'Registro de ${log.logType} salvo com sucesso!',
       );
 
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao salvar registro: $e'),
-          backgroundColor: AppTheme.error,
-        ),
+      AppFeedback.error(
+        context,
+        e,
+        fallback: 'Não foi possível salvar o registro.',
       );
     } finally {
       if (mounted) {

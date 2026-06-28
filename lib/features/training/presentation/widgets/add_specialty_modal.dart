@@ -1,3 +1,4 @@
+// TODO migração manual: SnackBars com construção dinâmica de mensagem por especialidade
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -354,25 +355,27 @@ class _AddSpecialtyModalState extends State<AddSpecialtyModal> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _selectedSpecialty == 'Detecção'
-                ? 'Especialidade de Detecção cadastrada para triagem: ${_selectedSubstances.join(", ")}!'
-                : 'Especialidade de $_selectedSpecialty iniciada com sucesso!',
-          ),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      // TODO migração manual
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text(
+      //       _selectedSpecialty == 'Detecção'
+      //           ? 'Especialidade de Detecção cadastrada para triagem: ${_selectedSubstances.join(", ")}!'
+      //           : 'Especialidade de $_selectedSpecialty iniciada com sucesso!',
+      //     ),
+      //     backgroundColor: AppTheme.success,
+      //   ),
+      // );
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao iniciar especialidade: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      // TODO migração manual
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Erro ao iniciar especialidade: $e'),
+      //     backgroundColor: AppTheme.error,
+      //   ),
+      // );
     }
   }
 }

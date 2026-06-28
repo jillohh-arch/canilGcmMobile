@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:printing/printing.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/services/report_service.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
@@ -111,11 +112,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
     final matchingDogs = dogVM.dogs.where((d) => d.id == widget.dogId);
     if (matchingDogs.isEmpty) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(
-          content: Text('Aguarde o carregamento dos dados do K9.'),
-        ),
-      );
+      AppFeedback.info(ctx, 'Aguarde o carregamento dos dados do K9.');
       return;
     }
     final dog = matchingDogs.first;
@@ -126,12 +123,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
 
     if (trainings.isEmpty) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text('Nenhuma sessão registrada para ${dog.name}.'),
-          backgroundColor: AppTheme.warning,
-        ),
-      );
+      AppFeedback.warning(ctx, 'Nenhuma sessão registrada para ${dog.name}.');
       return;
     }
 
@@ -165,12 +157,7 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
       );
     } catch (e) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao gerar PDF: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppFeedback.error(ctx, e, fallback: 'Erro ao gerar PDF.');
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/profiles/domain/seal_data.dart';
 
 /// Bottom sheet reutilizavel para exibir detalhes de um selo de conformidade.
@@ -122,16 +123,7 @@ class _ActiveContent extends StatelessWidget {
           onTap: () {
             // TODO: implementar navegacao para detalhe do selo
             Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Em breve',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                ),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            AppFeedback.info(context, 'Em breve');
           },
         ),
       ],
@@ -162,16 +154,7 @@ class _InactiveContent extends StatelessWidget {
             onTap: () {
               // TODO: implementar navegacao para actionRoute
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Em breve',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              AppFeedback.info(context, 'Em breve');
             },
           ),
       ],

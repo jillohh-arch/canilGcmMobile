@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 
 part 'login_screen_widgets.dart';
@@ -64,26 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        elevation: 0,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-          side: BorderSide(color: AppTheme.error.withAlpha(140)),
-        ),
-        content: Text(
-          message,
-          style: GoogleFonts.inter(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-        backgroundColor: AppTheme.error.withAlpha(30),
-      ),
-    );
+    AppFeedback.warning(context, message);
   }
 
   Future<void> _handleBiometricLogin(AuthViewModel authVM) async {
@@ -115,7 +97,8 @@ class _LoginScreenState extends State<LoginScreen> {
             cachedPass,
           );
           if (!success) {
-            _showSnack(
+            AppFeedback.error(
+              context,
               'Credenciais expiradas. Faça login com senha novamente.',
             );
           }
@@ -126,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      _showSnack('Erro ao acessar biometria.');
+      AppFeedback.error(context, e);
     }
   }
 

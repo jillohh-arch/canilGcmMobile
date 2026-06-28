@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
@@ -111,30 +112,19 @@ class _CreateAmendmentScreenState extends State<CreateAmendmentScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Retificação #${amendment.sequenceNumber} criada com sucesso',
-            ),
-            backgroundColor: AppTheme.successOperational,
-          ),
+        AppFeedback.success(
+          context,
+          'Retificação #${amendment.sequenceNumber} criada com sucesso',
         );
         Navigator.of(context).pop(amendment);
       }
     } on StateError catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: AppTheme.error),
-        );
+        AppFeedback.error(context, e);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao criar retificação: $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppFeedback.error(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

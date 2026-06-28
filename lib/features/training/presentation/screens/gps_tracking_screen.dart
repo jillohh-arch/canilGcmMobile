@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 
 import 'gps_tracking_summary_screen.dart';
 
@@ -58,9 +59,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
       sessionConfig: widget.sessionConfig,
     );
     if (error != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppTheme.error),
-      );
+      AppFeedback.error(context, error);
       Navigator.of(context).pop();
     }
   }
