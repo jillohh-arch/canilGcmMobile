@@ -1,4 +1,30 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+
+/// Estado de "dado novo" do card de nutrição: quando foi a última análise
+/// salva e quantos registros entraram desde então.
+class NutritionFreshness {
+  /// Timestamp da última análise persistida em `nutrition_ai_insights`.
+  /// `null` quando o cão ainda não tem nenhuma análise.
+  final DateTime? lastAnalysisAt;
+
+  /// Quantidade de registros novos (treinos + pesagens + refeições + eventos
+  /// de saúde) com data posterior à última análise.
+  final int newRecords;
+
+  const NutritionFreshness({
+    required this.lastAnalysisAt,
+    required this.newRecords,
+  });
+
+  /// Ainda não existe análise anterior — estado de "primeira vez".
+  bool get isFirstTime => lastAnalysisAt == null;
+
+  /// Há dado novo desde a última análise.
+  bool get hasNewData => lastAnalysisAt != null && newRecords > 0;
+
+  static const empty = NutritionFreshness(lastAnalysisAt: null, newRecords: 0);
+}
 
 class NutritionAiInsight {
   final String insightId;
@@ -77,12 +103,89 @@ class NutritionAiInsight {
 }
 
 class NutritionAiService {
-  NutritionAiService({FirebaseFunctions? functions})
+  NutritionAiService({FirebaseFunctions? functions, FirebaseFirestore? firestore})
     : _functions =
           functions ??
-          FirebaseFunctions.instanceFor(region: 'southamerica-east1');
+          FirebaseFunctions.instanceFor(region: 'southamerica-east1'),
+      _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFunctions _functions;
+  final FirebaseFirestore _firestore;
+
+  /// Lê a última análise salva e conta quantos registros novos entraram desde
+  /// então. Usa `count()` agregado do Firestore — não traz os documentos
+  /// inteiros, só os totais por coleção.
+  Future<NutritionFreshness> loadFreshness(String dogId) async {
+    final dogRef = _firestore.collection('dogs').doc(dogId);
+
+    final lastInsightSnap = await dogRef
+        .collection('nutrition_ai_insights')
+        .orderBy('created_at', descending: true)
+        .limit(1)
+        .get();
+
+    if (lastInsightSnap.docs.isEmpty) {
+      return NutritionFreshness.empty;
+    }
+
+    final lastAnalysisAt =
+        (lastInsightSnap.docs.first.data()['created_at'] as Timestamp?)
+            ?.toDate();
+    if (lastAnalysisAt == null) {
+      // Análise salva sem timestamp resolvido (serverTimestamp pendente):
+      // trata como sem dado novo para não falsear o contador.
+      return const NutritionFreshness(lastAnalysisAt: null, newRecords: 0);
+    }
+
+    final since = Timestamp.fromDate(lastAnalysisAt);
+    // ponytail: contagem leve via count() agregado; cada coleção usa seu
+    // próprio campo de data. Refinar se precisar de precisão por tipo.
+    final counts = await Future.wait([
+      _countSince(dogRef.collection('feeding_events'), 'fed_at', since),
+      _countSince(dogRef.collection('weight_records'), 'measured_at', since),
+      _countSince(dogRef.collection('health_events'), 'date', since),
+      _countTrainingSince(dogId, since),
+    ]);
+
+    final total = counts.fold<int>(0, (acc, value) => acc + value);
+    return NutritionFreshness(
+      lastAnalysisAt: lastAnalysisAt,
+      newRecords: total,
+    );
+  }
+
+  Future<int> _countSince(
+    Query<Map<String, dynamic>> collection,
+    String dateField,
+    Timestamp since,
+  ) async {
+    try {
+      final agg = await collection
+          .where(dateField, isGreaterThan: since)
+          .count()
+          .get();
+      return agg.count ?? 0;
+    } catch (_) {
+      // Coleção ausente / índice indisponível: não bloquear o card.
+      return 0;
+    }
+  }
+
+  Future<int> _countTrainingSince(String dogId, Timestamp since) async {
+    // Treinos ficam tanto na subcoleção do cão quanto na raiz (dogId/dog_id).
+    final dogRef = _firestore.collection('dogs').doc(dogId);
+    final results = await Future.wait([
+      _countSince(dogRef.collection('training_sessions'), 'date', since),
+      _countSince(
+        _firestore
+            .collection('training_sessions')
+            .where('dogId', isEqualTo: dogId),
+        'date',
+        since,
+      ),
+    ]);
+    return results.fold<int>(0, (acc, value) => acc + value);
+  }
 
   Future<NutritionAiInsight> generateInsight({
     required String dogId,

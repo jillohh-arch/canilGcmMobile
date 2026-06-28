@@ -1155,6 +1155,41 @@ class _HealthNutritionTabState extends State<_HealthNutritionTab> {
   final _aiService = NutritionAiService();
   int _periodDays = 30;
   bool _loadingAi = false;
+  bool _loadingFreshness = true;
+  NutritionFreshness _freshness = NutritionFreshness.empty;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFreshness();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HealthNutritionTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dog.id != widget.dog.id) {
+      _loadFreshness();
+    }
+  }
+
+  Future<void> _loadFreshness() async {
+    setState(() => _loadingFreshness = true);
+    try {
+      final freshness = await _aiService.loadFreshness(widget.dog.id);
+      if (!mounted) return;
+      setState(() {
+        _freshness = freshness;
+        _loadingFreshness = false;
+      });
+    } catch (_) {
+      // Falha ao contar não pode quebrar o card: cai no estado neutro.
+      if (!mounted) return;
+      setState(() {
+        _freshness = NutritionFreshness.empty;
+        _loadingFreshness = false;
+      });
+    }
+  }
 
   Future<void> _generateInsight() async {
     if (_loadingAi) return;
@@ -1168,6 +1203,8 @@ class _HealthNutritionTabState extends State<_HealthNutritionTab> {
       );
       if (!mounted) return;
       await _showNutritionInsightSheet(insight);
+      // Acabou de rodar: zera o "dado novo" recarregando o selo.
+      await _loadFreshness();
     } catch (e) {
       if (!mounted) return;
       AppFeedback.error(
@@ -1361,6 +1398,8 @@ class _HealthNutritionTabState extends State<_HealthNutritionTab> {
         _NutritionAiCard(
           periodDays: _periodDays,
           loading: _loadingAi,
+          loadingFreshness: _loadingFreshness,
+          freshness: _freshness,
           onPeriodChanged: (value) => setState(() => _periodDays = value),
           onGenerate: _generateInsight,
         ),
@@ -1372,18 +1411,34 @@ class _HealthNutritionTabState extends State<_HealthNutritionTab> {
 class _NutritionAiCard extends StatelessWidget {
   final int periodDays;
   final bool loading;
+  final bool loadingFreshness;
+  final NutritionFreshness freshness;
   final ValueChanged<int> onPeriodChanged;
   final VoidCallback onGenerate;
 
   const _NutritionAiCard({
     required this.periodDays,
     required this.loading,
+    required this.loadingFreshness,
+    required this.freshness,
     required this.onPeriodChanged,
     required this.onGenerate,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isFirstTime = freshness.isFirstTime;
+    final hasNewData = freshness.hasNewData;
+    // Só destaca com o accent quando há dado novo (ou na primeira análise).
+    // Análise em dia fica em estado neutro/discreto.
+    final highlightAction = isFirstTime || hasNewData;
+
+    final buttonLabel = loading
+        ? 'ANALISANDO'
+        : isFirstTime
+        ? 'GERAR PRIMEIRA ANALISE'
+        : 'REANALISAR';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _panelDecoration(),
@@ -1439,7 +1494,16 @@ class _NutritionAiCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (hasNewData) ...[
+                const SizedBox(width: 10),
+                _NutritionNewDataBadge(count: freshness.newRecords),
+              ],
             ],
+          ),
+          const SizedBox(height: 12),
+          _NutritionFreshnessLine(
+            loading: loadingFreshness,
+            freshness: freshness,
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -1482,19 +1546,36 @@ class _NutritionAiCard extends StatelessWidget {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: loading ? null : onGenerate,
-              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: Text(
-                loading ? 'GERANDO ANALISE' : 'GERAR ANALISE',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w900),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.attention,
-                foregroundColor: Colors.black,
-                disabledBackgroundColor: AppTheme.textPrimary.withAlpha(30),
-              ),
-            ),
+            child: highlightAction
+                ? ElevatedButton.icon(
+                    onPressed: loading ? null : onGenerate,
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                    label: Text(
+                      buttonLabel,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w900),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.attention,
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: AppTheme.textPrimary.withAlpha(
+                        30,
+                      ),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    // Nada mudou desde a última análise: botão discreto, sem
+                    // empurrar o usuário a gastar uma chamada de IA à toa.
+                    onPressed: loading ? null : onGenerate,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      buttonLabel,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w900),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.textSecondary,
+                      side: const BorderSide(color: AppTheme.surfaceWhiteBorder),
+                    ),
+                  ),
           ),
           const SizedBox(height: 10),
           Text(
@@ -1509,6 +1590,156 @@ class _NutritionAiCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Pílula verde de "X novos registros" — mesma linguagem dos badges de
+/// novidade usados em outras telas (ex: pending_screen).
+class _NutritionNewDataBadge extends StatelessWidget {
+  final int count;
+
+  const _NutritionNewDataBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.success.withAlpha(22),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppTheme.success.withAlpha(70)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.fiber_new_rounded,
+            color: AppTheme.success,
+            size: 13,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: GoogleFonts.ibmPlexMono(
+              color: AppTheme.success,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            count == 1 ? 'novo' : 'novos',
+            style: GoogleFonts.inter(
+              color: AppTheme.success,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Linha "Última análise há X dias · N novos registros". Adapta-se aos três
+/// estados: carregando, primeira vez (sem análise) e com análise anterior.
+class _NutritionFreshnessLine extends StatelessWidget {
+  final bool loading;
+  final NutritionFreshness freshness;
+
+  const _NutritionFreshnessLine({
+    required this.loading,
+    required this.freshness,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.6,
+              color: AppTheme.textTertiary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Verificando novidades...',
+            style: GoogleFonts.inter(
+              color: AppTheme.textTertiary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (freshness.isFirstTime) {
+      return Text(
+        'Nenhuma análise gerada ainda. Crie a primeira para acompanhar a evolução.',
+        style: GoogleFonts.inter(
+          color: AppTheme.textTertiary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          height: 1.3,
+        ),
+      );
+    }
+
+    final hasNewData = freshness.hasNewData;
+    final color = hasNewData ? AppTheme.success : AppTheme.textTertiary;
+    final lastLabel = _lastAnalysisLabel(freshness.lastAnalysisAt!);
+    final newLabel = hasNewData
+        ? '${freshness.newRecords} ${freshness.newRecords == 1 ? 'novo registro' : 'novos registros'}'
+        : 'sem dado novo';
+
+    return Row(
+      children: [
+        Icon(Icons.history_rounded, color: color, size: 14),
+        const SizedBox(width: 6),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+              children: [
+                TextSpan(text: 'Última análise $lastLabel · '),
+                TextSpan(
+                  text: newLabel,
+                  style: GoogleFonts.inter(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _lastAnalysisLabel(DateTime when) {
+    final diff = DateTime.now().difference(when);
+    if (diff.inDays >= 1) {
+      final days = diff.inDays;
+      return 'há $days ${days == 1 ? 'dia' : 'dias'}';
+    }
+    if (diff.inHours >= 1) {
+      return 'há ${diff.inHours}h';
+    }
+    if (diff.inMinutes >= 1) {
+      return 'há ${diff.inMinutes}min';
+    }
+    return 'agora há pouco';
   }
 }
 
