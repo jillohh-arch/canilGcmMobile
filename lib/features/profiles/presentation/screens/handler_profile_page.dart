@@ -18,6 +18,7 @@ import 'package:canil_gcm/features/training/presentation/viewmodels/training_vie
 import 'package:canil_gcm/features/users/domain/user.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/core/widgets/seal_detail_sheet.dart';
+import 'package:canil_gcm/features/help_center/presentation/screens/help_center_screen.dart';
 import 'package:canil_gcm/features/profiles/domain/seal_data.dart';
 import 'package:canil_gcm/features/profiles/domain/seal_definitions.dart';
 
@@ -980,6 +981,19 @@ class _SettingsMenu extends StatelessWidget {
               ),
               _MenuDivider(),
               _MenuItem(
+                icon: Icons.help_outline_rounded,
+                label: 'Ajuda / Como usar',
+                desc: 'Guias e instruções do app',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const HelpCenterScreen(),
+                    ),
+                  );
+                },
+              ),
+              _MenuDivider(),
+              _MenuItem(
                 icon: Icons.info_outline_rounded,
                 label: 'Sobre o app',
                 desc: 'Versão · termos · privacidade',
@@ -996,51 +1010,56 @@ class _MenuItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String desc;
+  final VoidCallback? onTap;
 
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.desc,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withAlpha(20),
-              borderRadius: BorderRadius.circular(8),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: AppTheme.primary, size: 14),
             ),
-            child: Icon(icon, color: AppTheme.primary, size: 14),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    color: _kTextPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: _kTextPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  desc,
-                  style: GoogleFonts.inter(color: _kTextMuted, fontSize: 10),
-                ),
-              ],
+                  const SizedBox(height: 1),
+                  Text(
+                    desc,
+                    style: GoogleFonts.inter(color: _kTextMuted, fontSize: 10),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text('›', style: GoogleFonts.inter(color: _kTextMuted, fontSize: 14)),
-        ],
+            Text('›', style: GoogleFonts.inter(color: _kTextMuted, fontSize: 14)),
+          ],
+        ),
       ),
     );
   }

@@ -19,8 +19,10 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_group_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
+import 'package:canil_gcm/core/services/onboarding_service.dart';
 import 'package:canil_gcm/core/services/push_notification_service.dart';
 import 'package:canil_gcm/features/app_shell/presentation/screens/main_root_screen.dart';
+import 'package:canil_gcm/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/login_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/splash_screen.dart';
@@ -92,8 +94,23 @@ Future<void> _initializePushNotificationsSafely() async {
   }
 }
 
-class GcmK9App extends StatelessWidget {
+class GcmK9App extends StatefulWidget {
   const GcmK9App({super.key});
+
+  @override
+  State<GcmK9App> createState() => _GcmK9AppState();
+}
+
+class _GcmK9AppState extends State<GcmK9App> {
+  bool _showOnboarding = false;
+  bool _onboardingChecked = false;
+
+  void _onOnboardingComplete() {
+    setState(() {
+      _showOnboarding = false;
+      _onboardingChecked = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +141,17 @@ class GcmK9App extends StatelessWidget {
             return const SplashScreen();
           }
 
+          // Check onboarding after data is loaded
+          if (!_onboardingChecked) {
+            _checkOnboarding();
+            return const SplashScreen();
+          }
+
+          // Show onboarding if needed
+          if (_showOnboarding) {
+            return OnboardingScreen(onComplete: _onOnboardingComplete);
+          }
+
           // Sem turno ativo → Seleção de cão
           if (!shiftVM.hasActiveShift) {
             return const ShiftAssumptionScreen();
@@ -135,5 +163,17 @@ class GcmK9App extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
     );
+  }
+
+  Future<void> _checkOnboarding() async {
+    if (_onboardingChecked) return;
+    final service = OnboardingService();
+    final hasSeen = await service.hasCompletedOnboarding();
+    if (mounted) {
+      setState(() {
+        _onboardingChecked = true;
+        _showOnboarding = !hasSeen;
+      });
+    }
   }
 }
