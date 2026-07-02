@@ -11,10 +11,15 @@ Dog? _localDogFallback(DogViewModel dogVM, String dogId) {
   }
 }
 
-void _assumeVehicleDuringShift(BuildContext context, Vehicle vehicle) async {
+void _assumeVehicleDuringShift(
+  BuildContext context,
+  Vehicle vehicle, {
+  String role = 'motorista',
+  String? name,
+}) async {
   HapticFeedback.mediumImpact();
   final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-  await shiftVM.assumeVehicle(vehicle);
+  await shiftVM.assumeVehicle(vehicle, role: role, name: name);
   if (!context.mounted) return;
   final error = shiftVM.error;
   if (error != null) {

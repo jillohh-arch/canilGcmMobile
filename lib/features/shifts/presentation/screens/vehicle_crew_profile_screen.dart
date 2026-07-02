@@ -517,7 +517,7 @@ class _MemberCard extends StatelessWidget {
                 ? 'CONVITE ENVIADO'
                 : member.isDeclined
                 ? 'RECUSADO'
-                : member.isTitular
+                : member.isLegacyTitular
                 ? 'TITULAR'
                 : 'NA EQUIPE',
             color: isCurrentUser ? AppTheme.primary : statusColor,

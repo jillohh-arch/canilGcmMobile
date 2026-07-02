@@ -54,7 +54,12 @@ class ShiftViewModel extends ChangeNotifier {
     _bindToUser(_authService.currentUser);
   }
 
-  Future<void> startShift(String dogId, {Vehicle? vehicle}) async {
+  Future<void> startShift(
+    String dogId, {
+    Vehicle? vehicle,
+    String? handlerName,
+    String role = 'motorista',
+  }) async {
     final resolvedHandlerId = _resolveHandlerId();
     final currentUser = _authService.currentUser;
     final startedAt = DateTime.now();
@@ -74,6 +79,7 @@ class ShiftViewModel extends ChangeNotifier {
         handlerId: resolvedHandlerId,
         handlerAuthUid: currentUser?.uid,
         handlerEmail: currentUser?.email,
+        handlerName: handlerName,
         shiftGroupId: shiftInfo?.group.id,
         shiftGroupCode: shiftInfo?.group.code,
         shiftGroupLabel: shiftInfo?.group.name,
@@ -95,8 +101,8 @@ class ShiftViewModel extends ChangeNotifier {
         vehicleUnit: vehicle?.unit,
         vehicleJoinedAt: vehicle == null ? null : startedAt,
         vehicleCrewId: vehicle?.id,
-        crewRole: vehicle == null ? null : 'titular',
-        crewStatus: vehicle == null ? null : 'titular',
+        crewRole: vehicle == null ? null : role,
+        crewStatus: vehicle == null ? null : 'active',
         shiftGroupId: shiftInfo?.group.id,
         shiftGroupCode: shiftInfo?.group.code,
         shiftGroupLabel: shiftInfo?.group.name,
@@ -153,7 +159,11 @@ class ShiftViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> assumeVehicle(Vehicle vehicle) async {
+  Future<void> assumeVehicle(
+    Vehicle vehicle, {
+    required String role,
+    String? name,
+  }) async {
     final resolvedHandlerId = _resolveHandlerId();
     final currentUser = _authService.currentUser;
     final activeDogId = _session?.dogId;
@@ -172,8 +182,10 @@ class ShiftViewModel extends ChangeNotifier {
         handlerId: resolvedHandlerId,
         handlerAuthUid: currentUser?.uid,
         handlerEmail: currentUser?.email,
+        handlerName: name,
         dogId: activeDogId,
         vehicle: vehicle,
+        role: role,
       );
       _session = _session?.copyWith(
         authUid: currentUser?.uid,
@@ -185,8 +197,8 @@ class ShiftViewModel extends ChangeNotifier {
         vehicleUnit: vehicle.unit,
         vehicleJoinedAt: DateTime.now(),
         vehicleCrewId: vehicle.id,
-        crewRole: 'titular',
-        crewStatus: 'titular',
+        crewRole: role,
+        crewStatus: 'active',
       );
 
       AuditService.log(

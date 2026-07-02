@@ -1333,6 +1333,7 @@ service cloud.firestore {
           'startedAt',
           'endedAt',
           'dogSwitches',
+          'vehicleChanges',
           'createdAt',
           'updatedAt',
           'vehicle_id',
@@ -1354,6 +1355,7 @@ service cloud.firestore {
         && request.resource.data.startedAt is timestamp
         && request.resource.data.endedAt == null
         && request.resource.data.dogSwitches is list
+        && request.resource.data.vehicleChanges is list
         && emailMatchesRa(request.resource.data.handlerId);
     }
 
@@ -1366,6 +1368,7 @@ service cloud.firestore {
           'currentDogId',
           'dogSwitches',
           'dog_changes',
+          'vehicleChanges',
           'auth_uid',
           'handler_email',
           'shift_group_id',
@@ -1481,8 +1484,8 @@ service cloud.firestore {
           'active',
           'created_at',
           'updated_at',
-          'dog_changes',
-          'ended_at'
+          'ended_at',
+          'dog_changes'
         ]);
       allow delete: if false;
 
@@ -1493,39 +1496,47 @@ service cloud.firestore {
             'handler_id',
             'auth_uid',
             'handler_email',
+            'name',
             'role',
             'status',
             'joined_at',
             'responded_at',
             'decline_reason',
+            'dog_id',
             'updated_at'
           ])
           && request.resource.data.handler_id == ra
-          && request.resource.data.role == 'titular'
-          && request.resource.data.status == 'titular';
+          // 'titular' = papel legado da transição; remover após rollout completo do APK
+          && request.resource.data.role in ['titular', 'motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2', 'k9']
+          && request.resource.data.status == 'active';
         allow update: if emailMatchesRa(ra)
           && request.resource.data.handler_id == resource.data.handler_id
+          && request.resource.data.role in ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2', 'k9', '']
           && (
             (
+              // Saída: campos de saída são imutáveis após criação
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'status',
                 'left_at',
+                'dog_id',
                 'updated_at'
               ])
               && request.resource.data.status == 'ended'
             )
             || (
-              request.resource.data.role == 'titular'
-              && request.resource.data.status == 'titular'
+              // Adesão/transf.: status ativo, campos completos
+              request.resource.data.status == 'active'
               && request.resource.data.keys().hasOnly([
                 'handler_id',
                 'auth_uid',
                 'handler_email',
+                'name',
                 'role',
                 'status',
                 'joined_at',
                 'responded_at',
                 'decline_reason',
+                'dog_id',
                 'left_at',
                 'updated_at'
               ])
@@ -1533,6 +1544,34 @@ service cloud.firestore {
           );
         allow delete: if false;
       }
+    }
+
+    match /vehicle_crew_history/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'vehicle_id',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'period',
+          'members',
+          'dog_changes',
+          'ended_by',
+          'shift_ids',
+          'created_at'
+        ])
+        && request.resource.data.vehicle_id is string
+        && request.resource.data.vehicle_id.size() > 0
+        && request.resource.data.period is map
+        && request.resource.data.period.started_at is timestamp
+        && request.resource.data.period.ended_at is timestamp
+        && request.resource.data.members is list
+        && request.resource.data.ended_by is string
+        && request.resource.data.shift_ids is list;
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /users/{ra} {

@@ -44,7 +44,15 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
   Future<void> _startShift(Dog dog, {Vehicle? vehicle}) async {
     if (_startingDogId != null) return;
 
+    // Capturar antes do await para evitar uso de BuildContext pós-assíncrono
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    final fbUser = Provider.of<AuthViewModel>(context, listen: false).user;
+    final currentRa = HandlerIdentityService.raFromUser(fbUser);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final displayName = userVM.displayNameFor(
+      ra: currentRa,
+      firebaseUser: fbUser,
+    );
     final fitness = _fitnessService.evaluate(dog);
 
     // Se não apto, pedir confirmação
@@ -56,7 +64,11 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _startingDogId = dog.id);
 
-    await shiftVM.startShift(dog.id, vehicle: vehicle);
+    await shiftVM.startShift(
+      dog.id,
+      vehicle: vehicle,
+      handlerName: displayName,
+    );
 
     if (!mounted) return;
     setState(() => _startingDogId = null);
