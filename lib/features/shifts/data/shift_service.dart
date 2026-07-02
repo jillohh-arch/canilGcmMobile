@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 
 class ShiftService {
   ShiftService({FirebaseFirestore? firestore})
@@ -22,6 +23,14 @@ class ShiftService {
     return _db.collection('vehicle_crews');
   }
 
+  CollectionReference<Map<String, dynamic>> get _vehicleCrewHistory {
+    return _db.collection('vehicle_crew_history');
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // WATCH / GET
+  // ──────────────────────────────────────────────────────────
+
   Stream<ActiveShiftSession?> watchActiveShift(String handlerId) {
     return _activeShiftDoc(handlerId).snapshots().map((snapshot) {
       final data = snapshot.data();
@@ -36,10 +45,34 @@ class ShiftService {
     });
   }
 
+  Future<List<ActiveShiftSession>> getActiveCrew(String vehicleId) async {
+    if (vehicleId.trim().isEmpty) return const [];
+    final snapshot = await _db
+        .collection('active_shifts')
+        .where('vehicle_id', isEqualTo: vehicleId.trim())
+        .get();
+    final crew = snapshot.docs
+        .map(
+          (doc) => ActiveShiftSession.fromJson({
+            ...doc.data(),
+            'handlerId': doc.id,
+          }),
+        )
+        .where((session) => session.isActive)
+        .toList();
+    crew.sort((a, b) => a.handlerId.compareTo(b.handlerId));
+    return crew;
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // START SHIFT  (abertura de turno + abertura de guarnição)
+  // ──────────────────────────────────────────────────────────
+
   Future<void> startShift({
     required String handlerId,
     String? handlerAuthUid,
     String? handlerEmail,
+    String? handlerName,
     String? shiftGroupId,
     String? shiftGroupCode,
     String? shiftGroupLabel,
@@ -62,10 +95,11 @@ class ShiftService {
     final crewId = vehicle == null ? null : _crewIdFor(vehicle.id);
     final crewFields = vehicle == null
         ? const <String, dynamic>{}
-        : _crewFields(crewId: crewId!, role: 'titular', status: 'titular');
+        : _crewFields(crewId: crewId!, role: 'motorista', status: 'active');
     final handlerFields = _handlerIdentityFields(
       authUid: handlerAuthUid,
       email: handlerEmail,
+      name: handlerName,
     );
     final shiftGroupFields = _shiftGroupFields(
       shiftGroupId: shiftGroupId,
@@ -73,6 +107,7 @@ class ShiftService {
       shiftGroupLabel: shiftGroupLabel,
     );
 
+    // ── shift_logs (criado como ended_at=null) ──
     batch.set(logRef, {
       'id': logRef.id,
       'handlerId': handlerId,
@@ -87,10 +122,12 @@ class ShiftService {
       'startedAt': Timestamp.fromDate(startedAt),
       'endedAt': null,
       'dogSwitches': <Map<String, dynamic>>[],
+      'vehicleChanges': <Map<String, dynamic>>[],
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
+    // ── active_shifts ──
     batch.set(activeRef, {
       'shiftId': logRef.id,
       'handlerId': handlerId,
@@ -105,6 +142,7 @@ class ShiftService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
+    // ── vehicle_crews/{vehicle_id} (abertura limpa — cleared ended_at) ──
     if (vehicle != null && crewId != null) {
       _upsertCrewInBatch(
         batch: batch,
@@ -114,18 +152,16 @@ class ShiftService {
         handlerId: handlerId,
         handlerAuthUid: handlerAuthUid,
         handlerEmail: handlerEmail,
-        role: 'titular',
-        status: 'titular',
+        handlerName: handlerName,
+        role: 'motorista',
+        status: 'active',
+        clearEndedAt: true, // abertura limpa ended_at
       );
     }
 
     try {
       await batch.commit();
     } on FirebaseException catch (e) {
-      // Se o Firestore bloquear active_shifts ou vehicle_crews por regras
-      // (PERMISSION_DENIED), o batch inteiro aborta atomicamente. Isso
-      // trava a UI em "iniciando turno…" sem chegar ao dashboard. Fallback:
-      // grava só o log do turno para o registro institucional não se perder.
       if (e.code == 'permission-denied') {
         debugPrint(
           '[ShiftService] batch bloqueado por regras (${e.code}); '
@@ -146,6 +182,7 @@ class ShiftService {
           'startedAt': Timestamp.fromDate(startedAt),
           'endedAt': null,
           'dogSwitches': <Map<String, dynamic>>[],
+          'vehicleChanges': <Map<String, dynamic>>[],
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -155,16 +192,40 @@ class ShiftService {
     }
   }
 
+  // ──────────────────────────────────────────────────────────
+  // ASSUME VEHICLE  (adesão a guarnição ativa)
+  // ──────────────────────────────────────────────────────────
+
+  /// Assumir uma função na guarnição da viatura [vehicle].
+  ///
+  /// Lança [StateError] se:
+  /// - a função já está ocupada por outro member ativo
+  /// - a guarnição já está completa (cargo cheia)
+  /// - a guarnição já tem cão de serviço diferente
   Future<void> assumeVehicle({
     required String handlerId,
     String? handlerAuthUid,
     String? handlerEmail,
+    String? handlerName,
     required String dogId,
     required Vehicle vehicle,
+    required String role,
   }) async {
+    if (!CrewRole.isValid(role)) {
+      throw StateError(
+        'Função inválida: $role. Valores permitidos: ${CrewRole.valuesList}',
+      );
+    }
+
     await _validateVehicleCanBeAssumed(
       vehicle: vehicle,
       serviceDogId: dogId,
+      excludingHandlerId: handlerId,
+    );
+    // Validar que a função está livre
+    await _validateRoleIsFree(
+      vehicleId: vehicle.id,
+      role: role,
       excludingHandlerId: handlerId,
     );
 
@@ -176,6 +237,7 @@ class ShiftService {
       final activeSnapshot = await transaction.get(activeRef);
       final activeData = activeSnapshot.data();
       final shiftId = activeData?['shiftId'] as String?;
+      final previousVehicleId = activeData?['vehicle_id'] as String?;
       final activeDogId =
           activeData?['service_dog_id']?.toString().trim() ??
           activeData?['serviceDogId']?.toString().trim() ??
@@ -191,23 +253,42 @@ class ShiftService {
 
       final vehicleFields = {
         ..._vehicleFields(vehicle),
-        ..._crewFields(crewId: crewId, role: 'titular', status: 'titular'),
-        ..._handlerIdentityFields(authUid: handlerAuthUid, email: handlerEmail),
+        ..._crewFields(crewId: crewId, role: role, status: 'active'),
+        ..._handlerIdentityFields(
+          authUid: handlerAuthUid,
+          email: handlerEmail,
+          name: handlerName,
+        ),
         'vehicle_joined_at': joinedAt,
       };
 
+      // ── active_shifts ──
       transaction.set(activeRef, {
         ...vehicleFields,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // ── shift_logs (vehicle_changes array) ──
       if (shiftId != null && shiftId.isNotEmpty) {
+        final vehicleChange = previousVehicleId != null &&
+                previousVehicleId.isNotEmpty &&
+                previousVehicleId != vehicle.id
+            ? {
+                'from_vehicle_id': previousVehicleId,
+                'to_vehicle_id': vehicle.id,
+                'at': joinedAt,
+              }
+            : null;
+
         transaction.set(_shiftLogs.doc(shiftId), {
           ...vehicleFields,
+          if (vehicleChange != null)
+            'vehicleChanges': FieldValue.arrayUnion([vehicleChange]),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 
+      // ── vehicle_crews/{vehicle_id} — só atualiza, não sobrescreve created_at ──
       transaction.set(_vehicleCrews.doc(crewId), {
         'id': crewId,
         'vehicle_id': vehicle.id,
@@ -217,11 +298,14 @@ class ShiftService {
         'vehicle_unit': vehicle.unit,
         'crew_size': vehicle.crewSize,
         'service_dog_id': activeDogId,
-        'titular_handler_id': handlerId,
+        'titular_handler_id': _nonEmpty(activeData['titular_handler_id']) ??
+            handlerId,
         'active': true,
         'updated_at': FieldValue.serverTimestamp(),
-        'created_at': FieldValue.serverTimestamp(),
+        // ended_at: NÃO toca — só abertura limpa (startShift)
       }, SetOptions(merge: true));
+
+      // ── members/{ra} ──
       transaction.set(
         _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
         {
@@ -229,9 +313,11 @@ class ShiftService {
           ..._handlerIdentityFields(
             authUid: handlerAuthUid,
             email: handlerEmail,
+            name: handlerName,
           ),
-          'role': 'titular',
-          'status': 'titular',
+          'role': role,
+          'status': 'active',
+          'dog_id': activeDogId,
           'joined_at': FieldValue.serverTimestamp(),
           'responded_at': FieldValue.serverTimestamp(),
         },
@@ -240,24 +326,9 @@ class ShiftService {
     });
   }
 
-  Future<List<ActiveShiftSession>> getActiveCrew(String vehicleId) async {
-    if (vehicleId.trim().isEmpty) return const [];
-    final snapshot = await _db
-        .collection('active_shifts')
-        .where('vehicle_id', isEqualTo: vehicleId.trim())
-        .get();
-    final crew = snapshot.docs
-        .map(
-          (doc) => ActiveShiftSession.fromJson({
-            ...doc.data(),
-            'handlerId': doc.id,
-          }),
-        )
-        .where((session) => session.isActive)
-        .toList();
-    crew.sort((a, b) => a.handlerId.compareTo(b.handlerId));
-    return crew;
-  }
+  // ──────────────────────────────────────────────────────────
+  // SWITCH DOG
+  // ──────────────────────────────────────────────────────────
 
   Future<void> switchDog({
     required String handlerId,
@@ -281,7 +352,8 @@ class ShiftService {
           activeData?['service_dog_id'] as String? ??
           activeData?['dogId'] as String? ??
           '';
-      final transactionVehicleId = activeData?['vehicle_id']?.toString().trim();
+      final transactionVehicleId =
+          activeData?['vehicle_id']?.toString().trim();
       final crewId = activeData?['vehicle_crew_id']?.toString().trim();
 
       transaction.set(activeRef, {
@@ -332,6 +404,10 @@ class ShiftService {
     });
   }
 
+  // ──────────────────────────────────────────────────────────
+  // END SHIFT  (encerramento individual + Possible crew closure)
+  // ──────────────────────────────────────────────────────────
+
   Future<void> endShift(String handlerId) {
     final activeRef = _activeShiftDoc(handlerId);
     final endedAt = Timestamp.fromDate(DateTime.now());
@@ -340,13 +416,18 @@ class ShiftService {
       final activeSnapshot = await transaction.get(activeRef);
       final activeData = activeSnapshot.data();
       final shiftId = activeData?['shiftId'] as String?;
+      final crewId = activeData?['vehicle_crew_id']?.toString().trim();
+      final vehicleId = activeData?['vehicle_id']?.toString().trim();
+      final dogId = activeData?['service_dog_id']?.toString().trim();
 
+      // ── active_shifts — marca como ended ──
       transaction.set(activeRef, {
         'status': 'ended',
         'endedAt': endedAt,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // ── shift_logs ──
       if (shiftId != null && shiftId.isNotEmpty) {
         transaction.set(_shiftLogs.doc(shiftId), {
           'status': 'ended',
@@ -355,21 +436,430 @@ class ShiftService {
         }, SetOptions(merge: true));
       }
 
-      final crewId = activeData?['vehicle_crew_id']?.toString().trim();
+      // ── vehicle_crews/{crewId}/members/{handlerId} — marca saída ──
       if (crewId != null && crewId.isNotEmpty) {
         transaction.set(
           _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
           {
             'status': 'ended',
             'left_at': endedAt,
+            'dog_id': dogId, // snapshot do cão no momento da saída
             'updated_at': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: true),
         );
-        //ponytail: crew deactivation movido para trigger onActiveShiftUpdated no index.ts —
-//          mais seguro que checar papel dentro da transacao (evita query dentro de transaction)
+
+        // ── Verificar se é o ÚLTIMO member ativo → encerrar guarnição ──
+        if (vehicleId != null && vehicleId.isNotEmpty) {
+          // Lê todos os members para verificar se há outros ativos
+          final membersSnapshot = await transaction.get(
+            _vehicleCrews.doc(crewId).collection('members'),
+          );
+
+          bool hasOtherActive = false;
+          for (final doc in membersSnapshot.docs) {
+            final data = doc.data();
+            final status = data['status']?.toString();
+            if (doc.id != handlerId &&
+                (status == 'active' || status == 'pending')) {
+              hasOtherActive = true;
+              break;
+            }
+          }
+
+          if (!hasOtherActive) {
+            // ÚLTIMO member saiu — criar snapshot imutável da guarnição
+            _createCrewHistorySnapshot(
+              transaction: transaction,
+              crewId: crewId,
+              vehicleId: vehicleId,
+              membersSnapshot: membersSnapshot,
+              endedAt: endedAt,
+              endedBy: handlerId,
+              shiftIds: shiftId != null && shiftId.isNotEmpty
+                  ? [shiftId]
+                  : <String>[],
+            );
+
+            // Marcar guarnição como encerrada
+            transaction.set(_vehicleCrews.doc(crewId), {
+              'active': false,
+              'ended_at': endedAt,
+              'updated_at': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        }
       }
     });
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // ASSUME VEHICLE FROM ANOTHER VEHICLE (troca de viatura)
+  // ──────────────────────────────────────────────────────────
+
+  /// Troca de viatura: sai da guarnição atual (se houver) e entra na nova.
+  /// Equivalente a: endShift na guarnição atual + assumeVehicle na nova.
+  /// Tratamento transacional: detecta se a guarnição de origem fica sem
+  /// members ativos e cria o snapshot de histórico.
+  Future<void> transferToVehicle({
+    required String handlerId,
+    required String dogId,
+    required Vehicle newVehicle,
+    required String newRole,
+    String? handlerAuthUid,
+    String? handlerEmail,
+    String? handlerName,
+  }) async {
+    if (!CrewRole.isValid(newRole)) {
+      throw StateError(
+        'Função inválida: $newRole. Valores permitidos: ${CrewRole.valuesList}',
+      );
+    }
+
+    // Validar nova viatura
+    await _validateVehicleCanBeAssumed(
+      vehicle: newVehicle,
+      serviceDogId: dogId,
+      excludingHandlerId: handlerId,
+    );
+    await _validateRoleIsFree(
+      vehicleId: newVehicle.id,
+      role: newRole,
+      excludingHandlerId: handlerId,
+    );
+
+    final activeRef = _activeShiftDoc(handlerId);
+    final newCrewId = _crewIdFor(newVehicle.id);
+    final transferredAt = Timestamp.fromDate(DateTime.now());
+
+    return _db.runTransaction((transaction) async {
+      final activeSnapshot = await transaction.get(activeRef);
+      final activeData = activeSnapshot.data();
+      final shiftId = activeData?['shiftId'] as String?;
+      final previousCrewId =
+          activeData?['vehicle_crew_id']?.toString().trim();
+      final previousVehicleId =
+          activeData?['vehicle_id']?.toString().trim();
+
+      if (!activeSnapshot.exists ||
+          activeData == null ||
+          activeData['status'] != 'active') {
+        throw StateError('Turno ativo não encontrado');
+      }
+
+      // ── 1) Sair da guarnição anterior ──
+      if (previousCrewId != null &&
+          previousCrewId.isNotEmpty &&
+          previousCrewId != newCrewId) {
+        // Marcar saída do member na guarnição anterior
+        transaction.set(
+          _vehicleCrews.doc(previousCrewId).collection('members').doc(handlerId),
+          {
+            'status': 'ended',
+            'left_at': transferredAt,
+            'dog_id': dogId,
+            'updated_at': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+
+        // Verificar se a guarnição anterior ficou sem members ativos
+        final prevMembersSnapshot = await transaction.get(
+          _vehicleCrews.doc(previousCrewId).collection('members'),
+        );
+
+        bool hasOtherActive = false;
+        for (final doc in prevMembersSnapshot.docs) {
+          final status = doc.data()['status']?.toString();
+          if (doc.id != handlerId &&
+              (status == 'active' || status == 'pending')) {
+            hasOtherActive = true;
+            break;
+          }
+        }
+
+        if (!hasOtherActive) {
+          // Fechar guarnição anterior
+          _createCrewHistorySnapshot(
+            transaction: transaction,
+            crewId: previousCrewId,
+            vehicleId: previousVehicleId ?? previousCrewId,
+            membersSnapshot: prevMembersSnapshot,
+            endedAt: transferredAt,
+            endedBy: handlerId,
+            shiftIds: shiftId != null && shiftId.isNotEmpty
+                ? [shiftId]
+                : <String>[],
+          );
+
+          transaction.set(_vehicleCrews.doc(previousCrewId), {
+            'active': false,
+            'ended_at': transferredAt,
+            'updated_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      }
+
+      // ── 2) Entrar na nova guarnição ──
+      final vehicleFields = {
+        ..._vehicleFields(newVehicle),
+        ..._crewFields(crewId: newCrewId, role: newRole, status: 'active'),
+        ..._handlerIdentityFields(
+          authUid: handlerAuthUid,
+          email: handlerEmail,
+          name: handlerName,
+        ),
+        'vehicle_joined_at': transferredAt,
+      };
+
+      transaction.set(activeRef, {
+        ...vehicleFields,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // ── 3) shift_logs — vehicle_changes array ──
+      if (shiftId != null && shiftId.isNotEmpty) {
+        final vehicleChange = previousVehicleId != null &&
+                previousVehicleId.isNotEmpty &&
+                previousVehicleId != newVehicle.id
+            ? {
+                'from_vehicle_id': previousVehicleId,
+                'to_vehicle_id': newVehicle.id,
+                'at': transferredAt,
+              }
+            : null;
+
+        transaction.set(_shiftLogs.doc(shiftId), {
+          ...vehicleFields,
+          if (vehicleChange != null)
+            'vehicleChanges': FieldValue.arrayUnion([vehicleChange]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      // ── 4) vehicle_crews/{newCrewId} — só atualiza (adesão) ──
+      transaction.set(_vehicleCrews.doc(newCrewId), {
+        'id': newCrewId,
+        'vehicle_id': newVehicle.id,
+        'vehicle_label': newVehicle.label,
+        'vehicle_prefix': newVehicle.prefix,
+        'vehicle_model': newVehicle.modelName,
+        'vehicle_unit': newVehicle.unit,
+        'crew_size': newVehicle.crewSize,
+        'service_dog_id': dogId,
+        'active': true,
+        'updated_at': FieldValue.serverTimestamp(),
+        // NÃO sobrescreve created_at nem ended_at aqui
+      }, SetOptions(merge: true));
+
+      transaction.set(
+        _vehicleCrews.doc(newCrewId).collection('members').doc(handlerId),
+        {
+          'handler_id': handlerId,
+          ..._handlerIdentityFields(
+            authUid: handlerAuthUid,
+            email: handlerEmail,
+            name: handlerName,
+          ),
+          'role': newRole,
+          'status': 'active',
+          'dog_id': dogId,
+          'joined_at': FieldValue.serverTimestamp(),
+          'responded_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // PRIVATE — VALIDAÇÕES
+  // ──────────────────────────────────────────────────────────
+
+  Future<void> _validateVehicleCanBeAssumed({
+    required Vehicle vehicle,
+    required String serviceDogId,
+    required String excludingHandlerId,
+  }) async {
+    if (!vehicle.active) {
+      throw StateError('Viatura inativa.');
+    }
+
+    final activeCrew = await getActiveCrew(vehicle.id);
+    final otherCrew = activeCrew
+        .where((session) => session.handlerId != excludingHandlerId)
+        .toList();
+    if (otherCrew.length >= vehicle.crewSize) {
+      throw StateError('${vehicle.label} já está com a guarnição completa.');
+    }
+
+    final crewSnapshot =
+        await _vehicleCrews.doc(_crewIdFor(vehicle.id)).get();
+    final crewData = crewSnapshot.data();
+    final existingServiceDogId =
+        crewData?['service_dog_id']?.toString().trim();
+    final existingTitular =
+        crewData?['titular_handler_id']?.toString().trim();
+    final crewIsActive = crewData?['active'] == true;
+    if (crewIsActive &&
+        existingTitular != null &&
+        existingTitular.isNotEmpty &&
+        existingTitular != excludingHandlerId) {
+      throw StateError(
+        '${vehicle.label} já possui guarnição. Entre somente por convite.',
+      );
+    }
+    if (crewIsActive &&
+        existingServiceDogId != null &&
+        existingServiceDogId.isNotEmpty &&
+        existingServiceDogId != serviceDogId) {
+      throw StateError(
+        '${vehicle.label} já está operando com outro K9 de serviço.',
+      );
+    }
+  }
+
+  /// Verifica que [role] não está ocupado por outro member ativo na
+  /// guarnição de [vehicleId].
+  Future<void> _validateRoleIsFree({
+    required String vehicleId,
+    required String role,
+    required String excludingHandlerId,
+  }) async {
+    final membersSnapshot = await _vehicleCrews
+        .doc(_crewIdFor(vehicleId))
+        .collection('members')
+        .where('role', isEqualTo: role)
+        .where('status', whereIn: ['active', 'pending'])
+        .get();
+
+    for (final doc in membersSnapshot.docs) {
+      if (doc.id != excludingHandlerId) {
+        throw StateError(
+          'A função "$role" já está ocupada na guarnição.',
+        );
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // PRIVATE — SNAPSHOT DE HISTÓRICO DA GUARNIÇÃO
+  // ──────────────────────────────────────────────────────────
+
+  /// Cria o doc em vehicle_crew_history com snapshot imutável da guarnição.
+  /// Chamado dentro de transaction quando o último member ativo sai.
+  void _createCrewHistorySnapshot({
+    required Transaction transaction,
+    required String crewId,
+    required String vehicleId,
+    required QuerySnapshot<Map<String, dynamic>> membersSnapshot,
+    required Timestamp endedAt,
+    required String endedBy,
+    required List<String> shiftIds,
+  }) {
+    // Ler doc pai da guarnição para metadata
+    final crewDoc = transaction.get(_vehicleCrews.doc(crewId));
+    final crewData = crewDoc.data();
+
+    final historyRef = _vehicleCrewHistory.doc();
+    final startedAt = crewData?['created_at'] as Timestamp?;
+    final vehicleLabel = crewData?['vehicle_label']?.toString();
+    final vehiclePrefix = crewData?['vehicle_prefix']?.toString();
+    final vehicleModel = crewData?['vehicle_model']?.toString();
+    final dogChanges = (crewData?['dog_changes'] as List<dynamic>?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        <Map<String, dynamic>>[];
+
+    // Montar lista de members completa (todos que passaram pela guarnição)
+    final members = membersSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'handler_id': doc.id,
+        'name': data['name'] ?? data['handler_name'],
+        'role': data['role'] ?? '',
+        'joined_at': data['joined_at'],
+        'left_at': data['left_at'],
+        'dog_id': data['dog_id'],
+      };
+    }).toList();
+
+    transaction.set(historyRef, {
+      'id': historyRef.id,
+      'vehicle_id': vehicleId,
+      'vehicle_label': vehicleLabel,
+      'vehicle_prefix': vehiclePrefix,
+      'vehicle_model': vehicleModel,
+      'period': {
+        'started_at': startedAt ?? FieldValue.serverTimestamp(),
+        'ended_at': endedAt,
+      },
+      'members': members,
+      'dog_changes': dogChanges,
+      'ended_by': endedBy,
+      'shift_ids': shiftIds,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // PRIVATE — HELPERS
+  // ──────────────────────────────────────────────────────────
+
+  String _crewIdFor(String vehicleId) => vehicleId.trim();
+
+  void _upsertCrewInBatch({
+    required WriteBatch batch,
+    required Vehicle vehicle,
+    required String crewId,
+    required String serviceDogId,
+    required String handlerId,
+    String? handlerAuthUid,
+    String? handlerEmail,
+    String? handlerName,
+    required String role,
+    required String status,
+    bool clearEndedAt = false,
+  }) {
+    final crewDocData = <String, dynamic>{
+      'id': crewId,
+      'vehicle_id': vehicle.id,
+      'vehicle_label': vehicle.label,
+      'vehicle_prefix': vehicle.prefix,
+      'vehicle_model': vehicle.modelName,
+      'vehicle_unit': vehicle.unit,
+      'crew_size': vehicle.crewSize,
+      'service_dog_id': serviceDogId,
+      'titular_handler_id': handlerId,
+      'active': true,
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    if (clearEndedAt) {
+      // Abertura: garante que ended_at não está presente (limpa fossilização)
+      crewDocData['ended_at'] = FieldValue.delete();
+    }
+
+    batch.set(_vehicleCrews.doc(crewId), crewDocData, SetOptions(merge: true));
+
+    batch.set(
+      _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
+      {
+        'handler_id': handlerId,
+        ..._handlerIdentityFields(
+          authUid: handlerAuthUid,
+          email: handlerEmail,
+          name: handlerName,
+        ),
+        'role': role,
+        'status': status,
+        'dog_id': serviceDogId,
+        'joined_at': FieldValue.serverTimestamp(),
+        'responded_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
   }
 
   Map<String, dynamic> _vehicleFields(Vehicle? vehicle) {
@@ -413,10 +903,12 @@ class ShiftService {
   Map<String, dynamic> _handlerIdentityFields({
     String? authUid,
     String? email,
+    String? name,
   }) {
     return {
       'auth_uid': _nonEmpty(authUid),
       'handler_email': _nonEmpty(email)?.toLowerCase(),
+      'name': _nonEmpty(name),
     };
   }
 
@@ -438,86 +930,5 @@ class ShiftService {
   String? _nonEmpty(String? value) {
     final text = value?.trim();
     return text == null || text.isEmpty ? null : text;
-  }
-
-  Future<void> _validateVehicleCanBeAssumed({
-    required Vehicle vehicle,
-    required String serviceDogId,
-    required String excludingHandlerId,
-  }) async {
-    if (!vehicle.active) {
-      throw StateError('Viatura inativa.');
-    }
-
-    final activeCrew = await getActiveCrew(vehicle.id);
-    final otherCrew = activeCrew
-        .where((session) => session.handlerId != excludingHandlerId)
-        .toList();
-    if (otherCrew.length >= vehicle.crewSize) {
-      throw StateError('${vehicle.label} já está com a guarnição completa.');
-    }
-
-    final crewSnapshot = await _vehicleCrews.doc(_crewIdFor(vehicle.id)).get();
-    final crewData = crewSnapshot.data();
-    final existingServiceDogId = crewData?['service_dog_id']?.toString().trim();
-    final existingTitular = crewData?['titular_handler_id']?.toString().trim();
-    final crewIsActive = crewData?['active'] == true;
-    if (crewIsActive &&
-        existingTitular != null &&
-        existingTitular.isNotEmpty &&
-        existingTitular != excludingHandlerId) {
-      throw StateError(
-        '${vehicle.label} já possui guarnição. Entre somente por convite.',
-      );
-    }
-    if (crewIsActive &&
-        existingServiceDogId != null &&
-        existingServiceDogId.isNotEmpty &&
-        existingServiceDogId != serviceDogId) {
-      throw StateError(
-        '${vehicle.label} já está operando com outro K9 de serviço.',
-      );
-    }
-  }
-
-  String _crewIdFor(String vehicleId) => vehicleId.trim();
-
-  void _upsertCrewInBatch({
-    required WriteBatch batch,
-    required Vehicle vehicle,
-    required String crewId,
-    required String serviceDogId,
-    required String handlerId,
-    String? handlerAuthUid,
-    String? handlerEmail,
-    required String role,
-    required String status,
-  }) {
-    batch.set(_vehicleCrews.doc(crewId), {
-      'id': crewId,
-      'vehicle_id': vehicle.id,
-      'vehicle_label': vehicle.label,
-      'vehicle_prefix': vehicle.prefix,
-      'vehicle_model': vehicle.modelName,
-      'vehicle_unit': vehicle.unit,
-      'crew_size': vehicle.crewSize,
-      'service_dog_id': serviceDogId,
-      'titular_handler_id': handlerId,
-      'active': true,
-      'created_at': FieldValue.serverTimestamp(),
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    batch.set(
-      _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
-      {
-        'handler_id': handlerId,
-        ..._handlerIdentityFields(authUid: handlerAuthUid, email: handlerEmail),
-        'role': role,
-        'status': status,
-        'joined_at': FieldValue.serverTimestamp(),
-        'responded_at': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
   }
 }

@@ -92,7 +92,7 @@ class _HudSelectBottomSheet<T> extends StatelessWidget {
                     Navigator.of(context).pop(item);
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
+                    duration: HudDurations.fast,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 13,

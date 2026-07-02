@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:canil_gcm/core/theme/animation_constants.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -46,7 +47,7 @@ class _TacticalCardState extends State<TacticalCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: HudDurations.tap,
       lowerBound: 0.97,
       upperBound: 1,
     )..value = 1;

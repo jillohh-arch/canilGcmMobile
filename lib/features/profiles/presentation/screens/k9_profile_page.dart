@@ -227,25 +227,28 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.surfacePanelAlt,
-                  border: Border.all(color: AppTheme.primary, width: 3),
-                ),
-                child: ClipOval(
-                  child:
-                      widget.dog.profileImageUrl != null &&
-                          widget.dog.profileImageUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.dog.profileImageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, _) => _dogInitialsFallback(),
-                          errorWidget: (_, _, _) => _dogInitialsFallback(),
-                        )
-                      : _dogInitialsFallback(),
+              Hero(
+                tag: 'dog_avatar_${widget.dog.id}',
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.surfacePanelAlt,
+                    border: Border.all(color: AppTheme.primary, width: 3),
+                  ),
+                  child: ClipOval(
+                    child:
+                        widget.dog.profileImageUrl != null &&
+                            widget.dog.profileImageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.dog.profileImageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, _) => _dogInitialsFallback(),
+                            errorWidget: (_, _, _) => _dogInitialsFallback(),
+                          )
+                        : _dogInitialsFallback(),
+                  ),
                 ),
               ),
               Positioned(

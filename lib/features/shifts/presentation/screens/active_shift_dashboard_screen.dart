@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
+import 'package:canil_gcm/core/theme/animation_constants.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
@@ -30,6 +31,7 @@ import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
+import 'package:canil_gcm/features/profiles/presentation/screens/k9_profile_page.dart';
 import 'package:canil_gcm/core/services/dog_fitness_service.dart';
 
 part 'active_shift_header.dart';
@@ -59,17 +61,195 @@ class ActiveShiftDashboardScreen extends StatefulWidget {
 }
 
 class _ActiveShiftDashboardScreenState
-    extends State<ActiveShiftDashboardScreen> {
+    extends State<ActiveShiftDashboardScreen>
+    with TickerProviderStateMixin {
   final DogService _dogService = DogService();
   final DashboardService _dashboardService = DashboardService();
   final VehicleService _vehicleService = VehicleService();
   String? _lastFetchedDogId;
   bool _recoveringMissingDog = false;
 
+  // Controller de animação de entrada das seções.
+  // Criado uma vez no initState — não re-criado em rebuilds.
+  late final AnimationController _sectionsAnimController;
+  late final Animation<double> _sectionsAnimation;
+
+  // Duração total da animação de entrada (compaível com HudDurations.entry + stagger).
+  static const _animTotalMs = 900; // ~3 * 300ms em sequência
+
   // Dados dinâmicos carregados do Firestore
   List<QuickAction> _quickActions = [];
   List<DashboardAlert> _alerts = [];
   int _totalAlerts = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _sectionsAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _animTotalMs),
+    );
+    _sectionsAnimation = CurvedAnimation(
+      parent: _sectionsAnimController,
+      curve: HudCurves.enter,
+    );
+
+    // Inicia a animação de entrada.
+    // Não usa post-frame callback — initState garante que o controller
+    // está disponível antes do primeiro build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (shouldAnimate(context)) {
+        _sectionsAnimController.forward();
+      } else {
+        // Se animações estão desativadas, vai direto ao estado final.
+        _sectionsAnimController.value = 1.0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sectionsAnimController.dispose();
+    super.dispose();
+  }
+
+  /// Wrapper que aplica fade + slide vertical a qualquer widget de seção.
+  /// Interval controla em qual parte da timeline da animação a seção aparece.
+  /// Ex: intervalo 0.0–0.33 = primeira seção, 0.11–0.44 = segunda, etc.
+  Widget _animateSection(
+    Widget child, {
+    required double intervalStart,
+    required double intervalEnd,
+  }) {
+    final animate = shouldAnimate(context);
+    if (!animate) return child;
+
+    return AnimatedBuilder(
+      animation: _sectionsAnimation,
+      builder: (context, _) {
+        final progress = _sectionsAnimation.value;
+        final interval = Interval(intervalStart, intervalEnd, curve: HudCurves.enter);
+        final sectionProgress = interval.transform(progress.clamp(intervalStart, intervalEnd));
+
+        return Opacity(
+          opacity: sectionProgress,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - sectionProgress)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  /// Monta o conteúdo do dashboard com animações de entrada escalonadas.
+  Widget _buildCockpitBody(Dog dog, String callsign) {
+    final userVM = Provider.of<UserViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+    final userModel = userVM.findByRa(currentRa);
+    final userPhoto = userModel?.photoUrl?.trim();
+    final firebasePhoto = authVM.user?.photoURL?.trim();
+    final conductorPhoto = userPhoto != null && userPhoto.isNotEmpty
+        ? userPhoto
+        : firebasePhoto != null && firebasePhoto.isNotEmpty
+        ? firebasePhoto
+        : null;
+
+    // Layout de intervalos para as seções.
+    // Total: 0.0 → 1.0 ao longo de ~900ms.
+    // Cada seção entra sequencialmente com stagger.
+    const base = 0.0;
+    const step = 0.14; // fração por seção
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header (índice 0, entra imediatamente)
+          _ShiftHeader(
+            dog: dog,
+            currentRa: currentRa,
+            conductorPhotoUrl: conductorPhoto,
+            onSwitchDog: () => _showDogSwitcher(context),
+            onDogHealth: widget.onOpenHealthTab,
+            onProfile: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const HandlerProfilePage(showBottomNav: false),
+              ),
+            ),
+          ),
+          // Scroll area
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!Provider.of<ShiftViewModel>(context).hasVehicle) ...[
+                    _animateSection(
+                      _VehicleAssumptionPrompt(
+                        vehicleService: _vehicleService,
+                        onAssume: (vehicle) =>
+                            _assumeVehicleDuringShift(context, vehicle),
+                      ),
+                      intervalStart: base + step * 1,
+                      intervalEnd: base + step * 1 + 0.1,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _animateSection(
+                    _ShiftProfileCardsSection(
+                      dog: dog,
+                      callsign: callsign,
+                      conductorPhotoUrl: conductorPhoto,
+                    ),
+                    intervalStart: base + step * 1,
+                    intervalEnd: base + step * 1 + 0.12,
+                  ),
+                  const SizedBox(height: 18),
+                  _animateSection(
+                    const _OperationalPulseSection(),
+                    intervalStart: base + step * 2,
+                    intervalEnd: base + step * 2 + 0.1,
+                  ),
+                  const SizedBox(height: 18),
+                  _animateSection(
+                    _QuickActionsSection(
+                      dog: dog,
+                      actions: _quickActions,
+                      onOpenTrainingHub: widget.onOpenTrainingHub,
+                      onOpenHealthTab: widget.onOpenHealthTab,
+                    ),
+                    intervalStart: base + step * 3,
+                    intervalEnd: base + step * 3 + 0.12,
+                  ),
+                  const SizedBox(height: 18),
+                  _animateSection(
+                    const _LatestRecordsSection(),
+                    intervalStart: base + step * 4,
+                    intervalEnd: base + step * 4 + 0.1,
+                  ),
+                  const SizedBox(height: 18),
+                  // Alertas (condicional)
+                  if (_alerts.isNotEmpty) ...[
+                    _animateSection(
+                      _AlertsSection(
+                        alerts: _alerts,
+                        totalAlerts: _totalAlerts,
+                      ),
+                      intervalStart: base + step * 5,
+                      intervalEnd: base + step * 5 + 0.1,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -210,7 +390,7 @@ class _ActiveShiftDashboardScreenState
                   systemNavigationBarColor: AppTheme.surfaceNavigation,
                   systemNavigationBarIconBrightness: Brightness.light,
                 ),
-                child: _buildCockpit(context, dog, callsign),
+                child: _buildCockpitBody(dog, callsign),
               ),
             );
           },

@@ -46,7 +46,7 @@ class HudProgressStrip extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               onTap: () => onSelected(index),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+                duration: HudDurations.fast,
                 width: isActive ? 164 : 122,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(

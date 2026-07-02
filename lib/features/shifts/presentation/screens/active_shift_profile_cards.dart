@@ -49,12 +49,24 @@ class _ShiftProfileCardsSection extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: _ServiceSummaryColumn(
-                        imageUrl: dog.profileImageUrl,
-                        icon: Icons.pets_rounded,
-                        accent: AppTheme.success,
-                        title: dog.name,
-                        subtitle: 'Cão de serviço',
+                      child: Builder(
+                        builder: (ctx) => _ServiceSummaryColumn(
+                          imageUrl: dog.profileImageUrl,
+                          icon: Icons.pets_rounded,
+                          accent: AppTheme.success,
+                          title: dog.name,
+                          subtitle: 'Cão de serviço',
+                          enableHero: true,
+                          heroTag: 'dog_avatar_${dog.id}',
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.of(ctx).push(
+                              MaterialPageRoute(
+                                builder: (_) => K9ProfilePage(dog: dog),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                     const _ServiceSummaryDivider(),
@@ -149,6 +161,9 @@ class _ServiceSummaryColumn extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? detail;
+  final bool enableHero;
+  final String? heroTag;
+  final VoidCallback? onTap;
 
   const _ServiceSummaryColumn({
     this.imageUrl,
@@ -157,14 +172,26 @@ class _ServiceSummaryColumn extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.detail,
+    this.enableHero = false,
+    this.heroTag,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ServiceSummaryAvatar(imageUrl: imageUrl, icon: icon, accent: accent),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ServiceSummaryAvatar(
+            imageUrl: imageUrl,
+            icon: icon,
+            accent: accent,
+            enableHero: enableHero,
+            heroTag: heroTag,
+          ),
         const SizedBox(height: 10),
         Text(
           title,
@@ -196,6 +223,7 @@ class _ServiceSummaryColumn extends StatelessWidget {
           ),
         ],
       ],
+      ),
     );
   }
 }
@@ -204,17 +232,22 @@ class _ServiceSummaryAvatar extends StatelessWidget {
   final String? imageUrl;
   final IconData icon;
   final Color accent;
+  final bool enableHero;
+  final String? heroTag;
 
   const _ServiceSummaryAvatar({
     this.imageUrl,
     required this.icon,
     required this.accent,
+    this.enableHero = false,
+    this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasImage = imageUrl?.trim().isNotEmpty == true;
-    return Container(
+
+    Widget avatar = Container(
       width: 58,
       height: 58,
       decoration: BoxDecoration(
@@ -232,6 +265,15 @@ class _ServiceSummaryAvatar extends StatelessWidget {
             : Icon(icon, color: accent, size: 28),
       ),
     );
+
+    if (enableHero && heroTag != null && hasImage) {
+      avatar = Hero(
+        tag: heroTag!,
+        child: avatar,
+      );
+    }
+
+    return avatar;
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
+import 'package:canil_gcm/core/widgets/hud_status_dot.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
@@ -204,21 +205,8 @@ class BinomioHeader extends StatelessWidget {
                 Row(
                   children: [
                     if (showStatusDot) ...[
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: statusDotColor ?? AppTheme.success,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (statusDotColor ?? AppTheme.success)
-                                  .withAlpha(80),
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
+                      HudStatusDot(
+                        color: statusDotColor ?? AppTheme.success,
                       ),
                       const SizedBox(width: 6),
                     ],

@@ -88,9 +88,9 @@ class HudStagePanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
+            duration: HudDurations.normal,
+            switchInCurve: HudCurves.enter,
+            switchOutCurve: HudCurves.exit,
             child: KeyedSubtree(key: ValueKey(currentIndex), child: child),
           ),
         ],
