@@ -1156,17 +1156,24 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   Widget _buildAiDraftAction() {
     final enabled =
         _reportController.text.trim().isNotEmpty && !_isGeneratingAiDraft;
+    final hasContent = _reportController.text.trim().isNotEmpty;
     return Opacity(
-      opacity: enabled ? 1 : 0.55,
+      opacity: enabled ? 1 : (hasContent ? 0.55 : 0.4),
       child: GestureDetector(
         onTap: enabled ? _generateAiDraft : null,
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.primary.withAlpha(12),
+            color: enabled
+                ? AppTheme.primary.withAlpha(15)
+                : AppTheme.textPrimary.withAlpha(5),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.primary.withAlpha(55)),
+            border: Border.all(
+              color: enabled
+                  ? AppTheme.primary.withAlpha(70)
+                  : AppTheme.outline.withAlpha(60),
+            ),
           ),
           child: Row(
             children: [
@@ -1174,7 +1181,9 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withAlpha(20),
+                  color: enabled
+                      ? AppTheme.primary.withAlpha(25)
+                      : AppTheme.textPrimary.withAlpha(8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: _isGeneratingAiDraft
@@ -1185,9 +1194,11 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                           color: AppTheme.primary,
                         ),
                       )
-                    : const Icon(
+                    : Icon(
                         Icons.auto_awesome_rounded,
-                        color: AppTheme.primary,
+                        color: enabled
+                            ? AppTheme.primary
+                            : AppTheme.textTertiary,
                         size: 21,
                       ),
               ),
@@ -1199,18 +1210,24 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                     Text(
                       _isGeneratingAiDraft
                           ? 'Gerando minuta...'
-                          : 'Aprimorar relato com IA',
+                          : 'Transformar em minuta',
                       style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
+                        color: enabled
+                            ? AppTheme.textPrimary
+                            : AppTheme.textTertiary,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Organiza o texto sem finalizar: voce revisa antes de aplicar.',
+                      hasContent
+                          ? 'Organizo seu relato em texto institucional'
+                          : 'Digite o relato primeiro',
                       style: GoogleFonts.inter(
-                        color: AppTheme.textSecondary,
+                        color: enabled
+                            ? AppTheme.textSecondary
+                            : AppTheme.textMuted,
                         fontSize: 11,
                         height: 1.25,
                       ),
@@ -1218,11 +1235,18 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: AppTheme.primary,
-                size: 16,
-              ),
+              if (!hasContent)
+                Icon(
+                  Icons.lock_outline_rounded,
+                  color: AppTheme.textMuted,
+                  size: 16,
+                )
+              else
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: AppTheme.primary,
+                  size: 16,
+                ),
             ],
           ),
         ),
@@ -1353,6 +1377,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               contentPadding: const EdgeInsets.all(14),
             ),
           ),
+          const SizedBox(height: 12),
+          _buildAiDraftAction(),
           const SizedBox(height: 8),
           Text(
             'Caracteres: ${_reportController.text.length}',
@@ -1361,8 +1387,6 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               fontSize: 11,
             ),
           ),
-          const SizedBox(height: 12),
-          _buildAiDraftAction(),
         ],
       ),
     );

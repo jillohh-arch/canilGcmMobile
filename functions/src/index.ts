@@ -4631,6 +4631,29 @@ type FetchLike = (
   text: () => Promise<string>;
 }>;
 
+type FetchLikeResponse = Awaited<ReturnType<FetchLike>>;
+
+// Retry unico em erros temporarios do Gemini (503 sobrecarga, 429 rate limit).
+// Uma tentativa extra apos delay curto; nao faz loop. Demais status seguem direto.
+async function geminiFetchWithRetry(
+  fetchLike: FetchLike,
+  endpoint: string,
+  body: string,
+): Promise<FetchLikeResponse> {
+  const init = {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body,
+  };
+  const response = await fetchLike(endpoint, init);
+  if (response.status !== 503 && response.status !== 429) {
+    return response;
+  }
+  logger.warn("Gemini transient error, retrying once", {status: response.status});
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  return fetchLike(endpoint, init);
+}
+
 function occurrenceAiEnv(name: string): string | undefined {
   const env = process.env as Record<string, string | undefined>;
   return stringValue(env[name]);
@@ -5040,29 +5063,39 @@ function geminiDraftFromResponse(payload: unknown): Omit<OccurrenceAiDraft, "use
     if (!isPlainObject(candidate) || !isPlainObject(candidate.content)) continue;
     const parts = candidate.content.parts;
     if (!Array.isArray(parts)) continue;
-    const text = parts
+    // ponytail: percorre todos os parts e isola só os que carregam o JSON;
+    // parts sem text (ex.: thoughtSignature de modelos de thinking) ou que não
+    // contenham o payload esperado são ignorados. Cada text é parseado
+    // isoladamente para não misturar conteúdo de parts distintos.
+    const texts = parts
       .map((part) => isPlainObject(part) ? stringValue(part.text) : undefined)
       .filter((part): part is string => Boolean(part))
-      .join("\n")
-      .trim();
-    if (!text) continue;
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start < 0 || end <= start) continue;
-    try {
-      const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
-      if (!isPlainObject(parsed)) continue;
-      const draftText = stringValue(parsed.draft_text);
-      if (!draftText) continue;
-      const attentionPoints = Array.isArray(parsed.attention_points) ?
-        parsed.attention_points
-          .map((point) => stringValue(point))
-          .filter((point): point is string => Boolean(point)) :
-        [];
-      const sourceSummary = isPlainObject(parsed.source_summary) ? parsed.source_summary : {};
-      return {draftText, attentionPoints, sourceSummary};
-    } catch {
-      continue;
+      .filter((part) => part.trimStart().startsWith("{") || part.includes("draft_text"));
+    for (const text of texts) {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end <= start) {
+        // AI_PARSE_FAIL (permanente até confirmar estabilidade): texto sem JSON fechável
+        logger.warn("AI_PARSE_FAIL", {fn: "occurrence", textLen: text.length, tail: text.slice(-100)});
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
+        if (!isPlainObject(parsed)) continue;
+        const draftText = stringValue(parsed.draft_text);
+        if (!draftText) continue;
+        const attentionPoints = Array.isArray(parsed.attention_points) ?
+          parsed.attention_points
+            .map((point) => stringValue(point))
+            .filter((point): point is string => Boolean(point)) :
+          [];
+        const sourceSummary = isPlainObject(parsed.source_summary) ? parsed.source_summary : {};
+        return {draftText, attentionPoints, sourceSummary};
+      } catch {
+        // AI_PARSE_FAIL (permanente até confirmar estabilidade): provável truncamento
+        logger.warn("AI_PARSE_FAIL", {fn: "occurrence", textLen: text.length, tail: text.slice(-100)});
+        continue;
+      }
     }
   }
   return null;
@@ -5077,27 +5110,22 @@ async function occurrenceAiGeminiDraft(context: OccurrenceAiContext): Promise<Oc
   const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-3.5-flash";
   const modelPath = model.startsWith("models/") ? model : `models/${model}`;
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const response = await fetchLike(endpoint, {
-    method: "POST",
-    headers: {"content-type": "application/json"},
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{text: occurrenceAiPrompt(context)}],
-        },
-      ],
-      systemInstruction: {
-        parts: [{text: occurrenceAiSystemInstruction}],
+  const response = await geminiFetchWithRetry(fetchLike, endpoint, JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [{text: occurrenceAiPrompt(context)}],
       },
-      generationConfig: {
-        temperature: 0.45,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
-        thinkingConfig: {thinkingLevel: "medium"},
-      },
-    }),
-  });
+    ],
+    systemInstruction: {
+      parts: [{text: occurrenceAiSystemInstruction}],
+    },
+    generationConfig: {
+      temperature: 0.45,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    },
+  }));
   const responseText = await response.text();
   if (!response.ok) {
     logger.warn("Gemini occurrence draft failed", {
@@ -5117,7 +5145,7 @@ async function occurrenceAiGeminiDraft(context: OccurrenceAiContext): Promise<Oc
   };
 }
 
-export const generateOccurrenceAiDraft = onCall({region, timeoutSeconds: 60}, async (request) => {
+export const generateOccurrenceAiDraft = onCall({region, timeoutSeconds: 60, secrets: ["GEMINI_API_KEY"]}, async (request) => {
   const caller = requireAuth(request.auth);
   const data = request.data as JsonMap;
   const occurrenceId = requiredString(data, "occurrence_id");
@@ -5691,35 +5719,46 @@ function nutritionInsightFromResponse(payload: unknown): Omit<NutritionAiInsight
     if (!isPlainObject(candidate) || !isPlainObject(candidate.content)) continue;
     const parts = candidate.content.parts;
     if (!Array.isArray(parts)) continue;
-    const text = parts
+    // ponytail: percorre todos os parts e isola só os que têm text; parts sem
+    // text (ex.: thoughtSignature de modelos de thinking) são ignorados. Mantém
+    // apenas parts que aparentam conter o JSON da resposta ({ ou "summary"),
+    // descartando texto de thinking que o modelo às vezes emite junto. Cada
+    // text é parseado isoladamente para não misturar conteúdo de parts distintos.
+    const texts = parts
       .map((part) => isPlainObject(part) ? stringValue(part.text) : undefined)
       .filter((part): part is string => Boolean(part))
-      .join("\n")
-      .trim();
-    if (!text) continue;
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start < 0 || end <= start) continue;
-    try {
-      const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
-      if (!isPlainObject(parsed)) continue;
-      const summary = stringValue(parsed.summary);
-      const foodAdjustment = stringValue(parsed.food_adjustment);
-      if (!summary || !foodAdjustment) continue;
-      return {
-        summary,
-        recommendationLevel: stringValue(parsed.recommendation_level) ?? "manter_monitorando",
-        foodAdjustment,
-        supplementNotes: stringArrayFromAi(parsed.supplement_notes),
-        hydrationNotes: stringArrayFromAi(parsed.hydration_notes),
-        operationalFactors: stringArrayFromAi(parsed.operational_factors),
-        dataGaps: stringArrayFromAi(parsed.data_gaps),
-        veterinaryWarnings: stringArrayFromAi(parsed.veterinary_warnings),
-        nextActions: stringArrayFromAi(parsed.next_actions),
-        sourceSummary: isPlainObject(parsed.source_summary) ? parsed.source_summary : {},
-      };
-    } catch {
-      continue;
+      .filter((part) => part.includes("{") || part.includes("\"summary\""));
+    for (const text of texts) {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end <= start) {
+        // AI_PARSE_FAIL (permanente até confirmar estabilidade): provável truncamento
+        logger.warn("AI_PARSE_FAIL", {fn: "nutrition", textLen: text.length, tail: text.slice(-100)});
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
+        if (!isPlainObject(parsed)) continue;
+        const summary = stringValue(parsed.summary);
+        const foodAdjustment = stringValue(parsed.food_adjustment);
+        if (!summary || !foodAdjustment) continue;
+        return {
+          summary,
+          recommendationLevel: stringValue(parsed.recommendation_level) ?? "manter_monitorando",
+          foodAdjustment,
+          supplementNotes: stringArrayFromAi(parsed.supplement_notes),
+          hydrationNotes: stringArrayFromAi(parsed.hydration_notes),
+          operationalFactors: stringArrayFromAi(parsed.operational_factors),
+          dataGaps: stringArrayFromAi(parsed.data_gaps),
+          veterinaryWarnings: stringArrayFromAi(parsed.veterinary_warnings),
+          nextActions: stringArrayFromAi(parsed.next_actions),
+          sourceSummary: isPlainObject(parsed.source_summary) ? parsed.source_summary : {},
+        };
+      } catch {
+        // AI_PARSE_FAIL (permanente até confirmar estabilidade): provável truncamento
+        logger.warn("AI_PARSE_FAIL", {fn: "nutrition", textLen: text.length, tail: text.slice(-100)});
+        continue;
+      }
     }
   }
   return null;
@@ -5733,27 +5772,22 @@ async function nutritionGeminiInsight(context: NutritionAiContext): Promise<Nutr
   const model = occurrenceAiEnv("GEMINI_MODEL") ?? "gemini-3.5-flash";
   const modelPath = model.startsWith("models/") ? model : `models/${model}`;
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const response = await fetchLike(endpoint, {
-    method: "POST",
-    headers: {"content-type": "application/json"},
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{text: nutritionAiPrompt(context)}],
-        },
-      ],
-      systemInstruction: {
-        parts: [{text: nutritionAiSystemInstruction}],
+  const response = await geminiFetchWithRetry(fetchLike, endpoint, JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [{text: nutritionAiPrompt(context)}],
       },
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1536,
-        responseMimeType: "application/json",
-        thinkingConfig: {thinkingLevel: "medium"},
-      },
-    }),
-  });
+    ],
+    systemInstruction: {
+      parts: [{text: nutritionAiSystemInstruction}],
+    },
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 3072,
+      responseMimeType: "application/json",
+    },
+  }));
   const responseText = await response.text();
   if (!response.ok) {
     logger.warn("Gemini nutrition insight failed", {
@@ -5776,7 +5810,7 @@ async function nutritionGeminiInsight(context: NutritionAiContext): Promise<Nutr
   };
 }
 
-export const generateNutritionAiInsight = onCall({region, timeoutSeconds: 60}, async (request) => {
+export const generateNutritionAiInsight = onCall({region, timeoutSeconds: 60, secrets: ["GEMINI_API_KEY"]}, async (request) => {
   const caller = requireAuth(request.auth);
   const data = request.data as JsonMap;
   const dogId = requiredString(data, "dog_id");
