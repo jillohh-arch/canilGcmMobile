@@ -1393,7 +1393,34 @@ service cloud.firestore {
 
     match /active_shifts/{ra} {
       allow read: if signedIn();
-      allow create, update: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
+      allow create: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
+      // Update usa diff(): só os campos que mudam (updatedAt SEMPRE presente nos merges)
+      allow update: if emailMatchesRa(ra)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'shiftId',
+          'auth_uid',
+          'handler_email',
+          'shift_group_id',
+          'shift_group_code',
+          'shift_group_label',
+          'dogId',
+          'service_dog_id',
+          'status',
+          'startedAt',
+          'updatedAt',
+          'lastDogSwitchAt',
+          'endedAt',
+          'vehicle_id',
+          'vehicle_crew_id',
+          'crew_id',
+          'crew_role',
+          'crew_status',
+          'vehicle_label',
+          'vehicle_prefix',
+          'vehicle_model',
+          'vehicle_unit',
+          'vehicle_joined_at'
+        ]);
       allow delete: if false;
     }
 

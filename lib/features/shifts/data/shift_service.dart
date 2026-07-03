@@ -132,11 +132,17 @@ class ShiftService {
             status: 'active',
             clearEndedAt: true,
           );
-    final handlerFields = _handlerIdentityFields(
-      authUid: handlerAuthUid,
-      email: handlerEmail,
-      name: handlerName,
-    );
+    // active_shifts/shift_logs: auth_uid + handler_email (SEM name — não whitelisted)
+    final handlerFieldsBasic = {
+      'auth_uid': _nonEmpty(handlerAuthUid),
+      'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+    };
+    // members: auth_uid + handler_email + name
+    final handlerFieldsWithName = {
+      'auth_uid': _nonEmpty(handlerAuthUid),
+      'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+      'name': _nonEmpty(handlerName),
+    };
     final shiftGroupFields = _shiftGroupFields(
       shiftGroupId: shiftGroupId,
       shiftGroupCode: shiftGroupCode,
@@ -147,7 +153,7 @@ class ShiftService {
     batch.set(logRef, {
       'id': logRef.id,
       'handlerId': handlerId,
-      ...handlerFields,
+      ...handlerFieldsBasic,
       ...shiftGroupFields,
       'initialDogId': dogId,
       'currentDogId': dogId,
@@ -170,7 +176,7 @@ class ShiftService {
     batch.set(activeRef, {
       'shiftId': logRef.id,
       'handlerId': handlerId,
-      ...handlerFields,
+      ...handlerFieldsWithName,
       ...shiftGroupFields,
       'dogId': dogId,
       'service_dog_id': dogId,
@@ -186,7 +192,16 @@ class ShiftService {
 
     // ── vehicle_crews/{vehicle_id} ──
     if (vehicle != null && crewId != null) {
-      _upsertCrewInBatch(batch: batch, fields: crewDocFields, crewId: crewId);
+      _upsertCrewInBatch(
+        batch: batch,
+        crewDocFields: crewDocFields,
+        handlerId: handlerId,
+        handlerFields: handlerFieldsWithName,
+        role: 'motorista',
+        status: 'active',
+        dogId: dogId,
+        crewId: crewId,
+      );
     }
 
     try {
@@ -200,7 +215,7 @@ class ShiftService {
         await logRef.set({
           'id': logRef.id,
           'handlerId': handlerId,
-          ...handlerFields,
+          ...handlerFieldsBasic,
           'initialDogId': dogId,
           'currentDogId': dogId,
           'service_dog_id': dogId,
@@ -281,12 +296,19 @@ class ShiftService {
       }
 
       final vehicleFields = _vehicleFields(vehicle);
-      final crewFields = _crewFields(crewId: crewId, role: role, status: 'active');
-      final handlerFields = _handlerIdentityFields(
-        authUid: handlerAuthUid,
-        email: handlerEmail,
-        name: handlerName,
-      );
+      final crewFields =
+          _crewFields(crewId: crewId, role: role, status: 'active');
+      // active_shifts/shift_logs: sem 'name'
+      final handlerFieldsBasic = {
+        'auth_uid': _nonEmpty(handlerAuthUid),
+        'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+      };
+      // members: com 'name'
+      final handlerFieldsWithName = {
+        'auth_uid': _nonEmpty(handlerAuthUid),
+        'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+        'name': _nonEmpty(handlerName),
+      };
       final vehicleChange = previousVehicleId != null &&
               previousVehicleId.isNotEmpty &&
               previousVehicleId != vehicle.id
@@ -301,7 +323,7 @@ class ShiftService {
       transaction.set(activeRef, {
         ...vehicleFields,
         ...crewFields,
-        ...handlerFields,
+        ...handlerFieldsBasic,
         'vehicle_joined_at': joinedAt,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -311,7 +333,7 @@ class ShiftService {
         transaction.set(_shiftLogs.doc(shiftId), {
           ...vehicleFields,
           ...crewFields,
-          ...handlerFields,
+          ...handlerFieldsBasic,
           'vehicle_joined_at': joinedAt,
           if (vehicleChange != null)
             'vehicleChanges': FieldValue.arrayUnion([vehicleChange]),
@@ -347,7 +369,7 @@ class ShiftService {
         _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
         {
           'handler_id': handlerId,
-          ...handlerFields,
+          ...handlerFieldsWithName,
           'role': role,
           'status': 'active',
           'dog_id': activeDogId,
@@ -390,7 +412,6 @@ class ShiftService {
       final crewId = activeData?['vehicle_crew_id']?.toString().trim();
 
       transaction.set(activeRef, {
-        'handlerId': handlerId,
         'dogId': dogId,
         'service_dog_id': dogId,
         'status': 'active',
@@ -638,11 +659,17 @@ class ShiftService {
       final vehicleFields = _vehicleFields(newVehicle);
       final crewFields =
           _crewFields(crewId: newCrewId, role: newRole, status: 'active');
-      final handlerFields = _handlerIdentityFields(
-        authUid: handlerAuthUid,
-        email: handlerEmail,
-        name: handlerName,
-      );
+      // active_shifts/shift_logs: sem 'name'
+      final handlerFieldsBasic = {
+        'auth_uid': _nonEmpty(handlerAuthUid),
+        'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+      };
+      // members: com 'name'
+      final handlerFieldsWithName = {
+        'auth_uid': _nonEmpty(handlerAuthUid),
+        'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
+        'name': _nonEmpty(handlerName),
+      };
       final vehicleChange = previousVehicleId != null &&
               previousVehicleId.isNotEmpty &&
               previousVehicleId != newVehicle.id
@@ -656,7 +683,7 @@ class ShiftService {
       transaction.set(activeRef, {
         ...vehicleFields,
         ...crewFields,
-        ...handlerFields,
+        ...handlerFieldsBasic,
         'vehicle_joined_at': transferredAt,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -666,7 +693,7 @@ class ShiftService {
         transaction.set(_shiftLogs.doc(shiftId), {
           ...vehicleFields,
           ...crewFields,
-          ...handlerFields,
+          ...handlerFieldsBasic,
           'vehicle_joined_at': transferredAt,
           if (vehicleChange != null)
             'vehicleChanges': FieldValue.arrayUnion([vehicleChange]),
@@ -693,7 +720,7 @@ class ShiftService {
         _vehicleCrews.doc(newCrewId).collection('members').doc(handlerId),
         {
           'handler_id': handlerId,
-          ...handlerFields,
+          ...handlerFieldsWithName,
           'role': newRole,
           'status': 'active',
           'dog_id': dogId,
@@ -805,7 +832,6 @@ class ShiftService {
       final data = doc.data();
       return {
         'handler_id': doc.id,
-        'name': data['name'] ?? data['handler_name'],
         'role': data['role'] ?? '',
         'joined_at': data['joined_at'],
         'left_at': data['left_at'],
@@ -839,24 +865,23 @@ class ShiftService {
 
   void _upsertCrewInBatch({
     required WriteBatch batch,
-    required Map<String, dynamic> fields,
+    required Map<String, dynamic> crewDocFields,
+    required String handlerId,
+    required Map<String, dynamic> handlerFields,
+    required String role,
+    required String status,
+    required String dogId,
     required String crewId,
   }) {
-    batch.set(_vehicleCrews.doc(crewId), fields, SetOptions(merge: true));
-    final handlerId = fields['titular_handler_id'] as String;
-    final handlerFields = _handlerIdentityFields(
-      authUid: fields['auth_uid'] as String?,
-      email: fields['handler_email'] as String?,
-      name: fields['name'] as String?,
-    );
+    batch.set(_vehicleCrews.doc(crewId), crewDocFields, SetOptions(merge: true));
     batch.set(
       _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
       {
         'handler_id': handlerId,
         ...handlerFields,
-        'role': fields['role'] ?? 'motorista',
-        'status': fields['status'] ?? 'active',
-        'dog_id': fields['service_dog_id'] as String?,
+        'role': role,
+        'status': status,
+        'dog_id': dogId,
         'joined_at': FieldValue.serverTimestamp(),
         'responded_at': FieldValue.serverTimestamp(),
       },
@@ -891,11 +916,6 @@ class ShiftService {
       'active': true,
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
-      'role': role,
-      'status': status,
-      'auth_uid': _nonEmpty(handlerAuthUid),
-      'handler_email': _nonEmpty(handlerEmail)?.toLowerCase(),
-      'name': _nonEmpty(handlerName),
     };
     if (clearEndedAt) {
       fields['ended_at'] = FieldValue.delete();
@@ -934,18 +954,6 @@ class ShiftService {
       'crew_id': crewId,
       'crew_role': role,
       'crew_status': status,
-    };
-  }
-
-  Map<String, dynamic> _handlerIdentityFields({
-    String? authUid,
-    String? email,
-    String? name,
-  }) {
-    return {
-      'auth_uid': _nonEmpty(authUid),
-      'handler_email': _nonEmpty(email)?.toLowerCase(),
-      'name': _nonEmpty(name),
     };
   }
 
