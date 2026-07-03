@@ -204,60 +204,6 @@ class ShiftService {
       );
     }
 
-    // ── DEBUG: payload completo antes do commit ──
-    debugPrint('[ShiftService] >>> BATCH PAYLOAD');
-    debugPrint('[ShiftService] 1. shift_logs: ${
-      {
-        'id': logRef.id,
-        'handlerId': handlerId,
-        ...handlerFieldsBasic,
-        ...shiftGroupFields,
-        'initialDogId': dogId,
-        'currentDogId': dogId,
-        'service_dog_id': dogId,
-        ...vehicleFields,
-        'vehicle_crew_id': crewId,
-        'crew_id': crewId,
-        'crew_role': 'motorista',
-        'crew_status': 'active',
-        'status': 'active',
-        'startedAt': startedAt,
-        'endedAt': null,
-        'dogSwitches': <Map<String, dynamic>>[],
-        'vehicleChanges': <Map<String, dynamic>>[],
-      }
-    }');
-    debugPrint('[ShiftService] 2. active_shifts: ${
-      {
-        'shiftId': logRef.id,
-        'handlerId': handlerId,
-        ...handlerFieldsBasic,
-        ...shiftGroupFields,
-        'dogId': dogId,
-        'service_dog_id': dogId,
-        ...vehicleFields,
-        'vehicle_crew_id': crewId,
-        'crew_id': crewId,
-        'crew_role': 'motorista',
-        'crew_status': 'active',
-        'status': 'active',
-        'startedAt': startedAt,
-      }
-    }');
-    if (vehicle != null && crewId != null) {
-      debugPrint('[ShiftService] 3. vehicle_crews/$crewId: $crewDocFields');
-      debugPrint('[ShiftService] 4. members/$handlerId: ${
-        {
-          'handler_id': handlerId,
-          ...handlerFieldsWithName,
-          'role': 'motorista',
-          'status': 'active',
-          'dog_id': dogId,
-        }
-      }');
-    }
-    debugPrint('[ShiftService] <<< FIM PAYLOAD');
-
     try {
       await batch.commit();
     } on FirebaseException catch (e) {

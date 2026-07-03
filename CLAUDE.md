@@ -49,3 +49,44 @@ Quando um documento pode ser criado ou atualizado (upsert via `merge: true`),
 campos que usam `FieldValue.delete()` para limpar valores do documento
 precisam constar no `keys().hasOnly()` do `allow create`, não só do
 `allow update`. Exemplo: `ended_at` no `vehicle_crews`.
+
+---
+
+## Lições de produção
+
+### Erros de permissão nunca degradam silenciosamente
+
+Falha de batch = falha da operação inteira. Não usar `catch (_) {}` vazio,
+não fazer fallback que "grava só o log" e retorna como sucesso. O padrão:
+
+```dart
+try {
+  await batch.commit();
+} on FirebaseException catch (e) {
+  debugPrint('[Servico] batch bloqueado [${e.code}]: ${e.message}');
+  rethrow; // propaga até o ViewModel → UI mostra AppFeedback.error
+}
+```
+
+Logs permanentes (`[ShiftService] batch bloqueado`, `[STREAM] falhou`) são
+valiosos e devem ser mantidos. Logs de diagnóstico temporários (payload
+completo impresso antes do commit) devem ser removidos após validação.
+
+### Diagnóstico de rules com payload impresso, não com tabela interpretada
+
+Ao investigar `PERMISSION_DENIED`, não reconstruir o payload "a olho" pelo
+código. Campos como `name`, `auth_uid`, `FieldValue.delete()` ou variáveis
+incorretas podem estar presentes sem serem visíveis na leitura estática.
+
+O diagnóstico definitivo:
+
+1. Adicionar `debugPrint` do payload completo antes do `batch.commit()`
+2. Rodar o teste real e capturar o logcat
+3. Confrontar cada campo real, linha a linha, com a whitelist da regra
+
+### Deploy de firestore.rules: sempre manual
+
+Sempre manual pelo usuário, sempre do repo mobile, nunca automático.
+O deploy de rules é irreversível a curto prazo (pode bloquear todas as
+escritas de todos os usuários simultaneamente). O usuário deploya após
+conferir o diff.
