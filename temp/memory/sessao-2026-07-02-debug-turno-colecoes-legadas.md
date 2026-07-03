@@ -487,7 +487,61 @@ Local: `G:/Meu Drive/apps k9/`
 
 ---
 
+## Round 5 — Campo `name` em active_shifts (REGRESSÃO)
+
+### Problema
+
+O `startShift` usava `handlerFieldsWithName` (que inclui `name`) no write de
+`active_shifts`. A regra `isValidActiveShiftFor()` nao contem `name` no
+`keys().hasOnly()` — write negado em todo novo turno.
+
+### Causa
+
+Regressao: o codigo de `startShift` foi reescrito em algum momento anterior
+sem manter a separacao entre `handlerFieldsBasic` (active_shifts/shift_logs)
+e `handlerFieldsWithName` (members).
+
+### Fix
+
+Trocado `handlerFieldsWithName` → `handlerFieldsBasic` no write de
+`active_shifts` em `startShift` (linha 179), e a debugPrint espelhada
+sincronizada (linha 234).
+
+### Tabela completa de handlerFields no arquivo
+
+```
+LINHA   METODO                  WRITE                   CAMPO           STATUS
+------  ---------------------  ---------------------  -------------  --------
+  156   startShift             shift_logs              basic          OK
+  179   startShift             active_shifts           WITHname       BUG (fixado)
+  199   startShift             _upsertCrewInBatch      WITHname       OK (members)
+  213   assumeVehicle          shift_logs (merge)      basic          OK
+  355   assumeVehicle          active_shifts (merge)   [sem spread]   OK
+  365   assumeVehicle          shift_logs (merge)      [sem spread]   OK
+  401   assumeVehicle          members                 WITHname       OK
+  715   transferToVehicle      active_shifts (merge)   basic          OK
+  725   transferToVehicle      shift_logs (merge)      basic          OK
+  752   transferToVehicle      members                 WITHname       OK
+```
+
+### APK
+
+`canil-gcm-20260702-*.apk` (151.3MB) no Drive.
+
+---
+
+## Licoes Aprendidas (registradas em CLAUDE.md)
+
+1. **Erro de permissao nunca degrada silenciosamente** — `debugPrint` + `rethrow`
+2. **Diagnostico de rules com payload impresso, nao com tabela interpretada**
+3. **Campo `name` em active_shifts vs members** — `handlerFieldsBasic` para
+   active_shifts/shift_logs, `handlerFieldsWithName` para members
+4. **`FieldValue.delete()` precisa estar no whitelist do CREATE** em upserts
+
+---
+
 ## Pendencias / Items Archivados
 
 - **Colecoes legadas** (alertas, atalhos_registro, documentos, registros, training_specialties, vacunas, climaAtual): mapeamento completo feito. Proposta de rules pendente auditoria posterior.
 - **Investigacao de historico de equipes**: tarefa original (quem estava de servico na viatura X no dia Y) NAO foi abordada nesta sessao — foco foi corrigir o bug de abertura de turno.
+
