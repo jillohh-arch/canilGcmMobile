@@ -159,6 +159,11 @@ void _showDogSwitcher(BuildContext context) {
                       if (!ctx.mounted) return;
                       Navigator.of(ctx).pop();
                       await shiftVM.switchDog(dog.id);
+                      if (!ctx.mounted) return;
+                      final error = shiftVM.error;
+                      if (error != null && error.trim().isNotEmpty) {
+                        AppFeedback.error(ctx, error);
+                      }
                     },
                   );
                 }),

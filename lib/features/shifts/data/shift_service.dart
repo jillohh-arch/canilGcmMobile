@@ -207,32 +207,7 @@ class ShiftService {
     try {
       await batch.commit();
     } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        debugPrint(
-          '[ShiftService] batch bloqueado por regras (${e.code}); '
-          'gravando só log do turno.',
-        );
-        await logRef.set({
-          'id': logRef.id,
-          'handlerId': handlerId,
-          ...handlerFieldsBasic,
-          'initialDogId': dogId,
-          'currentDogId': dogId,
-          'service_dog_id': dogId,
-          ...vehicleFields,
-          'crew_role': 'motorista',
-          'crew_status': 'active',
-          'vehicle_crew_id': crewId,
-          'status': 'active',
-          'startedAt': Timestamp.fromDate(startedAt),
-          'endedAt': null,
-          'dogSwitches': <Map<String, dynamic>>[],
-          'vehicleChanges': <Map<String, dynamic>>[],
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        return;
-      }
+      debugPrint('[ShiftService] batch bloqueado [${e.code}]: ${e.message}');
       rethrow;
     }
   }

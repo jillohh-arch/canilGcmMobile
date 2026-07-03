@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// Modelos leves para dados do dashboard vindos do Firestore.
 class QuickAction {
@@ -106,15 +107,20 @@ class DashboardService {
 
   /// Busca atalhos de registro rápido ativos, ordenados por [ordem].
   Future<List<QuickAction>> getQuickActions() async {
-    final snapshot = await _db
-        .collection('atalhos_registro')
-        .where('ativo', isEqualTo: true)
-        .orderBy('ordem')
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('atalhos_registro')
+          .where('ativo', isEqualTo: true)
+          .orderBy('ordem')
+          .get();
 
-    return snapshot.docs
-        .map((doc) => QuickAction.fromJson(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => QuickAction.fromJson(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] atalhos_registro falhou [${e.code}]: ${e.message}');
+      return [];
+    }
   }
 
   /// Busca alertas ativos para um cão específico (máx [limit]).
@@ -122,36 +128,51 @@ class DashboardService {
     String dogId, {
     int limit = 2,
   }) async {
-    final snapshot = await _db
-        .collection('alertas')
-        .where('caoId', isEqualTo: dogId)
-        .where('ativo', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('alertas')
+          .where('caoId', isEqualTo: dogId)
+          .where('ativo', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => DashboardAlert.fromJson(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => DashboardAlert.fromJson(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] alertas falhou [${e.code}]: ${e.message}');
+      return [];
+    }
   }
 
   /// Conta total de alertas ativos para o cão.
   Future<int> countActiveAlerts(String dogId) async {
-    final snapshot = await _db
-        .collection('alertas')
-        .where('caoId', isEqualTo: dogId)
-        .where('ativo', isEqualTo: true)
-        .count()
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('alertas')
+          .where('caoId', isEqualTo: dogId)
+          .where('ativo', isEqualTo: true)
+          .count()
+          .get();
 
-    return snapshot.count ?? 0;
+      return snapshot.count ?? 0;
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] alertas.count falhou [${e.code}]: ${e.message}');
+      return 0;
+    }
   }
 
   /// Busca dados de clima atuais do Firestore.
   Future<WeatherData?> getWeatherData(String localId) async {
-    final doc = await _db.collection('climaAtual').doc(localId).get();
-    if (!doc.exists || doc.data() == null) return null;
-    return WeatherData.fromJson(doc.data()!);
+    try {
+      final doc = await _db.collection('climaAtual').doc(localId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return WeatherData.fromJson(doc.data()!);
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] climaAtual falhou [${e.code}]: ${e.message}');
+      return null;
+    }
   }
 
   /// Conta registros do dia para um cão.
@@ -160,17 +181,22 @@ class DashboardService {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final snapshot = await _db
-        .collection('registros')
-        .where('caoId', isEqualTo: dogId)
-        .where(
-          'dataHora',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-        )
-        .where('dataHora', isLessThan: Timestamp.fromDate(endOfDay))
-        .count()
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('registros')
+          .where('caoId', isEqualTo: dogId)
+          .where(
+            'dataHora',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+          )
+          .where('dataHora', isLessThan: Timestamp.fromDate(endOfDay))
+          .count()
+          .get();
 
-    return snapshot.count ?? 0;
+      return snapshot.count ?? 0;
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] registros.count falhou [${e.code}]: ${e.message}');
+      return 0;
+    }
   }
 }

@@ -126,6 +126,9 @@ class ShiftViewModel extends ChangeNotifier {
       );
 
       notifyListeners();
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao sincronizar turno [${e.code}]: ${e.message}';
+      notifyListeners();
     } catch (e) {
       _error = 'Falha ao sincronizar turno: $e';
       notifyListeners();
@@ -136,14 +139,6 @@ class ShiftViewModel extends ChangeNotifier {
     final resolvedHandlerId = _resolveHandlerId();
 
     _error = null;
-    if (_session != null) {
-      _session = _session!.copyWith(
-        dogId: dogId,
-        serviceDogId: dogId,
-        lastDogSwitchAt: DateTime.now(),
-      );
-      notifyListeners();
-    }
 
     if (resolvedHandlerId == null) {
       _error = 'Usuario nao autenticado para trocar K9.';
@@ -153,6 +148,15 @@ class ShiftViewModel extends ChangeNotifier {
 
     try {
       await _shiftService.switchDog(handlerId: resolvedHandlerId, dogId: dogId);
+      _session = _session?.copyWith(
+        dogId: dogId,
+        serviceDogId: dogId,
+        lastDogSwitchAt: DateTime.now(),
+      );
+      notifyListeners();
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao sincronizar troca de K9 [${e.code}]: ${e.message}';
+      notifyListeners();
     } catch (e) {
       _error = 'Falha ao sincronizar troca de K9: $e';
       notifyListeners();
@@ -210,6 +214,9 @@ class ShiftViewModel extends ChangeNotifier {
       );
 
       _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao assumir viatura [${e.code}]: ${e.message}';
+      _setLoading(false);
     } catch (e) {
       _error = 'Falha ao assumir viatura: $e';
       _setLoading(false);
@@ -246,8 +253,11 @@ class ShiftViewModel extends ChangeNotifier {
 
       _clearSession();
       _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao encerrar turno [${e.code}]: ${e.message}';
+      _setLoading(false);
     } catch (e) {
-      _error = 'Falha ao sincronizar encerramento de turno: $e';
+      _error = 'Falha ao encerrar turno: $e';
       _setLoading(false);
     }
   }
@@ -303,7 +313,11 @@ class ShiftViewModel extends ChangeNotifier {
             _initialShiftTimer = null;
             _clearSession(notify: false);
             _isLoading = false;
-            _error = 'Falha ao carregar turno ativo: $e';
+            if (e is FirebaseException) {
+              _error = 'Falha ao carregar turno ativo [${e.code}]: ${e.message}';
+            } else {
+              _error = 'Falha ao carregar turno ativo: $e';
+            }
             notifyListeners();
           },
         );

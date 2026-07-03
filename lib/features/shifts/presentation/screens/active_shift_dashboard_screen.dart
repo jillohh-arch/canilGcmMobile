@@ -302,13 +302,19 @@ class _ActiveShiftDashboardScreenState
 
     try {
       quickActions = await _dashboardService.getQuickActions();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[STREAM] getQuickActions falhou: $e');
+    }
     try {
       alerts = await _dashboardService.getActiveAlerts(dogId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[STREAM] getActiveAlerts falhou: $e');
+    }
     try {
       totalAlerts = await _dashboardService.countActiveAlerts(dogId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[STREAM] countActiveAlerts falhou: $e');
+    }
 
     if (!mounted) return;
     setState(() {

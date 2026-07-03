@@ -146,10 +146,17 @@ class HandlerProfilePage extends StatelessWidget {
   Future<void> _endShift(BuildContext context, ShiftViewModel shiftVM) async {
     HapticFeedback.mediumImpact();
     await shiftVM.endShift();
-    // Sem guard de mounted: ao encerrar o turno a tela é trocada e este widget
-    // é desmontado. AppFeedback cai no messenger global nesse caso.
-    // ignore: use_build_context_synchronously
-    AppFeedback.success(context, 'Expediente encerrado. Obrigado pelo serviço!', title: 'Até logo');
+    if (!context.mounted) return;
+    final error = shiftVM.error;
+    if (error != null && error.trim().isNotEmpty) {
+      AppFeedback.error(context, error);
+    } else {
+      AppFeedback.success(
+        context,
+        'Expediente encerrado. Obrigado pelo serviço!',
+        title: 'Até logo',
+      );
+    }
   }
 
   Future<void> _logout(BuildContext context, AuthViewModel authVM) async {

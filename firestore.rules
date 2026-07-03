@@ -1481,6 +1481,9 @@ service cloud.firestore {
           'active',
           'created_at',
           'updated_at',
+          // ended_at entra como FieldValue.delete() no payload de abertura (limpeza
+          // de encerramento anterior) — a key precisa ser aceita também no create
+          'ended_at',
           'dog_changes'
         ]);
       allow update: if signedIn()
@@ -1498,7 +1501,7 @@ service cloud.firestore {
         )
         && request.resource.data.vehicle_id == resource.data.vehicle_id
         && request.resource.data.crew_size == resource.data.crew_size
-        && request.resource.data.keys().hasOnly([
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'id',
           'vehicle_id',
           'vehicle_label',
@@ -1538,7 +1541,7 @@ service cloud.firestore {
           && request.resource.data.status == 'active';
         allow update: if emailMatchesRa(ra)
           && request.resource.data.handler_id == resource.data.handler_id
-          && request.resource.data.role in ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2', 'k9', '']
+          && request.resource.data.role in ['titular', 'motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2', 'k9', '']
           && (
             (
               // Saída: campos de saída são imutáveis após criação

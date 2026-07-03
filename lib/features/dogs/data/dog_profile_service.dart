@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 import 'package:canil_gcm/core/services/audit_service.dart';
@@ -170,7 +171,8 @@ class DogProfileService {
       return snapshot.docs
           .map((doc) => VaccineRecord.fromJson(doc.data(), doc.id))
           .toList();
-    } catch (_) {
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] vacinas falhou [${e.code}]: ${e.message}');
       // Fallback: sem orderBy (índice composto pode não existir)
       try {
         final snapshot = await _db
@@ -184,7 +186,8 @@ class DogProfileService {
             .toList();
         vaccines.sort((a, b) => b.dataVencimento.compareTo(a.dataVencimento));
         return vaccines;
-      } catch (_) {
+      } on FirebaseException catch (e2) {
+        debugPrint('[STREAM] vacinas (fallback) falhou [${e2.code}]: ${e2.message}');
         // Último fallback: busca todas e filtra localmente
         final snapshot = await _db.collection('vacinas').get();
         final vaccines = snapshot.docs
@@ -235,16 +238,21 @@ class DogProfileService {
     String dogId, {
     int limit = 3,
   }) async {
-    final snapshot = await _db
-        .collection('registros')
-        .where('caoId', isEqualTo: dogId)
-        .orderBy('dataHora', descending: true)
-        .limit(limit)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection('registros')
+          .where('caoId', isEqualTo: dogId)
+          .orderBy('dataHora', descending: true)
+          .limit(limit)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => RecentRecord.fromJson(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => RecentRecord.fromJson(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] registros falhou [${e.code}]: ${e.message}');
+      return [];
+    }
   }
 
   /// Busca nome do condutor pelo ID.
@@ -267,18 +275,24 @@ class DogProfileService {
       return snapshot.docs
           .map((doc) => DogDocument.fromJson(doc.data(), doc.id))
           .toList();
-    } catch (_) {
+    } on FirebaseException catch (e) {
+      debugPrint('[STREAM] documentos falhou [${e.code}]: ${e.message}');
       // Fallback sem orderBy
-      final snapshot = await _db
-          .collection('documentos')
-          .where('caoId', isEqualTo: dogId)
-          .get();
+      try {
+        final snapshot = await _db
+            .collection('documentos')
+            .where('caoId', isEqualTo: dogId)
+            .get();
 
-      final docs = snapshot.docs
-          .map((doc) => DogDocument.fromJson(doc.data(), doc.id))
-          .toList();
-      docs.sort((a, b) => b.dataUpload.compareTo(a.dataUpload));
-      return docs;
+        final docs = snapshot.docs
+            .map((doc) => DogDocument.fromJson(doc.data(), doc.id))
+            .toList();
+        docs.sort((a, b) => b.dataUpload.compareTo(a.dataUpload));
+        return docs;
+      } on FirebaseException catch (e2) {
+        debugPrint('[STREAM] documentos (fallback) falhou [${e2.code}]: ${e2.message}');
+        return [];
+      }
     }
   }
 
