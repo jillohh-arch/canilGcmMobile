@@ -227,6 +227,50 @@ class ShiftViewModel extends ChangeNotifier {
     return _shiftService.getActiveCrew(vehicleId);
   }
 
+  /// Libera o posto na guarnição sem encerrar o turno.
+  Future<void> leaveVehicle() async {
+    final resolvedHandlerId = _resolveHandlerId();
+
+    _error = null;
+    _setLoading(true);
+
+    if (resolvedHandlerId == null) {
+      _error = 'Usuario nao autenticado.';
+      _setLoading(false);
+      return;
+    }
+
+    try {
+      await _shiftService.leaveVehicle(resolvedHandlerId);
+      _session = _session?.copyWith(
+        vehicleId: null,
+        vehicleLabel: null,
+        vehiclePrefix: null,
+        vehicleModel: null,
+        vehicleUnit: null,
+        vehicleCrewId: null,
+        crewRole: null,
+        crewStatus: null,
+        vehicleJoinedAt: null,
+      );
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'Posto liberado: condutor $resolvedHandlerId',
+      );
+
+      _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao liberar posto [${e.code}]: ${e.message}';
+      _setLoading(false);
+    } catch (e) {
+      _error = 'Falha ao liberar posto: $e';
+      _setLoading(false);
+    }
+  }
+
   Future<void> endShift() async {
     final resolvedHandlerId = _resolveHandlerId();
 

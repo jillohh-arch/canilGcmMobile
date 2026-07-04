@@ -21,9 +21,8 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
-import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
-import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_post_sheet.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
 import 'package:canil_gcm/features/training/presentation/screens/training_hub_screen.dart';
@@ -65,7 +64,6 @@ class _ActiveShiftDashboardScreenState
     with TickerProviderStateMixin {
   final DogService _dogService = DogService();
   final DashboardService _dashboardService = DashboardService();
-  final VehicleService _vehicleService = VehicleService();
   String? _lastFetchedDogId;
   bool _recoveringMissingDog = false;
 
@@ -187,11 +185,7 @@ class _ActiveShiftDashboardScreenState
                 children: [
                   if (!Provider.of<ShiftViewModel>(context).hasVehicle) ...[
                     _animateSection(
-                      _VehicleAssumptionPrompt(
-                        vehicleService: _vehicleService,
-                        onAssume: (vehicle) =>
-                            _assumeVehicleDuringShift(context, vehicle),
-                      ),
+                      const _VehicleAssumptionPrompt(),
                       intervalStart: base + step * 1,
                       intervalEnd: base + step * 1 + 0.1,
                     ),
@@ -206,7 +200,16 @@ class _ActiveShiftDashboardScreenState
                     intervalStart: base + step * 1,
                     intervalEnd: base + step * 1 + 0.12,
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
+                  // Card Guarnição - mostra quando tem viatura assumida
+                  if (Provider.of<ShiftViewModel>(context).hasVehicle) ...[
+                    _animateSection(
+                      const _GuarnicaoCard(),
+                      intervalStart: base + step * 1 + 0.12,
+                      intervalEnd: base + step * 1 + 0.22,
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   _animateSection(
                     const _OperationalPulseSection(),
                     intervalStart: base + step * 2,

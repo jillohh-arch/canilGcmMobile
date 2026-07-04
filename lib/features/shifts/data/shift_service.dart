@@ -270,6 +270,25 @@ class ShiftService {
         throw StateError('Turno ativo não encontrado para assumir viatura');
       }
 
+      // ── Validação 1 cão: rejeitar se guarnição ATIVA já tem cão ──
+      // Lê o doc pai. Só vale para crew ativa (active == true):
+      // crew encerrada (active == false) tem service_dog_id resíduo de ciclos
+      // anteriores — ignora, pois a reopening reescreverá o campo.
+      if (activeDogId.isNotEmpty) {
+        final crewDocSnap = await transaction.get(_vehicleCrews.doc(crewId));
+        final crewData = crewDocSnap.data();
+        final isCrewActive = crewData?['active'] == true;
+        if (isCrewActive) {
+          final crewDogId = crewData?['service_dog_id']?.toString().trim();
+          if (crewDogId != null && crewDogId.isNotEmpty) {
+            throw StateError(
+              'Guarnição já possui K9 embarcado. '
+              'Máximo 1 cão por guarnição.',
+            );
+          }
+        }
+      }
+
       final vehicleFields = _vehicleFields(vehicle);
       final crewFields =
           _crewFields(crewId: crewId, role: role, status: 'active');
@@ -515,6 +534,7 @@ class ShiftService {
           transaction.set(_vehicleCrews.doc(crewId), {
             'active': false,
             'ended_at': endedAt,
+            'service_dog_id': FieldValue.delete(),
             'updated_at': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         }
@@ -704,6 +724,82 @@ class ShiftService {
         },
         SetOptions(merge: true),
       );
+    });
+  }
+
+  /// Libera o posto do membro na guarnição atual sem encerrar o turno.
+  /// O shift continua ativo, mas sem viatura.
+  Future<void> leaveVehicle(String handlerId) async {
+    final activeRef = _activeShiftDoc(handlerId);
+    final leftAt = Timestamp.fromDate(DateTime.now());
+
+    // Phase 1: ler estado antes da transaction
+    final activeSnapshot = await activeRef.get();
+    final activeData = activeSnapshot.data();
+
+    if (!activeSnapshot.exists ||
+        activeData == null ||
+        activeData['status'] != 'active') {
+      throw StateError('Turno ativo não encontrado');
+    }
+
+    final previousCrewId =
+        activeData['vehicle_crew_id']?.toString().trim();
+    final shiftId = activeData['shiftId'] as String?;
+
+    // Se não está em nenhuma guarnição, nada a fazer
+    if (previousCrewId == null || previousCrewId.isEmpty) {
+      return;
+    }
+
+    return _db.runTransaction((transaction) async {
+      // ── 1) Marcar membro como saiu ──
+      // dog_id: null limpo junto na saída (rule exige dog_id no affectedKeys)
+      transaction.set(
+        _vehicleCrews.doc(previousCrewId).collection('members').doc(handlerId),
+        {
+          'status': 'ended',
+          'left_at': leftAt,
+          'dog_id': null,
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      // ── 1b) Limpar service_dog_id do doc pai se o saindo era o condutor K9 ──
+      transaction.set(_vehicleCrews.doc(previousCrewId), {
+        'service_dog_id': FieldValue.delete(),
+      }, SetOptions(merge: true));
+
+      // ── 2) Limpar campos de viatura do active_shift ──
+      transaction.set(activeRef, {
+        'vehicle_id': null,
+        'vehicle_label': null,
+        'vehicle_prefix': null,
+        'vehicle_model': null,
+        'vehicle_unit': null,
+        'vehicle_crew_id': null,
+        'crew_role': null,
+        'crew_status': null,
+        'vehicle_joined_at': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // ── 3) shift_logs: registrar saída ──
+      if (shiftId != null && shiftId.isNotEmpty) {
+        transaction.set(_shiftLogs.doc(shiftId), {
+          'vehicle_id': null,
+          'vehicle_label': null,
+          'vehicle_prefix': null,
+          'vehicle_model': null,
+          'vehicle_unit': null,
+          'vehicle_crew_id': null,
+          'crew_role': null,
+          'crew_status': null,
+          'vehicle_joined_at': null,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     });
   }
 

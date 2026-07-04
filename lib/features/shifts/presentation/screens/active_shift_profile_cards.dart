@@ -14,91 +14,62 @@ class _ShiftProfileCardsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shiftVM = context.watch<ShiftViewModel>();
-    final crewId = shiftVM.vehicleCrewId;
-    final vehicleLabel = shiftVM.vehicleLabel?.trim();
 
-    return StreamBuilder<List<VehicleCrewMember>>(
-      stream: crewId == null || crewId.isEmpty
-          ? Stream.value(const <VehicleCrewMember>[])
-          : VehicleCrewService().watchMembers(crewId),
-      builder: (context, snapshot) {
-        final members = snapshot.data ?? const <VehicleCrewMember>[];
-        final activeCount = members.where((member) => member.isActive).length;
-        final pendingCount = members.where((member) => member.isPending).length;
-        final teamSubtitle = crewId == null || crewId.isEmpty
-            ? 'Sem equipe ativa'
-            : '$activeCount condutor${activeCount == 1 ? '' : 'es'} + K9'
-                  '${pendingCount == 0 ? '' : ' · $pendingCount pendente(s)'}';
-
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-          decoration: BoxDecoration(
-            color: AppTheme.textPrimary.withAlpha(7),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _kBorder),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      decoration: BoxDecoration(
+        color: AppTheme.textPrimary.withAlpha(7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DashboardPanelTitle(
+            icon: Icons.pets_rounded,
+            title: 'Binômio em serviço',
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DashboardPanelTitle(
-                icon: Icons.groups_2_rounded,
-                title: 'Binômio em serviço',
-              ),
-              const SizedBox(height: 18),
-              IntrinsicHeight(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Builder(
-                        builder: (ctx) => _ServiceSummaryColumn(
-                          imageUrl: dog.profileImageUrl,
-                          icon: Icons.pets_rounded,
-                          accent: AppTheme.success,
-                          title: dog.name,
-                          subtitle: 'Cão de serviço',
-                          enableHero: true,
-                          heroTag: 'dog_avatar_${dog.id}',
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            Navigator.of(ctx).push(
-                              MaterialPageRoute(
-                                builder: (_) => K9ProfilePage(dog: dog),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+          const SizedBox(height: 18),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Builder(
+                    builder: (ctx) => _ServiceSummaryColumn(
+                      imageUrl: dog.profileImageUrl,
+                      icon: Icons.pets_rounded,
+                      accent: AppTheme.success,
+                      title: dog.name,
+                      subtitle: 'Cão de serviço',
+                      enableHero: true,
+                      heroTag: 'dog_avatar_${dog.id}',
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(ctx).push(
+                          MaterialPageRoute(
+                            builder: (_) => K9ProfilePage(dog: dog),
+                          ),
+                        );
+                      },
                     ),
-                    const _ServiceSummaryDivider(),
-                    Expanded(
-                      child: _ServiceSummaryColumn(
-                        imageUrl: conductorPhotoUrl,
-                        icon: Icons.person_rounded,
-                        accent: AppTheme.primary,
-                        title: callsign,
-                        subtitle: 'Condutor',
-                        detail: 'RA ${shiftVM.handlerId ?? '-'}',
-                      ),
-                    ),
-                    const _ServiceSummaryDivider(),
-                    Expanded(
-                      child: _ServiceSummaryColumn(
-                        icon: Icons.directions_car_filled_rounded,
-                        accent: AppTheme.primary,
-                        title: vehicleLabel?.isNotEmpty == true
-                            ? vehicleLabel!
-                            : 'Sem viatura',
-                        subtitle: 'Equipe',
-                        detail: teamSubtitle,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const _ServiceSummaryDivider(),
+                Expanded(
+                  child: _ServiceSummaryColumn(
+                    imageUrl: conductorPhotoUrl,
+                    icon: Icons.person_rounded,
+                    accent: AppTheme.primary,
+                    title: callsign,
+                    subtitle: 'Condutor',
+                    detail: 'RA ${shiftVM.handlerId ?? '-'}',
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -288,4 +259,350 @@ class _ServiceSummaryDivider extends StatelessWidget {
       color: AppTheme.textPrimary.withAlpha(18),
     );
   }
+}
+
+/// ─────────────────────────────────────────────────────────────
+/// Card "Guarnição" - mini-quadro dos 5 postos
+/// ─────────────────────────────────────────────────────────────
+class _GuarnicaoCard extends StatelessWidget {
+  const _GuarnicaoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final shiftVM = context.watch<ShiftViewModel>();
+    final crewId = shiftVM.vehicleCrewId;
+    final vehicleLabel = shiftVM.vehicleLabel?.trim();
+
+    // Se não tem viatura assumida, não mostra o card
+    if (crewId == null || crewId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<List<VehicleCrewMember>>(
+      stream: VehicleCrewService().watchMembers(crewId),
+      builder: (context, snapshot) {
+        final members = snapshot.data ?? [];
+        final activeMembers = {
+          for (final m in members.where((m) => m.isActive)) m.role: m
+        };
+
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            VehicleCrewPostSheet.show(context);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.textPrimary.withAlpha(7),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _kBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.groups_3_rounded, color: AppTheme.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'GUARNICAO',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    if (vehicleLabel != null && vehicleLabel.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withAlpha(15),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          vehicleLabel,
+                          style: GoogleFonts.robotoMono(
+                            color: AppTheme.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Status chip
+                    FutureBuilder<String>(
+                      future: VehicleCrewService().getCrewOperationalStatus(crewId),
+                      builder: (context, statusSnap) {
+                        final status = statusSnap.data ?? 'empty';
+                        return _MiniOperationalStatusChip(status: status);
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Mini-quadro: 4 postos em linha compacta + badge K9
+                Row(
+                  children: [
+                    Expanded(child: _MiniPostSlot(role: 'motorista', member: activeMembers['motorista'])),
+                    const SizedBox(width: 6),
+                    Expanded(child: _MiniPostSlot(role: 'encarregado', member: activeMembers['encarregado'])),
+                    const SizedBox(width: 6),
+                    Expanded(child: _MiniPostSlot(role: 'auxiliar_1', member: activeMembers['auxiliar_1'])),
+                    const SizedBox(width: 6),
+                    Expanded(child: _MiniPostSlot(role: 'auxiliar_2', member: activeMembers['auxiliar_2'])),
+                  ],
+                ),
+                // Linha K9: vínculo, não posto
+                const SizedBox(height: 8),
+                _MiniK9Line(activeMembers: activeMembers),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Slot compacto para o mini-quadro da guarnição.
+class _MiniPostSlot extends StatelessWidget {
+  final String role;
+  final VehicleCrewMember? member;
+
+  const _MiniPostSlot({required this.role, this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final isOccupied = member != null;
+    final color = isOccupied ? AppTheme.success : AppTheme.textTertiary;
+
+    return Column(
+      children: [
+        // Ícone + dot de status
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isOccupied ? AppTheme.success.withAlpha(15) : AppTheme.surfacePanelAlt,
+                border: Border.all(color: color.withAlpha(80)),
+              ),
+              child: Icon(
+                _roleIcon(role),
+                color: color,
+                size: 14,
+              ),
+            ),
+            if (isOccupied)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.success,
+                    border: Border.all(color: AppTheme.surfacePanel, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        // Nome curto ou traço
+        Text(
+          isOccupied ? _shortName(member!.name ?? member!.handlerId) : '-',
+          style: GoogleFonts.inter(
+            color: isOccupied ? AppTheme.textPrimary : AppTheme.textTertiary,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+        // Label da função
+        Text(
+          _roleLabelShort(role),
+          style: GoogleFonts.robotoMono(
+            color: AppTheme.textTertiary,
+            fontSize: 7,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+        // Badge K9 se o member é o condutor do cão
+        if (isOccupied && member!.dogId != null && member!.dogId!.trim().isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: AppTheme.primary.withAlpha(50)),
+            ),
+            child: Text(
+              'K9',
+              style: GoogleFonts.robotoMono(
+                color: AppTheme.primary,
+                fontSize: 7,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _shortName(String name) {
+    if (name.isEmpty) return '-';
+    final parts = name.trim().split(' ');
+    if (parts.length == 1) return parts[0].substring(0, parts[0].length.clamp(0, 4)).toUpperCase();
+    return parts[0].substring(0, 1).toUpperCase() + (parts.length > 1 ? '.${parts.last.substring(0, 1).toUpperCase()}.' : '');
+  }
+}
+
+/// Linha compacta K9 (vínculo, não posto).
+class _MiniK9Line extends StatelessWidget {
+  final Map<String, VehicleCrewMember> activeMembers;
+
+  const _MiniK9Line({required this.activeMembers});
+
+  @override
+  Widget build(BuildContext context) {
+    // Identificar condutor K9
+    VehicleCrewMember? k9Member;
+    for (final m in activeMembers.values) {
+      if (m.dogId != null && m.dogId!.trim().isNotEmpty) {
+        k9Member = m;
+        break;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: k9Member != null ? AppTheme.primary.withAlpha(8) : AppTheme.surfacePanelAlt,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: k9Member != null ? AppTheme.primary.withAlpha(30) : AppTheme.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.pets_rounded,
+            color: k9Member != null ? AppTheme.primary : AppTheme.textTertiary,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'K9',
+            style: GoogleFonts.robotoMono(
+              color: AppTheme.textTertiary,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              k9Member != null
+                  ? '${k9Member.name ?? 'RA ${k9Member.handlerId}'} (${_roleLabelShort(k9Member.role)})'
+                  : 'Sem cão',
+              style: GoogleFonts.inter(
+                color: k9Member != null ? AppTheme.textPrimary : AppTheme.textTertiary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _roleLabelShort(String role) {
+    return switch (role) {
+      'motorista' => 'MOT',
+      'encarregado' => 'ENC',
+      'auxiliar_1' => 'AUX1',
+      'auxiliar_2' => 'AUX2',
+      'k9' => 'K9',
+      _ => role,
+    };
+  }
+}
+
+/// Chip de status operacional compacto.
+class _MiniOperationalStatusChip extends StatelessWidget {
+  final String status;
+
+  const _MiniOperationalStatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      'operational' => ('OK', AppTheme.success),
+      'incomplete' => ('INC', AppTheme.warning),
+      _ => ('---', AppTheme.textTertiary),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withAlpha(15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withAlpha(60)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+/// Helper: ícone para cada função.
+IconData _roleIcon(String role) {
+  return switch (role) {
+    'motorista' => Icons.drive_eta_rounded,
+    'encarregado' => Icons.star_rounded,
+    'auxiliar_1' => Icons.person_outline_rounded,
+    'auxiliar_2' => Icons.person_outline_rounded,
+    'k9' => Icons.pets_rounded,
+    _ => Icons.person_outline_rounded,
+  };
+}
+
+/// Helper: label curto para cada função.
+String _roleLabelShort(String role) {
+  return switch (role) {
+    'motorista' => 'MOT',
+    'encarregado' => 'ENC',
+    'auxiliar_1' => 'AUX1',
+    'auxiliar_2' => 'AUX2',
+    'k9' => 'K9',
+    _ => role.toUpperCase().substring(0, 3),
+  };
 }

@@ -525,10 +525,23 @@ class _HeaderMenuButton extends StatelessWidget {
     BuildContext context,
     ShiftViewModel shiftVM,
   ) async {
+    // Montar mensagem contextual com base no estado atual
+    final hasVehicle = shiftVM.hasVehicle;
+    final crewRole = shiftVM.crewRole;
+    final vehicleLabel = shiftVM.vehicleLabel;
+
+    String message;
+    if (hasVehicle && crewRole != null && vehicleLabel != null) {
+      final roleLabel = _friendlyRoleLabel(crewRole);
+      message = 'Seu posto de $roleLabel na $vehicleLabel será liberado e o turno será encerrado.';
+    } else {
+      message = 'O turno ativo será finalizado para este condutor.';
+    }
+
     final confirmed = await _confirm(
       context,
       title: 'Encerrar turno?',
-      message: 'O turno ativo será finalizado para este condutor.',
+      message: message,
       confirmLabel: 'Encerrar',
     );
     if (confirmed != true) return;
@@ -609,6 +622,18 @@ class _HeaderMenuButton extends StatelessWidget {
   void _showSnack(BuildContext context, String message) {
     AppFeedback.info(context, message);
   }
+}
+
+/// Helper: label amigável para cada função na guarnição.
+String _friendlyRoleLabel(String role) {
+  return switch (role) {
+    'motorista' => 'Motorista',
+    'encarregado' => 'Encarregado',
+    'auxiliar_1' => 'Auxiliar 1',
+    'auxiliar_2' => 'Auxiliar 2',
+    'k9' => 'Condutor K9',
+    _ => role,
+  };
 }
 
 /// Avatar circular com foto ou fallback.
