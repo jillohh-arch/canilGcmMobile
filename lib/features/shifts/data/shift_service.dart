@@ -537,6 +537,15 @@ class ShiftService {
             'service_dog_id': FieldValue.delete(),
             'updated_at': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
+        } else {
+          // ── Guarnição continua (outros members ativos):
+          //    se quem encerra era o condutor K9, limpa service_dog_id do doc pai.
+          //    dogId foi lido antes da transaction (activeData).
+          if (dogId != null && dogId.isNotEmpty) {
+            transaction.set(_vehicleCrews.doc(crewId), {
+              'service_dog_id': FieldValue.delete(),
+            }, SetOptions(merge: true));
+          }
         }
       }
     });
@@ -746,6 +755,7 @@ class ShiftService {
     final previousCrewId =
         activeData['vehicle_crew_id']?.toString().trim();
     final shiftId = activeData['shiftId'] as String?;
+    final dogId = activeData['service_dog_id']?.toString().trim();
 
     // Se não está em nenhuma guarnição, nada a fazer
     if (previousCrewId == null || previousCrewId.isEmpty) {
@@ -766,10 +776,15 @@ class ShiftService {
         SetOptions(merge: true),
       );
 
-      // ── 1b) Limpar service_dog_id do doc pai se o saindo era o condutor K9 ──
-      transaction.set(_vehicleCrews.doc(previousCrewId), {
-        'service_dog_id': FieldValue.delete(),
-      }, SetOptions(merge: true));
+      // ── 1b) Limpar service_dog_id do doc pai SE o saindo era o condutor K9 ──
+      // dogId lido antes da transaction (activeData já contém o dog_id do member).
+      // Se o member não tinha cão (dogId vazio/nulo), não limpa — outro membro
+      // pode ser o condutor K9 ativo na guarnição.
+      if (dogId != null && dogId.isNotEmpty) {
+        transaction.set(_vehicleCrews.doc(previousCrewId), {
+          'service_dog_id': FieldValue.delete(),
+        }, SetOptions(merge: true));
+      }
 
       // ── 2) Limpar campos de viatura do active_shift ──
       transaction.set(activeRef, {
