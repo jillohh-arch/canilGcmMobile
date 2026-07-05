@@ -83,6 +83,7 @@ class _BinomioFaixa extends StatelessWidget {
         children: [
           // Avatar do cão — generoso
           _BinomioAvatar(
+            size: 64,
             imageUrl: dog.profileImageUrl,
             icon: Icons.pets_rounded,
             accent: AppTheme.success,
@@ -97,11 +98,12 @@ class _BinomioFaixa extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(width: 12),
-          // Info do cão
+          const SizedBox(width: 10),
+          // Info do cão — coluna esquerda
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   dog.name,
@@ -125,72 +127,66 @@ class _BinomioFaixa extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          // Divisor
-          Container(
-            width: 1,
-            height: 48,
-            color: AppTheme.textPrimary.withAlpha(15),
+          const SizedBox(width: 10),
+          // Avatar do condutor — mesmo tamanho
+          _BinomioAvatar(
+            size: 64,
+            imageUrl: conductorPhotoUrl,
+            icon: Icons.person_rounded,
+            accent: AppTheme.primary,
           ),
-          const SizedBox(width: 12),
-          // Info do condutor
+          const SizedBox(width: 10),
+          // Info do condutor — coluna direita
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        callsign,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isK9Conductor && condutorPapel != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withAlpha(20),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppTheme.primary.withAlpha(50)),
-                        ),
-                        child: Text(
-                          '$condutorPapel · K9',
-                          style: GoogleFonts.robotoMono(
-                            color: AppTheme.primary,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                // Nome do condutor
+                Text(
+                  callsign,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
+                // Linha 2: Condutor · RA completo
                 Text(
-                  'Condutor${handlerId != null ? ' · RA' : ''}',
+                  'Condutor${handlerId != null ? ' · RA $handlerId' : ''}',
                   style: GoogleFonts.inter(
                     color: AppTheme.textSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                // Linha 3: Badge função/K9 se embarcado
+                if (isK9Conductor && condutorPapel != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppTheme.primary.withAlpha(50)),
+                    ),
+                    child: Text(
+                      '$condutorPapel · K9',
+                      style: GoogleFonts.robotoMono(
+                        color: AppTheme.primary,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
-          ),
-          const SizedBox(width: 12),
-          // Avatar do condutor
-          _BinomioAvatar(
-            imageUrl: conductorPhotoUrl,
-            icon: Icons.person_rounded,
-            accent: AppTheme.primary,
           ),
         ],
       ),
@@ -200,6 +196,7 @@ class _BinomioFaixa extends StatelessWidget {
 
 /// Avatar generoso do card binômio.
 class _BinomioAvatar extends StatelessWidget {
+  final double size;
   final String? imageUrl;
   final IconData icon;
   final Color accent;
@@ -208,6 +205,7 @@ class _BinomioAvatar extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _BinomioAvatar({
+    this.size = 52,
     this.imageUrl,
     required this.icon,
     required this.accent,
@@ -219,10 +217,11 @@ class _BinomioAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = imageUrl?.trim().isNotEmpty == true;
+    final iconSize = size * 0.46;
 
     Widget avatar = Container(
-      width: 52,
-      height: 52,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: accent.withAlpha(12),
@@ -233,9 +232,9 @@ class _BinomioAvatar extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, _) => Icon(icon, color: accent, size: 24),
+                errorWidget: (_, __, _) => Icon(icon, color: accent, size: iconSize),
               )
-            : Icon(icon, color: accent, size: 24),
+            : Icon(icon, color: accent, size: iconSize),
       ),
     );
 
@@ -408,15 +407,14 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                   const SizedBox(width: 8),
                 ],
                 // Status chip
-                Expanded(
-                  child: FutureBuilder<String>(
-                    future: VehicleCrewService().getCrewOperationalStatus(crewId),
-                    builder: (context, snap) {
-                      final status = snap.data ?? 'empty';
-                      return _StatusChip(status: status);
-                    },
-                  ),
+                FutureBuilder<String>(
+                  future: VehicleCrewService().getCrewOperationalStatus(crewId),
+                  builder: (context, snap) {
+                    final status = snap.data ?? 'empty';
+                    return _StatusChip(status: status);
+                  },
                 ),
+                const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_right_rounded,
                   color: AppTheme.textTertiary.withAlpha(150),
@@ -527,7 +525,7 @@ class _MiniPostCard extends StatelessWidget {
     final hasK9 = isOccupied && member!.dogId?.trim().isNotEmpty == true;
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: isOccupied ? AppTheme.surfacePanel : AppTheme.surfacePanelAlt,
         borderRadius: BorderRadius.circular(8),
@@ -581,10 +579,10 @@ class _OccupiedMiniCard extends StatelessWidget {
 
     return Row(
       children: [
-        // Avatar com iniciais
+        // Avatar com iniciais (menor)
         Container(
-          width: 28,
-          height: 28,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: dotColor.withAlpha(15),
@@ -595,18 +593,19 @@ class _OccupiedMiniCard extends StatelessWidget {
               initials,
               style: GoogleFonts.inter(
                 color: dotColor,
-                fontSize: 10,
+                fontSize: 9,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 6),
-        // Info
+        const SizedBox(width: 5),
+        // Info (nome + função)
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 displayName,
@@ -630,14 +629,13 @@ class _OccupiedMiniCard extends StatelessWidget {
             ],
           ),
         ),
-        // Badge K9 + dot
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        // Badge K9 + dot na mesma linha
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (hasK9)
+            if (hasK9) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withAlpha(20),
                   borderRadius: BorderRadius.circular(3),
@@ -651,11 +649,11 @@ class _OccupiedMiniCard extends StatelessWidget {
                   ),
                 ),
               ),
-            if (hasK9)
-              const SizedBox(height: 3),
+              const SizedBox(width: 3),
+            ],
             Container(
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: dotColor,
@@ -700,10 +698,10 @@ class _VacantMiniCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Slot dashed
+        // Slot dashed (menor)
         Container(
-          width: 28,
-          height: 28,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppTheme.surfacePanelAlt,
@@ -716,14 +714,16 @@ class _VacantMiniCard extends StatelessWidget {
           child: Icon(
             _roleIcon(role),
             color: AppTheme.textTertiary.withAlpha(80),
-            size: 12,
+            size: 11,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
+        // Info compacta
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'POSTO VAGO',
@@ -733,6 +733,7 @@ class _VacantMiniCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 _roleLabelUpper(role),
@@ -742,6 +743,7 @@ class _VacantMiniCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
