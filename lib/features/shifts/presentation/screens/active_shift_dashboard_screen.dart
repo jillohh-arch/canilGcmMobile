@@ -183,16 +183,9 @@ class _ActiveShiftDashboardScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!Provider.of<ShiftViewModel>(context).hasVehicle) ...[
-                    _animateSection(
-                      const _VehicleAssumptionPrompt(),
-                      intervalStart: base + step * 1,
-                      intervalEnd: base + step * 1 + 0.1,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                  // Card unificado "EM SERVIÇO" (Binômio + Guarnição fundidos)
                   _animateSection(
-                    _ShiftProfileCardsSection(
+                    _EmServicoCard(
                       dog: dog,
                       callsign: callsign,
                       conductorPhotoUrl: conductorPhoto,
@@ -200,16 +193,7 @@ class _ActiveShiftDashboardScreenState
                     intervalStart: base + step * 1,
                     intervalEnd: base + step * 1 + 0.12,
                   ),
-                  const SizedBox(height: 12),
-                  // Card Guarnição - mostra quando tem viatura assumida
-                  if (Provider.of<ShiftViewModel>(context).hasVehicle) ...[
-                    _animateSection(
-                      const _GuarnicaoCard(),
-                      intervalStart: base + step * 1 + 0.12,
-                      intervalEnd: base + step * 1 + 0.22,
-                    ),
-                    const SizedBox(height: 18),
-                  ],
+                  const SizedBox(height: 18),
                   _animateSection(
                     const _OperationalPulseSection(),
                     intervalStart: base + step * 2,
