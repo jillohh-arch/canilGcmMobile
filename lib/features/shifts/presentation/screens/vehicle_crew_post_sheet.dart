@@ -40,7 +40,7 @@ class _VehicleCrewPostSheetState extends State<VehicleCrewPostSheet> {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.9,
+      initialChildSize: 0.85,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
@@ -192,7 +192,7 @@ class _VehicleSelectionStep extends StatelessWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: vehicles.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (context, index) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final vehicle = vehicles[index];
                   return _VehicleCrewSummaryCard(
@@ -357,25 +357,21 @@ class _PostBoardStep extends StatelessWidget {
         // Header com status da guarnição
         _PostBoardHeader(vehicle: vehicle, crewService: crewService),
         const Divider(color: AppTheme.outlineVariant, height: 1),
-        // Botão voltar
+        // Botão "Selecionar outra viatura" - ação discreta
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_rounded),
-                color: AppTheme.textSecondary,
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onBack,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+              label: const Text('Trocar viatura'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.textTertiary,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                textStyle: GoogleFonts.inter(fontSize: 12),
               ),
-              const SizedBox(width: 4),
-              Text(
-                'Selecionar outra viatura',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         // Quadro de postos
@@ -459,9 +455,12 @@ class _PostBoardStep extends StatelessWidget {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
-    // Chamar assumeVehicle via ShiftViewModel
+    // Chamar assumeVehicle via ShiftViewModel com o nome do condutor
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-    await shiftVM.assumeVehicle(vehicle, role: role);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final currentHandlerId = shiftVM.handlerId;
+    final memberName = userVM.displayNameFor(ra: currentHandlerId ?? '');
+    await shiftVM.assumeVehicle(vehicle, role: role, name: memberName);
 
     if (!context.mounted) return;
 
@@ -663,6 +662,7 @@ class _PostBoard extends StatelessWidget {
     // Verificar se o usuário logado está nesta guarnição
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     final currentCrewId = shiftVM.vehicleCrewId;
+    final currentHandlerId = shiftVM.handlerId;
     final isInThisCrew = currentCrewId == vehicle.id;
 
     // Identificar o membro com cão embarcado (condutor K9 = vínculo)
@@ -680,20 +680,23 @@ class _PostBoard extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: _roles.length + 1, // 4 postos + 1 linha K9
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               if (index < _roles.length) {
                 final role = _roles[index];
                 final member = activeMembers[role];
                 final isOccupied = member != null;
                 // Badge K9 se o membro tem cão embarcado
-                final hasK9 = member?.dogId != null && member!.dogId!.trim().isNotEmpty;
+                final hasK9 = isOccupied && member.dogId!.trim().isNotEmpty;
+                // Verificar se este slot é do usuário atual
+                final isCurrentUser = isOccupied && member.handlerId == currentHandlerId;
 
                 return _PostSlot(
                   role: role,
                   member: member,
                   isOccupied: isOccupied,
                   hasK9: hasK9,
+                  isCurrentUser: isCurrentUser,
                   onTap: isOccupied ? null : () => onPostSelected(role),
                 );
               } else {
@@ -738,6 +741,7 @@ class _PostSlot extends StatelessWidget {
   final VehicleCrewMember? member;
   final bool hasK9; // badge K9 se este membro é o condutor do cão
   final bool isOccupied;
+  final bool isCurrentUser; // destaca o slot do usuário atual
   final VoidCallback? onTap;
 
   const _PostSlot({
@@ -745,6 +749,7 @@ class _PostSlot extends StatelessWidget {
     required this.member,
     required this.hasK9,
     required this.isOccupied,
+    required this.isCurrentUser,
     this.onTap,
   });
 
@@ -758,10 +763,15 @@ class _PostSlot extends StatelessWidget {
         decoration: BoxDecoration(
           color: isOccupied ? AppTheme.surfacePanel : AppTheme.surfacePanelAlt,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.outlineVariant),
+          border: Border.all(
+            color: isCurrentUser
+                ? AppTheme.primary.withAlpha(180)
+                : AppTheme.outlineVariant,
+            width: isCurrentUser ? 2 : 1,
+          ),
         ),
         child: isOccupied
-            ? _OccupiedSlot(member: member!, role: role, hasK9: hasK9)
+            ? _OccupiedSlot(member: member!, role: role, hasK9: hasK9, isCurrentUser: isCurrentUser)
             : _VacantSlot(role: role),
       ),
     );
@@ -773,22 +783,26 @@ class _OccupiedSlot extends StatelessWidget {
   final VehicleCrewMember member;
   final String role;
   final bool hasK9;
+  final bool isCurrentUser;
 
   const _OccupiedSlot({
     required this.member,
     required this.role,
     required this.hasK9,
+    required this.isCurrentUser,
   });
 
   @override
   Widget build(BuildContext context) {
     final userVM = Provider.of<UserViewModel>(context);
     final memberName = member.name ?? userVM.displayNameFor(ra: member.handlerId);
+    // Cor do dot: cyan para o usuário atual, verde para os demais
+    final dotColor = isCurrentUser ? AppTheme.primary : AppTheme.success;
 
     return Row(
       children: [
         // Dot de status ativo
-        const HudStatusDot(color: AppTheme.success, size: 8, ringMaxSize: 16),
+        HudStatusDot(color: dotColor, size: 8, ringMaxSize: 16),
         const SizedBox(width: 12),
         // Role label
         Container(
@@ -829,28 +843,8 @@ class _OccupiedSlot extends StatelessWidget {
             ),
           ),
         if (hasK9) const SizedBox(width: 8),
-        // Avatar placeholder
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppTheme.surfacePanelAlt,
-            border: Border.all(color: AppTheme.outlineVariant),
-          ),
-          child: member.handlerId.isNotEmpty
-              ? Center(
-                  child: Text(
-                    member.handlerId.substring(0, member.handlerId.length.clamp(0, 2)).toUpperCase(),
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                )
-              : const Icon(Icons.person, color: AppTheme.textTertiary, size: 16),
-        ),
+        // Avatar placeholder com iniciais do nome
+        _OccupiedAvatar(member: member),
         const SizedBox(width: 10),
         // Nome + RA
         Expanded(
@@ -920,14 +914,18 @@ class _VacantSlot extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        // Avatar placeholder vazio
+        // Avatar placeholder vazio com borda dashed
         Container(
           width: 32,
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppTheme.background,
-            border: Border.all(color: AppTheme.outlineVariant),
+            border: Border.all(
+              color: AppTheme.textTertiary.withAlpha(60),
+              width: 1.5,
+              strokeAlign: BorderSide.strokeAlignInside,
+            ),
           ),
           child: const Icon(Icons.person_outline, color: AppTheme.textTertiary, size: 16),
         ),
@@ -1037,8 +1035,9 @@ class _K9Line extends StatelessWidget {
                     builder: (context, snap) {
                       final dogName = snap.data ?? k9Member!.dogId;
                       final handlerName = k9Member!.name ?? 'RA ${k9Member!.handlerId}';
+                      final roleCapitalized = _roleLabelCapitalized(k9Member!.role);
                       return Text(
-                        '$dogName — Conduzido por $handlerName (${_roleLabel(k9Member!.role)})',
+                        '$dogName — Conduzido por $handlerName ($roleCapitalized)',
                         style: GoogleFonts.inter(
                           color: AppTheme.textPrimary,
                           fontSize: 12,
@@ -1050,7 +1049,7 @@ class _K9Line extends StatelessWidget {
                 ] else ...[
                   Text(
                     hasBinomioActive
-                        ? 'Sem K9 nesta guarnicao'
+                        ? 'Sem K9 nesta guarnição'
                         : 'Sem K9 embarcado',
                     style: GoogleFonts.inter(
                       color: AppTheme.textTertiary,
@@ -1088,4 +1087,60 @@ String _roleLabel(String role) {
     'k9' => 'K9',
     _ => role.toUpperCase(),
   };
+}
+
+/// Label capitalizado para cada função (não grita).
+String _roleLabelCapitalized(String role) {
+  return switch (role) {
+    'motorista' => 'Motorista',
+    'encarregado' => 'Encarregado',
+    'auxiliar_1' => 'Auxiliar 1',
+    'auxiliar_2' => 'Auxiliar 2',
+    'k9' => 'K9',
+    _ => role,
+  };
+}
+
+/// Avatar do slot ocupado mostrando iniciais do nome.
+class _OccupiedAvatar extends StatelessWidget {
+  final VehicleCrewMember member;
+
+  const _OccupiedAvatar({required this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final memberName = member.name;
+    final initials = _getInitials(memberName ?? member.handlerId);
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.success.withAlpha(15),
+        border: Border.all(color: AppTheme.success.withAlpha(180)),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: GoogleFonts.inter(
+            color: AppTheme.success,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '--';
+    final parts = name.trim().split(' ');
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+    }
+    final first = parts.first.substring(0, 1).toUpperCase();
+    final last = parts.last.isNotEmpty ? parts.last.substring(0, 1).toUpperCase() : '';
+    return '$first$last';
+  }
 }

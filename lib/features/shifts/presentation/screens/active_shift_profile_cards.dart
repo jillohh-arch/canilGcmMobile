@@ -308,7 +308,7 @@ class _GuarnicaoCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'GUARNICAO',
+                        'GUARNIÇÃO',
                         style: GoogleFonts.inter(
                           color: AppTheme.primary,
                           fontSize: 11,
@@ -382,48 +382,21 @@ class _MiniPostSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOccupied = member != null;
-    final color = isOccupied ? AppTheme.success : AppTheme.textTertiary;
+    final memberName = member?.name;
 
     return Column(
       children: [
-        // Ícone + dot de status
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isOccupied ? AppTheme.success.withAlpha(15) : AppTheme.surfacePanelAlt,
-                border: Border.all(color: color.withAlpha(80)),
-              ),
-              child: Icon(
-                _roleIcon(role),
-                color: color,
-                size: 14,
-              ),
-            ),
-            if (isOccupied)
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.success,
-                    border: Border.all(color: AppTheme.surfacePanel, width: 1.5),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        // Avatar/inicial ou slot vago
+        if (isOccupied && memberName != null && memberName.trim().isNotEmpty)
+          _MiniOccupiedAvatar(name: memberName, role: role, hasK9: member!.dogId?.trim().isNotEmpty == true)
+        else if (isOccupied)
+          _MiniOccupiedAvatar(name: member!.handlerId, role: role, hasK9: member!.dogId?.trim().isNotEmpty == true)
+        else
+          _MiniVacantSlot(role: role),
         const SizedBox(height: 4),
         // Nome curto ou traço
         Text(
-          isOccupied ? _shortName(member!.name ?? member!.handlerId) : '-',
+          isOccupied ? _shortName(memberName ?? member!.handlerId) : '-',
           style: GoogleFonts.inter(
             color: isOccupied ? AppTheme.textPrimary : AppTheme.textTertiary,
             fontSize: 9,
@@ -472,6 +445,106 @@ class _MiniPostSlot extends StatelessWidget {
     final parts = name.trim().split(' ');
     if (parts.length == 1) return parts[0].substring(0, parts[0].length.clamp(0, 4)).toUpperCase();
     return parts[0].substring(0, 1).toUpperCase() + (parts.length > 1 ? '.${parts.last.substring(0, 1).toUpperCase()}.' : '');
+  }
+}
+
+/// Avatar compacto ocupado mostrando iniciais do nome.
+class _MiniOccupiedAvatar extends StatelessWidget {
+  final String name;
+  final String role;
+  final bool hasK9;
+
+  const _MiniOccupiedAvatar({
+    required this.name,
+    required this.role,
+    required this.hasK9,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _getInitials(name);
+    final accentColor = hasK9 ? AppTheme.primary : AppTheme.success;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accentColor.withAlpha(15),
+            border: Border.all(color: accentColor.withAlpha(180)),
+          ),
+          child: Center(
+            child: Text(
+              initials,
+              style: GoogleFonts.inter(
+                color: accentColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        // Dot de status
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accentColor,
+              border: Border.all(color: AppTheme.surfacePanel, width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '--';
+    final parts = name.trim().split(' ');
+    if (parts.length == 1) {
+      // Nome único: até 2 caracteres
+      return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+    }
+    // Primeiro nome + última letra do último nome (ex: "Ragonha" → "Ra", "Rui Santos" → "Rs")
+    final first = parts.first.substring(0, 1).toUpperCase();
+    final last = parts.last.isNotEmpty ? parts.last.substring(0, 1).toUpperCase() : '';
+    return '$first$last';
+  }
+}
+
+/// Slot vago com ícone da função e borda dashed.
+class _MiniVacantSlot extends StatelessWidget {
+  final String role;
+
+  const _MiniVacantSlot({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.surfacePanelAlt,
+        border: Border.all(
+          color: AppTheme.textTertiary.withAlpha(60),
+          style: BorderStyle.solid,
+          width: 1.5,
+        ),
+      ),
+      child: Icon(
+        _roleIcon(role),
+        color: AppTheme.textTertiary.withAlpha(80),
+        size: 14,
+      ),
+    );
   }
 }
 
@@ -559,9 +632,9 @@ class _MiniOperationalStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      'operational' => ('OK', AppTheme.success),
-      'incomplete' => ('INC', AppTheme.warning),
-      _ => ('---', AppTheme.textTertiary),
+      'operational' => ('OPERACIONAL', AppTheme.success),
+      'incomplete' => ('INCOMPLETA', AppTheme.warning),
+      _ => ('DISPONIVEL', AppTheme.textTertiary),
     };
 
     return Container(
