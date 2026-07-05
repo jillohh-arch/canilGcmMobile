@@ -1029,12 +1029,13 @@ class _K9Line extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 if (k9Member != null) ...[
-                  // Cão embarcado: foto/nome do cão + condutor responsável
+                  // Cão embarcado: nome do cão + condutor responsável (nome real)
                   FutureBuilder<String?>(
                     future: _getDogName(k9Member!.dogId!),
                     builder: (context, snap) {
                       final dogName = snap.data ?? k9Member!.dogId;
-                      final handlerName = k9Member!.name ?? 'RA ${k9Member!.handlerId}';
+                      final userVM = Provider.of<UserViewModel>(context, listen: false);
+                      final handlerName = k9Member!.name ?? userVM.displayNameFor(ra: k9Member!.handlerId);
                       final roleCapitalized = _roleLabelCapitalized(k9Member!.role);
                       return Text(
                         '$dogName — Conduzido por $handlerName ($roleCapitalized)',

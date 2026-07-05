@@ -261,6 +261,18 @@ class _ServiceSummaryDivider extends StatelessWidget {
   }
 }
 
+/// Helper: label curto para cada função.
+String _roleLabelShort(String role) {
+  return switch (role) {
+    'motorista' => 'MOT',
+    'encarregado' => 'ENC',
+    'auxiliar_1' => 'AUX1',
+    'auxiliar_2' => 'AUX2',
+    'k9' => 'K9',
+    _ => role,
+  };
+}
+
 /// ─────────────────────────────────────────────────────────────
 /// Card "Guarnição" - mini-quadro dos 5 postos
 /// ─────────────────────────────────────────────────────────────
@@ -347,20 +359,20 @@ class _GuarnicaoCard extends StatelessWidget {
                     const Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary, size: 20),
                   ],
                 ),
-                const SizedBox(height: 14),
-                // Mini-quadro: 4 postos em linha compacta + badge K9
-                Row(
+                const SizedBox(height: 12),
+                // Mini-quadro: 4 linhas compactas
+                Column(
                   children: [
-                    Expanded(child: _MiniPostSlot(role: 'motorista', member: activeMembers['motorista'])),
-                    const SizedBox(width: 6),
-                    Expanded(child: _MiniPostSlot(role: 'encarregado', member: activeMembers['encarregado'])),
-                    const SizedBox(width: 6),
-                    Expanded(child: _MiniPostSlot(role: 'auxiliar_1', member: activeMembers['auxiliar_1'])),
-                    const SizedBox(width: 6),
-                    Expanded(child: _MiniPostSlot(role: 'auxiliar_2', member: activeMembers['auxiliar_2'])),
+                    _MiniPostLine(role: 'motorista', member: activeMembers['motorista']),
+                    const SizedBox(height: 4),
+                    _MiniPostLine(role: 'encarregado', member: activeMembers['encarregado']),
+                    const SizedBox(height: 4),
+                    _MiniPostLine(role: 'auxiliar_1', member: activeMembers['auxiliar_1']),
+                    const SizedBox(height: 4),
+                    _MiniPostLine(role: 'auxiliar_2', member: activeMembers['auxiliar_2']),
                   ],
                 ),
-                // Linha K9: vínculo, não posto
+                // Linha K9: vínculo
                 const SizedBox(height: 8),
                 _MiniK9Line(activeMembers: activeMembers),
               ],
@@ -372,181 +384,94 @@ class _GuarnicaoCard extends StatelessWidget {
   }
 }
 
-/// Slot compacto para o mini-quadro da guarnição.
-class _MiniPostSlot extends StatelessWidget {
+/// Linha compacta para o mini-quadro da guarnição.
+class _MiniPostLine extends StatelessWidget {
   final String role;
   final VehicleCrewMember? member;
 
-  const _MiniPostSlot({required this.role, this.member});
+  const _MiniPostLine({required this.role, this.member});
 
   @override
   Widget build(BuildContext context) {
-    final isOccupied = member != null;
+    final isOccupied = member != null && member!.isActive;
     final memberName = member?.name;
+    final hasK9 = isOccupied && member!.dogId?.trim().isNotEmpty == true;
 
-    return Column(
-      children: [
-        // Avatar/inicial ou slot vago
-        if (isOccupied && memberName != null && memberName.trim().isNotEmpty)
-          _MiniOccupiedAvatar(name: memberName, role: role, hasK9: member!.dogId?.trim().isNotEmpty == true)
-        else if (isOccupied)
-          _MiniOccupiedAvatar(name: member!.handlerId, role: role, hasK9: member!.dogId?.trim().isNotEmpty == true)
-        else
-          _MiniVacantSlot(role: role),
-        const SizedBox(height: 4),
-        // Nome curto ou traço
-        Text(
-          isOccupied ? _shortName(memberName ?? member!.handlerId) : '-',
-          style: GoogleFonts.inter(
-            color: isOccupied ? AppTheme.textPrimary : AppTheme.textTertiary,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-        // Label da função
-        Text(
-          _roleLabelShort(role),
-          style: GoogleFonts.robotoMono(
-            color: AppTheme.textTertiary,
-            fontSize: 7,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-        // Badge K9 se o member é o condutor do cão
-        if (isOccupied && member!.dogId != null && member!.dogId!.trim().isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withAlpha(20),
-              borderRadius: BorderRadius.circular(3),
-              border: Border.all(color: AppTheme.primary.withAlpha(50)),
-            ),
-            child: Text(
-              'K9',
-              style: GoogleFonts.robotoMono(
-                color: AppTheme.primary,
-                fontSize: 7,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _shortName(String name) {
-    if (name.isEmpty) return '-';
-    final parts = name.trim().split(' ');
-    if (parts.length == 1) return parts[0].substring(0, parts[0].length.clamp(0, 4)).toUpperCase();
-    return parts[0].substring(0, 1).toUpperCase() + (parts.length > 1 ? '.${parts.last.substring(0, 1).toUpperCase()}.' : '');
-  }
-}
-
-/// Avatar compacto ocupado mostrando iniciais do nome.
-class _MiniOccupiedAvatar extends StatelessWidget {
-  final String name;
-  final String role;
-  final bool hasK9;
-
-  const _MiniOccupiedAvatar({
-    required this.name,
-    required this.role,
-    required this.hasK9,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final initials = _getInitials(name);
-    final accentColor = hasK9 ? AppTheme.primary : AppTheme.success;
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: accentColor.withAlpha(15),
-            border: Border.all(color: accentColor.withAlpha(180)),
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: GoogleFonts.inter(
-                color: accentColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ),
-        // Dot de status
-        Positioned(
-          right: 0,
-          bottom: 0,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accentColor,
-              border: Border.all(color: AppTheme.surfacePanel, width: 1.5),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _getInitials(String name) {
-    if (name.isEmpty) return '--';
-    final parts = name.trim().split(' ');
-    if (parts.length == 1) {
-      // Nome único: até 2 caracteres
-      return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+    // Nome visível: nome real ou fallback handlerId
+    String displayName;
+    if (isOccupied && memberName != null && memberName.trim().isNotEmpty) {
+      displayName = memberName;
+    } else if (isOccupied) {
+      displayName = member!.handlerId;
+    } else {
+      displayName = 'vago';
     }
-    // Primeiro nome + última letra do último nome (ex: "Ragonha" → "Ra", "Rui Santos" → "Rs")
-    final first = parts.first.substring(0, 1).toUpperCase();
-    final last = parts.last.isNotEmpty ? parts.last.substring(0, 1).toUpperCase() : '';
-    return '$first$last';
-  }
-}
 
-/// Slot vago com ícone da função e borda dashed.
-class _MiniVacantSlot extends StatelessWidget {
-  final String role;
-
-  const _MiniVacantSlot({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
+    return SizedBox(
       height: 32,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppTheme.surfacePanelAlt,
-        border: Border.all(
-          color: AppTheme.textTertiary.withAlpha(60),
-          style: BorderStyle.solid,
-          width: 1.5,
-        ),
-      ),
-      child: Icon(
-        _roleIcon(role),
-        color: AppTheme.textTertiary.withAlpha(80),
-        size: 14,
+      child: Row(
+        children: [
+          // Label da função - largura fixa, mono, esmaecido
+          SizedBox(
+            width: 44,
+            child: Text(
+              _roleLabelShort(role),
+              style: GoogleFonts.robotoMono(
+                color: AppTheme.textTertiary.withAlpha(isOccupied ? 180 : 120),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Conteúdo: nome ou "vago"
+          Expanded(
+            child: Text(
+              displayName,
+              style: GoogleFonts.inter(
+                color: isOccupied ? AppTheme.textPrimary : AppTheme.textTertiary,
+                fontSize: 11,
+                fontWeight: isOccupied ? FontWeight.w600 : FontWeight.w400,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // Badge K9 se condutor do cão
+          if (hasK9)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(20),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                'K9',
+                style: GoogleFonts.robotoMono(
+                  color: AppTheme.primary,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          // Dot de status - só se ocupado
+          if (isOccupied)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: hasK9 ? AppTheme.primary : AppTheme.success,
+              ),
+            ),
+        ],
       ),
     );
   }
 }
+
 
 /// Linha compacta K9 (vínculo, não posto).
 class _MiniK9Line extends StatelessWidget {
@@ -610,17 +535,6 @@ class _MiniK9Line extends StatelessWidget {
       ),
     );
   }
-
-  String _roleLabelShort(String role) {
-    return switch (role) {
-      'motorista' => 'MOT',
-      'encarregado' => 'ENC',
-      'auxiliar_1' => 'AUX1',
-      'auxiliar_2' => 'AUX2',
-      'k9' => 'K9',
-      _ => role,
-    };
-  }
 }
 
 /// Chip de status operacional compacto.
@@ -654,28 +568,4 @@ class _MiniOperationalStatusChip extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Helper: ícone para cada função.
-IconData _roleIcon(String role) {
-  return switch (role) {
-    'motorista' => Icons.drive_eta_rounded,
-    'encarregado' => Icons.star_rounded,
-    'auxiliar_1' => Icons.person_outline_rounded,
-    'auxiliar_2' => Icons.person_outline_rounded,
-    'k9' => Icons.pets_rounded,
-    _ => Icons.person_outline_rounded,
-  };
-}
-
-/// Helper: label curto para cada função.
-String _roleLabelShort(String role) {
-  return switch (role) {
-    'motorista' => 'MOT',
-    'encarregado' => 'ENC',
-    'auxiliar_1' => 'AUX1',
-    'auxiliar_2' => 'AUX2',
-    'k9' => 'K9',
-    _ => role.toUpperCase().substring(0, 3),
-  };
 }
