@@ -42,7 +42,7 @@ class _EmServicoCard extends StatelessWidget {
             color: AppTheme.textPrimary.withAlpha(12),
           ),
           // FAIXA 2 — GUARNIÇÃO (estado-dependente)
-          _GuarnicaoFaixa(hasVehicle: hasVehicle),
+          _GuarnicaoFaixa(hasVehicle: hasVehicle, dog: dog),
         ],
       ),
     );
@@ -252,8 +252,9 @@ class _BinomioAvatar extends StatelessWidget {
 /// FAIXA 2 — Guarnição: estado-dependente (sem viatura ou embarcado).
 class _GuarnicaoFaixa extends StatelessWidget {
   final bool hasVehicle;
+  final Dog dog;
 
-  const _GuarnicaoFaixa({required this.hasVehicle});
+  const _GuarnicaoFaixa({required this.hasVehicle, required this.dog});
 
   @override
   Widget build(BuildContext context) {
@@ -262,7 +263,10 @@ class _GuarnicaoFaixa extends StatelessWidget {
       switchInCurve: HudCurves.enter,
       switchOutCurve: HudCurves.exit,
       child: hasVehicle
-          ? _GuarnicaoEmbarcada(key: const ValueKey('embarcado'))
+          ? _GuarnicaoEmbarcada(
+              key: const ValueKey('embarcado'),
+              dog: dog,
+            )
           : _GuarnicaoSemViatura(key: const ValueKey('sem_viatura')),
     );
   }
@@ -331,7 +335,9 @@ class _GuarnicaoSemViatura extends StatelessWidget {
 
 /// Estado 2: embarcado — grade 2×2 dos postos.
 class _GuarnicaoEmbarcada extends StatefulWidget {
-  const _GuarnicaoEmbarcada({super.key});
+  final Dog dog;
+
+  const _GuarnicaoEmbarcada({super.key, required this.dog});
 
   @override
   State<_GuarnicaoEmbarcada> createState() => _GuarnicaoEmbarcadaState();
@@ -423,7 +429,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
               ],
             ),
             const SizedBox(height: 10),
-            // Grade 2×2 dos postos
+            // Grade 2×2: planta da viatura
             StreamBuilder<List<VehicleCrewMember>>(
               stream: VehicleCrewService().watchMembers(crewId),
               builder: (context, snapshot) {
@@ -432,10 +438,25 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                   for (final m in members.where((m) => m.isActive)) m.role: m
                 };
 
-                return _MiniPostGrid(
-                  activeMembers: activeMembers,
-                  currentHandlerId: currentHandlerId,
-                  staggerAnimation: _staggerAnimation,
+                return Column(
+                  children: [
+                    // Grade principal (MOT, ENC, AUX1, K9)
+                    _VehicleGrid(
+                      activeMembers: activeMembers,
+                      currentHandlerId: currentHandlerId,
+                      staggerAnimation: _staggerAnimation,
+                      dog: widget.dog,
+                      dogName: widget.dog.name,
+                    ),
+                    // Linha AUX2 se ocupado (senao invisivel)
+                    if (activeMembers.containsKey('auxiliar_2')) ...[
+                      const SizedBox(height: 6),
+                      _Aux2CompactRow(
+                        member: activeMembers['auxiliar_2']!,
+                        isCurrentUser: activeMembers['auxiliar_2']!.handlerId == currentHandlerId,
+                      ),
+                    ],
+                  ],
                 );
               },
             ),
@@ -446,25 +467,32 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
   }
 }
 
-/// Grade 2×2 dos mini-cards de posto.
-class _MiniPostGrid extends StatelessWidget {
+/// Grade 2×2: planta da viatura.
+/// Layout: MOT (top-left) | ENC (top-right)
+///          AUX1 (bot-left) | K9  (bot-right)
+class _VehicleGrid extends StatelessWidget {
   final Map<String, VehicleCrewMember> activeMembers;
   final String? currentHandlerId;
   final Animation<double> staggerAnimation;
+  final Dog dog;
+  final String dogName;
 
-  const _MiniPostGrid({
+  const _VehicleGrid({
     required this.activeMembers,
     required this.currentHandlerId,
     required this.staggerAnimation,
+    required this.dog,
+    required this.dogName,
   });
 
   @override
   Widget build(BuildContext context) {
-    final roles = [
-      ('encarregado', 0),
-      ('motorista', 1),
-      ('auxiliar_1', 2),
-      ('auxiliar_2', 3),
+    // Indices: 0=MOT, 1=ENC, 2=AUX1, 3=K9
+    final positions = [
+      (CrewPost.motorista, 0),
+      (CrewPost.encarregado, 1),
+      (CrewPost.auxiliar1, 2),
+      (CrewPost.k9, 3),
     ];
 
     return GridView.count(
@@ -474,16 +502,14 @@ class _MiniPostGrid extends StatelessWidget {
       mainAxisSpacing: 6,
       crossAxisSpacing: 6,
       childAspectRatio: 2.2,
-      children: roles.map((r) {
-        final index = r.$2;
-        final role = r.$1;
-        final member = activeMembers[role];
-        final isCurrentUser = member != null && member.handlerId == currentHandlerId;
+      children: positions.map((p) {
+        final post = p.$1;
+        final index = p.$2;
+        final member = activeMembers[post.role];
 
         return AnimatedBuilder(
           animation: staggerAnimation,
           builder: (context, child) {
-            // Stagger: cada card entra com delay progressivo
             final delay = (index * 0.15).clamp(0.0, 0.6);
             final progress = ((staggerAnimation.value - delay) / (1.0 - delay))
                 .clamp(0.0, 1.0);
@@ -492,11 +518,13 @@ class _MiniPostGrid extends StatelessWidget {
               opacity: progress,
               child: Transform.translate(
                 offset: Offset(0, 8 * (1 - progress)),
-                child: _MiniPostCard(
-                  role: role,
-                  member: member,
-                  isCurrentUser: isCurrentUser,
-                ),
+                child: post == CrewPost.k9
+                    ? _K9Card(dog: dog, dogName: dogName)
+                    : _CrewPostCard(
+                        post: post,
+                        member: member,
+                        isCurrentUser: member?.handlerId == currentHandlerId,
+                      ),
               ),
             );
           },
@@ -506,14 +534,143 @@ class _MiniPostGrid extends StatelessWidget {
   }
 }
 
-/// Mini-card de posto para a grade 2×2.
-class _MiniPostCard extends StatelessWidget {
-  final String role;
+/// Card do K9 na grade (baixo-direita) — estilo dourado.
+class _K9Card extends StatelessWidget {
+  final Dog dog;
+  final String dogName;
+
+  const _K9Card({required this.dog, required this.dogName});
+
+  @override
+  Widget build(BuildContext context) {
+    // Cor dourada/ambar para o card K9
+    const k9Color = Color(0xFFD4A017); // dourado-ambar
+    const k9ColorSoft = Color(0xFFFFF3CD); // fundo suave
+
+    // Buscar quem é o condutor deste cão
+    final shiftVM = context.watch<ShiftViewModel>();
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+
+    // Nome do condutor via ShiftViewModel
+    final handlerId = shiftVM.handlerId;
+    final conductorName = handlerId != null
+        ? userVM.displayNameFor(ra: handlerId)
+        : null;
+
+    final hasDog = dog.id.trim().isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: hasDog ? k9ColorSoft : AppTheme.surfacePanelAlt,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasDog ? k9Color.withAlpha(120) : AppTheme.outlineVariant.withAlpha(60),
+        ),
+      ),
+      child: hasDog
+          ? Row(
+              children: [
+                // Avatar do cão
+                _CrewAvatar(
+                  size: 24,
+                  imageUrl: dog.profileImageUrl,
+                  icon: Icons.pets_rounded,
+                  color: k9Color,
+                ),
+                const SizedBox(width: 5),
+                // Info
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        dogName.isNotEmpty ? dogName : dog.name,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (conductorName != null)
+                        Text(
+                          'com $conductorName',
+                          style: GoogleFonts.inter(
+                            color: k9Color,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                // Badge K9
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: k9Color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    'K9',
+                    style: GoogleFonts.robotoMono(
+                      color: k9Color,
+                      fontSize: 7,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.surfacePanelAlt,
+                    border: Border.all(
+                      color: AppTheme.textTertiary.withAlpha(60),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.pets_outlined,
+                    color: AppTheme.textTertiary.withAlpha(80),
+                    size: 11,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'SEM K9',
+                    style: GoogleFonts.robotoMono(
+                      color: AppTheme.textTertiary.withAlpha(100),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Card de posto de tripulante na grade.
+class _CrewPostCard extends StatelessWidget {
+  final CrewPost post;
   final VehicleCrewMember? member;
   final bool isCurrentUser;
 
-  const _MiniPostCard({
-    required this.role,
+  const _CrewPostCard({
+    required this.post,
     required this.member,
     required this.isCurrentUser,
   });
@@ -521,7 +678,6 @@ class _MiniPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOccupied = member != null && member!.isActive;
-    final memberName = member?.name;
     final hasK9 = isOccupied && member!.dogId?.trim().isNotEmpty == true;
 
     return Container(
@@ -539,68 +695,60 @@ class _MiniPostCard extends StatelessWidget {
         ),
       ),
       child: isOccupied
-          ? _OccupiedMiniCard(
-              role: role,
+          ? _OccupiedCrewCard(
+              post: post,
               member: member!,
-              memberName: memberName,
               hasK9: hasK9,
               isCurrentUser: isCurrentUser,
             )
-          : _VacantMiniCard(role: role),
+          : _VacantCrewCard(post: post),
     );
   }
 }
 
-/// Mini-card ocupado.
-class _OccupiedMiniCard extends StatelessWidget {
-  final String role;
+/// Card ocupado com avatar (foto real ou inicial).
+class _OccupiedCrewCard extends StatelessWidget {
+  final CrewPost post;
   final VehicleCrewMember member;
-  final String? memberName;
   final bool hasK9;
   final bool isCurrentUser;
 
-  const _OccupiedMiniCard({
-    required this.role,
+  const _OccupiedCrewCard({
+    required this.post,
     required this.member,
-    required this.memberName,
     required this.hasK9,
     required this.isCurrentUser,
   });
 
   @override
   Widget build(BuildContext context) {
-    final displayName = memberName?.trim().isNotEmpty == true
-        ? memberName!
+    // Nome para display
+    String displayName = member.name?.trim().isNotEmpty == true
+        ? member.name!
         : member.handlerId;
 
-    // Obter iniciais do nome
+    // Buscar foto via UserViewModel
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final user = userVM.findByRa(member.handlerId);
+    final memberPhoto = user?.photoUrl?.trim().isNotEmpty == true
+        ? user!.photoUrl
+        : null;
+
     final initials = _getInitials(displayName);
     final dotColor = isCurrentUser ? AppTheme.primary : AppTheme.success;
 
     return Row(
       children: [
-        // Avatar com iniciais (menor)
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: dotColor.withAlpha(15),
-            border: Border.all(color: dotColor.withAlpha(150)),
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: GoogleFonts.inter(
-                color: dotColor,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
+        // Avatar com foto real ou inicial
+        _CrewAvatar(
+          size: 24,
+          imageUrl: memberPhoto,
+          fallbackText: initials,
+          icon: _postIcon(post),
+          color: dotColor,
         ),
         const SizedBox(width: 5),
-        // Info (nome + função)
+        // Info
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -618,7 +766,7 @@ class _OccupiedMiniCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                _roleLabelUpper(role),
+                post.shortLabel,
                 style: GoogleFonts.robotoMono(
                   color: AppTheme.textTertiary,
                   fontSize: 8,
@@ -629,7 +777,7 @@ class _OccupiedMiniCard extends StatelessWidget {
             ],
           ),
         ),
-        // Badge K9 + dot na mesma linha
+        // Badge K9 + dot
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -665,40 +813,36 @@ class _OccupiedMiniCard extends StatelessWidget {
     );
   }
 
+  IconData _postIcon(CrewPost post) {
+    return switch (post) {
+      CrewPost.motorista => Icons.drive_eta_outlined,
+      CrewPost.encarregado => Icons.star_outline_rounded,
+      CrewPost.auxiliar1 => Icons.person_outline,
+      CrewPost.auxiliar2 => Icons.person_outline,
+      CrewPost.k9 => Icons.pets_outlined,
+    };
+  }
+
   String _getInitials(String name) {
     if (name.isEmpty) return '--';
     final parts = name.trim().split(' ');
     if (parts.length == 1) {
       return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
     }
-    final first = parts.first.substring(0, 1).toUpperCase();
-    final last = parts.last.isNotEmpty ? parts.last.substring(0, 1).toUpperCase() : '';
-    return '$first$last';
-  }
-
-  String _roleLabelUpper(String role) {
-    return switch (role) {
-      'motorista' => 'MOTORISTA',
-      'encarregado' => 'ENCARREGADO',
-      'auxiliar_1' => 'AUXILIAR 1',
-      'auxiliar_2' => 'AUXILIAR 2',
-      'k9' => 'K9',
-      _ => role.toUpperCase(),
-    };
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
 
-/// Mini-card vago.
-class _VacantMiniCard extends StatelessWidget {
-  final String role;
+/// Card vago.
+class _VacantCrewCard extends StatelessWidget {
+  final CrewPost post;
 
-  const _VacantMiniCard({required this.role});
+  const _VacantCrewCard({required this.post});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Slot dashed (menor)
         Container(
           width: 24,
           height: 24,
@@ -707,18 +851,15 @@ class _VacantMiniCard extends StatelessWidget {
             color: AppTheme.surfacePanelAlt,
             border: Border.all(
               color: AppTheme.textTertiary.withAlpha(60),
-              width: 1,
-              strokeAlign: BorderSide.strokeAlignInside,
             ),
           ),
           child: Icon(
-            _roleIcon(role),
+            _postIcon(post),
             color: AppTheme.textTertiary.withAlpha(80),
             size: 11,
           ),
         ),
         const SizedBox(width: 5),
-        // Info compacta
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -736,14 +877,13 @@ class _VacantMiniCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                _roleLabelUpper(role),
+                post.shortLabel,
                 style: GoogleFonts.robotoMono(
                   color: AppTheme.textTertiary.withAlpha(100),
                   fontSize: 8,
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -752,26 +892,168 @@ class _VacantMiniCard extends StatelessWidget {
     );
   }
 
-  String _roleLabelUpper(String role) {
-    return switch (role) {
-      'motorista' => 'MOTORISTA',
-      'encarregado' => 'ENCARREGADO',
-      'auxiliar_1' => 'AUXILIAR 1',
-      'auxiliar_2' => 'AUXILIAR 2',
-      'k9' => 'K9',
-      _ => role.toUpperCase(),
+  IconData _postIcon(CrewPost post) {
+    return switch (post) {
+      CrewPost.motorista => Icons.drive_eta_outlined,
+      CrewPost.encarregado => Icons.star_outline_rounded,
+      CrewPost.auxiliar1 => Icons.person_outline,
+      CrewPost.auxiliar2 => Icons.person_outline,
+      CrewPost.k9 => Icons.pets_outlined,
     };
   }
+}
 
-  IconData _roleIcon(String role) {
-    return switch (role) {
-      'motorista' => Icons.drive_eta_outlined,
-      'encarregado' => Icons.star_outline_rounded,
-      'auxiliar_1' => Icons.person_outline,
-      'auxiliar_2' => Icons.person_outline,
-      'k9' => Icons.pets_outlined,
-      _ => Icons.person_outline,
-    };
+/// Avatar genérico: foto ou fallback com texto/ícone.
+class _CrewAvatar extends StatelessWidget {
+  final double size;
+  final String? imageUrl;
+  final String? fallbackText;
+  final IconData icon;
+  final Color color;
+
+  const _CrewAvatar({
+    required this.size,
+    this.imageUrl,
+    this.fallbackText,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = imageUrl?.trim().isNotEmpty == true;
+
+    if (hasPhoto) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withAlpha(15),
+          border: Border.all(color: color.withAlpha(150)),
+        ),
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: imageUrl!,
+            fit: BoxFit.cover,
+            errorWidget: (_, __, _) => _fallbackWidget,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withAlpha(15),
+        border: Border.all(color: color.withAlpha(150)),
+      ),
+      child: Center(child: _fallbackWidget),
+    );
+  }
+
+  Widget get _fallbackWidget {
+    if (fallbackText != null && fallbackText!.isNotEmpty) {
+      return Text(
+        fallbackText!,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+    }
+    return Icon(icon, color: color, size: size * 0.5);
+  }
+}
+
+/// Linha compacta para AUX2 quando ocupado.
+class _Aux2CompactRow extends StatelessWidget {
+  final VehicleCrewMember member;
+  final bool isCurrentUser;
+
+  const _Aux2CompactRow({
+    required this.member,
+    required this.isCurrentUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = member.name?.trim().isNotEmpty == true
+        ? member.name!
+        : member.handlerId;
+    // Buscar foto via UserViewModel
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final user = userVM.findByRa(member.handlerId);
+    final memberPhoto = user?.photoUrl?.trim().isNotEmpty == true
+        ? user!.photoUrl
+        : null;
+    final dotColor = isCurrentUser ? AppTheme.primary : AppTheme.success;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.surfacePanel,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isCurrentUser
+              ? AppTheme.primary.withAlpha(180)
+              : AppTheme.outlineVariant,
+          width: isCurrentUser ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          _CrewAvatar(
+            size: 20,
+            imageUrl: memberPhoto,
+            fallbackText: _getInitials(displayName),
+            icon: Icons.person_outline,
+            color: dotColor,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            displayName,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'AUXILIAR 2',
+            style: GoogleFonts.robotoMono(
+              color: AppTheme.textTertiary,
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: dotColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '--';
+    final parts = name.trim().split(' ');
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+    }
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
 

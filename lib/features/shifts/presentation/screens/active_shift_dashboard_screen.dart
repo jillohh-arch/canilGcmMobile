@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/config/crew_composition.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/theme/animation_constants.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';

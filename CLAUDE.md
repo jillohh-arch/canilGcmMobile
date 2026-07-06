@@ -90,3 +90,36 @@ Sempre manual pelo usuário, sempre do repo mobile, nunca automático.
 O deploy de rules é irreversível a curto prazo (pode bloquear todas as
 escritas de todos os usuários simultaneamente). O usuário deploya após
 conferir o diff.
+
+---
+
+## Roadmap / Visão de produto
+
+### Composição de guarnição configurável por corporação
+**Validação de mercado: 07/2026** — Em evento com corporações de outros
+municípios, confirmou-se que a composição típica de guarnição K9 no mercado é
+**2-3 humanos + cão**; 4 humanos é exceção de cidades grandes (onde o cão vai
+em compartimento próprio).
+
+**Objetivo:** permitir que cada corporação configure a exibição da guarnição sem
+mudar o modelo de dados (roles).
+
+| Configuração | Descrição |
+|---|---|
+| Postos exibidos | Quais roles aparecem no card e em qual ordem |
+| Obratórios para OPERACIONAL | Hoje: motorista + encarregado |
+| Postos condicionais | Hoje: Auxiliar 2 (só aparece se ocupado) |
+| Posição do K9 | Hoje: baixo-direita na grade; pode variar |
+
+**Arquitetura:**
+- `lib/core/config/crew_composition.dart` — ponto central de configuração
+- Domain continua com roles string (`motorista`, `encarregado`, `auxiliar_1`, etc.)
+- UI (card, sheet) lê da configuração, não de listas hardcoded
+- **Futuro:** doc de config da corporação lido no boot via Firestore ou JSON
+- **Futuro:** tela de configuração para admin da corporação
+
+**Implementado (07/2026):**
+- `CrewComposition` com `gridPosts`, `compactPosts`, `requiredForOperational`
+- Enum `CrewPost` com `role`, `displayName`, `shortLabel`
+- Card unificado EM SERVIÇO com planta da viatura (MOT/ENC/AUX1/K9)
+- AUX2 como linha compacta só quando ocupado
