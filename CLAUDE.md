@@ -1,5 +1,9 @@
 # Canil GCM — Contexto e Padrões
 
+> **PENDÊNCIAS CONHECIDAS:** consultar [BACKLOG.md](./BACKLOG.md) antes de
+> propor trabalho novo. Lá estão as tasks pendentes em rules, mobile, web e
+> produto — e o histórico do que já foi concluído.
+
 ## Lições aprendidas
 
 ### Erro de permissão nunca degrada silenciosamente

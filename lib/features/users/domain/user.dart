@@ -11,6 +11,13 @@ class UserModel {
   final String? shiftGroupName;
   final int? shiftGroupStartHour;
   final int? shiftGroupEndHour;
+  /// Capacitações do condutor — valores literais vindos do painel web.
+  /// Ex: "Condutor K9", "Adestramento", "Figuração", "Apoio operacional",
+  /// "Veterinário", "Administrativo".
+  /// IMPORTANTE: a comparação em isCondutorK9 usa o literal exato
+  /// "Condutor K9" — se o painel web normalizar (ex: minúsculas, sem
+  /// acento, kebab-case), isso é breaking e deve ser corrigido aqui.
+  final List<String> specialties;
 
   UserModel({
     required this.ra,
@@ -25,6 +32,7 @@ class UserModel {
     this.shiftGroupName,
     this.shiftGroupStartHour,
     this.shiftGroupEndHour,
+    this.specialties = const [],
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +51,10 @@ class UserModel {
       shiftGroupName: json['shift_group_name'],
       shiftGroupStartHour: json['shift_group_start_hour'],
       shiftGroupEndHour: json['shift_group_end_hour'],
+      specialties: (json['specialties'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -60,6 +72,7 @@ class UserModel {
       'shift_group_name': shiftGroupName,
       'shift_group_start_hour': shiftGroupStartHour,
       'shift_group_end_hour': shiftGroupEndHour,
+      'specialties': specialties,
     };
   }
 
@@ -76,6 +89,7 @@ class UserModel {
     Object? shiftGroupName = _sentinel,
     Object? shiftGroupStartHour = _sentinel,
     Object? shiftGroupEndHour = _sentinel,
+    Object? specialties = _sentinel,
   }) {
     return UserModel(
       ra: ra ?? this.ra,
@@ -100,6 +114,9 @@ class UserModel {
       shiftGroupEndHour: shiftGroupEndHour == _sentinel
           ? this.shiftGroupEndHour
           : shiftGroupEndHour as int?,
+      specialties: specialties == _sentinel
+          ? this.specialties
+          : specialties as List<String>,
     );
   }
 
@@ -109,6 +126,10 @@ class UserModel {
     final end = shiftGroupEndHour.toString().padLeft(2, '0');
     return '$start:00 - $end:00';
   }
+
+  /// true se o usuário tem a capacitação "Condutor K9".
+  /// Verificar comentários do campo specialties sobre dependência do literal.
+  bool get isCondutorK9 => specialties.contains('Condutor K9');
 
   static const _sentinel = Object();
 }

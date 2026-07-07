@@ -232,7 +232,7 @@ class _BinomioAvatar extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, _) => Icon(icon, color: accent, size: iconSize),
+                errorWidget: (_, _, _) => Icon(icon, color: accent, size: iconSize),
               )
             : Icon(icon, color: accent, size: iconSize),
       ),
@@ -499,9 +499,9 @@ class _VehicleGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      mainAxisSpacing: 6,
-      crossAxisSpacing: 6,
-      childAspectRatio: 2.2,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 2.0, // Cards mais altos para a foto respirar (~95px)
       children: positions.map((p) {
         final post = p.$1;
         final index = p.$2;
@@ -534,7 +534,7 @@ class _VehicleGrid extends StatelessWidget {
   }
 }
 
-/// Card do K9 na grade (baixo-direita) — estilo dourado.
+/// Card do K9 na grade (baixo-direita) — acento teal/cyan quente, sem dourado.
 class _K9Card extends StatelessWidget {
   final Dog dog;
   final String dogName;
@@ -543,15 +543,14 @@ class _K9Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cor dourada/ambar para o card K9
-    const k9Color = Color(0xFFD4A017); // dourado-ambar
-    const k9ColorSoft = Color(0xFFFFF3CD); // fundo suave
+    // Acento teal diferenciado — não briga com o dark navy nem com cyan puro
+    const k9Accent = Color(0xFF26C6DA); // cyan mais quente
+    const k9AccentBg = Color(0xFF0A2E35); // background card
 
     // Buscar quem é o condutor deste cão
     final shiftVM = context.watch<ShiftViewModel>();
     final userVM = Provider.of<UserViewModel>(context, listen: false);
 
-    // Nome do condutor via ShiftViewModel
     final handlerId = shiftVM.handlerId;
     final conductorName = handlerId != null
         ? userVM.displayNameFor(ra: handlerId)
@@ -560,25 +559,24 @@ class _K9Card extends StatelessWidget {
     final hasDog = dog.id.trim().isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: hasDog ? k9ColorSoft : AppTheme.surfacePanelAlt,
-        borderRadius: BorderRadius.circular(8),
+        color: hasDog ? k9AccentBg : AppTheme.surfacePanelAlt,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: hasDog ? k9Color.withAlpha(120) : AppTheme.outlineVariant.withAlpha(60),
+          color: hasDog ? k9Accent.withAlpha(100) : AppTheme.outlineVariant.withAlpha(60),
         ),
       ),
       child: hasDog
           ? Row(
               children: [
-                // Avatar do cão
-                _CrewAvatar(
-                  size: 24,
+                // Foto do cão — retangular crachá (~3:4)
+                _K9Photo(
+                  size: 56,
                   imageUrl: dog.profileImageUrl,
-                  icon: Icons.pets_rounded,
-                  color: k9Color,
+                  accent: k9Accent,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 8),
                 // Info
                 Expanded(
                   child: Column(
@@ -586,75 +584,92 @@ class _K9Card extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Título K9 no topo (mono, pequeno)
+                      Text(
+                        'K9',
+                        style: GoogleFonts.robotoMono(
+                          color: k9Accent.withAlpha(140),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
                       Text(
                         dogName.isNotEmpty ? dogName : dog.name,
                         style: GoogleFonts.inter(
                           color: AppTheme.textPrimary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (conductorName != null)
+                      if (conductorName != null) ...[
+                        const SizedBox(height: 1),
                         Text(
                           'com $conductorName',
                           style: GoogleFonts.inter(
-                            color: k9Color,
-                            fontSize: 8,
+                            color: k9Accent,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                      ],
                     ],
-                  ),
-                ),
-                // Badge K9
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: k9Color.withAlpha(25),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    'K9',
-                    style: GoogleFonts.robotoMono(
-                      color: k9Color,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w800,
-                    ),
                   ),
                 ),
               ],
             )
           : Row(
               children: [
+                // Placeholder dashed
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: 40,
+                  height: 52,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(6),
                     color: AppTheme.surfacePanelAlt,
                     border: Border.all(
                       color: AppTheme.textTertiary.withAlpha(60),
+                      width: 1.5,
+                      strokeAlign: BorderSide.strokeAlignInside,
                     ),
                   ),
                   child: Icon(
                     Icons.pets_outlined,
                     color: AppTheme.textTertiary.withAlpha(80),
-                    size: 11,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'SEM K9',
-                    style: GoogleFonts.robotoMono(
-                      color: AppTheme.textTertiary.withAlpha(100),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'K9',
+                        style: GoogleFonts.robotoMono(
+                          color: AppTheme.textTertiary.withAlpha(100),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'SEM K9',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textTertiary.withAlpha(100),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -664,6 +679,8 @@ class _K9Card extends StatelessWidget {
 }
 
 /// Card de posto de tripulante na grade.
+/// Layout: foto grande retangular à esquerda (~3:4), texto à direita.
+/// Altura do card ≈ 95px para a foto respirar.
 class _CrewPostCard extends StatelessWidget {
   final CrewPost post;
   final VehicleCrewMember? member;
@@ -681,10 +698,10 @@ class _CrewPostCard extends StatelessWidget {
     final hasK9 = isOccupied && member!.dogId?.trim().isNotEmpty == true;
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: isOccupied ? AppTheme.surfacePanel : AppTheme.surfacePanelAlt,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isCurrentUser
               ? AppTheme.primary.withAlpha(180)
@@ -706,7 +723,11 @@ class _CrewPostCard extends StatelessWidget {
   }
 }
 
-/// Card ocupado com avatar (foto real ou inicial).
+/// Card ocupado com foto grande retangular estilo crachá.
+/// Layout: foto à esquerda (proporção ~3:4, altura ≈ altura do card) |
+///          título do POSTO (mono, caixa alta, esmaecido)
+///          NOME COMPLETO (ellipsis se não couber)
+///          badges CONDUTOR + K9 + dot de status
 class _OccupiedCrewCard extends StatelessWidget {
   final CrewPost post;
   final VehicleCrewMember member;
@@ -734,93 +755,89 @@ class _OccupiedCrewCard extends StatelessWidget {
         ? user!.photoUrl
         : null;
 
+    // isCondutorK9 vem de specialties do UserModel — campo specialties[] no Firestore.
+    final isCondutorK9 = user?.isCondutorK9 ?? false;
+
     final initials = _getInitials(displayName);
     final dotColor = isCurrentUser ? AppTheme.primary : AppTheme.success;
 
     return Row(
       children: [
-        // Avatar com foto real ou inicial
-        _CrewAvatar(
-          size: 24,
+        // Foto grande retangular estilo crachá (~3:4)
+        _CrewBadgePhoto(
+          width: 52,
+          height: 68,
           imageUrl: memberPhoto,
           fallbackText: initials,
-          icon: _postIcon(post),
-          color: dotColor,
+          accent: dotColor,
         ),
-        const SizedBox(width: 5),
-        // Info
+        const SizedBox(width: 8),
+        // Info à direita
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Título do POSTO no topo — mono, caixa alta, esmaecido
+              Text(
+                post.displayName.toUpperCase(),
+                style: GoogleFonts.robotoMono(
+                  color: AppTheme.textTertiary.withAlpha(120),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // Nome completo — ellipsis se não couber
               Text(
                 displayName,
                 style: GoogleFonts.inter(
                   color: AppTheme.textPrimary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                post.shortLabel,
-                style: GoogleFonts.robotoMono(
-                  color: AppTheme.textTertiary,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
+              const SizedBox(height: 4),
+              // Linha de badges: CONDUTOR + K9 + dot
+              Row(
+                children: [
+                  // CONDUTOR badge — cyan outline (se o membro tem "Condutor K9" em specialties)
+                  if (isCondutorK9) ...[
+                    _BadgeCondutor(),
+                    const SizedBox(width: 4),
+                  ],
+                  // K9 badge — cyan sólido (se este membro tem cão embarcado)
+                  if (hasK9) ...[
+                    _BadgeK9(),
+                    const SizedBox(width: 4),
+                  ],
+                  // Dot de status
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: dotColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: dotColor.withAlpha(100),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        // Badge K9 + dot
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasK9) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withAlpha(20),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  'K9',
-                  style: GoogleFonts.robotoMono(
-                    color: AppTheme.primary,
-                    fontSize: 7,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 3),
-            ],
-            Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: dotColor,
-              ),
-            ),
-          ],
-        ),
       ],
     );
-  }
-
-  IconData _postIcon(CrewPost post) {
-    return switch (post) {
-      CrewPost.motorista => Icons.drive_eta_outlined,
-      CrewPost.encarregado => Icons.star_outline_rounded,
-      CrewPost.auxiliar1 => Icons.person_outline,
-      CrewPost.auxiliar2 => Icons.person_outline,
-      CrewPost.k9 => Icons.pets_outlined,
-    };
   }
 
   String _getInitials(String name) {
@@ -833,7 +850,56 @@ class _OccupiedCrewCard extends StatelessWidget {
   }
 }
 
-/// Card vago.
+/// Badge "CONDUTOR" — cyan outline.
+class _BadgeCondutor extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppTheme.primary.withAlpha(140), width: 1),
+      ),
+      child: Text(
+        'CONDUTOR',
+        style: GoogleFonts.robotoMono(
+          color: AppTheme.primary,
+          fontSize: 7,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge "K9" — cyan sólido.
+class _BadgeK9 extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withAlpha(30),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'K9',
+        style: GoogleFonts.robotoMono(
+          color: AppTheme.primary,
+          fontSize: 7,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Card vago com placeholder dashed estilo crachá.
+/// Layout: foto vazia dashed à esquerda | título POSTO no topo |
+///          "POSTO VAGO" esmaecido | título do posto abaixo
 class _VacantCrewCard extends StatelessWidget {
   final CrewPost post;
 
@@ -843,43 +909,60 @@ class _VacantCrewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        // Placeholder dashed — formato retangular crachá (~3:4)
         Container(
-          width: 24,
-          height: 24,
+          width: 52,
+          height: 68,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(8),
             color: AppTheme.surfacePanelAlt,
             border: Border.all(
               color: AppTheme.textTertiary.withAlpha(60),
+              width: 1.5,
+              strokeAlign: BorderSide.strokeAlignInside,
+              // dashed simulation via custom painting would need CustomPainter;
+              // settling for subtle dashed look via lighter border
             ),
           ),
           child: Icon(
             _postIcon(post),
             color: AppTheme.textTertiary.withAlpha(80),
-            size: 11,
+            size: 22,
           ),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Título do posto no topo — esmaecido
+              Text(
+                post.displayName.toUpperCase(),
+                style: GoogleFonts.robotoMono(
+                  color: AppTheme.textTertiary.withAlpha(80),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(
                 'POSTO VAGO',
-                style: GoogleFonts.robotoMono(
+                style: GoogleFonts.inter(
                   color: AppTheme.textTertiary.withAlpha(150),
-                  fontSize: 9,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 4),
               Text(
                 post.shortLabel,
                 style: GoogleFonts.robotoMono(
-                  color: AppTheme.textTertiary.withAlpha(100),
+                  color: AppTheme.textTertiary.withAlpha(80),
                   fontSize: 8,
                   fontWeight: FontWeight.w500,
                 ),
@@ -903,73 +986,114 @@ class _VacantCrewCard extends StatelessWidget {
   }
 }
 
-/// Avatar genérico: foto ou fallback com texto/ícone.
-class _CrewAvatar extends StatelessWidget {
-  final double size;
+/// Foto estilo crachá: retangular (~3:4), cantos arredondados.
+/// Fallback: bloco com inicial do nome.
+class _CrewBadgePhoto extends StatelessWidget {
+  final double width;
+  final double height;
   final String? imageUrl;
   final String? fallbackText;
-  final IconData icon;
-  final Color color;
+  final Color accent;
 
-  const _CrewAvatar({
-    required this.size,
+  const _CrewBadgePhoto({
+    required this.width,
+    required this.height,
     this.imageUrl,
     this.fallbackText,
-    required this.icon,
-    required this.color,
+    required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasPhoto = imageUrl?.trim().isNotEmpty == true;
 
-    if (hasPhoto) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withAlpha(15),
-          border: Border.all(color: color.withAlpha(150)),
-        ),
-        child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: imageUrl!,
-            fit: BoxFit.cover,
-            errorWidget: (_, __, _) => _fallbackWidget,
-          ),
-        ),
-      );
-    }
-
     return Container(
-      width: size,
-      height: size,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withAlpha(15),
-        border: Border.all(color: color.withAlpha(150)),
+        borderRadius: BorderRadius.circular(8),
+        color: accent.withAlpha(15),
+        border: Border.all(
+          color: accent.withAlpha(120),
+          width: 1,
+        ),
       ),
-      child: Center(child: _fallbackWidget),
+      clipBehavior: Clip.antiAlias,
+      child: hasPhoto
+          ? CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => _fallbackWidget,
+            )
+          : _fallbackWidget,
     );
   }
 
   Widget get _fallbackWidget {
-    if (fallbackText != null && fallbackText!.isNotEmpty) {
-      return Text(
-        fallbackText!,
+    final text = fallbackText?.isNotEmpty == true ? fallbackText! : '--';
+    return Center(
+      child: Text(
+        text,
         style: GoogleFonts.inter(
-          color: color,
-          fontSize: size * 0.36,
-          fontWeight: FontWeight.w800,
+          color: accent,
+          fontSize: height * 0.28,
+          fontWeight: FontWeight.w900,
         ),
-      );
-    }
-    return Icon(icon, color: color, size: size * 0.5);
+      ),
+    );
   }
 }
 
-/// Linha compacta para AUX2 quando ocupado.
+/// Foto estilo crachá para o cão K9.
+class _K9Photo extends StatelessWidget {
+  final double size;
+  final String? imageUrl;
+  final Color accent;
+
+  const _K9Photo({
+    required this.size,
+    this.imageUrl,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = imageUrl?.trim().isNotEmpty == true;
+    // height = width * 4/3 para proporção ~3:4
+    final height = size * 4 / 3;
+
+    return Container(
+      width: size,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: accent.withAlpha(15),
+        border: Border.all(
+          color: accent.withAlpha(120),
+          width: 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hasPhoto
+          ? CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => _fallbackWidget,
+            )
+          : _fallbackWidget,
+    );
+  }
+
+  Widget get _fallbackWidget {
+    return Icon(
+      Icons.pets_rounded,
+      color: accent.withAlpha(160),
+      size: size * 0.5,
+    );
+  }
+}
+
+/// Linha compacta para AUX2 quando ocupado — novo estilo com foto crachá.
 class _Aux2CompactRow extends StatelessWidget {
   final VehicleCrewMember member;
   final bool isCurrentUser;
@@ -991,12 +1115,13 @@ class _Aux2CompactRow extends StatelessWidget {
         ? user!.photoUrl
         : null;
     final dotColor = isCurrentUser ? AppTheme.primary : AppTheme.success;
+    final initials = _getInitials(displayName);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.surfacePanel,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isCurrentUser
               ? AppTheme.primary.withAlpha(180)
@@ -1006,40 +1131,49 @@ class _Aux2CompactRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _CrewAvatar(
-            size: 20,
+          // Foto crachá compacta
+          _CrewBadgePhoto(
+            width: 36,
+            height: 48,
             imageUrl: memberPhoto,
-            fallbackText: _getInitials(displayName),
-            icon: Icons.person_outline,
-            color: dotColor,
+            fallbackText: initials,
+            accent: dotColor,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
             displayName,
             style: GoogleFonts.inter(
               color: AppTheme.textPrimary,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
             'AUXILIAR 2',
             style: GoogleFonts.robotoMono(
-              color: AppTheme.textTertiary,
+              color: AppTheme.textTertiary.withAlpha(150),
               fontSize: 8,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
           const Spacer(),
           Container(
-            width: 5,
-            height: 5,
+            width: 7,
+            height: 7,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: dotColor,
+              boxShadow: [
+                BoxShadow(
+                  color: dotColor.withAlpha(100),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
           ),
         ],

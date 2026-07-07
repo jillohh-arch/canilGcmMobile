@@ -1606,9 +1606,44 @@ service cloud.firestore {
 
     match /users/{ra} {
       allow read: if signedIn();
-      allow create: if emailMatchesRa(ra) && canCreateAuditedRecord();
+      // campos pessoais editáveis pelo próprio usuário no app
+      allow create: if emailMatchesRa(ra)
+        && canCreateAuditedRecord()
+        && request.resource.data.keys().hasOnly([
+          'ra',
+          'name',
+          'callsign',
+          'unit',
+          'photoUrl',
+          'shift_group_id',
+          'shift_group_name',
+          'shift_group_start_hour',
+          'shift_group_end_hour',
+          'updated_at',
+          'audit_trail'
+        ]);
+      // campos administrativos (accessLevel, specialties, is_k9_instructor,
+      // training_role, roles) são soberania do painel web via adminUpsertHuman
+      // (Admin SDK — ignora rules). NÃO adicionar esses campos aqui.
       allow update: if emailMatchesRa(ra)
-        && (canUpdateUserProfile() || canSoftDeleteUser());
+        && (
+          (
+            appendsInlineAuditOnUpdate()
+            && changedKeys().hasOnly([
+              'name',
+              'callsign',
+              'unit',
+              'photoUrl',
+              'shift_group_id',
+              'shift_group_name',
+              'shift_group_start_hour',
+              'shift_group_end_hour',
+              'updated_at',
+              'audit_trail'
+            ])
+          )
+          || canSoftDeleteUser()
+        );
       allow delete: if false;
 
       match /certifications/{recordId} {
@@ -2026,10 +2061,24 @@ service cloud.firestore {
 
     match /documentos/{docId} {
       allow read: if signedIn() && canAccessDogData(resource.data);
-      allow create: if canAccessDogData(request.resource.data)
-        && canCreateDogDocument();
-      allow update: if canAccessDogData(request.resource.data)
-        && canUpdateAuditedOrSoftDelete();
+      allow create: if signedIn()
+        && canCreateAuditedRecord()
+        && request.resource.data.keys().hasOnly([
+          'caoId', 'nome', 'descricao', 'tipo', 'url',
+          'dataUpload', 'emissor', 'audit_trail'
+        ])
+        && request.resource.data.caoId is string
+        && request.resource.data.caoId.size() > 0
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.tipo is string
+        && request.resource.data.url is string
+        && request.resource.data.dataUpload is timestamp;
+      allow update: if signedIn()
+        && canUpdateAuditedRecord()
+        && changedKeys().hasOnly([
+          'nome', 'descricao', 'tipo', 'emissor', 'audit_trail'
+        ]);
       allow delete: if false;
     }
 
@@ -2038,6 +2087,39 @@ service cloud.firestore {
       allow create: if canCreateNotification(userId);
       allow update: if emailMatchesRa(userId) && canUpdateOwnNotification();
       allow delete: if false;
+    }
+
+    // ── Coleções legadas (somente leitura) ──────────────────────────────────
+    // Lidas pelo app mas sem regras explícitas até esta versão.
+    // Nenhum write pelo app mobile — eventuais migrações via Admin SDK.
+    match /alertas/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /atalhos_registro/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /registros/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /climaAtual/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /vacinas/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /training_specialties/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
     }
 
     match /{document=**} {

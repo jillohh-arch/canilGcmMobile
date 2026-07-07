@@ -27,10 +27,24 @@ class UserService {
     final docRef = _db.collection('users').doc(user.ra);
     final snapshot = await docRef.get();
     final entry = AuditService.buildInlineEntry(action: 'updated');
+    // Campos administrativos (accessLevel, specialties, is_k9_instructor,
+    // training_role, access_profile*, role, admin, auth_uid) são soberania
+    // do painel web via Cloud Function adminUpsertHuman (Admin SDK).
+    // NÃO reintroduzir esses campos neste payload.
     await docRef.set({
-      ...user.toJson(),
-      'updated_at': FieldValue.serverTimestamp(),
-      'audit_trail': snapshot.exists ? FieldValue.arrayUnion([entry]) : [entry],
+      'ra':                     user.ra,
+      'name':                   user.name,
+      'callsign':               user.callsign,
+      'unit':                   user.unit,
+      'photoUrl':               user.photoUrl,
+      'shift_group_id':         user.shiftGroupId,
+      'shift_group_name':       user.shiftGroupName,
+      'shift_group_start_hour': user.shiftGroupStartHour,
+      'shift_group_end_hour':   user.shiftGroupEndHour,
+      'updated_at':  FieldValue.serverTimestamp(),
+      'audit_trail': snapshot.exists
+          ? FieldValue.arrayUnion([entry])
+          : [entry],
     }, SetOptions(merge: true));
   }
 
