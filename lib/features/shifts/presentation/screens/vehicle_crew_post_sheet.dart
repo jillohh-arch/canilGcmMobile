@@ -534,7 +534,7 @@ class _PostBoardStep extends StatelessWidget {
 }
 
 /// Header do quadro de postos com status OPERACIONAL/INCOMPLETA.
-class _PostBoardHeader extends StatelessWidget {
+class _PostBoardHeader extends StatefulWidget {
   final Vehicle vehicle;
   final VehicleCrewService crewService;
 
@@ -544,9 +544,28 @@ class _PostBoardHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final crewId = vehicle.id;
+  State<_PostBoardHeader> createState() => _PostBoardHeaderState();
+}
 
+class _PostBoardHeaderState extends State<_PostBoardHeader> {
+  late Future<String> _statusFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statusFuture = widget.crewService.getCrewOperationalStatus(widget.vehicle.id);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PostBoardHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.vehicle.id != widget.vehicle.id) {
+      _statusFuture = widget.crewService.getCrewOperationalStatus(widget.vehicle.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -559,16 +578,16 @@ class _PostBoardHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      vehicle.label,
+                      widget.vehicle.label,
                       style: GoogleFonts.robotoMono(
                         color: AppTheme.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (vehicle.modelName.isNotEmpty)
+                    if (widget.vehicle.modelName.isNotEmpty)
                       Text(
-                        vehicle.modelName,
+                        widget.vehicle.modelName,
                         style: GoogleFonts.inter(
                           color: AppTheme.textTertiary,
                           fontSize: 11,
@@ -577,9 +596,9 @@ class _PostBoardHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              // Status chip
+              // Status chip — future cached in initState
               FutureBuilder<String>(
-                future: crewService.getCrewOperationalStatus(crewId),
+                future: _statusFuture,
                 builder: (context, snapshot) {
                   final status = snapshot.data ?? 'empty';
                   return _OperationalStatusChip(status: status);

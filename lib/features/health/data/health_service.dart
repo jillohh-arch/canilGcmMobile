@@ -78,14 +78,14 @@ class HealthService {
         .doc(dogId)
         .collection('health_events');
 
-    final activeQuery = SoftDeletable.activeOnly(query);
+    final activeQuery = SoftDeletable.activeOnly(query)
+        .orderBy('date', descending: true)
+        .limit(50);
     final snapshot = await activeQuery.get();
 
-    final logs = snapshot.docs
+    return snapshot.docs
         .map((doc) => HealthLogModel.fromJson(doc.data(), doc.id))
         .toList();
-    logs.sort((a, b) => b.date.compareTo(a.date));
-    return logs;
   }
 
   Map<String, dynamic> _auditHealthSnapshot(Map<String, dynamic> data) {

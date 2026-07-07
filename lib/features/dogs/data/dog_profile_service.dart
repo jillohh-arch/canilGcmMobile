@@ -172,7 +172,7 @@ class DogProfileService {
           .map((doc) => VaccineRecord.fromJson(doc.data(), doc.id))
           .toList();
     } on FirebaseException catch (e) {
-      debugPrint('[STREAM] vacinas falhou [${e.code}]: ${e.message}');
+      debugPrint('[DogProfileService] vacinas query composta falhou [${e.code}]: ${e.message}');
       // Fallback: sem orderBy (índice composto pode não existir)
       try {
         final snapshot = await _db
@@ -187,18 +187,10 @@ class DogProfileService {
         vaccines.sort((a, b) => b.dataVencimento.compareTo(a.dataVencimento));
         return vaccines;
       } on FirebaseException catch (e2) {
-        debugPrint('[STREAM] vacinas (fallback) falhou [${e2.code}]: ${e2.message}');
-        // Último fallback: busca todas e filtra localmente
-        final snapshot = await _db.collection('vacinas').get();
-        final vaccines = snapshot.docs
-            .where((doc) {
-              final data = doc.data();
-              return data['caoId'] == dogId && data['ativo'] == true;
-            })
-            .map((doc) => VaccineRecord.fromJson(doc.data(), doc.id))
-            .toList();
-        vaccines.sort((a, b) => b.dataVencimento.compareTo(a.dataVencimento));
-        return vaccines;
+        debugPrint('[DogProfileService] vacinas fallback falhou [${e2.code}]: ${e2.message}');
+        // Se query simples (where caoId) falhou, problema é rede/permissão —
+        // full-scan não resolveria e puxaria a coleção inteira.
+        rethrow;
       }
     }
   }

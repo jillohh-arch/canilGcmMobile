@@ -347,6 +347,11 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
     with SingleTickerProviderStateMixin {
   late AnimationController _staggerController;
   late Animation<double> _staggerAnimation;
+  final _crewService = VehicleCrewService();
+
+  String? _crewId;
+  Stream<List<VehicleCrewMember>>? _membersStream;
+  Future<String>? _statusFuture;
 
   @override
   void initState() {
@@ -374,6 +379,13 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
     final crewId = shiftVM.vehicleCrewId!;
     final vehicleLabel = shiftVM.vehicleLabel?.trim();
     final currentHandlerId = shiftVM.handlerId;
+
+    // Cache the stream and status — only recreate if crewId changes
+    if (_crewId != crewId) {
+      _crewId = crewId;
+      _membersStream = _crewService.watchMembers(crewId);
+      _statusFuture = _crewService.getCrewOperationalStatus(crewId);
+    }
 
     return GestureDetector(
       onTap: () {
@@ -414,7 +426,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                 ],
                 // Status chip
                 FutureBuilder<String>(
-                  future: VehicleCrewService().getCrewOperationalStatus(crewId),
+                  future: _statusFuture,
                   builder: (context, snap) {
                     final status = snap.data ?? 'empty';
                     return _StatusChip(status: status);
@@ -431,7 +443,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
             const SizedBox(height: 10),
             // Grade 2×2: planta da viatura
             StreamBuilder<List<VehicleCrewMember>>(
-              stream: VehicleCrewService().watchMembers(crewId),
+              stream: _membersStream,
               builder: (context, snapshot) {
                 final members = snapshot.data ?? [];
                 final activeMembers = {

@@ -444,7 +444,7 @@ class _DetectionSpecialtyRow extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            _DetectionMetaFromLines(dogId: specialty.dogId),
+                            _DetectionMetaFromLines(dogId: specialty.dogId, lines: lines),
                           ],
                         ),
                       ),
@@ -695,15 +695,22 @@ Widget _buildSpecialtyMeta(
   );
 }
 
-/// Widget que lê as detection_lines reais do Firestore e monta o resumo
-/// derivado (ex: "Drogas: operacional · Armas/Cadáver: não iniciadas").
+/// Widget que mostra o resumo derivado das detection_lines
+/// (ex: "Drogas: operacional · Armas/Cadáver: não iniciadas").
+///
+/// Se [lines] for fornecido, renderiza direto sem abrir stream.
+/// Caso contrário, abre stream via [dogId].
 class _DetectionMetaFromLines extends StatelessWidget {
   final String dogId;
+  final List<DetectionLine>? lines;
 
-  const _DetectionMetaFromLines({required this.dogId});
+  const _DetectionMetaFromLines({required this.dogId, this.lines});
 
   @override
   Widget build(BuildContext context) {
+    if (lines != null) {
+      return _buildContent(lines!);
+    }
     final detectionService = DetectionService();
     return StreamBuilder<List<DetectionLine>>(
       stream: detectionService.watchLines(dogId),
@@ -718,81 +725,83 @@ class _DetectionMetaFromLines extends StatelessWidget {
             ),
           );
         }
+        return _buildContent(snapshot.data!);
+      },
+    );
+  }
 
-        final lines = snapshot.data!;
-        final operationalList = <String>[];
-        final inFormationList = <String>[];
-        final notStartedList = <String>[];
+  Widget _buildContent(List<DetectionLine> lines) {
+    final operationalList = <String>[];
+    final inFormationList = <String>[];
+    final notStartedList = <String>[];
 
-        for (final line in lines) {
-          switch (line.status) {
-            case 'operational':
-              operationalList.add(line.displayName);
-              break;
-            case 'in_formation':
-              inFormationList.add(line.displayName);
-              break;
-            case 'triagem':
-              inFormationList.add(line.displayName);
-              break;
-            default:
-              notStartedList.add(line.displayName);
-          }
-        }
+    for (final line in lines) {
+      switch (line.status) {
+        case 'operational':
+          operationalList.add(line.displayName);
+          break;
+        case 'in_formation':
+          inFormationList.add(line.displayName);
+          break;
+        case 'triagem':
+          inFormationList.add(line.displayName);
+          break;
+        default:
+          notStartedList.add(line.displayName);
+      }
+    }
 
-        final List<TextSpan> spans = [];
+    final List<TextSpan> spans = [];
 
-        void addGroup(List<String> list, String label) {
-          if (list.isEmpty) return;
-          if (spans.isNotEmpty) {
-            spans.add(
-              const TextSpan(
-                text: ' · ',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            );
-          }
-          spans.add(
-            TextSpan(
-              text: '${list.join("/")} ',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          );
-          spans.add(
-            TextSpan(
-              text: label,
-              style: const TextStyle(color: AppTheme.textSecondary),
-            ),
-          );
-        }
-
-        addGroup(operationalList, 'operacional');
-        addGroup(inFormationList, 'em formação');
-        addGroup(notStartedList, 'não iniciada');
-
-        if (spans.isEmpty) {
-          return Text(
-            'Nenhuma linha configurada',
-            style: GoogleFonts.inter(
-              color: AppTheme.textTertiary,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          );
-        }
-
-        return RichText(
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          text: TextSpan(
-            style: GoogleFonts.inter(fontSize: 10, height: 1.3),
-            children: spans,
+    void addGroup(List<String> list, String label) {
+      if (list.isEmpty) return;
+      if (spans.isNotEmpty) {
+        spans.add(
+          const TextSpan(
+            text: ' · ',
+            style: TextStyle(color: AppTheme.textSecondary),
           ),
         );
-      },
+      }
+      spans.add(
+        TextSpan(
+          text: '${list.join("/")} ',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+      );
+      spans.add(
+        TextSpan(
+          text: label,
+          style: const TextStyle(color: AppTheme.textSecondary),
+        ),
+      );
+    }
+
+    addGroup(operationalList, 'operacional');
+    addGroup(inFormationList, 'em formação');
+    addGroup(notStartedList, 'não iniciada');
+
+    if (spans.isEmpty) {
+      return Text(
+        'Nenhuma linha configurada',
+        style: GoogleFonts.inter(
+          color: AppTheme.textTertiary,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: GoogleFonts.inter(fontSize: 10, height: 1.3),
+        children: spans,
+      ),
     );
   }
 }

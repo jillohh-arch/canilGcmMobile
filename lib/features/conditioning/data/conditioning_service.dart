@@ -103,7 +103,7 @@ class ConditioningService {
       startOfWeek.day,
     );
 
-    final sessions = await getSessions(dogId, from: start);
+    final sessions = await getSessions(dogId, from: start, limit: 50);
 
     int totalMinutes = 0;
     double totalDistance = 0;
