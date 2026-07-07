@@ -42,11 +42,11 @@ logcat).
 
 ## 🟡 MOBILE
 
-### 5. Teste multi-membro no plantão real
-Cenários b/d do `service_dog_id` condicional:
-- Membro sem cão sai → crew continua sem ele
+### 5. Teste multi-membro no plantão real (cenários restantes)
+Cenários do `service_dog_id` condicional ainda não validados em campo:
 - Condutor encerra turno → crew continua (re-atribuição?)
 - Adesão de member legado + APK antigo convivendo
+- ⚠️ Deploy rules (dogId vazio) coordenado com APK novo
 
 ### 6. Animações Fase 2
 - Hero foto do cão (1 par: card → K9ProfilePage)
@@ -101,6 +101,10 @@ diretamente na UI.
 
 | Data | Item | Resumo |
 |---|---|---|
+| 07/07 | Multi-membro: morte dos convites | Sistema de convites removido por completo (service, push, UI) — posto vago = pode assumir |
+| 07/07 | Multi-membro: turno sem K9 | Rules aceita dogId vazio, UI com opção "Iniciar sem K9", dashboard condutor solo |
+| 07/07 | Multi-membro: troca K9 livre | Filtro por status Ativo + não embarcado, sem gate de titularidade |
+| 07/07 | Multi-membro: card real-time | Stream cacheado no State, zero re-subscribes — atualiza em todos os aparelhos |
 | 06/07 | Rules da guarnição | `vehicle_crew_history`, `members`, 8 bugs de rules/payload |
 | 06/07 | Card unificado EM SERVIÇO | Binômio + Guarnição, planta baixa da viatura |
 | 06/07 | Quadro de postos | Slots ocupados/vagos, redesign com foto crachá |
