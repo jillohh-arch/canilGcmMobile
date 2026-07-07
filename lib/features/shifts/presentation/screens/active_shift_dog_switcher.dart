@@ -4,16 +4,15 @@ part of 'active_shift_dashboard_screen.dart';
 void showDogSwitcher(BuildContext context) => _showDogSwitcher(context);
 
 /// Bottom sheet para troca rápida de cão durante o turno.
+/// Novo critério: qualquer cão com status 'Ativo' e NÃO embarcado em outro
+/// turno ativo. Cães do próprio titular aparecem primeiro (ordenação, não
+/// restrição).
 void _showDogSwitcher(BuildContext context) {
   final dogVM = Provider.of<DogViewModel>(context, listen: false);
   final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
   final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
   final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
-  final titularDogs = dogVM.dogs
-      .where((d) => d.conductorRa == currentRa)
-      .toList();
-  final isTitularOfSingleDog = titularDogs.length <= 1;
 
   showModalBottomSheet(
     context: context,
@@ -57,116 +56,19 @@ void _showDogSwitcher(BuildContext context) {
               ),
               const SizedBox(height: 4),
               Text(
-                'Selecione outro cão para continuar o plantão',
+                'Selecione outro cão operacional livre para continuar o plantão',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: AppTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 16),
-              if (isTitularOfSingleDog)
-                Container(
-                  margin: const EdgeInsets.only(top: 8, bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warning.withAlpha(15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.warning.withAlpha(60),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            color: AppTheme.warning,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Condutor Titular Único',
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Você é titular de apenas um cão associado neste plantão. Para conduzir outro cão, contate o gestor.',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: AppTheme.textSecondary.withAlpha(100),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'Fechar',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                ...dogVM.dogs.where((d) => d.id != shiftVM.activeDogId).map((
-                  dog,
-                ) {
-                  final fitness = const DogFitnessService().evaluate(dog);
-                  return _DogSwitchTile(
-                    dog: dog,
-                    fitness: fitness,
-                    onTap: () async {
-                      HapticFeedback.mediumImpact();
-                      if (fitness.status != DogFitnessStatus.apt) {
-                        final confirm = await _showFitnessConfirmation(
-                          context,
-                          dog,
-                          fitness,
-                        );
-                        if (!confirm) return;
-                      }
-                      if (!ctx.mounted) return;
-                      Navigator.of(ctx).pop();
-                      await shiftVM.switchDog(dog.id);
-                      if (!ctx.mounted) return;
-                      final error = shiftVM.error;
-                      if (error != null && error.trim().isNotEmpty) {
-                        AppFeedback.error(ctx, error);
-                      }
-                    },
-                  );
-                }),
+              // Lista de cães filtrada por status Ativo + não embarcado
+              _AvailableDogsLoader(
+                dogVM: dogVM,
+                shiftVM: shiftVM,
+                currentRa: currentRa,
+              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -176,15 +78,166 @@ void _showDogSwitcher(BuildContext context) {
   );
 }
 
+/// Widget que carrega os cães em uso (via active_shifts) e exibe a lista
+/// filtrada.
+class _AvailableDogsLoader extends StatefulWidget {
+  final DogViewModel dogVM;
+  final ShiftViewModel shiftVM;
+  final String currentRa;
+
+  const _AvailableDogsLoader({
+    required this.dogVM,
+    required this.shiftVM,
+    required this.currentRa,
+  });
+
+  @override
+  State<_AvailableDogsLoader> createState() => _AvailableDogsLoaderState();
+}
+
+class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
+  late Future<Set<String>> _dogsInUseFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dogsInUseFuture = _fetchDogsInUse();
+  }
+
+  /// Busca todos os dog IDs atualmente em turno ativo (exceto o do próprio
+  /// usuário, que vai ser trocado).
+  Future<Set<String>> _fetchDogsInUse() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('active_shifts')
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    final inUse = <String>{};
+    for (final doc in snapshot.docs) {
+      // Pula o próprio turno do usuário (ele pode trocar seu cão)
+      if (doc.id == widget.currentRa) continue;
+      final data = doc.data();
+      final dogId = data['service_dog_id'] as String? ??
+          data['dogId'] as String? ??
+          '';
+      if (dogId.isNotEmpty) inUse.add(dogId);
+    }
+    return inUse;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Set<String>>(
+      future: _dogsInUseFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final dogsInUse = snapshot.data ?? const <String>{};
+        final activeDogId = widget.shiftVM.activeDogId;
+
+        // Filtro: status Ativo + não é o cão atual + não está em uso
+        final available = widget.dogVM.dogs.where((d) {
+          if (d.id == activeDogId) return false;
+          if (d.status != 'Ativo') return false;
+          if (dogsInUse.contains(d.id)) return false;
+          return true;
+        }).toList();
+
+        // Ordenação: titular do usuário primeiro
+        available.sort((a, b) {
+          final aOwn = a.conductorRa == widget.currentRa ? 0 : 1;
+          final bOwn = b.conductorRa == widget.currentRa ? 0 : 1;
+          if (aOwn != bOwn) return aOwn.compareTo(bOwn);
+          return a.name.compareTo(b.name);
+        });
+
+        if (available.isEmpty) {
+          return Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withAlpha(15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.warning.withAlpha(60),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppTheme.warning,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Nenhum cão operacional livre disponível para troca no momento.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: available.map((dog) {
+            final fitness = const DogFitnessService().evaluate(dog);
+            return _DogSwitchTile(
+              dog: dog,
+              fitness: fitness,
+              isOwnDog: dog.conductorRa == widget.currentRa,
+              onTap: () async {
+                HapticFeedback.mediumImpact();
+                if (fitness.status != DogFitnessStatus.apt) {
+                  final confirm = await _showFitnessConfirmation(
+                    context,
+                    dog,
+                    fitness,
+                  );
+                  if (!confirm) return;
+                }
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                await widget.shiftVM.switchDog(dog.id);
+                if (!context.mounted) return;
+                final error = widget.shiftVM.error;
+                if (error != null && error.trim().isNotEmpty) {
+                  AppFeedback.error(context, error);
+                }
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
 class _DogSwitchTile extends StatelessWidget {
   final Dog dog;
   final DogFitnessResult fitness;
   final VoidCallback onTap;
+  final bool isOwnDog;
 
   const _DogSwitchTile({
     required this.dog,
     required this.fitness,
     required this.onTap,
+    this.isOwnDog = false,
   });
 
   @override

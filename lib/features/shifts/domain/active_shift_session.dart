@@ -151,7 +151,8 @@ class ActiveShiftSession {
     );
   }
 
-  bool get isActive => status == 'active' && effectiveServiceDogId.isNotEmpty;
+  bool get isActive => status == 'active';
+  bool get hasK9 => effectiveServiceDogId.isNotEmpty;
   bool get hasVehicle => vehicleId?.trim().isNotEmpty == true;
   String get effectiveServiceDogId =>
       serviceDogId?.trim().isNotEmpty == true ? serviceDogId!.trim() : dogId;

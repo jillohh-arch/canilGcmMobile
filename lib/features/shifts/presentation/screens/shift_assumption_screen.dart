@@ -29,6 +29,8 @@ class ShiftAssumptionScreen extends StatefulWidget {
 class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
   String? _selectedDogId;
   String? _startingDogId;
+  bool _noK9Selected = false;
+  bool _startingWithoutK9 = false;
   final DogFitnessService _fitnessService = const DogFitnessService();
 
   @override
@@ -38,7 +40,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
   }
 
   Future<void> _startShift(Dog dog) async {
-    if (_startingDogId != null) return;
+    if (_startingDogId != null || _startingWithoutK9) return;
 
     // Capturar antes do await para evitar uso de BuildContext pós-assíncrono
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
@@ -67,6 +69,39 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
 
     if (!mounted) return;
     setState(() => _startingDogId = null);
+
+    if (shiftVM.error != null) {
+      AppFeedback.error(
+        context,
+        shiftVM.error!,
+        fallback:
+            'Nao foi possivel iniciar o turno. Confira sua conexao e tente novamente.',
+      );
+    }
+  }
+
+  Future<void> _startShiftWithoutK9() async {
+    if (_startingDogId != null || _startingWithoutK9) return;
+
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    final fbUser = Provider.of<AuthViewModel>(context, listen: false).user;
+    final currentRa = HandlerIdentityService.raFromUser(fbUser);
+    final userVM = Provider.of<UserViewModel>(context, listen: false);
+    final displayName = userVM.displayNameFor(
+      ra: currentRa,
+      firebaseUser: fbUser,
+    );
+
+    HapticFeedback.mediumImpact();
+    setState(() => _startingWithoutK9 = true);
+
+    await shiftVM.startShift(
+      '',
+      handlerName: displayName,
+    );
+
+    if (!mounted) return;
+    setState(() => _startingWithoutK9 = false);
 
     if (shiftVM.error != null) {
       AppFeedback.error(
@@ -159,7 +194,12 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
                 Expanded(child: _buildBody(dogVM, userVM, currentRa)),
 
                 // ── CTA sticky ─────────────────────────────────────
-                if (selectedDog != null && selectedFitness != null)
+                if (_noK9Selected)
+                  _NoK9Cta(
+                    isLoading: _startingWithoutK9,
+                    onPressed: _startShiftWithoutK9,
+                  )
+                else if (selectedDog != null && selectedFitness != null)
                   _AssumptionCta(
                     dog: selectedDog,
                     fitness: selectedFitness,
@@ -191,11 +231,25 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: dogVM.dogs.length,
+      itemCount: dogVM.dogs.length + 1, // +1 for "sem K9" option
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
+        // Última posição: opção "Iniciar sem K9"
+        if (index == dogVM.dogs.length) {
+          return _NoK9SelectionCard(
+            isSelected: _noK9Selected,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _noK9Selected = true;
+                _selectedDogId = null;
+              });
+            },
+          );
+        }
+
         final dog = dogVM.dogs[index];
-        final isSelected = _selectedDogId == dog.id;
+        final isSelected = _selectedDogId == dog.id && !_noK9Selected;
         final isTitular = dog.conductorRa == currentRa;
         final fitness = _fitnessService.evaluate(dog);
 
@@ -215,6 +269,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
             HapticFeedback.selectionClick();
             setState(() {
               _selectedDogId = dog.id;
+              _noK9Selected = false;
             });
           },
         );

@@ -1313,7 +1313,6 @@ service cloud.firestore {
         ])
         && request.resource.data.handlerId == ra
         && request.resource.data.dogId is string
-        && request.resource.data.dogId.size() > 0
         && request.resource.data.status in ['active', 'ended'];
     }
 

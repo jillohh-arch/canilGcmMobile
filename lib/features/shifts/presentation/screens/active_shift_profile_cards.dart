@@ -252,7 +252,7 @@ class _BinomioAvatar extends StatelessWidget {
 /// FAIXA 2 — Guarnição: estado-dependente (sem viatura ou embarcado).
 class _GuarnicaoFaixa extends StatelessWidget {
   final bool hasVehicle;
-  final Dog dog;
+  final Dog? dog;
 
   const _GuarnicaoFaixa({required this.hasVehicle, required this.dog});
 
@@ -335,7 +335,7 @@ class _GuarnicaoSemViatura extends StatelessWidget {
 
 /// Estado 2: embarcado — grade 2×2 dos postos.
 class _GuarnicaoEmbarcada extends StatefulWidget {
-  final Dog dog;
+  final Dog? dog;
 
   const _GuarnicaoEmbarcada({super.key, required this.dog});
 
@@ -458,7 +458,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                       currentHandlerId: currentHandlerId,
                       staggerAnimation: _staggerAnimation,
                       dog: widget.dog,
-                      dogName: widget.dog.name,
+                      dogName: widget.dog?.name ?? '',
                     ),
                     // Linha AUX2 se ocupado (senao invisivel)
                     if (activeMembers.containsKey('auxiliar_2')) ...[
@@ -486,7 +486,7 @@ class _VehicleGrid extends StatelessWidget {
   final Map<String, VehicleCrewMember> activeMembers;
   final String? currentHandlerId;
   final Animation<double> staggerAnimation;
-  final Dog dog;
+  final Dog? dog;
   final String dogName;
 
   const _VehicleGrid({
@@ -548,7 +548,7 @@ class _VehicleGrid extends StatelessWidget {
 
 /// Card do K9 na grade (baixo-direita) — acento teal/cyan quente, sem dourado.
 class _K9Card extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final String dogName;
 
   const _K9Card({required this.dog, required this.dogName});
@@ -568,7 +568,7 @@ class _K9Card extends StatelessWidget {
         ? userVM.displayNameFor(ra: handlerId)
         : null;
 
-    final hasDog = dog.id.trim().isNotEmpty;
+    final hasDog = dog != null && dog!.id.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -585,7 +585,7 @@ class _K9Card extends StatelessWidget {
                 // Foto do cão — retangular crachá (~3:4)
                 _K9Photo(
                   size: 56,
-                  imageUrl: dog.profileImageUrl,
+                  imageUrl: dog?.profileImageUrl,
                   accent: k9Accent,
                 ),
                 const SizedBox(width: 8),
@@ -608,7 +608,7 @@ class _K9Card extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        dogName.isNotEmpty ? dogName : dog.name,
+                        dogName.isNotEmpty ? dogName : dog!.name,
                         style: GoogleFonts.inter(
                           color: AppTheme.textPrimary,
                           fontSize: 13,

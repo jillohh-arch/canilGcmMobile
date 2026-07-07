@@ -9,7 +9,6 @@ import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
-import 'package:canil_gcm/features/shifts/data/vehicle_crew_transition_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
@@ -27,8 +26,6 @@ class PendingScreen extends StatefulWidget {
 
 class _PendingScreenState extends State<PendingScreen> {
   final NotificationService _notificationService = NotificationService();
-  final VehicleCrewTransitionService _crewTransitionService =
-      VehicleCrewTransitionService();
   late Stream<List<NotificationItem>> _notificationsStream;
   final Set<String> _processingNotifications = <String>{};
   bool _markingAllAsRead = false;
@@ -183,19 +180,6 @@ class _PendingScreenState extends State<PendingScreen> {
                     notification: notification,
                     processing: _isProcessing(notification),
                     onTap: () => _handleNotificationTap(notification),
-                    onAccept:
-                        notification.type ==
-                            NotificationType.vehicleCrewInvitation
-                        ? () => _respondToCrewInvitation(
-                            notification,
-                            accept: true,
-                          )
-                        : null,
-                    onDecline:
-                        notification.type ==
-                            NotificationType.vehicleCrewInvitation
-                        ? () => _declineCrewInvitation(notification)
-                        : null,
                   ),
                 )
                 .toList(),
@@ -237,83 +221,6 @@ class _PendingScreenState extends State<PendingScreen> {
     } finally {
       if (mounted) setState(() => _markingAllAsRead = false);
     }
-  }
-
-  Future<void> _respondToCrewInvitation(
-    NotificationItem notification, {
-    required bool accept,
-    String? reason,
-  }) async {
-    final crewId = notification.vehicleCrewId;
-    if (crewId == null) {
-      _showSnack('Convite sem identificador da VTR/equipe.', isError: true);
-      return;
-    }
-
-    _setProcessing(notification, true);
-    try {
-      await _crewTransitionService.respondToInvitation(
-        crewId: crewId,
-        accept: accept,
-        reason: reason,
-      );
-      _showSnack(accept ? 'Convite aceito.' : 'Convite recusado.');
-    } catch (error) {
-      _showSnack('Falha ao responder convite: $error', isError: true);
-    } finally {
-      _setProcessing(notification, false);
-    }
-  }
-
-  Future<void> _declineCrewInvitation(NotificationItem notification) async {
-    final reason = await _askDeclineReason();
-    if (reason == null || !mounted) return;
-    await _respondToCrewInvitation(notification, accept: false, reason: reason);
-  }
-
-  Future<String?> _askDeclineReason() async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surfacePanel,
-        title: Text(
-          'Recusar convite',
-          style: GoogleFonts.inter(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          style: GoogleFonts.inter(color: AppTheme.textPrimary),
-          decoration: const InputDecoration(
-            labelText: 'Motivo obrigatorio',
-            hintText: 'Informe por que nao entrara na guarnicao',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) {
-                Navigator.of(dialogContext).pop(text);
-              }
-            },
-            child: const Text('Recusar'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return reason;
   }
 
   Future<void> _archiveNotice(NotificationItem notification) async {
@@ -743,16 +650,12 @@ class _SectionEmptyMessage extends StatelessWidget {
 class _NotificationCard extends StatelessWidget {
   final NotificationItem notification;
   final VoidCallback onTap;
-  final VoidCallback? onAccept;
-  final VoidCallback? onDecline;
   final VoidCallback? onArchive;
   final bool processing;
 
   const _NotificationCard({
     required this.notification,
     required this.onTap,
-    this.onAccept,
-    this.onDecline,
     this.onArchive,
     this.processing = false,
   });
@@ -885,10 +788,7 @@ class _NotificationCard extends StatelessWidget {
   }
 
   bool get _hasInlineActions {
-    return processing ||
-        onAccept != null ||
-        onDecline != null ||
-        onArchive != null;
+    return processing || onArchive != null;
   }
 
   Widget _buildInlineActions(Color accent) {
@@ -908,36 +808,6 @@ class _NotificationCard extends StatelessWidget {
               color: AppTheme.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (onAccept != null || onDecline != null) {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: onDecline,
-              icon: const Icon(Icons.close_rounded, size: 17),
-              label: const Text('Recusar'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.error,
-                side: BorderSide(color: AppTheme.error.withAlpha(120)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: onAccept,
-              icon: const Icon(Icons.check_rounded, size: 17),
-              label: const Text('Aceitar'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: AppTheme.background,
-              ),
             ),
           ),
         ],

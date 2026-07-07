@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -138,6 +139,158 @@ class _ActiveShiftDashboardScreenState
           ),
         );
       },
+    );
+  }
+
+  /// Dashboard simplificado para turno sem K9 (motorista/apoio).
+  Widget _buildNoK9Body(String callsign) {
+    final shiftVM = Provider.of<ShiftViewModel>(context);
+    final hasVehicle = shiftVM.hasVehicle;
+    final userVM = Provider.of<UserViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+    final userModel = userVM.findByRa(currentRa);
+    final userPhoto = userModel?.photoUrl?.trim();
+    final firebasePhoto = authVM.user?.photoURL?.trim();
+    final conductorPhoto = userPhoto != null && userPhoto.isNotEmpty
+        ? userPhoto
+        : firebasePhoto != null && firebasePhoto.isNotEmpty
+        ? firebasePhoto
+        : null;
+
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header simplificado — sem BinomioHeader pois não há cão
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.primary.withAlpha(12),
+                    border: Border.all(color: AppTheme.primary.withAlpha(180)),
+                  ),
+                  child: conductorPhoto != null
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: conductorPhoto,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, _, _) => const Icon(
+                              Icons.person_rounded,
+                              color: AppTheme.primary,
+                              size: 24,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_rounded,
+                          color: AppTheme.primary,
+                          size: 24,
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        callsign,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Em serviço · Sem K9',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Scroll area
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Card condutor solo (sem binômio)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.textPrimary.withAlpha(7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.textPrimary.withAlpha(18)),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.primary.withAlpha(12),
+                            border: Border.all(color: AppTheme.primary.withAlpha(180)),
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            color: AppTheme.primary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                callsign,
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Em serviço · Sem K9',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Guarnição (se embarcado)
+                  if (hasVehicle) ...[
+                    const SizedBox(height: 14),
+                    _GuarnicaoFaixa(hasVehicle: true, dog: null),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -345,10 +498,18 @@ class _ActiveShiftDashboardScreenState
         );
         final dogId = shiftVM.activeDogId;
 
+        // Turno sem K9 (intencional): mostrar dashboard simplificado
         if (dogId == null || dogId.trim().isEmpty) {
-          return _MissingShiftDogState(
-            recovering: _recoveringMissingDog,
-            onRecover: () => _recoverMissingShiftDog(context),
+          return Scaffold(
+            backgroundColor: AppTheme.background,
+            body: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: AppTheme.transparent,
+                systemNavigationBarColor: AppTheme.surfaceNavigation,
+                systemNavigationBarIconBrightness: Brightness.light,
+              ),
+              child: _buildNoK9Body(callsign),
+            ),
           );
         }
 

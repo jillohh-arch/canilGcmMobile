@@ -19,7 +19,6 @@ import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
-import 'package:canil_gcm/features/shifts/data/vehicle_crew_transition_service.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_profile_screen.dart';
@@ -28,8 +27,6 @@ import 'package:canil_gcm/features/training/presentation/screens/training_promot
 
 const String _operationsChannelId = 'canil_k9_operations';
 const String _operationsChannelName = 'Operações K9';
-const String _crewAcceptActionId = 'vehicle_crew_accept';
-const String _crewDeclineActionId = 'vehicle_crew_decline';
 const int _shiftEndReminderNotificationId = 910101;
 const int _shiftOverdueReminderNotificationId = 910102;
 const String _shiftTimeZone = 'America/Sao_Paulo';
@@ -175,22 +172,7 @@ class PushNotificationService {
     final data = _payloadMap(response.payload);
     if (data == null) return;
 
-    if (response.actionId == _crewAcceptActionId) {
-      await _handleBackgroundCrewAction(data, accept: true);
-      return;
-    }
-
-    if (response.actionId == _crewDeclineActionId) {
-      final reason = response.input?.trim();
-      if (reason == null || reason.isEmpty) {
-        await _showActionResultNotification(
-          title: 'Motivo obrigatório',
-          body: 'Abra o app e informe o motivo para recusar a guarnição.',
-        );
-        return;
-      }
-      await _handleBackgroundCrewAction(data, accept: false, reason: reason);
-    }
+    // Navigation will be handled when the app opens
   }
 
   Future<void> _handleInitialMessages() async {
@@ -368,49 +350,7 @@ class PushNotificationService {
   void _handleNotificationResponse(NotificationResponse response) {
     final data = _payloadMap(response.payload);
     if (data == null) return;
-
-    if (response.actionId == _crewAcceptActionId) {
-      unawaited(_handleCrewAction(data, accept: true));
-      return;
-    }
-
-    if (response.actionId == _crewDeclineActionId) {
-      final reason = response.input?.trim();
-      if (reason == null || reason.isEmpty) {
-        _scheduleNavigation(data);
-        return;
-      }
-      unawaited(_handleCrewAction(data, accept: false, reason: reason));
-      return;
-    }
-
     _scheduleNavigation(data);
-  }
-
-  Future<void> _handleCrewAction(
-    Map<String, dynamic> data, {
-    required bool accept,
-    String? reason,
-  }) async {
-    try {
-      await _respondToCrewInvitation(data, accept: accept, reason: reason);
-      await _markNotificationAsRead(data);
-      if (accept) return;
-    } catch (error) {
-      debugPrint('[PushNotificationService] Ação da guarnição falhou: $error');
-    }
-    _scheduleNavigation(data);
-  }
-
-  Future<void> _markNotificationAsRead(Map<String, dynamic> data) async {
-    final user = _auth.currentUser;
-    final notificationId = _stringValue(data['notification_id']);
-    final userId = HandlerIdentityService.raFromUser(user);
-    if (userId == null || notificationId == null) return;
-    await NotificationService().markAsRead(
-      userId: userId,
-      notificationId: notificationId,
-    );
   }
 
   void _scheduleNavigation(Map<String, dynamic>? data) {
@@ -529,27 +469,7 @@ Future<void> _configureLocalNotifications(
       AndroidInitializationSettings('drawable/ic_launcher');
   final initializationSettings = InitializationSettings(
     android: androidSettings,
-    iOS: DarwinInitializationSettings(
-      notificationCategories: [
-        DarwinNotificationCategory(
-          'vehicle_crew_invitation',
-          actions: [
-            DarwinNotificationAction.plain(
-              _crewAcceptActionId,
-              'Aceitar',
-              options: {DarwinNotificationActionOption.authenticationRequired},
-            ),
-            DarwinNotificationAction.text(
-              _crewDeclineActionId,
-              'Recusar',
-              buttonTitle: 'Enviar',
-              placeholder: 'Motivo da recusa',
-              options: {DarwinNotificationActionOption.authenticationRequired},
-            ),
-          ],
-        ),
-      ],
-    ),
+    iOS: const DarwinInitializationSettings(),
   );
 
   await plugin.initialize(
@@ -583,7 +503,6 @@ Future<void> _showRemoteNotificationWith(
       _stringValue(data['body']) ??
       message.notification?.body ??
       'Nova pendência operacional.';
-  final type = _stringValue(data['type']) ?? '';
   final payload = jsonEncode(data);
 
   final androidDetails = AndroidNotificationDetails(
@@ -594,29 +513,6 @@ Future<void> _showRemoteNotificationWith(
     priority: Priority.high,
     category: AndroidNotificationCategory.status,
     color: AppTheme.primary,
-    actions: type == 'vehicle_crew_invitation'
-        ? const [
-            AndroidNotificationAction(
-              _crewAcceptActionId,
-              'Aceitar',
-              showsUserInterface: false,
-              semanticAction: SemanticAction.markAsRead,
-            ),
-            AndroidNotificationAction(
-              _crewDeclineActionId,
-              'Recusar',
-              showsUserInterface: false,
-              semanticAction: SemanticAction.reply,
-              inputs: [
-                AndroidNotificationActionInput(label: 'Motivo da recusa'),
-              ],
-            ),
-          ]
-        : null,
-  );
-
-  const darwinDetails = DarwinNotificationDetails(
-    categoryIdentifier: 'vehicle_crew_invitation',
   );
 
   await plugin.show(
@@ -625,79 +521,8 @@ Future<void> _showRemoteNotificationWith(
     body: body,
     notificationDetails: NotificationDetails(
       android: androidDetails,
-      iOS: type == 'vehicle_crew_invitation' ? darwinDetails : null,
     ),
     payload: payload,
-  );
-}
-
-Future<void> _respondToCrewInvitation(
-  Map<String, dynamic> data, {
-  required bool accept,
-  String? reason,
-}) async {
-  final crewId = _crewIdFromPayload(data);
-  if (crewId == null) return;
-  await VehicleCrewTransitionService().respondToInvitation(
-    crewId: crewId,
-    accept: accept,
-    reason: reason,
-  );
-}
-
-Future<void> _handleBackgroundCrewAction(
-  Map<String, dynamic> data, {
-  required bool accept,
-  String? reason,
-}) async {
-  try {
-    await _respondToCrewInvitation(data, accept: accept, reason: reason);
-    await _markNotificationAsReadFromPayload(data);
-    await _showActionResultNotification(
-      title: accept ? 'Convite aceito' : 'Convite recusado',
-      body: accept
-          ? 'Você entrou na guarnição.'
-          : 'Sua recusa foi registrada com justificativa.',
-    );
-  } catch (error) {
-    await _showActionResultNotification(
-      title: 'Ação não concluída',
-      body: 'Abra o app para responder ao convite da guarnição.',
-    );
-  }
-}
-
-Future<void> _markNotificationAsReadFromPayload(
-  Map<String, dynamic> data,
-) async {
-  final user = FirebaseAuth.instance.currentUser;
-  final userId = HandlerIdentityService.raFromUser(user);
-  final notificationId = _stringValue(data['notification_id']);
-  if (userId == null || notificationId == null) return;
-  await NotificationService().markAsRead(
-    userId: userId,
-    notificationId: notificationId,
-  );
-}
-
-Future<void> _showActionResultNotification({
-  required String title,
-  required String body,
-}) async {
-  final plugin = FlutterLocalNotificationsPlugin();
-  await _configureLocalNotifications(plugin);
-  await plugin.show(
-    id: _notificationIdFor({'title': title, 'body': body}),
-    title: title,
-    body: body,
-    notificationDetails: const NotificationDetails(
-      android: AndroidNotificationDetails(
-        _operationsChannelId,
-        _operationsChannelName,
-        importance: Importance.high,
-        priority: Priority.high,
-      ),
-    ),
   );
 }
 

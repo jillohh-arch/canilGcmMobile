@@ -64,8 +64,8 @@ class ShiftService {
     return crew;
   }
 
-  /// Retorna true se ainda há members ativos (status active/pending) na
-  /// guarnição, exceto o handler especificado.
+  /// Retorna true se ainda há members ativos na guarnição, exceto o handler
+  /// especificado.
   Future<bool> _crewHasOtherActiveMembers({
     required String crewId,
     required String excludingHandlerId,
@@ -73,7 +73,7 @@ class ShiftService {
     final snapshot = await _vehicleCrews
         .doc(crewId)
         .collection('members')
-        .where('status', whereIn: ['active', 'pending'])
+        .where('status', isEqualTo: 'active')
         .get();
     return snapshot.docs.any((doc) => doc.id != excludingHandlerId);
   }
@@ -101,7 +101,7 @@ class ShiftService {
     String? shiftGroupId,
     String? shiftGroupCode,
     String? shiftGroupLabel,
-    required String dogId,
+    String dogId = '',
     required DateTime startedAt,
     Vehicle? vehicle,
   }) async {
@@ -839,29 +839,22 @@ class ShiftService {
       throw StateError('${vehicle.label} já está com a guarnição completa.');
     }
 
-    final crewSnapshot =
-        await _vehicleCrews.doc(_crewIdFor(vehicle.id)).get();
-    final crewData = crewSnapshot.data();
-    final existingServiceDogId =
-        crewData?['service_dog_id']?.toString().trim();
-    final existingTitular =
-        crewData?['titular_handler_id']?.toString().trim();
-    final crewIsActive = crewData?['active'] == true;
-    if (crewIsActive &&
-        existingTitular != null &&
-        existingTitular.isNotEmpty &&
-        existingTitular != excludingHandlerId) {
-      throw StateError(
-        '${vehicle.label} já possui guarnição. Entre somente por convite.',
-      );
-    }
-    if (crewIsActive &&
-        existingServiceDogId != null &&
-        existingServiceDogId.isNotEmpty &&
-        existingServiceDogId != serviceDogId) {
-      throw StateError(
-        '${vehicle.label} já está operando com outro K9 de serviço.',
-      );
+    // Conflito de K9: só aplica se o novo membro traz um cão
+    if (serviceDogId.isNotEmpty) {
+      final crewSnapshot =
+          await _vehicleCrews.doc(_crewIdFor(vehicle.id)).get();
+      final crewData = crewSnapshot.data();
+      final existingServiceDogId =
+          crewData?['service_dog_id']?.toString().trim();
+      final crewIsActive = crewData?['active'] == true;
+      if (crewIsActive &&
+          existingServiceDogId != null &&
+          existingServiceDogId.isNotEmpty &&
+          existingServiceDogId != serviceDogId) {
+        throw StateError(
+          '${vehicle.label} já está operando com outro K9 de serviço.',
+        );
+      }
     }
   }
 
@@ -876,7 +869,7 @@ class ShiftService {
         .doc(_crewIdFor(vehicleId))
         .collection('members')
         .where('role', isEqualTo: role)
-        .where('status', whereIn: ['active', 'pending'])
+        .where('status', isEqualTo: 'active')
         .get();
 
     for (final doc in membersSnapshot.docs) {
@@ -969,7 +962,6 @@ class ShiftService {
         'status': status,
         'dog_id': dogId,
         'joined_at': FieldValue.serverTimestamp(),
-        'responded_at': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );

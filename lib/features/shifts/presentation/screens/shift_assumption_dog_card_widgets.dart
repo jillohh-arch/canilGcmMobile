@@ -481,3 +481,146 @@ class _AssumptionCta extends StatelessWidget {
     );
   }
 }
+
+/// Card de seleção "Iniciar sem K9" — para motorista/apoio que entra sem cão.
+class _NoK9SelectionCard extends StatelessWidget {
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NoK9SelectionCard({
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.fromLTRB(17, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.textSecondary.withAlpha(12)
+              : AppTheme.surfacePanel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.textSecondary
+                : AppTheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.textSecondary.withAlpha(15),
+                border: Border.all(
+                  color: AppTheme.textSecondary.withAlpha(60),
+                ),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppTheme.textSecondary,
+                  size: 28,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Iniciar sem K9',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Para motorista ou apoio que entra sem cão',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppTheme.textSecondary,
+                size: 22,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// CTA sticky para "Iniciar sem K9".
+class _NoK9Cta extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _NoK9Cta({
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppTheme.background.withAlpha(0), AppTheme.background],
+          stops: const [0.0, 0.2],
+        ),
+      ),
+      child: SizedBox(
+        height: 56,
+        child: Material(
+          color: AppTheme.textSecondary.withAlpha(200),
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: isLoading ? null : onPressed,
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.background,
+                      ),
+                    )
+                  : Text(
+                      'INICIAR TURNO SEM K9',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.background,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -92,7 +92,7 @@ class ShiftViewModel extends ChangeNotifier {
         authUid: currentUser?.uid,
         handlerEmail: currentUser?.email,
         dogId: dogId,
-        serviceDogId: dogId,
+        serviceDogId: dogId.isEmpty ? null : dogId,
         startedAt: startedAt,
         vehicleId: vehicle?.id,
         vehicleLabel: vehicle?.label,
