@@ -59,9 +59,12 @@ class TrainingRepository {
     String dogField,
     String dogId,
   ) {
+    // limit(100): um cão não terá mais de 100 sessões ativas na coleção raiz;
+    // cap safety para evitar scan ilimitado conforme o histórico cresce.
     final query = _firestore
         .collection(collection)
-        .where(dogField, isEqualTo: dogId);
+        .where(dogField, isEqualTo: dogId)
+        .limit(100);
     return query
         .snapshots()
         .map(
@@ -75,10 +78,12 @@ class TrainingRepository {
   }
 
   Stream<List<TrainingHubSession>> _watchDogTrainingSessions(String dogId) {
+    // limit(100): subcoleção por cão; cap safety para histórico crescente.
     final query = _firestore
         .collection('dogs')
         .doc(dogId)
-        .collection('training_sessions');
+        .collection('training_sessions')
+        .limit(100);
     return query
         .snapshots()
         .map(
@@ -94,9 +99,11 @@ class TrainingRepository {
   }
 
   Stream<List<TrainingSpecialtyModel>> _watchRootSpecialties(String dogId) {
+    // limit(20): especialidades são estáveis; um cão raramente tem mais de 5.
     return _firestore
         .collection('training_specialties')
         .where('dogId', isEqualTo: dogId)
+        .limit(20)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -112,10 +119,12 @@ class TrainingRepository {
   }
 
   Stream<List<TrainingSpecialtyModel>> _watchDogSpecialties(String dogId) {
+    // limit(20): subcoleção de especialidades por cão; conjunto pequeno.
     return _firestore
         .collection('dogs')
         .doc(dogId)
         .collection('specialties')
+        .limit(20)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs

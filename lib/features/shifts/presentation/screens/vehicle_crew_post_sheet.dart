@@ -211,7 +211,12 @@ class _VehicleSelectionStep extends StatelessWidget {
 }
 
 /// Card mostrando resumo da guarnição de uma viatura.
-class _VehicleCrewSummaryCard extends StatelessWidget {
+///
+/// Usa [FutureBuilder] ao invés de [StreamBuilder] porque a lista de viaturas
+/// é uma tela de seleção (step 1), não um painel operacional. Um fetch único
+/// elimina N listeners simultâneos (1 por card) sem perda de UX — o usuário
+/// não precisa de tempo real aqui; o post-board do step 2 já usa stream.
+class _VehicleCrewSummaryCard extends StatefulWidget {
   final Vehicle vehicle;
   final VehicleCrewService crewService;
   final VoidCallback onTap;
@@ -223,18 +228,29 @@ class _VehicleCrewSummaryCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final crewId = vehicle.id;
+  State<_VehicleCrewSummaryCard> createState() =>
+      _VehicleCrewSummaryCardState();
+}
 
-    return StreamBuilder<List<VehicleCrewMember>>(
-      stream: crewService.watchMembers(crewId),
+class _VehicleCrewSummaryCardState extends State<_VehicleCrewSummaryCard> {
+  late final Future<List<VehicleCrewMember>> _membersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _membersFuture = widget.crewService.getMembers(widget.vehicle.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<VehicleCrewMember>>(
+      future: _membersFuture,
       builder: (context, snapshot) {
         final members = snapshot.data ?? [];
-        final activeMembers = members.where((m) => m.isActive).toList();
-        final occupancy = activeMembers.length;
+        final occupancy = members.where((m) => m.isActive).length;
 
         return GestureDetector(
-          onTap: onTap,
+          onTap: widget.onTap,
           child: AnimatedContainer(
             duration: HudDurations.fast,
             padding: const EdgeInsets.all(14),
@@ -265,17 +281,17 @@ class _VehicleCrewSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        vehicle.label,
+                        widget.vehicle.label,
                         style: GoogleFonts.robotoMono(
                           color: AppTheme.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (vehicle.modelName.isNotEmpty) ...[
+                      if (widget.vehicle.modelName.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          vehicle.modelName,
+                          widget.vehicle.modelName,
                           style: GoogleFonts.inter(
                             color: AppTheme.textTertiary,
                             fontSize: 11,
@@ -288,7 +304,7 @@ class _VehicleCrewSummaryCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 _OccupancyBadge(
                   occupancy: occupancy,
-                  crewSize: vehicle.crewSize,
+                  crewSize: widget.vehicle.crewSize,
                 ),
               ],
             ),

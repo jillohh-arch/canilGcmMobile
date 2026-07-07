@@ -11,7 +11,9 @@ class UserService {
       FirebaseFirestore.instance.collection('users');
 
   Stream<List<Map<String, dynamic>>> getAllHandlers() {
-    return _usersCollection.orderBy('ra').snapshots().map((snapshot) {
+    // limit(100): GCM Limeira tem ~6 condutores ativos; cap safety para evitar
+    // full-collection scan se a coleção crescer com usuários inativos.
+    return _usersCollection.orderBy('ra').limit(100).snapshots().map((snapshot) {
       return snapshot.docs.map(_handlerFromDoc).toList();
     });
   }

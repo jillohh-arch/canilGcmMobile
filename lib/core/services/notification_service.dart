@@ -16,6 +16,13 @@ class NotificationService {
     region: 'southamerica-east1',
   );
 
+  // Cache do stream base compartilhado. pending_badge, binomio_header e
+  // pending_screen consomem getOpenActionCount/getVisibleNotifications, que
+  // derivam de getAllNotifications — sem cache isso abre 3 listeners Firestore
+  // simultâneos na mesma subcoleção. Com broadcast + cache por userId, fica 1.
+  String? _cachedUserId;
+  Stream<List<NotificationItem>>? _cachedAllStream;
+
   /// Cria uma nova notificação para um usuário.
   Future<String> createNotification({
     required String userId,
@@ -213,17 +220,33 @@ class NotificationService {
   }
 
   /// Obtém todas as notificações de um usuário.
+  ///
+  /// O stream é cacheado como broadcast por userId: pending_badge,
+  /// binomio_header e pending_screen derivam daqui, então um único listener
+  /// Firestore serve a todos. limit(200) evita crescimento ilimitado de leitura.
   Stream<List<NotificationItem>> getAllNotifications({required String userId}) {
-    return _notificationsCollection
-        .doc(userId)
-        .collection('items')
-        .orderBy('created_at', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => NotificationItem.fromJson(doc.data(), doc.id))
-              .toList(),
-        );
+    if (_cachedUserId != userId || _cachedAllStream == null) {
+      _cachedUserId = userId;
+      _cachedAllStream = _notificationsCollection
+          .doc(userId)
+          .collection('items')
+          .orderBy('created_at', descending: true)
+          .limit(200)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => NotificationItem.fromJson(doc.data(), doc.id))
+                .toList(),
+          )
+          .asBroadcastStream();
+    }
+    return _cachedAllStream!;
+  }
+
+  /// Invalida o cache ao trocar de usuário (ex: logout/login).
+  void invalidateCache() {
+    _cachedUserId = null;
+    _cachedAllStream = null;
   }
 
   /// Conta notificações não lidas.
