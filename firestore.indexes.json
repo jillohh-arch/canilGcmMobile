@@ -15,6 +15,72 @@
         { "fieldPath": "dogId", "order": "ASCENDING" },
         { "fieldPath": "deleted_at", "order": "ASCENDING" }
       ]
+    },
+
+    {
+      "collectionGroup": "vacinas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "caoId", "order": "ASCENDING" },
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "dataVencimento", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entity_type", "order": "ASCENDING" },
+        { "fieldPath": "entity_id", "order": "ASCENDING" },
+        { "fieldPath": "performed_at", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "read_at", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "documentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "caoId", "order": "ASCENDING" },
+        { "fieldPath": "dataUpload", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "conditioning_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "exercise_type", "order": "ASCENDING" },
+        { "fieldPath": "performed_at", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "registros",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "caoId", "order": "ASCENDING" },
+        { "fieldPath": "dataHora", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "aptidoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "caoId", "order": "ASCENDING" },
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "ordem", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
