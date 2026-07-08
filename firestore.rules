@@ -686,6 +686,16 @@ service cloud.firestore {
         && appendsInlineAuditOnUpdate();
     }
 
+    function canUpdateDogDenormalizedStats() {
+      let allowed = [
+        '_last_vaccine_at', '_last_vaccine_due_at',
+        '_last_exam_at',
+        '_last_weight_kg', '_last_weight_at'
+      ];
+      return hasAccessPermission('health', 'create')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
     function canUpdateUserProfile() {
       let changed = changedKeys();
       return signedIn()
@@ -1729,7 +1739,8 @@ service cloud.firestore {
         || (
           hasAccessPermission('k9', 'archive')
           && canSoftDeleteDog()
-        );
+        )
+        || canUpdateDogDenormalizedStats();
       allow delete: if false;
 
       match /weight_history/{recordId} {

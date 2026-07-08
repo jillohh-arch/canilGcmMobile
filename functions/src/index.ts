@@ -2214,6 +2214,23 @@ const HEALTH_EVENT_TYPES = new Set([
   "vaccination",
 ]);
 
+function buildHealthDenormPatch(
+  type: string,
+  eventDate: admin.firestore.Timestamp,
+  nextDueDate?: admin.firestore.Timestamp | null,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (type === "vaccination") {
+    patch._last_vaccine_at = eventDate;
+    if (nextDueDate) {
+      patch._last_vaccine_due_at = nextDueDate;
+    }
+  } else if (type === "exam") {
+    patch._last_exam_at = eventDate;
+  }
+  return patch;
+}
+
 export const adminCreateHealthEvent = onCall({region}, async (request) => {
   const caller = await requireAnyAccessPermission(
     request.auth,
@@ -2275,8 +2292,13 @@ export const adminCreateHealthEvent = onCall({region}, async (request) => {
   if (costBrl !== null) record.costBrl = costBrl;
   if (vetName) record.vetName = vetName;
 
+  const denormPatch = buildHealthDenormPatch(type, eventDate, nextDueDate);
+
   const batch = db.batch();
   batch.set(eventRef, record);
+  if (Object.keys(denormPatch).length > 0) {
+    batch.set(dogRef, denormPatch, {merge: true});
+  }
   batch.set(db.collection("auditLogs").doc(), {
     action: "health_event_created",
     entity_type: "health_event",
@@ -2339,6 +2361,8 @@ export const adminCreateK9WeightRecord = onCall({region}, async (request) => {
   batch.set(legacyRef, record);
   batch.set(dogRef, {
     weight: weightKg,
+    _last_weight_kg: weightKg,
+    _last_weight_at: measuredAt,
     updatedAt: now,
     updated_at: now,
     audit_trail: admin.firestore.FieldValue.arrayUnion(

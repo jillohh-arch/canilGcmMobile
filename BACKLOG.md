@@ -101,6 +101,7 @@ diretamente na UI.
 
 | Data | Item | Resumo |
 |---|---|---|
+| 07/07 | Sincronização rules mobile↔web | Mobile eleito fonte canônica única. Portado `canUpdateDogDenormalizedStats` do web→mobile, copiado arquivo inteiro mobile→web. CLAUDE.md anotado em ambos. Deploy de rules SOMENTE do mobile. |
 | 07/07 | Multi-membro: morte dos convites | Sistema de convites removido por completo (service, push, UI) — posto vago = pode assumir |
 | 07/07 | Multi-membro: turno sem K9 | Rules aceita dogId vazio, UI com opção "Iniciar sem K9", dashboard condutor solo |
 | 07/07 | Multi-membro: troca K9 livre | Filtro por status Ativo + não embarcado, sem gate de titularidade |

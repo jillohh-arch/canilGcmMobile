@@ -4,6 +4,13 @@
 > propor trabalho novo. Lá estão as tasks pendentes em rules, mobile, web e
 > produto — e o histórico do que já foi concluído.
 
+## firestore.rules — fonte canônica
+
+`firestore.rules` CANÔNICO = este repo (mobile). Deploy de rules SEMPRE e
+SOMENTE deste repo (`firebase deploy --only firestore:rules`). O repo web
+(k9-ops) deploya apenas `--only hosting`. Nunca editar rules no web — a
+cópia lá é um espelho mantido manualmente após cada alteração aqui.
+
 ## Lições aprendidas
 
 ### Erro de permissão nunca degrada silenciosamente
