@@ -158,68 +158,36 @@ class _ActiveShiftDashboardScreenState
         ? firebasePhoto
         : null;
 
+    final elapsed = _formatNoK9Elapsed(shiftVM.shiftStartTime);
+
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header simplificado — sem BinomioHeader pois não há cão
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.primary.withAlpha(12),
-                    border: Border.all(color: AppTheme.primary.withAlpha(180)),
-                  ),
-                  child: conductorPhoto != null
-                      ? ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: conductorPhoto,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, _, _) => const Icon(
-                              Icons.person_rounded,
-                              color: AppTheme.primary,
-                              size: 24,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.person_rounded,
-                          color: AppTheme.primary,
-                          size: 24,
-                        ),
+          // Header com BinomioHeader (sem cão) — dá acesso ao menu hamburger
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(10),
+              border: Border(
+                bottom: BorderSide(color: AppTheme.primary.withAlpha(30)),
+              ),
+            ),
+            child: BinomioHeader(
+              dog: null,
+              subtitle: 'Em serviço · Sem K9 · $elapsed',
+              subtitleColor: AppTheme.success,
+              statusDotColor: AppTheme.success,
+              showStatusDot: true,
+              withBackground: false,
+              conductorPhotoUrl: conductorPhoto,
+              handlerNameOverride: callsign,
+              notificationUserId: currentRa,
+              onProfileTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const HandlerProfilePage(showBottomNav: false),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        callsign,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Em serviço · Sem K9',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           // Scroll area
@@ -229,57 +197,11 @@ class _ActiveShiftDashboardScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Card condutor solo (sem binômio)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.textPrimary.withAlpha(7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.textPrimary.withAlpha(18)),
+                  // Prompt para assumir viatura (se ainda não embarcado)
+                  if (!hasVehicle)
+                    _NoK9VehiclePrompt(
+                      onTap: () => VehicleCrewPostSheet.show(context),
                     ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.primary.withAlpha(12),
-                            border: Border.all(color: AppTheme.primary.withAlpha(180)),
-                          ),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            color: AppTheme.primary,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                callsign,
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Em serviço · Sem K9',
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   // Guarnição (se embarcado)
                   if (hasVehicle) ...[
                     const SizedBox(height: 14),
@@ -292,6 +214,15 @@ class _ActiveShiftDashboardScreenState
         ],
       ),
     );
+  }
+
+  String _formatNoK9Elapsed(DateTime? start) {
+    if (start == null) return 'agora';
+    final diff = DateTime.now().difference(start);
+    if (diff.inMinutes < 1) return 'agora';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    return 'há ${diff.inDays}d';
   }
 
   /// Monta o conteúdo do dashboard com animações de entrada escalonadas.
@@ -569,6 +500,76 @@ class _ActiveShiftDashboardScreenState
     if (error != null && error.trim().isNotEmpty) {
       AppFeedback.error(context, error);
     }
+  }
+}
+
+class _NoK9VehiclePrompt extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _NoK9VehiclePrompt({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primary.withAlpha(40)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withAlpha(18),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.directions_car_rounded,
+                color: AppTheme.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Embarcar em viatura',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Escolha uma viatura e assuma um posto',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.primary,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

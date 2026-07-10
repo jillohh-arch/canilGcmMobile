@@ -11,6 +11,7 @@ import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
+import 'package:canil_gcm/features/shifts/presentation/screens/dog_associator_sheet.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
@@ -739,6 +740,8 @@ class _PostBoard extends StatelessWidget {
                 return _K9Line(
                   k9Member: k9Member,
                   hasBinomioActive: hasBinomioActive,
+                  isCurrentUserInCrew: isInThisCrew,
+                  currentHandlerId: currentHandlerId,
                 );
               }
             },
@@ -1008,15 +1011,18 @@ class _VacantSlot extends StatelessWidget {
 class _K9Line extends StatelessWidget {
   final VehicleCrewMember? k9Member;
   final bool hasBinomioActive;
+  final bool isCurrentUserInCrew;
+  final String? currentHandlerId;
 
   const _K9Line({
     required this.k9Member,
     required this.hasBinomioActive,
+    required this.isCurrentUserInCrew,
+    this.currentHandlerId,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Buscar nome do cão via DogService se tivermos o dogId
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1097,9 +1103,127 @@ class _K9Line extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          // Acoes de Embarcar/Desembarcar K9
+          if (isCurrentUserInCrew) ...[
+            if (k9Member != null) ...[
+              // K9 embarcado: botao Desembarcar
+              TextButton.icon(
+                onPressed: () => _onDissociateDog(context),
+                icon: const Icon(Icons.pets_rounded, size: 16),
+                label: const Text('SAIR'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textTertiary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ] else ...[
+              // Sem K9: botao Embarcar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primary.withAlpha(60)),
+                ),
+                child: InkWell(
+                  onTap: () => _onAssociateDog(context),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.pets_rounded, size: 16, color: AppTheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'EMBARCAR',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _onAssociateDog(BuildContext context) async {
+    await showDogAssociatorSheet(context);
+  }
+
+  Future<void> _onDissociateDog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfacePanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text(
+          'Desembarcar K9?',
+          style: GoogleFonts.inter(
+            color: AppTheme.warning,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: FutureBuilder<String?>(
+          future: k9Member?.dogId != null ? _getDogName(k9Member!.dogId!) : Future.value(null),
+          builder: (context, snap) {
+            final dogName = snap.data ?? k9Member?.dogId ?? 'K9';
+            return Text(
+              'Remover $dogName da guarnicao?\nO cao ficara livre para ser embarcado em outra.',
+              style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: AppTheme.textTertiary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Desembarcar',
+              style: GoogleFonts.inter(
+                color: AppTheme.warning,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+      await shiftVM.dissociateDog();
+
+      if (context.mounted) {
+        if (shiftVM.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(shiftVM.error!),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('K9 desembarcado com sucesso!'),
+              backgroundColor: AppTheme.success,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<String?> _getDogName(String dogId) async {
@@ -1108,7 +1232,7 @@ class _K9Line extends StatelessWidget {
       final dog = await dogService.watchDog(dogId).first;
       return dog?.name;
     } catch (_) {
-      return dogId; // Fallback: mostra o ID
+      return dogId;
     }
   }
 }

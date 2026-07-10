@@ -135,34 +135,9 @@ class ShiftViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> switchDog(String dogId) async {
-    final resolvedHandlerId = _resolveHandlerId();
-
-    _error = null;
-
-    if (resolvedHandlerId == null) {
-      _error = 'Usuario nao autenticado para trocar K9.';
-      notifyListeners();
-      return;
-    }
-
-    try {
-      await _shiftService.switchDog(handlerId: resolvedHandlerId, dogId: dogId);
-      _session = _session?.copyWith(
-        dogId: dogId,
-        serviceDogId: dogId,
-        lastDogSwitchAt: DateTime.now(),
-      );
-      notifyListeners();
-    } on FirebaseException catch (e) {
-      _error = 'Falha ao sincronizar troca de K9 [${e.code}]: ${e.message}';
-      notifyListeners();
-    } catch (e) {
-      _error = 'Falha ao sincronizar troca de K9: $e';
-      notifyListeners();
-    }
-  }
-
+  /// Assumir um posto na guarnição.
+  /// O cão pode ser associado DEPOIS via [associateDog].
+  /// Qualquer membro pode embarcar sem cão — guarnição pode operar sem K9.
   Future<void> assumeVehicle(
     Vehicle vehicle, {
     required String role,
@@ -170,24 +145,24 @@ class ShiftViewModel extends ChangeNotifier {
   }) async {
     final resolvedHandlerId = _resolveHandlerId();
     final currentUser = _authService.currentUser;
-    final activeDogId = _session?.dogId;
 
     _error = null;
     _setLoading(true);
 
-    if (resolvedHandlerId == null || activeDogId == null) {
-      _error = 'Turno ativo nao encontrado para assumir viatura.';
+    if (resolvedHandlerId == null) {
+      _error = 'Usuário não autenticado para assumir viatura.';
       _setLoading(false);
       return;
     }
 
     try {
+      // dogId vazio = embarque sem cão. O cão será associado depois via associateDog.
       await _shiftService.assumeVehicle(
         handlerId: resolvedHandlerId,
         handlerAuthUid: currentUser?.uid,
         handlerEmail: currentUser?.email,
         handlerName: name,
-        dogId: activeDogId,
+        dogId: '', // SEM cão na entrada
         vehicle: vehicle,
         role: role,
       );
@@ -215,9 +190,11 @@ class ShiftViewModel extends ChangeNotifier {
 
       _setLoading(false);
     } on FirebaseException catch (e) {
+      debugPrint('[ShiftViewModel] assumeVehicle bloqueado [${e.code}]: ${e.message}');
       _error = 'Falha ao assumir viatura [${e.code}]: ${e.message}';
       _setLoading(false);
     } catch (e) {
+      debugPrint('[ShiftViewModel] assumeVehicle falhou: $e');
       _error = 'Falha ao assumir viatura: $e';
       _setLoading(false);
     }
@@ -269,6 +246,101 @@ class ShiftViewModel extends ChangeNotifier {
       _error = 'Falha ao liberar posto: $e';
       _setLoading(false);
     }
+  }
+
+  /// Associa um cão à guarnição do usuário.
+  /// O usuário precisa estar embarcado na viatura.
+  /// [dogId] - ID do cão a ser embarcado.
+  Future<void> associateDog(String dogId) async {
+    final resolvedHandlerId = _resolveHandlerId();
+
+    _error = null;
+    _setLoading(true);
+
+    if (resolvedHandlerId == null) {
+      _error = 'Usuário não autenticado.';
+      _setLoading(false);
+      return;
+    }
+
+    try {
+      await _shiftService.associateDog(
+        handlerId: resolvedHandlerId,
+        dogId: dogId,
+      );
+      // Atualiza session com o cão
+      _session = _session?.copyWith(
+        dogId: dogId,
+        serviceDogId: dogId,
+      );
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'K9 embarcado: $dogId',
+        after: {'dogId': dogId},
+      );
+
+      _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao embarcar K9 [${e.code}]: ${e.message}';
+      _setLoading(false);
+    } catch (e) {
+      _error = 'Falha ao embarcar K9: $e';
+      _setLoading(false);
+    }
+  }
+
+  /// Desassocia o cão da guarnição do usuário.
+  /// O cão fica livre para ser associado a outra guarnição.
+  Future<void> dissociateDog() async {
+    final resolvedHandlerId = _resolveHandlerId();
+
+    _error = null;
+    _setLoading(true);
+
+    if (resolvedHandlerId == null) {
+      _error = 'Usuário não autenticado.';
+      _setLoading(false);
+      return;
+    }
+
+    try {
+      await _shiftService.dissociateDog(handlerId: resolvedHandlerId);
+      // Atualiza session removendo o cão
+      _session = _session?.copyWith(
+        dogId: null,
+        serviceDogId: null,
+      );
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'K9 desassociado da guarnição',
+      );
+
+      _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao desassociar K9 [${e.code}]: ${e.message}';
+      _setLoading(false);
+    } catch (e) {
+      _error = 'Falha ao desassociar K9: $e';
+      _setLoading(false);
+    }
+  }
+
+  /// Verifica titularidade do cão para exibição de aviso na UI.
+  Future<DogOwnershipCheck> checkDogOwnership(String dogId) async {
+    final resolvedHandlerId = _resolveHandlerId();
+    if (resolvedHandlerId == null) {
+      return const DogOwnershipCheck(
+        hasTitular: false,
+        isTitular: false,
+      );
+    }
+    return _shiftService.checkDogOwnership(dogId, resolvedHandlerId);
   }
 
   Future<void> endShift() async {

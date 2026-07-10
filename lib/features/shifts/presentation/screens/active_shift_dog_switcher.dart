@@ -212,7 +212,12 @@ class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
                 }
                 if (!context.mounted) return;
                 Navigator.of(context).pop();
-                await widget.shiftVM.switchDog(dog.id);
+                // Novo fluxo: se já tem cão embarcado, desassociar primeiro
+                final currentDogId = widget.shiftVM.session?.dogId;
+                if (currentDogId != null && currentDogId.isNotEmpty) {
+                  await widget.shiftVM.dissociateDog();
+                }
+                await widget.shiftVM.associateDog(dog.id);
                 if (!context.mounted) return;
                 final error = widget.shiftVM.error;
                 if (error != null && error.trim().isNotEmpty) {
