@@ -2669,6 +2669,34 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   };
 });
 
+export const adminResetHumanPassword = onCall({region}, async (request) => {
+  const caller = await requireAccessPermission(request.auth, "humans", "edit");
+  const data = request.data as JsonMap;
+  const ra = requiredString(data, "ra");
+  assertHumanRa(ra);
+
+  const email = emailForRa(ra);
+  let authUser: admin.auth.UserRecord;
+  try {
+    authUser = await admin.auth().getUserByEmail(email);
+  } catch {
+    throw new HttpsError("not-found", "Conta de acesso nao localizada para este RA.");
+  }
+
+  const temporaryPassword = `${crypto.randomBytes(8).toString("base64url")}aA1!`;
+  await admin.auth().updateUser(authUser.uid, {password: temporaryPassword});
+
+  const userRef = db.collection("users").doc(ra);
+  await userRef.update({
+    audit_trail: admin.firestore.FieldValue.arrayUnion(
+      auditEntry("password_reset", caller),
+    ),
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {temporary_password: temporaryPassword};
+});
+
 export const adminArchiveHuman = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "humans", "archive");
   const data = request.data as JsonMap;
@@ -6076,8 +6104,47 @@ export const closeOccurrenceForSignatures = onCall({region}, async (request) => 
     }
 
     const coSigners = coSignerIds(occurrence);
+
+    // Sem coassinantes elegíveis: selar diretamente sem rodada de assinaturas.
     if (coSigners.length === 0) {
-      throw new HttpsError("failed-precondition", "Nenhum integrante apto para co-assinatura.");
+      const directEntry = auditEntry("finalized_no_cosigners", caller);
+      transaction.update(occurrenceRef, {
+        status: "finalized",
+        finalized_at: admin.firestore.FieldValue.serverTimestamp(),
+        final_report: finalReport,
+        results: requestedResults.length > 0 ?
+          requestedResults :
+          (Array.isArray(occurrence.results) ? occurrence.results : []),
+        details: requestedDetails ?? occurrence.details ?? null,
+        finalization_photos: requestedPhotos.length > 0 ?
+          requestedPhotos :
+          (Array.isArray(occurrence.finalization_photos) ? occurrence.finalization_photos : []),
+        finalization_photo_hashes: requestedPhotoHashes.length > 0 ?
+          requestedPhotoHashes :
+          (Array.isArray(occurrence.finalization_photo_hashes) ?
+            occurrence.finalization_photo_hashes : []),
+        finalization_draft: admin.firestore.FieldValue.delete(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        audit_trail: admin.firestore.FieldValue.arrayUnion(directEntry),
+      });
+
+      transaction.set(db.collection("auditLogs").doc(), {
+        action: "finalized_no_cosigners",
+        entity_type: "occurrence",
+        entity_id: occurrenceId,
+        summary: "Ocorrência finalizada diretamente (sem coassinantes elegíveis)",
+        actor: caller,
+        metadata: {team_size: teamMembers(occurrence).length},
+        source: "functions",
+        performed_at: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        status: "finalized",
+        signature_round: 0,
+        pending_signatures: [],
+      };
     }
 
     const round = signatureRound(occurrence);
