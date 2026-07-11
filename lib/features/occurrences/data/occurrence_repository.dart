@@ -13,6 +13,11 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
+enum CloseForSignaturesResult {
+  awaitingSignatures,
+  sealedDirectly,
+}
+
 class OccurrenceRepository {
   final FirebaseFirestore _firestore;
 
@@ -526,7 +531,7 @@ class OccurrenceRepository {
   /// awaiting_signatures -> in_progress: `revertToDraft` cancela o pedido.
   /// awaiting_signatures -> finalized/finalized_with_pending: feito pela
   /// camada de finalizacao, com hash de integridade.
-  Future<void> closeForSignatures({
+  Future<CloseForSignaturesResult> closeForSignatures({
     String? id,
     String? occurrenceId,
     DateTime? deadline,
@@ -609,7 +614,7 @@ class OccurrenceRepository {
           },
         ),
       );
-      return;
+      return CloseForSignaturesResult.sealedDirectly;
     }
 
     final draftPayload = _finalizationPayloadFromDraft(
@@ -671,6 +676,8 @@ class OccurrenceRepository {
         },
       ),
     );
+
+    return CloseForSignaturesResult.awaitingSignatures;
   }
 
   Future<void> addSignature({
