@@ -2669,34 +2669,6 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   };
 });
 
-export const adminResetHumanPassword = onCall({region}, async (request) => {
-  const caller = await requireAccessPermission(request.auth, "humans", "edit");
-  const data = request.data as JsonMap;
-  const ra = requiredString(data, "ra");
-  assertHumanRa(ra);
-
-  const email = emailForRa(ra);
-  let authUser: admin.auth.UserRecord;
-  try {
-    authUser = await admin.auth().getUserByEmail(email);
-  } catch {
-    throw new HttpsError("not-found", "Conta de acesso nao localizada para este RA.");
-  }
-
-  const temporaryPassword = `${crypto.randomBytes(8).toString("base64url")}aA1!`;
-  await admin.auth().updateUser(authUser.uid, {password: temporaryPassword});
-
-  const userRef = db.collection("users").doc(ra);
-  await userRef.update({
-    audit_trail: admin.firestore.FieldValue.arrayUnion(
-      auditEntry("password_reset", caller),
-    ),
-    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  return {temporary_password: temporaryPassword};
-});
-
 export const adminArchiveHuman = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "humans", "archive");
   const data = request.data as JsonMap;
