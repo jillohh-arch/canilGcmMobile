@@ -13,6 +13,11 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
+enum CloseForSignaturesResult {
+  awaitingSignatures,
+  sealedDirectly,
+}
+
 class OccurrenceRepository {
   final FirebaseFirestore _firestore;
 
@@ -526,7 +531,7 @@ class OccurrenceRepository {
   /// awaiting_signatures -> in_progress: `revertToDraft` cancela o pedido.
   /// awaiting_signatures -> finalized/finalized_with_pending: feito pela
   /// camada de finalizacao, com hash de integridade.
-  Future<void> closeForSignatures({
+  Future<CloseForSignaturesResult> closeForSignatures({
     String? id,
     String? occurrenceId,
     DateTime? deadline,
@@ -557,8 +562,59 @@ class OccurrenceRepository {
         .where((member) => member.role != TeamRole.titular)
         .where((member) => _canRequestSignatureFor(current, member.handlerId))
         .toList();
+
+    // Sem coassinantes elegíveis: selar diretamente sem fluxo de assinaturas.
+    // A regra de negócio permite finalizar mesmo sem coassinantes (ex: condutor
+    // solo ou participações não confirmadas).
     if (coSigners.isEmpty) {
-      throw StateError('Adicione pelo menos um integrante para co-assinatura');
+      final draftPayload = _finalizationPayloadFromDraft(
+        current.finalizationDraft,
+      );
+      final resolvedFinalReport =
+          _nonEmpty(finalReport) ??
+          _nonEmpty(current.finalReport) ??
+          _nonEmpty(draftPayload.finalReport);
+      if (resolvedFinalReport == null) {
+        throw StateError(
+          'Finalize o relato antes de fechar a ocorrencia',
+        );
+      }
+      final resolvedResults = results ?? current.results;
+      final finalResults = resolvedResults.isNotEmpty
+          ? resolvedResults
+          : draftPayload.results;
+      final resolvedDetails =
+          details ?? current.details ?? draftPayload.details;
+      final resolvedPhotos = finalizationPhotos.isNotEmpty
+          ? finalizationPhotos
+          : current.finalizationPhotos;
+      final resolvedPhotoHashes = finalizationPhotoHashes.isNotEmpty
+          ? finalizationPhotoHashes
+          : current.finalizationPhotoHashes;
+
+      await OccurrenceTransitionService().sealOccurrenceV4(
+        occurrenceId: resolvedId,
+        finalReport: resolvedFinalReport,
+        results: finalResults,
+        details: resolvedDetails,
+        finalizationPhotos: resolvedPhotos,
+        finalizationPhotoHashes: resolvedPhotoHashes,
+      );
+
+      unawaited(
+        AuditService.log(
+          action: 'finalized_no_cosigners',
+          entityType: 'occurrence',
+          entityId: resolvedId,
+          summary: 'Ocorrencia finalizada diretamente (sem coassinantes elegiveis)',
+          after: {
+            'status': 'finalized',
+            'has_final_report': true,
+            'team_size': current.team.length,
+          },
+        ),
+      );
+      return CloseForSignaturesResult.sealedDirectly;
     }
 
     final draftPayload = _finalizationPayloadFromDraft(
@@ -620,6 +676,8 @@ class OccurrenceRepository {
         },
       ),
     );
+
+    return CloseForSignaturesResult.awaitingSignatures;
   }
 
   Future<void> addSignature({

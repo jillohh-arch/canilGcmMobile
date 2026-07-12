@@ -375,7 +375,7 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   // ─── Cancelamento ──────────────────────────────────────────────────
 
-  Future<void> closeForSignatures({
+  Future<CloseForSignaturesResult> closeForSignatures({
     required String id,
     required String finalReport,
     required List<OccurrenceResult> results,
@@ -384,7 +384,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     List<String> finalizationPhotoHashes = const [],
     Duration signatureDeadline = const Duration(hours: 48),
   }) async {
-    if (_isLoading) return;
+    if (_isLoading) return CloseForSignaturesResult.awaitingSignatures;
 
     _isLoading = true;
     _error = null;
@@ -396,7 +396,7 @@ class OccurrenceViewModel extends ChangeNotifier {
         throw StateError('Ocorrencia nao encontrada.');
       }
 
-      await _repository.closeForSignatures(
+      final result = await _repository.closeForSignatures(
         occurrenceId: id,
         signatureDeadline: signatureDeadline,
         finalReport: finalReport,
@@ -410,6 +410,8 @@ class OccurrenceViewModel extends ChangeNotifier {
       _openSub = null;
       _openOccurrence = null;
       notifyListeners();
+
+      return result;
     } catch (e) {
       _error = 'Erro ao fechar ocorrencia para assinaturas: $e';
       notifyListeners();

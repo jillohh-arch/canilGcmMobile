@@ -15,6 +15,7 @@ import 'package:canil_gcm/core/services/storage_service.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_ai_service.dart';
+import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
@@ -578,7 +579,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final photoHashes = photoUploadResults.map((r) => r.sha256Hash).toList();
 
       if (_hasCoSigners) {
-        await vm
+        final closeResult = await vm
             .closeForSignatures(
               id: widget.occurrenceId,
               finalReport: report,
@@ -597,7 +598,35 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
               },
             );
 
-        if (mounted) {
+        if (!mounted) return;
+
+        if (closeResult == CloseForSignaturesResult.sealedDirectly) {
+          final sealedOccurrence = await vm.getById(widget.occurrenceId);
+          final confirmedHash =
+              sealedOccurrence?.integrityHash?.trim().isNotEmpty == true
+              ? sealedOccurrence!.integrityHash!
+              : '';
+
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => OccurrenceConfirmationScreen(
+                data: OccurrenceConfirmationData(
+                  occurrenceId: widget.occurrenceId,
+                  typeName: widget.typeName,
+                  durationLabel: widget.durationLabel,
+                  locationAddress: widget.locationAddress,
+                  dogName: widget.dogName,
+                  handlerName: widget.handlerName,
+                  eventCount: widget.eventCount,
+                  results: results,
+                  details: details,
+                  integrityHash: confirmedHash,
+                ),
+              ),
+            ),
+          );
+        } else {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) =>

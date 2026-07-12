@@ -7,10 +7,12 @@ import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/occurrence_transition_service.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
+import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_finalization_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_team_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_review_screen.dart';
@@ -31,6 +33,7 @@ class OccurrenceTeamScreen extends StatefulWidget {
 
 class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
   late OccurrenceFinalizationViewModel _viewModel;
+  bool _hasNavigatedToConfirmation = false;
 
   @override
   void initState() {
@@ -39,21 +42,74 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
       occurrenceRepository: OccurrenceRepository(FirebaseFirestore.instance),
       signatureRepository: SignatureRepository(),
     );
-    _viewModel.addListener(_syncAppBarActions);
+    _viewModel.addListener(_onViewModelChanged);
     _viewModel.initialize(occurrenceId: widget.occurrenceId);
   }
 
   @override
   void dispose() {
-    _viewModel.removeListener(_syncAppBarActions);
+    _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
     super.dispose();
   }
 
-  void _syncAppBarActions() {
-    if (mounted) {
-      setState(() {});
+  void _onViewModelChanged() {
+    if (!mounted) return;
+
+    // Detect finalization (local auto-finalization or remote update)
+    if (_viewModel.isFinalized && !_hasNavigatedToConfirmation) {
+      _navigateToConfirmation();
+      return;
     }
+
+    setState(() {});
+  }
+
+  void _navigateToConfirmation() {
+    if (_hasNavigatedToConfirmation) return;
+    _hasNavigatedToConfirmation = true;
+
+    final occurrence = _viewModel.occurrence!;
+    final dogVM = context.read<DogViewModel>();
+
+    final dog = dogVM.dogs.cast<dynamic>().firstWhere(
+      (d) => d.id == occurrence.dogId,
+      orElse: () => null,
+    );
+    final dogName = dog?.name ?? 'Cão';
+    final handlerName =
+        FirebaseAuth.instance.currentUser?.displayName ?? 'Condutor';
+
+    final durationLabel = _buildDurationLabel(occurrence);
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OccurrenceConfirmationScreen(
+          data: OccurrenceConfirmationData(
+            occurrenceId: occurrence.id,
+            typeName: occurrence.typeName,
+            durationLabel: durationLabel,
+            locationAddress: occurrence.locationAddress,
+            dogName: dogName,
+            handlerName: handlerName,
+            eventCount: 0,
+            results: occurrence.results,
+            details: occurrence.details,
+            integrityHash: occurrence.integrityHash ?? '',
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _buildDurationLabel(Occurrence occurrence) {
+    final start = occurrence.startedAt;
+    final end = occurrence.finalizedAt ?? DateTime.now();
+    final diff = end.difference(start);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes.remainder(60);
+    if (hours > 0) return '${hours}h ${minutes}min';
+    return '${minutes}min';
   }
 
   @override

@@ -10,6 +10,7 @@ class OccurrenceFinalizationViewModel extends OccurrenceTeamViewModel {
   OccurrenceFinalizationViewModel({
     required super.occurrenceRepository,
     required super.signatureRepository,
+    super.notificationService,
     OccurrenceFinalizationService? finalizationService,
   }) : _occurrenceRepository = occurrenceRepository,
        _finalizationService =
@@ -24,6 +25,14 @@ class OccurrenceFinalizationViewModel extends OccurrenceTeamViewModel {
 
   bool get isCheckingDeadline => _isCheckingDeadline;
   bool get isAutoFinalizing => _isAutoFinalizing;
+
+  /// Whether the occurrence reached a terminal finalized state.
+  /// Use this in the UI to trigger navigation to the confirmation screen.
+  bool get isFinalized {
+    final status = occurrence?.status;
+    return status == OccurrenceStatus.finalized ||
+        status == OccurrenceStatus.finalizedWithPending;
+  }
 
   @override
   bool get shouldShowDeadlineWarning {
