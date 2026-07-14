@@ -2,7 +2,7 @@
 
 **Data de criação:** 2026-07-13  
 **Autor:** Jilles Ragonha + Claude Fable 5  
-**Status:** Aguardando aprovação para merge em main
+**Status:** Aprovada para merge após validação documental
 
 ---
 
@@ -11,12 +11,13 @@
 | Campo | Valor |
 |-------|-------|
 | Repositório | `github.com/jillohh-arch/canilGcmMobile` |
-| Branch oficial da baseline | `chore/health-v1-baseline` |
-| SHA completo (ancestral) | `b19dc649bfd55619b9547dc8eff1dc5bda86b92f` |
-| SHA de origin/main | `80ad548723e092dd87f37e90c1310296f1e06132` |
-| Relação com origin/main | ahead 1 (commit `b19dc64` = docs Architecture + Roadmap) |
+| Branch de preparação | `chore/health-v1-baseline` |
+| Origin/main de referência | `80ad548723e092dd87f37e90c1310296f1e06132` |
+| Ancestral documental | `b19dc649bfd55619b9547dc8eff1dc5bda86b92f` |
+| Commit de publicação inicial da baseline | `3598f4de4367deabfef6b521acbb24d7698a73b3` |
+| Ref oficial após merge | tag `health-v1-baseline-2026-07-13` |
 | Data | 2026-07-13 |
-| Working tree | Limpo (nenhuma alteração funcional) |
+| Working tree | Limpo |
 
 ---
 
@@ -36,7 +37,7 @@
 | Campo | Valor |
 |-------|-------|
 | Branch | `backup/pre-health-v1-baseline-2026-07-13` |
-| SHA do snapshot | `899dedc` |
+| SHA do snapshot | `899dedcc872e0f2758c03e8f44aba98044f76158` |
 | Remoto | Publicada em origin |
 | Conteúdo | Working tree completo no momento da auditoria (Health + Shifts + testes) |
 
@@ -121,6 +122,23 @@ ls docs/HEALTH_IMPLEMENTATION_ROADMAP.md
 ls docs/HEALTH_MODULE_AUDIT.md
 ls docs/health/HEALTH_V1_BASELINE.md
 ```
+
+---
+
+## Validações executadas
+
+| Comando | Resultado | Observação |
+|---------|-----------|------------|
+| `flutter analyze` | Concluído com 8 ocorrências | 7 infos `use_build_context_synchronously` e 1 warning `unused_element`; nenhum erro e nenhuma ocorrência em Health |
+| `flutter test` | 182 testes, 1 falha | Falha preexistente no módulo Training: `'Condicionamento'` versus `'Condicionamento Físico'` |
+| `flutter build apk --debug` | Sucesso | APK debug gerado em ~115s |
+| Firebase Rules/Indexes | Não executado | Não existe suíte de testes de Rules no repositório e nenhuma foi criada nesta fase |
+
+### Estado de qualidade da baseline
+
+A baseline está aprovada como baseline documental e arquitetural.
+
+Ela não é uma baseline totalmente verde de testes porque existe uma falha preexistente no módulo Training, não relacionada ao Health v1.0. Essa falha deverá ser tratada em uma branch própria antes do primeiro commit funcional do Health v1.0.
 
 ---
 
