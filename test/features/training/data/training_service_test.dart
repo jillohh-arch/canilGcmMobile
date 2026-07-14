@@ -368,7 +368,7 @@ void main() {
 
       expect(
         data.generalTrainings.map((training) => training.name),
-        containsAll(const ['Obediência', 'Condicionamento']),
+        containsAll(const ['Obediência', 'Condicionamento Físico']),
       );
     });
   });
