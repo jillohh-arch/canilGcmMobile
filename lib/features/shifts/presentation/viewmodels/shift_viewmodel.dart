@@ -136,6 +136,11 @@ class ShiftViewModel extends ChangeNotifier {
   }
 
   Future<void> switchDog(String dogId) async {
+    if (_session?.hasK9 != true) {
+      await associateDog(dogId);
+      return;
+    }
+
     final resolvedHandlerId = _resolveHandlerId();
 
     _error = null;
@@ -160,6 +165,46 @@ class ShiftViewModel extends ChangeNotifier {
     } catch (e) {
       _error = 'Falha ao sincronizar troca de K9: $e';
       notifyListeners();
+    }
+  }
+
+  Future<void> associateDog(String dogId) async {
+    final resolvedHandlerId = _resolveHandlerId();
+
+    _error = null;
+    _setLoading(true);
+
+    if (resolvedHandlerId == null || !hasActiveShift) {
+      _error = 'Turno ativo nao encontrado para associar K9.';
+      _setLoading(false);
+      return;
+    }
+
+    try {
+      await _shiftService.associateDog(
+        handlerId: resolvedHandlerId,
+        dogId: dogId,
+      );
+      _session = _session?.copyWith(
+        dogId: dogId,
+        serviceDogId: dogId,
+        lastDogSwitchAt: DateTime.now(),
+      );
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'K9 associado ao turno: $dogId',
+        after: {'dogId': dogId, 'shiftId': _session?.shiftId},
+      );
+      _setLoading(false);
+    } on FirebaseException catch (e) {
+      _error = 'Falha ao associar K9 [${e.code}]: ${e.message}';
+      _setLoading(false);
+    } catch (e) {
+      _error = 'Falha ao associar K9: $e';
+      _setLoading(false);
     }
   }
 
@@ -358,7 +403,8 @@ class ShiftViewModel extends ChangeNotifier {
             _clearSession(notify: false);
             _isLoading = false;
             if (e is FirebaseException) {
-              _error = 'Falha ao carregar turno ativo [${e.code}]: ${e.message}';
+              _error =
+                  'Falha ao carregar turno ativo [${e.code}]: ${e.message}';
             } else {
               _error = 'Falha ao carregar turno ativo: $e';
             }

@@ -38,7 +38,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _ShiftHeader extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final String? currentRa;
   final String? conductorPhotoUrl;
   final VoidCallback onSwitchDog;
@@ -70,7 +70,9 @@ class _ShiftHeader extends StatelessWidget {
       ),
       child: BinomioHeader(
         dog: dog,
-        subtitle: 'Turno ativo · $elapsed',
+        subtitle: dog == null
+            ? 'Turno ativo · Sem K9 · $elapsed'
+            : 'Turno ativo · $elapsed',
         subtitleColor: AppTheme.success,
         statusDotColor: AppTheme.success,
         showStatusDot: true,
@@ -82,7 +84,7 @@ class _ShiftHeader extends StatelessWidget {
             : null,
         onSwitchDog: onSwitchDog,
         onProfileTap: onProfile,
-        onDogHealthTap: onDogHealth,
+        onDogHealthTap: dog == null ? null : onDogHealth,
       ),
     );
   }

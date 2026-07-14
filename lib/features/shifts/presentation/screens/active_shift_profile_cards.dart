@@ -4,7 +4,7 @@ part of 'active_shift_dashboard_screen.dart';
 /// Card unificado "EM SERVIÇO" — funde Binômio + Guarnição
 /// ─────────────────────────────────────────────────────────────
 class _EmServicoCard extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final String callsign;
   final String? conductorPhotoUrl;
 
@@ -28,13 +28,19 @@ class _EmServicoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FAIXA 1 — BINÔMIO (sempre presente com turno ativo)
-          _BinomioFaixa(
-            dog: dog,
-            callsign: callsign,
-            conductorPhotoUrl: conductorPhotoUrl,
-            hasVehicle: hasVehicle,
-          ),
+          // FAIXA 1 — estado do K9 dentro do mesmo card operacional.
+          if (dog != null)
+            _BinomioFaixa(
+              dog: dog!,
+              callsign: callsign,
+              conductorPhotoUrl: conductorPhotoUrl,
+              hasVehicle: hasVehicle,
+            )
+          else
+            _SemK9Faixa(
+              callsign: callsign,
+              conductorPhotoUrl: conductorPhotoUrl,
+            ),
           // Divisor
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 14),
@@ -43,6 +49,92 @@ class _EmServicoCard extends StatelessWidget {
           ),
           // FAIXA 2 — GUARNIÇÃO (estado-dependente)
           _GuarnicaoFaixa(hasVehicle: hasVehicle, dog: dog),
+        ],
+      ),
+    );
+  }
+}
+
+class _SemK9Faixa extends StatelessWidget {
+  final String callsign;
+  final String? conductorPhotoUrl;
+
+  const _SemK9Faixa({required this.callsign, required this.conductorPhotoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final handlerId = context.watch<ShiftViewModel>().handlerId;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Row(
+        children: [
+          _BinomioAvatar(
+            size: 58,
+            imageUrl: conductorPhotoUrl,
+            icon: Icons.person_rounded,
+            accent: AppTheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  callsign,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Em serviço${handlerId != null ? ' · RA $handlerId' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Sem K9 no turno',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.warning,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showDogSwitcher(context);
+            },
+            icon: const Icon(Icons.add_rounded, size: 17),
+            label: const Text('ASSOCIAR K9'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              textStyle: GoogleFonts.robotoMono(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
+              side: BorderSide(color: AppTheme.primary.withAlpha(70)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -74,8 +166,8 @@ class _BinomioFaixa extends StatelessWidget {
         ? _roleLabelCapitalized(crewRole)
         : null;
     // Badge K9 junto ao condutor se ele é o condutor do cão
-    final isK9Conductor = shiftVM.activeDogId != null &&
-        shiftVM.activeDogId!.trim().isNotEmpty;
+    final isK9Conductor =
+        shiftVM.activeDogId != null && shiftVM.activeDogId!.trim().isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
@@ -92,9 +184,7 @@ class _BinomioFaixa extends StatelessWidget {
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => K9ProfilePage(dog: dog),
-                ),
+                MaterialPageRoute(builder: (_) => K9ProfilePage(dog: dog)),
               );
             },
           ),
@@ -169,7 +259,10 @@ class _BinomioFaixa extends StatelessWidget {
                 if (isK9Conductor && condutorPapel != null) ...[
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withAlpha(20),
                       borderRadius: BorderRadius.circular(4),
@@ -232,7 +325,8 @@ class _BinomioAvatar extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
-                errorWidget: (_, _, _) => Icon(icon, color: accent, size: iconSize),
+                errorWidget: (_, _, _) =>
+                    Icon(icon, color: accent, size: iconSize),
               )
             : Icon(icon, color: accent, size: iconSize),
       ),
@@ -242,10 +336,7 @@ class _BinomioAvatar extends StatelessWidget {
       avatar = Hero(tag: heroTag!, child: avatar);
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: avatar,
-    );
+    return GestureDetector(onTap: onTap, child: avatar);
   }
 }
 
@@ -263,10 +354,7 @@ class _GuarnicaoFaixa extends StatelessWidget {
       switchInCurve: HudCurves.enter,
       switchOutCurve: HudCurves.exit,
       child: hasVehicle
-          ? _GuarnicaoEmbarcada(
-              key: const ValueKey('embarcado'),
-              dog: dog,
-            )
+          ? _GuarnicaoEmbarcada(key: const ValueKey('embarcado'), dog: dog)
           : _GuarnicaoSemViatura(key: const ValueKey('sem_viatura')),
     );
   }
@@ -408,7 +496,10 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                 const SizedBox(width: 8),
                 if (vehicleLabel != null && vehicleLabel.isNotEmpty) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withAlpha(15),
                       borderRadius: BorderRadius.circular(4),
@@ -447,7 +538,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
               builder: (context, snapshot) {
                 final members = snapshot.data ?? [];
                 final activeMembers = {
-                  for (final m in members.where((m) => m.isActive)) m.role: m
+                  for (final m in members.where((m) => m.isActive)) m.role: m,
                 };
 
                 return Column(
@@ -465,7 +556,9 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
                       const SizedBox(height: 6),
                       _Aux2CompactRow(
                         member: activeMembers['auxiliar_2']!,
-                        isCurrentUser: activeMembers['auxiliar_2']!.handlerId == currentHandlerId,
+                        isCurrentUser:
+                            activeMembers['auxiliar_2']!.handlerId ==
+                            currentHandlerId,
                       ),
                     ],
                   ],
@@ -576,7 +669,9 @@ class _K9Card extends StatelessWidget {
         color: hasDog ? k9AccentBg : AppTheme.surfacePanelAlt,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: hasDog ? k9Accent.withAlpha(100) : AppTheme.outlineVariant.withAlpha(60),
+          color: hasDog
+              ? k9Accent.withAlpha(100)
+              : AppTheme.outlineVariant.withAlpha(60),
         ),
       ),
       child: hasDog
@@ -718,8 +813,8 @@ class _CrewPostCard extends StatelessWidget {
           color: isCurrentUser
               ? AppTheme.primary.withAlpha(180)
               : isOccupied
-                  ? AppTheme.outlineVariant
-                  : AppTheme.outlineVariant.withAlpha(60),
+              ? AppTheme.outlineVariant
+              : AppTheme.outlineVariant.withAlpha(60),
           width: isCurrentUser ? 1.5 : 1,
         ),
       ),
@@ -823,10 +918,7 @@ class _OccupiedCrewCard extends StatelessWidget {
                     const SizedBox(width: 4),
                   ],
                   // K9 badge — cyan sólido (se este membro tem cão embarcado)
-                  if (hasK9) ...[
-                    _BadgeK9(),
-                    const SizedBox(width: 4),
-                  ],
+                  if (hasK9) ...[_BadgeK9(), const SizedBox(width: 4)],
                   // Dot de status
                   Container(
                     width: 7,
@@ -1025,10 +1117,7 @@ class _CrewBadgePhoto extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         color: accent.withAlpha(15),
-        border: Border.all(
-          color: accent.withAlpha(120),
-          width: 1,
-        ),
+        border: Border.all(color: accent.withAlpha(120), width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
@@ -1062,11 +1151,7 @@ class _K9Photo extends StatelessWidget {
   final String? imageUrl;
   final Color accent;
 
-  const _K9Photo({
-    required this.size,
-    this.imageUrl,
-    required this.accent,
-  });
+  const _K9Photo({required this.size, this.imageUrl, required this.accent});
 
   @override
   Widget build(BuildContext context) {
@@ -1080,10 +1165,7 @@ class _K9Photo extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         color: accent.withAlpha(15),
-        border: Border.all(
-          color: accent.withAlpha(120),
-          width: 1,
-        ),
+        border: Border.all(color: accent.withAlpha(120), width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
@@ -1110,10 +1192,7 @@ class _Aux2CompactRow extends StatelessWidget {
   final VehicleCrewMember member;
   final bool isCurrentUser;
 
-  const _Aux2CompactRow({
-    required this.member,
-    required this.isCurrentUser,
-  });
+  const _Aux2CompactRow({required this.member, required this.isCurrentUser});
 
   @override
   Widget build(BuildContext context) {

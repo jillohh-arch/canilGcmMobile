@@ -474,7 +474,7 @@ class _HealthProntuarioBody extends StatelessWidget {
                   ),
                   Positioned(
                     right: 22,
-                    bottom: 22,
+                    bottom: 96,
                     child: _HealthActionFab(onTap: onOpenHealthHub),
                   ),
                 ],

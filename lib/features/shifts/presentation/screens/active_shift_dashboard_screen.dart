@@ -61,8 +61,7 @@ class ActiveShiftDashboardScreen extends StatefulWidget {
       _ActiveShiftDashboardScreenState();
 }
 
-class _ActiveShiftDashboardScreenState
-    extends State<ActiveShiftDashboardScreen>
+class _ActiveShiftDashboardScreenState extends State<ActiveShiftDashboardScreen>
     with TickerProviderStateMixin {
   final DogService _dogService = DogService();
   final DashboardService _dashboardService = DashboardService();
@@ -128,8 +127,14 @@ class _ActiveShiftDashboardScreenState
       animation: _sectionsAnimation,
       builder: (context, _) {
         final progress = _sectionsAnimation.value;
-        final interval = Interval(intervalStart, intervalEnd, curve: HudCurves.enter);
-        final sectionProgress = interval.transform(progress.clamp(intervalStart, intervalEnd));
+        final interval = Interval(
+          intervalStart,
+          intervalEnd,
+          curve: HudCurves.enter,
+        );
+        final sectionProgress = interval.transform(
+          progress.clamp(intervalStart, intervalEnd),
+        );
 
         return Opacity(
           opacity: sectionProgress,
@@ -142,160 +147,8 @@ class _ActiveShiftDashboardScreenState
     );
   }
 
-  /// Dashboard simplificado para turno sem K9 (motorista/apoio).
-  Widget _buildNoK9Body(String callsign) {
-    final shiftVM = Provider.of<ShiftViewModel>(context);
-    final hasVehicle = shiftVM.hasVehicle;
-    final userVM = Provider.of<UserViewModel>(context);
-    final authVM = Provider.of<AuthViewModel>(context);
-    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
-    final userModel = userVM.findByRa(currentRa);
-    final userPhoto = userModel?.photoUrl?.trim();
-    final firebasePhoto = authVM.user?.photoURL?.trim();
-    final conductorPhoto = userPhoto != null && userPhoto.isNotEmpty
-        ? userPhoto
-        : firebasePhoto != null && firebasePhoto.isNotEmpty
-        ? firebasePhoto
-        : null;
-
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header simplificado — sem BinomioHeader pois não há cão
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.primary.withAlpha(12),
-                    border: Border.all(color: AppTheme.primary.withAlpha(180)),
-                  ),
-                  child: conductorPhoto != null
-                      ? ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: conductorPhoto,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, _, _) => const Icon(
-                              Icons.person_rounded,
-                              color: AppTheme.primary,
-                              size: 24,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.person_rounded,
-                          color: AppTheme.primary,
-                          size: 24,
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        callsign,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Em serviço · Sem K9',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Scroll area
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Card condutor solo (sem binômio)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.textPrimary.withAlpha(7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.textPrimary.withAlpha(18)),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.primary.withAlpha(12),
-                            border: Border.all(color: AppTheme.primary.withAlpha(180)),
-                          ),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            color: AppTheme.primary,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                callsign,
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Em serviço · Sem K9',
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Guarnição (se embarcado)
-                  if (hasVehicle) ...[
-                    const SizedBox(height: 14),
-                    _GuarnicaoFaixa(hasVehicle: true, dog: null),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Monta o conteúdo do dashboard com animações de entrada escalonadas.
-  Widget _buildCockpitBody(Dog dog, String callsign) {
+  Widget _buildCockpitBody(Dog? dog, String callsign) {
     final userVM = Provider.of<UserViewModel>(context);
     final authVM = Provider.of<AuthViewModel>(context);
     final currentRa = HandlerIdentityService.raFromUser(authVM.user);
@@ -323,7 +176,7 @@ class _ActiveShiftDashboardScreenState
             currentRa: currentRa,
             conductorPhotoUrl: conductorPhoto,
             onSwitchDog: () => _showDogSwitcher(context),
-            onDogHealth: widget.onOpenHealthTab,
+            onDogHealth: dog == null ? null : widget.onOpenHealthTab,
             onProfile: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const HandlerProfilePage(showBottomNav: false),
@@ -348,12 +201,14 @@ class _ActiveShiftDashboardScreenState
                     intervalEnd: base + step * 1 + 0.12,
                   ),
                   const SizedBox(height: 18),
-                  _animateSection(
-                    const _OperationalPulseSection(),
-                    intervalStart: base + step * 2,
-                    intervalEnd: base + step * 2 + 0.1,
-                  ),
-                  const SizedBox(height: 18),
+                  if (dog != null) ...[
+                    _animateSection(
+                      const _OperationalPulseSection(),
+                      intervalStart: base + step * 2,
+                      intervalEnd: base + step * 2 + 0.1,
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   _animateSection(
                     _QuickActionsSection(
                       dog: dog,
@@ -365,12 +220,14 @@ class _ActiveShiftDashboardScreenState
                     intervalEnd: base + step * 3 + 0.12,
                   ),
                   const SizedBox(height: 18),
-                  _animateSection(
-                    const _LatestRecordsSection(),
-                    intervalStart: base + step * 4,
-                    intervalEnd: base + step * 4 + 0.1,
-                  ),
-                  const SizedBox(height: 18),
+                  if (dog != null) ...[
+                    _animateSection(
+                      const _LatestRecordsSection(),
+                      intervalStart: base + step * 4,
+                      intervalEnd: base + step * 4 + 0.1,
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   // Alertas (condicional)
                   if (_alerts.isNotEmpty) ...[
                     _animateSection(
@@ -398,7 +255,9 @@ class _ActiveShiftDashboardScreenState
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final dogId = shiftVM.activeDogId;
 
-    if (dogId != null && dogId != _lastFetchedDogId) {
+    if (dogId != null &&
+        dogId.trim().isNotEmpty &&
+        dogId != _lastFetchedDogId) {
       _lastFetchedDogId = dogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadDashboardData(dogId);
@@ -457,7 +316,7 @@ class _ActiveShiftDashboardScreenState
       debugPrint('[STREAM] countActiveAlerts falhou: $e');
     }
 
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     setState(() {
       _quickActions = quickActions;
       _alerts = alerts;
@@ -496,30 +355,21 @@ class _ActiveShiftDashboardScreenState
           ra: currentRa,
           firebaseUser: fbUser,
         );
-        final dogId = shiftVM.activeDogId;
-
-        // Turno sem K9 (intencional): mostrar dashboard simplificado
-        if (dogId == null || dogId.trim().isEmpty) {
-          return Scaffold(
-            backgroundColor: AppTheme.background,
-            body: AnnotatedRegion<SystemUiOverlayStyle>(
-              value: SystemUiOverlayStyle.light.copyWith(
-                statusBarColor: AppTheme.transparent,
-                systemNavigationBarColor: AppTheme.surfaceNavigation,
-                systemNavigationBarIconBrightness: Brightness.light,
-              ),
-              child: _buildNoK9Body(callsign),
-            ),
-          );
-        }
+        final dogId = shiftVM.activeDogId?.trim();
+        final hasK9 = dogId?.isNotEmpty == true;
 
         return StreamBuilder<Dog?>(
-          stream: _dogService.watchDog(dogId),
+          stream: hasK9 ? _dogService.watchDog(dogId!) : null,
           builder: (context, snapshot) {
-            final dog = snapshot.data ?? _localDogFallback(dogVM, dogId);
+            // Ausência de K9 muda somente as seções dependentes do cão. Não há
+            // retorno para outro Scaffold ou outro corpo de dashboard.
+            final dog = hasK9
+                ? snapshot.data ?? _localDogFallback(dogVM, dogId!)
+                : null;
             final stillLoading =
-                snapshot.connectionState == ConnectionState.waiting ||
-                dogVM.isLoading;
+                hasK9 &&
+                (snapshot.connectionState == ConnectionState.waiting ||
+                    dogVM.isLoading);
 
             if (dog == null && stillLoading) {
               return const Scaffold(
@@ -530,7 +380,7 @@ class _ActiveShiftDashboardScreenState
               );
             }
 
-            if (dog == null) {
+            if (hasK9 && dog == null) {
               return _MissingShiftDogState(
                 dogId: dogId,
                 recovering: _recoveringMissingDog,
@@ -562,7 +412,7 @@ class _ActiveShiftDashboardScreenState
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     await shiftVM.endShift();
 
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     setState(() => _recoveringMissingDog = false);
 
     final error = shiftVM.error;

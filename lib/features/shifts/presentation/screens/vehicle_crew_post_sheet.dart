@@ -722,7 +722,7 @@ class _PostBoard extends StatelessWidget {
                 final member = activeMembers[role];
                 final isOccupied = member != null;
                 // Badge K9 se o membro tem cão embarcado
-                final hasK9 = isOccupied && member.dogId!.trim().isNotEmpty;
+                final hasK9 = member?.dogId?.trim().isNotEmpty == true;
                 // Verificar se este slot é do usuário atual
                 final isCurrentUser = isOccupied && member.handlerId == currentHandlerId;
 
@@ -1179,4 +1179,19 @@ class _OccupiedAvatar extends StatelessWidget {
     final last = parts.last.isNotEmpty ? parts.last.substring(0, 1).toUpperCase() : '';
     return '$first$last';
   }
+}
+
+@visibleForTesting
+Widget buildVehicleCrewPostBoardForTesting({
+  required Vehicle vehicle,
+  required Map<String, VehicleCrewMember> activeMembers,
+  bool hasBinomioActive = false,
+}) {
+  return _PostBoard(
+    vehicle: vehicle,
+    activeMembers: activeMembers,
+    hasBinomioActive: hasBinomioActive,
+    onPostSelected: (_) {},
+    onLeaveVehicle: () {},
+  );
 }

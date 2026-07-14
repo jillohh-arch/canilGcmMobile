@@ -2,7 +2,7 @@ part of 'active_shift_dashboard_screen.dart';
 
 /// Central de ações do turno, com contexto real do binômio.
 class _QuickActionsSection extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final List<QuickAction> actions;
   final VoidCallback? onOpenTrainingHub;
   final VoidCallback? onOpenHealthTab;
@@ -20,6 +20,7 @@ class _QuickActionsSection extends StatelessWidget {
     final healthVM = Provider.of<HealthViewModel>(context);
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
+    final hasK9 = dog != null;
     final now = DateTime.now();
     final trainings7d = trainingVM.trainings
         .where((training) => _isWithinDays(training.date, now, 7))
@@ -64,11 +65,15 @@ class _QuickActionsSection extends StatelessWidget {
                     child: _CommandCard(
                       icon: Icons.shield_rounded,
                       color: AppTheme.attention,
-                      eyebrow: '$occurrences7d em 7d',
+                      eyebrow: hasK9 ? '$occurrences7d em 7d' : 'K9 necessário',
                       title: 'Operação',
-                      subtitle: 'Abrir ocorrência operacional',
-                      actionLabel: 'Registrar',
-                      onTap: () => _openOccurrence(context),
+                      subtitle: hasK9
+                          ? 'Abrir ocorrência operacional'
+                          : 'Associe um K9 para registrar',
+                      actionLabel: hasK9 ? 'Registrar' : 'Associar',
+                      onTap: () => hasK9
+                          ? _openOccurrence(context)
+                          : _promptAssociateDog(context),
                     ),
                   ),
                   SizedBox(
@@ -76,11 +81,15 @@ class _QuickActionsSection extends StatelessWidget {
                     child: _CommandCard(
                       icon: Icons.fitness_center_rounded,
                       color: AppTheme.warning,
-                      eyebrow: '$trainings7d em 7d',
+                      eyebrow: hasK9 ? '$trainings7d em 7d' : 'K9 necessário',
                       title: 'Treino',
-                      subtitle: _lastAgo(lastTraining),
-                      actionLabel: 'Abrir hub',
-                      onTap: () => _openTrainingHub(context),
+                      subtitle: hasK9
+                          ? _lastAgo(lastTraining)
+                          : 'Associe um K9 para treinar',
+                      actionLabel: hasK9 ? 'Abrir hub' : 'Associar',
+                      onTap: () => hasK9
+                          ? _openTrainingHub(context)
+                          : _promptAssociateDog(context),
                     ),
                   ),
                   SizedBox(
@@ -88,11 +97,15 @@ class _QuickActionsSection extends StatelessWidget {
                     child: _CommandCard(
                       icon: Icons.local_hospital_rounded,
                       color: AppTheme.success,
-                      eyebrow: '$health7d em 7d',
+                      eyebrow: hasK9 ? '$health7d em 7d' : 'K9 necessário',
                       title: 'Saúde',
-                      subtitle: _lastAgo(lastHealth),
-                      actionLabel: 'Prontuário',
-                      onTap: () => _openHealth(context),
+                      subtitle: hasK9
+                          ? _lastAgo(lastHealth)
+                          : 'Associe um K9 para acessar',
+                      actionLabel: hasK9 ? 'Prontuário' : 'Associar',
+                      onTap: () => hasK9
+                          ? _openHealth(context)
+                          : _promptAssociateDog(context),
                     ),
                   ),
                   SizedBox(
@@ -100,13 +113,17 @@ class _QuickActionsSection extends StatelessWidget {
                     child: _CommandCard(
                       icon: Icons.restaurant_rounded,
                       color: AppTheme.primary,
-                      eyebrow: '$todayFeedings hoje',
+                      eyebrow: hasK9 ? '$todayFeedings hoje' : 'K9 necessário',
                       title: 'Nutrição',
-                      subtitle: todayFeedings == 0
-                          ? 'Nenhuma refeição registrada hoje'
-                          : 'Rotina alimentar em andamento',
-                      actionLabel: 'Registrar',
-                      onTap: () => _openNutrition(context),
+                      subtitle: hasK9
+                          ? todayFeedings == 0
+                                ? 'Nenhuma refeição registrada hoje'
+                                : 'Rotina alimentar em andamento'
+                          : 'Associe um K9 para registrar',
+                      actionLabel: hasK9 ? 'Registrar' : 'Associar',
+                      onTap: () => hasK9
+                          ? _openNutrition(context)
+                          : _promptAssociateDog(context),
                     ),
                   ),
                 ],
@@ -119,16 +136,28 @@ class _QuickActionsSection extends StatelessWidget {
   }
 
   void _openNutrition(BuildContext context) {
+    final activeDog = dog;
+    if (activeDog == null) {
+      _promptAssociateDog(context);
+      return;
+    }
     HapticFeedback.mediumImpact();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            FeedingRegistrationScreen(dogId: dog.id, dogName: dog.name),
+        builder: (_) => FeedingRegistrationScreen(
+          dogId: activeDog.id,
+          dogName: activeDog.name,
+        ),
       ),
     );
   }
 
   void _openHealth(BuildContext context) {
+    final activeDog = dog;
+    if (activeDog == null) {
+      _promptAssociateDog(context);
+      return;
+    }
     HapticFeedback.mediumImpact();
     final callback = onOpenHealthTab;
     if (callback != null) {
@@ -137,7 +166,7 @@ class _QuickActionsSection extends StatelessWidget {
     }
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DogHealthProntuarioScreen(dogId: dog.id),
+        builder: (_) => DogHealthProntuarioScreen(dogId: activeDog.id),
       ),
     );
   }
@@ -159,6 +188,11 @@ class _QuickActionsSection extends StatelessWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()));
+  }
+
+  void _promptAssociateDog(BuildContext context) {
+    HapticFeedback.lightImpact();
+    _showDogSwitcher(context);
   }
 
   DateTime? _latestDate(Iterable<DateTime> dates) {

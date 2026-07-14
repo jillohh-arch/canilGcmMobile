@@ -13,6 +13,7 @@ void _showDogSwitcher(BuildContext context) {
   final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
   final currentRa = HandlerIdentityService.raFromUser(authVM.user) ?? '';
+  final isAssociating = shiftVM.activeDogId?.trim().isNotEmpty != true;
 
   showModalBottomSheet(
     context: context,
@@ -47,7 +48,7 @@ void _showDogSwitcher(BuildContext context) {
               ),
               const SizedBox(height: 16),
               Text(
-                'Trocar cão',
+                isAssociating ? 'Associar K9' : 'Trocar cão',
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -56,7 +57,9 @@ void _showDogSwitcher(BuildContext context) {
               ),
               const SizedBox(height: 4),
               Text(
-                'Selecione outro cão operacional livre para continuar o plantão',
+                isAssociating
+                    ? 'Selecione um K9 operacional livre para este turno'
+                    : 'Selecione outro cão operacional livre para continuar o plantão',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: AppTheme.textSecondary,
@@ -117,9 +120,8 @@ class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
       // Pula o próprio turno do usuário (ele pode trocar seu cão)
       if (doc.id == widget.currentRa) continue;
       final data = doc.data();
-      final dogId = data['service_dog_id'] as String? ??
-          data['dogId'] as String? ??
-          '';
+      final dogId =
+          data['service_dog_id'] as String? ?? data['dogId'] as String? ?? '';
       if (dogId.isNotEmpty) inUse.add(dogId);
     }
     return inUse;
@@ -179,7 +181,9 @@ class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Nenhum cão operacional livre disponível para troca no momento.',
+                    widget.shiftVM.activeDogId?.trim().isNotEmpty == true
+                        ? 'Nenhum cão operacional livre disponível para troca no momento.'
+                        : 'Nenhum K9 operacional livre disponível para associação no momento.',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       color: AppTheme.textSecondary,
