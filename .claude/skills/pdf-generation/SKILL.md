@@ -1,439 +1,932 @@
 ---
+
 name: pdf-generation
-description: Padrão de geração de PDFs institucionais do app Canil K9 (Ocorrência, Carteira de Vacinação, Histórico de Peso, Relatório Nutricional, Histórico Mensal). Use quando implementar qualquer geração de PDF do app. Define estrutura visual formal light mode, hash de integridade SHA-256, QR code de verificação, identidade institucional e linguagem formal.
----
+description: Diretrizes para criação, manutenção, exportação, armazenamento e verificação de documentos PDF institucionais no K9 Ops. Use quando a tarefa envolver geração de PDFs, layout documental, integridade, QR Code, compartilhamento ou persistência de documentos. Não presume tipos fixos de relatório, URLs públicas ou mecanismos criptográficos sem verificar a arquitetura atual.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# Geração de PDFs · Padrão Institucional
+# Geração de PDFs · K9 Ops
 
-## Filosofia
+## Objetivo
 
-PDFs são o **produto institucional final** do app. Saem do tema dark do app e entram 
-em **light mode formal**. Vão pra:
+Os PDFs do K9 Ops são documentos institucionais gerados a partir de dados do sistema.
 
-- Auditor da Controladoria
-- Comandante da GCM
-- Promotor (se virar processo)
-- Defesa do condutor
-- Gestor no painel React
-- Veterinário (histórico do cão)
+Dependendo do contexto, podem servir para:
 
-Todos esses cenários pedem formato institucional formal.
+* prestação de contas;
+* gestão;
+* auditoria;
+* documentação operacional;
+* acompanhamento veterinário;
+* histórico de saúde;
+* treinamento;
+* relatórios administrativos;
+* defesa profissional;
+* compartilhamento formal de informações.
 
-## Pacotes Flutter necessários
+Por esse motivo, documentos PDF exigem precisão maior que uma simples exportação visual da tela.
 
-```yaml
-dependencies:
-  pdf: ^3.x.x           # geração de PDF
-  printing: ^5.x.x      # preview e share
-  qr_flutter: ^4.x.x    # QR codes
-  crypto: ^3.x.x        # SHA-256
+## Regra principal
+
+**Não invente arquitetura documental.**
+
+Antes de criar ou modificar um PDF:
+
+1. identifique o requisito real da tarefa;
+2. procure geradores existentes;
+3. verifique o padrão documental já adotado;
+4. confirme quais dados são fonte da verdade;
+5. determine se o PDF é dinâmico ou um snapshot fechado;
+6. verifique requisitos reais de auditoria, assinatura, hash, QR Code e armazenamento;
+7. implemente somente o que fizer parte do fluxo atual.
+
+Não adicione automaticamente:
+
+* hash;
+* QR Code;
+* assinatura;
+* mapa;
+* upload para Storage;
+* página pública de validação;
+* trilha completa de auditoria.
+
+Esses recursos devem existir por requisito real.
+
+## Hierarquia de autoridade
+
+Em caso de conflito, siga esta ordem:
+
+1. escopo explícito da tarefa atual;
+2. `CLAUDE.md`, `AGENTS.md` e instruções vigentes;
+3. código atual da branch;
+4. documentação oficial atual em `docs/`;
+5. decisões recentes do documento ou módulo;
+6. esta skill;
+7. especificações e mockups históricos.
+
+Não use documentos antigos em `temp/` como contrato atual automaticamente.
+
+## Tipos de documento
+
+Esta skill não mantém uma lista fixa de PDFs obrigatórios.
+
+O K9 Ops pode gerar documentos de diferentes domínios, por exemplo:
+
+* ocorrências;
+* saúde;
+* prontidão;
+* vacinação;
+* peso;
+* nutrição;
+* treinamento;
+* histórico operacional;
+* relatórios administrativos.
+
+Antes de criar um novo gerador, procure se o documento ou um padrão equivalente já existe.
+
+Não crie múltiplos sistemas de geração de PDF sem necessidade.
+
+## Identidade visual
+
+PDF institucional não precisa reproduzir o tema dark do aplicativo.
+
+Quando o padrão vigente utilizar documentos claros, priorize:
+
+* fundo claro;
+* texto com alto contraste;
+* hierarquia formal;
+* boa impressão em papel;
+* tabelas legíveis;
+* uso controlado das cores institucionais.
+
+A identidade do K9 Ops deve aparecer de forma profissional, não como uma captura de tela do aplicativo.
+
+## Layout
+
+A estrutura deve seguir a necessidade real do documento.
+
+Elementos possíveis incluem:
+
+```text
+identificação institucional
+título
+subtítulo
+identificador do documento
+data e período
+responsáveis
+resumo
+dados principais
+tabelas
+timeline
+gráficos
+anexos
+observações
+auditoria
+assinaturas
+informações de integridade
 ```
 
-## Os 5 PDFs do app
+Nenhuma dessas seções é universalmente obrigatória.
 
-| PDF | Cor identidade | Uso |
-|-----|----------------|-----|
-| Ocorrência | Ciano #0A8E9D | Documento institucional formal |
-| Carteira de Vacinação | Ciano #0A8E9D | Pra veterinário ou auditoria |
-| Histórico de Peso | Azul #2C6E91 | Acompanhamento clínico |
-| Relatório Nutricional | Laranja #C25E1F | **Defesa profissional crítica** |
-| Histórico Mensal | Roxo #5A4080 | Prestação de contas mensal |
+Não adicione páginas apenas para deixar o documento mais "completo".
 
-## Paleta de PDFs (light mode)
+## Cabeçalho
+
+Em documentos multipágina, o cabeçalho pode ajudar a manter contexto.
+
+Quando fizer parte do padrão atual, preserve informações como:
+
+* instituição;
+* tipo do documento;
+* identificação do registro.
+
+Exemplo conceitual:
+
+```text
+GCM LIMEIRA · RELATÓRIO DE SAÚDE              REG 2026-00142
+──────────────────────────────────────────────────────────────
+```
+
+Não repita blocos grandes de capa em todas as páginas.
+
+## Rodapé
+
+Quando necessário, utilize:
+
+* instituição;
+* tipo do documento;
+* paginação.
+
+Exemplo conceitual:
+
+```text
+GCM Limeira · Canil K9 · Saúde                 Página 2 de 5
+```
+
+Não exponha dados sensíveis no rodapé.
+
+## Margens e unidades
+
+O pacote `pdf` não utiliza milímetros diretamente como números simples.
+
+Não faça:
 
 ```dart
-class PdfColors {
-  // Fundo e textos
-  static final background = PdfColor.fromHex('FFFFFF');
-  static final textPrimary = PdfColor.fromHex('1A1A1A');
-  static final textSecondary = PdfColor.fromHex('4A5560');
-  static final textTertiary = PdfColor.fromHex('6C7A83');
-  
-  // Cor identidade (varia por tipo)
-  static final cyan = PdfColor.fromHex('0A8E9D');     // Ocorrência, Vacinação
-  static final blue = PdfColor.fromHex('2C6E91');     // Peso
-  static final orange = PdfColor.fromHex('C25E1F');   // Nutrição
-  static final purple = PdfColor.fromHex('5A4080');   // Histórico
-  
-  // Auxiliares
-  static final greenInstitutional = PdfColor.fromHex('2A9D52');
-  static final amberWarning = PdfColor.fromHex('B88A0C');
-  static final lightGray = PdfColor.fromHex('F8FAFB');
-  static final divider = PdfColor.fromHex('D8E0E5');
-}
+margin: const pw.EdgeInsets.all(30),
 ```
 
-## Estrutura padrão
+afirmando que isso representa 30 mm.
 
-### Capa (sempre)
+Para utilizar milímetros:
 
-```
-┌────────────────────────────┐
-│                            │
-│       [Brasão GCM]         │ ← placeholder até ter real
-│                            │
-│  GUARDA CIVIL MUNICIPAL    │
-│       DE LIMEIRA           │
-│                            │
-│  CANIL K9 · [SUBTÍTULO]    │
-│                            │
-│  ═══════════════════       │
-│                            │
-│  TIPO DO DOCUMENTO         │ ← "REGISTRO DE OCORRÊNCIA"
-│  Título Principal          │ ← "Faro em Veículo"
-│  SUBTÍTULO COLORIDO        │ ← "FARO ANTIDROGAS"
-│                            │
-│  ┌──────────────────────┐  │
-│  │ Data: 12/05/2026     │  │
-│  │ Início: 09:42        │  │
-│  │ Duração: 1h 36min    │  │
-│  └──────────────────────┘  │
-│                            │
-│  [REG: 2026/05/0142-K9]    │ ← ID único destacado
-│                            │
-│  BINÔMIO RESPONSÁVEL       │
-│  GCM Jilles Ragonha        │
-│  RA 691755                 │
-└────────────────────────────┘
+```dart
+margin: pw.EdgeInsets.all(
+  30 * PdfPageFormat.mm,
+),
 ```
 
-### Páginas internas (sempre)
+Use o valor definido pelo layout real.
 
-**Header padrão:**
-```
-[🛡 mini] GCM LIMEIRA · [TIPO DO DOC]    REG XXXX
-─────────────────────────────────────  (linha cor identidade)
+Não imponha 30 mm para todos os documentos.
+
+## Paginação
+
+Para conteúdo que pode crescer, prefira estruturas capazes de quebrar páginas corretamente.
+
+Considere:
+
+```dart
+pw.MultiPage
 ```
 
-**Footer padrão:**
-```
-─────────────────────────────────────
-GCM Limeira · Canil K9 · [Tipo]   Página X de Y
-```
+quando o conteúdo for dinâmico.
 
-### Última página (sempre)
+Não coloque grandes timelines, tabelas ou históricos em uma única `pw.Page` sem avaliar overflow.
 
-- Trilha de auditoria visível
-- Card de integridade com hash SHA-256
-- QR Code com link de verificação
-- Caixa de assinatura tradicional
+Exemplo:
+
+```dart
+final pdf = pw.Document();
+
+pdf.addPage(
+  pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.all(
+      20 * PdfPageFormat.mm,
+    ),
+    build: (context) => [
+      header,
+      content,
+    ],
+  ),
+);
+```
 
 ## Tipografia
 
-```dart
-// Fontes a carregar no PDF
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+Use fontes compatíveis com o padrão atual dos documentos.
 
-Future<PdfFonts> _loadFonts() async {
-  return PdfFonts(
-    regular: await PdfGoogleFonts.interRegular(),
-    medium: await PdfGoogleFonts.interMedium(),
-    bold: await PdfGoogleFonts.interBold(),
-    monospace: await PdfGoogleFonts.sourceSansProRegular(),
-  );
+Antes de carregar fontes remotamente:
+
+* verifique a estratégia existente;
+* considere disponibilidade offline;
+* considere estabilidade;
+* evite dependência de rede durante geração quando não for necessária.
+
+Preserve hierarquia clara entre:
+
+```text
+título principal
+seção
+subseção
+corpo
+metadado
+informação auxiliar
+```
+
+Não use tamanhos pequenos demais apenas para caber mais informação.
+
+## Cores
+
+Utilize cores institucionais com função clara.
+
+Uma cor pode identificar:
+
+* tipo de relatório;
+* status;
+* categoria;
+* alerta;
+* seção.
+
+Não use cores semânticas apenas como decoração.
+
+Sempre preserve contraste adequado para:
+
+* visualização em tela;
+* impressão;
+* cópia em escala de cinza quando possível.
+
+## Emojis
+
+Evite emojis decorativos em documentos institucionais.
+
+Quando for necessário representar um símbolo:
+
+* prefira asset oficial;
+* ícone vetorial;
+* texto;
+* forma gráfica simples.
+
+Não dependa de suporte de emoji do PDF para elementos institucionais importantes.
+
+## Brasões e logos
+
+Use somente assets oficiais disponíveis no projeto.
+
+Não invente brasão ou logo substituto.
+
+Se o asset oficial ainda não existir, utilize placeholder apenas quando explicitamente permitido pela tarefa.
+
+Não apresente placeholder como identidade definitiva.
+
+## Dados do documento
+
+Antes de gerar o PDF, determine a fonte dos dados.
+
+Pode ser:
+
+* documento atual do Firestore;
+* conjunto de documentos;
+* DTO;
+* snapshot fechado;
+* dados já carregados pelo fluxo.
+
+Evite acoplar o gerador diretamente a múltiplas queries Firestore quando isso dificultar:
+
+* testes;
+* consistência;
+* reprodutibilidade.
+
+Quando apropriado, prepare primeiro uma estrutura de dados específica do documento.
+
+Exemplo conceitual:
+
+```dart
+class HealthReportData {
+  final Dog dog;
+  final List<HealthEvent> events;
+  final DateTime generatedAt;
+
+  const HealthReportData({
+    required this.dog,
+    required this.events,
+    required this.generatedAt,
+  });
 }
 ```
 
-**Tamanhos:**
-- Título principal: 24pt
-- Subtítulo (tipo doc): 11pt letterSpacing 2pt
-- Seções: 12-13pt bold
-- Corpo: 10-11pt
-- Auxiliar: 9pt
-- Micro (IDs, hashes): 7-8pt monospace
+Não crie DTO apenas por formalidade se o gerador existente já possui contrato adequado.
 
-## Hash SHA-256
+## Documento dinâmico versus snapshot
+
+Antes de implementar, determine qual comportamento é esperado.
+
+### Documento dinâmico
+
+Representa os dados atuais toda vez que é gerado.
+
+Exemplo:
+
+```text
+Relatório atual de peso
+```
+
+Se os dados mudam, uma nova geração pode produzir conteúdo diferente.
+
+### Snapshot institucional
+
+Representa um estado fechado em determinado momento.
+
+Exemplo:
+
+```text
+Relatório finalizado de uma ocorrência
+```
+
+Nesse caso, pode ser necessário preservar:
+
+* versão;
+* data de fechamento;
+* conteúdo utilizado;
+* autoria;
+* integridade.
+
+Não misture os dois conceitos.
+
+## Auditoria
+
+Quando o documento precisar apresentar histórico de alterações, consulte:
+
+```text
+audit-trail
+```
+
+Não inclua automaticamente toda a auditoria interna.
+
+Considere:
+
+* público do documento;
+* finalidade;
+* dados sensíveis;
+* clareza.
+
+Uma versão destinada a auditoria pode ter conteúdo diferente de uma versão destinada a compartilhamento externo.
+
+## Integridade documental
+
+### Hash não é assinatura
+
+Um hash SHA-256 simples pode detectar alteração de determinado conteúdo.
+
+Ele não prova sozinho:
+
+* autoria;
+* identidade de quem gerou;
+* legitimidade;
+* origem;
+* autenticidade criptográfica.
+
+Não descreva um hash simples como:
+
+```text
+assinatura digital
+```
+
+ou:
+
+```text
+prova de autenticidade
+```
+
+sem arquitetura que realmente forneça isso.
+
+## Quando usar hash
+
+Use hash somente quando houver um fluxo real de verificação.
+
+Antes de implementar, defina:
+
+```text
+qual conteúdo entra no hash
+quando o hash é calculado
+quem calcula
+onde é armazenado
+como é validado
+o que acontece quando os dados mudam
+```
+
+Sem essas respostas, não introduza o mecanismo.
+
+## Payload canônico
+
+Nunca gere hash diretamente de:
 
 ```dart
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
-
-String calculateDocumentHash(Map<String, dynamic> docData) {
-  // Serializar de forma determinística
-  final orderedKeys = docData.keys.toList()..sort();
-  final orderedData = {for (var k in orderedKeys) k: docData[k]};
-  
-  final jsonString = jsonEncode(orderedData);
-  final bytes = utf8.encode(jsonString);
-  final hash = sha256.convert(bytes);
-  
-  return hash.toString();
-}
+jsonEncode(object.toJson())
 ```
 
-**Regras:**
-- Hash calculado UMA VEZ ao finalizar documento
-- Armazenado em `occurrences.{id}.integrity_hash`
-- Re-gerações do PDF usam o MESMO hash (se nada mudou no documento)
-- Hash diferente em re-geração = documento foi alterado, deve haver entrada no audit_trail
+sem definir uma serialização determinística.
 
-## QR Code de verificação
+Problemas possíveis:
 
-Aponta pra Firebase Hosting com URL pública:
+* ordem de chaves;
+* objetos aninhados;
+* timestamps;
+* doubles;
+* listas;
+* valores opcionais;
+* campos derivados;
+* próprio campo de hash.
 
-```
-https://canilk9-limeira.web.app/v/{occurrence_id}
-```
+O conteúdo protegido deve ter um contrato explícito.
 
-Implementação:
-```dart
-import 'package:qr_flutter/qr_flutter.dart';
-
-pw.Widget _buildQrCode(String url) {
-  return pw.BarcodeWidget(
-    data: url,
-    barcode: pw.Barcode.qrCode(),
-    width: 70,
-    height: 70,
-  );
-}
-```
-
-A página de verificação (no Firebase Hosting) mostra:
-- ID do documento
-- Hash esperado
-- Status (válido/adulterado)
-- Sem expor conteúdo sensível
-
-## Geração de mapa estático (Ocorrência)
+Exemplo conceitual:
 
 ```dart
-import 'package:http/http.dart' as http;
-
-Future<Uint8List> _generateStaticMap({
-  required double lat,
-  required double lng,
-  required String apiKey,
-}) async {
-  final url = Uri.parse(
-    'https://maps.googleapis.com/maps/api/staticmap'
-    '?center=$lat,$lng'
-    '&zoom=17'
-    '&size=600x400'
-    '&maptype=roadmap'
-    '&markers=color:red%7C$lat,$lng'
-    '&key=$apiKey'
-  );
-  final response = await http.get(url);
-  return response.bodyBytes;
-}
+final payload = buildCanonicalIntegrityPayload(document);
+final bytes = encodeCanonicalPayload(payload);
+final hash = sha256.convert(bytes);
 ```
 
-API Key fica em variável de ambiente, nunca commitada.
+As funções concretas devem ser testadas.
 
-## Esqueleto de gerador de PDF
+## Campo de hash
 
-```dart
-// core/services/pdf_generator/occurrence_pdf_generator.dart
+O próprio campo onde o hash é armazenado não deve participar do payload utilizado para calcular o mesmo hash.
 
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+Defina explicitamente os campos protegidos.
 
-class OccurrencePdfGenerator {
-  final PdfColor identityColor = PdfColor.fromHex('0A8E9D');
+Exemplo conceitual:
 
-  Future<Uint8List> generate(Occurrence occurrence) async {
-    final pdf = pw.Document();
-    final fonts = await _loadFonts();
-    final hash = calculateDocumentHash(occurrence.toJson());
-    
-    // Página 1: Capa
-    pdf.addPage(_buildCoverPage(occurrence, fonts));
-    
-    // Página 2: Identificação
-    pdf.addPage(_buildIdentificationPage(occurrence, fonts));
-    
-    // Página 3: Ocorrência e localização
-    pdf.addPage(await _buildLocationPage(occurrence, fonts));
-    
-    // Página 4+: Timeline de eventos (pode quebrar em múltiplas)
-    pdf.addPage(_buildTimelinePage(occurrence, fonts));
-    
-    // Página: Relato e resultado
-    pdf.addPage(_buildReportAndResultPage(occurrence, fonts));
-    
-    // Página final: Auditoria e assinatura
-    pdf.addPage(_buildAuditPage(occurrence, fonts, hash));
-    
-    return pdf.save();
-  }
-  
-  pw.Page _buildCoverPage(Occurrence occ, PdfFonts fonts) {
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(30),
-      build: (context) {
-        return pw.Column(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            _buildBrand(fonts),
-            _buildTitleSection(occ, fonts),
-            _buildMetaCard(occ, fonts),
-            _buildDocId(occ, fonts),
-            _buildResponsible(occ, fonts),
-          ],
-        );
-      },
-    );
-  }
-  
-  // ... outras páginas
-}
+```text
+PROTEGIDO:
+id
+type
+occurred_at
+responsible_id
+events
+
+NÃO PROTEGIDO:
+integrity_hash
+pdf_url
+pdf_generated_at
 ```
 
-## Linguagem formal institucional
+A lista real depende do domínio.
 
-**SEM:**
-- ❌ "Faro do Bono em veículo"
-- ❌ "Cão indicou que tinha droga"
-- ❌ "Pegamos 18g de maconha"
+## Alteração posterior
 
-**COM:**
-- ✅ "Faro operacional do cão K9 Bono em veículo"
-- ✅ "Indicação positiva do cão K9 em conformidade com protocolo"
-- ✅ "Apreensão de substância análoga à maconha · peso 18g"
+Se o documento protegido mudar, determine o comportamento correto.
 
-Procure tom de **relatório técnico**, não conversa informal.
+Possibilidades:
 
-## Cabeçalho institucional padrão
+* gerar nova versão;
+* invalidar versão anterior;
+* recalcular hash;
+* criar retificação;
+* impedir alteração após fechamento.
 
-```dart
-pw.Widget _buildHeader(String docType, String docId, PdfColor color) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: color, width: 2),
-      ),
-    ),
-    padding: const pw.EdgeInsets.only(bottom: 8),
-    child: pw.Row(
-      children: [
-        pw.Container(
-          width: 22,
-          height: 22,
-          decoration: pw.BoxDecoration(
-            color: color,
-            shape: pw.BoxShape.circle,
-          ),
-          child: pw.Center(
-            child: pw.Text(
-              '🛡',
-              style: pw.TextStyle(color: PdfColors.white, fontSize: 12),
-            ),
-          ),
-        ),
-        pw.SizedBox(width: 8),
-        pw.Text(
-          'GCM LIMEIRA · $docType',
-          style: pw.TextStyle(
-            color: color,
-            fontWeight: pw.FontWeight.bold,
-            fontSize: 10,
-            letterSpacing: 1,
-          ),
-        ),
-        pw.Spacer(),
-        pw.Text(
-          docId,
-          style: pw.TextStyle(
-            color: PdfColors.grey700,
-            fontSize: 9,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+Não recalcule silenciosamente sem compreender o modelo documental.
+
+## Assinatura criptográfica
+
+Quando houver exigência real de autenticação criptográfica, considere mecanismo server-side com chave protegida.
+
+Não implemente chave privada dentro do aplicativo mobile.
+
+Não invente uma infraestrutura de assinatura sem requisito explícito.
+
+## QR Code
+
+Um QR Code é apenas uma forma de transportar informação.
+
+Ele não prova autenticidade sozinho.
+
+Antes de adicionar QR Code, determine o destino real.
+
+Pode ser:
+
+* URL de verificação;
+* identificador;
+* conteúdo resumido;
+* outra informação.
+
+Não invente automaticamente uma URL como:
+
+```text
+https://canilk9-limeira.web.app/v/{id}
 ```
 
-## Card de integridade (última página)
+sem confirmar que:
 
-```dart
-pw.Widget _buildIntegrityCard(String hash, DateTime generatedAt) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(12),
-    decoration: pw.BoxDecoration(
-      color: PdfColor.fromHex('1A5560'),
-      borderRadius: pw.BorderRadius.circular(6),
-    ),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'HASH SHA-256',
-          style: pw.TextStyle(
-            color: PdfColor.fromHex('4DD0E1'),
-            fontSize: 8,
-            fontWeight: pw.FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          hash,
-          style: const pw.TextStyle(
-            color: PdfColors.white,
-            fontSize: 8,
-            font: pw.Font.courier(),
-          ),
-        ),
-        pw.SizedBox(height: 8),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              'Gerado em',
-              style: pw.TextStyle(
-                color: PdfColors.white.shade(0.6),
-                fontSize: 9,
-              ),
-            ),
-            pw.Text(
-              _formatDateTime(generatedAt),
-              style: const pw.TextStyle(color: PdfColors.white, fontSize: 9),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
+* a rota existe;
+* o domínio é correto;
+* o acesso é permitido;
+* os dados expostos são seguros.
+
+## Página de verificação
+
+Se existir um fluxo de validação pública ou autenticada, confirme:
+
+* quem pode acessar;
+* quais dados são exibidos;
+* qual dado é considerado fonte da verdade;
+* como versões são tratadas;
+* como documento revogado é apresentado.
+
+Nunca exponha conteúdo operacional ou clínico sensível apenas para validar um hash.
+
+## Storage
+
+Gerar PDF e armazenar PDF são responsabilidades diferentes.
+
+Fluxos possíveis:
+
+```text
+preview
+share
+download
+persistência
+arquivo final
 ```
 
-## Salvamento e compartilhamento
+Implemente somente os necessários.
 
-```dart
-// Salvar no Storage após gerar
-final pdfBytes = await OccurrencePdfGenerator().generate(occurrence);
+Não faça upload automático para Firebase Storage apenas porque o PDF foi gerado.
 
-final ref = FirebaseStorage.instance.ref(
-  'incidents/${occurrence.id}/pdf_final.pdf',
-);
-await ref.putData(pdfBytes);
+## Caminhos de Storage
 
-final url = await ref.getDownloadURL();
+Utilize a estrutura atual do projeto.
 
-await _firestore.collection('occurrences').doc(occurrence.id).update({
-  'pdf_export_url': url,
-  'pdf_generated_at': FieldValue.serverTimestamp(),
-});
+Não misture vocabulários legados.
 
-// Compartilhar
-import 'package:printing/printing.dart';
-await Printing.sharePdf(bytes: pdfBytes, filename: 'ocorrencia_${occurrence.id}.pdf');
+Antes de criar algo como:
+
+```text
+/incidents/
 ```
 
-## Princípios visuais sempre aplicados
+verifique se o domínio atual utiliza:
 
-1. ✅ Light mode (branco/preto/cor de detalhe)
-2. ✅ Cor identidade por tipo de PDF
-3. ✅ Linguagem formal institucional
-4. ✅ Sem emojis decorativos no corpo
-5. ✅ Tabelas com zebra striping
-6. ✅ Hierarquia visual clara (títulos > subtítulos > corpo)
-7. ✅ Margens generosas (30mm em A4)
-8. ✅ Identificação completa em todas as páginas
-9. ✅ Hash SHA-256 verificável
-10. ✅ QR code de verificação online
+```text
+/occurrences/
+```
+
+ou outra estrutura.
+
+O código atual é a fonte da verdade.
+
+## Arquivos finais
+
+Quando um PDF for considerado documento final:
+
+* defina quando ele é finalizado;
+* defina se pode ser substituído;
+* defina se versões anteriores precisam permanecer;
+* preserve metadados necessários.
+
+Não sobrescreva documento institucional histórico sem entender o requisito.
+
+## Nomes de arquivos
+
+Use nomes previsíveis e seguros.
+
+Evite:
+
+* caracteres inválidos;
+* dados pessoais desnecessários;
+* textos enormes.
+
+Exemplo conceitual:
+
+```text
+ocorrencia_2026_00142.pdf
+```
+
+ou:
+
+```text
+historico_saude_bono_2026_07.pdf
+```
+
+Siga o padrão real do projeto.
+
+## Compartilhamento
+
+Ao utilizar `Printing.sharePdf` ou mecanismo equivalente:
+
+* utilize nome de arquivo adequado;
+* trate erros;
+* não assuma que o compartilhamento foi concluído apenas porque a folha do sistema abriu.
+
+Não salve automaticamente o documento no backend como efeito colateral do compartilhamento.
+
+## Mapas
+
+Não adicione mapa automaticamente a PDFs de ocorrência.
+
+Quando o requisito exigir localização visual:
+
+1. verifique o padrão atual;
+2. confirme o provedor;
+3. confirme credenciais;
+4. trate falhas de rede;
+5. defina fallback.
+
+Nunca deixe API key hardcoded.
+
+## Imagens
+
+Ao incluir imagens:
+
+* preserve proporção;
+* limite resolução quando apropriado;
+* considere tamanho final do PDF;
+* trate falha de carregamento.
+
+Não embuta automaticamente arquivos originais enormes quando uma versão adequada para documento for suficiente.
+
+Isso não significa substituir ou destruir o original armazenado.
+
+## Dados sensíveis
+
+Antes de incluir informações, avalie o destinatário.
+
+Dados que podem exigir cuidado incluem:
+
+* dados clínicos;
+* localização;
+* identificação pessoal;
+* informações operacionais;
+* anexos;
+* dados internos de auditoria.
+
+O fato de uma informação existir no sistema não significa que ela deve aparecer em todo PDF.
+
+## Linguagem institucional
+
+Use linguagem clara, técnica e profissional.
+
+Prefira:
+
+```text
+Indicação positiva do cão K9 durante procedimento de busca.
+```
+
+a:
+
+```text
+O cachorro achou droga.
+```
+
+Ao mesmo tempo, evite artificialidade.
+
+Não escreva frases excessivamente burocráticas apenas para parecer institucional.
+
+A linguagem deve representar corretamente os fatos.
+
+## Dados e conclusões
+
+Não transforme automaticamente um dado em conclusão.
+
+Exemplo:
+
+```text
+Peso atual: 29,8 kg
+```
+
+não significa automaticamente:
+
+```text
+Condição corporal ideal
+```
+
+a menos que esse dado exista ou seja calculado por regra de negócio vigente.
+
+PDF não deve inventar interpretação.
+
+## Tabelas
+
+Para tabelas:
+
+* mantenha cabeçalhos claros;
+* preserve alinhamento numérico;
+* use contraste adequado;
+* permita quebra entre páginas;
+* evite colunas demais.
+
+Zebra striping pode ser utilizada quando fizer parte do padrão visual.
+
+Não é obrigatória.
+
+## Gráficos
+
+Quando o documento incluir gráficos:
+
+* confirme unidade;
+* confirme escala;
+* rotule eixos;
+* trate ausência de dados;
+* não distorça tendência.
+
+Não adicione gráfico apenas para preencher espaço.
+
+## Datas e horários
+
+Use o padrão definido pelo domínio e pelo contexto brasileiro.
+
+Normalmente:
+
+```text
+DD/MM/AAAA
+HH:mm
+```
+
+Quando timezone for relevante, trate explicitamente.
+
+Não converta timestamps sem considerar o fuso esperado.
+
+## Geração offline
+
+Quando o fluxo precisar funcionar offline, não dependa de recursos remotos durante a geração.
+
+Isso pode incluir:
+
+* fontes;
+* imagens;
+* mapas;
+* logos externos.
+
+Consulte o comportamento atual da feature.
+
+Não imponha suporte offline se não houver requisito.
+
+## Erros
+
+A geração deve tratar falhas previsíveis.
+
+Exemplos:
+
+* dados obrigatórios ausentes;
+* asset não encontrado;
+* imagem inválida;
+* erro de armazenamento;
+* falha de compartilhamento.
+
+Não gere documento silenciosamente incompleto quando o conteúdo ausente for crítico.
+
+## Testabilidade
+
+Separe, quando fizer sentido:
+
+```text
+preparação dos dados
+```
+
+de:
+
+```text
+renderização do PDF
+```
+
+Isso facilita testes.
+
+Não crie arquitetura adicional se o gerador for simples e já estiver testável.
+
+## Validação mínima
+
+Para lógica não trivial, valide:
+
+* geração sem exceção;
+* bytes não vazios;
+* conteúdo essencial presente;
+* comportamento com dados opcionais;
+* paginação;
+* nomes e datas;
+* integridade determinística quando houver hash.
+
+## Validação visual
+
+Para documentos importantes:
+
+1. gere o PDF;
+2. abra o arquivo;
+3. verifique todas as páginas;
+4. confirme que não existem cortes;
+5. confira tabelas;
+6. confira caracteres especiais;
+7. confira paginação;
+8. confira imagens.
+
+Não declare PDF concluído apenas porque `pdf.save()` retornou bytes.
+
+## Compatibilidade de schema
+
+Quando a geração depender de Firestore, considere documentos antigos.
+
+Não assuma que todos os registros possuem campos novos.
+
+Use parsers e fallbacks conforme o contrato atual.
+
+Antes de modificar schema para facilitar um PDF, consulte:
+
+```text
+firestore-coexistence
+```
+
+Não altere o banco apenas porque o gerador ficou mais conveniente.
+
+## Dependências
+
+Antes de adicionar:
+
+```text
+pdf
+printing
+crypto
+qr_flutter
+http
+```
+
+verifique o `pubspec.yaml`.
+
+Não adicione pacote duplicado ou desnecessário.
+
+Exemplo: o próprio pacote `pdf` pode oferecer geração de código de barras/QR em determinados fluxos.
+
+Não mantenha duas dependências para a mesma função sem necessidade.
+
+## Segurança
+
+Nunca inclua em código ou PDF:
+
+* API keys;
+* tokens;
+* credenciais;
+* URLs privadas com segredo;
+* dados internos não destinados ao público.
+
+Ao gerar URL de acesso, verifique o modelo de autorização.
+
+## Auditoria do documento
+
+Quando a geração ou finalização do PDF for uma ação institucional relevante, ela pode precisar ser auditada.
+
+Consulte:
+
+```text
+audit-trail
+```
+
+Não gere uma entrada de auditoria para cada simples preview se o domínio não exigir.
+
+## Checklist antes de implementar
+
+* [ ] O requisito atual do PDF foi confirmado.
+* [ ] O gerador existente foi procurado.
+* [ ] O documento é dinâmico ou snapshot.
+* [ ] Os dados de origem estão definidos.
+* [ ] O layout segue o padrão atual.
+* [ ] Conteúdo longo pode paginar corretamente.
+* [ ] Dados sensíveis foram avaliados.
+* [ ] Hash só foi incluído se houver fluxo real de integridade.
+* [ ] Payload canônico foi definido quando necessário.
+* [ ] QR Code só foi incluído se houver destino real.
+* [ ] Nenhuma URL pública foi inventada.
+* [ ] Storage só é utilizado se o fluxo exigir.
+* [ ] Dependências existentes foram verificadas.
+* [ ] O PDF foi inspecionado visualmente quando possível.
+* [ ] Nenhuma mudança de Firestore foi feita sem consultar `firestore-coexistence`.
+
+## Formato de reporte
+
+Quando implementar ou alterar um documento, reporte:
+
+```text
+Documento:
+Fonte dos dados:
+Arquivos alterados:
+Persistência:
+Integridade:
+Validações executadas:
+Pendências:
+```
+
+Não afirme que o documento foi salvo em produção quando apenas a geração local foi testada.
+
+## Regra final
+
+**Um PDF institucional precisa ser tecnicamente defensável, não apenas visualmente bonito.**
+
+Implemente somente os mecanismos que realmente existem no fluxo atual.
+
+Nunca transforme uma ideia conceitual antiga em requisito técnico automático.

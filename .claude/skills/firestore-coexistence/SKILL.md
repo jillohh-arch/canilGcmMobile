@@ -1,203 +1,663 @@
 ---
+
 name: firestore-coexistence
-description: Regras críticas de coexistência com painel React que acessa o mesmo Firestore do app Flutter Canil K9. Use sempre antes de criar, modificar, renomear ou deletar campos ou coleções no Firestore. Define protocolo de 4 fases para mudanças destrutivas e protege produção contra quebras do painel web.
+description: Regras obrigatórias de compatibilidade para alterações no Firestore compartilhado pelo ecossistema K9 Ops. Use antes de criar, modificar, renomear, remover ou reinterpretar campos, coleções, subcoleções, tipos, regras de segurança, índices ou operações que possam afetar dados compartilhados entre mobile, web e backend.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# Coexistência Firestore · K9 Ops
+
+## Por que existe
+
+O K9 Ops possui múltiplos consumidores que podem acessar os mesmos dados.
+
+Entre eles podem existir:
+
+* aplicativo mobile Flutter;
+* plataforma web;
+* Cloud Functions;
+* relatórios;
+* rotinas administrativas;
+* integrações futuras;
+* dados históricos produzidos por versões anteriores.
+
+Uma alteração aparentemente local pode quebrar outro fluxo do sistema.
+
+Por isso, qualquer mudança no contrato de dados deve considerar o ecossistema inteiro.
+
+## Regra principal
+
+**Nunca altere o contrato do Firestore olhando apenas para o arquivo que está sendo modificado.**
+
+Antes de mudar dados compartilhados:
+
+1. identifique o schema atual;
+2. descubra quem lê;
+3. descubra quem escreve;
+4. verifique dados históricos;
+5. determine se a mudança é compatível;
+6. planeje migração somente quando necessária.
+
+## Fonte da verdade
+
+Para entender o estado atual do Firestore, priorize:
+
+1. escopo explícito da tarefa atual;
+2. código atual da branch;
+3. código atual dos demais consumidores disponíveis;
+4. `CLAUDE.md`, `AGENTS.md` e instruções vigentes;
+5. documentação oficial atual em `docs/`;
+6. configuração Firebase atual;
+7. esta skill;
+8. documentos e especificações históricas.
+
+Não use listas antigas de coleções ou consumidores como fonte definitiva.
+
+Não presuma que uma aplicação está inativa, somente leitura ou irrelevante.
+
+Verifique o estado atual.
+
+## Antes de qualquer mudança
+
+Responda mentalmente:
+
+```text
+O que está mudando?
+
+Quem lê esse dado?
+
+Quem escreve esse dado?
+
+Existem documentos antigos sem esse campo?
+
+Existem valores legados?
+
+O tipo atual é consistente?
+
+A semântica está mudando?
+
+Rules ou índices serão afetados?
+
+Outro consumidor pode quebrar?
+
+A mudança precisa realmente acontecer no Firestore?
+```
+
+A análise deve ser proporcional ao risco.
+
+Uma adição simples não precisa virar uma migração complexa.
+
+Uma quebra de contrato precisa de planejamento.
+
+# Classificação das mudanças
+
+## 1. Mudança aditiva e compatível
+
+Exemplos:
+
+* adicionar campo opcional;
+* adicionar nova coleção;
+* adicionar nova subcoleção;
+* adicionar índice;
+* adicionar metadado que consumidores antigos ignoram;
+* adicionar novo recurso sem alterar o significado dos dados existentes.
+
+Normalmente é a forma preferida de evolução.
+
+Mesmo assim, verifique:
+
+* conflito de nomes;
+* Firestore Rules;
+* necessidade de índice;
+* comportamento com documentos antigos;
+* serialização e parsing.
+
+### Exemplo
+
+Documento antigo:
+
+```text
+{
+  weight_kg: 29.8
+}
+```
+
+Documento novo:
+
+```text
+{
+  weight_kg: 29.8,
+  body_condition_score: 5
+}
+```
+
+Se leitores antigos ignoram `body_condition_score`, a mudança tende a ser compatível.
+
+Isso não elimina a necessidade de verificar Rules e parsers.
+
 ---
 
-# Coexistência Firestore · Canil K9
+## 2. Mudança comportamental
 
-## Contexto crítico
+A estrutura pode continuar igual, mas o significado ou comportamento muda.
 
-Existe um **painel web React em produção** que acessa o MESMO Firestore que o app 
-Flutter. Ambos pertencem ao Jilles (gestor + condutor), mas o painel React **ainda nao esta em uso**.
+Exemplos:
 
-**Regra de ouro:** "Nunca quebre o painel React. Em dúvida, pergunte."
+* um status passa a representar outra coisa;
+* um campo antes opcional passa a ser tratado como obrigatório;
+* determinada query deixa de considerar certos documentos;
+* um valor passa a bloquear uma operação;
+* uma regra de segurança passa a impedir uma escrita anteriormente válida;
+* a origem canônica de um dado muda.
 
-## Mudanças aditivas (SEGURAS)
+Essas mudanças podem quebrar consumidores sem alterar nenhum nome de campo.
 
-Pode fazer sem cerimônia, apenas avise o Jilles:
+Trate mudança de semântica como mudança de contrato.
 
-✅ Adicionar campo NOVO em documento existente
-✅ Adicionar coleção NOVA
-✅ Adicionar subcoleção NOVA
-✅ Adicionar índice composto
-✅ Atualizar campo opcional (que pode ou não existir)
+---
 
-**Por quê são seguras:** painel React não vai notar (ignora campos que não lê).
+## 3. Mudança incompatível ou destrutiva
 
-## Mudanças destrutivas (PERIGOSAS)
+Exemplos:
 
-Podem quebrar o painel:
+* remover campo;
+* renomear campo;
+* alterar tipo;
+* alterar estrutura de objeto;
+* transformar string em lista;
+* transformar enum em objeto;
+* mover dados para outra coleção;
+* alterar estratégia de IDs;
+* excluir documentos;
+* alterar caminho canônico;
+* restringir acesso de forma incompatível;
+* substituir uma coleção por outra.
 
-❌ Remover campo existente
-❌ Renomear campo
-❌ Mudar tipo de campo (string → number, string → array)
-❌ Mudar estrutura de objeto aninhado
-❌ Migrar dados de uma coleção pra outra
-❌ Excluir documentos massivamente
-❌ Mudar regras de segurança restringindo acesso
+Não faça diretamente sem avaliar um rollout compatível.
 
-**NUNCA faça diretamente.** Use o protocolo de 4 fases.
+# Estratégia para mudanças incompatíveis
 
-## Protocolo de 4 Fases para mudanças destrutivas
+Quando possível, utilize evolução em fases.
 
-### Fase 1 — ADITIVA (não quebra ninguém)
+## Fase 1 — Compatibilidade aditiva
 
-Adicione o campo NOVO ao lado do antigo. Ambos coexistem.
+Introduza a nova estrutura sem remover imediatamente a antiga.
+
+Exemplo conceitual:
+
+```text
+campo_antigo
++
+campo_novo
+```
+
+Durante a transição, leitores novos podem precisar tolerar ambos.
+
+Exemplo:
 
 ```dart
-// ANTES: doc tinha só { weight: 28.0 }
-// AGORA: doc tem { weight: 28.0, weight_kg: 28.0 }
-
-await doc.update({
-  'weight': 28.0,      // antigo, mantido
-  'weight_kg': 28.0,   // novo, em paralelo
-});
+final value =
+    map['new_field'] ??
+    map['legacy_field'];
 ```
 
-Validação:
-- ✅ App Flutter já usa o novo (`weight_kg`)
-- ✅ Painel React continua usando o antigo (`weight`)
-- ✅ Nenhum dos dois quebra
+Esse fallback deve ser temporário quando fizer parte de uma migração.
 
-### Fase 2 — BACKFILL
+Não mantenha compatibilidade legada indefinidamente sem necessidade.
 
-Script ou Cloud Function preenche o campo novo retroativamente em documentos antigos.
+## Dual-write
 
-```javascript
-// Cloud Function ou script Node
-const snapshot = await db.collection('weight_records').get();
-for (const doc of snapshot.docs) {
-  if (!doc.data().weight_kg && doc.data().weight) {
-    await doc.ref.update({
-      weight_kg: doc.data().weight,
-    });
-  }
+Em alguns casos pode ser necessário escrever temporariamente em:
+
+```text
+campo antigo
++
+campo novo
+```
+
+Só faça dual-write quando realmente necessário.
+
+Ele aumenta o risco de divergência.
+
+Se utilizado:
+
+* defina qual campo é canônico;
+* defina quem mantém a sincronização;
+* determine quando o dual-write será removido.
+
+Nunca transforme uma solução de migração em arquitetura permanente por acidente.
+
+---
+
+## Fase 2 — Backfill
+
+Quando documentos antigos precisarem receber a nova estrutura, execute uma migração controlada.
+
+Antes de qualquer backfill:
+
+* estime quantidade de documentos;
+* identifique casos inconsistentes;
+* torne o processo idempotente;
+* teste em ambiente seguro ou amostra controlada;
+* defina comportamento em caso de falha;
+* considere backup quando houver risco relevante;
+* registre progresso quando necessário.
+
+Um backfill idempotente deve poder ser executado novamente sem corromper dados.
+
+Exemplo conceitual:
+
+```text
+se novo campo não existe
+e dado legado válido existe
+→ preencher campo novo
+```
+
+Não sobrescreva dados novos já existentes sem uma regra explícita.
+
+### Produção
+
+Nunca execute automaticamente:
+
+```text
+backfill massivo
+migração destrutiva
+cleanup irreversível
+```
+
+em produção apenas porque o código foi preparado.
+
+A execução precisa fazer parte explicitamente do escopo autorizado.
+
+---
+
+## Fase 3 — Migração dos consumidores
+
+Atualize todos os consumidores relevantes.
+
+Isso pode incluir:
+
+* mobile;
+* web;
+* Cloud Functions;
+* relatórios;
+* parsers;
+* testes;
+* scripts administrativos.
+
+Durante a transição, pode ser necessário ler:
+
+```text
+novo
+↓ fallback
+antigo
+```
+
+Depois que a migração estiver validada, remova fallbacks desnecessários.
+
+---
+
+## Fase 4 — Cleanup
+
+Somente remova a estrutura antiga após confirmar:
+
+* consumidores migrados;
+* documentos históricos tratados;
+* produção observada sem regressões relevantes;
+* código legado sem uso;
+* documentação atualizada.
+
+Então podem ser removidos:
+
+* campo antigo;
+* dual-write;
+* fallback;
+* migration flags;
+* scripts temporários;
+* código de compatibilidade.
+
+Não faça cleanup apenas porque a nova implementação já funciona localmente.
+
+# Quando não usar quatro fases
+
+Não force esse processo para mudanças genuinamente aditivas.
+
+Exemplo:
+
+```text
+nova subcoleção que nenhum consumidor antigo conhece
+```
+
+pode simplesmente ser criada, desde que:
+
+* Rules estejam corretas;
+* o contrato esteja definido;
+* não exista conflito com estrutura atual.
+
+O objetivo é reduzir risco, não criar burocracia.
+
+# Dados históricos
+
+O K9 Ops possui dados criados por versões diferentes do sistema.
+
+Ao implementar parsers, considere:
+
+* campo ausente;
+* valor `null`;
+* tipo legado;
+* enum desconhecido;
+* Timestamp Firestore;
+* representação serializada;
+* estrutura parcialmente migrada.
+
+Não presuma que todos os documentos possuem o schema mais recente.
+
+## Parsing defensivo
+
+Quando o domínio exigir compatibilidade histórica, prefira distinguir corretamente situações como:
+
+```text
+known
+unknown
+absent
+```
+
+em vez de transformar tudo em um valor padrão conhecido.
+
+Exemplo conceitual:
+
+```text
+"active" → conhecido
+
+"legacy_custom_value" → desconhecido, raw preservado
+
+campo inexistente → ausente
+```
+
+Não invente valores para esconder inconsistências históricas.
+
+# Mudança de tipo
+
+Alterar tipo é uma mudança incompatível mesmo quando o nome do campo permanece igual.
+
+Exemplo:
+
+```text
+ANTES
+status: "active"
+```
+
+```text
+DEPOIS
+status: {
+  code: "active",
+  reason: null
 }
 ```
 
-Validação:
-- ✅ 100% dos documentos têm o campo novo preenchido
-- ✅ Campos antigo e novo refletem mesma informação
+Consumidores antigos continuarão procurando uma string.
 
-### Fase 3 — MIGRAÇÃO DO PAINEL REACT
+Se a mudança for necessária, trate como migração de contrato.
 
-Jilles atualiza o painel React pra ler/escrever no campo novo.
+# Campos obrigatórios
 
-```javascript
-// Painel React, antes:
-const weight = doc.weight;
+Firestore não possui schema rígido por padrão.
 
-// Painel React, depois:
-const weight = doc.weight_kg ?? doc.weight; // fallback de segurança
+Portanto, tornar um campo obrigatório exige atenção.
+
+Antes de assumir que:
+
+```text
+campo sempre existe
 ```
 
-Validação:
-- ✅ Painel React funciona com o novo campo
-- ✅ Período de observação (~1 semana) sem erros
-- ✅ Monitorar console/Sentry
+verifique:
 
-### Fase 4 — CLEANUP
+* documentos históricos;
+* documentos criados por outros consumidores;
+* dados parcialmente migrados;
+* fixtures e ambientes de teste.
 
-Após validação, remove campo antigo.
+Durante uma transição, o parser pode precisar tolerar ausência.
 
-```dart
-await doc.update({
-  'weight': FieldValue.delete(), // remove o antigo
-});
+# Coleções e subcoleções
+
+Não mantenha nesta skill uma lista definitiva de coleções do projeto.
+
+O K9 Ops evolui continuamente.
+
+Antes de criar nova estrutura:
+
+1. procure estrutura equivalente;
+2. verifique convenções atuais;
+3. identifique consumidores;
+4. confirme se o dado pertence realmente àquele domínio.
+
+Não crie duas fontes da verdade para a mesma informação.
+
+# Fonte canônica
+
+Quando mais de uma estrutura representar informação semelhante, determine explicitamente qual é a fonte canônica.
+
+Exemplo conceitual:
+
+```text
+active_shifts
 ```
 
-Validação final:
-- ✅ Nenhum documento tem mais o campo antigo
-- ✅ Painel e app continuam funcionando
-- ✅ Código de migração removido
-- ✅ Documentação atualizada
+pode representar estado operacional atual enquanto outra coleção representa histórico.
 
-## Antes de qualquer mudança no Firestore, pergunte
+Não sincronize duas estruturas sem compreender a responsabilidade de cada uma.
 
-1. **Essa mudança é aditiva ou destrutiva?**
-2. **Se destrutiva, posso fazer aditiva primeiro?**
-3. **O painel React lê esse campo?** (consulte Jilles se incerto)
-4. **Vale a pena ou posso adaptar o código do app sem mudar Firestore?**
-5. **Se for fazer, qual o plano em 4 fases?**
+Evite soluções em que dois documentos diferentes possam discordar sem regra clara de autoridade.
 
-## Coleções e seus consumidores
+# Firestore Rules
 
-| Coleção | App Flutter | Painel React | Cuidado especial |
-|---------|-------------|--------------|------------------|
-| `/users` | leitura/escrita | leitura/escrita | crítico (autenticação) |
-| `/dogs` | leitura/escrita | leitura/escrita | crítico (entidade central) |
-| `/shifts` | leitura/escrita | leitura | usado em relatórios |
-| `/occurrences` | leitura/escrita | leitura | usado em relatórios |
-| `/occurrences/{id}/events` | leitura/escrita | leitura | timeline |
-| `/dogs/{id}/health_events` | leitura/escrita | leitura | histórico médico |
-| `/dogs/{id}/training_sessions` | leitura/escrita | leitura | histórico treino |
-| `/dogs/{id}/weight_records` | leitura/escrita | leitura | gráfico peso |
+Mudanças em `firestore.rules` fazem parte do contrato do sistema.
 
-## Coleções marcadas NOVA na especificação (seguras pra criar)
+Uma alteração de permissão pode quebrar um fluxo mesmo quando o schema permanece igual.
 
-- `/occurrence_types` — catálogo de naturezas de ocorrência
-- `/dogs/{id}/specialties_state` — estado das especialidades por cão
-- `/dogs/{id}/commands` — biblioteca de comandos por cão
-- `/dogs/{id}/commands/{id}/stage_history` — histórico de estágios
-- `/dogs/{id}/feeding_events` — refeições registradas
-- `/dogs/{id}/nutritional_prescriptions` — prescrições nutricionais
-- `/dogs/{id}/conditioning_sessions` — sessões de condicionamento
-- `/dogs/{id}/triagem_evaluations` — triagens de aptidão
-- `/dogs/{id}/documents` — laudos e certificações
+Antes de modificar Rules:
 
-**Todas podem ser criadas livremente** (são aditivas por definição).
+* identifique quem precisa ler;
+* identifique quem precisa escrever;
+* valide papéis e permissões;
+* verifique operações do mobile;
+* verifique operações da web;
+* verifique Cloud Functions quando aplicável;
+* teste cenários permitidos e negados.
 
-## Regras de segurança
+Não assuma:
 
-Quando criar coleção nova, **sempre** atualizar `firestore.rules`. Mostrar diff pro 
-Jilles antes de fazer deploy.
-
-Estrutura típica:
-```
-match /dogs/{dogId}/specialties_state/{specialtyId} {
-  allow read: if isAuthenticated();
-  allow write: if isAuthenticated() && (
-    isHandlerOfDog(dogId) || 
-    isManager()
-  );
-}
+```text
+usuário autenticado = usuário autorizado
 ```
 
-## Convenções pra documentos novos
+## Deploy
 
-Todo documento crítico tem:
+Alterar o arquivo de Rules não significa que o deploy está autorizado.
+
+Nunca execute deploy automaticamente fora do escopo explícito da tarefa.
+
+Sempre diferencie:
+
+```text
+código preparado
 ```
-{
-  // ... campos específicos
-  created_at: Timestamp,           // imutável
-  updated_at: Timestamp,            // atualiza a cada edit
-  created_by: string,               // uid
-  audit_trail: Array<AuditEntry>    // ver skill audit-trail
-}
+
+de:
+
+```text
+mudança aplicada em produção
 ```
 
-## Em caso de dúvida sobre se quebra o painel
+# Índices
 
-**Pause e pergunte ao Jilles.** Ele controla os dois sistemas, sabe o que cada um lê.
+Novas queries podem exigir índices compostos.
 
-Não tente "deduzir" lendo o código do painel — pode estar desatualizado, pode ter 
-queries dinâmicas que você não vê.
+Quando criar ou alterar uma consulta:
 
-## Cuidados extras
+* valide a query real;
+* identifique necessidade de índice;
+* atualize configuração somente quando necessário;
+* não crie índices especulativos;
+* preserve índices existentes fora do escopo.
 
-- ⚠️ **NUNCA rode `collection.doc().delete()` em produção** sem confirmação explícita
-- ⚠️ **NUNCA atualize muitos docs em batch** sem testar em ambiente dev primeiro
-- ⚠️ **Backups antes de migração** — exportar coleção antes de Fase 2 (backfill)
-- ⚠️ **Audit trail em mudanças de schema** — registrar a migração também
+Uma query funcionar em poucos dados não garante que o contrato esteja completo.
 
-## Quando criar Cloud Functions
+# Cloud Functions
 
-Pra operações que envolvem múltiplas coleções ou regras complexas, prefira Cloud 
-Functions:
+Considere lógica server-side quando houver necessidade real de:
 
-- Cálculo de selos de conformidade
-- Geração de PDFs no servidor (quando crescer)
-- Backfills de schema
-- Notificações automáticas (vacinas vencendo)
+* autoridade;
+* segredo;
+* atomicidade entre múltiplos recursos;
+* validação que não pode depender do cliente;
+* processamento confiável fora do ciclo de vida do aplicativo;
+* operação administrativa privilegiada.
 
-Cloud Functions ficam no painel React (mesmo projeto Firebase), mas chamadas pelo app.
+Não mova lógica para Cloud Functions automaticamente sob o argumento genérico de segurança.
+
+Primeiro determine o requisito real.
+
+# Operações em múltiplos documentos
+
+Quando uma ação precisar manter consistência entre vários documentos, avalie o mecanismo adequado:
+
+* transaction;
+* batch;
+* Cloud Function;
+* operação idempotente;
+* reconciliação posterior.
+
+A escolha depende do domínio.
+
+Não use batch apenas porque existem múltiplas escritas.
+
+Não use transaction quando não houver dependência de leitura consistente.
+
+# Auditoria
+
+Quando uma mudança afetar registros institucionais relevantes, consulte:
+
+```text
+audit-trail
+```
+
+Não crie um segundo sistema de auditoria durante uma migração.
+
+Mudanças de schema da própria auditoria também devem seguir estas regras de coexistência.
+
+# Mobile e web
+
+Mobile e web fazem parte do mesmo ecossistema.
+
+Antes de concluir que uma mudança é segura:
+
+* procure leituras do campo;
+* procure escritas do campo;
+* procure queries baseadas nele;
+* procure parsers;
+* procure Functions;
+* procure relatórios relevantes.
+
+Não presuma que um consumidor não utiliza um campo apenas porque ele não apareceu no primeiro arquivo consultado.
+
+Também não faça auditoria geral de todo o repositório sem necessidade.
+
+Pesquise proporcionalmente ao impacto da mudança.
+
+# Mudanças de estado operacional
+
+Alguns dados representam estado atual e possuem alto acoplamento entre fluxos.
+
+Exemplos podem incluir:
+
+* turno ativo;
+* equipe;
+* viatura;
+* associação de K9;
+* progressão de treinamento;
+* prontidão.
+
+Antes de mudar esses contratos, trace o fluxo real de leitura e escrita.
+
+Não una conceitos distintos apenas para simplificar schema.
+
+# Operações perigosas
+
+Nunca execute automaticamente sem autorização explícita:
+
+```text
+delete massivo
+backfill em produção
+remoção de campo em massa
+migração irreversível
+deploy de Rules
+deploy de Functions
+alteração destrutiva de dados reais
+```
+
+Preparar:
+
+```text
+script
+migration
+rules
+function
+```
+
+não autoriza executar.
+
+# Checklist antes de alterar Firestore
+
+Confirme:
+
+* [ ] O schema atual foi verificado.
+* [ ] A mudança foi classificada.
+* [ ] Consumidores relevantes foram identificados.
+* [ ] Leituras e escritas foram consideradas.
+* [ ] Dados históricos foram considerados.
+* [ ] Tipos legados foram considerados.
+* [ ] A fonte canônica continua clara.
+* [ ] Rules foram avaliadas.
+* [ ] Índices foram avaliados.
+* [ ] Migração foi criada apenas se necessária.
+* [ ] Nenhum dual-write permanente foi introduzido por acidente.
+* [ ] Nenhuma operação de produção foi executada sem autorização.
+* [ ] A mudança permaneceu dentro do escopo da fase atual.
+
+# Formato de reporte
+
+Quando uma tarefa alterar o contrato de dados, reporte objetivamente:
+
+```text
+Tipo da mudança:
+Consumidores afetados:
+Compatibilidade:
+Dados históricos:
+Migração necessária:
+Rules:
+Índices:
+Deploy realizado:
+Risco residual:
+```
+
+Não afirme que houve deploy quando apenas arquivos locais foram alterados.
+
+# Regra final
+
+**Compatibilidade é uma propriedade do ecossistema inteiro, não apenas do schema.**
+
+Faça a menor mudança segura que preserve:
+
+```text
+dados atuais
+dados históricos
+mobile
+web
+backend
+regras de segurança
+comportamento já validado
+```
+
+Nunca quebre um consumidor silenciosamente para simplificar outro.
