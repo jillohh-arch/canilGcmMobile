@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
-import 'package:canil_gcm/core/mixins/soft_deletable.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_soft_delete.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 
 /// Item bruto para composição de registros recentes.
 final class HealthSummaryRecentRawItem {
@@ -47,6 +49,9 @@ class HealthSummaryRecentRecordsReader {
   _loadItems;
   final int limit;
 
+  /// Quantos health_events **ativos** buscar antes de misturar com peso/feed.
+  static const int healthEventsActiveTarget = 20;
+
   Future<HealthSummarySectionData<HealthSummaryRecentRecordsView>> read(
     String dogId,
   ) async {
@@ -54,7 +59,7 @@ class HealthSummaryRecentRecordsReader {
       final items = await _loadItems(dogId);
       if (items.isEmpty) {
         return const HealthSummarySectionData.notRecorded(
-          message: 'Nenhum registro recente',
+          message: HealthSummaryUserCopy.recentNotRecorded,
         );
       }
       items.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
@@ -73,13 +78,24 @@ class HealthSummaryRecentRecordsReader {
       return HealthSummarySectionData.available(
         HealthSummaryRecentRecordsView(items: take),
       );
+    } on HealthSummaryScanTruncatedException catch (e) {
+      debugPrint('[HealthSummaryRecentRecordsReader] truncated: $e');
+      return const HealthSummarySectionData.unavailable(
+        message: HealthSummaryUserCopy.recentUnavailable,
+      );
     } on FirebaseException catch (e) {
+      debugPrint(
+        '[HealthSummaryRecentRecordsReader] unavailable [${e.code}]: ${e.message}',
+      );
       return HealthSummarySectionData.unavailable(
-        message: e.message ?? 'Falha ao ler registros recentes [${e.code}]',
+        message: e.code == 'unavailable'
+            ? HealthSummaryUserCopy.networkUnavailable
+            : HealthSummaryUserCopy.recentUnavailable,
       );
     } catch (e) {
-      return HealthSummarySectionData.unavailable(
-        message: 'Falha ao ler registros recentes: $e',
+      debugPrint('[HealthSummaryRecentRecordsReader] unavailable: $e');
+      return const HealthSummarySectionData.unavailable(
+        message: HealthSummaryUserCopy.recentUnavailable,
       );
     }
   }
@@ -88,45 +104,74 @@ class HealthSummaryRecentRecordsReader {
     FirebaseFirestore firestore,
     String dogId,
   ) async {
-    final results = await Future.wait([
-      _healthEvents(firestore, dogId),
+    // health_events primeiro: se truncado, NÃO misturar weights/feedings
+    // como se o histórico estivesse completo.
+    final events = await _healthEvents(firestore, dogId);
+
+    // Subfontes restantes em paralelo: se **qualquer** falhar, propaga e o
+    // bloco inteiro fica unavailable (intencional).
+    final rest = await Future.wait([
       _weights(firestore, dogId),
       _todayFeedings(firestore, dogId),
     ]);
-    return results.expand((e) => e).toList(growable: false);
+    return [...events, ...rest.expand((e) => e)];
   }
 
   static Future<List<HealthSummaryRecentRawItem>> _healthEvents(
     FirebaseFirestore firestore,
     String dogId,
   ) async {
-    final query = firestore
+    // Sem SoftDeletable.activeOnly + orderBy (índice composto).
+    // Pagina até healthEventsActiveTarget ativos — evita perda silenciosa
+    // quando a janela recente é dominada por soft-deletes.
+    final ordered = firestore
         .collection('dogs')
         .doc(dogId)
-        .collection('health_events');
-    final snap = await SoftDeletable.activeOnly(
-      query,
-    ).orderBy('date', descending: true).limit(20).get();
-    final items = <HealthSummaryRecentRawItem>[];
-    for (final doc in snap.docs) {
-      final data = doc.data();
-      final type = (data['type'] ?? data['logType'] ?? 'other').toString();
-      final at = HealthSummaryDateParse.tryParse(data['date']);
-      if (at == null) continue;
-      final subtype = data['subtype']?.toString().trim();
-      final title = _healthTitle(type, subtype);
-      final obs = data['healthObservations']?.toString().trim();
-      items.add(
-        HealthSummaryRecentRawItem(
-          id: 'he-${doc.id}',
-          type: type,
-          title: title,
-          subtitle: (obs == null || obs.isEmpty) ? null : obs,
-          occurredAt: at,
-        ),
+        .collection('health_events')
+        .orderBy('date', descending: true);
+
+    final scan = await HealthSummarySoftDelete.paginateActiveMapped(
+      orderedQuery: ordered,
+      targetActive: healthEventsActiveTarget,
+      debugScope: 'health_events/recent',
+      tryMap: (doc) => mapHealthEventDoc(doc.id, doc.data()),
+    );
+
+    if (scan.truncated) {
+      throw HealthSummaryScanTruncatedException(
+        scope: 'health_events/recent',
+        pageSize: HealthSummarySoftDelete.defaultPageSize,
+        maxPages: HealthSummarySoftDelete.defaultMaxPages,
+        targetActive: healthEventsActiveTarget,
+        pagesScanned: scan.pagesScanned,
+        itemsFound: scan.items.length,
       );
     }
-    return items;
+
+    // Conclusivo (vazio ou com itens). Vazio esgotado = só pesos/refeições.
+    return List.of(scan.items);
+  }
+
+  /// Mapeia um doc de health_events (null se soft-deleted / data inválida).
+  @visibleForTesting
+  static HealthSummaryRecentRawItem? mapHealthEventDoc(
+    String id,
+    Map<String, dynamic> data,
+  ) {
+    if (HealthSummarySoftDelete.isSoftDeleted(data)) return null;
+    final type = (data['type'] ?? data['logType'] ?? 'other').toString();
+    final at = HealthSummaryDateParse.tryParse(data['date']);
+    if (at == null) return null;
+    final subtype = data['subtype']?.toString().trim();
+    final title = _healthTitle(type, subtype);
+    final obs = data['healthObservations']?.toString().trim();
+    return HealthSummaryRecentRawItem(
+      id: 'he-$id',
+      type: type,
+      title: title,
+      subtitle: (obs == null || obs.isEmpty) ? null : obs,
+      occurredAt: at,
+    );
   }
 
   static Future<List<HealthSummaryRecentRawItem>> _weights(
@@ -180,7 +225,7 @@ class HealthSummaryRecentRecordsReader {
     for (final snap in snaps) {
       for (final doc in snap.docs) {
         final data = doc.data();
-        if (data['deleted_at'] != null) continue;
+        if (HealthSummarySoftDelete.isSoftDeleted(data)) continue;
         final at = HealthSummaryDateParse.tryParse(data['fed_at']);
         if (at == null) continue;
         final grams = data['amount_grams'];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
@@ -235,6 +236,15 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
+/// Espaço inferior do scroll do Resumo quando montado no MainRoot
+/// (`extendBody: true` + bottom nav + safe area + folga do FAB).
+@visibleForTesting
+double healthSummaryScrollBottomClearance(BuildContext context) {
+  return MainRootNavMetrics.scrollBottomClearance(
+    systemBottomInset: MediaQuery.paddingOf(context).bottom,
+  );
+}
+
 class _DataScroll extends StatelessWidget {
   final HealthSummaryDogContextView dogContext;
   final HealthSummaryViewData data;
@@ -264,9 +274,11 @@ class _DataScroll extends StatelessWidget {
         final textScale = MediaQuery.textScalerOf(context).scale(1.0);
         // Lado a lado no padrão do mockup; empilha em estreito ou textScale alto.
         final sideBySide = constraints.maxWidth >= 340 && textScale <= 1.2;
+        final bottomClearance = healthSummaryScrollBottomClearance(context);
 
         return SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: bottomClearance),
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: Column(
@@ -328,7 +340,6 @@ class _DataScroll extends StatelessWidget {
                   onOpenHistory: onOpenHistory,
                   onRecentRecordTap: onRecentRecordTap,
                 ),
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -343,9 +354,11 @@ class _StructuralLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      physics: AlwaysScrollableScrollPhysics(),
-      child: Column(
+    final bottomClearance = healthSummaryScrollBottomClearance(context);
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(bottom: bottomClearance),
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SkeletonCard(height: 140),

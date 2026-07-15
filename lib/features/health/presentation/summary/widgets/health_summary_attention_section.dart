@@ -19,16 +19,22 @@ class HealthSummaryAttentionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final header = _headerStyle(attention);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'REQUER ATENÇÃO',
-          style: GoogleFonts.inter(
-            color: AppTheme.warningAccent,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
+        Semantics(
+          header: true,
+          label: header.title,
+          child: Text(
+            header.title,
+            style: GoogleFonts.inter(
+              color: header.color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.4,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -40,6 +46,20 @@ class HealthSummaryAttentionSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Título âmbar "REQUER ATENÇÃO" só quando há itens disponíveis.
+  /// Unavailable / notRecorded / empty → título neutro (sem falso alerta).
+  static ({String title, Color color}) _headerStyle(
+    HealthSummarySectionData<HealthSummaryAttentionView> attention,
+  ) {
+    if (attention.status == HealthSummarySectionStatus.available) {
+      final items = attention.value?.items ?? const [];
+      if (items.isNotEmpty) {
+        return (title: 'REQUER ATENÇÃO', color: AppTheme.warningAccent);
+      }
+    }
+    return (title: 'ATENÇÕES', color: AppTheme.textMuted);
   }
 
   Widget _body() {
@@ -60,8 +80,9 @@ class HealthSummaryAttentionSection extends StatelessWidget {
         return _messageRow(
           icon: Icons.cloud_off_outlined,
           color: AppTheme.textSoft,
-          title: attention.message ?? 'Dados indisponíveis',
-          subtitle: 'Não foi possível carregar as atenções',
+          title:
+              attention.message ??
+              'Não foi possível determinar as atenções deste K9 no momento.',
         );
       case HealthSummarySectionStatus.notRecorded:
         return _positiveEmpty(
@@ -120,7 +141,6 @@ class HealthSummaryAttentionSection extends StatelessWidget {
     required IconData icon,
     required Color color,
     required String title,
-    required String subtitle,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
@@ -129,27 +149,14 @@ class HealthSummaryAttentionSection extends StatelessWidget {
           Icon(icon, size: 20, color: color),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSoft,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: Text(
+              title,
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
             ),
           ),
         ],

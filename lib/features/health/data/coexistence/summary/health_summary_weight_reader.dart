@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 
 /// Amostra mínima de peso para mapeamento (sem model legado na fronteira).
 final class HealthSummaryWeightSample {
@@ -66,11 +68,11 @@ class HealthSummaryWeightReader {
           current:
               const HealthSummarySectionData<
                 HealthSummaryWeightView
-              >.notRecorded(message: 'Nenhuma pesagem registrada'),
+              >.notRecorded(message: HealthSummaryUserCopy.weightNotRecorded),
           trend:
               const HealthSummarySectionData<
                 HealthSummaryWeightTrendView
-              >.notRecorded(message: 'Sem histórico de peso'),
+              >.notRecorded(message: HealthSummaryUserCopy.weightNotRecorded),
         );
       }
       final latest = valid.last;
@@ -95,7 +97,12 @@ class HealthSummaryWeightReader {
         ),
       );
     } on FirebaseException catch (e) {
-      final msg = e.message ?? 'Falha ao ler peso [${e.code}]';
+      debugPrint(
+        '[HealthSummaryWeightReader] unavailable [${e.code}]: ${e.message}',
+      );
+      final msg = e.code == 'unavailable'
+          ? HealthSummaryUserCopy.networkUnavailable
+          : HealthSummaryUserCopy.weightUnavailable;
       return (
         current: HealthSummarySectionData<HealthSummaryWeightView>.unavailable(
           message: msg,
@@ -106,15 +113,16 @@ class HealthSummaryWeightReader {
             ),
       );
     } catch (e) {
-      final msg = 'Falha ao ler peso: $e';
+      debugPrint('[HealthSummaryWeightReader] unavailable: $e');
       return (
-        current: HealthSummarySectionData<HealthSummaryWeightView>.unavailable(
-          message: msg,
-        ),
-        trend:
-            HealthSummarySectionData<HealthSummaryWeightTrendView>.unavailable(
-              message: msg,
+        current:
+            const HealthSummarySectionData<HealthSummaryWeightView>.unavailable(
+              message: HealthSummaryUserCopy.weightUnavailable,
             ),
+        trend:
+            const HealthSummarySectionData<
+              HealthSummaryWeightTrendView
+            >.unavailable(message: HealthSummaryUserCopy.weightUnavailable),
       );
     }
   }

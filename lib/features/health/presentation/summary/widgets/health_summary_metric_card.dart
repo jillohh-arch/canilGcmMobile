@@ -77,19 +77,21 @@ class HealthSummaryMetricCard extends StatelessWidget {
       );
     }
 
-    final primary = isUnavailable
-        ? (statusMessage?.trim().isNotEmpty == true
-              ? statusMessage!.trim()
-              : 'Dados indisponíveis')
-        : isNotRecorded
-        ? (statusMessage?.trim().isNotEmpty == true
-              ? statusMessage!.trim()
-              : 'Não registrado')
-        : (primaryValue?.trim().isNotEmpty == true
-              ? primaryValue!.trim()
-              : '—');
-
-    final secondary = isUnavailable || isNotRecorded ? null : secondaryValue;
+    // Unavailable / notRecorded: valor principal curto (evita overflow e jargão).
+    final String primary;
+    final String? secondary;
+    if (isUnavailable) {
+      primary = 'INDISPONÍVEL';
+      secondary = _shortSecondary(statusMessage) ?? 'Dados não disponíveis';
+    } else if (isNotRecorded) {
+      primary = 'NÃO REGISTRADO';
+      secondary = null;
+    } else {
+      primary = primaryValue?.trim().isNotEmpty == true
+          ? primaryValue!.trim()
+          : '—';
+      secondary = secondaryValue;
+    }
 
     // "—" e ausências usam cor neutra — não herdam o acento positivo do bloco.
     final primaryColor = isUnavailable
@@ -121,7 +123,7 @@ class HealthSummaryMetricCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
             color: primaryColor,
-            fontSize: 16,
+            fontSize: isUnavailable || isNotRecorded ? 13.5 : 16,
             fontWeight: FontWeight.w800,
             height: 1.15,
           ),
@@ -142,5 +144,13 @@ class HealthSummaryMetricCard extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  /// Texto secundário curto para cards densos; null se a mensagem for longa.
+  static String? _shortSecondary(String? message) {
+    final t = message?.trim();
+    if (t == null || t.isEmpty) return null;
+    if (t.length > 28) return null;
+    return t;
   }
 }

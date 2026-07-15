@@ -215,8 +215,10 @@ class HealthSummaryMetricsGrid extends StatelessWidget {
       semantics = 'Atenções $primary. $secondary';
     } else if (section.isNotRecorded) {
       semantics = 'Atenções sem registro';
+      accent = AppTheme.textMuted;
     } else if (section.isUnavailable) {
       semantics = 'Atenções indisponíveis';
+      accent = AppTheme.textSoft;
     } else {
       semantics = 'Atenções carregando';
     }

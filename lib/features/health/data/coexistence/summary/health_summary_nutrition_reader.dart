@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
@@ -52,7 +54,7 @@ class HealthSummaryNutritionReader {
 
       if (validFeedings.isEmpty && prescription == null) {
         return const HealthSummarySectionData.notRecorded(
-          message: 'Nenhum plano ou refeição registrada para hoje',
+          message: HealthSummaryUserCopy.nutritionNotRecorded,
         );
       }
 
@@ -79,12 +81,18 @@ class HealthSummaryNutritionReader {
         ),
       );
     } on FirebaseException catch (e) {
+      debugPrint(
+        '[HealthSummaryNutritionReader] unavailable [${e.code}]: ${e.message}',
+      );
       return HealthSummarySectionData.unavailable(
-        message: e.message ?? 'Falha ao ler nutrição [${e.code}]',
+        message: e.code == 'unavailable'
+            ? HealthSummaryUserCopy.networkUnavailable
+            : HealthSummaryUserCopy.nutritionUnavailable,
       );
     } catch (e) {
-      return HealthSummarySectionData.unavailable(
-        message: 'Falha ao ler nutrição: $e',
+      debugPrint('[HealthSummaryNutritionReader] unavailable: $e');
+      return const HealthSummarySectionData.unavailable(
+        message: HealthSummaryUserCopy.nutritionUnavailable,
       );
     }
   }

@@ -53,6 +53,16 @@ class _MainRootHealthTab extends StatelessWidget {
       );
     }
 
+    // Fase 2E: integração controlada do Resumo Health v1.
+    // Gate reversível — false restaura o prontuário legado nesta aba.
+    // Não instancia source/controller quando gate false (Entry nem monta).
+    if (shouldUseHealthV1SummaryEntry()) {
+      return HealthV1EntryScreen(
+        key: ValueKey<String>('health-v1-$dogId'),
+        dogId: dogId,
+      );
+    }
+
     return DogHealthProntuarioScreen(dogId: dogId);
   }
 }

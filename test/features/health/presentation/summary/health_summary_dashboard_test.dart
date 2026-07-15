@@ -348,11 +348,12 @@ void main() {
         await pumpDashboard(tester, source: source, emitData: data);
 
         expect(find.byKey(const ValueKey('summary-data')), findsOneWidget);
-        expect(find.text('Sem registro'), findsOneWidget);
-        expect(find.text('Dados indisponíveis'), findsOneWidget);
+        expect(find.text('NÃO REGISTRADO'), findsOneWidget);
+        expect(find.text('INDISPONÍVEL'), findsOneWidget);
         // Bloco unavailable de tratamentos NÃO derruba o dashboard.
         expect(find.text('Bono'), findsOneWidget);
-        expect(find.text('REQUER ATENÇÃO'), findsOneWidget);
+        // Attention available + empty → título neutro (sem falso alerta).
+        expect(find.text('REQUER ATENÇÃO'), findsNothing);
       },
     );
 
@@ -819,27 +820,37 @@ void main() {
       expect(find.text('Alpha'), findsOneWidget);
     });
 
-    testWidgets('atenção unavailable não mostra empty positivo', (
-      tester,
-    ) async {
-      final source = FakeHealthSummarySource();
-      addTearDown(source.disposeAll);
+    testWidgets(
+      'atenção unavailable não mostra empty positivo nem falso alerta',
+      (tester) async {
+        final source = FakeHealthSummarySource();
+        addTearDown(source.disposeAll);
 
-      await pumpDashboard(
-        tester,
-        source: source,
-        emitData: fullData(
-          attention: const HealthSummarySectionData.unavailable(
-            message: 'Falha ao carregar atenções',
+        await pumpDashboard(
+          tester,
+          source: source,
+          emitData: fullData(
+            attention: const HealthSummarySectionData.unavailable(
+              message:
+                  'Não foi possível determinar as atenções deste K9 no momento.',
+            ),
           ),
-        ),
-      );
+        );
 
-      // Mensagem no grid e na seção REQUER ATENÇÃO (ambos usam o contrato).
-      expect(find.text('Falha ao carregar atenções'), findsWidgets);
-      expect(find.text('Nenhuma atenção prioritária'), findsNothing);
-      expect(find.text('NENHUMA'), findsNothing);
-    });
+        // Título da seção neutro — não afirma "REQUER ATENÇÃO".
+        expect(find.text('REQUER ATENÇÃO'), findsNothing);
+        expect(find.text('ATENÇÕES'), findsWidgets);
+        expect(find.text('INDISPONÍVEL'), findsWidgets);
+        expect(
+          find.text(
+            'Não foi possível determinar as atenções deste K9 no momento.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Nenhuma atenção prioritária'), findsNothing);
+        expect(find.text('NENHUMA'), findsNothing);
+      },
+    );
 
     testWidgets('tratamentos unavailable não mostra NENHUMA ATIVA', (
       tester,
@@ -852,12 +863,12 @@ void main() {
         source: source,
         emitData: fullData(
           treatments: const HealthSummarySectionData.unavailable(
-            message: 'Fonte de tratamentos falhou',
+            message: 'Informações de tratamentos ainda não estão disponíveis.',
           ),
         ),
       );
 
-      expect(find.text('Fonte de tratamentos falhou'), findsOneWidget);
+      expect(find.text('INDISPONÍVEL'), findsWidgets);
       expect(find.text('NENHUMA ATIVA'), findsNothing);
     });
 

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -12,6 +13,7 @@ import 'package:canil_gcm/features/health/data/coexistence/summary/health_summar
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_state.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 
@@ -125,7 +127,10 @@ void main() {
       final reader = HealthSummaryWeightReader(
         loadSamples: (_) async => throw StateError('boom'),
       );
-      expect((await reader.readCurrent('x')).isUnavailable, isTrue);
+      final section = await reader.readCurrent('x');
+      expect(section.isUnavailable, isTrue);
+      expect(section.message, isNot(contains('boom')));
+      expect(section.message?.toLowerCase(), isNot(contains('exception')));
     });
   });
 
@@ -151,6 +156,25 @@ void main() {
       final reader = HealthSummaryVaccinationReader(loadFacts: (_) async => []);
       expect((await reader.read('dog-1')).isNotRecorded, isTrue);
     });
+
+    test(
+      'unavailable sanitiza erro técnico (sem index/firebase na UI)',
+      () async {
+        final reader = HealthSummaryVaccinationReader(
+          loadFacts: (_) async => throw Exception(
+            'The query requires an index. You can create it here: '
+            'https://console.firebase.google.com/project/x/indexes',
+          ),
+        );
+        final section = await reader.read('dog-1');
+        expect(section.isUnavailable, isTrue);
+        final msg = section.message ?? '';
+        expect(msg.toLowerCase(), isNot(contains('index')));
+        expect(msg.toLowerCase(), isNot(contains('firebase')));
+        expect(msg.toLowerCase(), isNot(contains('https://')));
+        expect(msg, contains('vacinação'));
+      },
+    );
   });
 
   group('HealthSummaryNutritionReader', () {
@@ -282,6 +306,19 @@ void main() {
         expect(HealthSummaryUnsafeSections.treatments.isUnavailable, isTrue);
         expect(HealthSummaryUnsafeSections.attention.isUnavailable, isTrue);
         expect(HealthSummaryUnsafeSections.readiness.valueOrNull, isNull);
+        // Copy operacional — sem jargão de arquitetura.
+        for (final msg in [
+          HealthSummaryUnsafeSections.readiness.message,
+          HealthSummaryUnsafeSections.treatments.message,
+          HealthSummaryUnsafeSections.attention.message,
+        ]) {
+          final lower = (msg ?? '').toLowerCase();
+          expect(lower.contains('coexist'), isFalse);
+          expect(lower.contains('legado'), isFalse);
+          expect(lower.contains('health v1'), isFalse);
+          expect(lower.contains('adapter'), isFalse);
+          expect(lower.contains('reader'), isFalse);
+        }
       },
     );
   });
@@ -438,6 +475,59 @@ void main() {
           source.watchSummary('dog-1'),
           emitsError(isA<HealthSummarySourceException>()),
         );
+      },
+    );
+
+    test(
+      'todas networkUnavailable → SourceException isOffline (pós-sanitização)',
+      () async {
+        // Readers mapeiam FirebaseException code unavailable → networkUnavailable.
+        final source = CoexistenceHealthSummarySource(
+          weightReader: HealthSummaryWeightReader(
+            loadSamples: (_) async {
+              throw FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'unavailable',
+                message: 'Failed to get document because the client is offline',
+              );
+            },
+          ),
+          vaccinationReader: HealthSummaryVaccinationReader(
+            loadFacts: (_) async {
+              throw FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'unavailable',
+                message: 'offline',
+              );
+            },
+          ),
+          nutritionReader: HealthSummaryNutritionReader(
+            loadDaySnapshot: (_) async {
+              throw FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'unavailable',
+                message: 'offline',
+              );
+            },
+          ),
+          recentRecordsReader: HealthSummaryRecentRecordsReader(
+            loadItems: (_) async {
+              throw FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'unavailable',
+                message: 'offline',
+              );
+            },
+          ),
+        );
+
+        try {
+          await source.watchSummary('dog-1').first;
+          fail('esperava SourceException');
+        } on HealthSummarySourceException catch (e) {
+          expect(e.isOffline, isTrue);
+          expect(e.message.toLowerCase(), isNot(contains('firebase')));
+        }
       },
     );
 

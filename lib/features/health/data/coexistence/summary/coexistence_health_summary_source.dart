@@ -9,6 +9,7 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_bl
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source_metadata.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_view_data.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_service.dart';
 
@@ -124,7 +125,10 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
       rethrow;
     } on FirebaseException catch (e) {
       throw HealthSummarySourceException(
-        e.message ?? 'Falha de leitura do resumo [${e.code}]',
+        HealthSummaryUserCopy.sanitizeUnavailable(
+          e.message,
+          fallback: HealthSummaryUserCopy.genericUnavailable,
+        ),
         isOffline: e.code == 'unavailable',
       );
     }
@@ -147,12 +151,18 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
     for (final m in messages) {
       if (m == null) continue;
       final lower = m.toLowerCase();
-      if (lower.contains('unavailable') ||
-          lower.contains('offline') ||
+      // Após 2E-R as mensagens de UI são sanitizadas; networkUnavailable
+      // preserva "conectar"/"rede". Também aceita textos legados/técnicos.
+      if (lower.contains('offline') ||
           lower.contains('network') ||
+          lower.contains('conectar') ||
+          lower.contains('conexão') ||
+          lower.contains('conexao') ||
+          lower.contains('rede') ||
           lower.contains(
             'failed to get document because the client is offline',
-          )) {
+          ) ||
+          m == HealthSummaryUserCopy.networkUnavailable) {
         return true;
       }
     }
