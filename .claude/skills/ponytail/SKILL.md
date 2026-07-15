@@ -1,117 +1,664 @@
 ---
+
 name: ponytail
-description: >
-  Forces the laziest solution that actually works, simplest, shortest, most
-  minimal. Channels a senior dev who has seen everything: question whether the
-  task needs to exist at all (YAGNI), reach for the standard library before
-  custom code, native platform features before dependencies, one line before
-  fifty. Supports intensity levels: lite, full (default), ultra. Use whenever
-  the user says "ponytail", "be lazy", "lazy mode", "simplest solution",
-  "minimal solution", "yagni", "do less", or "shortest path", and whenever
-  they complain about over-engineering, bloat, boilerplate, or unnecessary
-  dependencies.
+description: Modo manual para buscar a menor solução segura e suficiente dentro do escopo de uma tarefa. Use somente quando o usuário invocar explicitamente "ponytail", "modo minimalista", "solução mínima", "simplifique", "YAGNI" ou equivalente. Nunca substitui as regras de arquitetura, segurança, auditoria, compatibilidade, documentação ou validação do K9 Ops.
 argument-hint: "[lite|full|ultra]"
-license: MIT
----
+disable-model-invocation: true
+------------------------------
 
-# Ponytail
+# Ponytail · Menor Solução Segura
 
-You are a lazy senior developer. Lazy means efficient, not careless. You have
-seen every over-engineered codebase and been paged at 3am for one. The best
-code is the code never written.
+## Propósito
 
-## Persistence
+Esta skill existe para reduzir complexidade acidental.
 
-ACTIVE EVERY RESPONSE. No drift back to over-building. Still active if
-unsure. Off only: "stop ponytail" / "normal mode". Default: **full**.
-Switch: `/ponytail lite|full|ultra`.
+Quando ativada, procure a menor implementação que resolva corretamente o problema real.
 
-## The ladder
+O objetivo é reduzir:
 
-Stop at the first rung that holds:
+* código desnecessário;
+* abstrações prematuras;
+* dependências;
+* arquivos alterados;
+* duplicação;
+* boilerplate;
+* complexidade sem benefício real.
 
-1. **Does this need to exist at all?** Speculative need = skip it, say so in one line. (YAGNI)
-2. **Already in this codebase?** A helper, util, type, or pattern that already lives here → reuse it. Look before you write; re-implementing what's a few files over is the most common slop.
-3. **Stdlib does it?** Use it.
-4. **Native platform feature covers it?** `<input type="date">` over a picker lib, CSS over JS, DB constraint over app code.
-5. **Already-installed dependency solves it?** Use it. Never add a new one for what a few lines can do.
-6. **Can it be one line?** One line.
-7. **Only then:** the minimum code that works.
+Ela não é uma autorização para:
 
-The ladder is a reflex, not a research project — but it runs *after* you
-understand the problem, not instead of it. Read the task and the code it
-touches first, trace the real flow end to end, then climb. Two rungs work →
-take the higher one and move on. The first lazy solution that works is the
-right one — once you actually know what the change has to touch.
+* ignorar arquitetura;
+* pular investigação;
+* simplificar regras de negócio;
+* reduzir segurança;
+* quebrar compatibilidade;
+* ignorar auditoria;
+* omitir testes necessários;
+* entregar solução incompleta.
 
-**Bug fix = root cause, not symptom.** A report names a symptom. Before you
-edit, grep every caller of the function you're about to touch. The lazy fix IS
-the root-cause fix: one guard in the shared function is a smaller diff than a
-guard in every caller — and patching only the path the ticket names leaves
-every sibling caller still broken. Fix it once, where all callers route through.
+## Ativação
 
-## Rules
+Esta skill é manual.
 
-- No unrequested abstractions: no interface with one implementation, no factory for one product, no config for a value that never changes.
-- No boilerplate, no scaffolding "for later", later can scaffold for itself.
-- Deletion over addition. Boring over clever, clever is what someone decodes at 3am.
-- Fewest files possible. Shortest working diff wins — but only once you understand the problem. The smallest change in the wrong place isn't lazy, it's a second bug.
-- Complex request? Ship the lazy version and question it in the same response, "Did X; Y covers it. Need full X? Say so." Never stall on an answer you can default.
-- Two stdlib options, same size? Take the one that's correct on edge cases. Lazy means writing less code, not picking the flimsier algorithm.
-- Mark deliberate simplifications with a `ponytail:` comment (`// ponytail: this exists`), simple reads as intent, not ignorance. Shortcut with a known ceiling (global lock, O(n²) scan, naive heuristic)? The comment names the ceiling and the upgrade path: `# ponytail: global lock, per-account locks if throughput matters`.
+Só deve ser aplicada quando o usuário a invocar explicitamente.
+
+Exemplos:
+
+```text
+/ponytail
+```
+
+```text
+/ponytail lite
+```
+
+```text
+/ponytail full
+```
+
+```text
+/ponytail ultra
+```
+
+Também pode ser ativada quando o usuário pedir explicitamente algo como:
+
+```text
+use a solução mais simples
+evite over-engineering
+aplique YAGNI
+faça o menor diff possível
+modo minimalista
+```
+
+Não permaneça ativa automaticamente entre sessões.
+
+Não altere o comportamento geral do projeto sem invocação explícita.
+
+## Hierarquia de autoridade
+
+Ponytail nunca pode sobrescrever:
+
+1. escopo explícito da tarefa;
+2. `CLAUDE.md`, `AGENTS.md` e instruções vigentes;
+3. arquitetura atual do projeto;
+4. contratos de dados;
+5. segurança;
+6. integridade de dados;
+7. regras de auditoria;
+8. compatibilidade mobile/web;
+9. critérios de aceitação;
+10. validações obrigatórias.
+
+Se a menor solução conflitar com algum desses itens, ela não é a solução correta.
+
+## Regra principal
+
+A prioridade é:
+
+```text
+menor solução segura e completa
+```
+
+e não:
+
+```text
+menor quantidade de código possível
+```
+
+Código curto no lugar errado continua sendo código ruim.
+
+## Antes de simplificar
+
+Primeiro entenda:
+
+* o problema real;
+* o fluxo completo afetado;
+* a causa raiz;
+* os consumidores;
+* os dados envolvidos;
+* o comportamento esperado;
+* as restrições existentes.
+
+Não escolha a solução mínima antes de compreender o problema.
+
+## A escada Ponytail
+
+Percorra esta sequência.
+
+Pare na primeira solução que realmente resolver o problema.
+
+## 1. Isso precisa existir?
+
+Questione requisitos apenas quando forem claramente:
+
+* especulativos;
+* redundantes;
+* não solicitados;
+* criados apenas "para o futuro".
+
+Não questione novamente algo que já foi explicitamente decidido ou aprovado.
+
+Não use YAGNI para remover requisito real.
+
+## 2. Já existe algo equivalente no projeto?
+
+Antes de criar código novo, procure:
+
+* helper;
+* utilitário;
+* serviço;
+* repository;
+* parser;
+* componente;
+* model;
+* padrão equivalente.
+
+Reutilize quando a semântica for realmente a mesma.
+
+Não force reutilização inadequada apenas para reduzir o diff.
+
+## 3. A linguagem ou plataforma já resolve?
+
+Prefira recursos nativos quando atendem corretamente ao requisito.
+
+Exemplos possíveis:
+
+```text
+Dart
+Flutter
+Firebase
+Firestore
+biblioteca padrão
+```
+
+Não recrie manualmente algo que a plataforma já resolve de forma segura.
+
+## 4. Uma dependência já instalada resolve?
+
+Antes de adicionar pacote novo, verifique se já existe uma solução no projeto.
+
+Use a dependência existente quando:
+
+* ela realmente resolve o problema;
+* o uso está alinhado ao projeto;
+* não cria acoplamento desnecessário.
+
+Não adicione pacote para substituir poucas linhas simples sem benefício real.
+
+## 5. Qual é o menor ponto correto de alteração?
+
+Corrija no ponto onde o problema realmente nasce.
+
+Exemplo:
+
+```text
+5 consumidores falham por causa do mesmo parser
+```
+
+Prefira corrigir o parser corretamente.
+
+Não adicione cinco guards diferentes apenas para reduzir risco aparente.
+
+O menor diff correto pode estar em um ponto compartilhado.
+
+## 6. Só então implemente
+
+Faça o menor diff que resolva completamente:
+
+* fluxo principal;
+* erro relevante;
+* compatibilidade necessária;
+* segurança necessária;
+* validação necessária.
+
+Não implemente infraestrutura "para depois".
+
+## Bugfix
+
+Para bugs, siga:
+
+```text
+sintoma
+↓
+fluxo real
+↓
+causa raiz
+↓
+menor correção no ponto correto
+```
+
+Não confunda:
+
+```text
+menor diff
+```
+
+com:
+
+```text
+patch superficial
+```
+
+Se a correção apenas esconder o sintoma, ela não é Ponytail.
+
+Ela é dívida técnica.
+
+## Escopo mínimo não significa arquitetura mínima
+
+No K9 Ops, frequentemente buscamos:
+
+```text
+menor escopo possível
+```
+
+Isso significa:
+
+* não alterar áreas paralelas;
+* não fazer refactors desnecessários;
+* não incluir melhorias não solicitadas.
+
+Isso não significa eliminar a arquitetura necessária.
+
+Áreas como:
+
+* Firestore;
+* Saúde;
+* Turnos;
+* Ocorrências;
+* Treinamento;
+* Auditoria;
+* Permissões;
+
+podem exigir soluções mais estruturadas por natureza.
+
+## Abstrações
+
+Evite criar sem necessidade atual:
+
+* interface com uma única implementação;
+* factory para um único produto;
+* configuração para valor fixo;
+* camada intermediária sem responsabilidade;
+* wrapper que apenas repassa chamadas;
+* arquitetura preparada para casos inexistentes.
+
+Mas preserve abstrações que já fazem parte da arquitetura do projeto.
+
+Não destrua uma estrutura existente apenas porque código inline seria menor.
+
+## Services e repositories
+
+Não crie um service ou repository novo apenas por formalidade.
+
+Crie quando houver responsabilidade real, como:
+
+* acesso a dados;
+* isolamento de infraestrutura;
+* regra compartilhada;
+* coordenação;
+* transformação significativa.
+
+Ao mesmo tempo, não mova lógica de domínio para widget apenas para evitar criar um arquivo necessário.
+
+## Arquivos
+
+Prefira menos arquivos alterados quando isso não prejudicar:
+
+* separação de responsabilidades;
+* arquitetura;
+* testabilidade;
+* manutenção.
+
+Não coloque código no arquivo errado apenas para evitar tocar em outro arquivo.
+
+O menor número de arquivos não é objetivo absoluto.
+
+## Dependências
+
+Nova dependência precisa justificar:
+
+* benefício;
+* manutenção;
+* tamanho;
+* risco;
+* necessidade real.
+
+Antes de adicionar:
+
+```text
+já existe no projeto?
+stdlib resolve?
+Flutter resolve?
+Firebase resolve?
+```
+
+Se sim, prefira a opção existente.
+
+## Código legado
+
+Não refatore legado automaticamente.
+
+Se o legado:
+
+* não causa o problema;
+* não está no escopo;
+* funciona atualmente;
+
+deixe como está.
+
+Se ele for a causa raiz da tarefa atual, corrija apenas o necessário.
+
+Não transforme bugfix em modernização completa.
+
+## Firestore
+
+Ponytail não pode simplificar mudanças de Firestore ignorando compatibilidade.
+
+Antes de alterar:
+
+```text
+campo
+tipo
+coleção
+subcoleção
+semântica
+rules
+índice
+```
+
+consulte:
+
+```text
+firestore-coexistence
+```
+
+Não escolha uma mudança destrutiva apenas porque exige menos código.
+
+## Auditoria
+
+Quando a tarefa envolver registros críticos, consulte:
+
+```text
+audit-trail
+```
+
+Não remova rastreabilidade para simplificar implementação.
+
+Também não crie auditoria adicional sem necessidade.
+
+## Segurança
+
+Nunca simplifique removendo:
+
+* autenticação;
+* autorização;
+* validação de entrada em fronteiras de confiança;
+* proteção contra perda de dados;
+* consistência necessária;
+* controles de acesso;
+* tratamento de concorrência necessário.
+
+Ocultar uma ação na interface não substitui segurança real.
+
+## Integridade de dados
+
+Não reduza validações quando a ausência delas puder produzir:
+
+* corrupção;
+* perda de dados;
+* estado impossível;
+* inconsistência entre consumidores;
+* histórico incorreto.
+
+Lazy significa evitar trabalho desnecessário.
+
+Não significa aceitar risco desnecessário.
+
+## Concorrência
+
+Não adicione transaction, lock ou mecanismo complexo sem risco real.
+
+Mas quando houver risco concreto de concorrência, não escolha uma implementação insegura apenas porque é menor.
+
+Use o mecanismo mais simples que realmente garanta a consistência necessária.
+
+## Estado e UI
+
+Não crie:
+
+* estado global para problema local;
+* ViewModel para valor trivial;
+* nova arquitetura de navegação para uma tela;
+* componente compartilhado sem reutilização real.
+
+Ao mesmo tempo, não coloque toda lógica diretamente em um widget se a feature já possui estrutura clara para essa responsabilidade.
+
+## Testes
+
+Use a menor validação que realmente prove a mudança.
+
+Pode ser:
+
+* teste existente relevante;
+* pequeno teste unitário;
+* teste de parser;
+* teste de widget;
+* `flutter analyze`;
+* validação manual reproduzível;
+* validação autenticada;
+* combinação adequada.
+
+Não crie suíte inteira para uma mudança trivial.
+
+Não remova ou ignore teste importante para reduzir o trabalho.
+
+## Regra para lógica nova
+
+Quando adicionar lógica não trivial, deixe uma forma objetiva de verificar seu comportamento.
+
+Exemplos:
+
+```text
+branch importante
+parser
+transformação de dados
+regra de negócio
+fluxo crítico
+```
+
+Use o padrão de testes já existente no projeto.
+
+Não crie mecanismos improvisados de teste dentro de código de produção.
+
+## Comentários
+
+Não adicione comentários como:
+
+```dart
+// ponytail: ...
+```
+
+ao código do projeto.
+
+Esta skill é uma estratégia de trabalho.
+
+Ela não deve deixar sua própria marca no código.
+
+Adicione comentário somente quando o código realmente precisar explicar:
+
+* decisão não óbvia;
+* workaround;
+* limitação conhecida;
+* motivo técnico relevante.
+
+## Intensidade
+
+## `lite`
+
+Implemente normalmente o que foi pedido.
+
+Quando existir uma alternativa claramente mais simples, mencione-a sem substituir automaticamente o requisito.
+
+Ideal para:
+
+* tarefas já bem especificadas;
+* comparação de soluções;
+* revisão de complexidade.
+
+## `full`
+
+Modo padrão.
+
+Escolha a menor solução segura que satisfaça integralmente:
+
+* requisito;
+* arquitetura;
+* compatibilidade;
+* validação.
+
+Evite trabalho especulativo.
+
+## `ultra`
+
+Questione agressivamente:
+
+* abstrações;
+* infraestrutura futura;
+* novas dependências;
+* duplicação;
+* features especulativas.
+
+Mesmo em `ultra`, nunca simplifique:
+
+* segurança;
+* integridade;
+* auditoria necessária;
+* compatibilidade;
+* critérios de aceitação;
+* regras já aprovadas.
+
+`Ultra` questiona complexidade não necessária.
+
+Não questiona requisitos confirmados.
+
+## Quando parar
+
+Pare quando o problema estiver corretamente resolvido.
+
+Não continue para:
+
+* refatorar arquivos vizinhos;
+* limpar warnings antigos;
+* trocar biblioteca;
+* padronizar nomes fora do escopo;
+* criar infraestrutura futura;
+* melhorar telas não relacionadas.
+
+Reporte essas oportunidades separadamente quando forem relevantes.
+
+## Mudanças compartilhadas
+
+Antes de alterar um elemento compartilhado, identifique os consumidores relevantes.
+
+Exemplos:
+
+```text
+parser
+service
+repository
+widget compartilhado
+model
+campo Firestore
+```
+
+Uma alteração central pode ser o menor diff correto.
+
+Mas precisa preservar os outros consumidores.
+
+## Trabalho preexistente
+
+Nunca simplifique o worktree apagando alterações que não pertencem à tarefa.
+
+Antes de trabalhar:
+
+* identifique estado atual;
+* preserve arquivos preexistentes;
+* não faça cleanup destrutivo;
+* não inclua mudanças alheias no commit.
+
+## Commits
+
+Ponytail não autoriza commit automático.
+
+Siga o workflow atual.
+
+Quando o commit fizer parte da tarefa:
+
+* revise o diff;
+* inclua somente o escopo;
+* não misture alterações preexistentes.
 
 ## Output
 
-Code first. Then at most three short lines: what was skipped, when to add it.
-No essays, no feature tours, no design notes. If the explanation is longer
-than the code, delete the explanation, every paragraph defending a
-simplification is complexity smuggled back in as prose. Explanation the user
-explicitly asked for (a report, a walkthrough, per-phase notes) is not debt,
-give it in full, the rule is only against unrequested prose.
+Não imponha limite artificial de três linhas.
 
-Pattern: `[code] → skipped: [X], add when [Y].`
+Siga o formato solicitado pela tarefa ou pelo projeto.
 
-## Intensity
+Quando não houver formato específico, reporte:
 
-| Level | What change |
-|-------|------------|
-| **lite** | Build what's asked, but name the lazier alternative in one line. User picks. |
-| **full** | The ladder enforced. Stdlib and native first. Shortest diff, shortest explanation. Default. |
-| **ultra** | YAGNI extremist. Deletion before addition. Ship the one-liner and challenge the rest of the requirement in the same breath. |
+```text
+O que foi feito
 
-Example: "Add a cache for these API responses."
-- lite: "Done, cache added. FYI: `functools.lru_cache` covers this in one line if you'd rather not own a cache class."
-- full: "`@lru_cache(maxsize=1000)` on the fetch function. Skipped custom cache class, add when lru_cache measurably falls short."
-- ultra: "No cache until a profiler says so. When it does: `@lru_cache`. A hand-rolled TTL cache class is a bug farm with a hit rate."
+Por que esta é a menor solução segura
 
-## When NOT to be lazy
+O que deliberadamente não foi adicionado
 
-Never simplify away: input validation at trust boundaries, error handling
-that prevents data loss, security measures, accessibility basics, anything
-explicitly requested. User insists on the full version → build it, no
-re-arguing.
+Validações executadas
+```
 
-Never lazy about understanding the problem. The ladder shortens the
-solution, never the reading. Trace the whole thing first — every file the
-change touches, the actual flow — before picking a rung. Laziness that skips
-comprehension to ship a small diff is the dangerous kind: it dresses up as
-efficiency and ships a confident wrong fix. Read fully, then be lazy.
+Se nada relevante foi evitado, não invente uma justificativa.
 
-Hardware is never the ideal on paper: a real clock drifts, a real sensor
-reads off, a PCA9685 runs a few percent fast. Leave the calibration knob, not
-just less code, the physical world needs tuning a minimal model can't see.
+## O que Ponytail nunca deve fazer
 
-Lazy code without its check is unfinished. Non-trivial logic (a branch, a
-loop, a parser, a money/security path) leaves ONE runnable check behind, the
-smallest thing that fails if the logic breaks: an `assert`-based
-`demo()`/`__main__` self-check or one small `test_*.py`. No frameworks, no
-fixtures, no per-function suites unless asked. Trivial one-liners need no
-test, YAGNI applies to tests too.
+Não:
 
-## Boundaries
+* interromper uma tarefa aprovada para questionar sua existência;
+* reduzir requisito já confirmado;
+* remover arquitetura necessária;
+* ignorar documentação vigente;
+* alterar schema destrutivamente para economizar código;
+* esconder erro em vez de corrigir causa raiz;
+* trocar solução existente só porque outra seria menor;
+* produzir comentário `ponytail` no código;
+* permanecer ativo sem invocação explícita.
 
-Ponytail governs what you build, not how you talk (pair with Caveman for
-terse prose). "stop ponytail" / "normal mode": revert. Level persists until
-changed or session end.
+## Checklist
 
-The shortest path to done is the right path.
+Antes de concluir em modo Ponytail:
+
+* [ ] O problema real foi entendido.
+* [ ] A causa raiz foi identificada quando aplicável.
+* [ ] Soluções existentes foram procuradas.
+* [ ] Nenhuma abstração especulativa foi criada.
+* [ ] Nenhuma dependência desnecessária foi adicionada.
+* [ ] O menor ponto correto de alteração foi escolhido.
+* [ ] Segurança não foi reduzida.
+* [ ] Compatibilidade não foi ignorada.
+* [ ] Auditoria necessária foi preservada.
+* [ ] A validação é proporcional ao risco.
+* [ ] Nenhuma área fora do escopo foi alterada.
+
+## Regra final
+
+**Escreva menos código, não menos solução.**
+
+O melhor diff é o menor diff que continua:
+
+```text
+correto
+seguro
+compatível
+compreensível
+manutenível
+```
+
+seis meses depois.

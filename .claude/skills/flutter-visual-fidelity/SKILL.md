@@ -1,129 +1,445 @@
 ---
-name: flutter-visual-fidelity
-description: Converte mockups HTML em widgets Flutter com fidelidade visual precisa. Use quando implementar telas a partir de arquivos HTML em temp/mockups/, traduzir CSS em Theme/widgets Flutter, garantir que paleta de cores, espaçamentos, bordas, tipografia e hierarquia visual do mockup sejam reproduzidos no código Dart. Inclui padrões de tradução CSS-Flutter, decisões de quando usar Container vs DecoratedBox, e princípios de qualidade visual.
----
 
-# Fidelidade Visual · Mockup HTML → Flutter
+name: flutter-visual-fidelity
+description: Implementa ou ajusta interfaces Flutter a partir de mockups, screenshots ou especificações visuais explicitamente definidos como referência vigente. Use quando a tarefa exigir fidelidade visual. Decisões mais recentes, código validado e design system atual sempre prevalecem sobre artefatos históricos.
+disable-model-invocation: true
+------------------------------
+
+# Fidelidade Visual · K9 Ops
+
+## Objetivo
+
+Esta skill existe para traduzir uma referência visual aprovada para Flutter com alta fidelidade, preservando:
+
+* identidade visual;
+* hierarquia;
+* composição;
+* proporções;
+* espaçamentos;
+* tipografia;
+* cores;
+* estados;
+* responsividade;
+* comportamento real da interface.
+
+A referência visual orienta a implementação.
+
+Ela não substitui a arquitetura, o design system ou as decisões mais recentes do projeto.
+
+## Quando usar
+
+Use esta skill quando a tarefa indicar explicitamente uma referência visual vigente, como:
+
+* mockup HTML;
+* screenshot aprovado;
+* imagem de referência;
+* protótipo;
+* especificação visual atual.
+
+Não aplique automaticamente esta skill a qualquer tarefa de frontend.
+
+Não presuma que todo arquivo dentro de:
+
+```text
+temp/
+temp/mockups/
+temp/docs/
+```
+
+continua vigente.
+
+## Hierarquia de autoridade
+
+Quando houver conflito visual, siga esta ordem:
+
+1. decisão mais recente explicitamente aprovada;
+2. comportamento atual validado;
+3. código atual da branch;
+4. design system e tokens vigentes;
+5. documentação oficial atual;
+6. referência visual explicitamente indicada na tarefa;
+7. material histórico.
+
+Um mockup antigo nunca deve sobrescrever silenciosamente uma decisão posterior já validada.
 
 ## Princípio fundamental
 
-Os mockups em `temp/mockups/*.html` definem **exatamente** como cada tela deve ficar. 
-Sua tarefa é **reproduzir essa visualização em Flutter** com fidelidade.
+**Reproduza a intenção visual aprovada, não apenas pixels isolados.**
 
-Não improvise. Não simplifique. Não "modernize". O mockup já foi pensado.
+Fidelidade significa preservar:
 
-## Workflow correto
+```text
+hierarquia
+ritmo
+densidade
+contraste
+proporção
+identidade
+```
 
-Quando for implementar uma tela:
+sem comprometer:
 
-1. **Abra o mockup HTML** correspondente (ex: `temp/mockups/10_dashboard.html`)
-2. **Identifique a estrutura** (header, body, sections, cards)
-3. **Extraia os valores** (cores, espaçamentos, tamanhos, bordas)
-4. **Traduza pra Flutter** mantendo proporções
-5. **Valide visualmente** comparando lado a lado
+```text
+responsividade
+acessibilidade
+safe areas
+conteúdo dinâmico
+comportamento real
+```
 
-## Tradução CSS → Flutter (cheat sheet)
+## Antes de implementar
 
-### Cores
+### 1. Identifique a referência correta
+
+Abra apenas os arquivos relacionados à tarefa.
+
+Não faça auditoria geral de todos os mockups.
+
+Confirme:
+
+* qual tela está sendo implementada;
+* qual versão da referência é vigente;
+* se existem decisões posteriores à referência.
+
+### 2. Leia a implementação atual
+
+Antes de escrever código:
+
+* abra a tela atual;
+* identifique widgets compartilhados;
+* identifique tokens;
+* identifique componentes reutilizáveis;
+* identifique comportamento já funcionando.
+
+Não recrie do zero uma tela funcional apenas porque existe um mockup HTML.
+
+### 3. Identifique o sistema visual
+
+Extraia da referência:
+
+* estrutura geral;
+* alinhamentos;
+* espaçamentos;
+* larguras;
+* alturas;
+* radius;
+* bordas;
+* cores;
+* tipografia;
+* iconografia;
+* agrupamentos;
+* estados visuais;
+* hierarquia de informação.
+
+Diferencie valores realmente intencionais de medidas específicas do navegador usado para produzir o mockup.
+
+## Identidade visual do K9 Ops
+
+Preserve a identidade vigente do produto.
+
+Diretrizes atuais incluem:
+
+* base dark navy / azul petróleo;
+* ciano como identidade primária;
+* verde para estados positivos e operacionais;
+* amarelo para atenção;
+* vermelho para estados críticos ou restrições;
+* profundidade visual controlada;
+* glassmorphism discreto quando aprovado;
+* cantos arredondados;
+* contraste claro;
+* aparência premium e operacional;
+* elementos táticos sutis.
+
+Não substitua essa identidade por Material Design padrão apenas por conveniência.
+
+Não remova elementos visuais aprovados com base em heurísticas genéricas externas.
+
+## Tokens antes de hardcode
+
+Antes de escrever:
+
+```dart
+const Color(0xFF4DD0E1)
+```
+
+verifique se já existe algo como:
+
+```dart
+AppColors.k9Primary
+```
+
+Prefira tokens existentes quando representarem corretamente a referência.
+
+Faça o mesmo para:
+
+* cores;
+* radius;
+* espaçamentos;
+* tipografia;
+* sombras;
+* componentes.
+
+Hardcode apenas valores realmente específicos da tela quando não houver token equivalente.
+
+## Tradução CSS → Flutter
+
+## Fundo, borda e radius
+
+HTML:
 
 ```css
-/* HTML/CSS */
 background: #050d10;
-color: #4dd0e1;
-border-color: rgba(77, 208, 225, 0.2);
-```
-
-```dart
-// Flutter
-Container(
-  color: AppColors.k9Background,  // #050d10
-  child: Text(
-    '...',
-    style: TextStyle(color: AppColors.k9Primary),  // #4dd0e1
-  ),
-  decoration: BoxDecoration(
-    border: Border.all(
-      color: AppColors.k9Primary.withOpacity(0.2),
-    ),
-  ),
-)
-```
-
-### Espaçamentos
-
-```css
-padding: 16px 20px;       /* vertical horizontal */
-margin: 8px 0 14px 0;     /* top right bottom left */
-```
-
-```dart
-padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-
-margin: const EdgeInsets.only(top: 8, bottom: 14),
-```
-
-### Bordas
-
-```css
-border: 1px solid rgba(77, 208, 225, 0.3);
+border: 1px solid rgba(77, 208, 225, 0.2);
 border-radius: 14px;
 ```
 
-```dart
-decoration: BoxDecoration(
-  border: Border.all(
-    color: AppColors.k9Primary.withOpacity(0.3),
-    width: 1,
-  ),
-  borderRadius: BorderRadius.circular(14),
-)
-```
-
-### Border-radius assimétrico
-
-```css
-border-radius: 14px 14px 0 0;
-```
-
-```dart
-borderRadius: const BorderRadius.only(
-  topLeft: Radius.circular(14),
-  topRight: Radius.circular(14),
-),
-```
-
-### Border-left destaque
-
-```css
-border-left: 3px solid #2ecc71;
-padding-left: 12px;
-```
+Flutter:
 
 ```dart
 Container(
-  decoration: const BoxDecoration(
-    border: Border(
-      left: BorderSide(color: AppColors.k9Operational, width: 3),
+  decoration: BoxDecoration(
+    color: AppColors.k9Background,
+    border: Border.all(
+      color: AppColors.k9Primary.withValues(alpha: 0.2),
     ),
+    borderRadius: BorderRadius.circular(14),
   ),
-  padding: const EdgeInsets.only(left: 12),
-  child: ...,
+  child: child,
 )
 ```
 
-### Tipografia
+Não use:
+
+```dart
+Container(
+  color: AppColors.k9Background,
+  decoration: BoxDecoration(...),
+)
+```
+
+Quando houver `decoration`, coloque a cor dentro do `BoxDecoration`.
+
+## Espaçamentos
+
+HTML:
 
 ```css
-font-size: 14px;
-font-weight: 700;
-letter-spacing: 0.5px;
-line-height: 1.4;
-color: #fff;
+padding: 16px 20px;
 ```
+
+Flutter:
+
+```dart
+padding: const EdgeInsets.symmetric(
+  vertical: 16,
+  horizontal: 20,
+),
+```
+
+HTML:
+
+```css
+margin: 8px 0 14px;
+```
+
+Flutter:
+
+```dart
+margin: const EdgeInsets.only(
+  top: 8,
+  bottom: 14,
+),
+```
+
+Preserve os valores quando forem decisões visuais reais.
+
+Adapte quando necessário para:
+
+* safe area;
+* telas menores;
+* teclado;
+* conteúdo variável;
+* text scaling.
+
+## Flex horizontal
+
+HTML:
+
+```css
+display: flex;
+align-items: center;
+gap: 8px;
+```
+
+Flutter:
+
+```dart
+Row(
+  crossAxisAlignment: CrossAxisAlignment.center,
+  children: [
+    first,
+    const SizedBox(width: 8),
+    second,
+  ],
+)
+```
+
+## Flex vertical
+
+HTML:
+
+```css
+display: flex;
+flex-direction: column;
+gap: 12px;
+```
+
+Flutter:
+
+```dart
+Column(
+  children: [
+    first,
+    const SizedBox(height: 12),
+    second,
+  ],
+)
+```
+
+Use APIs mais recentes de `spacing` somente se a versão Flutter do projeto suportar e o padrão atual já utilizar esse recurso.
+
+## Distribuição horizontal
+
+HTML:
+
+```css
+justify-content: space-between;
+```
+
+Flutter:
+
+```dart
+Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  children: [
+    first,
+    second,
+  ],
+)
+```
+
+## Duas colunas
+
+Não converta automaticamente todo grid HTML em `GridView`.
+
+Para poucos elementos:
+
+```dart
+Row(
+  children: [
+    Expanded(child: first),
+    const SizedBox(width: 8),
+    Expanded(child: second),
+  ],
+)
+```
+
+pode ser mais adequado.
+
+Para coleções maiores ou conteúdo repetido, use o widget mais apropriado ao comportamento real.
+
+## Elementos sobrepostos
+
+HTML:
+
+```css
+position: absolute;
+bottom: 0;
+left: 0;
+right: 0;
+```
+
+Flutter:
+
+```dart
+Stack(
+  children: [
+    background,
+    Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: foreground,
+    ),
+  ],
+)
+```
+
+Use `Stack` somente quando a sobreposição fizer parte real da composição.
+
+Não use posicionamento absoluto para compensar uma estrutura de layout incorreta.
+
+## Conteúdo fixo na parte inferior
+
+Para CTAs persistentes, avalie o comportamento real da tela.
+
+Possíveis padrões:
+
+```dart
+Scaffold(
+  body: content,
+  bottomNavigationBar: bottomAction,
+)
+```
+
+ou:
+
+```dart
+Column(
+  children: [
+    Expanded(
+      child: SingleChildScrollView(
+        child: content,
+      ),
+    ),
+    bottomAction,
+  ],
+)
+```
+
+Não traduza `position: sticky` do CSS literalmente sem considerar o comportamento Flutter.
+
+## Cores e opacidade
+
+Prefira:
+
+```dart
+AppColors.k9Primary.withValues(alpha: 0.2)
+```
+
+quando a versão Flutter do projeto utilizar essa API.
+
+Se o projeto atual ainda usar `withOpacity`, siga o padrão existente.
+
+Não modernize todas as chamadas fora do escopo apenas para padronizar.
+
+## Tipografia
+
+Preserve:
+
+* tamanho relativo;
+* peso;
+* altura de linha;
+* espaçamento entre letras;
+* contraste;
+* hierarquia.
+
+Exemplo:
 
 ```dart
 Text(
-  '...',
+  'Título',
   style: TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w700,
@@ -134,478 +450,421 @@ Text(
 )
 ```
 
-**Mapping de font-weight:**
-- `400` → `FontWeight.w400` (normal)
-- `500` → `FontWeight.w500`
-- `600` → `FontWeight.w600` (semi-bold)
-- `700` → `FontWeight.w700` (bold)
-- `800` → `FontWeight.w800` (extra-bold)
+Antes de criar um `TextStyle` completo, verifique se existe estilo equivalente no tema atual.
 
-### Display flex
+Não introduza uma nova fonte apenas porque o HTML de referência utilizava outra, se o aplicativo já possui sistema tipográfico definido.
 
-```css
-display: flex;
-align-items: center;
-gap: 8px;
-```
+## Cards
 
-```dart
-Row(
-  crossAxisAlignment: CrossAxisAlignment.center,
-  children: [
-    Widget1(),
-    const SizedBox(width: 8),
-    Widget2(),
-    const SizedBox(width: 8),
-    Widget3(),
-  ],
-)
-```
+Use cards quando fizerem parte da estrutura aprovada.
 
-### Display flex column
+Não substitua automaticamente cards existentes por estruturas mais "minimalistas".
 
-```css
-display: flex;
-flex-direction: column;
-gap: 12px;
-```
+Ao reproduzir um card, observe:
 
-```dart
-Column(
-  children: [
-    Widget1(),
-    const SizedBox(height: 12),
-    Widget2(),
-  ],
-)
+* contraste com o fundo;
+* border;
+* radius;
+* padding;
+* alinhamento interno;
+* hierarquia;
+* estado semântico.
 
-// Ou em Flutter moderno (3.7+):
-Column(
-  spacing: 12,
-  children: [Widget1(), Widget2()],
-)
-```
+Evite adicionar sombra Material padrão quando a identidade do K9 Ops utiliza profundidade diferente.
 
-### Justify-content
+## Glassmorphism
 
-```css
-justify-content: space-between;
-```
+Quando a referência vigente utilizar glassmorphism:
 
-```dart
-Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  children: [...],
-)
-```
+* preserve com moderação;
+* reutilize o padrão atual;
+* evite blur excessivo;
+* mantenha legibilidade;
+* valide performance.
 
-### Grid 2 colunas
+Não remova glassmorphism apenas porque outra guideline genérica o desencoraja.
 
-```css
-display: grid;
-grid-template-columns: 1fr 1fr;
-gap: 8px;
-```
+Também não adicione vidro decorativo onde a referência não pede.
 
-```dart
-GridView.count(
-  crossAxisCount: 2,
-  mainAxisSpacing: 8,
-  crossAxisSpacing: 8,
-  shrinkWrap: true,
-  physics: const NeverScrollableScrollPhysics(),
-  children: [...],
-)
+## Gradientes
 
-// OU mais comum (mais flexível):
-Row(
-  children: [
-    Expanded(child: Widget1()),
-    const SizedBox(width: 8),
-    Expanded(child: Widget2()),
-  ],
-)
-```
+Use gradientes somente quando fizerem parte da identidade ou referência aprovada.
 
-### Position absolute
-
-```css
-position: absolute;
-bottom: 0;
-left: 0;
-right: 0;
-```
-
-```dart
-Positioned(
-  bottom: 0,
-  left: 0,
-  right: 0,
-  child: ...,
-)
-
-// Dentro de Stack
-Stack(
-  children: [
-    backgroundWidget,
-    Positioned(
-      bottom: 0, left: 0, right: 0,
-      child: foregroundWidget,
-    ),
-  ],
-)
-```
-
-### Sticky bottom (CTA fixo)
-
-```css
-.cta-sticky {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(to top, #050d10 80%, transparent);
-  padding: 16px;
-}
-```
-
-```dart
-// Padrão recomendado: Scaffold + bottomNavigationBar OU Column + Expanded
-Scaffold(
-  body: Column(
-    children: [
-      Expanded(child: SingleChildScrollView(child: content)),
-      _buildStickyBottomCta(),
-    ],
-  ),
-)
-
-Widget _buildStickyBottomCta() {
-  return Container(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          AppColors.k9Background,
-        ],
-        stops: const [0.0, 0.2],
-      ),
-    ),
-    padding: const EdgeInsets.all(16),
-    child: ElevatedButton(...),
-  );
-}
-```
-
-### Border-bottom em divisores
-
-```css
-border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-```
+Exemplo:
 
 ```dart
 Container(
-  decoration: const BoxDecoration(
-    border: Border(
-      bottom: BorderSide(
-        color: Color(0x0FFFFFFF), // branco com 6% opacidade
-        width: 1,
-      ),
-    ),
-  ),
-  child: ...,
-)
-```
-
-## Cores de opacidade
-
-Sempre que vir `rgba(R, G, B, 0.X)`:
-
-```dart
-Color(0xFFRRGGBB).withOpacity(0.X)
-
-// Ou diretamente em hexadecimal:
-// rgba(77, 208, 225, 0.2) = 4DD0E1 com 20% opacity = 33 no alpha
-Color(0x334DD0E1)
-```
-
-Tabela de conversão de opacidade pra hex:
-- 0.05 → `0D`
-- 0.1 → `1A`
-- 0.15 → `26`
-- 0.2 → `33`
-- 0.3 → `4D`
-- 0.4 → `66`
-- 0.5 → `80`
-- 0.6 → `99`
-- 0.7 → `B3`
-- 0.8 → `CC`
-- 0.9 → `E6`
-
-## Componentes comuns dos mockups
-
-### Status badge (verde/amarelo/vermelho)
-
-```html
-<span class="status-badge apt">✓ APTO PARA PLANTÃO</span>
-
-<style>
-.status-badge.apt {
-  background: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
-  border: 1px solid rgba(46, 204, 113, 0.3);
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-</style>
-```
-
-```dart
-class StatusBadge extends StatelessWidget {
-  final String text;
-  final BadgeType type;
-
-  const StatusBadge({super.key, required this.text, required this.type});
-
-  Color get _color {
-    switch (type) {
-      case BadgeType.apt: return AppColors.k9Operational;
-      case BadgeType.warning: return AppColors.k9Formation;
-      case BadgeType.critical: return AppColors.k9Critical;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: _color.withOpacity(0.1),
-        border: Border.all(color: _color.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: _color,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-}
-
-enum BadgeType { apt, warning, critical }
-```
-
-### Card com gradient sutil
-
-```html
-<div class="dog-card">
-  ...
-</div>
-
-<style>
-.dog-card {
-  background: linear-gradient(135deg, rgba(77, 208, 225, 0.08), rgba(46, 204, 113, 0.04));
-  border: 1px solid rgba(77, 208, 225, 0.2);
-  border-radius: 16px;
-  padding: 16px;
-}
-</style>
-```
-
-```dart
-Container(
-  padding: const EdgeInsets.all(16),
   decoration: BoxDecoration(
     gradient: LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        AppColors.k9Primary.withOpacity(0.08),
-        AppColors.k9Operational.withOpacity(0.04),
+        AppColors.k9Primary.withValues(alpha: 0.08),
+        AppColors.k9Operational.withValues(alpha: 0.04),
       ],
     ),
-    border: Border.all(
-      color: AppColors.k9Primary.withOpacity(0.2),
-    ),
-    borderRadius: BorderRadius.circular(16),
   ),
-  child: ...,
 )
 ```
 
-### Avatar circular com borda
+Evite introduzir gradientes como decoração genérica.
 
-```html
-<div class="avatar">BONO</div>
+## Bordas semânticas
 
-<style>
-.avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: #1a2a30;
-  border: 2px solid #2ecc71;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #2ecc71;
-  font-size: 11px;
-  font-weight: 800;
-}
-</style>
-```
+Se a referência utilizar uma borda lateral como código visual aprovado, ela pode ser reproduzida.
+
+Exemplo:
 
 ```dart
 Container(
-  width: 50,
-  height: 50,
-  decoration: BoxDecoration(
-    color: AppColors.k9Surface,
-    shape: BoxShape.circle,
-    border: Border.all(
-      color: AppColors.k9Operational,
-      width: 2,
-    ),
-  ),
-  child: Center(
-    child: Text(
-      'BONO',
-      style: TextStyle(
+  decoration: const BoxDecoration(
+    border: Border(
+      left: BorderSide(
         color: AppColors.k9Operational,
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
+        width: 3,
       ),
     ),
   ),
+  child: child,
 )
 ```
 
-### Botão primário (ciano fill)
+Não remova um padrão visual aprovado apenas porque outra skill genérica considera esse estilo um antipadrão.
 
-```dart
-Widget primaryButton({required String label, required VoidCallback onPressed}) {
-  return SizedBox(
-    width: double.infinity,
-    child: ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.k9Primary,
-        foregroundColor: AppColors.k9Background,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 0,
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.8,
-        ),
-      ),
-    ),
-  );
-}
+## Status e cores semânticas
+
+Use cores de acordo com o significado real.
+
+Exemplos conceituais:
+
+```text
+verde    → operacional / positivo
+amarelo  → atenção
+vermelho → crítico / restrição
+ciano    → ação ou identidade principal
 ```
 
-### Botão destrutivo (vermelho outline)
+Não use cor semântica apenas como decoração.
 
-```dart
-Widget destructiveButton({required String label, required VoidCallback onPressed}) {
-  return SizedBox(
-    width: double.infinity,
-    child: OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: AppColors.k9Critical.withOpacity(0.06),
-        foregroundColor: AppColors.k9Critical,
-        side: BorderSide(color: AppColors.k9Critical.withOpacity(0.3)),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ),
-  );
-}
+## Responsividade
+
+O mockup representa uma referência visual, não necessariamente todos os dispositivos.
+
+A implementação deve funcionar em diferentes condições.
+
+Valide:
+
+* telas estreitas;
+* telas maiores;
+* textos longos;
+* valores grandes;
+* nomes extensos;
+* escalonamento de fonte;
+* teclado aberto;
+* safe areas;
+* orientação quando aplicável.
+
+Não preserve uma medida rígida se ela causar overflow real.
+
+## Overflow
+
+Nunca aceite overflow como consequência necessária da fidelidade.
+
+Quando ocorrer:
+
+1. determine qual elemento está excedendo;
+2. preserve a hierarquia;
+3. adapte o layout;
+4. mantenha o resultado visual o mais próximo possível da referência.
+
+Possíveis soluções:
+
+* `Expanded`;
+* `Flexible`;
+* `Wrap`;
+* limite de largura;
+* ajuste responsivo;
+* quebra de linha;
+* scroll quando apropriado.
+
+Não reduza arbitrariamente o tamanho de toda a tipografia para esconder overflow.
+
+## Safe Area
+
+Respeite:
+
+* notch;
+* status bar;
+* navigation bar;
+* gestos do sistema;
+* teclado.
+
+Não posicione elementos importantes sob áreas inacessíveis apenas porque o mockup foi produzido sem safe area real.
+
+## Componentes compartilhados
+
+Reutilize componentes existentes quando eles reproduzem corretamente o comportamento e o visual.
+
+Antes de criar:
+
+```text
+novo header
+novo card
+novo badge
+novo botão
 ```
 
-## Validação visual
+procure equivalente no projeto.
 
-Depois de implementar uma tela, **valide visualmente** comparando com o mockup:
+Não force reutilização quando o componente existente possuir semântica diferente.
 
-### Checklist de validação
+Não extraia componentes prematuramente apenas para reduzir duplicação mínima.
 
-- [ ] Paleta de cores correta (mesmos hexadecimais)
-- [ ] Espaçamentos corretos (margens, paddings)
-- [ ] Bordas e radius corretos
-- [ ] Tipografia certa (Inter, tamanhos, weights)
-- [ ] Hierarquia visual respeitada
-- [ ] Estados especiais implementados (loading, vazio, erro)
-- [ ] Componentes condicionais (badges, alertas) aparecem certo
+## Header e navegação
 
-### Como comparar lado a lado
+Não implemente automaticamente estruturas globais antigas vistas em mockups históricos.
 
-1. Abre o mockup HTML no navegador (ex: 390x844 mobile view)
-2. Roda o app no emulador no mesmo tamanho
-3. Tira screenshot do mockup e do app
-4. Compara visualmente
+Antes de reproduzir:
 
-Se possível, use Puppeteer pra automatizar screenshots dos mockups.
+* header;
+* bottom navigation;
+* FAB;
+* app bar;
 
-## Quando o mockup parece "errado" pra você
+verifique o padrão atual do aplicativo.
 
-**NÃO modifique sem consultar o Jilles.** O mockup foi pensado pra defender 
-profissionalmente os condutores. Decisões aparentemente estranhas geralmente têm 
-razão institucional.
+A navegação atual do produto prevalece sobre um mockup antigo.
 
-Exemplos de "parecem errados mas são intencionais":
-- Paleta sem brilho/saturação → defesa proporcional, não chamativa
-- Ausência de animações elaboradas → seriedade institucional
-- Botões sem efeitos fancy → forma segue função
-- Linguagem formal → auditor invisível como usuário
+## Ícones
 
-Se realmente acha que algo está errado:
-1. Releia o mockup com cuidado
-2. Consulte ESPEC_TECNICA correspondente
-3. Em última instância, **pergunte ao Jilles** explicando seu raciocínio
+Prefira:
 
-## Antipadrões a evitar
+1. ícone já utilizado pelo projeto;
+2. asset oficial;
+3. equivalente adequado da biblioteca atual.
 
-❌ **Não use** Material Design padrão sem customização — o app tem identidade própria
-❌ **Não use** widgets visualmente "ricos" do Material 3 (ex: Card com sombra padrão)
-❌ **Não use** cores fora da paleta institucional
-❌ **Não adicione** animações elaboradas (fade simples, sim; spring complex, não)
-❌ **Não use** ícones decorativos que não estão no mockup
+Não introduza iconografia decorativa sem função.
 
-## Padrões a seguir
+Se a referência usar emoji apenas como placeholder visual, não assuma que o produto final também deve usar emoji.
 
-✅ **Use** Container + BoxDecoration pra customização precisa
-✅ **Use** const onde possível pra performance
-✅ **Use** AppColors constantes (não hexa hardcoded)
-✅ **Use** padding/margin exatos do mockup
-✅ **Use** mesma hierarquia visual do mockup
+## Imagens
 
-## Quando criar widget reutilizável
+Preserve:
 
-Se mesmo componente aparece em 3+ telas (header, badge, card de cão), **extraia pra 
-widget reutilizável** em `core/widgets/`.
+* proporção;
+* enquadramento;
+* clipping;
+* radius;
+* posição visual.
 
-Se aparece em 1-2 telas apenas, mantenha local na feature.
+Use:
+
+```dart
+BoxFit.cover
+```
+
+ou outro `BoxFit` apenas conforme a intenção real.
+
+Não distorça imagem para reproduzir uma dimensão fixa do mockup.
+
+## Estados reais
+
+Um mockup normalmente mostra apenas um estado.
+
+A implementação real precisa preservar estados quando aplicáveis:
+
+```text
+loading
+empty
+error
+offline
+disabled
+success
+```
+
+Não remova estados já existentes porque eles não aparecem no mockup.
+
+Quando a tela nova precisar deles, siga padrões visuais existentes do projeto.
+
+## Conteúdo dinâmico
+
+Teste mentalmente e, quando possível, visualmente:
+
+* nome curto;
+* nome longo;
+* zero registros;
+* muitos registros;
+* valor ausente;
+* valor desconhecido;
+* texto de erro;
+* dados históricos.
+
+Não use conteúdo fake permanente para manter o layout bonito.
+
+## Animações
+
+Implemente apenas animações:
+
+* já existentes no produto;
+* explicitamente aprovadas;
+* presentes na referência quando ela representar movimento;
+* necessárias para clareza de interação.
+
+Não adicione animação decorativa apenas para "dar vida".
+
+Também não remova transições já aprovadas porque um mockup estático não consegue representá-las.
+
+Sempre respeite redução de movimento quando a implementação atual oferecer esse suporte.
+
+## Material Design
+
+Use Flutter e Material como infraestrutura.
+
+Não permita que estilos padrão do Material substituam a identidade visual do K9 Ops.
+
+Evite deixar componentes com aparência padrão quando o design system atual define:
+
+* cor;
+* shape;
+* padding;
+* tipografia;
+* estados.
+
+## Acessibilidade
+
+Fidelidade visual não pode eliminar requisitos básicos.
+
+Verifique quando aplicável:
+
+* contraste;
+* tamanho de áreas tocáveis;
+* labels semânticos;
+* text scaling;
+* feedback de estado;
+* uso de cor como único indicador.
+
+Não faça redesign completo em nome de acessibilidade fora do escopo.
+
+Corrija conflitos objetivos quando encontrados na própria implementação.
+
+## Performance
+
+Evite soluções visuais claramente caras sem necessidade.
+
+Observe especialmente:
+
+* blur excessivo;
+* múltiplos `BackdropFilter`;
+* listas pesadas;
+* imagens grandes sem controle;
+* rebuilds desnecessários.
+
+Não remova um efeito aprovado apenas por suspeita de performance.
+
+Meça ou identifique problema concreto quando possível.
+
+## Comparação visual
+
+Depois da implementação, compare a referência com o app real.
+
+Idealmente utilize:
+
+```text
+mesma largura aproximada
+mesmo estado de dados
+mesmo conteúdo
+```
+
+Observe:
+
+* posição dos blocos;
+* proporção;
+* densidade;
+* contraste;
+* spacing;
+* tipografia;
+* bordas;
+* alinhamentos.
+
+Não declare fidelidade visual apenas porque os mesmos componentes existem.
+
+## Validação recomendada
+
+Quando as ferramentas permitirem:
+
+1. abra a referência;
+2. execute o aplicativo;
+3. navegue até a tela;
+4. use dimensões comparáveis;
+5. capture screenshots;
+6. compare lado a lado;
+7. ajuste diferenças relevantes.
+
+Pixel-perfect absoluto não é obrigatório quando diferenças de plataforma justificarem adaptação.
+
+O resultado final deve manter a mesma intenção e hierarquia visual.
+
+## Quando a referência parecer errada
+
+Não altere silenciosamente.
+
+Primeiro determine se:
+
+```text
+a referência está desatualizada
+```
+
+ou:
+
+```text
+a implementação atual divergiu indevidamente
+```
+
+Consulte:
+
+* decisões recentes;
+* código validado;
+* documentação oficial vigente.
+
+Quando existir uma divergência real de produto que não possa ser resolvida objetivamente, reporte a diferença.
+
+## O que não fazer
+
+Não:
+
+* ler todos os mockups do projeto sem necessidade;
+* recriar componente compartilhado sem procurar equivalente;
+* substituir navegação atual por estrutura histórica;
+* copiar CSS literalmente quando a plataforma exige adaptação;
+* hardcodar todas as cores ignorando tokens;
+* introduzir animações decorativas;
+* simplificar a referência sem motivo;
+* "modernizar" uma tela aprovada durante implementação;
+* remover identidade visual em nome de guidelines genéricas;
+* aceitar overflow para manter medidas rígidas.
+
+## Checklist final
+
+Antes de concluir:
+
+* [ ] A referência correta foi utilizada.
+* [ ] Nenhuma decisão recente foi substituída por material antigo.
+* [ ] A implementação atual foi lida antes das alterações.
+* [ ] Componentes existentes foram considerados.
+* [ ] Tokens atuais foram reutilizados quando aplicável.
+* [ ] Hierarquia visual foi preservada.
+* [ ] Espaçamentos estão coerentes.
+* [ ] Tipografia está coerente.
+* [ ] Cores semânticas mantêm seu significado.
+* [ ] Não existem overflows evidentes.
+* [ ] Safe areas foram respeitadas.
+* [ ] Estados funcionais foram preservados.
+* [ ] Responsividade foi considerada.
+* [ ] A comparação visual foi realizada quando possível.
+* [ ] Nenhuma alteração fora do escopo foi introduzida.
+
+## Regra final
+
+**Reproduza a intenção visual aprovada sem transformar um mockup histórico em autoridade absoluta.**
+
+A melhor implementação é aquela que parece pertencer ao mesmo produto da referência, mas continua funcionando corretamente no K9 Ops real.
