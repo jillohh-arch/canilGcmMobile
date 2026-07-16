@@ -12,7 +12,8 @@ abstract final class HealthTimelineUserCopy {
   static const emptyMessage = 'Nenhum registro de saúde encontrado.';
   static const emptyWithFiltersTitle = 'Nenhum resultado';
   static const emptyWithFiltersMessage =
-      'Nenhum registro encontrado para os filtros atuais.';
+      'Nenhum registro corresponde aos filtros aplicados.';
+  static const clearFilters = 'Limpar filtros';
 
   static const errorTitle = 'Não foi possível carregar';
   static const errorMessage =

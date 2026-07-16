@@ -26,8 +26,14 @@ class HealthTimelineView extends StatelessWidget {
   /// Callback opcional de toque no card (não resolve rota).
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
 
+  /// Se informado, chevron/tap só para entries em que retorna true (3D).
+  final bool Function(HealthTimelineEntryView entry)? entryNavigable;
+
   /// Ação visual de filtros (lógica completa em 3D).
   final VoidCallback? onFilterRequested;
+
+  /// Limpar filtros aplicados (empty filtrado / 3D).
+  final VoidCallback? onClearFilters;
 
   /// Contagem visual de filtros ativos (opcional; sobrescreve derivação da query).
   final int? activeFilterCount;
@@ -48,7 +54,9 @@ class HealthTimelineView extends StatelessWidget {
     super.key,
     required this.controller,
     this.onEntryTap,
+    this.entryNavigable,
     this.onFilterRequested,
+    this.onClearFilters,
     this.activeFilterCount,
     this.hasActiveFilters,
     this.contextLabel,
@@ -66,7 +74,9 @@ class HealthTimelineView extends StatelessWidget {
           onRefresh: _canRefresh(controller.state) ? controller.refresh : null,
           onLoadMore: controller.loadMore,
           onEntryTap: onEntryTap,
+          entryNavigable: entryNavigable,
           onFilterRequested: onFilterRequested,
+          onClearFilters: onClearFilters,
           activeFilterCount: activeFilterCount,
           hasActiveFilters: hasActiveFilters,
           contextLabel: contextLabel,
@@ -87,7 +97,9 @@ class _TimelineBody extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final Future<void> Function() onLoadMore;
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
+  final bool Function(HealthTimelineEntryView entry)? entryNavigable;
   final VoidCallback? onFilterRequested;
+  final VoidCallback? onClearFilters;
   final int? activeFilterCount;
   final bool? hasActiveFilters;
   final String? contextLabel;
@@ -99,7 +111,9 @@ class _TimelineBody extends StatelessWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.onEntryTap,
+    required this.entryNavigable,
     required this.onFilterRequested,
+    required this.onClearFilters,
     required this.activeFilterCount,
     required this.hasActiveFilters,
     required this.contextLabel,
@@ -143,6 +157,7 @@ class _TimelineBody extends StatelessWidget {
         isRefreshing: isRefreshing,
         onRefresh: onRefresh,
         onFilterRequested: onFilterRequested,
+        onClearFilters: onClearFilters,
       ),
       // lastKnown em Error/Offline: controller 3A preserva via Data na prática;
       // se lastKnown vier preenchido (mesma identidade), respeitar a semântica.
@@ -160,6 +175,7 @@ class _TimelineBody extends StatelessWidget {
                 onRefresh: onRefresh,
                 onLoadMore: onLoadMore,
                 onEntryTap: onEntryTap,
+                entryNavigable: entryNavigable,
                 now: now,
                 bottomPadding: bottomPadding,
               )
@@ -182,6 +198,7 @@ class _TimelineBody extends StatelessWidget {
                 onRefresh: onRefresh,
                 onLoadMore: onLoadMore,
                 onEntryTap: onEntryTap,
+                entryNavigable: entryNavigable,
                 now: now,
                 bottomPadding: bottomPadding,
               )
@@ -195,6 +212,7 @@ class _TimelineBody extends StatelessWidget {
         onRefresh: onRefresh,
         onLoadMore: onLoadMore,
         onEntryTap: onEntryTap,
+        entryNavigable: entryNavigable,
         now: now,
         bottomPadding: bottomPadding,
       ),
@@ -378,6 +396,7 @@ class _EmptyShell extends StatelessWidget {
   final bool isRefreshing;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onFilterRequested;
+  final VoidCallback? onClearFilters;
 
   const _EmptyShell({
     super.key,
@@ -385,6 +404,7 @@ class _EmptyShell extends StatelessWidget {
     required this.isRefreshing,
     required this.onRefresh,
     required this.onFilterRequested,
+    required this.onClearFilters,
   });
 
   @override
@@ -392,6 +412,7 @@ class _EmptyShell extends StatelessWidget {
     final body = HealthTimelineEmptyView(
       hasActiveFilters: hasActiveFilters,
       onFilterRequested: onFilterRequested,
+      onClearFilters: onClearFilters,
     );
 
     if (onRefresh == null) return body;
@@ -465,6 +486,7 @@ class _DataList extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final Future<void> Function() onLoadMore;
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
+  final bool Function(HealthTimelineEntryView entry)? entryNavigable;
   final DateTime Function()? now;
   final double bottomPadding;
 
@@ -474,9 +496,20 @@ class _DataList extends StatelessWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.onEntryTap,
+    required this.entryNavigable,
     required this.now,
     required this.bottomPadding,
   });
+
+  ValueChanged<HealthTimelineEntryView>? _tapFor(
+    HealthTimelineEntryView entry,
+  ) {
+    final handler = onEntryTap;
+    if (handler == null) return null;
+    final gate = entryNavigable;
+    if (gate != null && !gate(entry)) return null;
+    return handler;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -520,7 +553,7 @@ class _DataList extends StatelessWidget {
               entry: entry,
               isFirst: isFirst,
               isLast: isLast,
-              onEntryTap: onEntryTap,
+              onEntryTap: _tapFor(entry),
             ),
           ),
           _DayGapSlot() => const SizedBox(height: 18),

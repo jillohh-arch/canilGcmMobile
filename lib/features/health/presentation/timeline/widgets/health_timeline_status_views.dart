@@ -178,24 +178,29 @@ class HealthTimelineSurfaceMessage extends StatelessWidget {
 class HealthTimelineEmptyView extends StatelessWidget {
   final bool hasActiveFilters;
   final VoidCallback? onFilterRequested;
+  final VoidCallback? onClearFilters;
 
   const HealthTimelineEmptyView({
     super.key,
     this.hasActiveFilters = false,
     this.onFilterRequested,
+    this.onClearFilters,
   });
 
   @override
   Widget build(BuildContext context) {
     if (hasActiveFilters) {
+      final clear = onClearFilters;
       return HealthTimelineSurfaceMessage(
         icon: Icons.filter_alt_off_outlined,
         title: HealthTimelineUserCopy.emptyWithFiltersTitle,
         message: HealthTimelineUserCopy.emptyWithFiltersMessage,
-        actionLabel: onFilterRequested == null
-            ? null
-            : HealthTimelineUserCopy.filterAction,
-        onAction: onFilterRequested,
+        actionLabel: clear == null
+            ? (onFilterRequested == null
+                  ? null
+                  : HealthTimelineUserCopy.filterAction)
+            : HealthTimelineUserCopy.clearFilters,
+        onAction: clear ?? onFilterRequested,
       );
     }
     return const HealthTimelineSurfaceMessage(
