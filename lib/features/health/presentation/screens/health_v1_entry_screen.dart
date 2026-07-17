@@ -18,7 +18,7 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_do
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
-import 'package:canil_gcm/features/health/presentation/schedule/empty_health_schedule_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_screen.dart';
@@ -40,7 +40,7 @@ import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full
 /// - dispose único ao sair do fluxo Health.
 ///
 /// Integração controlada — reutiliza 3A–4A; sem arquitetura nova.
-/// Agenda é read-only (Empty source em produção até 4C). Sem writes.
+/// Agenda 4D Gate 2: leitura Firestore read-only. Sem writes cliente.
 class HealthV1EntryScreen extends StatefulWidget {
   final String dogId;
 
@@ -50,7 +50,7 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Source da timeline injetável (testes). Produção: Firestore read-only 3C.
   final HealthTimelineSource? timelineSource;
 
-  /// Source da agenda injetável (testes). Produção: [EmptyHealthScheduleSource].
+  /// Source da agenda injetável (testes). Produção: [FirestoreHealthScheduleSource].
   final HealthScheduleSource? scheduleSource;
 
   /// Contexto do K9 pré-resolvido (testes). Produção: [DogViewModel].
@@ -130,13 +130,13 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       dogId: widget.dogId,
     );
 
-    // Agenda 4D Gate 1: source Firestore e Rule read-only existem no repo,
-    // mas deploy e ativação ainda NÃO ocorreram. Produção permanece
-    // EmptyHealthScheduleSource até Gate 2 (Rules+índice deployados e
-    // auditoria humana). Injete [scheduleSource] nos testes.
-    // Ver docs/health/HEALTH_V1_PHASE_4D_AUTHORIZATION_REPORT.md.
+    // Agenda 4D Gate 2: default de produção = Firestore read-only após
+    // índice READY + Rules publicadas + query autenticada real OK.
+    // Injete [scheduleSource] nos testes (fake/empty). Sem fallback
+    // silencioso para Empty em erro de rede/permissão.
+    // Ver docs/health/HEALTH_V1_PHASE_4D_ACTIVATION_REPORT.md.
     _scheduleSource =
-        widget.scheduleSource ?? const EmptyHealthScheduleSource();
+        widget.scheduleSource ?? FirestoreHealthScheduleSource.forDefault();
     _scheduleController = HealthScheduleController(
       source: _scheduleSource,
       temporalPolicy: healthSchedulePresentationPolicy(),

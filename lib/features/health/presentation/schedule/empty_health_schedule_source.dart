@@ -2,10 +2,11 @@ import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_query.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_source.dart';
 
-/// Fonte de leitura honesta da Agenda na Fase 4B.
+/// Fonte vazia explícita da Agenda (testes / harness).
 ///
-/// Sem Firestore / dual-read / dados fake de produção.
-/// Sempre retorna página vazia conclusiva (empty ≠ erro).
+/// Não é fallback silencioso de produção após 4D Gate 2.
+/// Produção usa [FirestoreHealthScheduleSource]; injete esta source
+/// apenas quando o empty local for intencional (sem I/O).
 final class EmptyHealthScheduleSource implements HealthScheduleSource {
   const EmptyHealthScheduleSource();
 
