@@ -507,8 +507,35 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 | created_at | timestamp | ✅ | |
 | recorded_by | RecordedBy | ✅ | Ou "system" para Function |
 | notes | string | ❌ | |
-| migration_batch_id | string | ❌ | |
-| schema_version | number | ✅ | |
+| revision | number | ✅* | Monotônico; criação = 1. Ausente em legado → interpretado como 0 (4E Gate 2). *obrigatório em mutações novas |
+| create_operation_id | string | ❌ | Idempotency key da criação manual |
+| create_fingerprint | string | ❌ | Fingerprint canônico da intenção de create |
+| last_update_operation_id | string | ❌ | Atalho da última update (receipts são a fonte) |
+| last_lifecycle_operation_id | string | ❌ | Atalho da última complete/cancel |
+| migration_batch_id | string | ❌ | Se migrado |
+| schema_version | number | ✅ | Atual: 1 |
+
+**Subcoleção de operation receipts (4E Gate 2):**
+
+```text
+dogs/{dogId}/health_schedule/{scheduleId}/operations/{operationId}
+```
+
+`operationId` no path = token validado no callable (trim, 1..128, `[A-Za-z0-9][A-Za-z0-9._-]*`, sem `/` nem `.`/`..`). Não é hasheado; o ID lógico validado é o segmento físico.
+
+| Campo | Notas |
+|-------|-------|
+| operation_id | chave (mesmo token do path) |
+| operation_type | create_manual \| update_open \| complete \| cancel |
+| actor_uid | escopo do ator |
+| fingerprint | intenção canônica (sem timestamps/autoria server) |
+| result | scheduleId, revision, lifecycleStatus, wasNoOp |
+| processed_at | server timestamp |
+
+**Receipts = fonte durável de idempotência.**
+`last_*_operation_id` no documento pai = apenas atalhos auxiliares (não substituem receipts).
+
+Retenção: receipts permanecem enquanto forem necessários para retries legítimos; política de purga futura documentável sem apagar cedo demais.
 
 **Invariante absoluta de persistência:** apenas `lifecycle_status` é persistido. Os valores `scheduled`, `upcoming`, `today`, `pending`, `overdue` são **somente calculados na leitura**. Nenhuma Function, nenhum job periódico, nenhuma reconciliação, nenhuma atualização implícita grava esses valores como campos no documento. Não existe permissão em Rules para criar/atualizar campos temporais derivados. Quaisquer campos derivados existentes em dados migrados devem ser descartados no cutover.
 

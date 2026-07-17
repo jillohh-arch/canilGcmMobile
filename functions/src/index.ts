@@ -9,6 +9,13 @@ import {
   onCall,
   onRequest,
 } from "firebase-functions/v2/https";
+import {
+  runHealthScheduleCancel,
+  runHealthScheduleComplete,
+  runHealthScheduleCreateManual,
+  runHealthScheduleUpdateOpen,
+  ScheduleCaller,
+} from "./health_schedule_callables";
 
 admin.initializeApp();
 
@@ -7818,3 +7825,78 @@ export const scheduledCheckOpenShifts = onSchedule(
     return;
   },
 );
+
+
+// =============================================================================
+// Health Schedule callables (Fase 4E Gate 2) � Admin SDK; Rules client read-only
+// =============================================================================
+
+async function isAdministrativeHealthAuthority(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+): Promise<boolean> {
+  if (auth && isAdminToken(auth.token)) return true;
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const user = userSnap.data() ?? {};
+  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
+  return isAdminAccessLevel(accessLevel) || user.admin === true;
+}
+
+function toScheduleCaller(caller: CallerIdentity): ScheduleCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const healthScheduleDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toScheduleCaller(await requireAccessPermission(auth, "health", "create")),
+  requireHealthEdit: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toScheduleCaller(await requireAccessPermission(auth, "health", "edit")),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ScheduleCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ScheduleCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/** Create manual schedule item (health.create + dog access). Admin SDK write. */
+export const healthScheduleCreateManual = onCall({region}, async (request) => {
+  return runHealthScheduleCreateManual(request, healthScheduleDeps);
+});
+
+/** Update open manual item (health.edit + dog access + revision). */
+export const healthScheduleUpdateOpen = onCall({region}, async (request) => {
+  return runHealthScheduleUpdateOpen(request, healthScheduleDeps);
+});
+
+/** Complete open item (health.edit + dog access). Terminal idempotent. */
+export const healthScheduleComplete = onCall({region}, async (request) => {
+  return runHealthScheduleComplete(request, healthScheduleDeps);
+});
+
+/** Cancel item (health.edit + dog access; auto requires admin authority). */
+export const healthScheduleCancel = onCall({region}, async (request) => {
+  return runHealthScheduleCancel(request, healthScheduleDeps);
+});
