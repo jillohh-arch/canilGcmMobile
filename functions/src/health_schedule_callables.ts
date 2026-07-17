@@ -3,7 +3,7 @@
  * Admin SDK (bypass Rules). Client writes continuam negados.
  */
 import * as crypto from "crypto";
-import * as admin from "firebase-admin";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 import {
   AppErrorCode,
@@ -84,8 +84,19 @@ function appError(
   throw new HttpsError(http, message, {code});
 }
 
+/**
+ * HttpsError cross-bundle safe check (evita falha de `instanceof` no worker
+ * do Emulator/Functions quando há dual package hazard).
+ */
+function isHttpsError(err: unknown): err is HttpsError {
+  if (!err || typeof err !== "object") return false;
+  const e = err as {name?: string; code?: string; httpErrorCode?: unknown};
+  return e.name === "HttpsError" ||
+    (typeof e.code === "string" && e.httpErrorCode !== undefined);
+}
+
 function mapLogicError(err: unknown): never {
-  if (err instanceof HttpsError) throw err;
+  if (isHttpsError(err)) throw err;
   const e = err as Error & {appCode?: AppErrorCode};
   const code = e.appCode ?? "unexpected";
   const message = e.message || "Falha na operação de agenda.";
@@ -138,17 +149,17 @@ function requireScheduleId(data: JsonMap): string {
   return scheduleId;
 }
 
-function parseScheduledFor(raw: unknown): admin.firestore.Timestamp {
-  if (raw instanceof admin.firestore.Timestamp) return raw;
+function parseScheduledFor(raw: unknown): Timestamp {
+  if (raw instanceof Timestamp) return raw;
   const d = new Date(String(raw ?? ""));
   if (Number.isNaN(d.getTime())) {
     appError("invalid-argument", "validation", "scheduledFor inválido.");
   }
-  return admin.firestore.Timestamp.fromDate(d);
+  return Timestamp.fromDate(d);
 }
 
-function toIso(ts: admin.firestore.Timestamp | Date): string {
-  if (ts instanceof admin.firestore.Timestamp) return ts.toDate().toISOString();
+function toIso(ts: Timestamp | Date): string {
+  if (ts instanceof Timestamp) return ts.toDate().toISOString();
   return ts.toISOString();
 }
 
@@ -234,7 +245,7 @@ function receiptPayload(params: {
     actor_uid: params.actorUid,
     fingerprint: params.fingerprint,
     result: params.result,
-    processed_at: admin.firestore.FieldValue.serverTimestamp(),
+    processed_at: FieldValue.serverTimestamp(),
   };
 }
 
@@ -246,7 +257,7 @@ function auditLogPayload(
   summary: string,
   metadata?: JsonMap,
 ): JsonMap {
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  const now = FieldValue.serverTimestamp();
   return {
     action,
     entity_type: "health_schedule",
@@ -305,7 +316,7 @@ export async function runHealthScheduleCreateManual(
       data.scheduledFor ?? data.scheduled_for,
     );
     const dueUntilRaw = data.dueUntil ?? data.due_until;
-    let dueUntil: admin.firestore.Timestamp | null = null;
+    let dueUntil: Timestamp | null = null;
     if (dueUntilRaw !== undefined && dueUntilRaw !== null && dueUntilRaw !== "") {
       dueUntil = parseScheduledFor(dueUntilRaw);
     }
@@ -406,7 +417,7 @@ export async function runHealthScheduleCreateManual(
         timezone,
         lifecycle_status: "open",
         source_type: "manual",
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        created_at: FieldValue.serverTimestamp(),
         recorded_by: recordedBy,
         schema_version: HEALTH_SCHEDULE_SCHEMA_VERSION,
         revision,
@@ -555,18 +566,18 @@ export async function runHealthScheduleUpdateOpen(
       };
       if (patch.title !== undefined) update.title = patch.title;
       if (patch.scheduledFor !== undefined) {
-        update.scheduled_for = admin.firestore.Timestamp.fromDate(
+        update.scheduled_for = Timestamp.fromDate(
           patch.scheduledFor,
         );
       }
       if (patch.dueUntil === null) {
-        update.due_until = admin.firestore.FieldValue.delete();
+        update.due_until = FieldValue.delete();
       } else if (patch.dueUntil instanceof Date) {
-        update.due_until = admin.firestore.Timestamp.fromDate(patch.dueUntil);
+        update.due_until = Timestamp.fromDate(patch.dueUntil);
       }
       if (patch.timezone !== undefined) update.timezone = patch.timezone;
       if (patch.notes === null) {
-        update.notes = admin.firestore.FieldValue.delete();
+        update.notes = FieldValue.delete();
       } else if (typeof patch.notes === "string") {
         update.notes = patch.notes;
       }
@@ -715,7 +726,7 @@ export async function runHealthScheduleComplete(
 
       tx.update(scheduleRef, {
         lifecycle_status: "completed",
-        completed_at: admin.firestore.FieldValue.serverTimestamp(),
+        completed_at: FieldValue.serverTimestamp(),
         completed_by: completedBy,
         revision: newRevision,
         last_lifecycle_operation_id: operationId,
@@ -853,7 +864,7 @@ export async function runHealthScheduleCancel(
 
       tx.update(scheduleRef, {
         lifecycle_status: "cancelled",
-        cancelled_at: admin.firestore.FieldValue.serverTimestamp(),
+        cancelled_at: FieldValue.serverTimestamp(),
         cancelled_by: cancelledBy,
         cancel_reason: cancelReason,
         revision: newRevision,
