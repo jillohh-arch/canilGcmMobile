@@ -105,3 +105,6 @@ functions/lib/
 
 # planilhas pessoais que cairam na pasta da skill
 .claude/skills/ponytail/*.xlsx
+
+# Visual harness artifacts (schedule 4B)
+test/features/health/presentation/schedule/artifacts/

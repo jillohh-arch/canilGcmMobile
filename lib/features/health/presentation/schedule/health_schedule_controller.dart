@@ -18,6 +18,7 @@ import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_
 /// - trocar cão com isolamento de identidade;
 /// - race protection por generation token;
 /// - derivar estados temporais com [HealthScheduleTemporalPolicy] (única fonte);
+/// - reavaliar temporalmente itens já carregados sem nova leitura da source;
 /// - agrupar para apresentação (Atrasados / Hoje / Próximos / Programados);
 /// - não conhecer Firebase/Firestore;
 /// - não escrever no schema.
@@ -46,9 +47,17 @@ class HealthScheduleController extends ChangeNotifier {
   int _generation = 0;
   HealthScheduleSnapshot? _currentSnapshot;
 
+  /// Agregados canônicos da identidade atual (fonte para reavaliação temporal).
+  List<HealthScheduleItem> _domainItems = const [];
+
   HealthScheduleState get state => _state;
   HealthScheduleQuery? get activeQuery => _activeQuery;
   String? get activeDogId => _activeQuery?.dogId;
+
+  /// Itens de domínio da identidade atual (somente leitura; testes).
+  @visibleForTesting
+  List<HealthScheduleItem> get domainItemsForTest =>
+      List<HealthScheduleItem>.unmodifiable(_domainItems);
 
   /// Define a query ativa e carrega a primeira página.
   Future<void> setQuery(HealthScheduleQuery query) async {
@@ -58,6 +67,7 @@ class HealthScheduleController extends ChangeNotifier {
     _activeQuery = firstPageQuery;
     _nextCursor = null;
     _currentSnapshot = null;
+    _domainItems = const [];
     _setState(HealthScheduleLoading(query: firstPageQuery));
     await _loadFirstPage(generation: generation, query: firstPageQuery);
   }
@@ -130,6 +140,7 @@ class HealthScheduleController extends ChangeNotifier {
       _setState(HealthScheduleEmpty(query: firstPageQuery, isRefreshing: true));
     } else {
       _currentSnapshot = null;
+      _domainItems = const [];
       _setState(HealthScheduleLoading(query: firstPageQuery));
     }
 
@@ -139,6 +150,64 @@ class HealthScheduleController extends ChangeNotifier {
       preserveOnFailure: true,
       restoreCursorOnFailure: cursorBeforeRefresh,
     );
+  }
+
+  /// Reavalia estados temporais dos itens **já carregados** com o clock atual.
+  ///
+  /// Não consulta a [HealthScheduleSource]. Usado quando o tempo passa com a
+  /// tela aberta (foreground / tick periódico).
+  ///
+  /// No-op se disposed, sem itens de domínio, ou se o estado público não for
+  /// [HealthScheduleData] com snapshot da identidade ativa.
+  void recomputeTemporalStates() {
+    if (_disposed) return;
+    final query = _activeQuery;
+    if (query == null) return;
+    if (_domainItems.isEmpty) return;
+    final snapshot = _currentSnapshot;
+    if (snapshot == null) return;
+    if (snapshot.filterIdentity != query.filterIdentity) return;
+    // Só reavalia quando há dados utilizáveis (ou empty interno residual).
+    if (_state is! HealthScheduleData && _state is! HealthScheduleEmpty) {
+      return;
+    }
+
+    final views = _mapDomainItems(_domainItems);
+    final groups = groupScheduleItems(views);
+    if (views.isEmpty) {
+      final emptySnap = HealthScheduleSnapshot(
+        items: const [],
+        groups: groups,
+        hasMore: false,
+        query: query.withoutCursor(),
+        isRefreshing: snapshot.isRefreshing,
+        isLoadingMore: false,
+        lastRefreshError: snapshot.lastRefreshError,
+        lastRefreshWasOffline: snapshot.lastRefreshWasOffline,
+      );
+      _currentSnapshot = emptySnap;
+      _setState(
+        HealthScheduleEmpty(
+          query: query.withoutCursor(),
+          isRefreshing: snapshot.isRefreshing,
+        ),
+      );
+      return;
+    }
+
+    final next = HealthScheduleSnapshot(
+      items: views,
+      groups: groups,
+      hasMore: snapshot.hasMore,
+      query: query.withoutCursor(),
+      isRefreshing: snapshot.isRefreshing,
+      isLoadingMore: snapshot.isLoadingMore,
+      loadMoreError: snapshot.loadMoreError,
+      lastRefreshError: snapshot.lastRefreshError,
+      lastRefreshWasOffline: snapshot.lastRefreshWasOffline,
+    );
+    _currentSnapshot = next;
+    _setState(HealthScheduleData(snapshot: next));
   }
 
   /// Próxima página (não invalida a lista em falha).
@@ -167,11 +236,14 @@ class HealthScheduleController extends ChangeNotifier {
       final page = await _source.loadPage(pageQuery);
       if (!_isCurrent(generation, query.filterIdentity)) return;
 
-      final incoming = _mapPage(page);
-      final merged = _mergeById(existing: snapshot.items, incoming: incoming);
-      final groups = groupScheduleItems(merged);
+      _domainItems = _mergeDomainItems(
+        existing: _domainItems,
+        incoming: page.items,
+      );
+      final views = _mapDomainItems(_domainItems);
+      final groups = groupScheduleItems(views);
       final next = HealthScheduleSnapshot(
-        items: merged,
+        items: views,
         groups: groups,
         hasMore: page.hasMore,
         query: query.withoutCursor(),
@@ -221,11 +293,11 @@ class HealthScheduleController extends ChangeNotifier {
     required HealthSchedulePage page,
   }) {
     _nextCursor = page.nextCursor;
-    final views = _mapPage(page);
-    final deduped = _mergeById(existing: const [], incoming: views);
-    final groups = groupScheduleItems(deduped);
+    _domainItems = _mergeDomainItems(existing: const [], incoming: page.items);
+    final views = _mapDomainItems(_domainItems);
+    final groups = groupScheduleItems(views);
 
-    if (deduped.isEmpty) {
+    if (views.isEmpty) {
       _nextCursor = null;
       _currentSnapshot = HealthScheduleSnapshot(
         items: const [],
@@ -238,7 +310,7 @@ class HealthScheduleController extends ChangeNotifier {
     }
 
     final snapshot = HealthScheduleSnapshot(
-      items: deduped,
+      items: views,
       groups: groups,
       hasMore: page.hasMore,
       query: query.withoutCursor(),
@@ -285,6 +357,7 @@ class HealthScheduleController extends ChangeNotifier {
         return;
       }
       _currentSnapshot = null;
+      _domainItems = const [];
       _setState(
         HealthScheduleOffline(query: query.withoutCursor(), lastKnown: null),
       );
@@ -299,6 +372,7 @@ class HealthScheduleController extends ChangeNotifier {
     }
 
     _currentSnapshot = null;
+    _domainItems = const [];
     _setState(
       HealthScheduleError(
         query: query.withoutCursor(),
@@ -308,10 +382,10 @@ class HealthScheduleController extends ChangeNotifier {
     );
   }
 
-  List<HealthScheduleItemView> _mapPage(HealthSchedulePage page) {
+  List<HealthScheduleItemView> _mapDomainItems(List<HealthScheduleItem> items) {
     final now = _clock();
     return [
-      for (final item in page.items)
+      for (final item in items)
         HealthScheduleItemView.fromDomain(
           item,
           policy: _temporalPolicy,
@@ -320,18 +394,23 @@ class HealthScheduleController extends ChangeNotifier {
     ];
   }
 
-  static List<HealthScheduleItemView> _mergeById({
-    required List<HealthScheduleItemView> existing,
-    required List<HealthScheduleItemView> incoming,
+  static List<HealthScheduleItem> _mergeDomainItems({
+    required List<HealthScheduleItem> existing,
+    required List<HealthScheduleItem> incoming,
   }) {
-    final byId = <String, HealthScheduleItemView>{};
+    final byId = <String, HealthScheduleItem>{};
     for (final item in existing) {
       byId[item.id] = item;
     }
     for (final item in incoming) {
       byId[item.id] = item;
     }
-    final merged = byId.values.toList()..sort(compareScheduleItemsByDue);
+    final merged = byId.values.toList()
+      ..sort((a, b) {
+        final byTime = a.scheduledFor.compareTo(b.scheduledFor);
+        if (byTime != 0) return byTime;
+        return a.id.compareTo(b.id);
+      });
     return merged;
   }
 
@@ -358,6 +437,7 @@ class HealthScheduleController extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _domainItems = const [];
     super.dispose();
   }
 

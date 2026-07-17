@@ -18,6 +18,11 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_do
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/empty_health_schedule_source.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_screen.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_source.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_controller.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
@@ -25,17 +30,17 @@ import 'package:canil_gcm/features/health/presentation/widgets/health_shell_sect
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section_placeholder.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
-/// Entrada de produção controlada do Health v1.0 (Fase 2E + 3E-B).
+/// Entrada de produção controlada do Health v1.0 (Fase 2E + 3E-B + 4B).
 ///
-/// ## Composition root (3E-B)
-/// Possui lifecycle de Resumo **e** Timeline:
-/// - cria source/controller/session **fora** de [build];
-/// - timeline: **lazy** no primeiro acesso ao slot Histórico;
+/// ## Composition root
+/// Possui lifecycle de Resumo, Timeline e Agenda:
+/// - cria source/controller **fora** de [build];
+/// - timeline/agenda: **lazy** no primeiro acesso ao slot;
 /// - troca de cão via [selectDog] (sem recriar controller);
 /// - dispose único ao sair do fluxo Health.
 ///
-/// Integração controlada — reutiliza 3A–3E-A; sem arquitetura nova.
-/// Agenda / Nutrição permanecem placeholders. Sem writes.
+/// Integração controlada — reutiliza 3A–4A; sem arquitetura nova.
+/// Agenda é read-only (Empty source em produção até 4C). Sem writes.
 class HealthV1EntryScreen extends StatefulWidget {
   final String dogId;
 
@@ -44,6 +49,9 @@ class HealthV1EntryScreen extends StatefulWidget {
 
   /// Source da timeline injetável (testes). Produção: Firestore read-only 3C.
   final HealthTimelineSource? timelineSource;
+
+  /// Source da agenda injetável (testes). Produção: [EmptyHealthScheduleSource].
+  final HealthScheduleSource? scheduleSource;
 
   /// Contexto do K9 pré-resolvido (testes). Produção: [DogViewModel].
   final HealthSummaryDogContextView? dogContextOverride;
@@ -57,6 +65,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     required this.dogId,
     this.source,
     this.timelineSource,
+    this.scheduleSource,
     this.dogContextOverride,
     this.onTimelineNavigate,
   });
@@ -77,8 +86,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   late final HealthTimelineController _timelineController;
   late final HealthTimelineFilterSession _filterSession;
 
+  late final HealthScheduleSource _scheduleSource;
+  late final HealthScheduleController _scheduleController;
+
   /// Primeira carga da timeline só após visitar Histórico (lazy).
   bool _timelinePrimed = false;
+
+  /// Primeira carga da agenda só após visitar Agenda (lazy).
+  bool _schedulePrimed = false;
 
   HealthSummaryController get controllerForTest => _controller;
 
@@ -90,6 +105,12 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   @visibleForTesting
   bool get timelinePrimedForTest => _timelinePrimed;
+
+  @visibleForTesting
+  HealthScheduleController get scheduleControllerForTest => _scheduleController;
+
+  @visibleForTesting
+  bool get schedulePrimedForTest => _schedulePrimed;
 
   @override
   void initState() {
@@ -108,7 +129,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       controller: _timelineController,
       dogId: widget.dogId,
     );
-    // Sem selectDog aqui: evita Firestore se o usuário não abrir Histórico.
+
+    // Agenda 4B: source vazia honesta em produção; fake injetável em testes.
+    _scheduleSource =
+        widget.scheduleSource ?? const EmptyHealthScheduleSource();
+    _scheduleController = HealthScheduleController(
+      source: _scheduleSource,
+      temporalPolicy: healthSchedulePresentationPolicy(),
+    );
+    // Sem selectDog aqui: evita I/O se o usuário não abrir Agenda.
   }
 
   @override
@@ -119,10 +148,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     if (next.isNotEmpty && next != prev) {
       _controller.selectDog(next);
       _filterSession.updateDogId(next);
-      // Só recarrega timeline se já foi aberta nesta vida do entry.
+      // Só recarrega timeline/agenda se já foram abertas nesta vida do entry.
       if (_timelinePrimed) {
         // ignore: discarded_futures
         _timelineController.selectDog(next);
+      }
+      if (_schedulePrimed) {
+        // ignore: discarded_futures
+        _scheduleController.selectDog(next);
       }
     }
   }
@@ -131,6 +164,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   void dispose() {
     _filterSession.dispose();
     _timelineController.dispose();
+    _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -143,6 +177,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     if (section == HealthShellSection.historico) {
       _primeTimelineIfNeeded();
     }
+    if (section == HealthShellSection.agenda) {
+      _primeScheduleIfNeeded();
+    }
   }
 
   /// Lazy first-load: uma única vez por vida do entry (ou após dog change se já primed).
@@ -153,8 +190,18 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _timelineController.selectDog(widget.dogId);
   }
 
+  void _primeScheduleIfNeeded() {
+    if (_schedulePrimed) return;
+    _schedulePrimed = true;
+    // ignore: discarded_futures
+    _scheduleController.selectDog(widget.dogId);
+  }
+
   @visibleForTesting
   void primeTimelineForTest() => _primeTimelineIfNeeded();
+
+  @visibleForTesting
+  void primeScheduleForTest() => _primeScheduleIfNeeded();
 
   void _onRegister() {
     AppFeedback.info(
@@ -318,10 +365,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           bottomPadding: _timelineBottomPadding(context),
           onNavigate: _onTimelineNavigate,
         ),
-        agenda: (_) => const HealthShellSectionPlaceholder(
-          section: HealthShellSection.agenda,
-          message:
-              'Agenda Health v1 em construção. O Resumo já usa dados reais.',
+        agenda: (_) => HealthScheduleScreen(
+          controller: _scheduleController,
+          dogDisplayName: dogContext.name,
+          bottomPadding: _timelineBottomPadding(context),
         ),
         nutricao: (_) => const HealthShellSectionPlaceholder(
           section: HealthShellSection.nutricao,
