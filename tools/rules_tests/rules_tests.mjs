@@ -1502,6 +1502,9 @@ test('Storage permite upload valido mas recusa exclusao de evidencia', async () 
   await assertFails(deleteObject(imageRef));
 });
 
+// health_schedule (Health v1 / 4D): ver health_schedule_rules_tests.mjs
+// (runner dedicado — suíte geral tem falha preexistente em vehicle_crews).
+
 try {
   for (const {name, fn} of tests) {
     await clearAll();

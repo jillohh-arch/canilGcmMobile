@@ -1918,6 +1918,15 @@ service cloud.firestore {
         allow update: if canAccessDogRecord(dogId) && canUpdateAuditedOrSoftDelete();
         allow delete: if false;
       }
+
+      // Health v1 — Agenda preventiva (Fase 4D): somente leitura cliente.
+      // Mesma política de leitura das demais subcoleções de saúde do K9
+      // (signedIn + canAccessDogRecord). Writes cliente proibidos nesta fase;
+      // criação/conclusão/cancelamento ainda não possuem fluxo aprovado.
+      match /health_schedule/{scheduleId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /occurrences/{occurrenceId} {

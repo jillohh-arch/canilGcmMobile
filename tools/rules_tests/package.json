@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node rules_tests.mjs\"",
+    "test:health-schedule": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_schedule_rules_tests.mjs\"",
     "test:direct": "node rules_tests.mjs"
   },
   "devDependencies": {
