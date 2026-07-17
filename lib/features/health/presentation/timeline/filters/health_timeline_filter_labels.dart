@@ -69,17 +69,28 @@ abstract final class HealthTimelineFilterLabels {
   static String removeChipSemantics(String chipLabel) =>
       'Remover filtro $chipLabel';
 
+  /// Chips avançados. [suppressRedundantSingleType] evita duplicar a faixa
+  /// rápida quando só há um tipo (ex.: Pesagens já na quick bar).
   static List<HealthTimelineFilterChipData> chipsFor(
-    HealthTimelineFilterSelection selection,
-  ) {
+    HealthTimelineFilterSelection selection, {
+    bool suppressRedundantSingleType = true,
+  }) {
     final list = <HealthTimelineFilterChipData>[];
     if (selection.hasTypes) {
-      list.add(
-        HealthTimelineFilterChipData(
-          kind: HealthTimelineFilterChipKind.types,
-          label: typesChipLabel(selection.types),
-        ),
-      );
+      final onlySingleType =
+          suppressRedundantSingleType && selection.types.length == 1;
+      final onlyTypesDimension =
+          !selection.hasPeriod &&
+          !selection.hasCaseId &&
+          !selection.hasProfessional;
+      if (!(onlySingleType && onlyTypesDimension)) {
+        list.add(
+          HealthTimelineFilterChipData(
+            kind: HealthTimelineFilterChipKind.types,
+            label: typesChipLabel(selection.types),
+          ),
+        );
+      }
     }
     if (selection.hasPeriod) {
       final label = periodChipLabelForOrigin(selection.periodOrigin);

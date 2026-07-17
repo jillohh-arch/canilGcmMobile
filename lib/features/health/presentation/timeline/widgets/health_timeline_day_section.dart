@@ -82,6 +82,7 @@ class HealthTimelineEntryRow extends StatelessWidget {
   final bool isFirst;
   final bool isLast;
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
+  final String? navigationActionLabel;
 
   const HealthTimelineEntryRow({
     super.key,
@@ -89,6 +90,7 @@ class HealthTimelineEntryRow extends StatelessWidget {
     required this.isFirst,
     required this.isLast,
     this.onEntryTap,
+    this.navigationActionLabel,
   });
 
   @override
@@ -99,7 +101,11 @@ class HealthTimelineEntryRow extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 36),
-          child: HealthTimelineEntryCard(entry: entry, onTap: onEntryTap),
+          child: HealthTimelineEntryCard(
+            entry: entry,
+            onTap: onEntryTap,
+            navigationActionLabel: navigationActionLabel,
+          ),
         ),
         Positioned(
           left: 0,

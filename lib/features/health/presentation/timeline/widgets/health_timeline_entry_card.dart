@@ -17,14 +17,26 @@ class HealthTimelineEntryCard extends StatelessWidget {
   final HealthTimelineEntryView entry;
   final ValueChanged<HealthTimelineEntryView>? onTap;
 
-  const HealthTimelineEntryCard({super.key, required this.entry, this.onTap});
+  /// Prefixo de ação honesta (ex.: relatedHistory) — 3E-A.
+  final String? navigationActionLabel;
+
+  const HealthTimelineEntryCard({
+    super.key,
+    required this.entry,
+    this.onTap,
+    this.navigationActionLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
     final visual = HealthTimelineTypeVisuals.resolve(entry.type);
     final cancelled = entry.isCancelled;
     final interactive = onTap != null;
-    final semanticLabel = _semanticLabel(entry, visual);
+    final semanticLabel = _semanticLabel(
+      entry,
+      visual,
+      navigationActionLabel: interactive ? navigationActionLabel : null,
+    );
 
     final content = HealthSummaryCardSurface(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -95,9 +107,13 @@ class HealthTimelineEntryCard extends StatelessWidget {
   /// Label único e completo para leitores de tela (evita anúncio triplo).
   static String _semanticLabel(
     HealthTimelineEntryView entry,
-    HealthTimelineTypeVisual visual,
-  ) {
+    HealthTimelineTypeVisual visual, {
+    String? navigationActionLabel,
+  }) {
     final parts = <String>[
+      if (navigationActionLabel != null &&
+          navigationActionLabel.trim().isNotEmpty)
+        navigationActionLabel.trim(),
       visual.label,
       entry.title,
       if (entry.subtitle != null && entry.subtitle!.trim().isNotEmpty)

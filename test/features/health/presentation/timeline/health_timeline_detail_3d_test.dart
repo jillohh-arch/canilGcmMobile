@@ -39,7 +39,7 @@ void main() {
       expect(r, isA<HealthTimelineDetailUnsupported>());
     });
 
-    test('health_events unsupported (sem detalhe unitário)', () {
+    test('health_events sem type vaccination → unsupported', () {
       final r = HealthTimelineDetailResolver.resolve(
         dogId: 'dog-a',
         reference: const HealthTimelineDetailReference(
@@ -52,6 +52,7 @@ void main() {
         HealthTimelineDetailResolver.isNavigable(
           _entry(
             id: 'health_events:he1',
+            type: HealthTimelineType.consultation,
             detail: const HealthTimelineDetailReference(
               sourceType: 'health_events',
               sourceId: 'he1',
@@ -61,6 +62,40 @@ void main() {
         isFalse,
       );
     });
+
+    test(
+      'health_events + type vaccination → VaccinationHistoryTarget (3E-D3)',
+      () {
+        final r = HealthTimelineDetailResolver.resolve(
+          dogId: 'dog-a',
+          reference: const HealthTimelineDetailReference(
+            sourceType: 'health_events',
+            sourceId: 'vac-he-1',
+          ),
+          entryType: HealthTimelineTypeView.known(
+            HealthTimelineType.vaccination,
+          ),
+        );
+        expect(r, isA<HealthTimelineDetailResolved>());
+        final t = (r as HealthTimelineDetailResolved).target;
+        expect(t, isA<VaccinationHistoryTarget>());
+        expect(t.kind, HealthTimelineDestinationKind.relatedHistory);
+        expect(t.sourceId, 'vac-he-1');
+        expect(
+          HealthTimelineDetailResolver.isNavigable(
+            _entry(
+              id: 'health_events:vac-he-1',
+              type: HealthTimelineType.vaccination,
+              detail: const HealthTimelineDetailReference(
+                sourceType: 'health_events',
+                sourceId: 'vac-he-1',
+              ),
+            ),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('weight_records relatedHistory (não exact detail)', () {
       final r = HealthTimelineDetailResolver.resolve(
@@ -155,6 +190,18 @@ void main() {
             ),
           ),
           false,
+        ),
+        (
+          // 3E-D3: CRUD mobile de vacina em health_events
+          _entry(
+            id: 'he:vac',
+            type: HealthTimelineType.vaccination,
+            detail: const HealthTimelineDetailReference(
+              sourceType: 'health_events',
+              sourceId: 'hv1',
+            ),
+          ),
+          true,
         ),
         (_entry(id: 'x:1', detail: null), false),
         (

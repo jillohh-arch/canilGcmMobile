@@ -8,14 +8,20 @@ import 'package:canil_gcm/features/health/presentation/timeline/models/health_ti
 ///
 /// Sem BuildContext, sem Navigator, sem Firestore, sem imports da source 3C.
 ///
-/// ## Matriz (pós-auditoria)
+/// ## Matriz (3E-D3)
 /// | origem | destino | kind | status |
-/// | health_events | — | none | unsupported |
+/// | health_events + type vaccination | histórico vacinação | relatedHistory | resolved |
+/// | health_events (outros tipos) | — | none | unsupported |
 /// | weight_records | histórico de peso | relatedHistory | resolved |
 /// | feeding_* | histórico alimentação | relatedHistory | resolved |
 /// | vacinas | histórico vacinação | relatedHistory | resolved |
 /// | raw hostil | — | none | unsupported |
 /// | type×source mismatch | — | none | unavailable |
+///
+/// **Vacinação (3E-D3):** o CRUD mobile ativo grava vacinas em
+/// `dogs/{dogId}/health_events` com `type == vaccination` (ver
+/// [HealthSummaryVaccinationReader]). Sem este ramo, o card aparece na
+/// Timeline mas o toque não abre destino (allowlist só tinha `vacinas`).
 abstract final class HealthTimelineDetailResolver {
   HealthTimelineDetailResolver._();
 
@@ -31,6 +37,8 @@ abstract final class HealthTimelineDetailResolver {
     sourceFeedingEvents,
     sourceFeedings,
     sourceVacinas,
+    // health_events só navega com type vaccination (ver resolve).
+    sourceHealthEvents,
   };
 
   /// Resolve a partir da referência tipada + dogId (+ type opcional da entry).
@@ -61,6 +69,17 @@ abstract final class HealthTimelineDetailResolver {
 
     // Allowlist explícita — nunca route dinâmica a partir de raw.
     if (!_allowlist.contains(sourceType)) {
+      return const HealthTimelineDetailUnsupported();
+    }
+
+    // health_events: apenas vacinação tem relatedHistory real.
+    // Outros tipos permanecem unsupported (sem detalhe unitário na v1).
+    if (sourceType == sourceHealthEvents) {
+      if (entryType?.known == HealthTimelineType.vaccination) {
+        return HealthTimelineDetailResolved(
+          VaccinationHistoryTarget(dogId: dog, sourceId: sourceId),
+        );
+      }
       return const HealthTimelineDetailUnsupported();
     }
 
@@ -115,6 +134,7 @@ abstract final class HealthTimelineDetailResolver {
       sourceWeightRecords => known == HealthTimelineType.weight,
       sourceFeedingEvents || sourceFeedings => known == HealthTimelineType.meal,
       sourceVacinas => known == HealthTimelineType.vaccination,
+      sourceHealthEvents => known == HealthTimelineType.vaccination,
       _ => false,
     };
   }

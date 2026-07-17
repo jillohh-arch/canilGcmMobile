@@ -15,6 +15,14 @@ abstract final class HealthTimelineUserCopy {
       'Nenhum registro corresponde aos filtros aplicados.';
   static const clearFilters = 'Limpar filtros';
 
+  static const institutionalFooterGeneric =
+      'Os registros exibidos integram o histórico de saúde do K9 e mantêm '
+      'sua rastreabilidade de origem.';
+
+  static String institutionalFooterForDog(String dogName) =>
+      'Os registros exibidos integram o histórico de saúde de $dogName e '
+      'mantêm sua rastreabilidade de origem.';
+
   static const errorTitle = 'Não foi possível carregar';
   static const errorMessage =
       'Não foi possível carregar o histórico agora. Tente novamente.';

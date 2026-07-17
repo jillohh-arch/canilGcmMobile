@@ -110,6 +110,42 @@ abstract final class HealthTimelineMappers {
     return TimelineMappingInvalidReason.invalidRequiredDate;
   }
 
+  /// Espelho dual-write de pesagem mobile (3E-D3).
+  ///
+  /// **Prova de escrita** (`weight_history_screen.dart`):
+  /// ```dart
+  /// await healthVM.addHealthLog(HealthLogModel(
+  ///   type: 'other', subtype: 'Pesagem', weight: ...,
+  ///   healthObservations: 'Pesagem efetuada em ...',
+  /// ));
+  /// await WeightHistoryService().addRecord(...); // weight_records
+  /// ```
+  ///
+  /// IDs distintos (sem `source_id` / docId compartilhado) — identidade
+  /// lógica vem do **contrato de escrita dual comprovado**, não de
+  /// heurística de timestamp.
+  ///
+  /// Canônico na Timeline: [mapWeightRecord] / `weight_records` (ADR-006).
+  /// Este espelho é ignorado no read-side para evitar duas entradas do
+  /// mesmo ato operacional.
+  ///
+  /// **Não** suprime:
+  /// - health_events sem `weight` numérico;
+  /// - health_events com outros subtype/type (consulta, vacina, etc.);
+  /// - weight_records (permanecem).
+  static bool isProvenWeightDualWriteMirror(Map<String, dynamic> data) {
+    final type = (data['type'] ?? data['logType'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final subtype = (data['subtype'] ?? '').toString().trim().toLowerCase();
+    final weight = data['weight'];
+    final hasWeight = weight is num && weight.isFinite && weight > 0;
+    if (!hasWeight) return false;
+    // Payload canônico do dual-write em WeightHistoryScreen.
+    return type == 'other' && subtype == 'pesagem';
+  }
+
   static TimelineMappingResult mapHealthEvent({
     required String dogId,
     required String docId,
@@ -119,6 +155,12 @@ abstract final class HealthTimelineMappers {
     // 1. Soft-delete — ignorável mesmo com data inválida.
     if (HealthSummarySoftDelete.isSoftDeleted(data)) {
       return const TimelineIgnored('soft_deleted');
+    }
+
+    // 1b. Espelho dual-write de pesagem (3E-D3) — antes de type/data.
+    // Independente de página: não precisa do weight_record no mesmo batch.
+    if (isProvenWeightDualWriteMirror(data)) {
+      return const TimelineIgnored('weight_dual_write_mirror');
     }
 
     final typeRaw = (data['type'] ?? data['logType'] ?? '').toString().trim();

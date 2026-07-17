@@ -252,6 +252,193 @@ void main() {
       expect(e.operationalImpact, isNull);
     });
 
+    group('3E-D3 — dual-write pesagem (health_events espelho)', () {
+      test('isProvenWeightDualWriteMirror: payload WeightHistoryScreen', () {
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'other',
+            'subtype': 'Pesagem',
+            'weight': 30.0,
+            'healthObservations': 'Pesagem efetuada em Canil.',
+          }),
+          isTrue,
+        );
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'other',
+            'subtype': 'pesagem',
+            'weight': 28,
+          }),
+          isTrue,
+        );
+      });
+
+      test('não marca espelho sem weight / subtype errado / consulta', () {
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'other',
+            'subtype': 'Pesagem',
+            // sem weight
+          }),
+          isFalse,
+        );
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'other',
+            'subtype': 'Observação',
+            'weight': 30.0,
+          }),
+          isFalse,
+        );
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'consultation',
+            'subtype': 'Pesagem',
+            'weight': 30.0,
+          }),
+          isFalse,
+        );
+        expect(
+          HealthTimelineMappers.isProvenWeightDualWriteMirror({
+            'type': 'vaccination',
+            'subtype': 'V10',
+            'weight': 30.0,
+          }),
+          isFalse,
+        );
+      });
+
+      test('mapHealthEvent espelho → ignored; weight_record permanece', () {
+        final q = HealthTimelineQuery(dogId: 'd1');
+        final he = HealthTimelineMappers.mapHealthEvent(
+          dogId: 'd1',
+          docId: 'he-w1',
+          data: {
+            'date': DateTime(2026, 5, 10, 10),
+            'type': 'other',
+            'subtype': 'Pesagem',
+            'weight': 30.0,
+            'healthObservations': 'Pesagem efetuada em Canil.',
+          },
+          filters: q,
+        );
+        expect(he, isTimelineIgnored);
+        expect(
+          (he as TimelineIgnored).reasonCode,
+          'weight_dual_write_mirror',
+        );
+
+        final wr = _mapped(
+          HealthTimelineMappers.mapWeightRecord(
+            dogId: 'd1',
+            docId: 'wr-1',
+            data: {
+              'measured_at': DateTime(2026, 5, 10, 10),
+              'weight_kg': 30.0,
+            },
+            filters: q,
+          ),
+        );
+        expect(wr.type.known, HealthTimelineType.weight);
+        expect(wr.id, 'weight_records:wr-1');
+      });
+
+      test('health_event pesagem sem weight → NÃO some (sem prova dual)', () {
+        final e = _mapped(
+          HealthTimelineMappers.mapHealthEvent(
+            dogId: 'd1',
+            docId: 'orphan-pesagem',
+            data: {
+              'date': DateTime(2026, 5, 10),
+              'type': 'other',
+              'subtype': 'Pesagem',
+              // sem weight — não é o payload dual-write
+            },
+            filters: HealthTimelineQuery(dogId: 'd1'),
+          ),
+        );
+        expect(e.id, 'health_events:orphan-pesagem');
+      });
+
+      test('duas pesagens weight_records próximas → ambas', () async {
+        final a = _e(
+          id: 'weight_records:a',
+          at: DateTime.utc(2026, 5, 10, 10, 0),
+          type: HealthTimelineType.weight,
+          title: 'Pesagem',
+        );
+        final b = _e(
+          id: 'weight_records:b',
+          at: DateTime.utc(2026, 5, 10, 10, 1),
+          type: HealthTimelineType.weight,
+          title: 'Pesagem',
+        );
+        final source = CoexistenceHealthTimelineSourceFactory.forReaders([
+          MemoryTimelineSourceReader(
+            sourceKey: 'weight_records',
+            items: [a, b],
+          ),
+        ]);
+        final all = await drainAll(source, dogId: 'dog-a', pageSize: 10);
+        expect(all.length, 2);
+      });
+
+      test('consulta health_events não é removida como efeito colateral', () {
+        final e = _mapped(
+          HealthTimelineMappers.mapHealthEvent(
+            dogId: 'd1',
+            docId: 'c1',
+            data: {
+              'date': DateTime(2026, 5, 10),
+              'type': 'consultation',
+              'healthObservations': 'Check-up',
+            },
+            filters: HealthTimelineQuery(dogId: 'd1'),
+          ),
+        );
+        expect(e.type.known, HealthTimelineType.consultation);
+      });
+
+      test(
+        'espelho em page1 + weight em page2 → só weight no resultado global',
+        () async {
+          // Mapper já descarta espelho; simula merge multi-source.
+          final q = HealthTimelineQuery(dogId: 'dog-a', pageSize: 1);
+          final heMirror = HealthTimelineMappers.mapHealthEvent(
+            dogId: 'dog-a',
+            docId: 'mirror',
+            data: {
+              'date': DateTime.utc(2026, 5, 10, 12),
+              'type': 'other',
+              'subtype': 'Pesagem',
+              'weight': 30.0,
+            },
+            filters: q,
+          );
+          expect(heMirror, isTimelineIgnored);
+
+          final weight = _e(
+            id: 'weight_records:w-real',
+            at: DateTime.utc(2026, 5, 10, 12),
+            type: HealthTimelineType.weight,
+            title: 'Pesagem',
+          );
+          final source = CoexistenceHealthTimelineSourceFactory.forReaders([
+            MemoryTimelineSourceReader(
+              sourceKey: 'health_events',
+              items: const [],
+            ),
+            MemoryTimelineSourceReader(
+              sourceKey: 'weight_records',
+              items: [weight],
+            ),
+          ]);
+          final all = await drainAll(source, dogId: 'dog-a', pageSize: 1);
+          expect(all.map((e) => e.id).toList(), ['weight_records:w-real']);
+        },
+      );
+    });
+
     test('feeding dual-write unifica id por docId (NutritionService)', () {
       final q = HealthTimelineQuery(dogId: 'd1');
       final a = _mapped(

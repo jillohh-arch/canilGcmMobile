@@ -9,6 +9,7 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_state.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_day_section.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_formatters.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_institutional_footer.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_load_more.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_refresh_banner.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_status_views.dart';
@@ -28,6 +29,9 @@ class HealthTimelineView extends StatelessWidget {
 
   /// Se informado, chevron/tap só para entries em que retorna true (3D).
   final bool Function(HealthTimelineEntryView entry)? entryNavigable;
+
+  /// Label de ação honesta (relatedHistory) para semantics do card.
+  final String? Function(HealthTimelineEntryView entry)? entryNavigationLabel;
 
   /// Ação visual de filtros (lógica completa em 3D).
   final VoidCallback? onFilterRequested;
@@ -50,11 +54,20 @@ class HealthTimelineView extends StatelessWidget {
   /// Padding inferior extra (ex.: safe area / bottom nav do host).
   final double bottomPadding;
 
+  /// Exibe bloco institucional quando a timeline não tem mais páginas.
+  final bool showInstitutionalFooter;
+
+  /// Conteúdo entre o cabeçalho da página e a lista (quick filters, chips).
+  ///
+  /// Hierarquia 3E-E: título/Filtros **antes** dos atalhos de tipo.
+  final Widget? belowHeader;
+
   const HealthTimelineView({
     super.key,
     required this.controller,
     this.onEntryTap,
     this.entryNavigable,
+    this.entryNavigationLabel,
     this.onFilterRequested,
     this.onClearFilters,
     this.activeFilterCount,
@@ -62,6 +75,8 @@ class HealthTimelineView extends StatelessWidget {
     this.contextLabel,
     this.now,
     this.bottomPadding = 24,
+    this.showInstitutionalFooter = false,
+    this.belowHeader,
   });
 
   @override
@@ -75,6 +90,7 @@ class HealthTimelineView extends StatelessWidget {
           onLoadMore: controller.loadMore,
           onEntryTap: onEntryTap,
           entryNavigable: entryNavigable,
+          entryNavigationLabel: entryNavigationLabel,
           onFilterRequested: onFilterRequested,
           onClearFilters: onClearFilters,
           activeFilterCount: activeFilterCount,
@@ -82,6 +98,8 @@ class HealthTimelineView extends StatelessWidget {
           contextLabel: contextLabel,
           now: now,
           bottomPadding: bottomPadding,
+          showInstitutionalFooter: showInstitutionalFooter,
+          belowHeader: belowHeader,
         );
       },
     );
@@ -98,6 +116,7 @@ class _TimelineBody extends StatelessWidget {
   final Future<void> Function() onLoadMore;
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
   final bool Function(HealthTimelineEntryView entry)? entryNavigable;
+  final String? Function(HealthTimelineEntryView entry)? entryNavigationLabel;
   final VoidCallback? onFilterRequested;
   final VoidCallback? onClearFilters;
   final int? activeFilterCount;
@@ -105,6 +124,8 @@ class _TimelineBody extends StatelessWidget {
   final String? contextLabel;
   final DateTime Function()? now;
   final double bottomPadding;
+  final bool showInstitutionalFooter;
+  final Widget? belowHeader;
 
   const _TimelineBody({
     required this.state,
@@ -112,6 +133,7 @@ class _TimelineBody extends StatelessWidget {
     required this.onLoadMore,
     required this.onEntryTap,
     required this.entryNavigable,
+    required this.entryNavigationLabel,
     required this.onFilterRequested,
     required this.onClearFilters,
     required this.activeFilterCount,
@@ -119,6 +141,8 @@ class _TimelineBody extends StatelessWidget {
     required this.contextLabel,
     required this.now,
     required this.bottomPadding,
+    required this.showInstitutionalFooter,
+    required this.belowHeader,
   });
 
   @override
@@ -126,6 +150,7 @@ class _TimelineBody extends StatelessWidget {
     final filtersActive = _resolveHasActiveFilters();
     final filterCount = _resolveFilterCount();
 
+    // Ordem 3E-E: onde estou → como filtro → conteúdo.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -135,6 +160,7 @@ class _TimelineBody extends StatelessWidget {
           activeFilterCount: filterCount,
           hasActiveFilters: filtersActive,
         ),
+        ?belowHeader,
         Expanded(child: _body(filtersActive: filtersActive)),
       ],
     );
@@ -176,8 +202,11 @@ class _TimelineBody extends StatelessWidget {
                 onLoadMore: onLoadMore,
                 onEntryTap: onEntryTap,
                 entryNavigable: entryNavigable,
+                entryNavigationLabel: entryNavigationLabel,
+                contextLabel: contextLabel,
                 now: now,
                 bottomPadding: bottomPadding,
+                showInstitutionalFooter: showInstitutionalFooter,
               )
             : HealthTimelineErrorStateView(
                 key: const ValueKey('timeline-error'),
@@ -199,8 +228,11 @@ class _TimelineBody extends StatelessWidget {
                 onLoadMore: onLoadMore,
                 onEntryTap: onEntryTap,
                 entryNavigable: entryNavigable,
+                entryNavigationLabel: entryNavigationLabel,
+                contextLabel: contextLabel,
                 now: now,
                 bottomPadding: bottomPadding,
+                showInstitutionalFooter: showInstitutionalFooter,
               )
             : HealthTimelineOfflineStateView(
                 key: const ValueKey('timeline-offline'),
@@ -213,8 +245,11 @@ class _TimelineBody extends StatelessWidget {
         onLoadMore: onLoadMore,
         onEntryTap: onEntryTap,
         entryNavigable: entryNavigable,
+        entryNavigationLabel: entryNavigationLabel,
+        contextLabel: contextLabel,
         now: now,
         bottomPadding: bottomPadding,
+        showInstitutionalFooter: showInstitutionalFooter,
       ),
     };
   }
@@ -285,8 +320,9 @@ class _TimelineHeader extends StatelessWidget {
         ? '${HealthTimelineUserCopy.filterAction}, $activeFilterCount ativos'
         : '${HealthTimelineUserCopy.filterAction} ativos';
 
+    // Padding compacto sob tabs do shell (3E-E): denso sem esmagar toque.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 12, 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -296,6 +332,7 @@ class _TimelineHeader extends StatelessWidget {
               children: [
                 Text(
                   HealthTimelineUserCopy.title,
+                  key: const ValueKey('health-timeline-title'),
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 18,
@@ -306,6 +343,7 @@ class _TimelineHeader extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  key: const ValueKey('health-timeline-subtitle'),
                   style: GoogleFonts.inter(
                     color: AppTheme.textSoft,
                     fontSize: 13,
@@ -323,9 +361,11 @@ class _TimelineHeader extends StatelessWidget {
               child: Material(
                 color: AppTheme.transparent,
                 child: InkWell(
+                  key: const ValueKey('health-timeline-filters-button'),
                   onTap: onFilterRequested,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
+                    constraints: const BoxConstraints(minHeight: 40),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
@@ -481,14 +521,21 @@ final class _LoadMoreSlot extends _TimelineSlot {
   const _LoadMoreSlot();
 }
 
+final class _FooterSlot extends _TimelineSlot {
+  const _FooterSlot();
+}
+
 class _DataList extends StatelessWidget {
   final HealthTimelineSnapshot snapshot;
   final Future<void> Function()? onRefresh;
   final Future<void> Function() onLoadMore;
   final ValueChanged<HealthTimelineEntryView>? onEntryTap;
   final bool Function(HealthTimelineEntryView entry)? entryNavigable;
+  final String? Function(HealthTimelineEntryView entry)? entryNavigationLabel;
+  final String? contextLabel;
   final DateTime Function()? now;
   final double bottomPadding;
+  final bool showInstitutionalFooter;
 
   const _DataList({
     super.key,
@@ -497,8 +544,11 @@ class _DataList extends StatelessWidget {
     required this.onLoadMore,
     required this.onEntryTap,
     required this.entryNavigable,
+    required this.entryNavigationLabel,
+    required this.contextLabel,
     required this.now,
     required this.bottomPadding,
+    required this.showInstitutionalFooter,
   });
 
   ValueChanged<HealthTimelineEntryView>? _tapFor(
@@ -509,6 +559,11 @@ class _DataList extends StatelessWidget {
     final gate = entryNavigable;
     if (gate != null && !gate(entry)) return null;
     return handler;
+  }
+
+  String? _navLabel(HealthTimelineEntryView entry) {
+    if (_tapFor(entry) == null) return null;
+    return entryNavigationLabel?.call(entry);
   }
 
   @override
@@ -554,6 +609,7 @@ class _DataList extends StatelessWidget {
               isFirst: isFirst,
               isLast: isLast,
               onEntryTap: _tapFor(entry),
+              navigationActionLabel: _navLabel(entry),
             ),
           ),
           _DayGapSlot() => const SizedBox(height: 18),
@@ -566,6 +622,9 @@ class _DataList extends StatelessWidget {
                 : (snapshot.hasMore || snapshot.loadMoreError != null)
                 ? () => onLoadMore()
                 : null,
+          ),
+          _FooterSlot() => HealthTimelineInstitutionalFooter(
+            dogDisplayName: contextLabel,
           ),
         };
       },
@@ -619,6 +678,12 @@ class _DataList extends StatelessWidget {
       }
     }
     slots.add(const _LoadMoreSlot());
+    // Bloco institucional somente após o fim lógico da paginação.
+    if (showInstitutionalFooter &&
+        !snapshot.hasMore &&
+        snapshot.items.isNotEmpty) {
+      slots.add(const _FooterSlot());
+    }
     return slots;
   }
 }

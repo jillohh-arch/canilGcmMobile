@@ -146,6 +146,43 @@ class HealthTimelineFilterSession extends ChangeNotifier {
     await _pushApplied();
   }
 
+  /// Chip rápido “Todos”: limpa **somente** types (preserva period/case/professional).
+  Future<void> applyQuickAllTypes() async {
+    if (!_applied.hasTypes) {
+      _draft = _defensiveCopy(_applied);
+      notifyListeners();
+      return;
+    }
+    _applied = _applied.copyWith(types: const {});
+    _draft = _defensiveCopy(_applied);
+    notifyListeners();
+    await _pushApplied();
+  }
+
+  /// Chip rápido de tipo único (single-select). Preserva demais dimensões.
+  Future<void> applyQuickType(HealthTimelineType type) async {
+    final current = _applied.types;
+    if (current.length == 1 && current.contains(type)) {
+      _draft = _defensiveCopy(_applied);
+      notifyListeners();
+      return;
+    }
+    _applied = _applied.copyWith(types: {type});
+    _draft = _defensiveCopy(_applied);
+    notifyListeners();
+    await _pushApplied();
+  }
+
+  /// true se a faixa rápida deve marcar “Todos” (types vazio).
+  bool get isQuickAllSelected => !_applied.hasTypes;
+
+  /// true se exatamente um tipo está aplicado e coincide com [type].
+  bool isQuickTypeSelected(HealthTimelineType type) =>
+      _applied.types.length == 1 && _applied.types.contains(type);
+
+  /// Multi-type avançado: faixa rápida não finge seleção única.
+  bool get hasAdvancedMultiTypeSelection => _applied.types.length > 1;
+
   Future<void> removeAppliedPeriod() async {
     if (!_applied.hasPeriod) return;
     _applied = _applied.copyWith(

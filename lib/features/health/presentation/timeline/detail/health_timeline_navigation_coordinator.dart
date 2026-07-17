@@ -21,11 +21,14 @@ class HealthTimelineNavigationCoordinator {
     required Future<void> Function(HealthTimelineDetailTarget target)
     onNavigate,
     void Function(String message)? onUnavailable,
+    void Function(Object error, StackTrace stackTrace)? onNavigateError,
   }) : _onNavigate = onNavigate,
-       _onUnavailable = onUnavailable;
+       _onUnavailable = onUnavailable,
+       _onNavigateError = onNavigateError;
 
   final Future<void> Function(HealthTimelineDetailTarget target) _onNavigate;
   final void Function(String message)? _onUnavailable;
+  final void Function(Object error, StackTrace stackTrace)? _onNavigateError;
 
   bool _busy = false;
 
@@ -35,7 +38,9 @@ class HealthTimelineNavigationCoordinator {
   ///
   /// - unsupported → 0 callbacks, busy liberado;
   /// - unavailable → feedback (falha do callback não prende busy);
-  /// - resolved → no máximo 1 navegação concorrente.
+  /// - resolved → no máximo 1 navegação concorrente;
+  /// - falha no navigate → busy liberado + [_onNavigateError] (não silencioso).
+  /// - `_busy` **sempre** volta a false no [finally] (Gate I / 3E-D2).
   Future<void> onEntryTap(HealthTimelineEntryView entry) async {
     if (_busy) return;
     _busy = true;
@@ -52,7 +57,21 @@ class HealthTimelineNavigationCoordinator {
           }
           return;
         case HealthTimelineDetailResolved(:final target):
-          await _onNavigate(target);
+          try {
+            await _onNavigate(target);
+          } catch (error, stackTrace) {
+            // 3E-D2: falha async não pode morrer silenciosa (release/profile).
+            final handler = _onNavigateError;
+            if (handler != null) {
+              try {
+                handler(error, stackTrace);
+              } catch (_) {
+                // Handler de erro não pode re-prender o fluxo.
+              }
+            } else {
+              rethrow;
+            }
+          }
       }
     } finally {
       _busy = false;
