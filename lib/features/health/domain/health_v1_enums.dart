@@ -122,6 +122,16 @@ ParsedHealthEnum<T> _parseEnum<T extends Enum>(
   return ParsedHealthEnum<T>.unknown(raw);
 }
 
+/// Parse defensivo público para enums Health com wire name.
+///
+/// Valores desconhecidos viram [ParsedHealthEnum.unknown]; raw vazio/null
+/// vira [ParsedHealthEnum.absent]. Nunca lança por valor desconhecido.
+ParsedHealthEnum<T> parseHealthEnum<T extends Enum>(
+  Object? input,
+  Iterable<T> values,
+  String Function(T value) wireName,
+) => _parseEnum(input, values, wireName);
+
 extension ClinicalCaseStatusWire on ClinicalCaseStatus {
   String get wireName => switch (this) {
     ClinicalCaseStatus.open => 'open',

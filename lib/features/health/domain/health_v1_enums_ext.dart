@@ -1,5 +1,8 @@
 import 'health_v1_enums.dart';
 
+export 'health_v1_enums.dart'
+    show ParsedHealthEnum, ParsedHealthEnumState, parseHealthEnum;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Novos enums canônicos para os 9 agregados restantes da Fase 1C.
 // Nomes seguem o Domain Model §6 e ADR-005.
@@ -115,6 +118,14 @@ enum ScheduleLifecycleStatus {
     ScheduleLifecycleStatus.completed => 'completed',
     ScheduleLifecycleStatus.cancelled => 'cancelled',
   };
+
+  /// Parse defensivo (known / unknown / absent). Nunca lança por valor desconhecido.
+  static ParsedHealthEnum<ScheduleLifecycleStatus> parse(Object? value) =>
+      parseHealthEnum(
+        value,
+        ScheduleLifecycleStatus.values,
+        (item) => item.wireName,
+      );
 }
 
 /// Estado temporal derivado de um item de agenda.
@@ -126,7 +137,18 @@ enum HealthScheduleTemporalStatus {
   pending,
   overdue,
   completed,
-  cancelled,
+  cancelled;
+
+  /// Wire name apenas para diagnóstico/apresentação — nunca persistido.
+  String get wireName => switch (this) {
+    HealthScheduleTemporalStatus.scheduled => 'scheduled',
+    HealthScheduleTemporalStatus.upcoming => 'upcoming',
+    HealthScheduleTemporalStatus.today => 'today',
+    HealthScheduleTemporalStatus.pending => 'pending',
+    HealthScheduleTemporalStatus.overdue => 'overdue',
+    HealthScheduleTemporalStatus.completed => 'completed',
+    HealthScheduleTemporalStatus.cancelled => 'cancelled',
+  };
 }
 
 /// Tipo de um item de agenda (Domain Model §6).
@@ -152,6 +174,10 @@ enum ScheduleType {
     ScheduleType.bath => 'bath',
     ScheduleType.general => 'general',
   };
+
+  /// Parse defensivo (known / unknown / absent). Nunca lança por valor desconhecido.
+  static ParsedHealthEnum<ScheduleType> parse(Object? value) =>
+      parseHealthEnum(value, ScheduleType.values, (item) => item.wireName);
 }
 
 /// Origem do item de agenda (Domain Model §6).
@@ -169,6 +195,14 @@ enum ScheduleSourceType {
     ScheduleSourceType.preventive => 'preventive',
     ScheduleSourceType.manual => 'manual',
   };
+
+  /// Parse defensivo (known / unknown / absent). Nunca lança por valor desconhecido.
+  static ParsedHealthEnum<ScheduleSourceType> parse(Object? value) =>
+      parseHealthEnum(
+        value,
+        ScheduleSourceType.values,
+        (item) => item.wireName,
+      );
 }
 
 /// Tipo de documento clínico (Domain Model §2.10 e §6).

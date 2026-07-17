@@ -140,14 +140,15 @@ final class HealthScheduleItem {
 /// autossuficiente** em [_ensureTimeZonesInitialized] — o Health não depende
 /// da ordem de bootstrap de Push ou de qualquer outro módulo. Não há
 /// fallback silencioso para UTC: nome IANA inválido continua falhando.
+///
+/// Configuração de tolerância e janela `upcoming` é **por `schedule_type`**,
+/// via [HealthScheduleTemporalConfigResolver]. Não existe default universal.
 final class HealthScheduleTemporalPolicy {
   HealthScheduleTemporalPolicy({
-    required ScheduleToleranceResolver resolveTolerance,
-    this.upcomingWindow = const Duration(days: 7),
-  }) : resolveTolerance = resolveTolerance;
+    required HealthScheduleTemporalConfigResolver config,
+  }) : _config = config;
 
-  final ScheduleToleranceResolver resolveTolerance;
-  final Duration upcomingWindow;
+  final HealthScheduleTemporalConfigResolver _config;
 
   /// Flag interna: `timeZoneDatabase.isEmpty` NÃO indica prontidão do package
   /// (antes do init a base reporta isEmpty=false e getLocation falha).
@@ -184,6 +185,21 @@ final class HealthScheduleTemporalPolicy {
     }
   }
 
+  /// Data efetiva única:
+  /// `due_until ?? scheduled_for + config(schedule_type).tolerance`.
+  ///
+  /// Lança se a configuração do tipo estiver ausente.
+  DateTime effectiveDueUntil(HealthScheduleItem item) {
+    final due = item.dueUntil;
+    if (due != null) return due;
+    final settings = _config.resolve(
+      item.scheduleType,
+      scheduledFor: item.scheduledFor,
+      timezone: item.timezone,
+    );
+    return item.scheduledFor.add(settings.toleranceAfterScheduled);
+  }
+
   /// Regra única absoluta — primeira condição verdadeira vence.
   HealthScheduleTemporalStatus evaluate(
     HealthScheduleItem item, {
@@ -195,19 +211,21 @@ final class HealthScheduleTemporalPolicy {
     if (item.lifecycleStatus == ScheduleLifecycleStatus.cancelled) {
       return HealthScheduleTemporalStatus.cancelled;
     }
-    final DateTime effectiveDueUntil;
-    if (item.dueUntil != null) {
-      effectiveDueUntil = item.dueUntil!;
-    } else {
-      final tolerance = resolveTolerance(item.scheduleType);
-      effectiveDueUntil = item.scheduledFor.add(tolerance);
-    }
-    if (now.isAfter(effectiveDueUntil)) {
+
+    final effectiveDue = effectiveDueUntil(item);
+    if (now.isAfter(effectiveDue)) {
       return HealthScheduleTemporalStatus.overdue;
     }
     if (!now.isBefore(item.scheduledFor)) {
       return HealthScheduleTemporalStatus.pending;
     }
+
+    final settings = _config.resolve(
+      item.scheduleType,
+      scheduledFor: item.scheduledFor,
+      timezone: item.timezone,
+    );
+
     _ensureTimeZonesInitialized();
     final location = tz.getLocation(item.timezone);
     final nowInZone = tz.TZDateTime.from(now, location);
@@ -215,8 +233,11 @@ final class HealthScheduleTemporalPolicy {
     if (_isSameLocalDay(nowInZone, scheduledInZone)) {
       return HealthScheduleTemporalStatus.today;
     }
-    final upcomingBoundary = scheduledInZone.subtract(upcomingWindow);
-    if (nowInZone.isAfter(upcomingBoundary) &&
+
+    // Janela upcoming inclusiva no início: scheduled_for - window ≤ now < scheduled_for
+    // (no timezone do item). Configurável por schedule_type.
+    final windowStart = scheduledInZone.subtract(settings.upcomingWindow);
+    if (!nowInZone.isBefore(windowStart) &&
         nowInZone.isBefore(scheduledInZone)) {
       return HealthScheduleTemporalStatus.upcoming;
     }

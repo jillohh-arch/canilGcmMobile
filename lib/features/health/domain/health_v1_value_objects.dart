@@ -288,7 +288,108 @@ final class ScheduleBlock {
   }
 }
 
-/// Resolvedor externo de tolerância por `ScheduleType`.
+/// Configuração temporal explícita de um `ScheduleType`.
+///
+/// Não há default universal: cada tipo ativo deve fornecer valores válidos
+/// antes da derivação que dependa deles (Domain Model §2.12 / ADR-004 §13).
+final class HealthScheduleTypeTemporalConfig {
+  HealthScheduleTypeTemporalConfig({
+    required this.toleranceAfterScheduled,
+    required this.upcomingWindow,
+  }) {
+    if (toleranceAfterScheduled.isNegative) {
+      throw ArgumentError.value(
+        toleranceAfterScheduled,
+        'toleranceAfterScheduled',
+        'não pode ser negativo',
+      );
+    }
+    if (upcomingWindow.isNegative) {
+      throw ArgumentError.value(
+        upcomingWindow,
+        'upcomingWindow',
+        'não pode ser negativo',
+      );
+    }
+  }
+
+  /// Acrescentada a `scheduled_for` quando `due_until` está ausente.
+  final Duration toleranceAfterScheduled;
+
+  /// Janela "upcoming" antes de `scheduled_for` (configurável por tipo).
+  final Duration upcomingWindow;
+
+  @override
+  bool operator ==(Object other) =>
+      other is HealthScheduleTypeTemporalConfig &&
+      other.toleranceAfterScheduled == toleranceAfterScheduled &&
+      other.upcomingWindow == upcomingWindow;
+
+  @override
+  int get hashCode => Object.hash(toleranceAfterScheduled, upcomingWindow);
+}
+
+/// Resolve a configuração temporal por `schedule_type`.
+///
+/// A assinatura inclui `scheduledFor` e `timezone` para permitir regras
+/// futuras sem fallback universal silencioso.
+abstract interface class HealthScheduleTemporalConfigResolver {
+  /// Deve falhar de forma explícita se o tipo não tiver configuração.
+  HealthScheduleTypeTemporalConfig resolve(
+    ScheduleType scheduleType, {
+    required DateTime scheduledFor,
+    required String timezone,
+  });
+}
+
+/// Implementação map-based sem fallback universal.
+///
+/// Tipos ausentes do mapa falham com [HealthDomainException]
+/// (`missing_schedule_type_temporal_config`).
+final class MapHealthScheduleTemporalConfig
+    implements HealthScheduleTemporalConfigResolver {
+  MapHealthScheduleTemporalConfig(
+    Map<ScheduleType, HealthScheduleTypeTemporalConfig> byType,
+  ) : _byType =
+          Map<ScheduleType, HealthScheduleTypeTemporalConfig>.unmodifiable(
+            byType,
+          );
+
+  final Map<ScheduleType, HealthScheduleTypeTemporalConfig> _byType;
+
+  /// Atalho de teste/produção: mesma config para todos os [ScheduleType].
+  factory MapHealthScheduleTemporalConfig.uniform(
+    HealthScheduleTypeTemporalConfig config,
+  ) {
+    return MapHealthScheduleTemporalConfig({
+      for (final type in ScheduleType.values) type: config,
+    });
+  }
+
+  @override
+  HealthScheduleTypeTemporalConfig resolve(
+    ScheduleType scheduleType, {
+    required DateTime scheduledFor,
+    required String timezone,
+  }) {
+    final config = _byType[scheduleType];
+    if (config == null) {
+      throw HealthDomainException(
+        'missing_schedule_type_temporal_config',
+        'Configuração temporal ausente para schedule_type=${scheduleType.wireName}',
+      );
+    }
+    return config;
+  }
+}
+
+/// Resolvedor legado de tolerância por `ScheduleType` (compatibilidade).
+///
+/// Preferir [HealthScheduleTemporalConfigResolver]. Mantido para consumidores
+/// que ainda injetam apenas a duração de tolerância.
+@Deprecated(
+  'Use HealthScheduleTemporalConfigResolver (tolerância + upcoming por tipo)',
+)
 typedef ScheduleToleranceResolver =
     Duration Function(ScheduleType scheduleType);
 
