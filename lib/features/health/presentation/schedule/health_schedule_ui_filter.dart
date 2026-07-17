@@ -1,3 +1,6 @@
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
+
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_item_view.dart';
 
@@ -29,12 +32,18 @@ extension HealthScheduleUiFilterX on HealthScheduleUiFilter {
     HealthScheduleUiFilter.others => 'Outros',
   };
 
-  bool matches(HealthScheduleItemView item) {
+  /// [now] é o instante de referência (clock injetável).
+  ///
+  /// **Hoje (Fase 4C):** calendário UI — `scheduled_for` no dia civil atual
+  /// no **timezone do item**, com lifecycle `open` (via item carregado).
+  /// Inclui `today`, `pending` e `overdue` do mesmo dia civil.
+  /// Não altera [HealthScheduleTemporalStatus].
+  bool matches(HealthScheduleItemView item, {required DateTime now}) {
     switch (this) {
       case HealthScheduleUiFilter.all:
         return true;
       case HealthScheduleUiFilter.today:
-        return item.temporalStatus == HealthScheduleTemporalStatus.today;
+        return isScheduledOnLocalCivilDay(item: item, now: now);
       case HealthScheduleUiFilter.vaccination:
         return item.scheduleType == ScheduleType.vaccination;
       case HealthScheduleUiFilter.consultation:
@@ -55,16 +64,39 @@ extension HealthScheduleUiFilterX on HealthScheduleUiFilter {
   }
 }
 
+bool _tzReady = false;
+
+void _ensureTz() {
+  if (_tzReady) return;
+  tz_data.initializeTimeZones();
+  _tzReady = true;
+}
+
+/// `scheduled_for` e `now` caem no mesmo dia civil no timezone do item.
+bool isScheduledOnLocalCivilDay({
+  required HealthScheduleItemView item,
+  required DateTime now,
+}) {
+  _ensureTz();
+  final location = tz.getLocation(item.timezone);
+  final scheduledLocal = tz.TZDateTime.from(item.scheduledFor, location);
+  final nowLocal = tz.TZDateTime.from(now, location);
+  return scheduledLocal.year == nowLocal.year &&
+      scheduledLocal.month == nowLocal.month &&
+      scheduledLocal.day == nowLocal.day;
+}
+
 /// Aplica filtro de UI e reagrupa (derivado — não muta fonte).
 List<HealthScheduleItemView> filterScheduleItems(
   Iterable<HealthScheduleItemView> items,
-  HealthScheduleUiFilter filter,
-) {
+  HealthScheduleUiFilter filter, {
+  required DateTime now,
+}) {
   if (filter == HealthScheduleUiFilter.all) {
     return List<HealthScheduleItemView>.of(items);
   }
   return [
     for (final item in items)
-      if (filter.matches(item)) item,
+      if (filter.matches(item, now: now)) item,
   ];
 }

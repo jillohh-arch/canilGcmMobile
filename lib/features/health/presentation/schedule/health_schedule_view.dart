@@ -279,7 +279,8 @@ class _ScheduleBody extends StatelessWidget {
     required HealthScheduleSnapshot snapshot,
     required bool offlineBanner,
   }) {
-    final filtered = filterScheduleItems(snapshot.items, filter);
+    final clock = now?.call() ?? DateTime.now().toUtc();
+    final filtered = filterScheduleItems(snapshot.items, filter, now: clock);
     final groups = groupScheduleItems(filtered);
     final kpiGroups = groupScheduleItems(snapshot.items);
 

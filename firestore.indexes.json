@@ -81,6 +81,15 @@
         { "fieldPath": "ativo", "order": "ASCENDING" },
         { "fieldPath": "ordem", "order": "ASCENDING" }
       ]
+    },
+
+    {
+      "collectionGroup": "health_schedule",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
+        { "fieldPath": "scheduled_for", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

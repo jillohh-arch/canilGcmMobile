@@ -14,13 +14,18 @@ abstract interface class HealthScheduleSource {
 
 /// Erro tipado da fonte de leitura da Agenda.
 ///
-/// [isOffline] permite ao controller distinguir offline de erro genérico
-/// sem depender de FirebaseException.
+/// [isOffline] / [isPermissionDenied] permitem ao controller distinguir
+/// offline e autorização de empty/erro genérico — sem FirebaseException na UI.
 final class HealthScheduleSourceException implements Exception {
-  const HealthScheduleSourceException(this.message, {this.isOffline = false});
+  const HealthScheduleSourceException(
+    this.message, {
+    this.isOffline = false,
+    this.isPermissionDenied = false,
+  });
 
   final String message;
   final bool isOffline;
+  final bool isPermissionDenied;
 
   @override
   String toString() => message;

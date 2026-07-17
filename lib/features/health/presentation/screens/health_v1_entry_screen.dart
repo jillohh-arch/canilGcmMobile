@@ -130,7 +130,11 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       dogId: widget.dogId,
     );
 
-    // Agenda 4B: source vazia honesta em produção; fake injetável em testes.
+    // Agenda 4C: source Firestore implementada, mas Rules atuais NÃO têm
+    // match para dogs/{id}/health_schedule (catch-all deny). Produção
+    // permanece EmptyHealthScheduleSource até Rules read-only serem
+    // aprovadas/deployadas. Injete [scheduleSource] nos testes.
+    // Ver docs/health/HEALTH_V1_PHASE_4C_REPORT.md.
     _scheduleSource =
         widget.scheduleSource ?? const EmptyHealthScheduleSource();
     _scheduleController = HealthScheduleController(
