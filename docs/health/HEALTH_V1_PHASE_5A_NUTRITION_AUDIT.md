@@ -952,6 +952,25 @@ Capabilities `health.*` granulares da matriz **não** são enforced nestes match
 
 ---
 
+## NOTA PÓS-5B
+
+```text
+NOTA PÓS-5B
+
+As seções abaixo preservam a proposta produzida durante a auditoria 5A
+antes do congelamento do contrato.
+
+Elas são HISTÓRICAS e NÃO NORMATIVAS.
+
+O contrato canônico vigente é:
+HEALTH_V1_PHASE_5B_NUTRITION_CANONICAL_DECISIONS.md
+D1–D42.
+
+Em qualquer divergência, a Fase 5B e os documentos canônicos reconciliados prevalecem.
+```
+
+---
+
 ## 27. Proposed canonical contract
 
 ### Princípios (obrigatórios)

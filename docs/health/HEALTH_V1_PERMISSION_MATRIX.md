@@ -385,7 +385,8 @@ match /dogs/{dogId}/legacy_health_records/{id} {
 
 ## 10. Mapeamento de capabilities para implementação futura
 
-> **ATENÇÃO — este mapeamento é provisório.** A atribuição capability → perfil real (`condutor`/`admin`) é decisão de implementação **adiada para a Fase 1B** (questão aberta O1 do Foundation Review). As listas abaixo são **propostas candidatas**, **não atribuições aprovadas**. Toda capability nova adicionada nesta rodada (`health.reopen_case`, `health.cancel_case`, `health.complete_treatment`, `health.manage_schedule`) também está sujeita a essa revisão.
+> **ATENÇÃO — este mapeamento é provisório.** A atribuição capability → perfil real (`condutor`/`admin`) é decisão de implementação **adiada para a Fase 1B** (questão aberta O1 do Foundation Review). As listas abaixo são **propostas candidatas**, **não atribuições aprovadas**. Capabilities candidatas adicionadas no foundation (`health.reopen_case`, `health.cancel_case`, `health.complete_treatment`, etc.) também estão sujeitas a essa revisão.
+> **Agenda (4E — operacional real):** `health.schedule_item` e `health.manage_schedule` são **históricos / não operacionais**. Não reintroduzir nas listas de perfil. Contrato real: create manual = `health.create` + dog access; update/complete/cancel = `health.edit` + dog access; cancel automático = `health.edit` + dog access + admin real.
 
 O mapeamento capability → perfil real será definido na implementação. Possibilidades:
 
@@ -397,8 +398,10 @@ O mapeamento capability → perfil real será definido na implementação. Possi
 
 **Proposta provisória** (NÃO aprovada, pendente da Fase 1B):
 
-- **condutor (provisório)** → `health.read`, `health.record_routine`, `health.record_preventive`, `health.schedule_item`, `health.record_incident`, `health.record_clinical_document`, `health.request_exam`, `health.administer_dose`, `health.issue_restriction`, `health.release_restriction`, `health.cancel_record` (próprios drafts), `health.amend_record` (próprios)
-- **admin (provisório)** → todas as capabilities de condutor + `health.interpret_exam`, `health.create_treatment`, `health.complete_treatment`, `health.discharge_case`, `health.reopen_case`, `health.cancel_case`, `health.manage_nutrition_plan`, `health.audit`, `health.cancel_record` (qualquer), `health.amend_record` (qualquer), `health.manage_schedule`
+- **condutor (provisório)** → `health.read`, `health.record_routine`, `health.record_preventive`, `health.create` / `health.edit` (Agenda operacional 4E + dog access), `health.record_incident`, `health.record_clinical_document`, `health.request_exam`, `health.administer_dose`, `health.issue_restriction`, `health.release_restriction`, `health.cancel_record` (próprios drafts), `health.amend_record` (próprios)
+  — **não** inclui `health.schedule_item` (não operacional)
+- **admin (provisório)** → todas as capabilities de condutor + `health.interpret_exam`, `health.create_treatment`, `health.complete_treatment`, `health.discharge_case`, `health.reopen_case`, `health.cancel_case`, `health.manage_nutrition_plan`, `health.audit`, `health.cancel_record` (qualquer), `health.amend_record` (qualquer)
+  — **não** inclui `health.manage_schedule` (não operacional; cancel automático de agenda usa `health.edit` + admin real)
 
 > **Nenhuma capability inclui papel "veterinário"** — veterinário é profissional externo, registrado via `ProfessionalIdentity` quando a ação envolve decisão clínica externa.
 

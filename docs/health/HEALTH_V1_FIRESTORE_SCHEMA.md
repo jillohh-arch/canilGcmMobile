@@ -389,8 +389,8 @@ Path: `dogs/{dogId}/supplement_logs/{logId}`
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
 | supplement_name | string | ✅ | Snapshot legível |
-| dose | number ou string | ✅ | Preferir number + unit no canônico |
-| unit | string (enum) | ✅ | |
+| dose | number | ✅ | Administração estruturada; **não** texto livre |
+| unit | string (enum) | ✅ | Unidade canônica obrigatória com `dose` |
 | administered_at | timestamp | ✅ | Administração pontual |
 | nutrition_plan_id | string | ❌ | |
 | supplement_regimen_id | string | ❌ | Id em plan.supplements[] |
@@ -409,6 +409,8 @@ Path: `dogs/{dogId}/supplement_logs/{logId}`
 **Leitor:** Mobile, Web.
 **Índices:** `administered_at DESC`.
 **Legado:** `nutrition_supplements` = **regime/estado em uso** — **ZERO** backfill automático para `supplement_logs` (não inventar administração).
+
+> **Dose canônica:** o novo `SupplementLog` usa **`dose` numérico + `unit`**. Dose textual livre pertence somente ao legado / regimen adapter (`nutrition_supplements` ou `NutritionPlan.supplements[]` com representation textual legada). Não inventar backfill de administração a partir de dose texto.
 
 ---
 

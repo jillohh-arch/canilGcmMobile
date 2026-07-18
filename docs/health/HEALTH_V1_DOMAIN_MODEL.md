@@ -319,7 +319,7 @@ Legado: `manha→morning`, `almoco→afternoon`, `noite→night`. Labels PT-BR s
 | **Identificador** | `dogs/{dogId}/supplement_logs/{logId}` |
 | **Invariantes** | (1) Representa um ato em `administered_at`. (2) `administered_at` não futuro. (3) **Não** backfill a partir de `nutrition_supplements` (regime legado) — isso inventaria administrações. |
 | **Estados** | Soft cancel / correção auditada; sem hard delete |
-| **Campos obrigatórios** | `supplement_name` (ou snapshot), `dose`, `unit`, `administered_at`, `recorded_by`, `schema_version`, `revision` |
+| **Campos obrigatórios** | `supplement_name` (ou snapshot), `dose` (number), `unit` (enum), `administered_at`, `recorded_by`, `schema_version`, `revision` |
 | **Campos opcionais** | `nutrition_plan_id`, `supplement_regimen_id` (id em `NutritionPlan.supplements[]`), `notes`, `batch_number`, `protocol_id`, `legacy_source`, `legacy_id` |
 | **Valores derivados** | Nenhum |
 | **Dados sensíveis** | Nenhum |
