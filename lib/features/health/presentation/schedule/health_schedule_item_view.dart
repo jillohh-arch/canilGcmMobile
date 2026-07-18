@@ -1,4 +1,5 @@
 import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 
@@ -20,6 +21,7 @@ final class HealthScheduleItemView {
     required this.createdAt,
     required this.recordedBy,
     required this.schemaVersion,
+    required this.revision,
     this.dueUntil,
     this.effectiveDueUntil,
     this.completedAt,
@@ -63,6 +65,7 @@ final class HealthScheduleItemView {
       createdAt: item.createdAt,
       recordedBy: item.recordedBy,
       schemaVersion: item.schemaVersion,
+      revision: item.revision,
       completedAt: item.completedAt,
       completedBy: item.completedBy,
       cancelledAt: item.cancelledAt,
@@ -96,6 +99,10 @@ final class HealthScheduleItemView {
   final DateTime createdAt;
   final RecordedBy recordedBy;
   final int schemaVersion;
+
+  /// Revisão para optimistic concurrency (Gate 4/5). Backend-neutral.
+  final HealthScheduleRevision revision;
+
   final DateTime? completedAt;
   final RecordedBy? completedBy;
   final DateTime? cancelledAt;
@@ -129,6 +136,7 @@ final class HealthScheduleItemView {
         other.createdAt == createdAt &&
         other.recordedBy == recordedBy &&
         other.schemaVersion == schemaVersion &&
+        other.revision == revision &&
         other.completedAt == completedAt &&
         other.completedBy == completedBy &&
         other.cancelledAt == cancelledAt &&
@@ -158,6 +166,7 @@ final class HealthScheduleItemView {
     createdAt,
     recordedBy,
     schemaVersion,
+    revision,
     completedAt,
     completedBy,
     cancelledAt,

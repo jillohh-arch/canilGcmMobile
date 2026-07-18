@@ -39,12 +39,14 @@ void main() {
 
   group('HealthScheduleDocumentMapper', () {
     test('documento completo mapeia campos canônicos', () {
+      final data = fullDoc(
+        dueUntil: Timestamp.fromDate(DateTime.utc(2026, 7, 21, 12)),
+      );
+      data['revision'] = 1;
       final item = HealthScheduleDocumentMapper.fromFirestore(
         dogId: 'dog-a',
         documentId: 's1',
-        data: fullDoc(
-          dueUntil: Timestamp.fromDate(DateTime.utc(2026, 7, 21, 12)),
-        ),
+        data: data,
       );
       expect(item.id, 's1');
       expect(item.dogId, 'dog-a');
@@ -59,6 +61,64 @@ void main() {
       expect(item.notes, 'obs');
       expect(item.recordedBy.uid, 'u1');
       expect(item.schemaVersion, 1);
+      expect(item.revision.token, '1');
+    });
+
+    test('revision = 1 e revision > 1', () {
+      final d1 = fullDoc()..['revision'] = 1;
+      final d2 = fullDoc()..['revision'] = 7;
+      expect(
+        HealthScheduleDocumentMapper.fromFirestore(
+          dogId: 'dog-a',
+          documentId: 'r1',
+          data: d1,
+        ).revision.token,
+        '1',
+      );
+      expect(
+        HealthScheduleDocumentMapper.fromFirestore(
+          dogId: 'dog-a',
+          documentId: 'r2',
+          data: d2,
+        ).revision.token,
+        '7',
+      );
+    });
+
+    test('revision ausente → legado 0', () {
+      final data = fullDoc();
+      data.remove('revision');
+      final item = HealthScheduleDocumentMapper.fromFirestore(
+        dogId: 'dog-a',
+        documentId: 'legacy',
+        data: data,
+      );
+      expect(item.revision.token, '0');
+    });
+
+    test('revision inválida → integrity', () {
+      expect(
+        () => HealthScheduleDocumentMapper.fromFirestore(
+          dogId: 'dog-a',
+          documentId: 'bad-rev',
+          data: fullDoc()..['revision'] = true,
+        ),
+        throwsA(
+          isA<HealthScheduleIntegrityException>().having(
+            (e) => e.field,
+            'field',
+            'revision',
+          ),
+        ),
+      );
+      expect(
+        () => HealthScheduleDocumentMapper.fromFirestore(
+          dogId: 'dog-a',
+          documentId: 'neg-rev',
+          data: fullDoc()..['revision'] = -1,
+        ),
+        throwsA(isA<HealthScheduleIntegrityException>()),
+      );
     });
 
     test('campos opcionais ausentes: documento open válido', () {

@@ -98,7 +98,8 @@ Map<String, Object?> _freezeMap(Map<String, Object?> source) =>
 /// para permitir que novos value objects compartilhados (em arquivos
 /// distintos) reutilizem a mesma política de imutabilidade. Não duplica o
 /// helper e não altera o comportamento de nenhum contrato existente.
-Map<String, Object?> freezeJsonMap(Map<String, Object?> source) => _freezeMap(source);
+Map<String, Object?> freezeJsonMap(Map<String, Object?> source) =>
+    _freezeMap(source);
 
 final class RecordedBy {
   RecordedBy({

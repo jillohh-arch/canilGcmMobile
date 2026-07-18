@@ -1,6 +1,7 @@
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'health_schedule_revision.dart';
 import 'health_v1_enums_ext.dart';
 import 'health_v1_models.dart';
 import 'health_v1_value_objects.dart';
@@ -35,6 +36,9 @@ final class HealthScheduleItem {
     this.recurrenceRule,
     this.assignedToUid,
     this.assignedToName,
+
+    /// Revisão monotônica opaca (concorrência). Legado ausente → token `0`.
+    this.revision = const HealthScheduleRevision('0'),
   }) : lifecycleStatus = lifecycleStatus,
        title = title.trim(),
        cancelReason = cancelReason?.trim(),
@@ -127,6 +131,9 @@ final class HealthScheduleItem {
   final String? recurrenceRule;
   final String? assignedToUid;
   final String? assignedToName;
+
+  /// Token opaco de revisão (backend: inteiro monotônico; legado sem campo → `0`).
+  final HealthScheduleRevision revision;
 }
 
 /// Política pura de derivação temporal conforme Domain Model §2.12 e

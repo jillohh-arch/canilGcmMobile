@@ -19,6 +19,8 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_so
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
+import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_screen.dart';
@@ -53,6 +55,13 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Source da agenda injetável (testes). Produção: [FirestoreHealthScheduleSource].
   final HealthScheduleSource? scheduleSource;
 
+  /// Gateway de mutação da Agenda (Gate 4).
+  ///
+  /// Produção: [FirebaseFunctionsHealthScheduleMutationGateway].
+  /// Testes: injete [FailClosedHealthScheduleMutationGateway] ou spy.
+  /// Nenhuma UI de mutação consome o gateway nesta fase.
+  final HealthScheduleMutationGateway? scheduleMutationGateway;
+
   /// Contexto do K9 pré-resolvido (testes). Produção: [DogViewModel].
   final HealthSummaryDogContextView? dogContextOverride;
 
@@ -66,6 +75,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.source,
     this.timelineSource,
     this.scheduleSource,
+    this.scheduleMutationGateway,
     this.dogContextOverride,
     this.onTimelineNavigate,
   });
@@ -88,6 +98,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   late final HealthScheduleSource _scheduleSource;
   late final HealthScheduleController _scheduleController;
+  late final HealthScheduleMutationGateway _scheduleMutationGateway;
 
   /// Primeira carga da timeline só após visitar Histórico (lazy).
   bool _timelinePrimed = false;
@@ -111,6 +122,11 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   @visibleForTesting
   bool get schedulePrimedForTest => _schedulePrimed;
+
+  /// Gateway permanente (ou fake injetado). Não é acionado por UI no Gate 4.
+  @visibleForTesting
+  HealthScheduleMutationGateway get scheduleMutationGatewayForTest =>
+      _scheduleMutationGateway;
 
   @override
   void initState() {
@@ -141,6 +157,11 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       source: _scheduleSource,
       temporalPolicy: healthSchedulePresentationPolicy(),
     );
+    // Gate 4: gateway real como default. Nenhuma tela/listener chama mutação
+    // automaticamente — UI de ações permanece fora de escopo (Gate 5).
+    _scheduleMutationGateway =
+        widget.scheduleMutationGateway ??
+        FirebaseFunctionsHealthScheduleMutationGateway();
     // Sem selectDog aqui: evita I/O se o usuário não abrir Agenda.
   }
 

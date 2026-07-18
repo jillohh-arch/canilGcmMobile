@@ -1,6 +1,7 @@
 import 'package:canil_gcm/features/health/data/coexistence/schedule/health_schedule_date_parse.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/health_schedule_integrity_exception.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 
@@ -125,6 +126,7 @@ abstract final class HealthScheduleDocumentMapper {
                 ? (data['assigned_to'] as Map)['name']
                 : null),
       );
+      final revision = _parseRevision(data['revision'], documentId: documentId);
 
       // migration_batch_id é canônico no schema; não entra no domínio 4A.
       return HealthScheduleItem(
@@ -151,6 +153,7 @@ abstract final class HealthScheduleDocumentMapper {
         recurrenceRule: recurrenceRule,
         assignedToUid: assignedToUid,
         assignedToName: assignedToName,
+        revision: revision,
       );
     } on HealthScheduleIntegrityException {
       rethrow;
@@ -246,5 +249,55 @@ abstract final class HealthScheduleDocumentMapper {
     if (value == null) return null;
     final s = value.toString().trim();
     return s.isEmpty ? null : s;
+  }
+
+  /// Política backend-aligned: ausente → 0; inválido → integrity (sem fallback silencioso).
+  static HealthScheduleRevision _parseRevision(
+    Object? raw, {
+    required String documentId,
+  }) {
+    if (raw == null) {
+      return HealthScheduleRevision.numeric(0);
+    }
+    if (raw is int) {
+      if (raw < 0) {
+        throw HealthScheduleIntegrityException(
+          documentId: documentId,
+          field: 'revision',
+          reason: 'revision negativa',
+        );
+      }
+      return HealthScheduleRevision.numeric(raw);
+    }
+    if (raw is num) {
+      if (raw != raw.roundToDouble() || raw < 0) {
+        throw HealthScheduleIntegrityException(
+          documentId: documentId,
+          field: 'revision',
+          reason: 'revision numérica inválida',
+        );
+      }
+      return HealthScheduleRevision.numeric(raw.toInt());
+    }
+    if (raw is String) {
+      final t = raw.trim();
+      if (t.isEmpty) {
+        return HealthScheduleRevision.numeric(0);
+      }
+      final n = int.tryParse(t);
+      if (n == null || n < 0) {
+        throw HealthScheduleIntegrityException(
+          documentId: documentId,
+          field: 'revision',
+          reason: 'revision string inválida',
+        );
+      }
+      return HealthScheduleRevision.numeric(n);
+    }
+    throw HealthScheduleIntegrityException(
+      documentId: documentId,
+      field: 'revision',
+      reason: 'revision tipo inválido (${raw.runtimeType})',
+    );
   }
 }

@@ -120,7 +120,10 @@ abstract final class HealthScheduleMutationEngine {
       return HealthScheduleMutationApplyResult(
         snapshot: current,
         wasNoOp: true,
-        operationId: command.operationId ?? current.lastLifecycleOperationId ?? 'complete-noop',
+        operationId:
+            command.operationId ??
+            current.lastLifecycleOperationId ??
+            'complete-noop',
       );
     }
     if (current.item.lifecycleStatus == ScheduleLifecycleStatus.cancelled) {
@@ -265,7 +268,9 @@ abstract final class HealthScheduleMutationEngine {
       );
     }
 
-    if (HealthScheduleMutationPolicy.isAutomaticSource(current.item.sourceType)) {
+    if (HealthScheduleMutationPolicy.isAutomaticSource(
+      current.item.sourceType,
+    )) {
       throw const HealthScheduleMutationPermissionDenied(
         'Itens automáticos da agenda não podem ser editados pelo cliente; '
         'use complete/cancel ou fluxo de origem.',

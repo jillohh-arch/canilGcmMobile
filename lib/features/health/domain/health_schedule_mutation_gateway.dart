@@ -2,19 +2,54 @@ import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_commands.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_engine.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_errors.dart';
+import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 
 /// Resultado assíncrono tipado do gateway (sucesso ou falha).
 sealed class HealthScheduleMutationResult {
   const HealthScheduleMutationResult();
 }
 
+/// Sucesso de mutação com receipt canônico (engine local ou callable remoto).
+///
+/// Callables retornam receipt enxuto (`dogId`/`scheduleId`/`revision`/
+/// `lifecycleStatus`/`wasNoOp`) — [apply] fica null nesse caminho.
+/// O engine puro preenche [apply] com o snapshot completo.
 final class HealthScheduleMutationSuccess extends HealthScheduleMutationResult {
-  const HealthScheduleMutationSuccess(this.apply);
+  const HealthScheduleMutationSuccess({
+    required this.dogId,
+    required this.scheduleId,
+    required this.revision,
+    required this.wasNoOp,
+    required this.lifecycleStatus,
+    required this.operationId,
+    this.apply,
+  });
 
-  final HealthScheduleMutationApplyResult apply;
+  factory HealthScheduleMutationSuccess.fromApply(
+    HealthScheduleMutationApplyResult apply,
+  ) {
+    return HealthScheduleMutationSuccess(
+      dogId: apply.item.dogId,
+      scheduleId: apply.item.id,
+      revision: apply.snapshot.revision,
+      wasNoOp: apply.wasNoOp,
+      lifecycleStatus: apply.item.lifecycleStatus,
+      operationId: apply.operationId,
+      apply: apply,
+    );
+  }
 
-  HealthScheduleItem get item => apply.item;
-  bool get wasNoOp => apply.wasNoOp;
+  final String dogId;
+  final String scheduleId;
+  final HealthScheduleRevision revision;
+  final bool wasNoOp;
+  final ScheduleLifecycleStatus lifecycleStatus;
+  final String operationId;
+
+  /// Snapshot completo quando produzido pelo engine local; null no receipt remoto.
+  final HealthScheduleMutationApplyResult? apply;
+
+  HealthScheduleItem? get item => apply?.item;
 }
 
 final class HealthScheduleMutationErrorResult
@@ -24,14 +59,10 @@ final class HealthScheduleMutationErrorResult
   final HealthScheduleMutationFailure failure;
 }
 
-/// Porta de mutação da Agenda — sem implementação remota no Gate 1.
+/// Porta de mutação da Agenda Preventiva.
 ///
-/// Estratégia planejada (ver relatório 4E):
-/// - complete / cancel → callable/backend (preferencial)
-/// - create manual / update open → pendente de autorização formal;
-///   preferência alinhada a callable se capabilities granulares não existirem
-///
-/// Gate 1: [FailClosedHealthScheduleMutationGateway] recusa writes.
+/// Produção (Gate 4): [FirebaseFunctionsHealthScheduleMutationGateway].
+/// Testes/harnesses: [FailClosedHealthScheduleMutationGateway] ou fakes.
 abstract interface class HealthScheduleMutationGateway {
   Future<HealthScheduleMutationResult> createManual(
     CreateManualScheduleItemCommand command,

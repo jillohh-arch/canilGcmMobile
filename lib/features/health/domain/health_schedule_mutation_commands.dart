@@ -1,6 +1,9 @@
 import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+
+export 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
 
 /// Comandos de intenção do **cliente** (Fase 4E Gate 1).
 ///
@@ -27,51 +30,6 @@ import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 /// futuro. Nunca é preenchido a partir de campos arbitrários do form.
 /// Nenhum gateway remoto deve aceitar UID/nome/timestamp de auditoria
 /// vindos do cliente como autoridade.
-
-/// Revisão opaca para optimistic concurrency (neutra de backend).
-///
-/// Não é `DocumentSnapshot`, nem `Timestamp` Firestore.
-/// O backend futuro pode materializar como contador, updateTime ou token.
-final class HealthScheduleRevision {
-  const HealthScheduleRevision(this.token);
-
-  /// Token opaco não vazio.
-  final String token;
-
-  /// Atalho de teste: revisão numérica serializada.
-  factory HealthScheduleRevision.numeric(int value) {
-    if (value < 0) {
-      throw const HealthDomainException(
-        'invalid_revision',
-        'revisão numérica não pode ser negativa',
-      );
-    }
-    return HealthScheduleRevision('$value');
-  }
-
-  /// Próxima revisão após mutação bem-sucedida (helper de teste/engine).
-  /// Backend real pode usar outra função de avanço.
-  HealthScheduleRevision nextNumeric() {
-    final n = int.tryParse(token);
-    if (n == null) {
-      throw const HealthDomainException(
-        'invalid_revision',
-        'nextNumeric exige token numérico',
-      );
-    }
-    return HealthScheduleRevision.numeric(n + 1);
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      other is HealthScheduleRevision && other.token == token;
-
-  @override
-  int get hashCode => token.hashCode;
-
-  @override
-  String toString() => 'HealthScheduleRevision($token)';
-}
 
 /// Snapshot de estado para o engine puro (item + metadados de concorrência).
 ///
@@ -154,6 +112,7 @@ final class CreateManualScheduleItemCommand {
     this.dueUntil,
     String? notes,
     String? caseId,
+
     /// ID opcional do documento; se null, a camada de persistência gera.
     String? clientGeneratedId,
   }) : dogId = dogId.trim(),
