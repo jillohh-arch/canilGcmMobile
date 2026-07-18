@@ -2,10 +2,14 @@
 
 | Campo | Valor |
 |-------|-------|
-| Status | **Gate 3 aberto — smoke autenticado real pendente** |
+| Status | **Gate 3 aprovado — smoke autenticado real concluído** |
 | Data | 2026-07-17 |
 | Branch | `feature/health-v1-foundation` |
 | HEAD Git inicial | `169b7f57d31fb7a3a9d9dd2d97f7f0e5333259a0` |
+| HEAD final / commit de reconciliação | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
+| HEAD deployado | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
+| Mensagem | `fix(health): validate preventive schedule callables` |
+| Tracking pós-push | `origin/feature/health-v1-foundation` — `0/0` |
 | Commit base Gate 2 | `feat(health): add preventive schedule callables` |
 | Deploy | **sim** (filtrado, 4 callables) |
 | Projeto | `canil-gcm` |
@@ -207,6 +211,12 @@ Campos confirmados: `actor_uid`, `operation_type`, `fingerprint`, `processed_at`
 
 ## 7. Deploy filtrado
 
+### Redeploy de reconciliação
+
+O redeploy abaixo foi executado **depois** do commit e push
+`4b56587ab15d295788e5c9950cacc0030ec8e2aa`, a partir de working tree limpo e
+branch sincronizada `0/0`.
+
 ### Comando exato
 
 ```powershell
@@ -222,6 +232,23 @@ Campos confirmados: `actor_uid`, `operation_type`, `fingerprint`, `processed_at`
 +  functions[healthScheduleCancel(southamerica-east1)] Successful create operation.
 +  Deploy complete!
 Project: canil-gcm
+```
+
+Resultado da reconciliação: as quatro Functions foram atualizadas com sucesso.
+Os logs administrativos confirmam estado `ACTIVE`, mesmo hash de pacote Firebase
+`296c925d0ed989a99c66c694bbb209337292d3b6` e os seguintes horários UTC:
+
+| Function | updateTime | Revisão |
+|----------|------------|---------|
+| `healthScheduleCreateManual` | `2026-07-17T17:25:23.002655233Z` | `healthschedulecreatemanual-00002-niq` |
+| `healthScheduleUpdateOpen` | `2026-07-17T17:26:03.119015554Z` | `healthscheduleupdateopen-00002-xel` |
+| `healthScheduleComplete` | `2026-07-17T17:26:03.183399721Z` | `healthschedulecomplete-00002-hib` |
+| `healthScheduleCancel` | `2026-07-17T17:26:03.270470959Z` | `healthschedulecancel-00002-pig` |
+
+```text
+COMMIT DE RECONCILIAÇÃO: 4b56587ab15d295788e5c9950cacc0030ec8e2aa
+HEAD DEPLOYADO: 4b56587ab15d295788e5c9950cacc0030ec8e2aa
+DEPLOY EXECUTADO DEPOIS DESSE COMMIT: SIM
 ```
 
 ### Confirmação `functions:list`
@@ -262,21 +289,32 @@ Sem write.
 
 ### B/C. Autenticado com usuário real
 
-**Não executado nesta sessão** por ausência de token Firebase de usuário
-operacional real no ambiente e de sessão autenticada reutilizável no navegador.
+Executado em **2026-07-17**, em dispositivo Android físico, reutilizando a sessão
+Firebase Auth já ativa no aplicativo. O SDK `cloud_functions` anexou a sessão
+automaticamente; nenhum token foi obtido, copiado, inspecionado ou registrado.
 
-Caminho autenticado completo (validation/not-found controlado sem write feliz) permanece coberto pelo **Emulator** e pelos testes unitários de handlers.
+K9 acessível: **CONFIRMADO**. Identificador anonimizado neste relatório.
 
-Observação residual (não é falha de segurança dos callables):
+| Function | Payload controlado | Resultado tipado |
+|----------|--------------------|------------------|
+| `healthScheduleCreateManual` | campo server-owned `revision` em payload deliberadamente inválido | `invalid-argument` |
+| `healthScheduleUpdateOpen` | `scheduleId` sintético inexistente + `operationId` válido | `not-found` |
+| `healthScheduleComplete` | `scheduleId` sintético inexistente + `operationId` válido | `not-found` |
+| `healthScheduleCancel` | `scheduleId` sintético inexistente + `operationId` válido | `not-found` |
 
-* smoke autenticado em produção deve ser refeito por humano com sessão real autorizada, ainda sem write feliz artificial.
+Resultado agregado do harness transitório: **PASS**.
+
+O harness foi removido integralmente após a execução. Não permaneceu gateway,
+botão, rota, tela ou arquivo auxiliar no aplicativo.
 
 ### Zero seed / zero write feliz em produção
 
 * nenhum item de agenda criado em produção nesta rodada;
 * nenhum claim alterado;
 * nenhum usuário artificial criado;
-* smoke usou apenas falha pré-mutação (unauthenticated).
+* smoke autenticado usou apenas validação e `not-found` pré-mutação;
+* consulta administrativa read-only por prefixo transitório confirmou:
+  `health_schedule = 0`, `operations = 0`, `auditLogs = 0`.
 
 ---
 
@@ -286,10 +324,17 @@ Revisão `firebase functions:log --project canil-gcm --only healthSchedule*`:
 
 * create operations bem-sucedidas (ACTIVE);
 * startup TCP probe OK nas quatro Functions;
-* invocações smoke: `auth: MISSING` + `Callable request verification passed`;
+* invocações do smoke autenticado: `auth: VALID` nas quatro Functions;
+* Create chegou a `invalid-argument`; Update/Complete/Cancel chegaram a `not-found`;
 * **sem** stack trace de inicialização;
 * **sem** erro de dependência ausente;
+* **sem** erro interno dos handlers;
 * **sem** indício de permission bypass.
+
+Observação de ambiente: o build debug emitiu `app: INVALID` para App Check porque
+o debug provider do dispositivo não está cadastrado. O enforcement está
+desabilitado e a própria plataforma registrou a continuidade das requisições.
+Esse aviso não alterou `auth: VALID` nem os resultados tipados acima.
 
 ---
 
@@ -320,10 +365,12 @@ Revisão `firebase functions:log --project canil-gcm --only healthSchedule*`:
 | seed produção | **não** |
 | registro técnico permanente em prod | **não** |
 | callable sem auth | denied (401) |
-| mobile conectado | **não** |
+| mobile conectado permanentemente | **não** (harness removido) |
 | UI adicionada | **não** |
 | idempotência Emulator | **pass** |
 | audit não duplicada (Emulator) | **pass** |
+| smoke autenticado real | **pass** |
+| writes residuais do smoke | **zero** |
 
 ---
 
@@ -335,6 +382,8 @@ Revisão `firebase functions:log --project canil-gcm --only healthSchedule*`:
 | `npm --prefix functions run build` | **ok** |
 | Emulator callables integration | **26/26** |
 | `flutter test .../health_schedule_mutation_engine_test.dart` | **28 passed** |
+| `flutter test test/features/health` | **all passed** |
+| `flutter test` | **995 passed, 1 skipped** |
 | `git diff --check` | **ok** (apenas avisos CRLF) |
 
 ---
@@ -365,27 +414,32 @@ M  tools/rules_tests/package-lock.json
 | 1 | Emulator: `Timestamp`/`FieldValue` namespace quebrados no path de mutação | imports modulares `firebase-admin/firestore` |
 | 2 | Emulator: `instanceof HttpsError` frágil | `isHttpsError` por shape |
 | 3 | Porta 8080 ocupada na 2ª corrida | kill processo stale + reexecução |
-| 4 | Smoke autenticado prod sem ADC | documentado residual; Emulator cobre auth path |
+| 4 | Requisito de smoke autenticado em produção | executado pelo app em dispositivo físico com sessão real; `auth: VALID` |
 
 ---
 
-## 15. Pendência para fechamento
+## 15. Fechamento do gate
 
-1. Smoke autenticado real em produção (validation/not-found) com usuário real
-   autorizado e K9 realmente acessível, sem write feliz artificial.
-2. Revisar os logs das quatro Functions após esse smoke.
-3. Manter Gate 4, gateway Flutter e UI fora de escopo até o fechamento formal.
+1. Smoke autenticado real executado com usuário autorizado e K9 acessível.
+2. Logs das quatro Functions revisados após o smoke.
+3. Ausência de writes residuais confirmada administrativamente.
+4. Gate 4, gateway Flutter e UI permanecem fora de escopo.
 
 ---
 
 ## 16. Gate final
 
 ```text
-FASE 4E — GATE 3 AINDA NÃO PRONTO PARA FECHAMENTO
+FASE 4E — GATE 3 APROVADO
 ```
 
 Callables da Agenda reconciliados com Git, validados no Emulator integrado e
-com smoke unauthenticated em produção. O smoke autenticado real permanece
-pendente; por isso o Gate 3 continua aberto.
+confirmados em produção por smoke autenticado real sem write feliz artificial.
+As quatro invocações tiveram autenticação válida e retornos funcionais tipados;
+as consultas pós-smoke confirmaram zero resíduos.
 
-Mobile **não** conectado. UI **não** adicionada. Rules client write **continuam negadas**.
+```text
+SMOKE AUTENTICADO REAL: APROVADO
+```
+
+Mobile **não permanece conectado**. UI **não** adicionada. Rules client write **continuam negadas**.
