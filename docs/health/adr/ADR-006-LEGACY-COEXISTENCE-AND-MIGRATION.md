@@ -119,11 +119,11 @@ O mobile NÃO faz dual-write. A migração é responsabilidade exclusiva do back
 | 1 | health_events | `dogs/{dogId}/health_events/{id}` | Ativo (CRUD) | Principal | **Todos os `health_events` anteriores ao go-live → `dogs/{dogId}/legacy_health_records/{recordId}`.** Nenhum `ClinicalEvent` retroativo é criado; nenhum `clinical_cases` retroativo é criado a partir de `health_events`. Operações administrativas futuras podem preencher `case_id`, atualizar `normalized_view` ou criar evento clínico curado separado quando necessário. |
 | 2 | weight_records | `dogs/{dogId}/weight_records/{id}` | Ativo (canônico) | Peso | `weight_records` (mantém, normaliza) |
 | 3 | weight_history | `dogs/{dogId}/weight_history/{id}` | Espelho legado | Duplicata | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| 4 | feeding_events | `dogs/{dogId}/feeding_events/{id}` | Ativo (canônico) | Refeições | `meal_logs` (renomeia/normaliza) |
-| 5 | feedings | `dogs/{dogId}/feedings/{id}` | Espelho legado | Duplicata | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| 6 | nutritional_prescriptions | `dogs/{dogId}/nutritional_prescriptions/{id}` | Ativo (canônico) | Planos | `nutrition_plans` (renomeia/normaliza) |
-| 7 | nutrition_prescriptions | `dogs/{dogId}/nutrition_prescriptions/{id}` | Fallback legado | Duplicata | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| 8 | nutrition_supplements | `dogs/{dogId}/nutrition_supplements/{id}` | Ativo | Suplementos | `supplement_logs` (normaliza) |
+| 4 | feeding_events | `dogs/{dogId}/feeding_events/{id}` | **LEGACY CURRENT** (ops dual-write mobile ainda ativo pré-cutover) | Refeições | `meal_logs` — HEALTH V1 TARGET; backfill conservador (offered=amount_grams; sem occurrence inventada) |
+| 5 | feedings | `dogs/{dogId}/feedings/{id}` | Espelho legado | Duplicata | Não migrado como fonte canônica; preservado read-only |
+| 6 | nutritional_prescriptions | `dogs/{dogId}/nutritional_prescriptions/{id}` | **LEGACY CURRENT** ops | Planos | `nutrition_plans` — TARGET; `vigent_*`→`valid_*` |
+| 7 | nutrition_prescriptions | `dogs/{dogId}/nutrition_prescriptions/{id}` | Fallback legado | Duplicata | Read-only histórico |
+| 8 | nutrition_supplements | `dogs/{dogId}/nutrition_supplements/{id}` | **LEGACY CURRENT** (regime “em uso”) | Regime, **não** admin pontual | **NÃO** backfill automático → `supplement_logs` (ZERO admin inventada); adapter de estado / curadoria de regimen |
 | 9 | vacinas | `vacinas/{id}` (raiz) | Leitura legacy | Vacinas antigas | Backfill → `vaccination_records/{vaccinationId}` quando dados suficientes; caso contrário, `legacy_health_records/{recordId}` (read-only). **Não** backfilar para `clinical_cases/events` nem para "caso preventivo". |
 | 10 | documentos | `documentos/{id}` (raiz) | Ativo (upload) | Documentos | `health_documents` (migra com referências) |
 | 11 | dogs/{dogId}/documents | Subcoleção | Regras sem uso mobile | Desconhecido | Avaliar no inventário real |
@@ -424,11 +424,42 @@ Cada transição de estágio gera um ClinicalEvent imutável. Não se confunde c
 | `health_events` (qualquer tipo) | `dogs/{dogId}/legacy_health_records/{recordId}` | **Contrato conservador único:** todos os `health_events` anteriores ao go-live vão para `legacy_health_records` com `original_payload` preservado. Nenhum `ClinicalEvent` retroativo é criado em `clinical_cases/events`. Operações administrativas futuras podem vincular `case_id`, atualizar `normalized_view` ou criar evento clínico curado separado quando clinicamente justificado. |
 | `weight_records` | `weight_records` (normalizado) | In-place normalization + campos extras |
 | `weight_history` | — | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| `feeding_events` | `meal_logs` | Rename + normalização |
-| `feedings` | — | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| `nutritional_prescriptions` | `nutrition_plans` | Rename + normalização |
-| `nutrition_prescriptions` | — | Não migrado como fonte canônica; preservado read-only para auditoria histórica |
-| `nutrition_supplements` | `supplement_logs` | Normalização de campos |
+| `feeding_events` | `meal_logs` | Rename + normalização conservadora (5B D10/D32); **sem** inventar plan/occurrence |
+| `feedings` | — | Não migrado como fonte canônica; read-only histórico |
+| `nutritional_prescriptions` | `nutrition_plans` | Rename + normalização (valid_*, meal_schedule, 1 active) |
+| `nutrition_prescriptions` | — | Read-only histórico |
+| `nutrition_supplements` | **não** `supplement_logs` automático | Regime legado ≠ admin pontual; ZERO SupplementLog retroativo (5B D16) |
+
+### Nutrição Health v1 — coexistência e cutover (Fase 5B)
+
+```text
+NOVO CÓDIGO (contrato canônico):
+  ZERO dual-write permanente
+
+LEGACY CURRENT (pré-cutover):
+  NutritionService ainda pode dual-write feeding_events + feedings
+  — não estender; cutover elimina writes legados
+
+Migração:
+  single-write canônico
+  dual-read temporário (canônico vence em conflito)
+  backfill idempotente (após inventário prod)
+  paridade de leitores
+  cutover
+  legado read-only
+  remoção futura de dual-write e paths mortos
+```
+
+Paths **HEALTH V1 TARGET:**
+
+```text
+dogs/{dogId}/nutrition_plans/{planId}
+dogs/{dogId}/meal_logs/{mealId}
+dogs/{dogId}/supplement_logs/{logId}
+```
+
+Writers TARGET: backend callables (plan Web-originated; meal/supplement Mobile-initiated).
+Mobile plan: **read-only**.
 | `vacinas` (raiz) | `vaccination_records/{vaccinationId}` (dados suficientes) ou `legacy_health_records/{recordId}` (incompletos) | Migração direta para VaccinationRecord quando há dados suficientes; caso contrário preservada em legacy_health_records read-only |
 | `documentos` (raiz) | `health_documents` | Backfill; URLs de Storage mantidas |
 | `dogs/{dogId}/documents` | Avaliar (possivelmente vazio) | Inventário na Fase 0 |

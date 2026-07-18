@@ -236,18 +236,36 @@ schedule: {
 
 | Aspecto | Definição |
 |---------|-----------|
-| **Responsabilidade** | Plano alimentar vigente definido pela Web, executado pelo Mobile |
-| **Identificador** | `{dogId}/nutrition_plans/{id}` — UUID |
-| **Invariantes** | (1) Apenas Web pode criar/editar. (2) Apenas um plano pode estar `active` por vez. (3) Ao ativar novo, o anterior vira `superseded`. |
-| **Estados** | `active`, `superseded`, `cancelled` |
-| **Transições** | `active→superseded` (quando novo plano ativa), `active→cancelled` |
-| **Campos obrigatórios** | `food_type`, `amount_grams_per_day`, `meals_per_day`, `vigent_from`, `recorded_by`, `schema_version` |
-| **Campos opcionais** | `vigent_until`, `hydration_ml`, `special_instructions`, `professional`, `source_document`, `attachment_refs`, `legacy_source`, `legacy_id` |
-| **Valores derivados** | `amount_per_meal` (total / meals_per_day), `is_current` |
+| **Responsabilidade** | Plano alimentar vigente **definido pela Web** (backend), **consultado e executado pelo Mobile** |
+| **Identificador** | `dogs/{dogId}/nutrition_plans/{planId}` |
+| **Invariantes** | (1) Writer canônico: **backend** (Web-originated); Mobile **read-only**. (2) No máximo **1** plano `active` por cão. (3) Ao ativar novo, o anterior `active` → `superseded` (server-orchestrated). (4) **Plano com início futuro não suportado no v1:** na ativação como `active`, `valid_from <= server_now`. (5) `valid_until == null` ou `valid_until > valid_from`. (6) Plano `active` não pode nascer já expirado. |
+| **Estados** | `active`, `superseded`, `cancelled` — **sem** status `scheduled` no v1 |
+| **Transições** | `active→superseded` (novo plano ativa), `active→cancelled` (com evidência) |
+| **Campos obrigatórios** | `food_type`, `amount_grams_per_day`, `meals_per_day`, `meal_schedule` (slots explícitos), `valid_from`, `timezone`, `status`, `recorded_by`, `schema_version`, `revision` |
+| **Campos opcionais** | `valid_until`, `hydration_ml`, `special_instructions`, `professional`, `source_document`, `attachment_refs`, `supplements[]` (regime prescrito embutido), `legacy_source`, `legacy_id` |
+| **Valores derivados** | `amount_per_meal` / coerência com `sum(meal_schedule.target_grams)` quando schedule completo; status de slot no dia = **derivado** (não persistido no plano) |
+| **Timezone** | Default de domínio atual: `America/Sao_Paulo`. “Hoje” e `local_service_date` usam o timezone do plano |
 | **Dados sensíveis** | Nenhum |
-| **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` (admin Web) |
-| **Auditoria** | Versionamento por documento (novo plano não edita o anterior) |
-| **Soft delete** | `deleted_at`, `deleted_by`, `delete_reason` |
+| **Autoria** | `recorded_by: RecordedBy` (admin Web via backend) |
+| **Auditoria** | Versionamento por documento + `auditLogs` canônico nas mutações; `revision` monotônica (create = 1) |
+| **Soft delete** | Preferir lifecycle `cancelled`/`superseded`; soft-delete só com política explícita |
+
+**`meal_schedule[]` (slots — identidade estável, não índice do array):**
+
+```text
+id              string   // estável na versão do plano
+period          MealPeriod  // morning|afternoon|evening|night|extra
+scheduled_time  "HH:mm"  // interpretado no timezone do plano
+target_grams    number
+```
+
+**`supplements[]` (regime prescrito — ≠ SupplementLog):**
+
+```text
+id, name, dose, unit, frequency, instructions?, valid_from?, valid_until?
+```
+
+Legado `vigent_from` / `vigent_until` (paths `nutritional_prescriptions` / `nutrition_prescriptions`) mapeia via adapter para `valid_from` / `valid_until` — **não** é o schema canônico novo.
 
 ---
 
@@ -255,17 +273,41 @@ schedule: {
 
 | Aspecto | Definição |
 |---------|-----------|
-| **Responsabilidade** | Registro de refeição executada pelo condutor |
-| **Identificador** | `{dogId}/meal_logs/{id}` — UUID |
-| **Invariantes** | (1) `fed_at` não pode ser futuro. (2) `amount_grams` > 0. (3) Pode referenciar plano vigente no momento. |
-| **Estados** | Nenhum estado além de soft delete |
-| **Campos obrigatórios** | `period` (enum: morning, afternoon, evening, night, extra), `amount_grams`, `fed_at`, `recorded_by`, `schema_version` |
-| **Campos opcionais** | `plan_id`, `prescription_amount_at_time`, `divergence_percent`, `divergence_reason`, `attachment_refs`, `observations`, `legacy_source`, `legacy_id` |
-| **Valores derivados** | `is_conforming` (divergence < threshold) |
+| **Responsabilidade** | Registro de refeição **executada** (planejada ou avulsa) |
+| **Identificador** | `dogs/{dogId}/meal_logs/{mealId}` |
+| **Invariantes** | (1) `offered_grams > 0`. (2) Se `consumed_grams` presente: `0 <= consumed_grams <= offered_grams`. (3) `fed_at` não pode ser futuro (autoridade server). (4) Planejado: no máximo **1** MealLog canônico **não cancelado** por `meal_occurrence_id`. (5) `idempotencyKey` (transporte) **≠** `meal_occurrence_id` (identidade semântica). (6) Avulsa: `plan_id` / `planned_meal_id` / `meal_occurrence_id` ausentes. |
+| **Estados** | Soft cancel / correção auditada; **sem** hard delete. Majoritariamente append-only |
+| **Campos obrigatórios (create novo)** | `period`, `offered_grams`, `acceptance`, `fed_at`, `recorded_by`, `schema_version`, `revision` |
+| **Campos opcionais** | `plan_id`, `planned_meal_id`, `meal_occurrence_id`, `scheduled_for`, `consumed_grams`, `prescription_amount_at_time`, `divergence_percent`, `divergence_reason`, `observations`, `attachment_refs`, `legacy_photo_balance_url`, `legacy_source`, `legacy_id`, `legacy_amount_grams`, `source` |
+| **Acceptance** | `full` \| `partial` \| `refused` \| `unknown` (regras D42: refused ⇒ consumed=0; full/partial permitem consumed null se não mensurado; unknown preferencialmente null) |
+| **Valores derivados** | `is_conforming` (threshold produto default ±10% vs snapshot); status de slot do dia (`pending`/`completed`/`late`/…) derivado na leitura |
 | **Dados sensíveis** | Nenhum |
-| **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` |
-| **Auditoria** | Append-only |
-| **Soft delete** | `deleted_at`, `deleted_by`, `delete_reason` |
+| **Autoria** | `recorded_by` (backend preenche) |
+| **Writer** | **Callable backend** (Mobile-initiated). **Não** Firestore client write no contrato novo |
+| **Auditoria** | `auditLogs` canônico; 1 audit por op lógica; 0 em replay |
+| **Soft delete / cancel** | Soft cancellation / audited correction — sem hard delete |
+
+**Ocorrência planejada (`meal_occurrence_id`) — identidade conceitual:**
+
+```text
+dog_id + plan_id + planned_meal_id + local_service_date
+```
+
+`local_service_date` no **timezone do plano** (não “UTC date” crua).
+Algoritmo de hash/ID físico: **não** congelado no Domain Model (implementação).
+
+**Planejado — autoridade backend (cliente NÃO é fonte de verdade):**
+
+```text
+period, scheduled_for, prescription_amount_at_time, meal_occurrence_id
+```
+
+Cliente envia: `plan_id`, `planned_meal_id`, execução (`offered_grams`, `consumed_grams?`, `acceptance`, `fed_at`, …) + `idempotencyKey`.
+
+**Legado (`feeding_events` / `feedings`):** `amount_grams` → backfill conservador `offered_grams=amount_grams`, `consumed_grams=null`, `acceptance=unknown`, **sem** inventar `plan_id` / `planned_meal_id` / `meal_occurrence_id`.
+
+**MealPeriod wire canônico:** `morning|afternoon|evening|night|extra`.
+Legado: `manha→morning`, `almoco→afternoon`, `noite→night`. Labels PT-BR só na UI.
 
 ---
 
@@ -273,17 +315,27 @@ schedule: {
 
 | Aspecto | Definição |
 |---------|-----------|
-| **Responsabilidade** | Registro de administração de suplemento |
-| **Identificador** | `{dogId}/supplement_logs/{id}` — UUID |
-| **Invariantes** | (1) Deve referenciar um suplemento conhecido (nome + dose). (2) `administered_at` não pode ser futuro. |
-| **Estados** | Nenhum estado além de soft delete |
-| **Campos obrigatórios** | `supplement_name`, `dose`, `administered_at`, `recorded_by`, `schema_version` |
-| **Campos opcionais** | `notes`, `batch_number`, `protocol_id`, `legacy_source`, `legacy_id` |
+| **Responsabilidade** | **Administração pontual** de suplemento efetivamente realizada — **≠** regime “em uso” |
+| **Identificador** | `dogs/{dogId}/supplement_logs/{logId}` |
+| **Invariantes** | (1) Representa um ato em `administered_at`. (2) `administered_at` não futuro. (3) **Não** backfill a partir de `nutrition_supplements` (regime legado) — isso inventaria administrações. |
+| **Estados** | Soft cancel / correção auditada; sem hard delete |
+| **Campos obrigatórios** | `supplement_name` (ou snapshot), `dose`, `unit`, `administered_at`, `recorded_by`, `schema_version`, `revision` |
+| **Campos opcionais** | `nutrition_plan_id`, `supplement_regimen_id` (id em `NutritionPlan.supplements[]`), `notes`, `batch_number`, `protocol_id`, `legacy_source`, `legacy_id` |
 | **Valores derivados** | Nenhum |
 | **Dados sensíveis** | Nenhum |
-| **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` |
-| **Auditoria** | Append-only |
-| **Soft delete** | `deleted_at`, `deleted_by`, `delete_reason` |
+| **Autoria** | `recorded_by` |
+| **Writer** | **Callable backend** (Mobile-initiated) |
+| **Auditoria** | `auditLogs` canônico |
+| **Soft delete** | Soft cancel — sem hard delete |
+
+**Regime vs log:**
+
+```text
+NutritionPlan.supplements[]     = regime prescrito (Web define)
+SupplementLog                   = administração pontual (Mobile executa via backend)
+nutrition_supplements (legado)  = estado “em uso” → adapter / curadoria de regime;
+                                  ZERO SupplementLog retroativo automático
+```
 
 ---
 
@@ -511,7 +563,9 @@ Ver §2.14 acima.
 | `ScheduleType` | dose, vaccination, exam, consultation, weighing, reevaluation, deworming, bath, general | Tipo de agendamento |
 | `ScheduleSourceType` | treatment_protocol, clinical_case, exam_process, preventive, manual | Origem do item |
 | `DocumentType` | prescription, report, certificate, exam_image, exam_pdf, photo, vaccination_card, surgical_report, other | Tipo de documento |
-| `MealPeriod` | morning, afternoon, evening, night, extra | Período da refeição |
+| `MealPeriod` | morning, afternoon, evening, night, extra | Período da refeição (wire EN; legado manha/almoco/noite; labels PT só UI) |
+| `MealAcceptance` | full, partial, refused, unknown | Aceitação da refeição (MealLog) |
+| `NutritionPlanStatus` | active, superseded, cancelled | Lifecycle do plano (sem scheduled no v1) |
 | `WeightContext` | routine, clinical, pre_op, post_op | Contexto da pesagem |
 | `AmendmentType` | correction, addendum, complement | Tipo de adendo |
 | `OpeningType` | incident, consultation, preventive, administrative | Abertura do caso |

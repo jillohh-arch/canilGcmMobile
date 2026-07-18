@@ -300,81 +300,115 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 
 ---
 
-### 2.8 nutrition_plans/{id}
+### 2.8 nutrition_plans/{planId}
+
+Path: `dogs/{dogId}/nutrition_plans/{planId}`
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
-| status | string (enum) | ✅ | active, superseded, cancelled |
+| status | string (enum) | ✅ | `active` \| `superseded` \| `cancelled` (sem `scheduled` no v1) |
 | food_type | string | ✅ | |
-| amount_grams_per_day | number | ✅ | |
-| meals_per_day | number | ✅ | |
-| vigent_from | timestamp | ✅ | |
-| vigent_until | timestamp | ❌ | |
+| amount_grams_per_day | number | ✅ | Agregado; coerente com schedule quando completo |
+| meals_per_day | number | ✅ | Agregado; tipicamente `meal_schedule.length` |
+| meal_schedule | array | ✅ | Slots com `id` estável, `period`, `scheduled_time` ("HH:mm"), `target_grams` |
+| supplements | array | ❌ | Regime prescrito embutido (≠ supplement_logs) |
+| valid_from | timestamp | ✅ | Ativação `active`: `valid_from <= server_now` (sem plano futuro no v1) |
+| valid_until | timestamp | ❌ | null ou `> valid_from` |
+| timezone | string | ✅ | Default domínio: `America/Sao_Paulo` |
 | hydration_ml | number | ❌ | |
 | special_instructions | string | ❌ | |
-| professional | ProfessionalIdentity | ❌ | Se definido por nutricionista |
+| professional | ProfessionalIdentity | ❌ | |
 | source_document | HealthDocumentRef | ❌ | |
-| attachment_refs | array of health_document_id | ❌ | Referências a HealthDocument (substitui report_url) |
-| recorded_by | RecordedBy | ✅ | Quem registrou |
-| created_at | timestamp | ✅ | |
-| deleted_at | timestamp | ❌ | Soft delete |
+| attachment_refs | array of health_document_id | ❌ | |
+| recorded_by | RecordedBy | ✅ | |
+| revision | number | ✅ | Create = 1; monotônico |
+| created_at | timestamp | ✅ | Server |
+| deleted_at | timestamp | ❌ | Preferir lifecycle status |
 | deleted_by | RecordedBy | ❌ | |
 | delete_reason | string | ❌ | |
 | migration_batch_id | string | ❌ | |
+| legacy_source / legacy_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Web exclusivamente (admin).
+**Escritor canônico:** backend / Web-originated (callable ou server-orchestrated).
+**Mobile:** **read-only**. **Não** client write no contrato novo.
 **Leitor:** Mobile, Web.
-**Índices:** `status ASC, vigent_from DESC`.
+**Índices:** `status ASC, valid_from DESC`.
+**Legado (coexistência):** `nutritional_prescriptions` (ops) + `nutrition_prescriptions` (fallback); campos `vigent_*` só no legado/adapter.
 
 ---
 
-### 2.9 meal_logs/{id}
+### 2.9 meal_logs/{mealId}
+
+Path: `dogs/{dogId}/meal_logs/{mealId}`
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
-| period | string (enum) | ✅ | morning, afternoon, evening, night, extra |
-| amount_grams | number | ✅ | |
+| period | string (enum) | ✅ | morning…extra; **planejado: server-derived do slot** |
+| offered_grams | number | ✅ | > 0 |
+| consumed_grams | number | ❌ | Se presente: `0 <= x <= offered_grams` |
+| acceptance | string (enum) | ✅ | full \| partial \| refused \| unknown |
 | fed_at | timestamp | ✅ | |
-| recorded_by | RecordedBy | ✅ | |
-| plan_id | string | ❌ | Ref ao plano vigente |
-| prescription_amount_at_time | number | ❌ | Snapshot do plano |
+| plan_id | string | ❌ | Vínculo opcional |
+| planned_meal_id | string | ❌ | Slot id no plano |
+| meal_occurrence_id | string | ❌ | Conceitual: dog+plan+slot+local_service_date; ≤1 log **não cancelado** por occurrence |
+| scheduled_for | timestamp | ❌ | **Server-derived** se planejado |
+| prescription_amount_at_time | number | ❌ | Snapshot `target_grams` do slot (**server**) |
 | divergence_percent | number | ❌ | |
 | divergence_reason | string | ❌ | |
-| attachment_refs | array of health_document_id | ❌ | Referências a HealthDocument (substitui photo_url) |
 | observations | string | ❌ | |
-| deleted_at | timestamp | ❌ | Soft delete |
-| deleted_by | RecordedBy | ❌ | |
-| delete_reason | string | ❌ | |
+| attachment_refs | array | ❌ | |
+| legacy_photo_balance_url | string | ❌ | Coexistência de `photo_balance_url` legado |
+| recorded_by | RecordedBy | ✅ | Server |
+| revision | number | ✅ | Create = 1 |
+| source | string | ❌ | manual \| legacy_migration \| … |
+| legacy_amount_grams | number | ❌ | Preserva bruto do legado |
+| deleted_at / cancel fields | — | ❌ | Soft cancel; sem hard delete cliente |
 | migration_batch_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Mobile.
+**Escritor canônico:** **callable backend** (Mobile-initiated). **Não** Firestore client write no contrato novo.
 **Leitor:** Mobile, Web.
-**Índices:** `deleted_at ASC, fed_at DESC`; `fed_at DESC` (stream do dia).
+**Índices:** `fed_at DESC`; `meal_occurrence_id ASC` (unicidade lógica enforced no backend); `deleted_at ASC, fed_at DESC`.
+**Legado (coexistência):** `feeding_events` (ops dual-write atual) + `feedings` (espelho). Backfill: `offered=amount_grams`, `consumed=null`, `acceptance=unknown`, **sem** inventar occurrence/plan link.
+**Storage futuro:** `dogs/{dogId}/meal_attachments/...` (legado: `feeding_photos` + `photo_balance_url`).
+
+**Identidade:**
+
+```text
+idempotencyKey  = transporte/operação
+meal_occurrence_id = identidade semântica da refeição planejada no dia local
+```
 
 ---
 
-### 2.10 supplement_logs/{id}
+### 2.10 supplement_logs/{logId}
+
+Path: `dogs/{dogId}/supplement_logs/{logId}`
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
-| supplement_name | string | ✅ | |
-| dose | string | ✅ | Texto descritivo da dose |
-| administered_at | timestamp | ✅ | |
+| supplement_name | string | ✅ | Snapshot legível |
+| dose | number ou string | ✅ | Preferir number + unit no canônico |
+| unit | string (enum) | ✅ | |
+| administered_at | timestamp | ✅ | Administração pontual |
+| nutrition_plan_id | string | ❌ | |
+| supplement_regimen_id | string | ❌ | Id em plan.supplements[] |
 | recorded_by | RecordedBy | ✅ | |
+| revision | number | ✅ | Create = 1 |
 | notes | string | ❌ | |
 | batch_number | string | ❌ | |
 | protocol_id | string | ❌ | |
-| deleted_at | timestamp | ❌ | Soft delete |
+| deleted_at | timestamp | ❌ | Soft cancel |
 | deleted_by | RecordedBy | ❌ | |
 | delete_reason | string | ❌ | |
 | migration_batch_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Mobile.
+**Escritor canônico:** **callable backend**.
 **Leitor:** Mobile, Web.
 **Índices:** `administered_at DESC`.
+**Legado:** `nutrition_supplements` = **regime/estado em uso** — **ZERO** backfill automático para `supplement_logs` (não inventar administração).
 
 ---
 
@@ -679,10 +713,11 @@ Reapresenta o ReadinessSnapshot consolidado (readiness_status, indicadores, etc.
 | `dogs/{dogId}/exams` (se existir como subcollection) | `clinical_cases/{caseId}/exams` | Migração para subcoleção de caso; sem exam_group_id |
 | `dogs/{dogId}/weight_records` | `weight_records` (normalizado) | Adicionar campos |
 | `dogs/{dogId}/weight_history` | — | Não migrado como fonte canônica; preservado read-only durante todo o v1 |
-| `dogs/{dogId}/feeding_events` | `meal_logs` | Rename + normalização |
-| `dogs/{dogId}/feedings` | — | Não migrado como fonte canônica; preservado read-only durante todo o v1 |
-| `dogs/{dogId}/nutritional_prescriptions` | `nutrition_plans` | Rename + normalização |
-| `dogs/{dogId}/nutrition_supplements` | `supplement_logs` | Normalização |
+| `dogs/{dogId}/feeding_events` | `meal_logs` | Rename + normalização conservadora (`offered_grams=amount_grams`, `consumed=null`, `acceptance=unknown`; **sem** inventar plan/occurrence) |
+| `dogs/{dogId}/feedings` | — | LEGACY CURRENT espelho; read-only histórico; **não** fonte canônica |
+| `dogs/{dogId}/nutritional_prescriptions` | `nutrition_plans` | Rename + normalização (`vigent_*`→`valid_*`; schedule inferido marcado; 1 active) |
+| `dogs/{dogId}/nutrition_prescriptions` | — | LEGACY CURRENT fallback; read-only histórico |
+| `dogs/{dogId}/nutrition_supplements` | **não** `supplement_logs` automático | Regime/estado em uso → adapter / curadoria de regimen; **ZERO** SupplementLog retroativo |
 | `vacinas/{id}` (raiz) | `vaccination_records/{vaccinationId}` (canônico) + `legacy_health_records` (incompletos) | Migração com dados suficientes vai para VaccinationRecord; incompletos permanecem em legacy_health_records read-only. **Não** backfilar para `clinical_cases/events` nem para "caso preventivo". |
 | `documentos/{id}` (raiz) | `health_documents` | Backfill com `storage_path` canônico normalizado (URLs antigas preservadas apenas no payload/metadado legado) |
 | `dogs/{dogId}/documents` | `health_documents` | Migrar para coleção consolidada |

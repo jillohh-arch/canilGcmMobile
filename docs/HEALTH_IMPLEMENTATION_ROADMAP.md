@@ -86,12 +86,36 @@ AGENDA
 
 NUTRIÇÃO
 
-- Plano
-- Consumo
-- Refeições
-- Suplementos
-- Observações
-- Histórico
+Contrato canônico (5A/5B): `nutrition_plans` / `meal_logs` / `supplement_logs`.
+Web define plano; Mobile executa via backend; zero dual-write novo.
+
+Subfases:
+
+```text
+5A — Auditoria do operacional legado          [ENCERRADA]
+5B — Decisões canônicas D1–D42                [ENCERRADA]
+5C — Foundation domínio + read/adapters       [próxima; ZERO write]
+5D — Writes canônicos de execução (callables)
+5E — Plano backend + fechamento mobile write de plano
+5F — UI Nutrição Hoje (shell + registro)
+5G — Inventário produção + backfill
+5H — Cutover e confronto final
+```
+
+Read model / UI:
+
+- estados `loading | data | empty | offline | error` (erro ≠ empty silencioso)
+- estado keyed por `dogId`
+- timezone domínio default `America/Sao_Paulo`
+
+Escopo de produto da fase:
+
+- Plano (consulta mobile; gestão Web/backend)
+- Consumo (offered/consumed/acceptance)
+- Refeições (slots + meal_occurrence_id)
+- Suplementos (regime no plano ≠ SupplementLog)
+- Observações (no MealLog)
+- Histórico (meals + admin logs + plano via timeline)
 
 ---
 

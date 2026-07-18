@@ -137,8 +137,11 @@ Esses nomes, se aparecerem em tabelas históricas, são **não operacionais**.
 |-----------|-----------|--------------------|-------|--------------------|-----------|
 | `health.cancel_record` | Cancelar registro (com justificativa) | condutor (próprios drafts), admin (qualquer) | Mobile, Web | cancel_reason obrigatório | recorded_by + reason |
 | `health.amend_record` | Adicionar adendo a registro finalizado | condutor (próprios), admin (qualquer) | Mobile, Web | reason obrigatório + type (correction/addendum/complement) | recorded_by + reason |
-| `health.manage_nutrition_plan` | Criar/superseder planos nutricionais | admin | Web | professional recomendado | recorded_by |
+| `health.manage_nutrition_plan` | Criar/superseder planos nutricionais | admin | Web → **backend** | professional recomendado | recorded_by |
 | `health.audit` | Visualizar trilha de auditoria completa | admin | Web | — | — |
+
+> **Nutrição (Fase 5B) — honestidade operacional:** as capabilities `health.read`, `health.record_routine` e `health.manage_nutrition_plan` são a **direção documental** alvo. **Não** estão enforced como catálogo granular nas Rules atuais (acesso a paths legados usa `canAccessDogRecord` + audited create/update). Wiring real = fase de autorização posterior (ou padrão Agenda create/edit se a matriz granular permanecer não implantada).
+> **Writers canônicos alvo:** NutritionPlan = backend/Web-originated; MealLog e SupplementLog = **callable backend** (não Firestore client write). Mobile = plan **read-only**.
 
 **Invariantes das capabilities:**
 
@@ -164,9 +167,9 @@ Esses nomes, se aparecerem em tabelas históricas, são **não operacionais**.
 | TreatmentProtocol | health.create_treatment (Web, com evidence profissional) [provisório] | health.read | health.complete_treatment ou health.cancel_record [provisório] | health.cancel_record |
 | DoseAdministration | health.administer_dose | health.read | — (imutável) | — |
 | WeightAssessment | health.record_routine | health.read | autor (com audit) [provisório] | health.cancel_record [provisório] |
-| NutritionPlan | health.manage_nutrition_plan (Web) [provisório] | health.read | health.manage_nutrition_plan (Web) | health.cancel_record [provisório] |
-| MealLog | health.record_routine | health.read | — | health.cancel_record [provisório] |
-| SupplementLog | health.record_routine | health.read | — | health.cancel_record [provisório] |
+| NutritionPlan | health.manage_nutrition_plan via **backend** (Web) [provisório; capability **não** enforced no runtime atual] | health.read [doc] / dog access [ops] | backend only; Mobile **ZERO** write | lifecycle cancelled [provisório] |
+| MealLog | health.record_routine via **callable** [provisório; não enforced] | health.read [doc] | soft cancel / correction auditada [provisório] | soft cancel — sem hard delete |
+| SupplementLog | health.record_routine via **callable** [provisório; não enforced] | health.read [doc] | soft cancel [provisório] | soft cancel — sem hard delete |
 | HealthDocument | health.record_clinical_document (quando clinical) ou health.record_preventive (quando preventivo); upload via Web ou Mobile com capability adequada [provisório] | health.read | metadados (autor) [provisório] | health.cancel_record [provisório] |
 | OperationalRestriction | health.issue_restriction (com evidence profissional) | health.read | health.release_restriction (com end_professional+end_source_document quando externo, end_reason sempre) | capability administrativa [provisório] |
 | VaccinationRecord | health.record_preventive (ProfessionalIdentity+source_document só quando externo; aplicação interna fica sem professional) [provisório] | health.read | metadados (autor) [provisório] | health.cancel_record [provisório] |
