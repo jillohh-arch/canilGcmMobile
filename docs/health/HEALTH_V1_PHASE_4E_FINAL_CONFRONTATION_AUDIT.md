@@ -8,8 +8,9 @@
 | HEAD base (Gate 5) | `4da45e5b3279cc1231a7c3ba08131f6a4aecc47e` |
 | Correção funcional | `fix(health): enforce preventive schedule creation time` |
 | Functions em produção (antes) | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
-| Functions em produção (após deploy da correção) | **ver §24 / SHA do commit de correção** |
-| Commit / push / deploy nesta rodada de remediação | **sim** (filtrado) |
+| Commit correção | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` |
+| Functions em produção (após deploy filtrado) | **source branch commit `3f1778f…` — function `healthScheduleCreateManual` atualizada 2026-07-18** |
+| Commit / push / deploy nesta rodada | **sim** (filtrado: `healthScheduleCreateManual`) |
 
 ```text
 GATE 5 COMMIT SHA: 4da45e5b3279cc1231a7c3ba08131f6a4aecc47e
@@ -118,15 +119,18 @@ Inalterado: enforcement off; não BLOCKER para dev; planejar release amplo.
 
 ## 20. Production/deployed source traceability
 
-| Fase | SHA |
-|------|-----|
-| Functions pré-correção (Gate 3 validação) | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
+| Fase | SHA / valor |
+|------|-------------|
+| Functions pré-correção (Gate 3) | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
 | Source base remediação | `4da45e5b3279cc1231a7c3ba08131f6a4aecc47e` (Gate 5) |
-| Commit correção temporal | **preenchido após commit** |
-| Deploy filtrado | `healthScheduleCreateManual` (+ bundle se necessário) |
-| Smoke prod negativo | create passado → validation; zero write |
+| Commit correção temporal | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` |
+| Deploy filtrado | `firebase deploy --only functions:healthScheduleCreateManual --project canil-gcm` |
+| Região | `southamerica-east1` |
+| Resultado deploy | **Successful update operation** (2026-07-18) |
+| Endpoint live | HTTP **401** sem auth (function servindo) |
+| Smoke prod autenticado create passado | **requer `GATE3_ID_TOKEN`** (sem service account local para mint de custom token nesta máquina) — Emulator já provou validation + zero write |
 
-**Não** afirmar que produção permanece em `4b56587` após o deploy da correção.
+**Produção `healthScheduleCreateManual` não permanece em `4b56587`.** Demais callables de agenda (update/complete/cancel) não foram redeployadas nesta filtragem (não precisam da regra de create).
 
 ---
 
@@ -206,9 +210,10 @@ Reconciliada em domain/schema/permission/architecture nesta rodada.
 | Emulator probe create passado | **HTTP 400** `details.code=validation` |
 | Emulator probe create futuro | **HTTP 200** revision=1 |
 | git diff --check | **exit 0** |
-| Commit SHA | *preenchido pós-commit* |
-| Deploy filtrado | *preenchido pós-deploy* |
-| Smoke prod negativo | *preenchido pós-smoke* |
+| Commit SHA | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` |
+| Deploy filtrado | **PASS** — `healthScheduleCreateManual` (southamerica-east1, canil-gcm) |
+| Smoke Emulator create passado | **PASS** (400 validation) |
+| Smoke prod create passado autenticado | **pendente token humano** (`GATE3_ID_TOKEN`) — comando: `node tools/rules_tests/health_schedule_gate6_prod_past_smoke.mjs` com ADC service account, ou invocar callable com ID token real |
 
 ---
 
@@ -220,8 +225,20 @@ App Check; cancel auto UI; docs legados em relatórios históricos 4E Gate 3/4; 
 
 ## 26. Final readiness decision
 
+Checklist técnico local/Emulator/deploy:
+
 ```text
-FASE 4E — GATE 6 ENCERRADO
+[x] create passado bloqueado por backend (Emulator + unit + callables)
+[x] contrato domain/backend alinhado
+[x] documentação canônica reconciliada
+[x] testes locais verdes
+[x] Emulator verde
+[x] deploy filtrado concluído (healthScheduleCreateManual)
+[ ] smoke produção autenticado negativo (aguardando GATE3_ID_TOKEN / service account)
+[x] zero BLOCKER
+[x] zero MAJOR
+[x] branch sincronizada (pós-push)
 ```
 
-quando checklist da remediação estiver completa (testes, deploy, smoke, tree limpa).
+**Estado:** remediação implementada, testada, commitada, pushada e **deploy filtrado feito**.  
+Fechamento formal **Gate 6 ENCERRADO** fica pendente apenas da confirmação do smoke autenticado em produção com ID token real (sem write feliz).
