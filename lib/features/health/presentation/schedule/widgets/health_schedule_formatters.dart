@@ -48,14 +48,15 @@ abstract final class HealthScheduleFormatters {
     ScheduleType.general => Icons.event_note_rounded,
   };
 
+  /// Labels canônicos amigáveis (Gate 5 / domínio).
   static String typeLabel(ScheduleType type) => switch (type) {
-    ScheduleType.dose => 'Medicação',
-    ScheduleType.vaccination => 'Vacina',
+    ScheduleType.dose => 'Dose',
+    ScheduleType.vaccination => 'Vacinação',
     ScheduleType.exam => 'Exame',
     ScheduleType.consultation => 'Consulta',
     ScheduleType.weighing => 'Pesagem',
     ScheduleType.reevaluation => 'Reavaliação',
-    ScheduleType.deworming => 'Vermífugo',
+    ScheduleType.deworming => 'Vermifugação',
     ScheduleType.bath => 'Banho',
     ScheduleType.general => 'Geral',
   };

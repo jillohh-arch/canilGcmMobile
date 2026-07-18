@@ -2,17 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_mutation_policy.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_action_availability.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_item_view.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_user_copy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_formatters.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
 
-/// Card read-only de item da Agenda (sem ações de write).
+/// Card de item da Agenda com menu contextual de mutações (Gate 5).
 class HealthScheduleItemCard extends StatelessWidget {
   final HealthScheduleItemView item;
   final DateTime Function()? now;
+  final bool isBusy;
+  final ValueChanged<HealthScheduleItemAction>? onAction;
 
-  const HealthScheduleItemCard({super.key, required this.item, this.now});
+  /// Gate 5: default false — sem helper admin cliente confiável.
+  final bool canCancelAutomaticAsAdmin;
+
+  const HealthScheduleItemCard({
+    super.key,
+    required this.item,
+    this.now,
+    this.isBusy = false,
+    this.onAction,
+    this.canCancelAutomaticAsAdmin = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,15 +41,24 @@ class HealthScheduleItemCard extends StatelessWidget {
     final statusLabel = HealthScheduleFormatters.statusLabel(status);
     final typeLabel = HealthScheduleFormatters.typeLabel(item.scheduleType);
     final assignee = item.assignedToName?.trim();
+    final isAutomatic = HealthScheduleMutationPolicy.isAutomaticSource(
+      item.sourceType,
+    );
+    final actions = HealthScheduleActionAvailability.forView(
+      item,
+      canCancelAutomaticAsAdmin: canCancelAutomaticAsAdmin,
+      isItemBusy: isBusy,
+    );
 
     final semantic =
         '$typeLabel, ${item.title}, $statusLabel, $when'
-        '${assignee != null && assignee.isNotEmpty ? ', responsável $assignee' : ''}';
+        '${assignee != null && assignee.isNotEmpty ? ', responsável $assignee' : ''}'
+        '${isAutomatic ? ', ${HealthScheduleMutationUserCopy.generatedAutomatically}' : ''}';
 
     return Semantics(
       label: semantic,
       child: HealthSummaryCardSurface(
-        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        padding: const EdgeInsets.fromLTRB(12, 11, 8, 11),
         borderRadius: 14,
         borderColor: muted
             ? AppTheme.outline.withValues(alpha: 0.5)
@@ -55,11 +79,19 @@ class HealthScheduleItemCard extends StatelessWidget {
                   color: accent.withValues(alpha: muted ? 0.15 : 0.28),
                 ),
               ),
-              child: Icon(
-                HealthScheduleFormatters.typeIcon(item.scheduleType),
-                color: accent.withValues(alpha: muted ? 0.55 : 0.95),
-                size: 20,
-              ),
+              child: isBusy
+                  ? Padding(
+                      padding: const EdgeInsets.all(9),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: accent,
+                      ),
+                    )
+                  : Icon(
+                      HealthScheduleFormatters.typeIcon(item.scheduleType),
+                      color: accent.withValues(alpha: muted ? 0.55 : 0.95),
+                      size: 20,
+                    ),
             ),
             const SizedBox(width: 11),
             Expanded(
@@ -113,6 +145,20 @@ class HealthScheduleItemCard extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (isAutomatic) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      HealthScheduleMutationUserCopy.generatedAutomatically,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textTertiary,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                   if (item.notes != null && item.notes!.trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -155,9 +201,122 @@ class HealthScheduleItemCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (actions.isNotEmpty && onAction != null)
+              _ItemActionsMenu(
+                actions: actions,
+                enabled: !isBusy,
+                onSelected: onAction!,
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ItemActionsMenu extends StatelessWidget {
+  final Set<HealthScheduleItemAction> actions;
+  final bool enabled;
+  final ValueChanged<HealthScheduleItemAction> onSelected;
+
+  const _ItemActionsMenu({
+    required this.actions,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Ações do item',
+      child: PopupMenuButton<HealthScheduleItemAction>(
+        key: const ValueKey('schedule-item-actions'),
+        enabled: enabled,
+        tooltip: 'Ações',
+        padding: EdgeInsets.zero,
+        icon: Icon(
+          Icons.more_vert_rounded,
+          color: enabled ? AppTheme.textSecondary : AppTheme.textMuted,
+          size: 22,
+        ),
+        color: AppTheme.surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.outline.withValues(alpha: 0.8)),
+        ),
+        onSelected: onSelected,
+        itemBuilder: (context) {
+          final items = <PopupMenuEntry<HealthScheduleItemAction>>[];
+          if (actions.contains(HealthScheduleItemAction.edit)) {
+            items.add(
+              PopupMenuItem(
+                value: HealthScheduleItemAction.edit,
+                child: _MenuRow(
+                  icon: Icons.edit_outlined,
+                  label: HealthScheduleMutationUserCopy.actionEdit,
+                  color: AppTheme.primary,
+                ),
+              ),
+            );
+          }
+          if (actions.contains(HealthScheduleItemAction.complete)) {
+            items.add(
+              PopupMenuItem(
+                value: HealthScheduleItemAction.complete,
+                child: _MenuRow(
+                  icon: Icons.check_circle_outline_rounded,
+                  label: HealthScheduleMutationUserCopy.actionComplete,
+                  color: AppTheme.success,
+                ),
+              ),
+            );
+          }
+          if (actions.contains(HealthScheduleItemAction.cancel)) {
+            items.add(
+              PopupMenuItem(
+                value: HealthScheduleItemAction.cancel,
+                child: _MenuRow(
+                  icon: Icons.cancel_outlined,
+                  label: HealthScheduleMutationUserCopy.actionCancel,
+                  color: AppTheme.error,
+                ),
+              ),
+            );
+          }
+          return items;
+        },
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ],
     );
   }
 }

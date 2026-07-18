@@ -4,11 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/forms/health_schedule_item_form_screen.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_action_availability.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_grouping.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_item_view.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_user_copy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_state.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_ui_filter.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_add_button.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_cancel_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_complete_dialog.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_filter_chips.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_item_card.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_kpi_row.dart';
@@ -16,10 +25,10 @@ import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_s
 import 'package:canil_gcm/features/health/presentation/schedule/widgets/health_schedule_user_copy.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_refresh_banner.dart';
 
-/// Shell visual da Agenda Preventiva (Fase 4B).
+/// Shell visual da Agenda Preventiva (Fase 4B + mutações Gate 5).
 ///
-/// Consome [HealthScheduleController] da 4A. Reavalia temporalmente itens
-/// carregados no foreground e em tick periódico — sem nova leitura da source.
+/// Consome [HealthScheduleController] (leitura) e, opcionalmente,
+/// [HealthScheduleMutationController] (mutações via gateway — sem Firestore).
 class HealthScheduleView extends StatefulWidget {
   final HealthScheduleController controller;
   final String dogDisplayName;
@@ -31,6 +40,9 @@ class HealthScheduleView extends StatefulWidget {
   /// Clock opcional só para labels de horário nos cards.
   final DateTime Function()? now;
 
+  /// Coordenador de mutações. Null = somente leitura (testes legados).
+  final HealthScheduleMutationController? mutationController;
+
   const HealthScheduleView({
     super.key,
     required this.controller,
@@ -38,6 +50,7 @@ class HealthScheduleView extends StatefulWidget {
     this.bottomPadding = 24,
     this.recomputeInterval = const Duration(minutes: 1),
     this.now,
+    this.mutationController,
   });
 
   @override
@@ -89,10 +102,119 @@ class _HealthScheduleViewState extends State<HealthScheduleView>
     });
   }
 
+  Future<void> _openCreate() async {
+    final mutation = widget.mutationController;
+    final dogId = widget.controller.activeDogId;
+    if (mutation == null || dogId == null || dogId.isEmpty) return;
+    await HealthScheduleItemFormScreen.openCreate(
+      context,
+      dogId: dogId,
+      mutationController: mutation,
+    );
+  }
+
+  Future<void> _handleAction(
+    HealthScheduleItemView item,
+    HealthScheduleItemAction action,
+  ) async {
+    final mutation = widget.mutationController;
+    if (mutation == null) return;
+    if (mutation.isItemBusy(item.id)) return;
+
+    switch (action) {
+      case HealthScheduleItemAction.edit:
+        await HealthScheduleItemFormScreen.openEdit(
+          context,
+          item: item,
+          mutationController: mutation,
+        );
+      case HealthScheduleItemAction.complete:
+        await _completeItem(item, mutation);
+      case HealthScheduleItemAction.cancel:
+        await _cancelItem(item, mutation);
+    }
+  }
+
+  Future<void> _completeItem(
+    HealthScheduleItemView item,
+    HealthScheduleMutationController mutation,
+  ) async {
+    final confirmed = await showHealthScheduleCompleteDialog(
+      context,
+      itemTitle: item.title,
+    );
+    if (!confirmed || !mounted) return;
+
+    final outcome = await mutation.complete(
+      dogId: item.dogId,
+      scheduleId: item.id,
+    );
+    if (!mounted) return;
+    await _presentOutcome(outcome);
+  }
+
+  Future<void> _cancelItem(
+    HealthScheduleItemView item,
+    HealthScheduleMutationController mutation,
+  ) async {
+    final reason = await showHealthScheduleCancelSheet(
+      context,
+      itemTitle: item.title,
+    );
+    if (reason == null || reason.trim().isEmpty || !mounted) return;
+
+    final outcome = await mutation.cancel(
+      dogId: item.dogId,
+      scheduleId: item.id,
+      cancelReason: reason,
+    );
+    if (!mounted) return;
+    await _presentOutcome(outcome);
+  }
+
+  Future<void> _presentOutcome(HealthScheduleMutationUiOutcome outcome) async {
+    switch (outcome) {
+      case HealthScheduleMutationUiBlocked():
+        return;
+      case HealthScheduleMutationUiSuccess(
+        :final successMessage,
+        :final refreshFailed,
+        :final refreshWarning,
+      ):
+        if (refreshFailed) {
+          AppFeedback.warning(
+            context,
+            refreshWarning ??
+                HealthScheduleMutationUserCopy.refreshFailedAfterSuccess,
+          );
+        } else {
+          AppFeedback.success(context, successMessage);
+        }
+      case HealthScheduleMutationUiFailure(
+        :final userMessage,
+        :final shouldRefresh,
+      ):
+        AppFeedback.show(
+          context,
+          userMessage,
+          type: AppFeedbackType.error,
+          title: 'Não foi possível concluir',
+        );
+        if (shouldRefresh) {
+          await widget.mutationController?.refreshSchedule();
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mutation = widget.mutationController;
+    final listenable = mutation == null
+        ? widget.controller
+        : Listenable.merge([widget.controller, mutation]);
+
     return ListenableBuilder(
-      listenable: widget.controller,
+      listenable: listenable,
       builder: (context, _) {
         return _ScheduleBody(
           state: widget.controller.state,
@@ -104,6 +226,9 @@ class _HealthScheduleViewState extends State<HealthScheduleView>
               ? widget.controller.refresh
               : null,
           now: widget.now,
+          mutationController: mutation,
+          onAdd: mutation == null ? null : _openCreate,
+          onItemAction: mutation == null ? null : _handleAction,
         );
       },
     );
@@ -122,6 +247,13 @@ class _ScheduleBody extends StatelessWidget {
   final ValueChanged<HealthScheduleUiFilter> onFilterChanged;
   final Future<void> Function()? onRefresh;
   final DateTime Function()? now;
+  final HealthScheduleMutationController? mutationController;
+  final VoidCallback? onAdd;
+  final void Function(
+    HealthScheduleItemView item,
+    HealthScheduleItemAction action,
+  )?
+  onItemAction;
 
   const _ScheduleBody({
     required this.state,
@@ -131,6 +263,9 @@ class _ScheduleBody extends StatelessWidget {
     required this.onFilterChanged,
     required this.onRefresh,
     required this.now,
+    required this.mutationController,
+    required this.onAdd,
+    required this.onItemAction,
   });
 
   @override
@@ -177,14 +312,26 @@ class _ScheduleBody extends StatelessWidget {
                 padding: EdgeInsets.only(bottom: 8),
                 child: LinearProgressIndicator(minHeight: 2),
               ),
-            const Expanded(
+            Expanded(
               child: HealthScheduleSurfaceMessage(
-                key: ValueKey('schedule-empty'),
+                key: const ValueKey('schedule-empty'),
                 icon: Icons.event_note_rounded,
                 title: HealthScheduleUserCopy.emptyTitle,
-                message: HealthScheduleUserCopy.emptyMessage,
+                message: onAdd == null
+                    ? HealthScheduleUserCopy.emptyMessage
+                    : '${HealthScheduleUserCopy.emptyMessage}\n\n'
+                          '${HealthScheduleMutationUserCopy.emptyAddHint}',
+                actionLabel: onAdd == null
+                    ? null
+                    : HealthScheduleMutationUserCopy.addToSchedule,
+                onAction: onAdd,
               ),
             ),
+            if (onAdd != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+                child: HealthScheduleAddButton(onPressed: onAdd),
+              ),
           ],
         ),
       ),
@@ -337,6 +484,10 @@ class _ScheduleBody extends StatelessWidget {
             ),
           ),
         ),
+      if (onAdd != null) ...[
+        const SizedBox(height: 20),
+        HealthScheduleAddButton(onPressed: onAdd),
+      ],
     ];
 
     final list = ListView(
@@ -408,7 +559,19 @@ class _ScheduleBody extends StatelessWidget {
       );
       for (var i = 0; i < block.items.length; i++) {
         if (i > 0) widgets.add(const SizedBox(height: 8));
-        widgets.add(HealthScheduleItemCard(item: block.items[i], now: now));
+        final item = block.items[i];
+        final busy = mutationController?.isItemBusy(item.id) ?? false;
+        widgets.add(
+          HealthScheduleItemCard(
+            key: ValueKey('schedule-card-${item.id}'),
+            item: item,
+            now: now,
+            isBusy: busy,
+            onAction: onItemAction == null
+                ? null
+                : (action) => onItemAction!(item, action),
+          ),
+        );
       }
       widgets.add(const SizedBox(height: 16));
     }

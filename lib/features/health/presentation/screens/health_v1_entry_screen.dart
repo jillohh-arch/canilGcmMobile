@@ -22,6 +22,7 @@ import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_he
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_screen.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_source.dart';
@@ -55,11 +56,11 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Source da agenda injetável (testes). Produção: [FirestoreHealthScheduleSource].
   final HealthScheduleSource? scheduleSource;
 
-  /// Gateway de mutação da Agenda (Gate 4).
+  /// Gateway de mutação da Agenda (Gate 4/5).
   ///
   /// Produção: [FirebaseFunctionsHealthScheduleMutationGateway].
   /// Testes: injete [FailClosedHealthScheduleMutationGateway] ou spy.
-  /// Nenhuma UI de mutação consome o gateway nesta fase.
+  /// Gate 5: UI de mutações consome via [HealthScheduleMutationController].
   final HealthScheduleMutationGateway? scheduleMutationGateway;
 
   /// Contexto do K9 pré-resolvido (testes). Produção: [DogViewModel].
@@ -99,6 +100,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   late final HealthScheduleSource _scheduleSource;
   late final HealthScheduleController _scheduleController;
   late final HealthScheduleMutationGateway _scheduleMutationGateway;
+  late final HealthScheduleMutationController _scheduleMutationController;
 
   /// Primeira carga da timeline só após visitar Histórico (lazy).
   bool _timelinePrimed = false;
@@ -123,10 +125,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   @visibleForTesting
   bool get schedulePrimedForTest => _schedulePrimed;
 
-  /// Gateway permanente (ou fake injetado). Não é acionado por UI no Gate 4.
+  /// Gateway permanente (ou fake injetado).
   @visibleForTesting
   HealthScheduleMutationGateway get scheduleMutationGatewayForTest =>
       _scheduleMutationGateway;
+
+  @visibleForTesting
+  HealthScheduleMutationController get scheduleMutationControllerForTest =>
+      _scheduleMutationController;
 
   @override
   void initState() {
@@ -157,11 +163,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       source: _scheduleSource,
       temporalPolicy: healthSchedulePresentationPolicy(),
     );
-    // Gate 4: gateway real como default. Nenhuma tela/listener chama mutação
-    // automaticamente — UI de ações permanece fora de escopo (Gate 5).
+    // Gate 4/5: gateway real como default. Mutações apenas por ação explícita
+    // do usuário (forms/menu) — sem auto-write, sem listener de mutação.
     _scheduleMutationGateway =
         widget.scheduleMutationGateway ??
         FirebaseFunctionsHealthScheduleMutationGateway();
+    _scheduleMutationController = HealthScheduleMutationController(
+      gateway: _scheduleMutationGateway,
+      scheduleController: _scheduleController,
+    );
     // Sem selectDog aqui: evita I/O se o usuário não abrir Agenda.
   }
 
@@ -189,6 +199,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   void dispose() {
     _filterSession.dispose();
     _timelineController.dispose();
+    _scheduleMutationController.dispose();
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
@@ -392,6 +403,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
         ),
         agenda: (_) => HealthScheduleScreen(
           controller: _scheduleController,
+          mutationController: _scheduleMutationController,
           dogDisplayName: dogContext.name,
           bottomPadding: _timelineBottomPadding(context),
         ),

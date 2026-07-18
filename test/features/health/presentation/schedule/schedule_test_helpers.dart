@@ -1,4 +1,5 @@
 import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
@@ -43,6 +44,7 @@ HealthScheduleItem scheduleItem({
   DateTime? completedAt,
   DateTime? cancelledAt,
   String? cancelReason,
+  HealthScheduleRevision revision = const HealthScheduleRevision('0'),
 }) {
   final scheduled =
       scheduledFor ?? scheduleTestNow.add(const Duration(hours: 2));
@@ -66,6 +68,7 @@ HealthScheduleItem scheduleItem({
     cancelledAt: cancelledAt,
     cancelledBy: cancelledAt == null ? null : scheduleTestActor,
     cancelReason: cancelReason,
+    revision: revision,
   );
 }
 
