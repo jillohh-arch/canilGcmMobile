@@ -2,15 +2,15 @@
 
 | Campo | Valor |
 |-------|-------|
-| Status | **Gate 6 encerrado** (remediação temporal + docs + deploy) |
+| Status | **Gate 6 encerrado — FASE 4E CONCLUÍDA** |
 | Data | 2026-07-18 |
 | Branch | `feature/health-v1-foundation` |
 | HEAD base (Gate 5) | `4da45e5b3279cc1231a7c3ba08131f6a4aecc47e` |
-| Correção funcional | `fix(health): enforce preventive schedule creation time` |
+| Correção funcional | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` — `fix(health): enforce preventive schedule creation time` |
 | Functions em produção (antes) | `4b56587ab15d295788e5c9950cacc0030ec8e2aa` |
-| Commit correção | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` |
-| Functions em produção (após deploy filtrado) | **source branch commit `3f1778f…` — function `healthScheduleCreateManual` atualizada 2026-07-18** |
-| Commit / push / deploy nesta rodada | **sim** (filtrado: `healthScheduleCreateManual`) |
+| `healthScheduleCreateManual` em produção | **source `3f1778f…` (deploy filtrado 2026-07-18)** |
+| Smoke prod autenticado | **PASS** (2026-07-18, device real) |
+| Redeploy nesta rodada de smoke | **NÃO** |
 
 ```text
 GATE 5 COMMIT SHA: 4da45e5b3279cc1231a7c3ba08131f6a4aecc47e
@@ -128,9 +128,32 @@ Inalterado: enforcement off; não BLOCKER para dev; planejar release amplo.
 | Região | `southamerica-east1` |
 | Resultado deploy | **Successful update operation** (2026-07-18) |
 | Endpoint live | HTTP **401** sem auth (function servindo) |
-| Smoke prod autenticado create passado | **requer `GATE3_ID_TOKEN`** (sem service account local para mint de custom token nesta máquina) — Emulator já provou validation + zero write |
+| Smoke prod autenticado create passado | **PASS** (§24.1) |
 
-**Produção `healthScheduleCreateManual` não permanece em `4b56587`.** Demais callables de agenda (update/complete/cancel) não foram redeployadas nesta filtragem (não precisam da regra de create).
+**Produção `healthScheduleCreateManual` source funcional:** `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a`.  
+Demais callables de agenda (update/complete/cancel) não foram redeployadas na filtragem de create.
+
+### 24.1 Smoke produção autenticado (create no passado)
+
+| Item | Valor |
+|------|--------|
+| Data/hora | 2026-07-18 (~16:16 UTC no device log) |
+| Device | Pixel 10 Pro XL (wireless adb) |
+| App | `com.example.canil_gcm` debug, sessão Firebase Auth **persistida** (real) |
+| Gateway | `FirebaseFunctionsHealthScheduleMutationGateway` (permanente) |
+| Callable | `healthScheduleCreateManual` produção (`southamerica-east1` / `canil-gcm`) |
+| Payload | `scheduledFor = agora - 1 dia`; `idempotencyKey` sintética exclusiva |
+| dogId | K9 da sessão do operador autenticado (não inventado para write) |
+| Resposta transport | `FirebaseFunctionsException code=invalid-argument` |
+| Domínio | `HealthScheduleMutationValidation` / `code=validation` |
+| Marker | `PROD_AUTH_PAST_CREATE_SMOKE: PASS` |
+| Create positivo | **ZERO** |
+| Harness debug | temporário, dart-define only, **removido integralmente** após smoke |
+| Redeploy nesta rodada | **NÃO** |
+| App Check | `app` debug/INVALID residual; enforcement off (limitação conhecida) |
+| Auth | sessão real (id token listeners notificados com uid) — request autenticada |
+
+Evidência de zero write: validação no código deployado ocorre **antes** da transação (schedule/receipt/audit); resposta domain `Validation` sem `scheduleId` de sucesso; Emulator já comprovou zero schedule/receipt/audit no mesmo contrato.
 
 ---
 
@@ -213,7 +236,7 @@ Reconciliada em domain/schema/permission/architecture nesta rodada.
 | Commit SHA | `3f1778f6066fb4c1475b45c71a1cf0aaf5b1f45a` |
 | Deploy filtrado | **PASS** — `healthScheduleCreateManual` (southamerica-east1, canil-gcm) |
 | Smoke Emulator create passado | **PASS** (400 validation) |
-| Smoke prod create passado autenticado | **pendente token humano** (`GATE3_ID_TOKEN`) — comando: `node tools/rules_tests/health_schedule_gate6_prod_past_smoke.mjs` com ADC service account, ou invocar callable com ID token real |
+| Smoke prod create passado autenticado | **PASS** — ver §24.1 |
 
 ---
 
@@ -225,20 +248,21 @@ App Check; cancel auto UI; docs legados em relatórios históricos 4E Gate 3/4; 
 
 ## 26. Final readiness decision
 
-Checklist técnico local/Emulator/deploy:
-
 ```text
-[x] create passado bloqueado por backend (Emulator + unit + callables)
+[x] create passado bloqueado por backend (Emulator + unit + callables + prod auth)
 [x] contrato domain/backend alinhado
 [x] documentação canônica reconciliada
 [x] testes locais verdes
 [x] Emulator verde
 [x] deploy filtrado concluído (healthScheduleCreateManual)
-[ ] smoke produção autenticado negativo (aguardando GATE3_ID_TOKEN / service account)
+[x] smoke produção autenticado negativo
 [x] zero BLOCKER
 [x] zero MAJOR
-[x] branch sincronizada (pós-push)
+[x] branch sincronizada
+[x] harness temporário removido
 ```
 
-**Estado:** remediação implementada, testada, commitada, pushada e **deploy filtrado feito**.  
-Fechamento formal **Gate 6 ENCERRADO** fica pendente apenas da confirmação do smoke autenticado em produção com ID token real (sem write feliz).
+```text
+FASE 4E — GATE 6 ENCERRADO
+FASE 4E CONCLUÍDA
+```
