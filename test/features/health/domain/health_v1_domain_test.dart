@@ -584,10 +584,12 @@ void main() {
           id: 'meal-1',
           dogId: 'dog-1',
           period: MealPeriodWire.parseCanonical(period.wireName),
-          amountGrams: 300,
+          offeredGrams: 300,
+          acceptance: MealAcceptanceWire.parse('full'),
           fedAt: now,
           recordedBy: actor,
           schemaVersion: 1,
+          revision: 1,
         );
         expect(meal.period.value, period);
       }
@@ -595,10 +597,12 @@ void main() {
         id: 'meal-2',
         dogId: 'dog-1',
         period: ParsedHealthEnum.unknown('madrugada'),
-        amountGrams: 100,
+        offeredGrams: 100,
+        acceptance: MealAcceptanceWire.parse('unknown'),
         fedAt: now,
         recordedBy: actor,
         schemaVersion: 1,
+        revision: 1,
       );
       expect(unknown.period.raw, 'madrugada');
       expect(
@@ -608,10 +612,12 @@ void main() {
             id: 'meal-2',
             dogId: 'dog-1',
             period: ParsedHealthEnum.unknown('madrugada'),
-            amountGrams: 100,
+            offeredGrams: 100,
+            acceptance: MealAcceptanceWire.parse('unknown'),
             fedAt: now,
             recordedBy: actor,
             schemaVersion: 2,
+            revision: 1,
           ),
         ),
       );
@@ -630,10 +636,12 @@ void main() {
             id: 'meal-1',
             dogId: 'dog-1',
             period: MealPeriodWire.parseCanonical('morning'),
-            amountGrams: invalid,
+            offeredGrams: invalid,
+            acceptance: MealAcceptanceWire.parse('unknown'),
             fedAt: now,
             recordedBy: actor,
             schemaVersion: 1,
+            revision: 1,
           ),
           throwsA(isA<HealthDomainException>()),
         );
@@ -643,10 +651,12 @@ void main() {
           id: 'meal-1',
           dogId: 'dog-1',
           period: const ParsedHealthEnum.absent(),
-          amountGrams: 100,
+          offeredGrams: 100,
+          acceptance: MealAcceptanceWire.parse('unknown'),
           fedAt: now,
           recordedBy: actor,
           schemaVersion: 1,
+          revision: 1,
         ),
         throwsA(isA<HealthDomainException>()),
       );
@@ -656,10 +666,12 @@ void main() {
             id: 'meal-1',
             dogId: 'dog-1',
             period: MealPeriodWire.parseCanonical('morning'),
-            amountGrams: 100,
+            offeredGrams: 100,
+            acceptance: MealAcceptanceWire.parse('unknown'),
             fedAt: now,
             recordedBy: actor,
             schemaVersion: invalidSchema,
+            revision: 1,
           ),
           throwsA(isA<HealthDomainException>()),
         );
@@ -668,10 +680,12 @@ void main() {
         id: 'meal-1',
         dogId: 'dog-1',
         period: MealPeriodWire.parseCanonical('morning'),
-        amountGrams: 100,
+        offeredGrams: 100,
+        acceptance: MealAcceptanceWire.parse('unknown'),
         fedAt: now,
         recordedBy: actor,
         schemaVersion: 1,
+        revision: 1,
       );
       meal.validateFedAt(referenceTime: now);
       expect(

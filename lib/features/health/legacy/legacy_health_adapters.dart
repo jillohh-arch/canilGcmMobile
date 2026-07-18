@@ -417,25 +417,49 @@ final class LegacyNutritionAdapter {
         warnings,
       );
     }
+    // D10 / D32 — amount_grams → offered + consumed null + unknown;
+    // sem vínculo de slot artificial.
     final meal = MealLog(
       id: sourceId,
       dogId: dogId,
       period: period,
-      amountGrams: amount!,
+      offeredGrams: amount!,
+      acceptance: MealAcceptanceWire.parse('unknown'),
       fedAt: fedAt.value!,
       recordedBy: actor,
       schemaVersion: 1,
+      revision: 1,
+      consumedGrams: null,
+      // Dual-read adapter: proveniência de leitura (backfill server usa
+      // `legacy_migration` — fora desta fase).
+      source: 'legacy_read',
+      legacySource:
+          _LegacyFields.nonEmptyString(data, ['legacy_source', 'collection']) ??
+          'feeding_events',
+      legacyId: sourceId,
+      legacyAmountGrams: amount,
+      legacyPhotoBalanceUrl: _LegacyFields.nonEmptyString(data, [
+        'photo_balance_url',
+        'legacy_photo_balance_url',
+      ]),
+      observations: _LegacyFields.nonEmptyString(data, [
+        'observations',
+        'notes',
+      ]),
     );
+    final warnings = <LegacyParseIssue>[];
     if (period.isUnknown) {
-      return LegacyParseResult.partial(meal, [
+      warnings.add(
         const LegacyParseIssue(
           code: 'unknown_period',
           field: 'period',
           severity: LegacyIssueSeverity.warning,
           message: 'Período legado desconhecido preservado',
         ),
-      ]);
+      );
     }
-    return LegacyParseResult.success(meal);
+    return warnings.isEmpty
+        ? LegacyParseResult.success(meal)
+        : LegacyParseResult.partial(meal, warnings);
   }
 }

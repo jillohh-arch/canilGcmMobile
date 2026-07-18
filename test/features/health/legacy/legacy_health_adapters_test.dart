@@ -315,9 +315,10 @@ void main() {
       expect(meal.recordedBy.uid, 'user-1');
     });
 
-    test('mapeia apenas aliases comprovados para período canônico', () {
+    test('mapeia aliases legados para período canônico (D6)', () {
       for (final entry in const {
         'manha': MealPeriod.morning,
+        'almoco': MealPeriod.afternoon,
         'noite': MealPeriod.night,
       }.entries) {
         expect(MealPeriodWire.parseLegacy(entry.key).value, entry.value);
@@ -329,7 +330,7 @@ void main() {
         sourceId: 'meal-1',
         dogId: 'dog-1',
         data: const {
-          'period': 'almoco',
+          'period': 'madrugada',
           'amount_grams': 100,
           'fed_at': '2026-07-14T04:00:00Z',
           'fed_by': 'user-legacy',
@@ -337,12 +338,42 @@ void main() {
       );
       final view = result.value! as LegacyHealthRecordView;
       expect(result.state, LegacyParseState.partial);
-      expect(view.originalPayload['period'], 'almoco');
-      expect(MealPeriodWire.parseLegacy('almoco').isUnknown, isTrue);
+      expect(view.originalPayload['period'], 'madrugada');
+      expect(MealPeriodWire.parseLegacy('madrugada').isUnknown, isTrue);
       expect(result.issues.map((issue) => issue.code), {
         'incomplete_legacy_author',
         'unknown_period',
       });
+    });
+
+    test('D10: amount_grams vira offered + unknown + sem vínculo de slot', () {
+      final result = adapter.parse(
+        sourceId: 'meal-enriched',
+        dogId: 'dog-1',
+        data: const {
+          'period': 'manha',
+          'amount_grams': 300,
+          'fed_at': '2026-07-14T08:00:00Z',
+          'photo_balance_url': 'https://example/photo.jpg',
+          'recorded_by': {
+            'uid': 'user-1',
+            'name': 'Condutor',
+            'internal_role': 'condutor',
+          },
+        },
+      );
+      final meal = result.value! as MealLog;
+      expect(result.state, LegacyParseState.success);
+      expect(meal.offeredGrams, 300);
+      expect(meal.consumedGrams, isNull);
+      expect(meal.acceptance.value, MealAcceptance.unknown);
+      expect(meal.legacyAmountGrams, 300);
+      expect(meal.source, 'legacy_read');
+      expect(meal.planId, isNull);
+      expect(meal.plannedMealId, isNull);
+      expect(meal.mealOccurrenceId, isNull);
+      expect(meal.legacyPhotoBalanceUrl, 'https://example/photo.jpg');
+      expect(meal.revision, 1);
     });
 
     test('rejeita date e campos obrigatórios ausentes ou inválidos', () {

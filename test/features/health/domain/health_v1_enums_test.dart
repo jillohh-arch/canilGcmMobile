@@ -61,10 +61,12 @@ void main() {
       );
     });
 
-    test('aliases legados comprovados preservam raw', () {
+    test('aliases legados comprovados (D6) mapeiam para wire canônico', () {
       expect(MealPeriodWire.parseLegacy('manha').value, MealPeriod.morning);
-      expect(MealPeriodWire.parseLegacy('almoco').isUnknown, isTrue);
-      expect(MealPeriodWire.parseLegacy('almoco').raw, 'almoco');
+      // raw known = wire canônico (não o alias PT)
+      expect(MealPeriodWire.parseLegacy('manha').raw, 'morning');
+      expect(MealPeriodWire.parseLegacy('almoco').value, MealPeriod.afternoon);
+      expect(MealPeriodWire.parseLegacy('almoco').raw, 'afternoon');
       expect(MealPeriodWire.parseLegacy('noite').value, MealPeriod.night);
       expect(MealPeriodWire.parseLegacy('noite').raw, 'night');
       expect(MealPeriodWire.parseLegacy('madrugada').isUnknown, isTrue);

@@ -21,11 +21,30 @@ void main() {
         administeredAt: now,
         recordedBy: actor,
         schemaVersion: 1,
+        revision: 1,
       );
       expect(log.dose, 1000);
       expect(log.unit, SupplementDoseUnit.mg);
       expect(log.nutritionPlanId, isNull);
       expect(log.protocolId, isNull);
+      expect(log.revision, 1);
+    });
+
+    test('revision < 1 é rejeitada', () {
+      expect(
+        () => SupplementLog(
+          id: 'sl-1',
+          dogId: 'dog-1',
+          supplementName: 'X',
+          dose: 1,
+          unit: SupplementDoseUnit.mg,
+          administeredAt: now,
+          recordedBy: actor,
+          schemaVersion: 1,
+          revision: 0,
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
     });
 
     test('supplementName vazio é rejeitado', () {
@@ -39,6 +58,7 @@ void main() {
           administeredAt: now,
           recordedBy: actor,
           schemaVersion: 1,
+          revision: 1,
         ),
         throwsA(isA<HealthDomainException>()),
       );
@@ -55,6 +75,7 @@ void main() {
           administeredAt: now,
           recordedBy: actor,
           schemaVersion: 1,
+          revision: 1,
         ),
         throwsA(isA<HealthDomainException>()),
       );
@@ -71,6 +92,7 @@ void main() {
           administeredAt: now,
           recordedBy: actor,
           schemaVersion: 1,
+          revision: 1,
         ),
         throwsA(isA<HealthDomainException>()),
       );
@@ -86,11 +108,35 @@ void main() {
         administeredAt: now,
         recordedBy: actor,
         schemaVersion: 1,
+        revision: 1,
         nutritionPlanId: 'np-1',
         protocolId: 'tp-1',
+        supplementRegimenId: 'reg-1',
       );
       expect(log.nutritionPlanId, 'np-1');
       expect(log.protocolId, 'tp-1');
+      expect(log.supplementRegimenId, 'reg-1');
+    });
+
+    test('validateAdministeredAt rejeita futuro', () {
+      final log = SupplementLog(
+        id: 'sl-1',
+        dogId: 'dog-1',
+        supplementName: 'X',
+        dose: 1,
+        unit: SupplementDoseUnit.mg,
+        administeredAt: now,
+        recordedBy: actor,
+        schemaVersion: 1,
+        revision: 1,
+      );
+      log.validateAdministeredAt(referenceTime: now);
+      expect(
+        () => log.validateAdministeredAt(
+          referenceTime: now.subtract(const Duration(seconds: 1)),
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
     });
 
     test('unit expõe wireNames aprovados', () {

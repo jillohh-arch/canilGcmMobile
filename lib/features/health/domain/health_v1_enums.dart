@@ -48,6 +48,9 @@ enum ExamStage {
 
 enum MealPeriod { morning, afternoon, evening, night, extra }
 
+/// Aceitação da refeição (MealLog) — Domain Model §2.8 / D9 / D42.
+enum MealAcceptance { full, partial, refused, unknown }
+
 enum ParsedHealthEnumState { known, unknown, absent }
 
 /// Preserva valores desconhecidos sem confundi-los com ausência.
@@ -218,11 +221,17 @@ extension MealPeriodWire on MealPeriod {
   static ParsedHealthEnum<MealPeriod> parseCanonical(Object? value) =>
       _parseEnum(value, MealPeriod.values, (item) => item.wireName);
 
+  /// Parse legado unknown-safe (D6).
+  ///
+  /// Aliases: `manha→morning`, `almoco→afternoon`, `noite→night`.
+  /// Casing/trim: trim + match exato do alias (política existente); depois
+  /// tenta wire canônico. Desconhecido → [ParsedHealthEnum.unknown].
   static ParsedHealthEnum<MealPeriod> parseLegacy(Object? value) {
     final raw = value?.toString().trim() ?? '';
     if (raw.isEmpty) return const ParsedHealthEnum<MealPeriod>.absent();
     final canonical = switch (raw) {
       'manha' => MealPeriod.morning,
+      'almoco' => MealPeriod.afternoon,
       'noite' => MealPeriod.night,
       _ => null,
     };
@@ -234,4 +243,17 @@ extension MealPeriodWire on MealPeriod {
     }
     return parseCanonical(raw);
   }
+}
+
+extension MealAcceptanceWire on MealAcceptance {
+  String get wireName => switch (this) {
+    MealAcceptance.full => 'full',
+    MealAcceptance.partial => 'partial',
+    MealAcceptance.refused => 'refused',
+    MealAcceptance.unknown => 'unknown',
+  };
+
+  /// Parse unknown-safe — nunca promove valor desconhecido a um known incorreto.
+  static ParsedHealthEnum<MealAcceptance> parse(Object? value) =>
+      _parseEnum(value, MealAcceptance.values, (item) => item.wireName);
 }

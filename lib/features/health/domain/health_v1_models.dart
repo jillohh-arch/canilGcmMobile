@@ -473,23 +473,56 @@ final class MealLog {
     required String id,
     required String dogId,
     required this.period,
-    required num amountGrams,
+    required num offeredGrams,
+    required this.acceptance,
     required this.fedAt,
     required this.recordedBy,
     required this.schemaVersion,
+    required this.revision,
+    String? planId,
+    String? plannedMealId,
+    String? mealOccurrenceId,
+    this.scheduledFor,
+    num? consumedGrams,
+    String? observations,
+    List<String>? attachmentRefs,
+    String? legacyPhotoBalanceUrl,
+    num? prescriptionAmountAtTime,
+    num? divergencePercent,
+    String? divergenceReason,
+    String? source,
+    String? legacySource,
+    String? legacyId,
+    num? legacyAmountGrams,
   }) : id = _required(id, 'id'),
        dogId = _required(dogId, 'dog_id'),
-       amountGrams = amountGrams.toDouble() {
+       planId = _emptyToNull(planId),
+       plannedMealId = _emptyToNull(plannedMealId),
+       mealOccurrenceId = _emptyToNull(mealOccurrenceId),
+       offeredGrams = offeredGrams.toDouble(),
+       consumedGrams = consumedGrams?.toDouble(),
+       observations = observations?.trim(),
+       attachmentRefs = List.unmodifiable(
+         List<String>.of(attachmentRefs ?? const []),
+       ),
+       legacyPhotoBalanceUrl = _emptyToNull(legacyPhotoBalanceUrl),
+       prescriptionAmountAtTime = prescriptionAmountAtTime?.toDouble(),
+       divergencePercent = divergencePercent?.toDouble(),
+       divergenceReason = divergenceReason?.trim(),
+       source = _emptyToNull(source),
+       legacySource = _emptyToNull(legacySource),
+       legacyId = _emptyToNull(legacyId),
+       legacyAmountGrams = legacyAmountGrams?.toDouble() {
     if (period.isAbsent) {
       throw const HealthDomainException(
         'missing_period',
         'period é obrigatório',
       );
     }
-    if (!this.amountGrams.isFinite || this.amountGrams <= 0) {
+    if (acceptance.isAbsent) {
       throw const HealthDomainException(
-        'invalid_amount_grams',
-        'amount_grams deve ser finito e maior que zero',
+        'missing_acceptance',
+        'acceptance é obrigatório',
       );
     }
     if (schemaVersion <= 0) {
@@ -498,16 +531,148 @@ final class MealLog {
         'schema_version deve ser positivo',
       );
     }
+    if (revision < 1) {
+      throw const HealthDomainException(
+        'invalid_revision',
+        'revision deve ser >= 1 para documento canônico',
+      );
+    }
+    validateQuantityInvariantsPublic(
+      offeredGrams: this.offeredGrams,
+      consumedGrams: this.consumedGrams,
+      acceptance: acceptance,
+    );
+    _validatePlannedLinkage(
+      planId: this.planId,
+      plannedMealId: this.plannedMealId,
+      mealOccurrenceId: this.mealOccurrenceId,
+    );
+    final rx = this.prescriptionAmountAtTime;
+    if (rx != null && (!rx.isFinite || rx <= 0)) {
+      throw const HealthDomainException(
+        'invalid_prescription_amount_at_time',
+        'prescription_amount_at_time deve ser finito e > 0 quando presente',
+      );
+    }
+    final legacyAmt = this.legacyAmountGrams;
+    if (legacyAmt != null && (!legacyAmt.isFinite || legacyAmt <= 0)) {
+      throw const HealthDomainException(
+        'invalid_legacy_amount_grams',
+        'legacy_amount_grams deve ser finito e > 0 quando presente',
+      );
+    }
   }
 
   final String id;
   final String dogId;
+  final String? planId;
+  final String? plannedMealId;
+  final String? mealOccurrenceId;
   final ParsedHealthEnum<MealPeriod> period;
-  final double amountGrams;
+  final DateTime? scheduledFor;
+  final double offeredGrams;
+  final double? consumedGrams;
+  final ParsedHealthEnum<MealAcceptance> acceptance;
   final DateTime fedAt;
+  final String? observations;
+  final List<String> attachmentRefs;
+  final String? legacyPhotoBalanceUrl;
+  final double? prescriptionAmountAtTime;
+  final double? divergencePercent;
+  final String? divergenceReason;
   final RecordedBy recordedBy;
   final int schemaVersion;
+  final int revision;
+  final String? source;
+  final String? legacySource;
+  final String? legacyId;
+  final double? legacyAmountGrams;
 
+  /// D42 — invariantes de quantidade e acceptance (domínio puro).
+  ///
+  /// Público para reutilização em inputs de cliente (D41) sem montar MealLog.
+  static void validateQuantityInvariantsPublic({
+    required double offeredGrams,
+    required double? consumedGrams,
+    required ParsedHealthEnum<MealAcceptance> acceptance,
+  }) {
+    if (!offeredGrams.isFinite || offeredGrams <= 0) {
+      throw const HealthDomainException(
+        'invalid_offered_grams',
+        'offered_grams deve ser finito e maior que zero',
+      );
+    }
+    if (consumedGrams != null) {
+      if (!consumedGrams.isFinite) {
+        throw const HealthDomainException(
+          'invalid_consumed_grams',
+          'consumed_grams deve ser finito quando presente',
+        );
+      }
+      if (consumedGrams < 0 || consumedGrams > offeredGrams) {
+        throw const HealthDomainException(
+          'invalid_consumed_grams',
+          'consumed_grams deve satisfazer 0 <= consumed <= offered',
+        );
+      }
+    }
+
+    final known = acceptance.value;
+    if (acceptance.isUnknown || acceptance.isAbsent || known == null) {
+      // unknown: preferencialmente null; se valor presente, só bounds gerais.
+      return;
+    }
+
+    switch (known) {
+      case MealAcceptance.refused:
+        if (consumedGrams != 0) {
+          throw const HealthDomainException(
+            'inconsistent_acceptance_refused',
+            'acceptance=refused exige consumed_grams == 0',
+          );
+        }
+      case MealAcceptance.full:
+        if (consumedGrams != null && consumedGrams != offeredGrams) {
+          throw const HealthDomainException(
+            'inconsistent_acceptance_full',
+            'acceptance=full exige consumed null ou == offered_grams',
+          );
+        }
+      case MealAcceptance.partial:
+        if (consumedGrams != null &&
+            (consumedGrams <= 0 || consumedGrams >= offeredGrams)) {
+          throw const HealthDomainException(
+            'inconsistent_acceptance_partial',
+            'acceptance=partial exige consumed null ou 0 < consumed < offered',
+          );
+        }
+      case MealAcceptance.unknown:
+        // bounds já validados acima; não inferir outro acceptance.
+        break;
+    }
+  }
+
+  /// Planejado: os três vínculos; avulso: nenhum (D12).
+  /// Meio-termo (só plan_id, etc.) é inconsistente.
+  static void _validatePlannedLinkage({
+    required String? planId,
+    required String? plannedMealId,
+    required String? mealOccurrenceId,
+  }) {
+    final hasPlan = planId != null && planId.isNotEmpty;
+    final hasSlot = plannedMealId != null && plannedMealId.isNotEmpty;
+    final hasOcc = mealOccurrenceId != null && mealOccurrenceId.isNotEmpty;
+    final any = hasPlan || hasSlot || hasOcc;
+    final all = hasPlan && hasSlot && hasOcc;
+    if (any && !all) {
+      throw const HealthDomainException(
+        'incomplete_planned_meal_linkage',
+        'MealLog planejado exige plan_id, planned_meal_id e meal_occurrence_id',
+      );
+    }
+  }
+
+  /// `fed_at` não pode ser futuro (relógio injetado — não usa DateTime.now).
   void validateFedAt({required DateTime referenceTime}) {
     if (fedAt.isAfter(referenceTime)) {
       throw const HealthDomainException(
@@ -517,27 +682,86 @@ final class MealLog {
     }
   }
 
+  bool get isPlanned =>
+      planId != null &&
+      planId!.isNotEmpty &&
+      plannedMealId != null &&
+      plannedMealId!.isNotEmpty &&
+      mealOccurrenceId != null &&
+      mealOccurrenceId!.isNotEmpty;
+
+  bool get isAdHoc => !isPlanned;
+
   @override
   bool operator ==(Object other) =>
       other is MealLog &&
       other.id == id &&
       other.dogId == dogId &&
+      other.planId == planId &&
+      other.plannedMealId == plannedMealId &&
+      other.mealOccurrenceId == mealOccurrenceId &&
       other.period == period &&
-      other.amountGrams == amountGrams &&
+      other.scheduledFor == scheduledFor &&
+      other.offeredGrams == offeredGrams &&
+      other.consumedGrams == consumedGrams &&
+      other.acceptance == acceptance &&
       other.fedAt == fedAt &&
+      other.observations == observations &&
+      _listEq(other.attachmentRefs, attachmentRefs) &&
+      other.legacyPhotoBalanceUrl == legacyPhotoBalanceUrl &&
+      other.prescriptionAmountAtTime == prescriptionAmountAtTime &&
+      other.divergencePercent == divergencePercent &&
+      other.divergenceReason == divergenceReason &&
       other.recordedBy == recordedBy &&
-      other.schemaVersion == schemaVersion;
+      other.schemaVersion == schemaVersion &&
+      other.revision == revision &&
+      other.source == source &&
+      other.legacySource == legacySource &&
+      other.legacyId == legacyId &&
+      other.legacyAmountGrams == legacyAmountGrams;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     dogId,
+    planId,
+    plannedMealId,
+    mealOccurrenceId,
     period,
-    amountGrams,
+    scheduledFor,
+    offeredGrams,
+    consumedGrams,
+    acceptance,
     fedAt,
+    observations,
+    Object.hashAll(attachmentRefs),
+    legacyPhotoBalanceUrl,
+    prescriptionAmountAtTime,
+    divergencePercent,
+    divergenceReason,
     recordedBy,
     schemaVersion,
-  );
+    revision,
+    source,
+    legacySource,
+    legacyId,
+    legacyAmountGrams,
+  ]);
+
+  static bool _listEq(List<String> a, List<String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static String? _emptyToNull(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 }
 
 final class LegacyHealthRecordView {
