@@ -124,6 +124,45 @@ export function initialRevision(): number {
   return 1;
 }
 
+/**
+ * Create manual: `scheduled_for` deve ser presente ou futuro.
+ *
+ * Granularidade: início do minuto UTC do servidor (evita race de segundos
+ * entre seleção UX → submit → rede → callable no minuto corrente).
+ *
+ * Válido: scheduledFor >= startOfUtcMinute(serverNow)
+ * Inválido: qualquer instante no minuto anterior ou antes.
+ *
+ * Não usa relógio do cliente. Apenas criação; update não reutiliza esta regra.
+ */
+export function startOfUtcMinute(when: Date): Date {
+  return new Date(Date.UTC(
+    when.getUTCFullYear(),
+    when.getUTCMonth(),
+    when.getUTCDate(),
+    when.getUTCHours(),
+    when.getUTCMinutes(),
+    0,
+    0,
+  ));
+}
+
+export function assertScheduledForNotInPast(
+  scheduledFor: Date,
+  serverNow: Date = new Date(),
+): void {
+  if (Number.isNaN(scheduledFor.getTime())) {
+    throw logicError("validation", "scheduledFor inválido.");
+  }
+  const floor = startOfUtcMinute(serverNow);
+  if (scheduledFor.getTime() < floor.getTime()) {
+    throw logicError(
+      "validation",
+      "scheduled_for deve ser presente ou futuro na criação",
+    );
+  }
+}
+
 export function parseExpectedRevision(raw: unknown): number {
   if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0) return raw;
   if (typeof raw === "string" && raw.trim() !== "") {

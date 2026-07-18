@@ -332,6 +332,49 @@ void main() {
       expect(r.item.lifecycleStatus, ScheduleLifecycleStatus.open);
       expect(r.item.recordedBy, actor);
       expect(r.snapshot.createOperationId, 'create-op-1');
+      expect(r.snapshot.revision, HealthScheduleRevision.numeric(1));
+      expect(r.wasNoOp, isFalse);
+    });
+
+    test('create no passado (minuto anterior) → validation', () {
+      expect(
+        () => HealthScheduleMutationEngine.createManual(
+          command: CreateManualScheduleItemCommand(
+            dogId: 'dog-1',
+            scheduleType: ScheduleType.dose,
+            title: 'Dose passada',
+            scheduledFor: serverNow.subtract(const Duration(minutes: 1)),
+            timezone: 'America/Sao_Paulo',
+            operationId: 'create-past-1',
+          ),
+          trusted: trusted,
+          resolvedId: 'past-1',
+        ),
+        throwsA(isA<HealthScheduleMutationValidation>()),
+      );
+    });
+
+    test('create no minuto corrente do trusted → aceito', () {
+      final r = HealthScheduleMutationEngine.createManual(
+        command: CreateManualScheduleItemCommand(
+          dogId: 'dog-1',
+          scheduleType: ScheduleType.dose,
+          title: 'Dose agora',
+          // Mesmo minuto de serverNow, segundos anteriores — ainda válido.
+          scheduledFor: DateTime.utc(
+            serverNow.year,
+            serverNow.month,
+            serverNow.day,
+            serverNow.hour,
+            serverNow.minute,
+          ),
+          timezone: 'America/Sao_Paulo',
+          operationId: 'create-now-1',
+        ),
+        trusted: trusted,
+        resolvedId: 'now-1',
+      );
+      expect(r.snapshot.revision, HealthScheduleRevision.numeric(1));
       expect(r.wasNoOp, isFalse);
     });
 

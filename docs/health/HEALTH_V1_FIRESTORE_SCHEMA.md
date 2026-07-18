@@ -492,7 +492,7 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 |-------|------|-------------|-------|
 | schedule_type | string (enum) | ✅ | dose, vaccination, exam, consultation, weighing, reevaluation, deworming, bath, general |
 | title | string | ✅ | |
-| scheduled_for | timestamp | ✅ | |
+| scheduled_for | timestamp | ✅ | Create manual: presente ou futuro (autoridade callable; minuto corrente do servidor aceito). Não nasce no passado. |
 | due_until | timestamp | ❌ | Opcional — quando ausente, tolerância é definida por configuração por `schedule_type`, **sem default universal**. |
 | timezone | string | ✅ | Ex: "America/Sao_Paulo"; usado em toda derivação temporal |
 | lifecycle_status | string (enum) | ✅ | **open, completed, cancelled** — único campo de estado persistido |
@@ -561,8 +561,12 @@ Quando `due_until` está ausente, a tolerância é resolvida por configuração 
 
 A regra é única: o primeiro caso verdadeiro vence. Não há caso em que o mesmo item seja classificado simultaneamente como `pending` e `overdue`.
 
-**Escritor:** Function (automático), Mobile/Web (manual).
-**Leitor:** Mobile, Web.
+**Escritores (contrato operacional 4E):**
+- **Flutter client:** **read-only** (Rules: `create/update/delete: if false`).
+- **Backend callables / Admin SDK:** writer canônico das mutações manuais (`healthScheduleCreateManual`, `healthScheduleUpdateOpen`, `healthScheduleComplete`, `healthScheduleCancel`) e de gerações automáticas futuras.
+- Mobile/Web **não** escrevem o documento diretamente; invocam callables autenticados.
+
+**Leitor:** Mobile, Web (cliente autenticado com `canAccessDogRecord`).
 **Índices:** `lifecycle_status ASC, scheduled_for ASC`; `schedule_type ASC, lifecycle_status ASC, scheduled_for ASC`.
 
 ---

@@ -243,15 +243,29 @@ Reúne:
 - pesagens
 - reavaliações
 
-Estados
+## Lifecycle persistido (documento `health_schedule`)
 
-- Programado
-- Próximo
-- Hoje
-- Pendente
-- Atrasado
-- Concluído
-- Cancelado
+Somente estes valores são gravados em `lifecycle_status`:
+
+- `open`
+- `completed`
+- `cancelled`
+
+Create manual: `scheduled_for` deve ser **presente ou futuro** (autoridade backend).
+`pending` / `overdue` **não** são valores de create — surgem só com a passagem do tempo.
+
+## Status temporal derivado (somente leitura / UI)
+
+Calculados no cliente a partir de `scheduled_for`, `due_until` e agora:
+
+- `scheduled` (programado)
+- `upcoming` (próximo)
+- `today` (hoje)
+- `pending` (pendente)
+- `overdue` (atrasado)
+
+**Nunca** são persistidos como campos do documento.
+`completed` / `cancelled` na UI de timeline/status visual refletem o lifecycle terminal, não um campo temporal separado.
 
 ---
 

@@ -337,22 +337,23 @@ schedule: {
 | Aspecto | Definição |
 |---------|-----------|
 | **Responsabilidade** | Item de agenda preventiva ou terapêutica (próxima dose, vacina, pesagem, consulta) — agregado canônico persistente |
-| **Identificador** | `{dogId}/health_schedule/{scheduleId}` — UUID |
-| **Invariantes** | (1) `scheduled_for` deve ser presente ou futuro na criação. (2) Item `completed` não volta a estado anterior. (3) Pode ser criado por Function (automático) ou condutor/admin (manual). |
+| **Identificador** | `{dogId}/health_schedule/{scheduleId}` — identificador opaco e estável; no create manual o backend pode gerar id determinístico a partir da idempotência (não é obrigatório UUID) |
+| **Invariantes** | (1) **Create manual:** `scheduled_for` deve ser presente ou futuro (autoridade backend; granularidade do minuto corrente do servidor). Itens **não** nascem no passado. `pending`/`overdue` só aparecem depois, por passagem do tempo. (2) Item `completed` não volta a estado anterior. (3) Manual via callable; automático via Function/origem clínica. (4) `revision` monotônica (create = 1; legado ausente = 0 na leitura). |
 | **Estados (persisted)** | `lifecycle_status: open \| completed \| cancelled` |
 | **Estados temporais (derived at read time)** | `scheduled`, `upcoming` (≤N dias), `today`, `pending` (no horário), `overdue` (atrasado) — NUNCA persistidos, calculados no momento da leitura |
 | **Transições** | `open→completed` (manual ou automático), `open→cancelled`, terminal em ambos os casos |
-| **Campos obrigatórios** | `schedule_type` (enum), `title`, `scheduled_for`, `timezone`, `lifecycle_status`, `source_type`, `created_at`, `recorded_by`, `schema_version` |
+| **Campos obrigatórios** | `schedule_type` (enum), `title`, `scheduled_for`, `timezone`, `lifecycle_status`, `source_type`, `created_at`, `recorded_by`, `schema_version`, `revision` (mutações novas) |
 | **Campos opcionais** | `due_until`, `completed_at`, `completed_by: RecordedBy`, `cancelled_at`, `cancelled_by: RecordedBy`, `cancel_reason`, `source_id`, `case_id`, `notes`, `recurrence_rule` |
 | **Valores derivados (read-time)** | `temporal_state`, `minutes_until_due`, `is_overdue` |
 | **Dados sensíveis** | Nenhum |
 | **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` ou `"system"` |
-| **Auditoria** | Transição de lifecycle_status registrada em campos próprios (completed_*, cancelled_*) |
+| **Auditoria** | Transição de lifecycle_status registrada em campos próprios (completed_*, cancelled_*); mutações manuais via callables geram auditLogs + operation receipts |
 
 **Separação lifecycle vs temporal:**
 - `lifecycle_status` é o estado persistido do item (open/completed/cancelled).
 - Estados temporais (`scheduled`, `upcoming`, `today`, `pending`, `overdue`) são DERIVADOS no momento da leitura, baseados em `scheduled_for`, `due_until` (quando presente) e `current_time`. **Nenhum desses estados é persistido como campo no documento.**
 - A UI/cliente calcula o `temporal_state` localmente. Nenhuma Function reescreve o documento apenas porque o tempo passou.
+- **Create manual não pode nascer no passado.** `pending`/`overdue` surgem só após a criação, com o tempo.
 - Timezone é obrigatório e armazenado no próprio item; toda derivação usa esse timezone.
 - Quando `due_until` está ausente, a tolerância é definida por configuração por `schedule_type` — sem default universal.
 

@@ -13,6 +13,7 @@ import {
   UpdatePatch,
   assertCancelReason,
   assertScheduleType,
+  assertScheduledForNotInPast,
   assertTimezone,
   assertTitle,
   createIdempotencyMaterial,
@@ -315,6 +316,8 @@ export async function runHealthScheduleCreateManual(
     const scheduledFor = parseScheduledFor(
       data.scheduledFor ?? data.scheduled_for,
     );
+    // Autoridade de tempo: relógio do servidor (granularidade minuto UTC).
+    assertScheduledForNotInPast(scheduledFor.toDate(), new Date());
     const dueUntilRaw = data.dueUntil ?? data.due_until;
     let dueUntil: Timestamp | null = null;
     if (dueUntilRaw !== undefined && dueUntilRaw !== null && dueUntilRaw !== "") {

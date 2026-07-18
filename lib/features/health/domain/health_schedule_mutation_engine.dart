@@ -70,8 +70,12 @@ abstract final class HealthScheduleMutationEngine {
         'id do item é obrigatório na criação',
       );
     }
-    if (command.scheduledFor.isBefore(trusted.serverNow) &&
-        !_isSameUtcMinute(command.scheduledFor, trusted.serverNow)) {
+    // Create only: presente/futuro com granularidade de minuto UTC
+    // (alinhado a assertScheduledForNotInPast no backend).
+    // Usa trusted.serverNow — nunca DateTime.now() no domínio.
+    final scheduledUtc = command.scheduledFor.toUtc();
+    final floor = _startOfUtcMinute(trusted.serverNow);
+    if (scheduledUtc.isBefore(floor)) {
       throw const HealthScheduleMutationValidation(
         'scheduled_for deve ser presente ou futuro na criação',
       );
@@ -94,10 +98,12 @@ abstract final class HealthScheduleMutationEngine {
         caseId: command.caseId,
         notes: command.notes,
       );
+      // Alinhado ao backend (`initialRevision() = 1`). Legado ausente na leitura
+      // continua 0 (mapper/readRevision); create novo nunca materializa 0.
       return HealthScheduleMutationApplyResult(
         snapshot: HealthScheduleMutationStateSnapshot(
           item: item,
-          revision: HealthScheduleRevision.numeric(0),
+          revision: HealthScheduleRevision.numeric(1),
           createOperationId: command.operationId,
         ),
         wasNoOp: false,
@@ -350,13 +356,9 @@ abstract final class HealthScheduleMutationEngine {
     }
   }
 
-  static bool _isSameUtcMinute(DateTime a, DateTime b) {
-    final au = a.toUtc();
-    final bu = b.toUtc();
-    return au.year == bu.year &&
-        au.month == bu.month &&
-        au.day == bu.day &&
-        au.hour == bu.hour &&
-        au.minute == bu.minute;
+  /// Início do minuto UTC — mesma semântica do backend `startOfUtcMinute`.
+  static DateTime _startOfUtcMinute(DateTime when) {
+    final u = when.toUtc();
+    return DateTime.utc(u.year, u.month, u.day, u.hour, u.minute);
   }
 }

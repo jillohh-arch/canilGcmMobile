@@ -29,7 +29,9 @@ final class HealthScheduleQuery {
   /// Vazio = todos os tipos.
   final Set<ScheduleType> types;
 
-  /// Vazio = todos os lifecycle (open/completed/cancelled).
+  /// Vazio = política operacional da source: somente `open`
+  /// ([FirestoreHealthScheduleSource] força open-only).
+  /// Terminais (completed/cancelled) não entram na lista padrão da Agenda.
   final Set<ScheduleLifecycleStatus> lifecycleStatuses;
 
   final int pageSize;

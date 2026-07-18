@@ -177,11 +177,24 @@ class _HealthScheduleItemFormScreenState
     if (_scheduledFor == null) {
       return HealthScheduleMutationUserCopy.scheduledForRequired;
     }
+    // Create only: alinhado ao backend (presente/futuro, minuto corrente OK).
+    // Update de item já atrasado continua permitido (outros campos / reprogramação).
+    if (_isCreate && _isBeforeStartOfLocalMinute(_scheduledFor!)) {
+      return HealthScheduleMutationUserCopy.scheduledForInPast;
+    }
     final due = _dueUntil;
     if (due != null && due.isBefore(_scheduledFor!)) {
       return HealthScheduleMutationUserCopy.dueUntilBeforeScheduled;
     }
     return null;
+  }
+
+  /// Conveniência UX local: rejeita instantes anteriores ao início do minuto
+  /// civil atual do aparelho. Backend permanece autoridade (UTC minute).
+  static bool _isBeforeStartOfLocalMinute(DateTime value) {
+    final now = DateTime.now();
+    final floor = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    return value.isBefore(floor);
   }
 
   Future<void> _submit() async {
@@ -330,6 +343,8 @@ class _HealthScheduleItemFormScreenState
                     ],
 
                     // 3. Agendado para
+                    // Create: firstDate = hoje (picker); validação de minuto no submit.
+                    // Edit: sem firstDate restritiva — item pode já estar atrasado.
                     HealthDateTimeField(
                       key: const ValueKey('schedule-form-scheduled-for'),
                       label: HealthScheduleMutationUserCopy.fieldScheduledFor,
@@ -337,6 +352,13 @@ class _HealthScheduleItemFormScreenState
                       includeTime: true,
                       required: true,
                       enabled: !submitting,
+                      firstDate: _isCreate
+                          ? DateTime(
+                              DateTime.now().year,
+                              DateTime.now().month,
+                              DateTime.now().day,
+                            )
+                          : null,
                       onChanged: _setScheduledFor,
                     ),
                     const SizedBox(height: 14),

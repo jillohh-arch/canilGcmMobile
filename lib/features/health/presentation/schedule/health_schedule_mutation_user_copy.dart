@@ -25,6 +25,8 @@ abstract final class HealthScheduleMutationUserCopy {
   static const typeManualHint = 'Item manual';
   static const titleRequired = 'Informe um título.';
   static const scheduledForRequired = 'Informe a data e hora do agendamento.';
+  static const scheduledForInPast =
+      'O agendamento deve ser para o momento atual ou para o futuro.';
   static const dueUntilBeforeScheduled =
       'O prazo não pode ser anterior ao horário agendado.';
   static const typeRequired = 'Selecione o tipo do item.';

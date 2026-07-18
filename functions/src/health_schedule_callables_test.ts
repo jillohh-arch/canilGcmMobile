@@ -878,6 +878,95 @@ async function main(): Promise<void> {
     );
   });
 
+  await test("create scheduled_for no passado → validation + zero write", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    const auth = {uid: actor.uid, token: {}};
+    // Claramente no passado relativo a qualquer "agora" do teste.
+    const pastIso = "2020-01-01T12:00:00.000Z";
+    await assert.rejects(
+      () =>
+        runHealthScheduleCreateManual(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              scheduleType: "vaccination",
+              title: "Vacina passada",
+              scheduledFor: pastIso,
+              timezone: "America/Sao_Paulo",
+              idempotencyKey: "create-past-1",
+            },
+            auth,
+          ),
+          deps,
+        ),
+      (e: {code?: string; details?: {code?: string}}) =>
+        e.code === "invalid-argument" && e.details?.code === "validation",
+    );
+    // ZERO schedule / receipt / audit
+    const scheduleKeys = Object.keys(db._store).filter((k) =>
+      k.includes("/health_schedule/"),
+    );
+    assert.strictEqual(scheduleKeys.length, 0, "zero health_schedule");
+    assert.strictEqual(
+      countAudit(db._store, "health_schedule_created"),
+      0,
+      "zero audit",
+    );
+  });
+
+  await test("create scheduled_for minuto corrente e futuro → aceito", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    const auth = {uid: actor.uid, token: {}};
+    const now = new Date();
+    const currentMinute = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      0,
+      0,
+    ));
+    const future = new Date(now.getTime() + 60 * 60 * 1000);
+
+    const rCurrent = await runHealthScheduleCreateManual(
+      mockRequest(
+        {
+          dogId: "dog-1",
+          scheduleType: "weighing",
+          title: "Pesagem agora",
+          scheduledFor: currentMinute.toISOString(),
+          timezone: "America/Sao_Paulo",
+          idempotencyKey: "create-now-minute-1",
+        },
+        auth,
+      ),
+      deps,
+    );
+    assert.strictEqual(rCurrent.wasNoOp, false);
+    assert.strictEqual(rCurrent.revision, 1);
+    assert.strictEqual(rCurrent.lifecycleStatus, "open");
+
+    const rFuture = await runHealthScheduleCreateManual(
+      mockRequest(
+        {
+          dogId: "dog-1",
+          scheduleType: "bath",
+          title: "Banho futuro",
+          scheduledFor: future.toISOString(),
+          timezone: "America/Sao_Paulo",
+          idempotencyKey: "create-future-1",
+        },
+        auth,
+      ),
+      deps,
+    );
+    assert.strictEqual(rFuture.wasNoOp, false);
+    assert.strictEqual(rFuture.revision, 1);
+  });
+
   // sanity deterministic id
   const material = createIdempotencyMaterial("u", "d", "k");
   const hash = crypto.createHash("sha256").update(material).digest("hex");

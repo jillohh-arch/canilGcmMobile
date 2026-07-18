@@ -115,8 +115,21 @@ o que exige e quem pode exercê-la como **executor candidato** (não mapeamento 
 | Capability | Descrição | Executor candidato | Canal | Evidência requerida | Auditoria |
 |-----------|-----------|--------------------|-------|--------------------|-----------|
 | `health.complete_treatment` | Concluir protocolo de tratamento (transição para `monitoring`) | condutor (provisório), admin | Web | professional recomendado | recorded_by + professional |
-| `health.schedule_item` | Criar item manual na agenda | condutor, admin | Mobile, Web | — | recorded_by |
-| `health.manage_schedule` | Cancelar ou editar item de agenda criado por outro usuário, ou por Function | condutor (provisório), admin | Web | `cancel_reason` obrigatório quando cancelar | recorded_by + reason |
+
+#### Agenda Preventiva — modelo operacional real (4E, canônico)
+
+Não inventar capabilities `health.schedule_item` / `health.manage_schedule` nesta rodada.
+Esses nomes, se aparecerem em tabelas históricas, são **não operacionais**.
+
+| Operação | Autorização real (Functions) | Observação |
+|----------|------------------------------|------------|
+| **Create manual** | `health.create` + `requireDogRecordAccess` | Callable `healthScheduleCreateManual`; `scheduled_for` presente/futuro (backend) |
+| **Update open** | `health.edit` + dog access + manual + open + revision | Callable `healthScheduleUpdateOpen` |
+| **Complete** | `health.edit` + dog access | Callable `healthScheduleComplete` |
+| **Cancel manual** | `health.edit` + dog access + `cancel_reason` | Callable `healthScheduleCancel` |
+| **Cancel automático** | `health.edit` + dog access + **autoridade admin real** | Mesmo callable; UI mobile pode esconder se admin não for determinável no cliente |
+
+> **Histórico (não operacional):** `health.schedule_item` e `health.manage_schedule` eram rótulos provisórios do foundation. A implementação 4E reutiliza `health.create` / `health.edit` existentes.
 
 ### 4.7 Correções e gestão
 
@@ -130,7 +143,7 @@ o que exige e quem pode exercê-la como **executor candidato** (não mapeamento 
 **Invariantes das capabilities:**
 
 - `health.discharge_case`, `health.reopen_case`, `health.cancel_case`, `health.complete_treatment` exigem `ProfessionalIdentity` preenchida **quando representam decisão clínica externa**. Reaberturas meramente administrativas por erro de fechamento exigem capability, `reopen_reason` e auditoria — sem inventar documento veterinário inexistente.
-- `health.manage_schedule` opera apenas sobre itens da agenda — não modifica prontidão, não encerra restrições, não altera casos.
+- Mutações da Agenda (`health.create` / `health.edit` nos callables) operam apenas sobre `health_schedule` — não modificam prontidão, não encerram restrições, não alteram casos.
 - `health.reopen_case` é permitido apenas em `ClinicalCase` com `clinical_status == "discharged"`. Estado de destino permitido: `open`, `under_investigation`, `under_treatment` ou `monitoring` (nunca direto a `cancelled`).
 - `health.cancel_case` adiciona `cancel_reason` e mantém o histórico completo.
 - `health.release_restriction` registra encerramento de restrição. Quando representa decisão clínica externa, exige `ProfessionalIdentity` + `end_source_document` + `end_reason` obrigatórios. O Schema armazena `end_professional` e `end_source_document` para esses casos.
@@ -157,7 +170,7 @@ o que exige e quem pode exercê-la como **executor candidato** (não mapeamento 
 | HealthDocument | health.record_clinical_document (quando clinical) ou health.record_preventive (quando preventivo); upload via Web ou Mobile com capability adequada [provisório] | health.read | metadados (autor) [provisório] | health.cancel_record [provisório] |
 | OperationalRestriction | health.issue_restriction (com evidence profissional) | health.read | health.release_restriction (com end_professional+end_source_document quando externo, end_reason sempre) | capability administrativa [provisório] |
 | VaccinationRecord | health.record_preventive (ProfessionalIdentity+source_document só quando externo; aplicação interna fica sem professional) [provisório] | health.read | metadados (autor) [provisório] | health.cancel_record [provisório] |
-| HealthScheduleItem | health.schedule_item (manual) [provisório]; Function (automático) | health.read | health.manage_schedule (cancelar/editar itens de outros) [provisório] | health.manage_schedule [provisório] |
+| HealthScheduleItem | **Operacional 4E:** `health.create` + dog (create manual via callable); Function (automático). ~~`health.schedule_item`~~ não operacional | health.read (Rules) | **Operacional 4E:** `health.edit` + dog (update/complete/cancel via callable); cancel auto exige admin real. ~~`health.manage_schedule`~~ não operacional | soft cancel via lifecycle (sem hard delete cliente) |
 | LegacyHealthRecord | — (Admin SDK apenas, auditado) | health.read | **Read-only para clientes.** Admin SDK auditado pode atualizar `normalized_view`, `case_id`, metadados de reconciliação. `original_payload` é sempre imutável. | — |
 | HealthTimeline (projeção) | Function | health.read | Function | Function |
 | ReadinessSnapshot (projeção) | Function | health.read | Function | — |

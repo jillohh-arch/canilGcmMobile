@@ -11,12 +11,14 @@ import {
   fingerprintCancel,
   fingerprintCreateIntent,
   fingerprintUpdatePatch,
+  assertScheduledForNotInPast,
   initialRevision,
   matchOperationReceipt,
   nextRevision,
   parseUpdatePatch,
   readRevision,
   normalizeOperationId,
+  startOfUtcMinute,
 } from "./health_schedule_logic";
 
 function test(name: string, fn: () => void): void {
@@ -33,6 +35,35 @@ test("revision ausente = 0; next monotônico; create inicia em 1", () => {
   assert.strictEqual(readRevision({}), 0);
   assert.strictEqual(nextRevision(0), 1);
   assert.strictEqual(initialRevision(), 1);
+});
+
+test("create scheduled_for: passado rejeita; minuto atual e futuro aceitam", () => {
+  const now = new Date("2026-07-18T15:30:45.123Z");
+  const floor = startOfUtcMinute(now);
+  assert.strictEqual(floor.toISOString(), "2026-07-18T15:30:00.000Z");
+
+  // Minuto anterior → validation
+  assert.throws(
+    () =>
+      assertScheduledForNotInPast(
+        new Date("2026-07-18T15:29:59.999Z"),
+        now,
+      ),
+    (e: Error & {appCode?: string}) => e.appCode === "validation",
+  );
+
+  // Início do minuto corrente → OK
+  assert.doesNotThrow(() =>
+    assertScheduledForNotInPast(new Date("2026-07-18T15:30:00.000Z"), now),
+  );
+  // Meio do minuto corrente → OK
+  assert.doesNotThrow(() =>
+    assertScheduledForNotInPast(new Date("2026-07-18T15:30:30.000Z"), now),
+  );
+  // Futuro → OK
+  assert.doesNotThrow(() =>
+    assertScheduledForNotInPast(new Date("2026-07-18T16:00:00.000Z"), now),
+  );
 });
 
 test("complete: open muta; completed noop; cancelled invalid", () => {
