@@ -64,4 +64,26 @@ abstract final class NutritionFirestoreError {
   static Map<String, Object?> asObjectMap(Map<String, dynamic> data) {
     return data.map((key, value) => MapEntry(key, value as Object?));
   }
+
+  /// Materializa payload legado para o domínio puro, removendo tipos do SDK.
+  ///
+  /// Adapters legados podem preservar o payload original em value objects
+  /// imutáveis. Por isso não basta o parser de data aceitar [Timestamp]: todo
+  /// Timestamp, inclusive em campos auxiliares/nested, precisa virar DateTime.
+  static Map<String, Object?> asLegacyDomainMap(Map<String, dynamic> data) {
+    return data.map((key, value) => MapEntry(key, _toDomainValue(value)));
+  }
+
+  static Object? _toDomainValue(Object? value) {
+    if (value is Timestamp) return value.toDate().toUtc();
+    if (value is Map) {
+      return value.map(
+        (key, nested) => MapEntry(key.toString(), _toDomainValue(nested)),
+      );
+    }
+    if (value is Iterable) {
+      return value.map(_toDomainValue).toList(growable: false);
+    }
+    return value;
+  }
 }

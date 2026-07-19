@@ -28,6 +28,7 @@ import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gatewa
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
@@ -37,7 +38,6 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
-import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section_placeholder.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
 /// Entrada de produção controlada do Health v1.0 (Fase 2E + 3E-B + 4B).
@@ -311,6 +311,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     if (section == HealthShellSection.agenda) {
       _primeScheduleIfNeeded();
     }
+    if (section == HealthShellSection.nutricao) {
+      _primeNutritionIfNeeded();
+    }
   }
 
   /// Lazy first-load: uma única vez por vida do entry (ou após dog change se já primed).
@@ -328,11 +331,25 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _scheduleController.selectDog(widget.dogId);
   }
 
+  /// Gate 5B: prime real do read controller ao abrir Nutrição Hoje.
+  void _primeNutritionIfNeeded() {
+    if (_nutritionReadPrimed) return;
+    _nutritionReadPrimed = true;
+    // ignore: discarded_futures
+    _nutritionReadController.selectDog(widget.dogId);
+  }
+
   @visibleForTesting
   void primeTimelineForTest() => _primeTimelineIfNeeded();
 
   @visibleForTesting
   void primeScheduleForTest() => _primeScheduleIfNeeded();
+
+  @visibleForTesting
+  void primeNutritionForTest() => _primeNutritionIfNeeded();
+
+  @visibleForTesting
+  bool get nutritionReadPrimedForTest => _nutritionReadPrimed;
 
   void _onRegister() {
     AppFeedback.info(
@@ -502,10 +519,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           dogDisplayName: dogContext.name,
           bottomPadding: _timelineBottomPadding(context),
         ),
-        nutricao: (_) => const HealthShellSectionPlaceholder(
-          section: HealthShellSection.nutricao,
-          message:
-              'Nutrição Health v1 em construção. O card do Resumo já lê dados reais.',
+        nutricao: (_) => HealthNutritionTodayScreen(
+          controller: _nutritionReadController,
+          dogDisplayName: dogContext.name,
+          bottomPadding: _timelineBottomPadding(context),
         ),
       ),
     );

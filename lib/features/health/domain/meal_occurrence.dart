@@ -150,6 +150,32 @@ final class LocalServiceDate {
     return LocalServiceDate._(local.year, local.month, local.day);
   }
 
+  /// Converte um instante para a data/hora civil no mesmo timezone normativo.
+  ///
+  /// Mantém apresentação e agregação alinhadas sem depender do timezone do
+  /// aparelho.
+  static DateTime instantInTimezone(
+    DateTime instant, {
+    required String timezone,
+  }) {
+    final name = timezone.trim();
+    if (name.isEmpty) {
+      throw const HealthDomainException(
+        'missing_timezone',
+        'timezone é obrigatório para conversão civil',
+      );
+    }
+    _ensureTimeZonesInitialized();
+    try {
+      return tz.TZDateTime.from(instant, tz.getLocation(name));
+    } on Exception {
+      throw HealthDomainException(
+        'invalid_timezone',
+        'timezone "$name" não é reconhecido pela base IANA',
+      );
+    }
+  }
+
   final int year;
   final int month;
   final int day;

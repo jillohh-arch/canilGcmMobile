@@ -68,7 +68,7 @@ final class FirestoreNutritionLegacyPlanReader
           final result = _adapter.parse(
             sourceId: doc.id,
             dogId: id,
-            data: NutritionFirestoreError.asObjectMap(doc.data()),
+            data: NutritionFirestoreError.asLegacyDomainMap(doc.data()),
             legacySource: collectionKey,
           );
           if (result.hasValue) {
@@ -180,7 +180,7 @@ final class FirestoreNutritionLegacyMealReader
       final meals = <MealLog>[];
       String? firstIntegrity;
       for (final doc in snap.docs) {
-        final data = NutritionFirestoreError.asObjectMap(doc.data());
+        final data = NutritionFirestoreError.asLegacyDomainMap(doc.data());
         // Garante proveniência de collection no adapter.
         final withSource = Map<String, Object?>.from(data)
           ..putIfAbsent('legacy_source', () => key);
@@ -189,7 +189,28 @@ final class FirestoreNutritionLegacyMealReader
           dogId: id,
           data: withSource,
         );
-        final value = result.value;
+        var value = result.value;
+        if (value is LegacyHealthRecordView &&
+            result.state == LegacyParseState.partial) {
+          // Produção legada possui refeições com `fed_by` textual, sem
+          // uid/role suficientes para RecordedBy. O adapter puro preserva esses
+          // docs como view; para a UI read-only, materializamos um ator técnico
+          // de compatibilidade que nunca é apresentado como autoria real.
+          final fedBy = withSource['fed_by']?.toString().trim();
+          final reparsed = _adapter.parse(
+            sourceId: doc.id,
+            dogId: id,
+            data: Map<String, Object?>.from(withSource)
+              ..['recorded_by'] = <String, Object?>{
+                'uid': 'legacy-unattributed:${doc.id}',
+                'name': fedBy == null || fedBy.isEmpty
+                    ? 'Autoria legada não informada'
+                    : fedBy,
+                'internal_role': 'legacy',
+              },
+          );
+          value = reparsed.value;
+        }
         if (value is MealLog) {
           meals.add(value);
         } else if (result.state == LegacyParseState.failure) {
@@ -285,7 +306,7 @@ final class FirestoreNutritionLegacySupplementRegimenReader
         final result = _adapter.parse(
           sourceId: doc.id,
           dogId: id,
-          data: NutritionFirestoreError.asObjectMap(doc.data()),
+          data: NutritionFirestoreError.asLegacyDomainMap(doc.data()),
           legacySource: collectionKey,
         );
         if (result.hasValue) {

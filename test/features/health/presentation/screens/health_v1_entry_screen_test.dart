@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/memory_timeline_source_reader.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
@@ -183,6 +184,41 @@ void main() {
       find.text(HealthShellSectionPlaceholder.structuralBanner),
       findsNothing,
     );
+  });
+
+  testWidgets('Nutrição faz lazy prime somente ao abrir a seção', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    await tester.pumpWidget(
+      wrap(
+        HealthV1EntryScreen(
+          dogId: 'dog-1',
+          source: _FixedSummarySource.single(
+            HealthSummaryViewData(dogId: 'dog-1'),
+          ),
+          timelineSource: _emptyTimelineSource(),
+          nutritionReadSource: CoexistenceNutritionReadSource(),
+          dogContextOverride: dogContext,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    var state = tester.state<HealthV1EntryScreenState>(
+      find.byType(HealthV1EntryScreen),
+    );
+    expect(state.nutritionReadPrimedForTest, isFalse);
+    expect(state.nutritionReadControllerForTest.activeDogId, isNull);
+
+    await tester.tap(find.text('Nutrição'));
+    await tester.pumpAndSettle();
+
+    state = tester.state<HealthV1EntryScreenState>(
+      find.byType(HealthV1EntryScreen),
+    );
+    expect(state.nutritionReadPrimedForTest, isTrue);
+    expect(state.nutritionReadControllerForTest.activeDogId, 'dog-1');
   });
 
   testWidgets('timeline com itens injetados aparece no slot Histórico', (

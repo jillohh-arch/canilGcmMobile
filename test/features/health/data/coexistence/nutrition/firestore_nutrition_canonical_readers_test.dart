@@ -5,7 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/firestore_nutrition_canonical_readers.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/firestore_nutrition_legacy_readers.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/nutrition_firestore_error.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/nutrition_merge_policy.dart';
+import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
@@ -92,6 +95,55 @@ Map<String, dynamic> _validSupplement({required DateTime at}) {
 }
 
 void main() {
+  test('legacy Firestore payload removes Timestamp SDK types recursively', () {
+    final instant = DateTime.utc(2026, 7, 19, 12);
+    final mapped = NutritionFirestoreError.asLegacyDomainMap({
+      'fed_at': Timestamp.fromDate(instant),
+      'nested': {
+        'created_at': Timestamp.fromDate(instant),
+        'items': [Timestamp.fromDate(instant)],
+      },
+    });
+
+    expect(mapped['fed_at'], instant);
+    final nested = mapped['nested']! as Map;
+    expect(nested['created_at'], instant);
+    expect((nested['items']! as List).single, instant);
+  });
+
+  test(
+    'legacy meal with textual author remains visible as legacy read',
+    () async {
+      final legacyDb = FakeFirebaseFirestore();
+      await legacyDb
+          .collection('dogs')
+          .doc('dog-a')
+          .collection('feeding_events')
+          .doc('legacy-1')
+          .set({
+            'amount_grams': 180,
+            'period': 'morning',
+            'fed_at': Timestamp.fromDate(DateTime.utc(2026, 7, 19, 10)),
+            'fed_by': 'Condutor legado',
+            'created_at': Timestamp.fromDate(DateTime.utc(2026, 7, 19, 10)),
+          });
+
+      final batch = await FirestoreNutritionLegacyMealReader(
+        collectionKey: 'feeding_events',
+        firestore: legacyDb,
+      ).loadMeals('dog-a');
+
+      expect(batch.availability, NutritionSourceAvailability.available);
+      final meal = batch.items.single;
+      expect(meal.offeredGrams, 180);
+      expect(meal.consumedGrams, isNull);
+      expect(meal.acceptance.value, MealAcceptance.unknown);
+      expect(meal.legacySource, 'feeding_events');
+      expect(meal.plannedMealId, isNull);
+      expect(meal.mealOccurrenceId, isNull);
+    },
+  );
+
   late FakeFirebaseFirestore db;
   late FirestoreNutritionCanonicalPlanReader planReader;
   late FirestoreNutritionCanonicalMealReader mealReader;

@@ -361,6 +361,35 @@ void main() {
   });
 
   group('CoexistenceNutritionReadSource §29', () {
+    test('today aggregation usa data civil America/Sao_Paulo', () async {
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemCanonicalPlans([
+          canonicalPlan(id: 'tz-plan', dogId: 'dog-1'),
+        ]),
+        canonicalMealReader: _MemCanonicalMeals([
+          meal(
+            id: 'local-yesterday',
+            dogId: 'dog-1',
+            fedAt: DateTime.utc(2026, 7, 19, 0, 30),
+          ),
+          meal(
+            id: 'local-today',
+            dogId: 'dog-1',
+            fedAt: DateTime.utc(2026, 7, 19, 23, 30),
+          ),
+        ]),
+      );
+
+      final result = await source.loadToday(
+        'dog-1',
+        serverNow: DateTime.utc(2026, 7, 19, 16),
+      );
+
+      expect(result.isData, isTrue);
+      expect(result.value!.localServiceDate, '2026-07-19');
+      expect(result.value!.meals.map((m) => m.meal.id), ['local-today']);
+    });
+
     test('1. canonical only', () async {
       final source = CoexistenceNutritionReadSource(
         canonicalPlanReader: _MemCanonicalPlans([
