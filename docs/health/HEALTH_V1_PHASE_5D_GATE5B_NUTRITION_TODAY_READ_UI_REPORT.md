@@ -1,7 +1,7 @@
 # Health v1.0 — Fase 5D — Gate 5B — Nutrição Hoje Read UI
 
-Data: 2026-07-19  
-Branch: `feature/health-v1-foundation`  
+Data: 2026-07-19
+Branch: `feature/health-v1-foundation`
 Base HEAD: `26c6bcd6fc78a2fb6d819e5ff05641e26d8182fc`
 
 ## 1. Executive summary
@@ -18,7 +18,15 @@ refeições com autoria textual incompleta sendo descartadas. Quantidade
 oferecida foi preservada; consumo, acceptance, slot e occurrence não foram
 inventados.
 
-**Status: FASE 5D — GATE 5B APROVADO PARA COMMIT.**
+**Status: CONCLUÍDO, COMMITADO E SINCRONIZADO.**
+
+Commit funcional Gate 5B: `66cb6ed86a58beb6362b89dbee4b9322e8c1302a`
+
+Mensagem: `feat(health): add nutrition today read UI`
+
+Tracking: `origin/feature/health-v1-foundation`
+
+Divergência após o push funcional: `0/0`
 
 ## 2. Preflight
 
@@ -234,8 +242,9 @@ condicionais previstos.
 
 ## 31. Git diff
 
-`git diff --check`: **OK**.  
-Nenhum commit ou push foi realizado.
+`git diff --check` no fechamento documental: **OK**.
+
+O commit funcional foi criado e sincronizado com o tracking remoto.
 
 ## 32. Findings
 
@@ -270,9 +279,11 @@ PRODUÇÃO.**
 **ZERO CANONICAL MUTATION UI ATIVADA. ZERO PRODUCTION WRITE. ZERO LEGACY
 CUTOVER. ZERO DEPLOY.**
 
-**GATE 5B APROVADO PARA COMMIT.**
+**GATE 5B CONCLUÍDO, COMMITADO E SINCRONIZADO.**
 
-**NENHUM COMMIT OU PUSH REALIZADO.**
+**COMMIT FUNCIONAL: `66cb6ed86a58beb6362b89dbee4b9322e8c1302a`.**
+
+**TRACKING: `origin/feature/health-v1-foundation`; DIVERGÊNCIA: `0/0`.**
 
 ## 35. Auditoria temporal adversarial dos registros recentes
 
