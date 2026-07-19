@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc",
     "test:health-schedule": "npm run build && node lib/health_schedule_logic_test.js && node lib/health_schedule_callables_test.js",
+    "test:health-nutrition": "npm run build && node lib/health_nutrition_logic_test.js && node lib/health_nutrition_engine_test.js",
+    "test": "npm run test:health-schedule && npm run test:health-nutrition",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions"
   },
