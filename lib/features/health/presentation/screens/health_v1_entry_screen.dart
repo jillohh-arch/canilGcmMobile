@@ -19,8 +19,12 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_so
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
+import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
@@ -63,6 +67,20 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Gate 5: UI de mutações consome via [HealthScheduleMutationController].
   final HealthScheduleMutationGateway? scheduleMutationGateway;
 
+  /// Gateway de mutação canônica de Nutrição (5D Gate 3).
+  ///
+  /// Produção default: [FirebaseFunctionsHealthNutritionMutationGateway].
+  /// **Não** conectado a fluxo operacional legado neste Gate (read/write gap).
+  /// Testes: injete fake / [FailClosedHealthNutritionMutationGateway].
+  final HealthNutritionMutationGateway? nutritionMutationGateway;
+
+  /// Holder de pending intent com lifecycle **maior** que este State.
+  ///
+  /// Produção: [HealthNutritionPendingIntentSession] no [MainRootScreen].
+  /// Se null, cria holder local (apenas testes isolados) — **não** sobrevive
+  /// a dispose desta tela (ex.: troca de ValueKey / perda de cão ativo).
+  final HealthNutritionPendingIntentHolder? nutritionPendingIntentHolder;
+
   /// Contexto do K9 pré-resolvido (testes). Produção: [DogViewModel].
   final HealthSummaryDogContextView? dogContextOverride;
 
@@ -77,6 +95,8 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.timelineSource,
     this.scheduleSource,
     this.scheduleMutationGateway,
+    this.nutritionMutationGateway,
+    this.nutritionPendingIntentHolder,
     this.dogContextOverride,
     this.onTimelineNavigate,
   });
@@ -101,6 +121,11 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   late final HealthScheduleController _scheduleController;
   late final HealthScheduleMutationGateway _scheduleMutationGateway;
   late final HealthScheduleMutationController _scheduleMutationController;
+  late final HealthNutritionMutationGateway _nutritionMutationGateway;
+  /// Holder de pending intent fora do lifecycle do controller (5D Gate 3).
+  /// dispose técnico do controller não apaga intenção incerta.
+  late final HealthNutritionPendingIntentHolder _nutritionPendingIntentHolder;
+  late final HealthNutritionMutationController _nutritionMutationController;
 
   /// Primeira carga da timeline só após visitar Histórico (lazy).
   bool _timelinePrimed = false;
@@ -133,6 +158,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   @visibleForTesting
   HealthScheduleMutationController get scheduleMutationControllerForTest =>
       _scheduleMutationController;
+
+  /// Gateway Nutrição canônico (real ou fake injetado). Sem UI operacional.
+  @visibleForTesting
+  HealthNutritionMutationGateway get nutritionMutationGatewayForTest =>
+      _nutritionMutationGateway;
+
+  @visibleForTesting
+  HealthNutritionMutationController get nutritionMutationControllerForTest =>
+      _nutritionMutationController;
 
   @override
   void initState() {
@@ -172,6 +206,25 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       gateway: _scheduleMutationGateway,
       scheduleController: _scheduleController,
     );
+    // 5D Gate 3: gateway real preparado no composition root.
+    // Sem botão operacional / cutover — read-after-write canônico ainda
+    // não está liberado (Rules + reader). Controller disponível só para
+    // testes / futura fundação de UI (Gate 4).
+    _nutritionMutationGateway =
+        widget.nutritionMutationGateway ??
+        FirebaseFunctionsHealthNutritionMutationGateway();
+    // Preferir holder injetado (sessão MainRoot / dog-keyed). Fallback local
+    // só para testes sem host — NÃO é o owner de produção.
+    _nutritionPendingIntentHolder =
+        widget.nutritionPendingIntentHolder ??
+        HealthNutritionPendingIntentHolder();
+    _nutritionMutationController = HealthNutritionMutationController(
+      gateway: _nutritionMutationGateway,
+      pendingIntentHolder: _nutritionPendingIntentHolder,
+      // Sem refresh de fonte legada: write canônico ≠ visibilidade em
+      // feeding_events. Callback null = não finge read-after-write.
+      onRefreshAfterSuccess: null,
+    );
     // Sem selectDog aqui: evita I/O se o usuário não abrir Agenda.
   }
 
@@ -200,6 +253,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _filterSession.dispose();
     _timelineController.dispose();
     _scheduleMutationController.dispose();
+    _nutritionMutationController.dispose();
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();

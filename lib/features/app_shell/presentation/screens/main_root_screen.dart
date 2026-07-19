@@ -9,6 +9,7 @@ import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent_session.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_flags.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_screen.dart';
@@ -39,6 +40,11 @@ class _MainRootScreenState extends State<MainRootScreen> {
   DateTime? _lastBackPress;
   late final List<Widget> _screens;
 
+  /// Sessão de pending intent Nutrição (Gate 3): lifecycle = MainRoot.
+  /// Sobrevive a remount de HealthV1EntryScreen (ValueKey/dog) e à aba sem cão.
+  final HealthNutritionPendingIntentSession _nutritionPendingSession =
+      HealthNutritionPendingIntentSession();
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +54,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
         onOpenHealthTab: () => _onTabTapped(2),
       ),
       const TrainingHubScreen(),
-      const _MainRootHealthTab(),
+      _MainRootHealthTab(nutritionPendingSession: _nutritionPendingSession),
       const HistoryScreen(),
     ];
     PermissionService.requestInitialPermissions();

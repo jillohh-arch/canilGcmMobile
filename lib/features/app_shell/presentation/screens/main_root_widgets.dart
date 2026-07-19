@@ -30,7 +30,10 @@ class _ActiveOccurrenceBanner extends StatelessWidget {
 }
 
 class _MainRootHealthTab extends StatelessWidget {
-  const _MainRootHealthTab();
+  const _MainRootHealthTab({required this.nutritionPendingSession});
+
+  /// Owner de lifecycle maior que [HealthV1EntryScreen] (MainRoot).
+  final HealthNutritionPendingIntentSession nutritionPendingSession;
 
   @override
   Widget build(BuildContext context) {
@@ -57,9 +60,14 @@ class _MainRootHealthTab extends StatelessWidget {
     // Gate reversível — false restaura o prontuário legado nesta aba.
     // Não instancia source/controller quando gate false (Entry nem monta).
     if (shouldUseHealthV1SummaryEntry()) {
+      final id = dogId.trim();
       return HealthV1EntryScreen(
-        key: ValueKey<String>('health-v1-$dogId'),
-        dogId: dogId,
+        // ValueKey recria State ao trocar K9 — holder vem da sessão MainRoot
+        // keyed por dog, então pending intent incerta de A sobrevive e NÃO
+        // vaza para B.
+        key: ValueKey<String>('health-v1-$id'),
+        dogId: id,
+        nutritionPendingIntentHolder: nutritionPendingSession.holderFor(id),
       );
     }
 
