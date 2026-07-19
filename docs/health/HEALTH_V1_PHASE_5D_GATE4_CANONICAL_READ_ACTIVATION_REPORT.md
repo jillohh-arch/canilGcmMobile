@@ -2,13 +2,17 @@
 
 | Campo | Valor |
 |-------|-------|
-| Status | **APROVADO PARA COMMIT** (pós-auditoria query integrity) |
+| Status | **CONCLUÍDO, COMMITADO E SINCRONIZADO** |
 | Data | 2026-07-19 |
 | Branch | `feature/health-v1-foundation` |
 | HEAD base | `b8cd0990e63d8979e706455829b88abd9649c877` |
 | Mensagem base | `feat(health): add nutrition mutation client foundation` |
+| Commit | `cb2e21f07f30109720c0575dc2caab6aa85c7d67` |
+| Mensagem commit | `feat(health): activate canonical nutrition reads` |
+| Tracking | `origin/feature/health-v1-foundation` |
+| Divergência | **0/0** |
 | Escopo | Canonical readers Firestore + Rules RO + read controller + RAW + query integrity |
-| Commit / push / deploy | **NÃO** |
+| Deploy | **NÃO** |
 
 ```text
 Gate 1 = backend mutation foundation
@@ -43,9 +47,10 @@ Gate 4 transforma a read foundation 5C em camada Flutter/Firestore real e testá
 | Full Flutter tests | 1218 passed / 5 skipped |
 | Analyze Gate 4 paths | 0 issues |
 | Emulator query integrity | OK (client SDK + fixtures Dart) |
-| Deploy / commit / push | ZERO |
+| Commit Gate 4 | `cb2e21f07f30109720c0575dc2caab6aa85c7d67` |
+| Deploy | **NÃO** (Rules commitadas no repo, não publicadas) |
 
-**Local preparado ≠ produção ativada.** Rules canônicas **não** foram publicadas.
+**Commitado ≠ produção ativada.** Rules canônicas **não** foram publicadas.
 
 ---
 
@@ -764,17 +769,11 @@ npm run test:health-nutrition-readers
 ## Encerramento
 
 ```text
-FASE 5D — GATE 4 CANONICAL QUERY INTEGRITY AUDIT CONCLUÍDA.
+FASE 5D — GATE 4 CONCLUÍDO, COMMITADO E SINCRONIZADO.
 
-ZERO BLOCKER.
+CANONICAL NUTRITION READERS IMPLEMENTADOS.
 
-ZERO MAJOR.
-
-CANONICAL MALFORMED DOCUMENTS NÃO PODEM SER OCULTADOS PELA QUERY.
-
-MEALLOG SEM FED_AT É DETECTADO COMO INTEGRITY FAILURE.
-
-SUPPLEMENTLOG SEM ADMINISTERED_AT É DETECTADO COMO INTEGRITY FAILURE.
+CANONICAL QUERY INTEGRITY FAIL-CLOSED PRESERVADA.
 
 FIRESTORE QUERY SEMANTICS VALIDADA NO EMULATOR REAL.
 
@@ -784,13 +783,11 @@ CONCRETE DART READERS VALIDADOS COM FAKEFIRESTORE.
 
 DART FIREBASE PLUGIN E2E CONTRA EMULATOR PERMANECE DEFERRED.
 
-MULTIPLE ACTIVE PLAN FAIL-CLOSED VALIDADO (FAKEFIRESTORE + FIXTURES EMULATOR).
+CANONICAL NUTRITION RULES READ-ONLY COMMITADAS, MAS NÃO DEPLOYADAS.
 
-READ-AFTER-WRITE FOUNDATION PRESERVADA.
+ZERO BLOCKER.
 
-NUTRITION OPERATIONS CONTINUAM PRIVADAS AO BACKEND.
-
-DIRECT CLIENT WRITES CONTINUAM NEGADOS.
+ZERO MAJOR.
 
 ZERO LEGACY CUTOVER.
 
@@ -798,5 +795,7 @@ ZERO FUNCTIONS ALTERADAS.
 
 ZERO DEPLOY.
 
-GATE 4 APROVADO PARA COMMIT.
+BRANCH LIMPA E SINCRONIZADA.
+
+FASE 5D — GATE 5 NÃO INICIADO.
 ```
