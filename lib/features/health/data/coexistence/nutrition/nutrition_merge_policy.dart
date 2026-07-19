@@ -14,10 +14,7 @@ import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 
 /// Envelope de refeição legada com collection de origem.
 final class LegacyMealEnvelope {
-  const LegacyMealEnvelope({
-    required this.meal,
-    required this.collectionKey,
-  });
+  const LegacyMealEnvelope({required this.meal, required this.collectionKey});
 
   final MealLog meal;
 
@@ -99,8 +96,8 @@ abstract final class NutritionMergePolicy {
   /// Precedência entre collections legadas de refeição (§22).
   /// Ordem de rank é **independente** da ordem de chegada das Futures.
   static int legacyCollectionRank(String collectionKey) {
-    final n = NutritionLegacySourceIdentity.normalize(collectionKey) ??
-        collectionKey;
+    final n =
+        NutritionLegacySourceIdentity.normalize(collectionKey) ?? collectionKey;
     return switch (n) {
       feedingEvents => 0, // vence
       feedings => 1,

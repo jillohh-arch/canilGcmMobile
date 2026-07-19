@@ -153,9 +153,7 @@ final class CoexistenceNutritionReadSource {
         if (batch.availability == NutritionSourceAvailability.available ||
             batch.availability == NutritionSourceAvailability.empty) {
           // Isolamento por dogId (defesa).
-          canonicalPlans.addAll(
-            batch.items.where((p) => p.dogId == dogId),
-          );
+          canonicalPlans.addAll(batch.items.where((p) => p.dogId == dogId));
         }
       } catch (e) {
         planStatuses.add(
@@ -259,10 +257,7 @@ final class CoexistenceNutritionReadSource {
             batch.availability == NutritionSourceAvailability.empty) {
           for (final m in batch.items.where((m) => m.dogId == dogId)) {
             legacyEnvelopes.add(
-              LegacyMealEnvelope(
-                meal: m,
-                collectionKey: reader.collectionKey,
-              ),
+              LegacyMealEnvelope(meal: m, collectionKey: reader.collectionKey),
             );
           }
         }
@@ -360,8 +355,7 @@ final class CoexistenceNutritionReadSource {
       mergeDiagnostics: List.unmodifiable(allDiagnostics),
     );
 
-    final anyConfigured =
-        planStatuses.isNotEmpty || mealStatuses.isNotEmpty;
+    final anyConfigured = planStatuses.isNotEmpty || mealStatuses.isNotEmpty;
     if (!anyConfigured) {
       return const NutritionReadResult.error(
         code: 'no_sources_configured',
@@ -369,8 +363,10 @@ final class CoexistenceNutritionReadSource {
       );
     }
 
-    final planUsable = planStatuses.isEmpty || planStatuses.any((s) => s.isUsable);
-    final mealUsable = mealStatuses.isEmpty || mealStatuses.any((s) => s.isUsable);
+    final planUsable =
+        planStatuses.isEmpty || planStatuses.any((s) => s.isUsable);
+    final mealUsable =
+        mealStatuses.isEmpty || mealStatuses.any((s) => s.isUsable);
     final allFailed =
         planStatuses.isNotEmpty &&
         planStatuses.every((s) => s.isFailure) &&
@@ -381,7 +377,9 @@ final class CoexistenceNutritionReadSource {
       final all = [...planStatuses, ...mealStatuses];
       final allOffline =
           all.isNotEmpty &&
-          all.every((s) => s.availability == NutritionSourceAvailability.offline);
+          all.every(
+            (s) => s.availability == NutritionSourceAvailability.offline,
+          );
       if (allOffline) {
         return const NutritionReadResult.offline(
           message: 'Fontes de nutrição offline',
@@ -461,18 +459,17 @@ final class CoexistenceNutritionReadSource {
       NutritionActivePlanIntegrityConflict() => NutritionPlan.defaultTimezone,
       _ => NutritionPlan.defaultTimezone,
     };
-    final localDate = LocalServiceDate.fromInstant(
-      serverNow,
-      timezone: tzName,
-    );
+    final localDate = LocalServiceDate.fromInstant(serverNow, timezone: tzName);
 
-    final mealsToday = snap.mergedMeals.where((item) {
-      final itemDate = LocalServiceDate.fromInstant(
-        item.fedAt,
-        timezone: tzName,
-      );
-      return itemDate == localDate;
-    }).toList(growable: false);
+    final mealsToday = snap.mergedMeals
+        .where((item) {
+          final itemDate = LocalServiceDate.fromInstant(
+            item.fedAt,
+            timezone: tzName,
+          );
+          return itemDate == localDate;
+        })
+        .toList(growable: false);
 
     final today = NutritionTodayReadModel(
       dogId: dogId,

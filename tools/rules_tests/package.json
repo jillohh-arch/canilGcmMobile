@@ -5,6 +5,8 @@
   "scripts": {
     "test": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node rules_tests.mjs\"",
     "test:health-schedule": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_schedule_rules_tests.mjs\"",
+    "test:health-nutrition": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_nutrition_rules_tests.mjs\"",
+    "test:health-nutrition-readers": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore \"node health_nutrition_canonical_readers_emulator_tests.mjs\"",
     "test:health-nutrition-callable-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node health_nutrition_callables_emulator_tests.mjs\"",
     "test:direct": "node rules_tests.mjs"
   },

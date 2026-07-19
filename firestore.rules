@@ -1926,6 +1926,32 @@ service cloud.firestore {
         allow read: if signedIn() && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+
+      // Health v1 — Nutrição canônica (5D Gate 4): read-only no cliente.
+      // Mesmo predicado da Agenda: signedIn + canAccessDogRecord(dogId).
+      // Writes canônicos exclusivamente via callables Admin SDK
+      // (healthNutritionCreateMealLog / healthNutritionCreateSupplementLog).
+      // Plan write futuro: backend/Web — cliente permanece DENY em write.
+      match /nutrition_plans/{planId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      match /meal_logs/{mealId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      match /supplement_logs/{logId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Receipts operacionais internos (idempotência / fingerprint).
+      // Nunca expostos ao app cliente — nem get/list nem write.
+      match /nutrition_operations/{receiptId} {
+        allow read, create, update, delete: if false;
+      }
     }
 
     match /occurrences/{occurrenceId} {

@@ -84,9 +84,7 @@ void main() {
   group('NutritionLegacySourceIdentity', () {
     test('normaliza path e aliases sem fundir collections distintas', () {
       expect(
-        NutritionLegacySourceIdentity.normalize(
-          'dogs/dog-1/feeding_events',
-        ),
+        NutritionLegacySourceIdentity.normalize('dogs/dog-1/feeding_events'),
         'feeding_events',
       );
       expect(NutritionLegacySourceIdentity.normalize('/feedings'), 'feedings');
@@ -100,23 +98,26 @@ void main() {
   });
 
   group('mergeLegacyMealCollections §22', () {
-    test('mesmo ID: feeding_events vence feedings (ordem invertida de entrada)', () {
-      final result = NutritionMergePolicy.mergeLegacyMealCollections(
-        envelopes: [
-          LegacyMealEnvelope(
-            meal: meal(id: 'x1', dogId: 'dog-1', fedAt: t0, offered: 100),
-            collectionKey: NutritionMergePolicy.feedings,
-          ),
-          LegacyMealEnvelope(
-            meal: meal(id: 'x1', dogId: 'dog-1', fedAt: t0, offered: 150),
-            collectionKey: 'dogs/x/feeding_events',
-          ),
-        ],
-      );
-      expect(result.items, hasLength(1));
-      expect(result.items.single.collectionKey, 'feeding_events');
-      expect(result.items.single.meal.offeredGrams, 150);
-    });
+    test(
+      'mesmo ID: feeding_events vence feedings (ordem invertida de entrada)',
+      () {
+        final result = NutritionMergePolicy.mergeLegacyMealCollections(
+          envelopes: [
+            LegacyMealEnvelope(
+              meal: meal(id: 'x1', dogId: 'dog-1', fedAt: t0, offered: 100),
+              collectionKey: NutritionMergePolicy.feedings,
+            ),
+            LegacyMealEnvelope(
+              meal: meal(id: 'x1', dogId: 'dog-1', fedAt: t0, offered: 150),
+              collectionKey: 'dogs/x/feeding_events',
+            ),
+          ],
+        );
+        expect(result.items, hasLength(1));
+        expect(result.items.single.collectionKey, 'feeding_events');
+        expect(result.items.single.meal.offeredGrams, 150);
+      },
+    );
 
     test('mesmo ID com payload divergente → primary vence + warning', () {
       final result = NutritionMergePolicy.mergeLegacyMealCollections(
@@ -478,8 +479,14 @@ void main() {
       );
       final rA = await source.loadSnapshot('dog-A');
       final rB = await source.loadSnapshot('dog-B');
-      expect(rA.value!.mergedMeals.every((m) => m.meal.dogId == 'dog-A'), isTrue);
-      expect(rB.value!.mergedMeals.every((m) => m.meal.dogId == 'dog-B'), isTrue);
+      expect(
+        rA.value!.mergedMeals.every((m) => m.meal.dogId == 'dog-A'),
+        isTrue,
+      );
+      expect(
+        rB.value!.mergedMeals.every((m) => m.meal.dogId == 'dog-B'),
+        isTrue,
+      );
       expect(rA.value!.mergedMeals, hasLength(1));
       expect(rB.value!.mergedMeals, hasLength(1));
     });

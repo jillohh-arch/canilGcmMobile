@@ -94,10 +94,7 @@ void main() {
     }
   });
 
-  CreateMealLogSuccess mealOk({
-    bool wasNoOp = false,
-    String mealId = 'mo1_x',
-  }) {
+  CreateMealLogSuccess mealOk({bool wasNoOp = false, String mealId = 'mo1_x'}) {
     return CreateMealLogSuccess(
       dogId: 'dog-a',
       mealId: mealId,
@@ -205,8 +202,8 @@ void main() {
         acceptance: MealAcceptanceWire.parse('full'),
         fedAt: fedAt,
       );
-      final key1 = (gateway.commands.single as CreatePlannedMealLogCommand)
-          .operationId;
+      final key1 =
+          (gateway.commands.single as CreatePlannedMealLogCommand).operationId;
       expect(controller.activeOperationIdForTest, key1);
 
       gateway.next = mealOk();
@@ -404,47 +401,44 @@ void main() {
       },
     );
 
-    test(
-      'adhoc unavailable → dispose → recreate → same operationId',
-      () async {
-        gateway.next = const HealthNutritionMutationErrorResult(
-          HealthNutritionMutationNetwork(),
-        );
-        final fedAt = DateTime.utc(2026, 7, 17, 12);
-        await controller.createAdhocMeal(
-          dogId: 'dog-a',
-          period: MealPeriodWire.parseCanonical('extra'),
-          offeredGrams: 90,
-          acceptance: MealAcceptanceWire.parse('full'),
-          fedAt: fedAt,
-        );
-        final keyA =
-            (gateway.commands.single as CreateAdhocMealLogCommand).operationId;
-        controller.dispose();
-        expect(holder.value?.operationId, keyA);
+    test('adhoc unavailable → dispose → recreate → same operationId', () async {
+      gateway.next = const HealthNutritionMutationErrorResult(
+        HealthNutritionMutationNetwork(),
+      );
+      final fedAt = DateTime.utc(2026, 7, 17, 12);
+      await controller.createAdhocMeal(
+        dogId: 'dog-a',
+        period: MealPeriodWire.parseCanonical('extra'),
+        offeredGrams: 90,
+        acceptance: MealAcceptanceWire.parse('full'),
+        fedAt: fedAt,
+      );
+      final keyA =
+          (gateway.commands.single as CreateAdhocMealLogCommand).operationId;
+      controller.dispose();
+      expect(holder.value?.operationId, keyA);
 
-        final restored = buildController();
-        gateway.next = CreateMealLogSuccess(
-          dogId: 'dog-a',
-          mealId: 'ml1_x',
-          revision: 1,
-          wasNoOp: false,
-          operationId: keyA,
-          mealOccurrenceId: null,
-        );
-        await restored.createAdhocMeal(
-          dogId: 'dog-a',
-          period: MealPeriodWire.parseCanonical('extra'),
-          offeredGrams: 90,
-          acceptance: MealAcceptanceWire.parse('full'),
-          fedAt: fedAt,
-        );
-        final keyRetry =
-            (gateway.commands[1] as CreateAdhocMealLogCommand).operationId;
-        expect(keyRetry, keyA);
-        restored.dispose();
-      },
-    );
+      final restored = buildController();
+      gateway.next = CreateMealLogSuccess(
+        dogId: 'dog-a',
+        mealId: 'ml1_x',
+        revision: 1,
+        wasNoOp: false,
+        operationId: keyA,
+        mealOccurrenceId: null,
+      );
+      await restored.createAdhocMeal(
+        dogId: 'dog-a',
+        period: MealPeriodWire.parseCanonical('extra'),
+        offeredGrams: 90,
+        acceptance: MealAcceptanceWire.parse('full'),
+        fedAt: fedAt,
+      );
+      final keyRetry =
+          (gateway.commands[1] as CreateAdhocMealLogCommand).operationId;
+      expect(keyRetry, keyA);
+      restored.dispose();
+    });
 
     test(
       'explicit discardIntent após unavailable → nova key em nova intenção igual',
@@ -801,8 +795,8 @@ void main() {
           acceptance: MealAcceptanceWire.parse('full'),
           fedAt: fed,
         );
-        final opA =
-            (gateway.commands.single as CreatePlannedMealLogCommand).operationId;
+        final opA = (gateway.commands.single as CreatePlannedMealLogCommand)
+            .operationId;
 
         final blocked = await controller.createPlannedMeal(
           dogId: 'dog-a',

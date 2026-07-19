@@ -19,12 +19,15 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_so
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
@@ -74,6 +77,14 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Testes: injete fake / [FailClosedHealthNutritionMutationGateway].
   final HealthNutritionMutationGateway? nutritionMutationGateway;
 
+  /// Source de leitura de coexistência Nutrição (5D Gate 4).
+  ///
+  /// Produção default: [CoexistenceNutritionReadSourceFactory.forFirestore].
+  /// **Local preparado ≠ Rules em produção** — até deploy (Gate 5), reads
+  /// canônicos autenticados podem falhar com permission-denied.
+  /// Testes: injete source com delegates fake/in-memory.
+  final CoexistenceNutritionReadSource? nutritionReadSource;
+
   /// Holder de pending intent com lifecycle **maior** que este State.
   ///
   /// Produção: [HealthNutritionPendingIntentSession] no [MainRootScreen].
@@ -96,6 +107,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.scheduleSource,
     this.scheduleMutationGateway,
     this.nutritionMutationGateway,
+    this.nutritionReadSource,
     this.nutritionPendingIntentHolder,
     this.dogContextOverride,
     this.onTimelineNavigate,
@@ -122,16 +134,22 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   late final HealthScheduleMutationGateway _scheduleMutationGateway;
   late final HealthScheduleMutationController _scheduleMutationController;
   late final HealthNutritionMutationGateway _nutritionMutationGateway;
+
   /// Holder de pending intent fora do lifecycle do controller (5D Gate 3).
   /// dispose técnico do controller não apaga intenção incerta.
   late final HealthNutritionPendingIntentHolder _nutritionPendingIntentHolder;
   late final HealthNutritionMutationController _nutritionMutationController;
+  late final CoexistenceNutritionReadSource _nutritionReadSource;
+  late final HealthNutritionReadController _nutritionReadController;
 
   /// Primeira carga da timeline só após visitar Histórico (lazy).
   bool _timelinePrimed = false;
 
   /// Primeira carga da agenda só após visitar Agenda (lazy).
   bool _schedulePrimed = false;
+
+  /// Primeira carga do read model Nutrição canônico (lazy / pós-mutation).
+  bool _nutritionReadPrimed = false;
 
   HealthSummaryController get controllerForTest => _controller;
 
@@ -167,6 +185,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   @visibleForTesting
   HealthNutritionMutationController get nutritionMutationControllerForTest =>
       _nutritionMutationController;
+
+  @visibleForTesting
+  HealthNutritionReadController get nutritionReadControllerForTest =>
+      _nutritionReadController;
+
+  @visibleForTesting
+  CoexistenceNutritionReadSource get nutritionReadSourceForTest =>
+      _nutritionReadSource;
 
   @override
   void initState() {
@@ -206,10 +232,17 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       gateway: _scheduleMutationGateway,
       scheduleController: _scheduleController,
     );
-    // 5D Gate 3: gateway real preparado no composition root.
-    // Sem botão operacional / cutover — read-after-write canônico ainda
-    // não está liberado (Rules + reader). Controller disponível só para
-    // testes / futura fundação de UI (Gate 4).
+    // 5D Gate 4: read source Firestore real como default (não Empty/fake).
+    // Lazy first-load: evita I/O canônico até refresh pós-mutation ou
+    // UI futura. Rules canônicas ainda não deployadas em produção.
+    _nutritionReadSource =
+        widget.nutritionReadSource ??
+        CoexistenceNutritionReadSourceFactory.forFirestore();
+    _nutritionReadController = HealthNutritionReadController(
+      source: _nutritionReadSource,
+    );
+    // 5D Gate 3+4: gateway real + read-after-write no read controller canônico.
+    // Sem botão operacional / cutover de FeedingRegistrationScreen.
     _nutritionMutationGateway =
         widget.nutritionMutationGateway ??
         FirebaseFunctionsHealthNutritionMutationGateway();
@@ -221,11 +254,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _nutritionMutationController = HealthNutritionMutationController(
       gateway: _nutritionMutationGateway,
       pendingIntentHolder: _nutritionPendingIntentHolder,
-      // Sem refresh de fonte legada: write canônico ≠ visibilidade em
-      // feeding_events. Callback null = não finge read-after-write.
-      onRefreshAfterSuccess: null,
+      // Mutation success + refresh failure ≠ mutation failure (Gate 3/4).
+      onRefreshAfterSuccess: () async {
+        _nutritionReadPrimed = true;
+        await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+      },
     );
-    // Sem selectDog aqui: evita I/O se o usuário não abrir Agenda.
+    // Sem selectDog de timeline/agenda/nutrição aqui: evita I/O se o usuário
+    // não abrir a seção (ou até a 1ª mutation canônica).
   }
 
   @override
@@ -236,7 +272,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     if (next.isNotEmpty && next != prev) {
       _controller.selectDog(next);
       _filterSession.updateDogId(next);
-      // Só recarrega timeline/agenda se já foram abertas nesta vida do entry.
+      // Só recarrega timeline/agenda/nutrição se já foram abertas nesta vida.
       if (_timelinePrimed) {
         // ignore: discarded_futures
         _timelineController.selectDog(next);
@@ -244,6 +280,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       if (_schedulePrimed) {
         // ignore: discarded_futures
         _scheduleController.selectDog(next);
+      }
+      if (_nutritionReadPrimed) {
+        // ignore: discarded_futures
+        _nutritionReadController.selectDog(next);
       }
     }
   }
@@ -254,6 +294,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _timelineController.dispose();
     _scheduleMutationController.dispose();
     _nutritionMutationController.dispose();
+    _nutritionReadController.dispose();
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
