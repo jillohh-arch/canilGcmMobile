@@ -250,6 +250,39 @@ function resultFromReceipt(data: JsonMap): NutritionMutationResult {
  * Consulta durable receipt (fonte de verdade).
  * Não carrega plano / entidade.
  */
+/**
+ * Receipt malformado ≠ missing.
+ * Documento presente sem campos canônicos → integrity (fail-closed).
+ */
+function assertReceiptShape(data: JsonMap): void {
+  const required = [
+    "receipt_id",
+    "operation_id",
+    "operation_type",
+    "actor_uid",
+    "fingerprint",
+    "entity_type",
+    "entity_id",
+    "result",
+  ];
+  for (const key of required) {
+    if (data[key] === undefined || data[key] === null || data[key] === "") {
+      throw nutritionError(
+        "integrity",
+        `Receipt malformado: campo obrigatório ausente (${key}).`,
+        "receipt_integrity",
+      );
+    }
+  }
+  if (typeof data.result !== "object" || Array.isArray(data.result)) {
+    throw nutritionError(
+      "integrity",
+      "Receipt malformado: result inválido.",
+      "receipt_integrity",
+    );
+  }
+}
+
 async function resolveDurableReceipt(params: {
   deps: NutritionEngineDeps;
   dogId: string;
@@ -267,6 +300,8 @@ async function resolveDurableReceipt(params: {
   const path = pathNutritionOperation(params.dogId, receiptId);
   const snap = params.snap ?? (await params.deps.getDoc(path));
   if (!snap.exists) return "missing";
+
+  assertReceiptShape(snap.data);
 
   const match = matchNutritionReceipt({
     receiptExists: true,

@@ -834,6 +834,12 @@ const FORBIDDEN_MEAL_SERVER_FIELDS = [
   "mealOccurrenceId",
   "local_service_date",
   "localServiceDate",
+  "create_fingerprint",
+  "createFingerprint",
+  "entity_semantic_fingerprint",
+  "entitySemanticFingerprint",
+  "receipt_id",
+  "receiptId",
 ];
 
 export function rejectForbiddenClientFields(
@@ -858,14 +864,65 @@ function parseOptionalNumber(raw: unknown): number | null {
   return raw;
 }
 
-function parseInstant(raw: unknown, field: string): Date {
+/**
+ * Wire temporal: Date | ISO-8601 string | Firestore Timestamp-like
+ * ({toDate()} | {seconds|_seconds}).
+ * Rejeita objeto arbitrário sem semântica de instante.
+ */
+export function parseInstant(raw: unknown, field: string): Date {
   if (raw instanceof Date) {
     if (Number.isNaN(raw.getTime())) {
       throw nutritionError("validation", `${field} inválido.`);
     }
     return raw;
   }
-  const d = new Date(String(raw ?? ""));
+  if (raw && typeof raw === "object") {
+    const obj = raw as {
+      toDate?: () => Date;
+      seconds?: number;
+      _seconds?: number;
+      nanoseconds?: number;
+      _nanoseconds?: number;
+    };
+    if (typeof obj.toDate === "function") {
+      const d = obj.toDate();
+      if (!(d instanceof Date) || Number.isNaN(d.getTime())) {
+        throw nutritionError("validation", `${field} inválido.`);
+      }
+      return d;
+    }
+    const sec =
+      typeof obj.seconds === "number" ?
+        obj.seconds :
+        typeof obj._seconds === "number" ?
+          obj._seconds :
+          undefined;
+    if (sec !== undefined && Number.isFinite(sec)) {
+      const nanos =
+        typeof obj.nanoseconds === "number" ?
+          obj.nanoseconds :
+          typeof obj._nanoseconds === "number" ?
+            obj._nanoseconds :
+            0;
+      const d = new Date(sec * 1000 + Math.floor(nanos / 1e6));
+      if (Number.isNaN(d.getTime())) {
+        throw nutritionError("validation", `${field} inválido.`);
+      }
+      return d;
+    }
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    // epoch millis only (reject tiny epoch-seconds confusion as invalid wire)
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      throw nutritionError("validation", `${field} inválido.`);
+    }
+    return d;
+  }
+  if (typeof raw !== "string" || raw.trim() === "") {
+    throw nutritionError("validation", `${field} inválido.`);
+  }
+  const d = new Date(raw);
   if (Number.isNaN(d.getTime())) {
     throw nutritionError("validation", `${field} inválido.`);
   }

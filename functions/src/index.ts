@@ -16,6 +16,12 @@ import {
   runHealthScheduleUpdateOpen,
   ScheduleCaller,
 } from "./health_schedule_callables";
+import {
+  runHealthNutritionCreateMealLog,
+  runHealthNutritionCreateSupplementLog,
+  type HealthNutritionCallableDeps,
+} from "./health_nutrition_callables";
+import type {NutritionActor} from "./health_nutrition_engine";
 
 admin.initializeApp();
 
@@ -7900,3 +7906,57 @@ export const healthScheduleComplete = onCall({region}, async (request) => {
 export const healthScheduleCancel = onCall({region}, async (request) => {
   return runHealthScheduleCancel(request, healthScheduleDeps);
 });
+
+// =============================================================================
+// Health Nutrition callables (Fase 5D Gate 2) — Admin SDK; Rules client read-only
+// App Check: paridade Agenda — sem enforceAppCheck (ACCEPTED HARDENING DEBT)
+// =============================================================================
+
+function toNutritionActor(caller: CallerIdentity): NutritionActor {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const healthNutritionDeps: HealthNutritionCallableDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toNutritionActor(await requireAccessPermission(auth, "health", "create")),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: NutritionActor,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: NutritionActor,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/** Create MealLog planned|adhoc (health.create + dog access). Admin SDK write. */
+export const healthNutritionCreateMealLog = onCall({region}, async (request) => {
+  return runHealthNutritionCreateMealLog(request, healthNutritionDeps);
+});
+
+/** Create SupplementLog (health.create + dog access). Admin SDK write. */
+export const healthNutritionCreateSupplementLog = onCall(
+  {region},
+  async (request) => {
+    return runHealthNutritionCreateSupplementLog(request, healthNutritionDeps);
+  },
+);
