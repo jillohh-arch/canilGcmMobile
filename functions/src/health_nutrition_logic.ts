@@ -48,7 +48,10 @@ export const SUPPLEMENT_UNITS = new Set([
 export type NutritionOperationType =
   | "create_planned_meal"
   | "create_adhoc_meal"
-  | "create_supplement_log";
+  | "create_supplement_log"
+  | "create_nutrition_plan"
+  | "update_nutrition_plan"
+  | "cancel_nutrition_plan";
 
 export type NutritionPlanStatus = "active" | "superseded" | "cancelled";
 
@@ -1271,3 +1274,511 @@ export const CANONICAL_WRITE_COLLECTIONS = [
   "auditLogs",
   "operations",
 ] as const;
+
+export interface ProfessionalIdentity {
+  name: string;
+  register_number: string;
+  register_state: string;
+  specialty?: string | null;
+}
+
+export interface HealthDocumentRef {
+  id: string;
+  type: "prescription" | "laudo" | "exame" | "other";
+  issued_by: string;
+  issued_at: string;
+  url?: string | null;
+}
+
+export interface MealScheduleSlot {
+  id: string;
+  period: "morning" | "afternoon" | "evening" | "night" | "extra";
+  scheduled_time: string;
+  target_grams: number;
+}
+
+export interface NutritionPlanSupplement {
+  id: string;
+  name: string;
+  dose: number;
+  unit: "mg" | "g" | "ml" | "scoop" | "tablet" | "drop" | "other";
+  frequency: string;
+  instructions?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface CreateAndActivateNutritionPlanRequest {
+  dogId: string;
+  operationId: string;
+  planData: {
+    food_type: string;
+    amount_grams_per_day: number;
+    meals_per_day: number;
+    timezone: string;
+    valid_from: string;
+    valid_until?: string | null;
+    meal_schedule: MealScheduleSlot[];
+    supplements?: NutritionPlanSupplement[];
+    hydration_ml?: number | null;
+    special_instructions?: string | null;
+    professional?: ProfessionalIdentity | null;
+    source_document?: HealthDocumentRef | null;
+    attachment_refs?: string[];
+  };
+}
+
+export interface UpdateActiveNutritionPlanRequest {
+  dogId: string;
+  planId: string;
+  operationId: string;
+  expectedRevision: number;
+  planData: {
+    special_instructions?: string | null;
+    professional?: ProfessionalIdentity | null;
+    source_document?: HealthDocumentRef | null;
+    attachment_refs?: string[];
+  };
+}
+
+export interface CancelNutritionPlanRequest {
+  dogId: string;
+  planId: string;
+  operationId: string;
+  expectedRevision: number;
+  reason: string;
+}
+
+function parseProfessionalIdentity(val: unknown): ProfessionalIdentity | null {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return null;
+  const obj = val as Record<string, unknown>;
+  const name = stringValue(obj.name);
+  const register_number = stringValue(obj.register_number) ?? stringValue(obj.registerNumber);
+  const register_state = stringValue(obj.register_state) ?? stringValue(obj.registerState);
+  const specialty = stringValue(obj.specialty) ?? null;
+
+  if (!name || !register_number || !register_state) {
+    throw nutritionError("validation", "ProfessionalIdentity incompleto (name, register_number, register_state obrigatórios).");
+  }
+  return {
+    name,
+    register_number,
+    register_state,
+    specialty,
+  };
+}
+
+function parseHealthDocumentRef(val: unknown): HealthDocumentRef | null {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return null;
+  const obj = val as Record<string, unknown>;
+  const id = stringValue(obj.id);
+  const typeStr = stringValue(obj.type);
+  const issued_by = stringValue(obj.issued_by) ?? stringValue(obj.issuedBy);
+  const issued_at = stringValue(obj.issued_at) ?? stringValue(obj.issuedAt);
+  const url = stringValue(obj.url) ?? null;
+
+  if (!id || !typeStr || !issued_by || !issued_at) {
+    throw nutritionError("validation", "HealthDocumentRef incompleto (id, type, issued_by, issued_at obrigatórios).");
+  }
+  if (!["prescription", "laudo", "exame", "other"].includes(typeStr)) {
+    throw nutritionError("validation", `HealthDocumentRef.type inválido: ${typeStr}`);
+  }
+  return {
+    id,
+    type: typeStr as any,
+    issued_by,
+    issued_at,
+    url,
+  };
+}
+
+export function parseCreateAndActivateNutritionPlan(
+  data: Record<string, unknown>,
+  serverNow: Date = new Date(),
+): CreateAndActivateNutritionPlanRequest {
+  const forbiddenServerFields = [
+    "status",
+    "revision",
+    "schema_version", "schemaVersion",
+    "recorded_by", "recordedBy",
+    "created_at", "createdAt",
+    "updated_at", "updatedAt"
+  ];
+  for (const k of forbiddenServerFields) {
+    if (Object.prototype.hasOwnProperty.call(data, k)) {
+      throw nutritionError("validation", `Campo controlado pelo servidor não permitido na raiz: ${k}.`);
+    }
+  }
+
+  const dogId = stringValue(data.dogId) ?? stringValue(data.dog_id);
+  if (!dogId) throw nutritionError("validation", "dogId é obrigatório.");
+  if (dogId.includes("/") || dogId.length > 128) {
+    throw nutritionError("validation", "dogId inválido.");
+  }
+
+  const rawOpId = data.operationId ?? data.operation_id;
+  if (rawOpId !== undefined && typeof rawOpId !== "string") {
+    throw nutritionError("validation", "operationId deve ser string.");
+  }
+  const operationId = normalizeOperationId(rawOpId, true);
+
+  const planDataRaw = data.planData ?? data.plan_data;
+  if (!planDataRaw || typeof planDataRaw !== "object" || Array.isArray(planDataRaw)) {
+    throw nutritionError("validation", "planData é obrigatório e deve ser objeto.");
+  }
+  const pd = planDataRaw as Record<string, unknown>;
+
+  for (const k of forbiddenServerFields) {
+    if (Object.prototype.hasOwnProperty.call(pd, k)) {
+      throw nutritionError("validation", `Campo controlado pelo servidor não permitido em planData: ${k}.`);
+    }
+  }
+
+  const food_type = stringValue(pd.food_type) ?? stringValue(pd.foodType);
+  if (!food_type || !food_type.trim()) throw nutritionError("validation", "food_type é obrigatório e não pode ser vazio.");
+
+  const amount_grams_per_day = pd.amount_grams_per_day ?? pd.amountGramsPerDay;
+  assertFinitePositive(amount_grams_per_day, "amount_grams_per_day");
+
+  const meals_per_day = pd.meals_per_day ?? pd.mealsPerDay;
+  assertFinitePositive(meals_per_day, "meals_per_day");
+
+  const timezone = stringValue(pd.timezone) ?? NUTRITION_DEFAULT_TIMEZONE;
+  try {
+    localServiceDateFromInstant(serverNow, timezone);
+  } catch {
+    throw nutritionError("validation", "timezone inválido.", "invalid_timezone");
+  }
+
+  const valid_from = stringValue(pd.valid_from) ?? stringValue(pd.validFrom);
+  if (!valid_from) throw nutritionError("validation", "valid_from é obrigatório.");
+  const validFromDate = parseInstant(valid_from, "valid_from");
+
+  if (validFromDate.getTime() > serverNow.getTime()) {
+    throw nutritionError("validation", "valid_from no futuro não é permitido na v1.");
+  }
+
+  const localTodayStr = localServiceDateFromInstant(serverNow, timezone);
+  const startOfToday = scheduledForFromLocal(localTodayStr, "00:00", timezone);
+  if (validFromDate.getTime() < startOfToday.getTime()) {
+    throw nutritionError("validation", "Vigência do plano anterior ao início do dia civil atual.");
+  }
+
+  const valid_until_raw = pd.valid_until ?? pd.validUntil;
+  let valid_until: string | null = null;
+  if (valid_until_raw !== undefined && valid_until_raw !== null && valid_until_raw !== "") {
+    valid_until = stringValue(valid_until_raw) ?? null;
+    const validUntilDate = parseInstant(valid_until, "valid_until");
+    if (validUntilDate.getTime() <= validFromDate.getTime()) {
+      throw nutritionError("validation", "valid_until deve ser posterior a valid_from.");
+    }
+    if (validUntilDate.getTime() <= serverNow.getTime()) {
+      throw nutritionError("validation", "Plano expirado não pode ser ativado.");
+    }
+  }
+
+  const scheduleRaw = pd.meal_schedule ?? pd.mealSchedule;
+  if (!Array.isArray(scheduleRaw) || scheduleRaw.length === 0) {
+    throw nutritionError("validation", "meal_schedule é obrigatório e não pode ser vazio.");
+  }
+
+  if (Number(meals_per_day) !== scheduleRaw.length) {
+    throw nutritionError("validation", "meals_per_day deve ser igual ao número de slots em meal_schedule.");
+  }
+
+  const meal_schedule: MealScheduleSlot[] = [];
+  const slotIds = new Set<string>();
+  let totalTarget = 0;
+
+  for (const item of scheduleRaw) {
+    if (!item || typeof item !== "object") {
+      throw nutritionError("validation", "slot de meal_schedule inválido.");
+    }
+    const m = item as Record<string, unknown>;
+    const id = stringValue(m.id);
+    if (!id || id.trim() === "") throw nutritionError("validation", "id do slot é obrigatório.");
+    if (slotIds.has(id)) throw nutritionError("validation", `id de slot duplicado: ${id}`);
+    slotIds.add(id);
+
+    const period = stringValue(m.period);
+    if (!period || !MEAL_PERIODS.has(period)) {
+      throw nutritionError("validation", `period do slot inválido ou não suportado: ${period}`);
+    }
+
+    const scheduled_time = stringValue(m.scheduled_time) ?? stringValue(m.scheduledTime);
+    if (!scheduled_time || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(scheduled_time)) {
+      throw nutritionError("validation", "scheduled_time do slot deve estar no formato HH:mm.");
+    }
+
+    const target_grams = m.target_grams ?? m.targetGrams;
+    assertFinitePositive(target_grams, `target_grams do slot ${id}`);
+    totalTarget += Number(target_grams);
+
+    meal_schedule.push({
+      id,
+      period: period as any,
+      scheduled_time,
+      target_grams: Number(target_grams),
+    });
+  }
+
+  if (Math.abs(totalTarget - Number(amount_grams_per_day)) > 0.01) {
+    throw nutritionError("validation", "A soma das refeições (target_grams) deve equivaler a amount_grams_per_day.");
+  }
+
+  const supplementsRaw = pd.supplements;
+  const supplements: NutritionPlanSupplement[] = [];
+  const suppIds = new Set<string>();
+  if (Array.isArray(supplementsRaw)) {
+    for (const item of supplementsRaw) {
+      if (!item || typeof item !== "object") {
+        throw nutritionError("validation", "suplemento inválido.");
+      }
+      const s = item as Record<string, unknown>;
+      const id = stringValue(s.id);
+      if (!id || id.trim() === "") throw nutritionError("validation", "id do suplemento é obrigatório.");
+      if (suppIds.has(id)) throw nutritionError("validation", `id de suplemento duplicado: ${id}`);
+      suppIds.add(id);
+
+      const name = stringValue(s.name);
+      if (!name) throw nutritionError("validation", "name do suplemento é obrigatório.");
+
+      const dose = s.dose;
+      if (typeof dose === "string") throw nutritionError("validation", "dose do suplemento deve ser numérica.");
+      assertFinitePositive(dose, `dose do suplemento ${id}`);
+
+      const unit = assertSupplementUnit(s.unit);
+
+      const frequency = stringValue(s.frequency);
+      if (!frequency) throw nutritionError("validation", "frequency do suplemento é obrigatório.");
+
+      const instructions = stringValue(s.instructions) ?? null;
+      const val_from = stringValue(s.valid_from) ?? stringValue(s.validFrom) ?? null;
+      let valFromDateSupp: Date | null = null;
+      if (val_from) {
+        valFromDateSupp = parseInstant(val_from, "supplements.valid_from");
+      }
+
+      const val_until = stringValue(s.valid_until) ?? stringValue(s.validUntil) ?? null;
+      if (val_until) {
+        const valUntilDateSupp = parseInstant(val_until, "supplements.valid_until");
+        if (valFromDateSupp && valUntilDateSupp.getTime() <= valFromDateSupp.getTime()) {
+          throw nutritionError("validation", "valid_until do suplemento deve ser posterior ao valid_from.");
+        }
+      }
+
+      supplements.push({
+        id,
+        name,
+        dose: Number(dose),
+        unit: unit as any,
+        frequency,
+        instructions,
+        valid_from: val_from,
+        valid_until: val_until,
+      });
+    }
+  }
+
+  const hydration_ml = pd.hydration_ml ?? pd.hydrationMl;
+  let hydration: number | null = null;
+  if (hydration_ml !== undefined && hydration_ml !== null && hydration_ml !== "") {
+    assertFinitePositive(hydration_ml, "hydration_ml");
+    hydration = Number(hydration_ml);
+  }
+
+  const special_instructions = stringValue(pd.special_instructions) ?? stringValue(pd.specialInstructions) ?? null;
+  const professional = parseProfessionalIdentity(pd.professional);
+  const source_document = parseHealthDocumentRef(pd.source_document ?? pd.sourceDocument);
+
+  const attachmentRefsRaw = pd.attachment_refs ?? pd.attachmentRefs;
+  const attachment_refs: string[] = [];
+  if (Array.isArray(attachmentRefsRaw)) {
+    for (const r of attachmentRefsRaw) {
+      const url = stringValue(r);
+      if (url) attachment_refs.push(url);
+    }
+  }
+
+  return {
+    dogId,
+    operationId,
+    planData: {
+      food_type,
+      amount_grams_per_day: Number(amount_grams_per_day),
+      meals_per_day: Number(meals_per_day),
+      timezone,
+      valid_from,
+      valid_until,
+      meal_schedule,
+      supplements,
+      hydration_ml: hydration,
+      special_instructions,
+      professional,
+      source_document,
+      attachment_refs,
+    },
+  };
+}
+
+export function parseUpdateActiveNutritionPlan(
+  data: Record<string, unknown>,
+): UpdateActiveNutritionPlanRequest {
+  const dogId = stringValue(data.dogId) ?? stringValue(data.dog_id);
+  if (!dogId) throw nutritionError("validation", "dogId é obrigatório.");
+  if (dogId.includes("/") || dogId.length > 128) {
+    throw nutritionError("validation", "dogId inválido.");
+  }
+
+  const planId = stringValue(data.planId) ?? stringValue(data.plan_id);
+  if (!planId) throw nutritionError("validation", "planId é obrigatório.");
+  if (planId.includes("/") || planId.length > 128) {
+    throw nutritionError("validation", "planId inválido.");
+  }
+
+  const rawOpId = data.operationId ?? data.operation_id;
+  if (rawOpId !== undefined && typeof rawOpId !== "string") {
+    throw nutritionError("validation", "operationId deve ser string.");
+  }
+  const operationId = normalizeOperationId(rawOpId, true);
+
+  const expectedRevision = data.expectedRevision ?? data.expected_revision;
+  if (typeof expectedRevision !== "number" || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    throw nutritionError("validation", "expectedRevision deve ser inteiro positivo.");
+  }
+
+  const planDataRaw = data.planData ?? data.plan_data;
+  if (!planDataRaw || typeof planDataRaw !== "object" || Array.isArray(planDataRaw)) {
+    throw nutritionError("validation", "planData é obrigatório e deve ser objeto.");
+  }
+  const pd = planDataRaw as Record<string, unknown>;
+
+  const allowedAdminKeys = [
+    "special_instructions", "specialInstructions",
+    "professional",
+    "source_document", "sourceDocument",
+    "attachment_refs", "attachmentRefs"
+  ];
+  const hasAdminKey = allowedAdminKeys.some(k => Object.prototype.hasOwnProperty.call(pd, k));
+  if (!hasAdminKey) {
+    throw nutritionError("validation", "planData do update deve conter pelo menos uma chave administrativa.");
+  }
+
+  const forbiddenStructural = [
+    "food_type", "foodType",
+    "amount_grams_per_day", "amountGramsPerDay",
+    "meals_per_day", "mealsPerDay",
+    "meal_schedule", "mealSchedule",
+    "supplements",
+    "hydration_ml", "hydrationMl",
+    "timezone",
+    "valid_from", "validFrom",
+    "valid_until", "validUntil"
+  ];
+  for (const k of forbiddenStructural) {
+    if (Object.prototype.hasOwnProperty.call(pd, k)) {
+      throw nutritionError("validation", `Alteração estrutural não permitida no update: ${k}. Crie um novo plano.`);
+    }
+  }
+
+  const special_instructions = stringValue(pd.special_instructions) ?? stringValue(pd.specialInstructions) ?? null;
+  const professional = parseProfessionalIdentity(pd.professional);
+  const source_document = parseHealthDocumentRef(pd.source_document ?? pd.sourceDocument);
+
+  const attachmentRefsRaw = pd.attachment_refs ?? pd.attachmentRefs;
+  const attachment_refs: string[] = [];
+  if (Array.isArray(attachmentRefsRaw)) {
+    for (const r of attachmentRefsRaw) {
+      const url = stringValue(r);
+      if (url) attachment_refs.push(url);
+    }
+  }
+
+  return {
+    dogId,
+    planId,
+    operationId,
+    expectedRevision: Number(expectedRevision),
+    planData: {
+      special_instructions,
+      professional,
+      source_document,
+      attachment_refs,
+    },
+  };
+}
+
+export function parseCancelNutritionPlan(
+  data: Record<string, unknown>,
+): CancelNutritionPlanRequest {
+  const dogId = stringValue(data.dogId) ?? stringValue(data.dog_id);
+  if (!dogId) throw nutritionError("validation", "dogId é obrigatório.");
+  if (dogId.includes("/") || dogId.length > 128) {
+    throw nutritionError("validation", "dogId inválido.");
+  }
+
+  const planId = stringValue(data.planId) ?? stringValue(data.plan_id);
+  if (!planId) throw nutritionError("validation", "planId é obrigatório.");
+  if (planId.includes("/") || planId.length > 128) {
+    throw nutritionError("validation", "planId inválido.");
+  }
+
+  const rawOpId = data.operationId ?? data.operation_id;
+  if (rawOpId !== undefined && typeof rawOpId !== "string") {
+    throw nutritionError("validation", "operationId deve ser string.");
+  }
+  const operationId = normalizeOperationId(rawOpId, true);
+
+  const expectedRevision = data.expectedRevision ?? data.expected_revision;
+  if (typeof expectedRevision !== "number" || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    throw nutritionError("validation", "expectedRevision deve ser inteiro positivo.");
+  }
+
+  const reason = stringValue(data.reason);
+  if (!reason || !reason.trim()) {
+    throw nutritionError("validation", "Justificativa (reason) é obrigatória e não pode ser vazia.");
+  }
+
+  return {
+    dogId,
+    planId,
+    operationId,
+    expectedRevision: Number(expectedRevision),
+    reason: reason.trim(),
+  };
+}
+
+export function fingerprintNutritionPlan(
+  planData: CreateAndActivateNutritionPlanRequest["planData"],
+): string {
+  const structural = {
+    food_type: stringValue(planData.food_type) ?? "",
+    amount_grams_per_day: Number(planData.amount_grams_per_day ?? 0),
+    meals_per_day: Number(planData.meals_per_day ?? 0),
+    timezone: stringValue(planData.timezone) ?? NUTRITION_DEFAULT_TIMEZONE,
+    valid_from: stringValue(planData.valid_from) ?? "",
+    valid_until: stringValue(planData.valid_until) ?? null,
+    hydration_ml: planData.hydration_ml !== undefined && planData.hydration_ml !== null ? Number(planData.hydration_ml) : null,
+    meal_schedule: Array.isArray(planData.meal_schedule)
+      ? planData.meal_schedule.map((m) => ({
+          id: stringValue(m.id) ?? "",
+          period: stringValue(m.period) ?? "",
+          scheduled_time: stringValue(m.scheduled_time) ?? "",
+          target_grams: Number(m.target_grams ?? 0),
+        })).sort((a, b) => a.id.localeCompare(b.id))
+      : [],
+    supplements: Array.isArray(planData.supplements)
+      ? planData.supplements.map((s) => ({
+          id: stringValue(s.id) ?? "",
+          name: stringValue(s.name) ?? "",
+          dose: Number(s.dose ?? 0),
+          unit: stringValue(s.unit) ?? "",
+          frequency: stringValue(s.frequency) ?? "",
+          instructions: stringValue(s.instructions) ?? null,
+          valid_from: stringValue(s.valid_from) ?? null,
+          valid_until: stringValue(s.valid_until) ?? null,
+        })).sort((a, b) => a.id.localeCompare(b.id))
+      : [],
+  };
+  return sha256Hex(stableStringify(structural));
+}

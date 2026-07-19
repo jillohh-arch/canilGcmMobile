@@ -57,7 +57,7 @@ export function docRefFromPath(
   return ref;
 }
 
-function assertCanonicalWritePath(path: string): void {
+export function assertCanonicalWritePath(path: string): void {
   for (const col of FORBIDDEN_LEGACY_WRITE_COLLECTIONS) {
     if (
       path === col ||
@@ -78,22 +78,9 @@ function assertCanonicalWritePath(path: string): void {
     /^dogs\/[^/]+\/(meal_logs|supplement_logs|nutrition_operations|nutrition_plans)\/[^/]+$/,
   );
   if (!m) {
-    // engine só deve set em meal/supp/ops/audit; plan é get-only
-    if (path.includes("/nutrition_plans/")) {
-      throw nutritionError(
-        "integrity",
-        `Write em nutrition_plans não permitido neste adapter: ${path}`,
-      );
-    }
     throw nutritionError(
       "integrity",
       `Write path fora do conjunto canônico de nutrição: ${path}`,
-    );
-  }
-  if (m[1] === "nutrition_plans") {
-    throw nutritionError(
-      "integrity",
-      `Write em nutrition_plans não permitido neste adapter: ${path}`,
     );
   }
 }

@@ -3,6 +3,7 @@
  * npm run build && node lib/health_nutrition_logic_test.js
  */
 import * as assert from "assert";
+import { assertCanonicalWritePath } from "./health_nutrition_firestore_adapter";
 import {
   assertMealQuantities,
   assertNotFuture,
@@ -25,6 +26,10 @@ import {
   supplementLogIdV1,
   FORBIDDEN_LEGACY_WRITE_COLLECTIONS,
   CANONICAL_WRITE_COLLECTIONS,
+  parseCreateAndActivateNutritionPlan,
+  parseUpdateActiveNutritionPlan,
+  parseCancelNutritionPlan,
+  fingerprintNutritionPlan,
 } from "./health_nutrition_logic";
 
 function test(name: string, fn: () => void): void {
@@ -552,6 +557,780 @@ test("zero dual-write collection lists", () => {
   assert.ok(FORBIDDEN_LEGACY_WRITE_COLLECTIONS.includes("nutrition_supplements"));
   assert.ok(CANONICAL_WRITE_COLLECTIONS.includes("meal_logs"));
   assert.ok(CANONICAL_WRITE_COLLECTIONS.includes("auditLogs"));
+});
+
+// ── NutritionPlan Tests ──
+
+const baseValidPlanPayload = {
+  dogId: "dog-test-123",
+  operationId: "op-create-123",
+  planData: {
+    food_type: "ração super premium light",
+    amount_grams_per_day: 400,
+    meals_per_day: 2,
+    timezone: "America/Sao_Paulo",
+    valid_from: "2026-07-20T03:00:00Z",
+    valid_until: null,
+    meal_schedule: [
+      {
+        id: "slot-morning",
+        period: "morning",
+        scheduled_time: "08:00",
+        target_grams: 200,
+      },
+      {
+        id: "slot-evening",
+        period: "evening",
+        scheduled_time: "18:00",
+        target_grams: 200,
+      },
+    ],
+    supplements: [
+      {
+        id: "supp-joint",
+        name: "Condroitina + Glucosamina",
+        dose: 1,
+        unit: "tablet",
+        frequency: "daily",
+        instructions: "Dar após o treino",
+        valid_from: "2026-07-20T03:00:00Z",
+        valid_until: null,
+      },
+    ],
+    hydration_ml: 1200,
+    special_instructions: "Umedecer levemente os grãos",
+    professional: {
+      name: "Dr. Ana Cláudia",
+      register_number: "CRMV-SP-9876",
+      register_state: "SP",
+      specialty: "Nutrologia Veterinária",
+    },
+    source_document: {
+      id: "doc-prescription-11",
+      type: "prescription",
+      issued_by: "Clínica Vet K9",
+      issued_at: "2026-07-18T10:00:00Z",
+      url: "https://k9ops.net/docs/prescription-11.pdf",
+    },
+    attachment_refs: ["https://k9ops.net/docs/ref-1.jpg"],
+  },
+};
+
+const testServerNow = new Date("2026-07-20T12:00:00.000Z");
+
+test("parseCreateAndActivateNutritionPlan: valid payload success", () => {
+  const result = parseCreateAndActivateNutritionPlan(baseValidPlanPayload as any, testServerNow);
+  assert.strictEqual(result.dogId, "dog-test-123");
+  assert.strictEqual(result.operationId, "op-create-123");
+  assert.strictEqual(result.planData.food_type, "ração super premium light");
+  assert.strictEqual(result.planData.amount_grams_per_day, 400);
+  assert.strictEqual(result.planData.meals_per_day, 2);
+  assert.strictEqual(result.planData.timezone, "America/Sao_Paulo");
+  assert.strictEqual(result.planData.meal_schedule.length, 2);
+  assert.strictEqual(result.planData.supplements?.length, 1);
+  assert.strictEqual(result.planData.hydration_ml, 1200);
+  assert.strictEqual(result.planData.special_instructions, "Umedecer levemente os grãos");
+  assert.strictEqual(result.planData.professional?.name, "Dr. Ana Cláudia");
+  assert.strictEqual(result.planData.source_document?.id, "doc-prescription-11");
+  assert.strictEqual(result.planData.source_document?.type, "prescription");
+  assert.strictEqual(result.planData.attachment_refs?.length, 1);
+});
+
+test("parseCreateAndActivateNutritionPlan: validations reject invalid timezone", () => {
+  const badPayload = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      timezone: "Invalid/Timezone_Name",
+    },
+  };
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan(badPayload as any, testServerNow);
+  }, /timezone inválido/);
+});
+
+test("parseCreateAndActivateNutritionPlan: validations reject slot target grams sum mismatch", () => {
+  const badPayload = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      amount_grams_per_day: 500, // sum of slots is 400
+    },
+  };
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan(badPayload as any, testServerNow);
+  }, /A soma das refeições.*deve equivaler a amount_grams_per_day/);
+});
+
+test("parseCreateAndActivateNutritionPlan: validations ALLOW duplicate slot period", () => {
+  const okPayload = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 200 },
+        { id: "s2", period: "morning", scheduled_time: "10:00", target_grams: 200 }, // duplicate 'morning' allowed
+      ],
+    },
+  };
+  assert.doesNotThrow(() => {
+    parseCreateAndActivateNutritionPlan(okPayload as any, testServerNow);
+  });
+});
+
+test("parseCreateAndActivateNutritionPlan: validations reject non-numeric supplement dose", () => {
+  const badPayload = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      supplements: [
+        {
+          id: "supp-1",
+          name: "S",
+          dose: "1 tablet", // string
+          unit: "tablet",
+          frequency: "daily",
+        },
+      ],
+    },
+  };
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan(badPayload as any, testServerNow);
+  }, /dose do suplemento deve ser numérica/);
+});
+
+test("fingerprintNutritionPlan: deterministic ordering & hashing", () => {
+  const fpA = fingerprintNutritionPlan(baseValidPlanPayload.planData as any);
+
+  // Payload B has meal_schedule and supplements in a different physical order
+  const shuffledPlanData = {
+    ...baseValidPlanPayload.planData,
+    meal_schedule: [
+      baseValidPlanPayload.planData.meal_schedule[1],
+      baseValidPlanPayload.planData.meal_schedule[0],
+    ],
+  };
+
+  const fpB = fingerprintNutritionPlan(shuffledPlanData as any);
+  assert.strictEqual(fpA, fpB, "Fingerprint should be identical regardless of schedule order");
+});
+
+test("parseUpdateActiveNutritionPlan: allows administrative changes", () => {
+  const updatePayload = {
+    dogId: "dog-test-123",
+    planId: "plan-active-99",
+    operationId: "op-update-456",
+    expectedRevision: 4,
+    planData: {
+      special_instructions: "Colocar ração fria",
+      professional: {
+        name: "Dr. Ana Cláudia",
+        register_number: "CRMV-SP-9876",
+        register_state: "SP",
+      },
+    },
+  };
+  const result = parseUpdateActiveNutritionPlan(updatePayload as any);
+  assert.strictEqual(result.dogId, "dog-test-123");
+  assert.strictEqual(result.planId, "plan-active-99");
+  assert.strictEqual(result.expectedRevision, 4);
+  assert.strictEqual(result.planData.special_instructions, "Colocar ração fria");
+  assert.strictEqual(result.planData.professional?.name, "Dr. Ana Cláudia");
+});
+
+test("parseUpdateActiveNutritionPlan: rejects structural changes", () => {
+  const badUpdatePayload = {
+    dogId: "dog-test-123",
+    planId: "plan-active-99",
+    operationId: "op-update-456",
+    expectedRevision: 4,
+    planData: {
+      special_instructions: "Nova instrução",
+      food_type: "ração diferente", // structural field!
+    },
+  };
+  assert.throws(() => {
+    parseUpdateActiveNutritionPlan(badUpdatePayload as any);
+  }, /Alteração estrutural não permitida no update/);
+});
+
+test("parseCancelNutritionPlan: parses cancel with valid reason", () => {
+  const cancelPayload = {
+    dogId: "dog-test-123",
+    planId: "plan-active-99",
+    operationId: "op-cancel-789",
+    expectedRevision: 5,
+    reason: "Indicação clínica",
+  };
+  const result = parseCancelNutritionPlan(cancelPayload as any);
+  assert.strictEqual(result.dogId, "dog-test-123");
+  assert.strictEqual(result.planId, "plan-active-99");
+  assert.strictEqual(result.expectedRevision, 5);
+  assert.strictEqual(result.reason, "Indicação clínica");
+});
+
+test("parseCancelNutritionPlan: rejects empty cancel reason", () => {
+  const badCancelPayload = {
+    dogId: "dog-test-123",
+    planId: "plan-active-99",
+    operationId: "op-cancel-789",
+    expectedRevision: 5,
+    reason: "   ", // empty string after trim
+  };
+  assert.throws(() => {
+    parseCancelNutritionPlan(badCancelPayload as any);
+  }, /Justificativa \(reason\) é obrigatória/);
+});
+
+// A fixed server time for tests: 2026-07-20T12:00:00.000Z
+test("CREATE: payload mínimo válido", () => {
+  const payload = {
+    dogId: "dog-min",
+    operationId: "op-min",
+    planData: {
+      food_type: "ração light",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T12:00:00Z", // exactly serverNow
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }
+      ]
+    }
+  };
+  const result = parseCreateAndActivateNutritionPlan(payload as any, testServerNow);
+  assert.strictEqual(result.dogId, "dog-min");
+  assert.strictEqual(result.planData.meals_per_day, 1);
+  assert.strictEqual(result.planData.meal_schedule.length, 1);
+});
+
+test("CREATE: payload completo válido", () => {
+  const payload = {
+    dogId: "dog-full",
+    operationId: "op-full",
+    planData: {
+      food_type: "ração premium",
+      amount_grams_per_day: 300,
+      meals_per_day: 2,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T10:00:00Z", // past but within local day
+      valid_until: "2026-07-25T12:00:00Z",
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 150 },
+        { id: "s2", period: "afternoon", scheduled_time: "14:00", target_grams: 150 }
+      ],
+      supplements: [
+        { id: "sp1", name: "Glucosamina", dose: 2, unit: "tablet", frequency: "daily" }
+      ],
+      hydration_ml: 500,
+      special_instructions: "Comer devagar",
+      professional: { name: "Dr Vet", register_number: "123", register_state: "SP" },
+      source_document: { id: "d1", type: "prescription", issued_by: "Clinic", issued_at: "2026-07-19T00:00:00Z" },
+      attachment_refs: ["url1"]
+    }
+  };
+  const result = parseCreateAndActivateNutritionPlan(payload as any, testServerNow);
+  assert.strictEqual(result.dogId, "dog-full");
+  assert.strictEqual(result.planData.supplements?.length, 1);
+  assert.strictEqual(result.planData.professional?.name, "Dr Vet");
+  assert.strictEqual(result.planData.source_document?.id, "d1");
+});
+
+test("CREATE: rejeita chaves server-controlled", () => {
+  const serverKeys = ["status", "revision", "schema_version", "schemaVersion", "recorded_by", "recordedBy", "created_at", "createdAt", "updated_at", "updatedAt"];
+  for (const k of serverKeys) {
+    const payloadWithRootKey = {
+      ...baseValidPlanPayload,
+      [k]: "val"
+    };
+    assert.throws(() => {
+      parseCreateAndActivateNutritionPlan(payloadWithRootKey as any, testServerNow);
+    }, /Campo controlado pelo servidor não permitido/);
+
+    const payloadWithDataKey = {
+      ...baseValidPlanPayload,
+      planData: {
+        ...baseValidPlanPayload.planData,
+        [k]: "val"
+      }
+    };
+    assert.throws(() => {
+      parseCreateAndActivateNutritionPlan(payloadWithDataKey as any, testServerNow);
+    }, /Campo controlado pelo servidor não permitido/);
+  }
+});
+
+test("CREATE: food_type vazio", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: { ...baseValidPlanPayload.planData, food_type: "   " }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /food_type/);
+});
+
+test("CREATE: amount_grams_per_day <= 0", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      amount_grams_per_day: 0,
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 0 }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /amount_grams_per_day/);
+});
+
+test("CREATE: meals_per_day <= 0", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: { ...baseValidPlanPayload.planData, meals_per_day: -1 }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /meals_per_day/);
+});
+
+test("CREATE: meal_schedule vazio", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: { ...baseValidPlanPayload.planData, meal_schedule: [] }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /meal_schedule/);
+});
+
+test("CREATE: slot ID duplicado", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meal_schedule: [
+        { id: "slot-dup", period: "morning", scheduled_time: "08:00", target_grams: 200 },
+        { id: "slot-dup", period: "evening", scheduled_time: "18:00", target_grams: 200 }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /id de slot duplicado/);
+});
+
+test("CREATE: MealPeriod inválido", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meals_per_day: 1,
+      meal_schedule: [
+        { id: "s1", period: "invalid_period", scheduled_time: "08:00", target_grams: 400 }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /period do slot inválido/);
+});
+
+test("CREATE: scheduled_time inválido", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meals_per_day: 1,
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:000", target_grams: 400 }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /scheduled_time/);
+});
+
+test("CREATE: target_grams <= 0", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meals_per_day: 1,
+      meal_schedule: [
+        { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: -10 }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /target_grams/);
+});
+
+test("CREATE: supplement ID duplicado", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      supplements: [
+        { id: "sp-dup", name: "S1", dose: 1, unit: "tablet", frequency: "daily" },
+        { id: "sp-dup", name: "S2", dose: 1, unit: "tablet", frequency: "daily" }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /id de suplemento duplicado/);
+});
+
+test("CREATE: unit inválida", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      supplements: [
+        { id: "sp1", name: "S1", dose: 1, unit: "invalid_unit", frequency: "daily" }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /unit inválido/);
+});
+
+test("CREATE: supplement valid_until <= valid_from", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      supplements: [
+        {
+          id: "sp1",
+          name: "S1",
+          dose: 1,
+          unit: "tablet",
+          frequency: "daily",
+          valid_from: "2026-07-20T00:00:00Z",
+          valid_until: "2026-07-19T23:59:59Z"
+        }
+      ]
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /valid_until do suplemento deve ser posterior/);
+});
+
+test("CREATE: plano valid_until <= valid_from", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      valid_from: "2026-07-20T05:00:00Z",
+      valid_until: "2026-07-20T05:00:00Z"
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /valid_until deve ser posterior/);
+});
+
+test("CREATE: timezone inválida", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: { ...baseValidPlanPayload.planData, timezone: "XYZ/Abc" }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /timezone inválido/);
+});
+
+test("CREATE: plano expirado", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      valid_from: "2026-07-20T04:00:00Z",
+      valid_until: "2026-07-20T05:00:00Z" // expired (testServerNow is 12:00:00Z)
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /Plano expirado/);
+});
+
+test("CREATE: valid_from futuro", () => {
+  const bad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      valid_from: "2026-07-20T12:00:01Z" // serverNow is 12:00:00Z
+    }
+  };
+  assert.throws(() => parseCreateAndActivateNutritionPlan(bad as any, testServerNow), /valid_from no futuro não é permitido/);
+});
+
+test("CREATE: retroatividade dia civil local limite", () => {
+  // testServerNow = 2026-07-20T12:00:00.000Z. Em America/Sao_Paulo (UTC-3), isso é 2026-07-20 09:00:00.
+  // Início do dia local em UTC = 2026-07-20T03:00:00.000Z.
+  // 02:59:59Z é no dia anterior (19/07), logo deve ser rejeitado.
+  const limitOk = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      valid_from: "2026-07-20T03:00:00Z" // exactly start of today
+    }
+  };
+  const result = parseCreateAndActivateNutritionPlan(limitOk as any, testServerNow);
+  assert.strictEqual(result.planData.valid_from, "2026-07-20T03:00:00Z");
+
+  const limitBad = {
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      valid_from: "2026-07-20T02:59:59Z" // yesterday!
+    }
+  };
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan(limitBad as any, testServerNow);
+  }, /Vigência do plano anterior ao início do dia civil atual/);
+});
+
+// ── UPDATE TESTS ──
+
+test("UPDATE: rejeita individualmente campos estruturais", () => {
+  const forbidden = [
+    "food_type", "foodType",
+    "amount_grams_per_day", "amountGramsPerDay",
+    "meals_per_day", "mealsPerDay",
+    "meal_schedule", "mealSchedule",
+    "supplements",
+    "hydration_ml", "hydrationMl",
+    "timezone",
+    "valid_from", "validFrom",
+    "valid_until", "validUntil"
+  ];
+  for (const k of forbidden) {
+    const payload = {
+      dogId: "d",
+      planId: "p",
+      operationId: "op",
+      expectedRevision: 1,
+      planData: {
+        special_instructions: "nova", // chave administrativa válida
+        [k]: "val"
+      }
+    };
+    assert.throws(() => {
+      parseUpdateActiveNutritionPlan(payload as any);
+    }, /Alteração estrutural não permitida no update/);
+  }
+});
+
+test("UPDATE: campos administrativos permitidos", () => {
+  const adminFields = [
+    { special_instructions: "nova" },
+    { professional: { name: "Dr Vet", register_number: "1", register_state: "SP" } },
+    { source_document: { id: "d1", type: "prescription", issued_by: "Vet", issued_at: "2026-07-20T00:00:00Z" } },
+    { attachment_refs: ["url"] }
+  ];
+  for (const f of adminFields) {
+    const payload = {
+      dogId: "d",
+      planId: "p",
+      operationId: "op",
+      expectedRevision: 2,
+      planData: f
+    };
+    const res = parseUpdateActiveNutritionPlan(payload as any);
+    assert.strictEqual(res.expectedRevision, 2);
+  }
+});
+
+test("UPDATE: combinação de campos administrativos", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      special_instructions: "nova",
+      professional: { name: "Dr Vet", register_number: "1", register_state: "SP" },
+      attachment_refs: ["url1", "url2"]
+    }
+  };
+  const res = parseUpdateActiveNutritionPlan(payload as any);
+  assert.strictEqual(res.planData.special_instructions, "nova");
+  assert.strictEqual(res.planData.professional?.name, "Dr Vet");
+});
+
+test("UPDATE: payload vazio rejeitado", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {}
+  };
+  assert.throws(() => parseUpdateActiveNutritionPlan(payload as any), /pelo menos uma chave administrativa/);
+});
+
+test("UPDATE: chaves explicitamente nulas aceitas", () => {
+  const p1 = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      special_instructions: null
+    }
+  };
+  const res1 = parseUpdateActiveNutritionPlan(p1 as any);
+  assert.strictEqual(res1.planData.special_instructions, null);
+
+  const p2 = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      professional: null
+    }
+  };
+  const res2 = parseUpdateActiveNutritionPlan(p2 as any);
+  assert.strictEqual(res2.planData.professional, null);
+});
+
+test("UPDATE: expectedRevision inválida", () => {
+  const payloads = [
+    { dogId: "d", planId: "p", operationId: "o", expectedRevision: 0, planData: {} },
+    { dogId: "d", planId: "p", operationId: "o", expectedRevision: -5, planData: {} },
+    { dogId: "d", planId: "p", operationId: "o", expectedRevision: "1", planData: {} }
+  ];
+  for (const p of payloads) {
+    assert.throws(() => parseUpdateActiveNutritionPlan(p as any), /expectedRevision/);
+  }
+});
+
+// ── CANCEL TESTS ──
+
+test("CANCEL: reason válido", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 5,
+    reason: "Motivo Clínico"
+  };
+  const res = parseCancelNutritionPlan(payload as any);
+  assert.strictEqual(res.reason, "Motivo Clínico");
+});
+
+test("CANCEL: reason vazio ou whitespace", () => {
+  const payloads = [
+    { dogId: "d", planId: "p", operationId: "o", expectedRevision: 5, reason: "" },
+    { dogId: "d", planId: "p", operationId: "o", expectedRevision: 5, reason: "     " }
+  ];
+  for (const p of payloads) {
+    assert.throws(() => parseCancelNutritionPlan(p as any), /Justificativa.*reason.*obrigatória/);
+  }
+});
+
+test("CANCEL: expectedRevision inválida", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: -1,
+    reason: "Ok"
+  };
+  assert.throws(() => parseCancelNutritionPlan(payload as any), /expectedRevision/);
+});
+
+test("CANCEL: operationId inválido", () => {
+  const payloads = [
+    { dogId: "d", planId: "p", operationId: "", expectedRevision: 1, reason: "Ok" },
+    { dogId: "d", planId: "p", operationId: 123, expectedRevision: 1, reason: "Ok" }
+  ];
+  for (const p of payloads) {
+    assert.throws(() => parseCancelNutritionPlan(p as any), /operationId/);
+  }
+});
+
+// ── FINGERPRINT & RECEIPTS ──
+
+test("FINGERPRINT: determinismo com reordenação de chaves e arrays", () => {
+  const pA = {
+    food_type: "premium",
+    amount_grams_per_day: 300,
+    meals_per_day: 2,
+    timezone: "America/Sao_Paulo",
+    valid_from: "2026-07-20T00:00:00Z",
+    valid_until: null,
+    meal_schedule: [
+      { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 150 },
+      { id: "s2", period: "afternoon", scheduled_time: "14:00", target_grams: 150 }
+    ],
+    supplements: [
+      { id: "sp1", name: "A", dose: 1, unit: "tablet", frequency: "daily" },
+      { id: "sp2", name: "B", dose: 1, unit: "tablet", frequency: "daily" }
+    ]
+  };
+
+  const pB = {
+    timezone: "America/Sao_Paulo",
+    amount_grams_per_day: 300,
+    food_type: "premium",
+    meals_per_day: 2,
+    valid_from: "2026-07-20T00:00:00Z",
+    valid_until: null,
+    meal_schedule: [
+      { id: "s2", scheduled_time: "14:00", period: "afternoon", target_grams: 150 },
+      { id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 150 }
+    ],
+    supplements: [
+      { name: "B", id: "sp2", unit: "tablet", dose: 1, frequency: "daily" },
+      { name: "A", id: "sp1", dose: 1, unit: "tablet", frequency: "daily" }
+    ]
+  };
+
+  const fpA = fingerprintNutritionPlan(pA as any);
+  const fpB = fingerprintNutritionPlan(pB as any);
+  assert.strictEqual(fpA, fpB, "Fingerprint deve ser idêntico com reordenação");
+});
+
+test("FINGERPRINT: alteração estrutural altera fingerprint", () => {
+  const pA = {
+    food_type: "premium",
+    amount_grams_per_day: 300,
+    meals_per_day: 1,
+    timezone: "America/Sao_Paulo",
+    valid_from: "2026-07-20T00:00:00Z",
+    meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 300 }]
+  };
+  const pB = {
+    ...pA,
+    amount_grams_per_day: 310, // diff
+    meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 310 }]
+  };
+  assert.notStrictEqual(fingerprintNutritionPlan(pA as any), fingerprintNutritionPlan(pB as any));
+});
+
+test("RECEIPTS: nutritionOperationReceiptIdV1 com novas operações", () => {
+  const rCreate = nutritionOperationReceiptIdV1({
+    actorUid: "actor-1",
+    operationType: "create_nutrition_plan",
+    operationId: "op-1"
+  });
+  const rUpdate = nutritionOperationReceiptIdV1({
+    actorUid: "actor-1",
+    operationType: "update_nutrition_plan",
+    operationId: "op-1"
+  });
+  assert.ok(rCreate.startsWith("nr1_"));
+  assert.ok(rUpdate.startsWith("nr1_"));
+  assert.notStrictEqual(rCreate, rUpdate, "Receipts de tipos de operação diferente devem ser distintos");
+});
+
+// ── FIRESTORE ADAPTER SECURITY ──
+
+test("ADAPTER SECURITY: assertCanonicalWritePath allowlists & blocking", () => {
+  // Allowed shape of plan
+  assert.doesNotThrow(() => assertCanonicalWritePath("dogs/dog-1/nutrition_plans/plan-1"));
+
+  // Allowed shape of logs
+  assert.doesNotThrow(() => assertCanonicalWritePath("dogs/dog-1/meal_logs/log-1"));
+  assert.doesNotThrow(() => assertCanonicalWritePath("dogs/dog-1/supplement_logs/log-1"));
+  assert.doesNotThrow(() => assertCanonicalWritePath("dogs/dog-1/nutrition_operations/op-1"));
+  assert.doesNotThrow(() => assertCanonicalWritePath("auditLogs/audit-1"));
+
+  // Forbidden shapes of nutrition_plans
+  assert.throws(() => assertCanonicalWritePath("dogs/dog-1/nutrition_plans"), /Write path fora do conjunto/);
+  assert.throws(() => assertCanonicalWritePath("nutrition_plans/plan-1"), /Write path fora do conjunto/);
+  assert.throws(() => assertCanonicalWritePath("dogs/dog-1/nutrition_plans/plan-1/nested"), /Write path fora do conjunto/);
+
+  // Forbidden legacy write collections
+  assert.throws(() => assertCanonicalWritePath("dogs/dog-1/nutritional_prescriptions/presc-1"), /Write proibido em collection legada/);
+  assert.throws(() => assertCanonicalWritePath("dogs/dog-1/nutrition_prescriptions/presc-1"), /Write proibido em collection legada/);
+
+  // Arbitrary paths
+  assert.throws(() => assertCanonicalWritePath("dogs/dog-1/arbitrary/path-1"), /Write path fora do conjunto/);
+  assert.throws(() => assertCanonicalWritePath("arbitrary_collection/doc-1"), /Write path fora do conjunto/);
 });
 
 console.log("\nhealth_nutrition_logic_test: all passed");
