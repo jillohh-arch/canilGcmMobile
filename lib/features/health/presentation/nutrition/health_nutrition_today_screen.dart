@@ -4,27 +4,31 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
+import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan_regimen.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:canil_gcm/features/health/domain/supplement_log.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_planned_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
 import 'package:canil_gcm/features/health/presentation/shared/states/health_state_views.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
 
-/// Nutrição Hoje — read-only canônico + legacy coexistence (Gate 5B).
-///
-/// **ZERO write:** sem CTA de mutation, sem gateway de create.
+/// Nutrição Hoje — coexistência read + execução planned fail-closed (Gate 5C.2A).
 class HealthNutritionTodayScreen extends StatelessWidget {
   final HealthNutritionReadController controller;
+  final HealthNutritionMutationController? mutationController;
   final String dogDisplayName;
   final double bottomPadding;
 
   const HealthNutritionTodayScreen({
     super.key,
     required this.controller,
+    this.mutationController,
     required this.dogDisplayName,
     this.bottomPadding = 24,
   });
@@ -95,6 +99,12 @@ class HealthNutritionTodayScreen extends StatelessWidget {
         final integrityConflict =
             snapshot.activePlan is NutritionActivePlanIntegrityConflict ||
             (todayModel?.hasActivePlanIntegrityConflict ?? false);
+        final mutationHealthy =
+            !degraded &&
+            !integrityConflict &&
+            today?.isData == true &&
+            mutationController != null &&
+            _isCanonicalPlanEffectiveNow(snapshot.activePlan);
 
         return RefreshIndicator(
           color: AppTheme.primary,
@@ -139,6 +149,13 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 mealsToday: todayModel?.meals ?? const [],
                 serverNow: DateTime.now().toUtc(),
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
+                mutationEnabled: mutationHealthy,
+                onRegister: (plan, slot) => _openPlannedMealForm(
+                  context,
+                  plan: plan,
+                  slot: slot,
+                  serviceDate: todayModel!.localServiceDate,
+                ),
               ),
               const SizedBox(height: 14),
               _SupplementsSection(
@@ -168,7 +185,124 @@ class HealthNutritionTodayScreen extends StatelessWidget {
       },
     );
   }
+
+  bool _isCanonicalPlanEffectiveNow(NutritionActivePlanRef? ref) {
+    if (ref is! NutritionActiveCanonicalPlan) return false;
+    try {
+      ref.plan.validateForActivation(DateTime.now().toUtc());
+      return ref.plan.status == NutritionPlanStatus.active;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _openPlannedMealForm(
+    BuildContext context, {
+    required NutritionPlan plan,
+    required MealScheduleSlot slot,
+    required String serviceDate,
+  }) async {
+    final mutation = mutationController;
+    if (mutation == null) return;
+    final pending = mutation.pendingIntent;
+    final draft = pending?.plannedMealDraft;
+    if (pending != null &&
+        (draft == null ||
+            draft.dogId != plan.dogId ||
+            draft.planId != plan.id ||
+            draft.plannedMealId != slot.id)) {
+      final action = await showDialog<_PendingAction>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: AppTheme.surfacePanel,
+          title: const Text('Registro pendente'),
+          content: const Text(
+            'Existe um registro de alimentação pendente de confirmação. '
+            'Conclua ou descarte essa tentativa antes de iniciar outra.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            if (draft != null)
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, _PendingAction.resume),
+                child: const Text('Retomar tentativa'),
+              ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _PendingAction.discard),
+              child: const Text('Descartar tentativa'),
+            ),
+          ],
+        ),
+      );
+      if (!context.mounted || action == null) return;
+      if (action == _PendingAction.discard) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: AppTheme.surfacePanel,
+            title: const Text('Descartar tentativa?'),
+            content: const Text(
+              'A tentativa atual deixará de ser reutilizada. Isso não confirma '
+              'que o backend deixou de receber um envio anterior.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Manter tentativa'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) mutation.discardIntent();
+        return;
+      }
+      if (action == _PendingAction.resume && draft != null) {
+        MealScheduleSlot? pendingSlot;
+        for (final item in plan.mealSchedule) {
+          if (item.id == draft.plannedMealId) {
+            pendingSlot = item;
+            break;
+          }
+        }
+        if (pendingSlot == null) return;
+        slot = pendingSlot;
+      }
+    }
+
+    final outcome =
+        await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: AppTheme.background,
+          builder: (_) => HealthPlannedMealFormSheet(
+            dogDisplayName: dogDisplayName,
+            plan: plan,
+            slot: slot,
+            localServiceDate: serviceDate,
+            controller: mutation,
+            onRefreshRequested: controller.refresh,
+          ),
+        );
+    if (!context.mounted || outcome == null) return;
+    if (outcome is HealthNutritionMutationUiSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Refeição registrada com sucesso.')),
+      );
+    }
+  }
 }
+
+enum _PendingAction { resume, discard }
 
 // ── Sections ────────────────────────────────────────────────────────────────
 
@@ -621,12 +755,16 @@ class _MealsSection extends StatelessWidget {
     required this.mealsToday,
     required this.serverNow,
     required this.timezone,
+    required this.mutationEnabled,
+    required this.onRegister,
   });
 
   final NutritionActivePlanRef? plan;
   final List<NutritionMealReadItem> mealsToday;
   final DateTime serverNow;
   final String timezone;
+  final bool mutationEnabled;
+  final void Function(NutritionPlan plan, MealScheduleSlot slot) onRegister;
 
   @override
   Widget build(BuildContext context) {
@@ -668,6 +806,11 @@ class _MealsSection extends StatelessWidget {
                 targetGrams: slotView.slot.targetGrams,
                 meal: slotView.meal,
                 status: uiStatus,
+                onRegister:
+                    mutationEnabled &&
+                        uiStatus != NutritionTodaySlotUiStatus.completed
+                    ? () => onRegister(canonical, slotView.slot)
+                    : null,
               ),
             );
           }),
@@ -714,6 +857,7 @@ class _MealSlotCard extends StatelessWidget {
     required this.targetGrams,
     required this.status,
     this.meal,
+    this.onRegister,
   });
 
   final String periodLabel;
@@ -721,6 +865,7 @@ class _MealSlotCard extends StatelessWidget {
   final double targetGrams;
   final NutritionTodaySlotUiStatus status;
   final NutritionMealReadItem? meal;
+  final VoidCallback? onRegister;
 
   @override
   Widget build(BuildContext context) {
@@ -798,6 +943,23 @@ class _MealSlotCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ] else if (onRegister != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onRegister,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Registrar refeição'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+              ),
             ),
           ],
         ],

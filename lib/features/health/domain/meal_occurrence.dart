@@ -176,6 +176,56 @@ final class LocalServiceDate {
     }
   }
 
+  /// Converte um wall-clock civil explícito para instante UTC no timezone IANA.
+  ///
+  /// Rejeita horários inexistentes em transições DST em vez de normalizá-los
+  /// silenciosamente. Não consulta o timezone do aparelho.
+  static DateTime instantFromLocal({
+    required int year,
+    required int month,
+    required int day,
+    required int hour,
+    required int minute,
+    required String timezone,
+  }) {
+    final name = timezone.trim();
+    if (name.isEmpty) {
+      throw const HealthDomainException(
+        'missing_timezone',
+        'timezone é obrigatório para conversão civil',
+      );
+    }
+    _ensureTimeZonesInitialized();
+    try {
+      final local = tz.TZDateTime(
+        tz.getLocation(name),
+        year,
+        month,
+        day,
+        hour,
+        minute,
+      );
+      if (local.year != year ||
+          local.month != month ||
+          local.day != day ||
+          local.hour != hour ||
+          local.minute != minute) {
+        throw const HealthDomainException(
+          'invalid_local_time',
+          'horário local não existe no timezone informado',
+        );
+      }
+      return local.toUtc();
+    } on HealthDomainException {
+      rethrow;
+    } on Exception {
+      throw HealthDomainException(
+        'invalid_timezone',
+        'timezone "$name" não é reconhecido pela base IANA',
+      );
+    }
+  }
+
   final int year;
   final int month;
   final int day;

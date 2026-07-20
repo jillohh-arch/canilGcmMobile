@@ -4,6 +4,32 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('LocalServiceDate', () {
+    test('wall clock usa timezone do plano e não timezone do device', () {
+      final instant = LocalServiceDate.instantFromLocal(
+        year: 2026,
+        month: 7,
+        day: 19,
+        hour: 8,
+        minute: 30,
+        timezone: 'America/Sao_Paulo',
+      );
+      expect(instant, DateTime.utc(2026, 7, 19, 11, 30));
+    });
+
+    test('fronteira DST rejeita horário local inexistente', () {
+      expect(
+        () => LocalServiceDate.instantFromLocal(
+          year: 2026,
+          month: 3,
+          day: 8,
+          hour: 2,
+          minute: 30,
+          timezone: 'America/New_York',
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
+    });
+
     test('fromIso válido sem horário embutido', () {
       final d = LocalServiceDate.fromIso('2026-07-18');
       expect(d.year, 2026);

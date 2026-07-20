@@ -521,6 +521,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
         ),
         nutricao: (_) => HealthNutritionTodayScreen(
           controller: _nutritionReadController,
+          mutationController: _nutritionMutationController,
           dogDisplayName: dogContext.name,
           bottomPadding: _timelineBottomPadding(context),
         ),

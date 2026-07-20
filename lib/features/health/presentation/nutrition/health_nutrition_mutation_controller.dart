@@ -62,13 +62,18 @@ class HealthNutritionMutationController extends ChangeNotifier {
   String ensureOperationIdForIntent({
     required String intentFingerprint,
     required HealthNutritionMutationKind kind,
+    HealthNutritionPendingPlannedMealDraft? plannedMealDraft,
   }) {
     final fp = intentFingerprint.trim();
     final existing = _pendingHolder.value;
     if (existing != null && existing.operationId.isNotEmpty) {
       if (existing.intentFingerprint == fp) {
-        if (existing.kind != kind) {
-          _pendingHolder.value = existing.copyWith(kind: kind);
+        if (existing.kind != kind ||
+            (existing.plannedMealDraft == null && plannedMealDraft != null)) {
+          _pendingHolder.value = existing.copyWith(
+            kind: kind,
+            plannedMealDraft: plannedMealDraft,
+          );
         }
         return existing.operationId;
       }
@@ -83,6 +88,7 @@ class HealthNutritionMutationController extends ChangeNotifier {
       operationId: next,
       intentFingerprint: fp,
       kind: kind,
+      plannedMealDraft: plannedMealDraft,
     );
     return next;
   }
@@ -129,6 +135,16 @@ class HealthNutritionMutationController extends ChangeNotifier {
       final operationId = ensureOperationIdForIntent(
         intentFingerprint: draftFp,
         kind: HealthNutritionMutationKind.plannedMeal,
+        plannedMealDraft: HealthNutritionPendingPlannedMealDraft(
+          dogId: dogId,
+          planId: planId,
+          plannedMealId: plannedMealId,
+          offeredGrams: offeredGrams,
+          consumedGrams: consumedGrams,
+          acceptance: acceptance,
+          fedAt: fedAt,
+          observations: observations,
+        ),
       );
       command = CreatePlannedMealLogCommand(
         dogId: dogId,
