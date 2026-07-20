@@ -561,6 +561,27 @@ test("zero dual-write collection lists", () => {
 
 // ── NutritionPlan Tests ──
 
+/**
+ * ProfessionalIdentity canônico (Health v1).
+ * Campos: name, registration_type, registration_number, clinic?, specialty?
+ */
+const CANONICAL_PROFESSIONAL = {
+  name: "Dr. Ana Cláudia",
+  registration_type: "CRMV",
+  registration_number: "9876",
+  clinic: "Clínica Vet K9",
+  specialty: "Nutrologia Veterinária",
+};
+
+/**
+ * HealthDocumentRef canônico (Health v1).
+ * Campos: health_document_id, description?
+ */
+const CANONICAL_SOURCE_DOCUMENT = {
+  health_document_id: "doc-prescription-11",
+  description: "Prescrição nutricional K9",
+};
+
 const baseValidPlanPayload = {
   dogId: "dog-test-123",
   operationId: "op-create-123",
@@ -599,20 +620,12 @@ const baseValidPlanPayload = {
     ],
     hydration_ml: 1200,
     special_instructions: "Umedecer levemente os grãos",
-    professional: {
-      name: "Dr. Ana Cláudia",
-      register_number: "CRMV-SP-9876",
-      register_state: "SP",
-      specialty: "Nutrologia Veterinária",
-    },
-    source_document: {
-      id: "doc-prescription-11",
-      type: "prescription",
-      issued_by: "Clínica Vet K9",
-      issued_at: "2026-07-18T10:00:00Z",
-      url: "https://k9ops.net/docs/prescription-11.pdf",
-    },
-    attachment_refs: ["https://k9ops.net/docs/ref-1.jpg"],
+    // Canonical ProfessionalIdentity (Health v1)
+    professional: CANONICAL_PROFESSIONAL,
+    // Canonical HealthDocumentRef (Health v1)
+    source_document: CANONICAL_SOURCE_DOCUMENT,
+    // attachment_refs: array de health_document_id (string[])
+    attachment_refs: ["doc-lab-result-1", "doc-prescription-11"],
   },
 };
 
@@ -630,10 +643,18 @@ test("parseCreateAndActivateNutritionPlan: valid payload success", () => {
   assert.strictEqual(result.planData.supplements?.length, 1);
   assert.strictEqual(result.planData.hydration_ml, 1200);
   assert.strictEqual(result.planData.special_instructions, "Umedecer levemente os grãos");
+  // ProfessionalIdentity canônico
   assert.strictEqual(result.planData.professional?.name, "Dr. Ana Cláudia");
-  assert.strictEqual(result.planData.source_document?.id, "doc-prescription-11");
-  assert.strictEqual(result.planData.source_document?.type, "prescription");
-  assert.strictEqual(result.planData.attachment_refs?.length, 1);
+  assert.strictEqual(result.planData.professional?.registration_type, "CRMV");
+  assert.strictEqual(result.planData.professional?.registration_number, "9876");
+  assert.strictEqual(result.planData.professional?.clinic, "Clínica Vet K9");
+  assert.strictEqual(result.planData.professional?.specialty, "Nutrologia Veterinária");
+  // HealthDocumentRef canônico: health_document_id, description
+  assert.strictEqual(result.planData.source_document?.health_document_id, "doc-prescription-11");
+  assert.strictEqual(result.planData.source_document?.description, "Prescrição nutricional K9");
+  // attachment_refs: array de health_document_id
+  assert.strictEqual(result.planData.attachment_refs?.length, 2);
+  assert.deepStrictEqual(result.planData.attachment_refs, ["doc-lab-result-1", "doc-prescription-11"]);
 });
 
 test("parseCreateAndActivateNutritionPlan: validations reject invalid timezone", () => {
@@ -723,10 +744,11 @@ test("parseUpdateActiveNutritionPlan: allows administrative changes", () => {
     expectedRevision: 4,
     planData: {
       special_instructions: "Colocar ração fria",
+      // ProfessionalIdentity canônico (Health v1)
       professional: {
         name: "Dr. Ana Cláudia",
-        register_number: "CRMV-SP-9876",
-        register_state: "SP",
+        registration_type: "CRMV",
+        registration_number: "9876",
       },
     },
   };
@@ -736,6 +758,8 @@ test("parseUpdateActiveNutritionPlan: allows administrative changes", () => {
   assert.strictEqual(result.expectedRevision, 4);
   assert.strictEqual(result.planData.special_instructions, "Colocar ração fria");
   assert.strictEqual(result.planData.professional?.name, "Dr. Ana Cláudia");
+  assert.strictEqual(result.planData.professional?.registration_type, "CRMV");
+  assert.strictEqual(result.planData.professional?.registration_number, "9876");
 });
 
 test("parseUpdateActiveNutritionPlan: rejects structural changes", () => {
@@ -824,16 +848,22 @@ test("CREATE: payload completo válido", () => {
       ],
       hydration_ml: 500,
       special_instructions: "Comer devagar",
-      professional: { name: "Dr Vet", register_number: "123", register_state: "SP" },
-      source_document: { id: "d1", type: "prescription", issued_by: "Clinic", issued_at: "2026-07-19T00:00:00Z" },
-      attachment_refs: ["url1"]
+      // ProfessionalIdentity canônico
+      professional: { name: "Dr Vet", registration_type: "CRMV", registration_number: "12345", clinic: "Clínica Central" },
+      // HealthDocumentRef canônico
+      source_document: { health_document_id: "doc-full-1", description: "Prescrição completa" },
+      attachment_refs: ["doc-lab-1", "doc-prescription-2"]
     }
   };
   const result = parseCreateAndActivateNutritionPlan(payload as any, testServerNow);
   assert.strictEqual(result.dogId, "dog-full");
   assert.strictEqual(result.planData.supplements?.length, 1);
   assert.strictEqual(result.planData.professional?.name, "Dr Vet");
-  assert.strictEqual(result.planData.source_document?.id, "d1");
+  assert.strictEqual(result.planData.professional?.registration_type, "CRMV");
+  assert.strictEqual(result.planData.professional?.clinic, "Clínica Central");
+  assert.strictEqual(result.planData.source_document?.health_document_id, "doc-full-1");
+  assert.strictEqual(result.planData.source_document?.description, "Prescrição completa");
+  assert.strictEqual(result.planData.attachment_refs?.length, 2);
 });
 
 test("CREATE: rejeita chaves server-controlled", () => {
@@ -1105,9 +1135,12 @@ test("UPDATE: rejeita individualmente campos estruturais", () => {
 test("UPDATE: campos administrativos permitidos", () => {
   const adminFields = [
     { special_instructions: "nova" },
-    { professional: { name: "Dr Vet", register_number: "1", register_state: "SP" } },
-    { source_document: { id: "d1", type: "prescription", issued_by: "Vet", issued_at: "2026-07-20T00:00:00Z" } },
-    { attachment_refs: ["url"] }
+    // ProfessionalIdentity canônico
+    { professional: { name: "Dr Vet", registration_type: "CRMV", registration_number: "12345" } },
+    // HealthDocumentRef canônico
+    { source_document: { health_document_id: "doc-update-1", description: "Atualização" } },
+    // attachment_refs: array de health_document_id
+    { attachment_refs: ["doc-1", "doc-2"] }
   ];
   for (const f of adminFields) {
     const payload = {
@@ -1130,13 +1163,17 @@ test("UPDATE: combinação de campos administrativos", () => {
     expectedRevision: 3,
     planData: {
       special_instructions: "nova",
-      professional: { name: "Dr Vet", register_number: "1", register_state: "SP" },
-      attachment_refs: ["url1", "url2"]
+      // ProfessionalIdentity canônico
+      professional: { name: "Dr Vet", registration_type: "CRMV", registration_number: "12345", clinic: "Clínica K9" },
+      // attachment_refs: array de health_document_id
+      attachment_refs: ["doc-1", "doc-2"]
     }
   };
   const res = parseUpdateActiveNutritionPlan(payload as any);
   assert.strictEqual(res.planData.special_instructions, "nova");
   assert.strictEqual(res.planData.professional?.name, "Dr Vet");
+  assert.strictEqual(res.planData.professional?.registration_type, "CRMV");
+  assert.strictEqual(res.planData.professional?.clinic, "Clínica K9");
 });
 
 test("UPDATE: payload vazio rejeitado", () => {
@@ -1185,6 +1222,347 @@ test("UPDATE: expectedRevision inválida", () => {
   for (const p of payloads) {
     assert.throws(() => parseUpdateActiveNutritionPlan(p as any), /expectedRevision/);
   }
+});
+
+// ── HEALTH V1 CANONICAL CONTRACT TESTS ──
+
+test("ProfessionalIdentity: campos obrigatórios no contrato canônico", () => {
+  // registration_type é obrigatório
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan({
+      dogId: "d",
+      operationId: "o",
+      planData: {
+        food_type: "racao",
+        amount_grams_per_day: 100,
+        meals_per_day: 1,
+        timezone: "America/Sao_Paulo",
+        valid_from: "2026-07-20T03:00:00Z",
+        meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+        professional: { name: "Dr", registration_number: "123" }, // falta registration_type
+      }
+    } as any, testServerNow);
+  }, /registration_type.*obrigatório/);
+});
+
+test("ProfessionalIdentity: registration_number é obrigatório", () => {
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan({
+      dogId: "d",
+      operationId: "o",
+      planData: {
+        food_type: "racao",
+        amount_grams_per_day: 100,
+        meals_per_day: 1,
+        timezone: "America/Sao_Paulo",
+        valid_from: "2026-07-20T03:00:00Z",
+        meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+        professional: { name: "Dr", registration_type: "CRMV" }, // falta registration_number
+      }
+    } as any, testServerNow);
+  }, /registration_number.*obrigatório/);
+});
+
+test("ProfessionalIdentity: clinic é opcional", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      professional: {
+        name: "Dr Vet",
+        registration_type: "CRMV",
+        registration_number: "12345",
+        // clinic omitido = opcional
+        specialty: "Nutrologia"
+      }
+    }
+  } as any, testServerNow);
+  assert.strictEqual(result.planData.professional?.clinic, null);
+  assert.strictEqual(result.planData.professional?.specialty, "Nutrologia");
+});
+
+test("ProfessionalIdentity: specialty é opcional", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      professional: {
+        name: "Dr Vet",
+        registration_type: "CRMV",
+        registration_number: "12345",
+        clinic: "Clínica K9"
+        // specialty omitido = opcional
+      }
+    }
+  } as any, testServerNow);
+  assert.strictEqual(result.planData.professional?.specialty, null);
+  assert.strictEqual(result.planData.professional?.clinic, "Clínica K9");
+});
+
+test("ProfessionalIdentity: shape persistido canônico", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      professional: {
+        name: "Dr Fulano",
+        registration_type: "CRM",
+        registration_number: "54321",
+        clinic: "Posto Central",
+        specialty: "Clínica Geral"
+      }
+    }
+  } as any, testServerNow);
+  // Verifica que o shape persistido tem campos canônicos
+  const prof = result.planData.professional!;
+  assert.strictEqual(prof.name, "Dr Fulano");
+  assert.strictEqual(prof.registration_type, "CRM");
+  assert.strictEqual(prof.registration_number, "54321");
+  assert.strictEqual(prof.clinic, "Posto Central");
+  assert.strictEqual(prof.specialty, "Clínica Geral");
+  // Verifica que NÃO tem campos legados no shape de saída
+  assert.strictEqual((prof as any).register_number, undefined);
+  assert.strictEqual((prof as any).register_state, undefined);
+});
+
+test("ProfessionalIdentity: register_state NÃO vira registration_type (semanticamente distinto)", () => {
+  // register_state representa UF (ex: "SP"), registration_type representa tipo de conselho (ex: "CRMV")
+  // O parser canônico NÃO deve converter um no outro
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan({
+      dogId: "d",
+      operationId: "o",
+      planData: {
+        food_type: "racao",
+        amount_grams_per_day: 100,
+        meals_per_day: 1,
+        timezone: "America/Sao_Paulo",
+        valid_from: "2026-07-20T03:00:00Z",
+        meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+        // Enviando apenas register_state (legado) sem registration_type
+        // O parser canônico deve rejeitar porque falta registration_type
+        professional: {
+          name: "Dr",
+          register_number: "123",
+          register_state: "SP"
+        },
+      }
+    } as any, testServerNow);
+  }, /registration_type.*obrigatório/);
+});
+
+test("HealthDocumentRef: health_document_id é obrigatório no contrato canônico", () => {
+  assert.throws(() => {
+    parseCreateAndActivateNutritionPlan({
+      dogId: "d",
+      operationId: "o",
+      planData: {
+        food_type: "racao",
+        amount_grams_per_day: 100,
+        meals_per_day: 1,
+        timezone: "America/Sao_Paulo",
+        valid_from: "2026-07-20T03:00:00Z",
+        meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+        // source_document sem health_document_id
+        source_document: { description: "Apenas descrição" }
+      }
+    } as any, testServerNow);
+  }, /health_document_id.*obrigatório/);
+});
+
+test("HealthDocumentRef: description é opcional", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      source_document: { health_document_id: "doc-123" } // sem description
+    }
+  } as any, testServerNow);
+  assert.strictEqual(result.planData.source_document?.health_document_id, "doc-123");
+  assert.strictEqual(result.planData.source_document?.description, null);
+});
+
+test("HealthDocumentRef: shape persistido canônico", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      source_document: {
+        health_document_id: "doc-nutrition-001",
+        description: "Laudo nutricional completo"
+      }
+    }
+  } as any, testServerNow);
+  const doc = result.planData.source_document!;
+  assert.strictEqual(doc.health_document_id, "doc-nutrition-001");
+  assert.strictEqual(doc.description, "Laudo nutricional completo");
+  // Verifica que NÃO tem campos legados no shape de saída
+  assert.strictEqual((doc as any).id, undefined);
+  assert.strictEqual((doc as any).type, undefined);
+  assert.strictEqual((doc as any).issued_by, undefined);
+  assert.strictEqual((doc as any).issued_at, undefined);
+  assert.strictEqual((doc as any).url, undefined);
+});
+
+test("attachment_refs: array de health_document_id (string[])", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      attachment_refs: [
+        "doc-lab-blood-001",
+        "doc-prescription-002",
+        "doc-exam-xray-003"
+      ]
+    }
+  } as any, testServerNow);
+  assert.strictEqual(result.planData.attachment_refs?.length, 3);
+  assert.deepStrictEqual(result.planData.attachment_refs, [
+    "doc-lab-blood-001",
+    "doc-prescription-002",
+    "doc-exam-xray-003"
+  ]);
+});
+
+test("attachment_refs: vazio é aceito", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    dogId: "d",
+    operationId: "o",
+    planData: {
+      food_type: "racao",
+      amount_grams_per_day: 100,
+      meals_per_day: 1,
+      timezone: "America/Sao_Paulo",
+      valid_from: "2026-07-20T03:00:00Z",
+      meal_schedule: [{ id: "s1", period: "morning", scheduled_time: "08:00", target_grams: 100 }],
+      attachment_refs: []
+    }
+  } as any, testServerNow);
+  assert.deepStrictEqual(result.planData.attachment_refs, []);
+});
+
+test("UPDATE: {} rejeitado (deve ter pelo menos uma chave administrativa)", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {} // vazio!
+  };
+  assert.throws(() => parseUpdateActiveNutritionPlan(payload as any), /pelo menos uma chave administrativa/);
+});
+
+test("UPDATE: null explícito limpa campo", () => {
+  // professional null deve limpar o campo
+  const p1 = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      professional: null
+    }
+  };
+  const res1 = parseUpdateActiveNutritionPlan(p1 as any);
+  assert.strictEqual(res1.planData.professional, null);
+
+  // special_instructions null deve limpar
+  const p2 = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      special_instructions: null
+    }
+  };
+  const res2 = parseUpdateActiveNutritionPlan(p2 as any);
+  assert.strictEqual(res2.planData.special_instructions, null);
+
+  // attachment_refs null deve limpar
+  const p3 = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      attachment_refs: null
+    }
+  };
+  const res3 = parseUpdateActiveNutritionPlan(p3 as any);
+  assert.deepStrictEqual(res3.planData.attachment_refs, []);
+});
+
+test("UPDATE: campo omitido preserva existente", () => {
+  // Campo não enviado = omitido, não deve ser incluído no planData de saída
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      special_instructions: "Nova instrução"
+      // professional omitido - preserva existente
+      // source_document omitido - preserva existente
+      // attachment_refs omitido - preserva existente
+    }
+  };
+  const res = parseUpdateActiveNutritionPlan(payload as any);
+  assert.strictEqual(res.planData.special_instructions, "Nova instrução");
+  // Os outros campos não devem estar no planData de saída
+  assert.strictEqual(res.planData.professional, undefined);
+  assert.strictEqual(res.planData.source_document, undefined);
+  assert.strictEqual(res.planData.attachment_refs, undefined);
+});
+
+test("UPDATE: source_document null limpa", () => {
+  const payload = {
+    dogId: "d",
+    planId: "p",
+    operationId: "op",
+    expectedRevision: 3,
+    planData: {
+      source_document: null
+    }
+  };
+  const res = parseUpdateActiveNutritionPlan(payload as any);
+  assert.strictEqual(res.planData.source_document, null);
 });
 
 // ── CANCEL TESTS ──

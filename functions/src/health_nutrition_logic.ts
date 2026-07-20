@@ -1275,19 +1275,84 @@ export const CANONICAL_WRITE_COLLECTIONS = [
   "operations",
 ] as const;
 
+/**
+ * ProfessionalIdentity — Contrato Health v1 canônico.
+ *
+ * Wire de leitura legado (backward-compatible):
+ * - name
+ * - register_number (legado, lido para compatibilidade)
+ * - register_state (legado, lido para compatibilidade)
+ * - specialty?
+ *
+ * Wire de escrita canônico (PRIMARY):
+ * - name (obrigatório)
+ * - registration_type (obrigatório) — tipo de registro profissional (ex: "CRMV", "CRM", "CRFA")
+ * - registration_number (obrigatório) — número do registro profissional
+ * - clinic? (opcional) — nome da clínica/posto
+ * - specialty? (opcional)
+ *
+ * IMPORTANTE: NÃO mapear register_state → registration_type.
+ * register_state representa UF (ex: "SP"), enquanto registration_type representa
+ * o tipo de conselho (ex: "CRMV"). São semanticamente distintos.
+ */
 export interface ProfessionalIdentity {
+  /** Nome completo do profissional. */
+  name: string;
+  /** Tipo de registro profissional (ex: "CRMV", "CRM", "CRFA"). */
+  registration_type: string;
+  /** Número do registro profissional (ex: "9876"). */
+  registration_number: string;
+  /** Nome da clínica ou posto de trabalho (opcional). */
+  clinic?: string | null;
+  /** Especialidade do profissional (opcional). */
+  specialty?: string | null;
+}
+
+/**
+ * ProfessionalIdentity legado — shape histórico lido para compatibilidade.
+ * Preservado para leitura de documentos históricos existentes.
+ * NÃO deve ser usado em novas escritas.
+ */
+export interface LegacyProfessionalIdentity {
   name: string;
   register_number: string;
   register_state: string;
   specialty?: string | null;
 }
 
+/**
+ * HealthDocumentRef — Contrato Health v1 canônico.
+ *
+ * Wire de escrita canônico (PRIMARY):
+ * - health_document_id (obrigatório) — ID do documento de saúde
+ * - description? (opcional) — descrição textual do documento
+ *
+ * URLs são derivadas do HealthDocument real, não persistidas aqui.
+ *
+ * Wire de leitura legado (backward-compatible):
+ * - id (legacy alias para health_document_id)
+ * - type, issued_by, issued_at, url (campos históricos preservados em leitura)
+ *
+ * NÃO buscar HealthDocument para copiar metadados. Não transformar em snapshot.
+ */
 export interface HealthDocumentRef {
+  /** ID do documento de saúde referenciado. */
+  health_document_id: string;
+  /** Descrição textual do documento (opcional). */
+  description?: string | null;
+}
+
+/**
+ * HealthDocumentRef legado — shape histórico para leitura de documentos existentes.
+ * Campos adicionais (type, issued_by, issued_at, url) preservados em leitura legacy.
+ */
+export interface LegacyHealthDocumentRef {
   id: string;
   type: "prescription" | "laudo" | "exame" | "other";
   issued_by: string;
   issued_at: string;
   url?: string | null;
+  description?: string | null;
 }
 
 export interface MealScheduleSlot {
@@ -1322,8 +1387,11 @@ export interface CreateAndActivateNutritionPlanRequest {
     supplements?: NutritionPlanSupplement[];
     hydration_ml?: number | null;
     special_instructions?: string | null;
+    /** ProfessionalIdentity canônico (Health v1). Campos: name, registration_type, registration_number, clinic?, specialty? */
     professional?: ProfessionalIdentity | null;
+    /** HealthDocumentRef canônico (Health v1). Campos: health_document_id, description? */
     source_document?: HealthDocumentRef | null;
+    /** Array de health_document_id (IDs de HealthDocument). */
     attachment_refs?: string[];
   };
 }
@@ -1335,8 +1403,11 @@ export interface UpdateActiveNutritionPlanRequest {
   expectedRevision: number;
   planData: {
     special_instructions?: string | null;
+    /** ProfessionalIdentity canônico (Health v1). */
     professional?: ProfessionalIdentity | null;
+    /** HealthDocumentRef canônico (Health v1). */
     source_document?: HealthDocumentRef | null;
+    /** Array de health_document_id. */
     attachment_refs?: string[];
   };
 }
@@ -1349,47 +1420,86 @@ export interface CancelNutritionPlanRequest {
   reason: string;
 }
 
-function parseProfessionalIdentity(val: unknown): ProfessionalIdentity | null {
+/**
+ * Parseia ProfessionalIdentity com contrato canônico Health v1.
+ *
+ * Wire de entrada aceito:
+ * - name (obrigatório)
+ * - registration_type (obrigatório) — tipo de registro profissional (ex: "CRMV", "CRM", "CRFA")
+ * - registration_number (obrigatório) — número do registro profissional
+ * - registration_number pode vir como alias "register_number" (compatibilidade de leitura)
+ * - clinic? (opcional) — nome da clínica/posto
+ * - specialty? (opcional)
+ *
+ * IMPORTANTE:
+ * - register_state NÃO é aceito nem convertido para registration_type
+ * - register_state representa UF (ex: "SP"), registration_type representa tipo de conselho (ex: "CRMV")
+ * - São domínios semanticamente distintos
+ *
+ * @returns ProfessionalIdentity canônico ou null se professional for omitido
+ */
+function parseProfessionalIdentity(
+  val: unknown,
+): ProfessionalIdentity | null {
   if (!val || typeof val !== "object" || Array.isArray(val)) return null;
   const obj = val as Record<string, unknown>;
-  const name = stringValue(obj.name);
-  const register_number = stringValue(obj.register_number) ?? stringValue(obj.registerNumber);
-  const register_state = stringValue(obj.register_state) ?? stringValue(obj.registerState);
-  const specialty = stringValue(obj.specialty) ?? null;
 
-  if (!name || !register_number || !register_state) {
-    throw nutritionError("validation", "ProfessionalIdentity incompleto (name, register_number, register_state obrigatórios).");
+  const name = stringValue(obj.name);
+  if (!name) return null; // null é aceitável (professional é opcional)
+
+  const registration_type = stringValue(obj.registration_type);
+  if (!registration_type) {
+    throw nutritionError(
+      "validation",
+      "ProfessionalIdentity incompleto: registration_type é obrigatório no contrato Health v1.",
+    );
   }
-  return {
-    name,
-    register_number,
-    register_state,
-    specialty,
-  };
+
+  const registration_number =
+    stringValue(obj.registration_number) ?? stringValue(obj.register_number);
+  if (!registration_number) {
+    throw nutritionError(
+      "validation",
+      "ProfessionalIdentity incompleto: registration_number é obrigatório no contrato Health v1.",
+    );
+  }
+
+  const clinic = stringValue(obj.clinic) ?? null;
+  const specialty = stringValue(obj.specialty) ?? null;
+  return {name, registration_type, registration_number, clinic, specialty};
 }
 
-function parseHealthDocumentRef(val: unknown): HealthDocumentRef | null {
+/**
+ * Parseia HealthDocumentRef com contrato canônico Health v1.
+ *
+ * Wire de entrada aceito:
+ * - health_document_id (obrigatório) — ID do documento de saúde
+ * - health_document_id pode vir como alias "id" (compatibilidade de leitura)
+ * - description? (opcional) — descrição textual do documento
+ *
+ * Campos legados (type, issued_by, issued_at, url) são IGNORADOS se presentes.
+ * URLs são derivadas do HealthDocument real, não persistidas no Ref.
+ * NÃO buscar HealthDocument para copiar metadados.
+ *
+ * @returns HealthDocumentRef canônico ou null se source_document for omitido
+ */
+function parseHealthDocumentRef(
+  val: unknown,
+): HealthDocumentRef | null {
   if (!val || typeof val !== "object" || Array.isArray(val)) return null;
   const obj = val as Record<string, unknown>;
-  const id = stringValue(obj.id);
-  const typeStr = stringValue(obj.type);
-  const issued_by = stringValue(obj.issued_by) ?? stringValue(obj.issuedBy);
-  const issued_at = stringValue(obj.issued_at) ?? stringValue(obj.issuedAt);
-  const url = stringValue(obj.url) ?? null;
 
-  if (!id || !typeStr || !issued_by || !issued_at) {
-    throw nutritionError("validation", "HealthDocumentRef incompleto (id, type, issued_by, issued_at obrigatórios).");
+  const health_document_id =
+    stringValue(obj.health_document_id) ?? stringValue(obj.id);
+  if (!health_document_id) {
+    throw nutritionError(
+      "validation",
+      "HealthDocumentRef incompleto: health_document_id é obrigatório no contrato Health v1.",
+    );
   }
-  if (!["prescription", "laudo", "exame", "other"].includes(typeStr)) {
-    throw nutritionError("validation", `HealthDocumentRef.type inválido: ${typeStr}`);
-  }
-  return {
-    id,
-    type: typeStr as any,
-    issued_by,
-    issued_at,
-    url,
-  };
+
+  const description = stringValue(obj.description) ?? null;
+  return {health_document_id, description};
 }
 
 export function parseCreateAndActivateNutritionPlan(
@@ -1588,15 +1698,22 @@ export function parseCreateAndActivateNutritionPlan(
   }
 
   const special_instructions = stringValue(pd.special_instructions) ?? stringValue(pd.specialInstructions) ?? null;
+  // Canonical parse: exige campos Health v1 (registration_type, registration_number, clinic?)
   const professional = parseProfessionalIdentity(pd.professional);
+  // Canonical parse: exige health_document_id, description opcional
   const source_document = parseHealthDocumentRef(pd.source_document ?? pd.sourceDocument);
 
+  /**
+   * attachment_refs: array de health_document_id (IDs de HealthDocument).
+   * Runtime continua string[] para compatibilidade wire.
+   * URLs são derivadas do HealthDocument real, não persistidas como refs.
+   */
   const attachmentRefsRaw = pd.attachment_refs ?? pd.attachmentRefs;
   const attachment_refs: string[] = [];
   if (Array.isArray(attachmentRefsRaw)) {
     for (const r of attachmentRefsRaw) {
-      const url = stringValue(r);
-      if (url) attachment_refs.push(url);
+      const docId = stringValue(r);
+      if (docId) attachment_refs.push(docId);
     }
   }
 
@@ -1682,15 +1799,22 @@ export function parseUpdateActiveNutritionPlan(
   }
 
   const special_instructions = stringValue(pd.special_instructions) ?? stringValue(pd.specialInstructions) ?? null;
+  // Canonical parse: exige campos Health v1 (registration_type, registration_number, clinic?)
   const professional = parseProfessionalIdentity(pd.professional);
+  // Canonical parse: exige health_document_id, description opcional
   const source_document = parseHealthDocumentRef(pd.source_document ?? pd.sourceDocument);
 
+  /**
+   * attachment_refs: array de health_document_id (IDs de HealthDocument).
+   * Runtime continua string[] para compatibilidade wire.
+   * URLs são derivadas do HealthDocument real, não persistidas como refs.
+   */
   const attachmentRefsRaw = pd.attachment_refs ?? pd.attachmentRefs;
   const attachment_refs: string[] = [];
   if (Array.isArray(attachmentRefsRaw)) {
     for (const r of attachmentRefsRaw) {
-      const url = stringValue(r);
-      if (url) attachment_refs.push(url);
+      const docId = stringValue(r);
+      if (docId) attachment_refs.push(docId);
     }
   }
 
