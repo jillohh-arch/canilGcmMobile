@@ -159,8 +159,13 @@ function assertDocumentId(id: string, label: string): void {
   }
 }
 
-function isAdminAccessLevel(accessLevel: string): boolean {
+export function isAdminAccessLevel(accessLevel: string): boolean {
   return ["admin", "administrador"].includes(normalizedKey(accessLevel));
+}
+
+export function isAdminUserRecord(user: JsonMap): boolean {
+  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
+  return isAdminAccessLevel(accessLevel) || user.admin === true;
 }
 
 const MANAGED_ACCESS_ROLES = new Set([
@@ -335,7 +340,7 @@ function customClaimRoles(token: admin.auth.DecodedIdToken): string[] {
     [];
 }
 
-function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
+export function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
   const role = normalizedKey(token.role);
   return token.admin === true ||
     ["admin", "administrador", "admin_master"].includes(role) ||
@@ -440,7 +445,7 @@ function accessProfileIdFrom(
   return "operador_k9";
 }
 
-function profileGrantsPermission(
+export function profileGrantsPermission(
   profile: JsonMap,
   moduleId: AccessModule,
   action: AccessAction,
@@ -463,8 +468,7 @@ async function requireAccessPermission(
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
   const user = userSnap.data() ?? {};
-  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
-  if (isAdminAccessLevel(accessLevel) || user.admin === true) return caller;
+  if (isAdminUserRecord(user)) return caller;
 
   const profileId = accessProfileIdFrom(auth?.token, user);
   const profileSnap = await db.collection("access_profiles").doc(profileId).get();
@@ -7847,8 +7851,7 @@ async function isAdministrativeHealthAuthority(
   if (auth && isAdminToken(auth.token)) return true;
   const userSnap = await db.collection("users").doc(caller.ra).get();
   const user = userSnap.data() ?? {};
-  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
-  return isAdminAccessLevel(accessLevel) || user.admin === true;
+  return isAdminUserRecord(user);
 }
 
 function toScheduleCaller(caller: CallerIdentity): ScheduleCaller {
