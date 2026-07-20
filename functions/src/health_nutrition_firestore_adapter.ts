@@ -26,6 +26,8 @@ const SERVER_TIMESTAMP_FIELDS = new Set([
   "recorded_at",
   "performed_at",
   "createdAt",
+  "created_at",
+  "updated_at",
 ]);
 
 /** Fatos temporais do cliente / derivados de materialização (não sentinels). */
@@ -148,7 +150,11 @@ export function prepareWriteData(data: JsonMap): JsonMap {
   const out: JsonMap = {};
   for (const [key, value] of Object.entries(data)) {
     if (SERVER_TIMESTAMP_FIELDS.has(key)) {
-      out[key] = FieldValue.serverTimestamp();
+      // Rewrites de plano carregam created_at materializado do documento antigo.
+      // Preserve o instante original; somente valores lógicos novos (Date) pedem
+      // a sentinela autoritativa.
+      out[key] = key === "created_at" && typeof value === "string" ?
+        toFirestoreTimestamp(value) : FieldValue.serverTimestamp();
       continue;
     }
     if (CLIENT_INSTANT_FIELDS.has(key)) {
@@ -284,6 +290,37 @@ export function createNutritionFirestoreEngineDeps(
             assertCanonicalWritePath(path);
             const prepared = prepareWriteData(data);
             firestoreTx.set(docRefFromPath(db, path), prepared);
+          },
+          getActivePlans: async (dogId: string): Promise<Array<{ id: string; data: JsonMap }>> => {
+            const snap = await firestoreTx.get(
+              db.collection("dogs").doc(dogId).collection("nutrition_plans").where("status", "==", "active")
+            );
+            return snap.docs.map((doc) => ({
+              id: doc.id,
+              data: firestoreDataToPlain(doc.data()),
+            }));
+          },
+          getMealLogsInWindow: async (dogId: string, start: Date, end: Date): Promise<Array<{ id: string; data: JsonMap }>> => {
+            void start;
+            void end;
+            const snap = await firestoreTx.get(
+              db.collection("dogs").doc(dogId).collection("meal_logs")
+            );
+            return snap.docs.map((doc) => ({
+              id: doc.id,
+              data: firestoreDataToPlain(doc.data()),
+            }));
+          },
+          getSupplementLogsInWindow: async (dogId: string, start: Date, end: Date): Promise<Array<{ id: string; data: JsonMap }>> => {
+            void start;
+            void end;
+            const snap = await firestoreTx.get(
+              db.collection("dogs").doc(dogId).collection("supplement_logs")
+            );
+            return snap.docs.map((doc) => ({
+              id: doc.id,
+              data: firestoreDataToPlain(doc.data()),
+            }));
           },
         };
         return fn(adapterTx);

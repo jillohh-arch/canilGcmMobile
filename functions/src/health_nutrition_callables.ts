@@ -15,9 +15,13 @@ import {
   NutritionActor,
   NutritionEngineDeps,
   NutritionMutationResult,
+  NutritionPlanMutationResult,
   runCreateAdhocMealLog,
   runCreatePlannedMealLog,
   runCreateSupplementLog,
+  runCreateAndActivateNutritionPlan,
+  runUpdateActiveNutritionPlan,
+  runCancelNutritionPlan,
 } from "./health_nutrition_engine";
 import {createNutritionFirestoreEngineDeps} from "./health_nutrition_firestore_adapter";
 import {
@@ -29,6 +33,9 @@ export type JsonMap = Record<string, unknown>;
 export interface HealthNutritionCallableDeps {
   db: FirebaseFirestore.Firestore;
   requireHealthCreate: (
+    auth: CallableRequest["auth"],
+  ) => Promise<NutritionActor>;
+  requireManageNutritionPlan?: (
     auth: CallableRequest["auth"],
   ) => Promise<NutritionActor>;
   requireDogAccess: (
@@ -265,6 +272,40 @@ function supplementResponse(result: NutritionMutationResult): JsonMap {
   };
 }
 
+function planResponse(result: NutritionPlanMutationResult): JsonMap {
+  return {
+    success: true,
+    planId: result.planId,
+    status: result.status,
+    revision: result.revision,
+    supersededPlanId: result.supersededPlanId ?? null,
+    wasNoOp: result.wasNoOp,
+  };
+}
+
+async function requirePlanManager(
+  request: CallableRequest,
+  deps: HealthNutritionCallableDeps,
+): Promise<NutritionActor> {
+  if (!request.auth) appError("unauthenticated", "unauthenticated", "Autenticação obrigatória.");
+  if (!deps.requireManageNutritionPlan) {
+    appError("internal", "permission-gate-not-configured", "Capability de NutritionPlan não configurada.");
+  }
+  return deps.requireManageNutritionPlan(request.auth);
+}
+
+async function authorizePlanMutation(request: CallableRequest, deps: HealthNutritionCallableDeps): Promise<{
+  caller: NutritionActor; data: JsonMap; dogId: string; engineDeps: NutritionEngineDeps;
+}> {
+  const caller = await requirePlanManager(request, deps);
+  const data = (request.data ?? {}) as JsonMap;
+  rejectServerAuthoritativeInjection(data);
+  const dogId = requireDogId(data);
+  const dog = await loadDog(deps.db, dogId);
+  await deps.requireDogAccess(request.auth, caller, dogId, dog);
+  return {caller, data, dogId, engineDeps: buildEngineDeps(deps, request.auth, caller)};
+}
+
 function resolveMode(data: JsonMap): "planned" | "adhoc" {
   const mode = stringValue(data.mode);
   if (mode !== "planned" && mode !== "adhoc") {
@@ -350,6 +391,39 @@ export async function runHealthNutritionCreateSupplementLog(
     const engineDeps = buildEngineDeps(deps, request.auth, caller);
     const result = await runCreateSupplementLog(caller, data, engineDeps);
     return supplementResponse(result);
+  } catch (err) {
+    mapNutritionError(err);
+  }
+}
+
+export async function runHealthNutritionCreateAndActivatePlan(
+  request: CallableRequest, deps: HealthNutritionCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const {caller, data, engineDeps} = await authorizePlanMutation(request, deps);
+    return planResponse(await runCreateAndActivateNutritionPlan(caller, data, engineDeps));
+  } catch (err) {
+    mapNutritionError(err);
+  }
+}
+
+export async function runHealthNutritionUpdateActivePlan(
+  request: CallableRequest, deps: HealthNutritionCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const {caller, data, engineDeps} = await authorizePlanMutation(request, deps);
+    return planResponse(await runUpdateActiveNutritionPlan(caller, data, engineDeps));
+  } catch (err) {
+    mapNutritionError(err);
+  }
+}
+
+export async function runHealthNutritionCancelPlan(
+  request: CallableRequest, deps: HealthNutritionCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const {caller, data, engineDeps} = await authorizePlanMutation(request, deps);
+    return planResponse(await runCancelNutritionPlan(caller, data, engineDeps));
   } catch (err) {
     mapNutritionError(err);
   }

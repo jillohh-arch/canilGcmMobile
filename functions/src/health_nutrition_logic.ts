@@ -1694,17 +1694,18 @@ export function parseUpdateActiveNutritionPlan(
     }
   }
 
+  const planData: UpdateActiveNutritionPlanRequest["planData"] = {};
+  if (Object.prototype.hasOwnProperty.call(pd, "special_instructions") || Object.prototype.hasOwnProperty.call(pd, "specialInstructions")) planData.special_instructions = special_instructions;
+  if (Object.prototype.hasOwnProperty.call(pd, "professional")) planData.professional = professional;
+  if (Object.prototype.hasOwnProperty.call(pd, "source_document") || Object.prototype.hasOwnProperty.call(pd, "sourceDocument")) planData.source_document = source_document;
+  if (Object.prototype.hasOwnProperty.call(pd, "attachment_refs") || Object.prototype.hasOwnProperty.call(pd, "attachmentRefs")) planData.attachment_refs = attachment_refs;
+
   return {
     dogId,
     planId,
     operationId,
     expectedRevision: Number(expectedRevision),
-    planData: {
-      special_instructions,
-      professional,
-      source_document,
-      attachment_refs,
-    },
+    planData,
   };
 }
 

@@ -6,6 +6,9 @@ import * as assert from "assert";
 import {
   runHealthNutritionCreateMealLog,
   runHealthNutritionCreateSupplementLog,
+  runHealthNutritionCreateAndActivatePlan,
+  runHealthNutritionUpdateActivePlan,
+  runHealthNutritionCancelPlan,
   HealthNutritionCallableDeps,
   mapNutritionError,
 } from "./health_nutrition_callables";
@@ -149,6 +152,11 @@ function memoryEngineFactory(store: Map<string, JsonMap>, serverNow: Date) {
           set: (path: string, data: JsonMap) => {
             pending.set(path, {...data});
           },
+          getActivePlans: async (dogId: string) => [...store.entries()]
+            .filter(([path, data]) => path.startsWith(`dogs/${dogId}/nutrition_plans/`) && data.status === "active")
+            .map(([path, data]) => ({id: path.split("/").pop()!, data})),
+          getMealLogsInWindow: async () => [],
+          getSupplementLogsInWindow: async () => [],
         };
         const result = await fn(tx);
         for (const [k, v] of pending.entries()) {
@@ -163,6 +171,7 @@ function memoryEngineFactory(store: Map<string, JsonMap>, serverNow: Date) {
 function depsFor(options: {
   db: FirebaseFirestore.Firestore & {_store: Map<string, JsonMap>};
   allowCreate?: boolean;
+  allowManage?: boolean;
   dogAccess?: boolean;
   admin?: boolean;
   caller?: NutritionActor;
@@ -182,6 +191,13 @@ function depsFor(options: {
         throw new HttpsError("permission-denied", "no create", {
           code: "permission-denied",
         });
+      }
+      return caller;
+    },
+    requireManageNutritionPlan: async (auth) => {
+      if (!auth) throw new HttpsError("unauthenticated", "auth");
+      if (options.allowManage === false) {
+        throw new HttpsError("permission-denied", "no manage", {code: "permission-denied"});
       }
       return caller;
     },
@@ -659,6 +675,46 @@ async function main(): Promise<void> {
     });
     assert.ok(rid.startsWith("nr1_"));
     assert.ok(pathNutritionOperation("dog-1", rid).includes("nutrition_operations"));
+  });
+
+  const planCreate = (operationId: string) => ({dogId: "dog-1", operationId, planData: {
+    food_type: "Ração", amount_grams_per_day: 300, meals_per_day: 1,
+    timezone: "America/Sao_Paulo", valid_from: "2026-07-18T14:00:00.000Z",
+    meal_schedule: [{id: "slot", period: "morning", scheduled_time: "07:00", target_grams: 300}],
+  }});
+
+  await test("plan callable unauthenticated", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "K9"}});
+    await assert.rejects(() => runHealthNutritionCreateAndActivatePlan(mockRequest(planCreate("p-auth"), undefined),
+      depsFor({db})), (e: {code?: string}) => e.code === "unauthenticated");
+  });
+  await test("plan callable requires health.manage_nutrition_plan", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "K9"}});
+    await assert.rejects(() => runHealthNutritionCreateAndActivatePlan(mockRequest(planCreate("p-denied"),
+      {uid: actor.uid, token: {}}), depsFor({db, allowManage: false})),
+    (e: {code?: string}) => e.code === "permission-denied");
+  });
+  await test("plan callable requires dog access", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "K9"}});
+    await assert.rejects(() => runHealthNutritionCreateAndActivatePlan(mockRequest(planCreate("p-dog"),
+      {uid: actor.uid, token: {}}), depsFor({db, dogAccess: false})),
+    (e: {code?: string}) => e.code === "permission-denied");
+  });
+  await test("plan create/update/cancel callable success contracts", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "K9"}});
+    const deps = depsFor({db, allowManage: true, dogAccess: true, admin: true});
+    const created = await runHealthNutritionCreateAndActivatePlan(mockRequest(planCreate("p-create"),
+      {uid: actor.uid, token: {}}), deps);
+    assert.strictEqual(created.status, "active");
+    const planId = created.planId as string;
+    const updated = await runHealthNutritionUpdateActivePlan(mockRequest({dogId: "dog-1", planId,
+      operationId: "p-update", expectedRevision: 1, planData: {special_instructions: "nova"}},
+    {uid: actor.uid, token: {}}), deps);
+    assert.strictEqual(updated.revision, 2);
+    const cancelled = await runHealthNutritionCancelPlan(mockRequest({dogId: "dog-1", planId,
+      operationId: "p-cancel", expectedRevision: 2, reason: "clínico"},
+    {uid: actor.uid, token: {}}), deps);
+    assert.strictEqual(cancelled.status, "cancelled");
   });
 
   console.log("\nAll health_nutrition_callables tests passed.");

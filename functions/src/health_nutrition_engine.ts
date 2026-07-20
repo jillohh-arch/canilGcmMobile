@@ -19,6 +19,7 @@ import {
   fingerprintAdhocMeal,
   fingerprintPlannedMeal,
   fingerprintSupplement,
+  fingerprintNutritionPlan,
   localServiceDateFromInstant,
   matchNutritionReceipt,
   mealOccurrenceIdV1,
@@ -28,6 +29,10 @@ import {
   parsePlanFromDoc,
   parsePlannedMealCommand,
   parseSupplementCommand,
+  parseCreateAndActivateNutritionPlan,
+  parseUpdateActiveNutritionPlan,
+  parseCancelNutritionPlan,
+  parseInstant,
   plannedMealEntityFingerprintFromDoc,
   recordedByPayload,
   scheduledForFromLocal,
@@ -55,6 +60,15 @@ export type NutritionMutationResult = {
   mealOccurrenceId?: string | null;
 };
 
+export type NutritionPlanMutationResult = {
+  dogId: string;
+  planId: string;
+  status: "active" | "cancelled";
+  revision: number;
+  wasNoOp: boolean;
+  supersededPlanId?: string | null;
+};
+
 export type TxDocSnap = {
   exists: boolean;
   data: JsonMap;
@@ -63,6 +77,9 @@ export type TxDocSnap = {
 export type NutritionTxn = {
   get: (path: string) => Promise<TxDocSnap>;
   set: (path: string, data: JsonMap) => void;
+  getActivePlans?: (dogId: string) => Promise<Array<{ id: string; data: JsonMap }>>;
+  getMealLogsInWindow?: (dogId: string, start: Date, end: Date) => Promise<Array<{ id: string; data: JsonMap }>>;
+  getSupplementLogsInWindow?: (dogId: string, start: Date, end: Date) => Promise<Array<{ id: string; data: JsonMap }>>;
 };
 
 export type NutritionEngineDeps = {
@@ -154,6 +171,14 @@ function auditId(
 ): string {
   const h = sha256Hex(`${dogId}|${entityId}|${op}|${key}`);
   return `nu_audit_${h.slice(0, 40)}`;
+}
+
+function planId(actorUid: string, operationId: string): string {
+  return `nutrition_plan_${sha256Hex(`${actorUid}|create_nutrition_plan|${operationId}`).slice(0, 32)}`;
+}
+
+function planFingerprint(value: unknown): string {
+  return sha256Hex(JSON.stringify(value));
 }
 
 function auditPayload(
@@ -975,5 +1000,284 @@ export async function runCreateSupplementLog(
       revision,
       wasNoOp: false,
     };
+  });
+}
+
+// ── NutritionPlan administrative mutations ─────────────────────────────────
+
+function requirePlanTxnReaders(tx: NutritionTxn): Required<Pick<NutritionTxn,
+  "getActivePlans" | "getMealLogsInWindow" | "getSupplementLogsInWindow">> {
+  if (!tx.getActivePlans || !tx.getMealLogsInWindow || !tx.getSupplementLogsInWindow) {
+    throw nutritionError("integrity", "Adapter transacional de NutritionPlan incompleto.", "internal-integrity-error");
+  }
+  return {
+    getActivePlans: tx.getActivePlans,
+    getMealLogsInWindow: tx.getMealLogsInWindow,
+    getSupplementLogsInWindow: tx.getSupplementLogsInWindow,
+  };
+}
+
+function planResultFromReceipt(data: JsonMap, dogId: string): NutritionPlanMutationResult {
+  assertReceiptShape(data);
+  const result = data.result as JsonMap;
+  const storedPlanId = stringValue(data.entity_id) ?? stringValue(result.planId);
+  const status = stringValue(result.status);
+  const revision = Number(result.revision);
+  if (!storedPlanId || (status !== "active" && status !== "cancelled") || !Number.isInteger(revision)) {
+    throw nutritionError("integrity", "Receipt de NutritionPlan malformado.", "receipt-integrity");
+  }
+  return {
+    dogId,
+    planId: storedPlanId,
+    status,
+    revision,
+    wasNoOp: true,
+    supersededPlanId: result.supersededPlanId === null ? null : stringValue(result.supersededPlanId),
+  };
+}
+
+async function resolvePlanReceipt(params: {
+  deps: NutritionEngineDeps; dogId: string; actorUid: string;
+  operationType: NutritionOperationType; operationId: string; fingerprint: string;
+  snap?: TxDocSnap;
+}): Promise<"missing" | NutritionPlanMutationResult> {
+  const receiptId = nutritionOperationReceiptIdV1(params);
+  const snap = params.snap ?? await params.deps.getDoc(pathNutritionOperation(params.dogId, receiptId));
+  if (!snap.exists) return "missing";
+  assertReceiptShape(snap.data);
+  if (stringValue(snap.data.receipt_id) !== receiptId ||
+      stringValue(snap.data.operation_id) !== params.operationId ||
+      stringValue(snap.data.entity_type) !== "nutrition_plan") {
+    throw nutritionError("integrity", "Receipt de NutritionPlan inconsistente.", "receipt-integrity");
+  }
+  const match = matchNutritionReceipt({
+    receiptExists: true,
+    storedActorUid: stringValue(snap.data.actor_uid),
+    storedOperationType: stringValue(snap.data.operation_type) as NutritionOperationType | undefined,
+    storedFingerprint: stringValue(snap.data.fingerprint),
+    actorUid: params.actorUid,
+    operationType: params.operationType,
+    fingerprint: params.fingerprint,
+  });
+  if (match === "replay") return planResultFromReceipt(snap.data, params.dogId);
+  if (match === "idempotency-conflict") {
+    throw nutritionError("idempotency-conflict", "operationId reutilizada com payload diferente.", "idempotency-conflict");
+  }
+  return "missing";
+}
+
+function planReceiptPayload(params: {
+  receiptId: string; operationId: string; operationType: NutritionOperationType;
+  actorUid: string; fingerprint: string; planId: string; result: JsonMap; serverNow: Date;
+}): JsonMap {
+  return {
+    receipt_id: params.receiptId,
+    operation_id: params.operationId,
+    operation_type: params.operationType,
+    actor_uid: params.actorUid,
+    fingerprint: params.fingerprint,
+    entity_type: "nutrition_plan",
+    entity_id: params.planId,
+    result: params.result,
+    processed_at: params.serverNow,
+  };
+}
+
+function activePlanIntegrity(active: Array<{id: string; data: JsonMap}>): void {
+  if (active.length > 1) {
+    throw nutritionError("integrity", "Mais de um NutritionPlan active.", "integrity-conflict");
+  }
+}
+
+function hasExecutionInWindow(
+  docs: Array<{id: string; data: JsonMap}>, field: string, start: Date, end: Date,
+): boolean {
+  for (const doc of docs) {
+    let instant: Date;
+    try {
+      instant = parseInstant(doc.data[field], `${field}:${doc.id}`);
+    } catch {
+      throw nutritionError("integrity", `Registro nutricional com ${field} malformado.`, "retroactive-plan-conflict");
+    }
+    if (instant.getTime() >= start.getTime() && instant.getTime() < end.getTime()) return true;
+  }
+  return false;
+}
+
+function planRevision(data: JsonMap): number {
+  const revision = Number(data.revision);
+  if (!Number.isInteger(revision) || revision < 1) {
+    throw nutritionError("integrity", "NutritionPlan com revision inválida.", "internal-integrity-error");
+  }
+  return revision;
+}
+
+function assertActiveTarget(planIdValue: string, target: TxDocSnap, active: Array<{id: string; data: JsonMap}>): JsonMap {
+  if (!target.exists) throw nutritionError("not-found", "NutritionPlan não encontrado.", "plan-not-found");
+  const status = stringValue(target.data.status);
+  if (status === "cancelled") throw nutritionError("already-cancelled", "NutritionPlan já cancelado.", "already-cancelled");
+  if (status !== "active") throw nutritionError("failed-precondition", "NutritionPlan não está active.", "invalid-lifecycle");
+  activePlanIntegrity(active);
+  if (active.length !== 1 || active[0].id !== planIdValue) {
+    throw nutritionError("integrity", "Plano alvo não corresponde ao único active.", "integrity-conflict");
+  }
+  return target.data;
+}
+
+function assertExpectedRevision(data: JsonMap, expected: number): number {
+  const current = planRevision(data);
+  if (current !== expected) {
+    throw nutritionError("failed-precondition", "Revision desatualizada.", "revision-conflict");
+  }
+  return current;
+}
+
+function planAudit(actor: NutritionActor, action: string, dogId: string, planIdValue: string,
+  operationType: NutritionOperationType, operationId: string, serverNow: Date, metadata: JsonMap): JsonMap {
+  return {
+    ...auditPayload(actor, action, "nutrition_plan", planIdValue,
+      pathNutritionPlan(dogId, planIdValue), dogId, action, serverNow),
+    metadata: {dog_id: dogId, operation_type: operationType, operation_id: operationId, source: "web", ...metadata},
+  };
+}
+
+export async function runCreateAndActivateNutritionPlan(
+  actor: NutritionActor, rawCommand: Record<string, unknown>, deps: NutritionEngineDeps,
+): Promise<NutritionPlanMutationResult> {
+  const serverNow = deps.serverNow();
+  const cmd = parseCreateAndActivateNutritionPlan(rawCommand, serverNow);
+  const operationType: NutritionOperationType = "create_nutrition_plan";
+  const fingerprint = planFingerprint({operationType, dogId: cmd.dogId, planData: cmd.planData,
+    structuralFingerprint: fingerprintNutritionPlan(cmd.planData)});
+  const receiptId = nutritionOperationReceiptIdV1({actorUid: actor.uid, operationType, operationId: cmd.operationId});
+  const receiptPath = pathNutritionOperation(cmd.dogId, receiptId);
+  const newPlanId = planId(actor.uid, cmd.operationId);
+  const audit = auditId(cmd.dogId, newPlanId, operationType, `${actor.uid}|${cmd.operationId}`);
+  const replay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid, operationType,
+    operationId: cmd.operationId, fingerprint});
+  if (replay !== "missing") return replay;
+  const recordedBy = recordedByPayload(actor, await deps.isAdmin(actor));
+  const validFrom = parseInstant(cmd.planData.valid_from, "valid_from");
+
+  return deps.runTransaction(async (tx) => {
+    const readers = requirePlanTxnReaders(tx);
+    const receiptSnap = await tx.get(receiptPath);
+    const active = await readers.getActivePlans(cmd.dogId);
+    let mealLogs: Array<{id: string; data: JsonMap}> = [];
+    let supplementLogs: Array<{id: string; data: JsonMap}> = [];
+    if (validFrom.getTime() < serverNow.getTime()) {
+      mealLogs = await readers.getMealLogsInWindow(cmd.dogId, validFrom, serverNow);
+      supplementLogs = await readers.getSupplementLogsInWindow(cmd.dogId, validFrom, serverNow);
+    }
+    const txReplay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid,
+      operationType, operationId: cmd.operationId, fingerprint, snap: receiptSnap});
+    if (txReplay !== "missing") return txReplay;
+    activePlanIntegrity(active);
+    if (hasExecutionInWindow(mealLogs, "fed_at", validFrom, serverNow) ||
+        hasExecutionInWindow(supplementLogs, "administered_at", validFrom, serverNow)) {
+      throw nutritionError("failed-precondition", "Execução nutricional já existe na janela retroativa.", "retroactive-plan-conflict");
+    }
+    const previous = active[0];
+    if (previous) {
+      const previousFrom = parseInstant(previous.data.valid_from, "active.valid_from");
+      if (validFrom.getTime() <= previousFrom.getTime()) {
+        throw nutritionError("validation", "Novo valid_from deve ser posterior ao plano active.", "invalid-validity-window");
+      }
+    }
+    const supersededPlanId = previous?.id ?? null;
+    if (previous) {
+      safeSet(tx, pathNutritionPlan(cmd.dogId, previous.id), {
+        ...previous.data, status: "superseded", valid_until: validFrom,
+        revision: planRevision(previous.data) + 1, updated_at: serverNow,
+      });
+    }
+    const newPlan: JsonMap = {
+      ...cmd.planData,
+      valid_from: validFrom,
+      valid_until: cmd.planData.valid_until ? parseInstant(cmd.planData.valid_until, "valid_until") : null,
+      status: "active", revision: 1, schema_version: 1, recorded_by: recordedBy,
+      created_at: serverNow, updated_at: serverNow,
+    };
+    const result: JsonMap = {success: true, planId: newPlanId, status: "active", revision: 1, supersededPlanId};
+    safeSet(tx, pathNutritionPlan(cmd.dogId, newPlanId), newPlan);
+    safeSet(tx, receiptPath, planReceiptPayload({receiptId, operationId: cmd.operationId, operationType,
+      actorUid: actor.uid, fingerprint, planId: newPlanId, result, serverNow}));
+    safeSet(tx, pathAudit(audit), planAudit(actor, "create_and_activate_nutrition_plan", cmd.dogId,
+      newPlanId, operationType, cmd.operationId, serverNow, {revision: 1, superseded_plan_id: supersededPlanId}));
+    return {dogId: cmd.dogId, planId: newPlanId, status: "active", revision: 1,
+      wasNoOp: false, supersededPlanId};
+  });
+}
+
+export async function runUpdateActiveNutritionPlan(
+  actor: NutritionActor, rawCommand: Record<string, unknown>, deps: NutritionEngineDeps,
+): Promise<NutritionPlanMutationResult> {
+  const cmd = parseUpdateActiveNutritionPlan(rawCommand);
+  const serverNow = deps.serverNow();
+  const operationType: NutritionOperationType = "update_nutrition_plan";
+  const fingerprint = planFingerprint({operationType, ...cmd});
+  const receiptId = nutritionOperationReceiptIdV1({actorUid: actor.uid, operationType, operationId: cmd.operationId});
+  const receiptPath = pathNutritionOperation(cmd.dogId, receiptId);
+  const audit = auditId(cmd.dogId, cmd.planId, operationType, `${actor.uid}|${cmd.operationId}`);
+  const replay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid, operationType,
+    operationId: cmd.operationId, fingerprint});
+  if (replay !== "missing") return replay;
+  return deps.runTransaction(async (tx) => {
+    const readers = requirePlanTxnReaders(tx);
+    const receiptSnap = await tx.get(receiptPath);
+    const target = await tx.get(pathNutritionPlan(cmd.dogId, cmd.planId));
+    const active = await readers.getActivePlans(cmd.dogId);
+    const txReplay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid, operationType,
+      operationId: cmd.operationId, fingerprint, snap: receiptSnap});
+    if (txReplay !== "missing") return txReplay;
+    const currentData = assertActiveTarget(cmd.planId, target, active);
+    const currentRevision = assertExpectedRevision(currentData, cmd.expectedRevision);
+    const nextRevision = currentRevision + 1;
+    const changedFields = Object.keys(cmd.planData);
+    const result: JsonMap = {success: true, planId: cmd.planId, status: "active", revision: nextRevision};
+    safeSet(tx, pathNutritionPlan(cmd.dogId, cmd.planId), {...currentData, ...cmd.planData,
+      revision: nextRevision, updated_at: serverNow});
+    safeSet(tx, receiptPath, planReceiptPayload({receiptId, operationId: cmd.operationId, operationType,
+      actorUid: actor.uid, fingerprint, planId: cmd.planId, result, serverNow}));
+    safeSet(tx, pathAudit(audit), planAudit(actor, "update_active_nutrition_plan", cmd.dogId, cmd.planId,
+      operationType, cmd.operationId, serverNow, {previous_revision: currentRevision,
+        revision: nextRevision, changed_fields: changedFields}));
+    return {dogId: cmd.dogId, planId: cmd.planId, status: "active", revision: nextRevision, wasNoOp: false};
+  });
+}
+
+export async function runCancelNutritionPlan(
+  actor: NutritionActor, rawCommand: Record<string, unknown>, deps: NutritionEngineDeps,
+): Promise<NutritionPlanMutationResult> {
+  const cmd = parseCancelNutritionPlan(rawCommand);
+  const serverNow = deps.serverNow();
+  const operationType: NutritionOperationType = "cancel_nutrition_plan";
+  const fingerprint = planFingerprint({operationType, ...cmd});
+  const receiptId = nutritionOperationReceiptIdV1({actorUid: actor.uid, operationType, operationId: cmd.operationId});
+  const receiptPath = pathNutritionOperation(cmd.dogId, receiptId);
+  const audit = auditId(cmd.dogId, cmd.planId, operationType, `${actor.uid}|${cmd.operationId}`);
+  const replay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid, operationType,
+    operationId: cmd.operationId, fingerprint});
+  if (replay !== "missing") return replay;
+  return deps.runTransaction(async (tx) => {
+    const readers = requirePlanTxnReaders(tx);
+    const receiptSnap = await tx.get(receiptPath);
+    const target = await tx.get(pathNutritionPlan(cmd.dogId, cmd.planId));
+    const active = await readers.getActivePlans(cmd.dogId);
+    const txReplay = await resolvePlanReceipt({deps, dogId: cmd.dogId, actorUid: actor.uid, operationType,
+      operationId: cmd.operationId, fingerprint, snap: receiptSnap});
+    if (txReplay !== "missing") return txReplay;
+    const currentData = assertActiveTarget(cmd.planId, target, active);
+    const currentRevision = assertExpectedRevision(currentData, cmd.expectedRevision);
+    const nextRevision = currentRevision + 1;
+    const result: JsonMap = {success: true, planId: cmd.planId, status: "cancelled", revision: nextRevision};
+    safeSet(tx, pathNutritionPlan(cmd.dogId, cmd.planId), {...currentData, status: "cancelled",
+      valid_until: serverNow, revision: nextRevision, updated_at: serverNow});
+    safeSet(tx, receiptPath, planReceiptPayload({receiptId, operationId: cmd.operationId, operationType,
+      actorUid: actor.uid, fingerprint, planId: cmd.planId, result, serverNow}));
+    safeSet(tx, pathAudit(audit), planAudit(actor, "cancel_nutrition_plan", cmd.dogId, cmd.planId,
+      operationType, cmd.operationId, serverNow, {previous_revision: currentRevision,
+        revision: nextRevision, reason: cmd.reason}));
+    return {dogId: cmd.dogId, planId: cmd.planId, status: "cancelled", revision: nextRevision, wasNoOp: false};
   });
 }

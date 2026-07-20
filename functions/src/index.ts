@@ -19,6 +19,9 @@ import {
 import {
   runHealthNutritionCreateMealLog,
   runHealthNutritionCreateSupplementLog,
+  runHealthNutritionCreateAndActivatePlan,
+  runHealthNutritionUpdateActivePlan,
+  runHealthNutritionCancelPlan,
   type HealthNutritionCallableDeps,
 } from "./health_nutrition_callables";
 import type {NutritionActor} from "./health_nutrition_engine";
@@ -351,7 +354,7 @@ type AccessModule =
   | "training"
   | "vehicles";
 
-type AccessAction = "view" | "create" | "edit" | "archive" | "approve";
+type AccessAction = "view" | "create" | "edit" | "archive" | "approve" | "manage_nutrition_plan";
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -7926,6 +7929,11 @@ const healthNutritionDeps: HealthNutritionCallableDeps = {
   requireHealthCreate: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   ) => toNutritionActor(await requireAccessPermission(auth, "health", "create")),
+  requireManageNutritionPlan: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toNutritionActor(
+    await requireAccessPermission(auth, "health", "manage_nutrition_plan"),
+  ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
     caller: NutritionActor,
@@ -7960,3 +7968,18 @@ export const healthNutritionCreateSupplementLog = onCall(
     return runHealthNutritionCreateSupplementLog(request, healthNutritionDeps);
   },
 );
+
+/** Create and atomically activate a NutritionPlan (health.manage_nutrition_plan). */
+export const healthNutritionCreateAndActivatePlan = onCall({region}, async (request) => {
+  return runHealthNutritionCreateAndActivatePlan(request, healthNutritionDeps);
+});
+
+/** Administrative in-place update of the unique active NutritionPlan. */
+export const healthNutritionUpdateActivePlan = onCall({region}, async (request) => {
+  return runHealthNutritionUpdateActivePlan(request, healthNutritionDeps);
+});
+
+/** Cancel the unique active NutritionPlan without reactivating superseded plans. */
+export const healthNutritionCancelPlan = onCall({region}, async (request) => {
+  return runHealthNutritionCancelPlan(request, healthNutritionDeps);
+});
