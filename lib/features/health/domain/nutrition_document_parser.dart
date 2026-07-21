@@ -1,5 +1,7 @@
 import 'health_v1_enums.dart';
+import 'health_v1_enums_ext.dart';
 import 'health_v1_models.dart';
+import 'health_v1_value_objects.dart';
 import 'meal_schedule_slot.dart';
 import 'nutrition_plan.dart';
 import 'nutrition_plan_regimen.dart';
@@ -82,6 +84,68 @@ abstract final class NutritionFieldParse {
     } on HealthDomainException {
       return null;
     }
+  }
+
+  /// Parse de ProfessionalIdentity do wire format.
+  /// Wire: name, registration_type, registration_number, clinic, specialty?
+  /// Retorna null se o objeto estiver ausente ou incompleto.
+  static ProfessionalIdentity? professionalIdentity(Object? raw) {
+    if (raw == null) return null;
+    if (raw is! Map) return null;
+    final map = Map<String, Object?>.from(raw);
+
+    final name = nonEmptyString(map['name']);
+    final registrationTypeRaw = nonEmptyString(map['registration_type']);
+    final registrationNumber = nonEmptyString(map['registration_number']);
+    final clinic = nonEmptyString(map['clinic']);
+    final specialty = nonEmptyString(map['specialty']);
+
+    if (name == null || registrationTypeRaw == null || registrationNumber == null) {
+      return null;
+    }
+
+    final registrationType = ProfessionalRegistrationType.fromWire(registrationTypeRaw);
+    if (registrationType == null) {
+      // Fallback: treat as 'other' if unrecognized
+      try {
+        return ProfessionalIdentity(
+          name: name,
+          registrationType: ProfessionalRegistrationType.other,
+          registrationNumber: registrationNumber,
+          clinic: clinic ?? '',
+          specialty: specialty,
+        );
+      } on HealthDomainException {
+        return null;
+      }
+    }
+
+    try {
+      return ProfessionalIdentity(
+        name: name,
+        registrationType: registrationType,
+        registrationNumber: registrationNumber,
+        clinic: clinic ?? '',
+        specialty: specialty,
+      );
+    } on HealthDomainException {
+      return null;
+    }
+  }
+
+  /// Parse de HealthDocumentRef do wire format.
+  /// Wire: health_document_id, description?
+  /// Retorna null se o objeto estiver ausente ou incompleto.
+  static HealthDocumentRef? healthDocumentRef(Object? raw) {
+    if (raw == null) return null;
+    if (raw is! Map) return null;
+    final map = Map<String, Object?>.from(raw);
+
+    final id = nonEmptyString(map['health_document_id'] ?? map['id']);
+    if (id == null) return null;
+
+    final description = nonEmptyString(map['description']);
+    return HealthDocumentRef(healthDocumentId: id, description: description);
   }
 
   static List<String> stringList(Object? raw) {
@@ -178,6 +242,10 @@ abstract final class NutritionPlanDocumentParser {
 
     final hydration = NutritionFieldParse.number(data['hydration_ml']);
 
+    // Parse professional and sourceDocument (F-05)
+    final professional = NutritionFieldParse.professionalIdentity(data['professional']);
+    final sourceDocument = NutritionFieldParse.healthDocumentRef(data['source_document']);
+
     return NutritionPlan(
       id: id,
       dogId: dogId,
@@ -196,6 +264,8 @@ abstract final class NutritionPlanDocumentParser {
       specialInstructions: NutritionFieldParse.nonEmptyString(
         data['special_instructions'],
       ),
+      professional: professional,
+      sourceDocument: sourceDocument,
       attachmentRefs: NutritionFieldParse.stringList(data['attachment_refs']),
       supplements: supplements,
       legacySource: NutritionFieldParse.nonEmptyString(data['legacy_source']),
@@ -269,25 +339,45 @@ abstract final class NutritionPlanDocumentParser {
       final map = Map<String, Object?>.from(item);
       final id = NutritionFieldParse.nonEmptyString(map['id']);
       final name = NutritionFieldParse.nonEmptyString(map['name']);
-      final dose = NutritionFieldParse.nonEmptyString(map['dose']);
-      final unit = NutritionFieldParse.nonEmptyString(map['unit']);
       final frequency = NutritionFieldParse.nonEmptyString(map['frequency']);
-      if (id == null ||
-          name == null ||
-          dose == null ||
-          unit == null ||
-          frequency == null) {
+
+      if (id == null || name == null || frequency == null) {
         throw const HealthDomainException(
           'invalid_supplement_regimen',
-          'supplement regimen incompleto (id/name/dose/unit/frequency)',
+          'supplement regimen incompleto (id/name/frequency)',
         );
       }
+
+      // Parse dose: canonical contract requires number (not string).
+      // String values indicate legacy/malformed documents — reject them.
+      final doseRaw = map['dose'];
+      num? doseValue;
+      if (doseRaw is num && doseRaw.isFinite && doseRaw > 0) {
+        doseValue = doseRaw;
+      }
+      if (doseValue == null) {
+        throw HealthDomainException(
+          'invalid_regimen_dose',
+          'supplement regimen dose must be positive number (id=$id)',
+        );
+      }
+
+      // Parse unit: canonical enum
+      final unitRaw = NutritionFieldParse.nonEmptyString(map['unit']);
+      final unitParsed = SupplementDoseUnit.parse(unitRaw);
+      if (!unitParsed.isKnown) {
+        throw HealthDomainException(
+          'invalid_regimen_unit',
+          'supplement regimen unit must be canonical: ${SupplementDoseUnit.values.map((u) => u.wireName).join(", ")} (got "${unitRaw ?? 'null'}")',
+        );
+      }
+
       out.add(
         NutritionPlanSupplementRegimen(
           id: id,
           name: name,
-          dose: dose,
-          unit: unit,
+          dose: doseValue,
+          unit: unitParsed.value!,
           frequency: frequency,
           instructions: NutritionFieldParse.nonEmptyString(map['instructions']),
           validFrom: NutritionFieldParse.dateTime(map['valid_from']),

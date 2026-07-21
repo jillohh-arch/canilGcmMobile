@@ -1149,7 +1149,7 @@ class _SupplementsSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${r.dose} ${r.unit} · ${r.frequency}',
+                      '${r.dose} ${r.unit.wireName} · ${r.frequency}',
                       style: GoogleFonts.inter(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
@@ -1272,7 +1272,7 @@ class _SupplementsSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${a.dose} ${a.unit.name} · '
+                      '${a.dose} ${a.unit.wireName} · '
                       '${HealthNutritionTodayFormatters.timeShort(a.administeredAt)}',
                       style: GoogleFonts.inter(
                         color: AppTheme.textSecondary,

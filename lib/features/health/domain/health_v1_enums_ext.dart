@@ -292,6 +292,21 @@ enum ProfessionalRegistrationType {
     ProfessionalRegistrationType.cfmv => 'CFMV',
     ProfessionalRegistrationType.other => 'other',
   };
+
+  /// Parse de string wire para enum.
+  /// Retorna null se o valor não for reconhecido.
+  static ProfessionalRegistrationType? fromWire(String value) {
+    final normalized = value.toUpperCase().trim();
+    return switch (normalized) {
+      'CRMV' || 'CRM' => ProfessionalRegistrationType.crmv,
+      'CRMV-Z' || 'CRMVZ' => ProfessionalRegistrationType.crmvZ,
+      'CRN' => ProfessionalRegistrationType.crn,
+      'CRF' || 'CRFA' => ProfessionalRegistrationType.crf,
+      'CFMV' => ProfessionalRegistrationType.cfmv,
+      'OTHER' => ProfessionalRegistrationType.other,
+      _ => null,
+    };
+  }
 }
 
 /// Via de administração de uma dose (Domain Model §6).

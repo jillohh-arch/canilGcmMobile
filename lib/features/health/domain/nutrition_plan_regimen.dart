@@ -1,4 +1,5 @@
 import 'health_v1_models.dart';
+import 'supplement_log.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Regime prescrito embutido em NutritionPlan.supplements[] (D13–D14).
@@ -6,21 +7,24 @@ import 'health_v1_models.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Item de regime nutricional prescrito no plano (não é log de administração).
+/// Contrato canônico Health v1:
+/// - dose: número finito e positivo
+/// - unit: SupplementDoseUnit canônico
 final class NutritionPlanSupplementRegimen {
   NutritionPlanSupplementRegimen({
     required String id,
     required String name,
-    required String dose,
-    required String unit,
+    required num dose,
+    required SupplementDoseUnit unit,
     required String frequency,
     String? instructions,
     this.validFrom,
     this.validUntil,
-  }) : id = _require(id, 'supplement_regimen_id'),
-       name = _require(name, 'supplement_regimen_name'),
-       dose = _require(dose, 'supplement_regimen_dose'),
-       unit = _require(unit, 'supplement_regimen_unit'),
-       frequency = _require(frequency, 'supplement_regimen_frequency'),
+  }) : id = _requireId(id),
+       name = _requireName(name),
+       dose = _requireDose(dose),
+       unit = unit,
+       frequency = _requireFrequency(frequency),
        instructions = instructions?.trim() {
     final until = validUntil;
     final from = validFrom;
@@ -35,18 +39,56 @@ final class NutritionPlanSupplementRegimen {
   final String id;
   final String name;
 
-  /// Representação prescrita (pode ser textual — regime ≠ dose estruturada do log).
-  final String dose;
-  final String unit;
+  /// Dose numérica finita e positiva.
+  final num dose;
+
+  /// Unidade canônica.
+  final SupplementDoseUnit unit;
+
   final String frequency;
   final String? instructions;
   final DateTime? validFrom;
   final DateTime? validUntil;
 
-  static String _require(String value, String field) {
+  static String _requireId(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      throw HealthDomainException('missing_$field', '$field é obrigatório');
+      throw const HealthDomainException(
+        'missing_supplement_regimen_id',
+        'supplement_regimen_id é obrigatório',
+      );
+    }
+    return trimmed;
+  }
+
+  static String _requireName(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      throw const HealthDomainException(
+        'missing_supplement_regimen_name',
+        'supplement_regimen_name é obrigatório',
+      );
+    }
+    return trimmed;
+  }
+
+  static num _requireDose(num value) {
+    if (!value.isFinite || value <= 0) {
+      throw const HealthDomainException(
+        'invalid_regimen_dose',
+        'supplement_regimen_dose deve ser número finito e positivo',
+      );
+    }
+    return value;
+  }
+
+  static String _requireFrequency(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      throw const HealthDomainException(
+        'missing_supplement_regimen_frequency',
+        'supplement_regimen_frequency é obrigatório',
+      );
     }
     return trimmed;
   }
