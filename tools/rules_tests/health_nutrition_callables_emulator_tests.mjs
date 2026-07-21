@@ -256,6 +256,13 @@ function samplePlan(overrides = {}) {
 }
 
 async function seedBase() {
+  for (const col of ["meal_logs", "nutrition_operations", "supplement_logs", "feeding_events", "feedings"]) {
+    const snap = await adminDb.collection("dogs").doc(DOG_A).collection(col).get();
+    for (const d of snap.docs) {
+      await d.ref.delete();
+    }
+  }
+
   await adminDb.collection("access_profiles").doc("operador_k9").set({
     status: "active",
     scope: "own_records",
@@ -686,6 +693,145 @@ await test(
     });
     assert.equal(res.data.was_no_op ?? res.data.wasNoOp, false);
     assert.ok(String(res.data.meal_id || res.data.mealId).startsWith("ml1_"));
+  },
+);
+
+// -----------------------------------------------------------------------------
+// GATE 5C.3B — Ad Hoc Meal Execution Real E2E Emulator (Baseline, After, Slot Non-Interference, Replay)
+// -----------------------------------------------------------------------------
+await test(
+  "GATE 5C.3B Real E2E: Ad hoc meal creation, baseline/after, slot non-interference, receipt, audit & replay",
+  async () => {
+    await signIn(OP);
+
+    // 1. BASELINE
+    const beforeMeals = await countSub(DOG_A, "meal_logs");
+    const beforeOps = await countSub(DOG_A, "nutrition_operations");
+    const beforeAudits = await adminDb
+      .collection("auditLogs")
+      .where("action", "==", "health.nutrition.meal_log.create_adhoc")
+      .get();
+    const beforeAuditsCount = beforeAudits.size;
+    const beforeLegacy = await countLegacy(DOG_A);
+
+    const planDocBefore = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_plans")
+      .doc(PLAN_ID)
+      .get();
+    const planRevisionBefore = planDocBefore.data()?.revision ?? 1;
+
+    const opId = "gate-5c3b-adhoc-e2e-op-1";
+    const adhocPayload = {
+      mode: "adhoc",
+      dog_id: DOG_A,
+      period: "afternoon",
+      offered_grams: 150,
+      consumed_grams: 150,
+      acceptance: "full",
+      fed_at: "2026-07-21T15:00:00.000Z",
+      operation_id: opId,
+      observations: "Ad hoc meal via canonical execution UI",
+      attachment_refs: [],
+    };
+
+    // 2. EXECUTION VIA REAL CALLABLE
+    const res = await callable("healthNutritionCreateMealLog")(adhocPayload);
+    const data = res.data;
+    const wasNoOp = data.was_no_op ?? data.wasNoOp;
+    const mealId = String(data.meal_id || data.mealId);
+    const occurrenceId = data.meal_occurrence_id ?? data.mealOccurrenceId;
+
+    assert.equal(wasNoOp, false, "Primeira execução não deve ser no-op");
+    assert.ok(mealId.startsWith("ml1_"), `MealLog ID deve ter prefixo ml1_: ${mealId}`);
+    assert.equal(occurrenceId, null, "meal_occurrence_id deve ser null para adhoc");
+
+    // 3. AFTER IN FIRESTORE EMULATOR
+    const afterMeals = await countSub(DOG_A, "meal_logs");
+    const afterOps = await countSub(DOG_A, "nutrition_operations");
+    const afterAuditsCount = await countAuditsForEntity(mealId);
+    const afterLegacy = await countLegacy(DOG_A);
+
+    const planDocAfter = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_plans")
+      .doc(PLAN_ID)
+      .get();
+    const planRevisionAfter = planDocAfter.data()?.revision ?? 1;
+
+    assert.equal(afterMeals, beforeMeals + 1, "meal_logs delta deve ser +1");
+    assert.equal(afterOps, beforeOps + 1, "nutrition_operations delta deve ser +1");
+    assert.equal(afterAuditsCount, 1, "auditLogs count para o mealId deve ser 1");
+    assert.equal(afterLegacy, beforeLegacy, "Legacy write delta deve ser ZERO");
+    assert.equal(planRevisionAfter, planRevisionBefore, "NutritionPlan revision delta deve ser ZERO");
+
+    // 4. PERSISTED MEALLOG CANONICAL FIELDS & NULL MATERIALIZATION
+    const mealDoc = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("meal_logs")
+      .doc(mealId)
+      .get();
+    assert.ok(mealDoc.exists, "Documento MealLog ml1_* deve existir no Firestore");
+    const m = mealDoc.data();
+
+    // Persisted null materialization for planned fields & path-based dog identity
+    assert.equal(m?.dog_id, undefined, "dog_id NÃO é armazenado no corpo do documento (determinado pelo path)");
+    assert.equal(mealDoc.ref.path, `dogs/${DOG_A}/meal_logs/${mealId}`);
+    assert.equal(m?.plan_id, null, "plan_id deve ser persistido como null");
+    assert.equal(m?.planned_meal_id, null, "planned_meal_id deve ser persistido como null");
+    assert.equal(m?.meal_occurrence_id, null, "meal_occurrence_id deve ser persistido como null");
+    assert.equal(m?.scheduled_for, null, "scheduled_for deve ser persistido como null");
+    assert.equal(m?.prescription_amount_at_time, null, "prescription_amount_at_time deve ser persistido como null");
+
+    // Ad hoc persisted canonical payload
+    assert.equal(m?.period, "afternoon");
+    assert.equal(m?.offered_grams, 150);
+    assert.equal(m?.consumed_grams, 150);
+    assert.equal(m?.acceptance, "full");
+    assert.equal(m?.observations, "Ad hoc meal via canonical execution UI");
+    assert.deepEqual(m?.attachment_refs, []);
+    assert.ok(m?.recorded_by, "recorded_by presente");
+    assert.ok(m?.recorded_at, "recorded_at presente");
+    assert.equal(m?.revision, 1);
+    assert.equal(m?.schema_version, 1);
+    assert.equal(m?.source, "mobile_callable");
+
+    // 5. RECEIPT VALIDATION
+    const receiptSnap = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_operations")
+      .where("operation_id", "==", opId)
+      .get();
+    assert.equal(receiptSnap.size, 1, "Receipt de operação deve existir");
+    const receiptData = receiptSnap.docs[0].data();
+    assert.equal(receiptData?.operation_type, "create_adhoc_meal");
+    const receiptResult = receiptData?.result || {};
+    assert.equal(receiptResult.was_no_op ?? receiptResult.wasNoOp, false);
+
+    // 6. AUDITLOG VALIDATION
+    const auditSnap = await adminDb
+      .collection("auditLogs")
+      .where("entity_id", "==", mealId)
+      .get();
+    assert.equal(auditSnap.size, 1, "AuditLog correspondente ao ml1_* deve existir");
+    const auditDoc = auditSnap.docs[0];
+    assert.equal(auditDoc.data()?.action, "health.nutrition.meal_log.create_adhoc");
+    assert.equal(auditDoc.data()?.entity_type, "meal_log");
+    assert.equal(auditDoc.data()?.entity_path, `dogs/${DOG_A}/meal_logs/${mealId}`);
+
+    // 7. CONTROLLED REPLAY
+    const replayRes = await callable("healthNutritionCreateMealLog")(adhocPayload);
+    const replayData = replayRes.data;
+    assert.equal(replayData.was_no_op ?? replayData.wasNoOp, true, "Replay deve retornar was_no_op = true");
+    assert.equal(String(replayData.meal_id || replayData.mealId), mealId);
+
+    assert.equal(await countSub(DOG_A, "meal_logs"), afterMeals, "Replay delta meal_logs deve ser ZERO");
+    assert.equal(await countSub(DOG_A, "nutrition_operations"), afterOps, "Replay delta operations deve ser ZERO");
+    assert.equal(await countLegacy(DOG_A), beforeLegacy, "Replay delta legacy deve ser ZERO");
   },
 );
 

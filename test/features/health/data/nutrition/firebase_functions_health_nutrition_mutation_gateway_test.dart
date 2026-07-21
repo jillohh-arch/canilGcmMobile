@@ -162,8 +162,20 @@ void main() {
       );
       expect(calls.single.data['mode'], 'adhoc');
       expect(calls.single.data['period'], 'extra');
-      expect(calls.single.data.containsKey('plan_id'), isFalse);
-      expect(calls.single.data.containsKey('planned_meal_id'), isFalse);
+      for (final forbiddenKey in const [
+        'plan_id',
+        'planId',
+        'planned_meal_id',
+        'plannedMealId',
+        'meal_occurrence_id',
+        'mealOccurrenceId',
+        'scheduled_for',
+        'scheduledFor',
+        'prescription_amount_at_time',
+        'prescriptionAmountAtTime',
+      ]) {
+        expect(calls.single.data.containsKey(forbiddenKey), isFalse, reason: forbiddenKey);
+      }
       final ok = result as CreateMealLogSuccess;
       expect(ok.mealId, 'ml1_adhoc');
       expect(ok.mealOccurrenceId, isNull);

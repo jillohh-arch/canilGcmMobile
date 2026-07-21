@@ -21,6 +21,11 @@ import 'package:canil_gcm/features/health/data/health_service.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
@@ -224,23 +229,50 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   Future<bool> _openFeedingRegistration(
     Dog dog, {
     BuildContext? hostContext,
+    HealthNutritionMutationController? mutationControllerOverride,
   }) async {
-    final saved =
-        await Navigator.of(
-          hostContext ?? context,
-          rootNavigator: true,
-        ).push<bool>(
-          MaterialPageRoute(
-            builder: (_) =>
-                FeedingRegistrationScreen(dogId: dog.id, dogName: dog.name),
+    final controller = mutationControllerOverride ??
+        HealthNutritionMutationController(
+          gateway: FirebaseFunctionsHealthNutritionMutationGateway(),
+        );
+    final outcome =
+        await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+          context: hostContext ?? context,
+          isScrollControlled: true,
+          backgroundColor: AppTheme.surfacePanel,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => HealthAdhocMealFormSheet(
+            dogId: dog.id,
+            dogDisplayName: dog.name,
+            controller: controller,
+            onRefreshRequested: () async {
+              final nutritionVM = Provider.of<NutritionViewModel>(
+                context,
+                listen: false,
+              );
+              await nutritionVM.loadForDog(dog.id, forceReload: true);
+              await nutritionVM.loadFullHistory(dog.id);
+              _refresh();
+            },
           ),
         );
-    if (!mounted) return saved == true;
-    if (saved != true) return false;
-    final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
-    await nutritionVM.loadForDog(dog.id, forceReload: true);
-    await nutritionVM.loadFullHistory(dog.id);
-    return true;
+    if (mutationControllerOverride == null) {
+      controller.dispose();
+    }
+    if (!mounted) return outcome is HealthNutritionMutationUiSuccess;
+    if (outcome is HealthNutritionMutationUiSuccess) {
+      final nutritionVM = Provider.of<NutritionViewModel>(
+        context,
+        listen: false,
+      );
+      await nutritionVM.loadForDog(dog.id, forceReload: true);
+      await nutritionVM.loadFullHistory(dog.id);
+      _refresh();
+      return true;
+    }
+    return false;
   }
 
   Future<void> _openUnifiedHistory() async {
