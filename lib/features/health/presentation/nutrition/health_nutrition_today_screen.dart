@@ -1224,7 +1224,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${r.dose} ${r.unit.wireName} · ${r.frequency}',
+                      '${r.dose} ${r.unit.displayLabel} · ${r.frequency}',
                       style: GoogleFonts.inter(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
@@ -1347,7 +1347,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${a.dose} ${a.unit.wireName} · '
+                      '${a.dose} ${a.unit.displayLabel} · '
                       '${HealthNutritionTodayFormatters.timeShort(a.administeredAt)}',
                       style: GoogleFonts.inter(
                         color: AppTheme.textSecondary,

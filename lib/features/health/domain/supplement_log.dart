@@ -108,6 +108,18 @@ enum SupplementDoseUnit {
     SupplementDoseUnit.other => 'other',
   };
 
+  /// Label amigável para exibição ao usuário em cards e listas.
+  /// Não altera o wire value enviado ao backend.
+  String get displayLabel => switch (this) {
+    SupplementDoseUnit.mg => 'mg',
+    SupplementDoseUnit.g => 'g',
+    SupplementDoseUnit.ml => 'ml',
+    SupplementDoseUnit.scoop => 'scoop',
+    SupplementDoseUnit.tablet => 'comprimido',
+    SupplementDoseUnit.drop => 'gota',
+    SupplementDoseUnit.other => 'outra',
+  };
+
   static ParsedHealthEnum<SupplementDoseUnit> parse(Object? value) =>
       parseHealthEnum<SupplementDoseUnit>(
         value,

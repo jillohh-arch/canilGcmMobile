@@ -148,5 +148,18 @@ void main() {
       expect(SupplementDoseUnit.drop.wireName, 'drop');
       expect(SupplementDoseUnit.other.wireName, 'other');
     });
+
+    test('unit expõe displayLabels amigáveis', () {
+      // wire values unchanged
+      expect(SupplementDoseUnit.scoop.wireName, 'scoop');
+      // display labels are user-friendly
+      expect(SupplementDoseUnit.scoop.displayLabel, 'scoop');
+      expect(SupplementDoseUnit.tablet.displayLabel, 'comprimido');
+      expect(SupplementDoseUnit.drop.displayLabel, 'gota');
+      expect(SupplementDoseUnit.other.displayLabel, 'outra');
+      expect(SupplementDoseUnit.mg.displayLabel, 'mg');
+      expect(SupplementDoseUnit.g.displayLabel, 'g');
+      expect(SupplementDoseUnit.ml.displayLabel, 'ml');
+    });
   });
 }

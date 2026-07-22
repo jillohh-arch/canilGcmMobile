@@ -388,7 +388,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
           if (regimen != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Regime: ${regimen.name} · ${regimen.dose} ${regimen.unit.wireName}',
+              'Regime: ${regimen.name} · ${regimen.dose} ${regimen.unit.displayLabel}',
               style: GoogleFonts.inter(
                 color: AppTheme.textMuted,
                 fontSize: 11,
@@ -442,7 +442,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
         return DropdownMenuItem(
           value: r,
           child: Text(
-            '${r.name} · ${r.dose} ${r.unit.wireName}',
+            '${r.name} · ${r.dose} ${r.unit.displayLabel}',
             overflow: TextOverflow.ellipsis,
           ),
         );
@@ -537,7 +537,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
         SupplementDoseUnit.mg => 'mg (miligrama)',
         SupplementDoseUnit.g => 'g ( grama)',
         SupplementDoseUnit.ml => 'ml (mililitro)',
-        SupplementDoseUnit.scoop => 'dose (colher)',
+        SupplementDoseUnit.scoop => 'Scoop / medida do dosador',
         SupplementDoseUnit.tablet => 'comprimido',
         SupplementDoseUnit.drop => 'gota',
         SupplementDoseUnit.other => 'outra',
