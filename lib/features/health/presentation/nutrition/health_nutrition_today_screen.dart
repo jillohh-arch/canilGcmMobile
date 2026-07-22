@@ -418,7 +418,7 @@ class _TodaySummaryCard extends StatelessWidget {
       NutritionActiveLegacyPlan(:final view) => view.mealsPerDay,
       _ => null,
     };
-    final completed = meals.length;
+    final completed = meals.where((m) => m.meal.isPlanned).length;
 
     final consumedLabel = consumed.knownSum == null
         ? '—'

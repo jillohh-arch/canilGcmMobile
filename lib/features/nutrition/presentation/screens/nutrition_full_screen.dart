@@ -20,8 +20,13 @@ import 'package:canil_gcm/core/services/pdf_generator/nutrition_pdf.dart';
 /// filtros, lista de refeições, CTA registrar.
 class NutritionFullScreen extends StatefulWidget {
   final Dog dog;
+  final VoidCallback? onRegisterAdhoc;
 
-  const NutritionFullScreen({super.key, required this.dog});
+  const NutritionFullScreen({
+    super.key,
+    required this.dog,
+    this.onRegisterAdhoc,
+  });
 
   @override
   State<NutritionFullScreen> createState() => _NutritionFullScreenState();
@@ -930,6 +935,10 @@ class _NutritionFullScreenState extends State<NutritionFullScreen> {
       child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
+          if (widget.onRegisterAdhoc != null) {
+            widget.onRegisterAdhoc!();
+            return;
+          }
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => FeedingRegistrationScreen(

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_recent_records_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_unsafe_sections.dart';
@@ -25,6 +27,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
   CoexistenceHealthSummarySource({
     FirebaseFirestore? firestore,
     NutritionService? nutritionService,
+    CoexistenceNutritionReadSource? coexistenceNutritionReadSource,
     HealthSummaryWeightReader? weightReader,
     HealthSummaryVaccinationReader? vaccinationReader,
     HealthSummaryNutritionReader? nutritionReader,
@@ -36,7 +39,14 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
            HealthSummaryVaccinationReader(firestore: firestore),
        _nutritionReader =
            nutritionReader ??
-           HealthSummaryNutritionReader(nutritionService: nutritionService),
+           HealthSummaryNutritionReader(
+             nutritionService: nutritionService,
+             coexistenceReadSource:
+                 coexistenceNutritionReadSource ??
+                 CoexistenceNutritionReadSourceFactory.forFirestore(
+                   firestore: firestore,
+                 ),
+           ),
        _recentRecordsReader =
            recentRecordsReader ??
            HealthSummaryRecentRecordsReader(firestore: firestore);

@@ -172,6 +172,7 @@ final class HealthSummaryAttentionView {
 final class HealthSummaryNutritionTodayView {
   const HealthSummaryNutritionTodayView({
     this.consumedAmount,
+    this.offeredAmount,
     this.plannedAmount,
     this.mealsRecorded,
     this.mealsPlanned,
@@ -179,6 +180,7 @@ final class HealthSummaryNutritionTodayView {
   });
 
   final double? consumedAmount;
+  final double? offeredAmount;
   final double? plannedAmount;
   final int? mealsRecorded;
   final int? mealsPlanned;
@@ -188,6 +190,7 @@ final class HealthSummaryNutritionTodayView {
   bool operator ==(Object other) =>
       other is HealthSummaryNutritionTodayView &&
       other.consumedAmount == consumedAmount &&
+      other.offeredAmount == offeredAmount &&
       other.plannedAmount == plannedAmount &&
       other.mealsRecorded == mealsRecorded &&
       other.mealsPlanned == mealsPlanned &&
@@ -196,6 +199,7 @@ final class HealthSummaryNutritionTodayView {
   @override
   int get hashCode => Object.hash(
     consumedAmount,
+    offeredAmount,
     plannedAmount,
     mealsRecorded,
     mealsPlanned,

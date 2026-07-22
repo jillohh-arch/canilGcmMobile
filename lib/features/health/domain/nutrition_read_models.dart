@@ -143,6 +143,9 @@ final class NutritionTodayReadModel {
 
   int get mealsRecorded => meals.length;
 
+  int get plannedMealsCompleted =>
+      meals.where((item) => item.meal.isPlanned).length;
+
   int? get mealsPlanned {
     final p = activePlan;
     return switch (p) {

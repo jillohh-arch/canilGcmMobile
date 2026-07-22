@@ -115,11 +115,18 @@ class HealthSummaryNutritionCard extends StatelessWidget {
   Widget _available(HealthSummaryNutritionTodayView view) {
     final unit = view.unitLabel;
     final consumed = view.consumedAmount;
+    final offered = view.offeredAmount;
     final planned = view.plannedAmount;
 
-    final headline = _headline(consumed, planned, unit);
+    final effectiveAmount = consumed ?? offered;
+    final headline = _headline(
+      consumed: consumed,
+      offered: offered,
+      planned: planned,
+      unit: unit,
+    );
     final mealsLine = _mealsLine(view.mealsRecorded, view.mealsPlanned);
-    final progress = _progress(consumed, planned);
+    final progress = _progress(effectiveAmount, planned);
     final percentLabel = progress == null
         ? null
         : '${(progress * 100).clamp(0, 999).round()}%';
@@ -199,16 +206,26 @@ class HealthSummaryNutritionCard extends StatelessWidget {
     );
   }
 
-  static String _headline(double? consumed, double? planned, String? unit) {
-    if (consumed == null && planned == null) {
+  static String _headline({
+    double? consumed,
+    double? offered,
+    double? planned,
+    String? unit,
+  }) {
+    if (consumed == null && offered == null && planned == null) {
       return 'Sem quantidades';
     }
-    if (consumed != null && planned != null) {
-      return '${HealthSummaryFormatters.amount(consumed, unit)} de '
+
+    final amount = consumed ?? offered;
+    final isOfferedOnly = consumed == null && offered != null;
+    final suffix = isOfferedOnly ? ' oferecidos' : '';
+
+    if (amount != null && planned != null) {
+      return '${HealthSummaryFormatters.amount(amount, unit)}$suffix de '
           '${HealthSummaryFormatters.amount(planned, unit)}';
     }
-    if (consumed != null) {
-      return HealthSummaryFormatters.amount(consumed, unit);
+    if (amount != null) {
+      return '${HealthSummaryFormatters.amount(amount, unit)}$suffix';
     }
     return 'Meta ${HealthSummaryFormatters.amount(planned!, unit)}';
   }

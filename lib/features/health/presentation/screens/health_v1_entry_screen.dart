@@ -38,6 +38,9 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
 /// Entrada de produção controlada do Health v1.0 (Fase 2E + 3E-B + 4B).
@@ -346,16 +349,63 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   void primeScheduleForTest() => _primeScheduleIfNeeded();
 
   @visibleForTesting
-  void primeNutritionForTest() => _primeNutritionIfNeeded();
-
-  @visibleForTesting
   bool get nutritionReadPrimedForTest => _nutritionReadPrimed;
 
-  void _onRegister() {
-    AppFeedback.info(
-      context,
-      'Registro Health v1 em breve — use o fluxo legado se necessário.',
+  Future<void> _onRegister() async {
+    DogViewModel? dogVM;
+    try {
+      dogVM = context.read<DogViewModel>();
+    } on ProviderNotFoundException {
+      dogVM = null;
+    }
+    final dogContext =
+        widget.dogContextOverride ??
+        _resolveDogContext(dogVM ?? DogViewModel());
+
+    final saved = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => HealthTypeSelectorScreen(
+          dogId: widget.dogId,
+          dogName: dogContext.name,
+          dogBreed: dogContext.breed,
+          onRegisterNutrition: (hubContext) async {
+            final outcome =
+                await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+                  context: hubContext,
+                  isScrollControlled: true,
+                  backgroundColor: AppTheme.surfacePanel,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  builder: (_) => HealthAdhocMealFormSheet(
+                    dogId: widget.dogId,
+                    dogDisplayName: dogContext.name,
+                    controller: _nutritionMutationController,
+                    onRefreshRequested: () async {
+                      _primeNutritionIfNeeded();
+                      await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                      _controller.selectDog(widget.dogId);
+                    },
+                  ),
+                );
+
+            if (outcome is HealthNutritionMutationUiSuccess) {
+              _primeNutritionIfNeeded();
+              await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+              _controller.selectDog(widget.dogId);
+              return true;
+            }
+            return false;
+          },
+        ),
+      ),
     );
+
+    if (saved == true && mounted) {
+      _primeNutritionIfNeeded();
+      await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+      _controller.selectDog(widget.dogId);
+    }
   }
 
   HealthSummaryDogContextView _resolveDogContext(DogViewModel dogVM) {
@@ -451,7 +501,26 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           builder: (_) => switch (target) {
             WeightHistoryTarget() => WeightHistoryScreen(dog: dog),
             VaccinationHistoryTarget() => VaccinationHistoryScreen(dog: dog),
-            NutritionHistoryTarget() => NutritionFullScreen(dog: dog),
+            NutritionHistoryTarget() => NutritionFullScreen(
+              dog: dog,
+              onRegisterAdhoc: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: AppTheme.transparent,
+                  builder: (_) => HealthAdhocMealFormSheet(
+                    dogId: dog.id,
+                    dogDisplayName: dog.name,
+                    controller: _nutritionMutationController,
+                    onRefreshRequested: () async {
+                      _primeNutritionIfNeeded();
+                      await _nutritionReadController.ensureDogAndRefresh(dog.id);
+                      _controller.selectDog(dog.id);
+                    },
+                  ),
+                );
+              },
+            ),
           },
         ),
       );
