@@ -4,7 +4,7 @@
 > **SUPERSEDED BY:**
 > `docs/health/HEALTH_V1_PHASE_5D_GATE5C4A_SUPPLEMENT_LOG_AUDIT_R1.md`
 >
-> Este documento保留了原始审计结果，但已被 R1 版本取代。R1 版本包含了更正、手术闭合轮以及修正后的合同和测试计数。
+> Este documento manteve os resultados da auditoria original, mas foi substituído pela versão R1. A versão R1 inclui correções, fechamento cirúrgico e contagens de contratos e testes atualizadas.
 
 **Checkpoint anterior:** `a4677e3` (`fix(health): reconcile nutrition runtime integration`)
 **Branch:** `feature/health-v1-foundation`

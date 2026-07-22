@@ -14,6 +14,7 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_nutritio
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_planned_meal_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
 import 'package:canil_gcm/features/health/presentation/shared/states/health_state_views.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
@@ -166,6 +167,9 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 legacyRegimens:
                     todayModel?.legacySupplementRegimens ??
                     snapshot.legacySupplementRegimens,
+                mutationController: mutationController,
+                dogDisplayName: dogDisplayName,
+                onRefreshRequested: controller.refresh,
               ),
               const SizedBox(height: 14),
               _RecentMealsSection(
@@ -1089,38 +1093,109 @@ class _AdhocMealCard extends StatelessWidget {
   }
 }
 
-class _SupplementsSection extends StatelessWidget {
+class _SupplementsSection extends StatefulWidget {
   const _SupplementsSection({
     required this.plan,
     required this.administrations,
     required this.legacyRegimens,
+    this.mutationController,
+    required this.dogDisplayName,
+    required this.onRefreshRequested,
   });
 
   final NutritionActivePlanRef? plan;
   final List<SupplementLog> administrations;
   final List<LegacySupplementRegimenView> legacyRegimens;
+  final HealthNutritionMutationController? mutationController;
+  final String dogDisplayName;
+  final Future<void> Function() onRefreshRequested;
+
+  @override
+  State<_SupplementsSection> createState() => _SupplementsSectionState();
+}
+
+class _SupplementsSectionState extends State<_SupplementsSection> {
+  NutritionActiveCanonicalPlan? get _activeCanonicalPlan {
+    final p = widget.plan;
+    if (p is NutritionActiveCanonicalPlan) return p;
+    return null;
+  }
+
+  Future<void> _openSupplementForm() async {
+    final mutation = widget.mutationController;
+    if (mutation == null) return;
+
+    final activePlan = _activeCanonicalPlan;
+    final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
+    final dogId = activePlan?.plan.dogId ?? '';
+
+    final outcome = await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surfacePanel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => HealthSupplementFormSheet(
+        dogId: dogId,
+        dogDisplayName: widget.dogDisplayName,
+        controller: mutation,
+        onRefreshRequested: widget.onRefreshRequested,
+        timezone: tz,
+        activePlan: activePlan,
+      ),
+    );
+
+    if (!mounted) return;
+    if (outcome is HealthNutritionMutationUiSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Suplemento registrado com sucesso.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final planRegimens = switch (plan) {
+    final planRegimens = switch (widget.plan) {
       NutritionActiveCanonicalPlan(:final plan) => plan.supplements,
       _ => const <NutritionPlanSupplementRegimen>[],
     };
 
+    final hasMutation = widget.mutationController != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'SUPLEMENTOS EM USO',
-          style: GoogleFonts.inter(
-            color: AppTheme.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.55,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'SUPLEMENTOS EM USO',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.55,
+                ),
+              ),
+            ),
+            if (hasMutation)
+              TextButton.icon(
+                onPressed: _openSupplementForm,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Registrar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  textStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
-        if (planRegimens.isEmpty && legacyRegimens.isEmpty)
+        if (planRegimens.isEmpty && widget.legacyRegimens.isEmpty)
           HealthSummaryCardSurface(
             child: Text(
               'Nenhum suplemento em uso registrado.',
@@ -1171,7 +1246,7 @@ class _SupplementsSection extends StatelessWidget {
               ),
             ),
           ),
-          ...legacyRegimens.map(
+          ...widget.legacyRegimens.map(
             (r) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: HealthSummaryCardSurface(
@@ -1239,10 +1314,10 @@ class _SupplementsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        if (administrations.isEmpty)
+        if (widget.administrations.isEmpty)
           HealthSummaryCardSurface(
             child: Text(
-              planRegimens.isNotEmpty || legacyRegimens.isNotEmpty
+              planRegimens.isNotEmpty || widget.legacyRegimens.isNotEmpty
                   ? 'Nenhuma administração registrada. '
                         'Os suplementos em uso aparecem acima.'
                   : 'Nenhuma administração registrada.',
@@ -1255,7 +1330,7 @@ class _SupplementsSection extends StatelessWidget {
             ),
           )
         else
-          ...administrations.map(
+          ...widget.administrations.map(
             (a) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: HealthSummaryCardSurface(

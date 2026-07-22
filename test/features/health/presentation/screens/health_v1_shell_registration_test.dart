@@ -117,6 +117,12 @@ void main() {
       await tester.tap(continueButton);
       await tester.pumpAndSettle();
 
+      // F-01 Gate 5C.4B: agora aparece seleção de tipo (Alimentação avulsa / Suplemento)
+      // Selecionar "Alimentação avulsa" para manter compatibilidade com o teste original.
+      expect(find.text('Alimentação avulsa'), findsOneWidget);
+      await tester.tap(find.text('Alimentação avulsa'));
+      await tester.pumpAndSettle();
+
       // CRITICAL ASSERTION 1: HealthAdhocMealFormSheet is displayed
       expect(find.byType(HealthAdhocMealFormSheet), findsOneWidget);
 

@@ -646,34 +646,228 @@ await test("callable real fed_at inválido → invalid-argument", async () => {
 });
 
 // -----------------------------------------------------------------------------
-// Supplement via real callable
+// Supplement via real callable — E2E completo com 7 fases
+// GATE 5C.4B: documenta todos os asserts concretos da tabela deverdade
 // -----------------------------------------------------------------------------
-await test("callable real healthNutritionCreateSupplementLog", async () => {
-  await signIn(OP);
-  const res = await callable("healthNutritionCreateSupplementLog")({
-    dog_id: DOG_A,
-    supplement_name: "Omega E2E",
-    dose: 5,
-    unit: "ml",
-    administered_at: "2026-07-17T14:00:00.000Z",
-    operation_id: "nutri-e2e-supp-1",
-  });
-  const data = res.data;
-  assert.equal(data.was_no_op ?? data.wasNoOp, false);
-  assert.equal(data.revision, 1);
-  const logId = String(data.supplement_log_id || data.supplementLogId);
-  assert.ok(logId.startsWith("sl1_"));
+await test(
+  "GATE 5C.4B E2E SupplementLog: creation, receipt, audit, replay, nulls",
+  async () => {
+    await signIn(OP);
 
-  const snap = await adminDb
-    .collection("dogs")
-    .doc(DOG_A)
-    .collection("supplement_logs")
-    .doc(logId)
-    .get();
-  assert.ok(snap.exists);
-  assert.equal(snap.data()?.dose, 5);
-  assert.equal(await countLegacy(DOG_A), 0);
-});
+    const opId = "nutri-e2e-supp-1";
+
+    // 1. BASELINE
+    const beforeLogs = await countSub(DOG_A, "supplement_logs");
+    const beforeOps = await countSub(DOG_A, "nutrition_operations");
+    const beforeLegacy = await countLegacy(DOG_A);
+    const planDocBefore = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_plans")
+      .doc(PLAN_ID)
+      .get();
+    const planRevisionBefore = planDocBefore.data()?.revision ?? 1;
+
+    // 2. CREATE via real callable
+    const res = await callable("healthNutritionCreateSupplementLog")({
+      dog_id: DOG_A,
+      supplement_name: "Omega E2E",
+      dose: 5,
+      unit: "ml",
+      administered_at: "2026-07-17T14:00:00.000Z",
+      operation_id: opId,
+      nutrition_plan_id: null,
+      supplement_regimen_id: null,
+    });
+    const data = res.data;
+    const wasNoOp = data.was_no_op ?? data.wasNoOp;
+    const logId = String(data.supplement_log_id || data.supplementLogId || data.entityId || "MISSING");
+
+    // 3. AFTER delta validation
+    const afterLogs = await countSub(DOG_A, "supplement_logs");
+    const afterOps = await countSub(DOG_A, "nutrition_operations");
+    const afterLegacy = await countLegacy(DOG_A);
+    const planDocAfter = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_plans")
+      .doc(PLAN_ID)
+      .get();
+    const planRevisionAfter = planDocAfter.data()?.revision ?? 1;
+
+    assert.equal(wasNoOp, false, "Primeira execução não deve ser no-op");
+    assert.equal(data.revision, 1);
+    assert.ok(logId.startsWith("sl1_"), `Log ID deve ter prefixo sl1_: ${logId}`);
+    assert.equal(afterLogs, beforeLogs + 1, "supplement_logs delta deve ser +1");
+    assert.equal(afterOps, beforeOps + 1, "nutrition_operations delta deve ser +1");
+    assert.equal(afterLegacy, beforeLegacy, "Legacy write delta deve ser ZERO");
+    assert.equal(
+      planRevisionAfter,
+      planRevisionBefore,
+      "NutritionPlan revision delta deve ser ZERO (plano inalterado)",
+    );
+
+    // 4. PERSISTED DOCUMENT CANONICAL FIELDS
+    const snap = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("supplement_logs")
+      .doc(logId)
+      .get();
+    assert.ok(snap.exists, `Documento SupplementLog ${logId} deve existir`);
+    const doc = snap.data();
+    assert.equal(snap.ref.path, `dogs/${DOG_A}/supplement_logs/${logId}`);
+    assert.equal(doc?.dose, 5);
+    assert.equal(doc?.supplement_name, "Omega E2E");
+    assert.equal(doc?.unit, "ml");
+    assert.equal(doc?.nutrition_plan_id, null, "nutrition_plan_id deve ser null no modo avulso");
+    assert.equal(
+      doc?.supplement_regimen_id,
+      null,
+      "supplement_regimen_id deve ser null no modo avulso",
+    );
+    assert.ok(doc?.recorded_by, "recorded_by presente");
+    assert.ok(doc?.recorded_at, "recorded_at presente");
+    assert.equal(doc?.revision, 1);
+    assert.equal(doc?.schema_version, 1);
+    assert.equal(doc?.source, "mobile_callable");
+
+    // 5. RECEIPT VALIDATION
+    const receiptSnap = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_operations")
+      .where("operation_id", "==", opId)
+      .get();
+    assert.equal(receiptSnap.size, 1, "Receipt de operação deve existir para operation_id");
+    const receiptData = receiptSnap.docs[0].data();
+    assert.equal(
+      receiptData?.operation_type,
+      "create_supplement_log",
+      "operation_type deve ser create_supplement_log",
+    );
+    assert.equal(receiptData?.operation_id, opId, "operation_id no receipt deve ser preservado");
+    const receiptResult = receiptData?.result || {};
+    assert.equal(
+      receiptResult.was_no_op ?? receiptResult.wasNoOp,
+      false,
+      "Receipt result.was_no_op deve ser false",
+    );
+    assert.equal(
+      String(receiptResult.entityId || receiptResult.logId || receiptResult.supplement_log_id || receiptResult.supplementLogId),
+      logId,
+    );
+
+    // 6. AUDITLOG VALIDATION
+    const auditSnap = await adminDb
+      .collection("auditLogs")
+      .where("entity_id", "==", logId)
+      .get();
+    assert.equal(auditSnap.size, 1, "AuditLog para o sl1_* deve existir");
+    const auditDoc = auditSnap.docs[0];
+    assert.equal(
+      auditDoc.data()?.action,
+      "health.nutrition.supplement_log.create",
+      "AuditLog action deve ser health.nutrition.supplement_log.create",
+    );
+    assert.equal(auditDoc.data()?.entity_type, "supplement_log");
+    assert.equal(auditDoc.data()?.entity_path, `dogs/${DOG_A}/supplement_logs/${logId}`);
+
+    // 7. CONTROLLED REPLAY (mesmo operation_id → no-op)
+    const replayRes = await callable("healthNutritionCreateSupplementLog")({
+      dog_id: DOG_A,
+      supplement_name: "Omega E2E",
+      dose: 5,
+      unit: "ml",
+      administered_at: "2026-07-17T14:00:00.000Z",
+      operation_id: opId,
+      nutrition_plan_id: null,
+      supplement_regimen_id: null,
+    });
+    const replayData = replayRes.data;
+    assert.equal(
+      replayData.was_no_op ?? replayData.wasNoOp,
+      true,
+      "Replay com mesmo operation_id deve retornar was_no_op = true",
+    );
+    assert.equal(
+      String(replayData.supplement_log_id || replayData.supplementLogId),
+      logId,
+      "Replay deve retornar o mesmo logId",
+    );
+    assert.equal(
+      await countSub(DOG_A, "supplement_logs"),
+      afterLogs,
+      "Replay supplement_logs delta deve ser ZERO",
+    );
+    assert.equal(
+      await countSub(DOG_A, "nutrition_operations"),
+      afterOps,
+      "Replay nutrition_operations delta deve ser ZERO",
+    );
+    assert.equal(
+      await countLegacy(DOG_A),
+      beforeLegacy,
+      "Replay legacy delta deve ser ZERO",
+    );
+  },
+);
+
+// -----------------------------------------------------------------------------
+// Modo prescrito: nutrition_plan_id e supplement_regimen_id preenchidos
+// -----------------------------------------------------------------------------
+await test(
+  "GATE 5C.4B E2E SupplementLog modo prescrito: vínculos preenchidos no documento",
+  async () => {
+    await signIn(OP);
+
+    const opId = "nutri-e2e-supp-prescribed-1";
+    const res = await callable("healthNutritionCreateSupplementLog")({
+      dog_id: DOG_A,
+      supplement_name: "Vitamina B12",
+      dose: 1,
+      unit: "tablet",
+      administered_at: "2026-07-17T15:00:00.000Z",
+      operation_id: opId,
+      nutrition_plan_id: PLAN_ID,
+      supplement_regimen_id: "reg-1",
+      notes: "Aplicar via oral",
+    });
+    const data = res.data;
+    const logId = String(data.supplement_log_id || data.supplementLogId);
+    assert.ok(logId.startsWith("sl1_"));
+    assert.equal(data.was_no_op ?? data.wasNoOp, false);
+
+    const snap = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("supplement_logs")
+      .doc(logId)
+      .get();
+    assert.ok(snap.exists);
+    const doc = snap.data();
+    assert.equal(doc?.nutrition_plan_id, PLAN_ID, "nutrition_plan_id deve ser preenchido");
+    assert.equal(doc?.supplement_regimen_id, "reg-1", "supplement_regimen_id deve ser preenchido");
+    assert.equal(doc?.notes, "Aplicar via oral");
+
+    // AuditLog existe
+    const auditSnap = await adminDb
+      .collection("auditLogs")
+      .where("entity_id", "==", logId)
+      .get();
+    assert.equal(auditSnap.size, 1);
+
+    // Receipt existe
+    const receiptSnap = await adminDb
+      .collection("dogs")
+      .doc(DOG_A)
+      .collection("nutrition_operations")
+      .where("operation_id", "==", opId)
+      .get();
+    assert.equal(receiptSnap.size, 1);
+    assert.equal(receiptSnap.docs[0].data()?.operation_type, "create_supplement_log");
+  },
+);
 
 // -----------------------------------------------------------------------------
 // App Check off — already proven by all authorized calls without App Check token

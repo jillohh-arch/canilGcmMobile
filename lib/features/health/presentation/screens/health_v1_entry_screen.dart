@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
@@ -25,6 +26,8 @@ import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_heal
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
+import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
@@ -40,6 +43,7 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
@@ -369,6 +373,56 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           dogName: dogContext.name,
           dogBreed: dogContext.breed,
           onRegisterNutrition: (hubContext) async {
+            // Mostrar seleção entre Alimentação Avulsa e Suplemento.
+            final choice = await showModalBottomSheet<_NutritionRegistrationChoice>(
+              context: hubContext,
+              isScrollControlled: true,
+              backgroundColor: AppTheme.surfacePanel,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => _NutritionRegistrationTypeSheet(
+                dogDisplayName: dogContext.name,
+              ),
+            );
+
+            if (!hubContext.mounted) return false;
+            if (choice == null) return false;
+
+            if (choice == _NutritionRegistrationChoice.adhocMeal) {
+              final outcome =
+                  await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+                    context: hubContext,
+                    isScrollControlled: true,
+                    backgroundColor: AppTheme.surfacePanel,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (_) => HealthAdhocMealFormSheet(
+                      dogId: widget.dogId,
+                      dogDisplayName: dogContext.name,
+                      controller: _nutritionMutationController,
+                      onRefreshRequested: () async {
+                        _primeNutritionIfNeeded();
+                        await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                        _controller.selectDog(widget.dogId);
+                      },
+                    ),
+                  );
+
+              if (outcome is HealthNutritionMutationUiSuccess) {
+                _primeNutritionIfNeeded();
+                await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                _controller.selectDog(widget.dogId);
+                return true;
+              }
+              return false;
+            }
+
+            // choice == _NutritionRegistrationChoice.supplement
+            final activePlan = _tryGetActiveCanonicalPlan();
+            final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
+
             final outcome =
                 await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
                   context: hubContext,
@@ -377,7 +431,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                   shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  builder: (_) => HealthAdhocMealFormSheet(
+                  builder: (_) => HealthSupplementFormSheet(
                     dogId: widget.dogId,
                     dogDisplayName: dogContext.name,
                     controller: _nutritionMutationController,
@@ -386,6 +440,8 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                       await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
                       _controller.selectDog(widget.dogId);
                     },
+                    timezone: tz,
+                    activePlan: activePlan,
                   ),
                 );
 
@@ -593,6 +649,177 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           mutationController: _nutritionMutationController,
           dogDisplayName: dogContext.name,
           bottomPadding: _timelineBottomPadding(context),
+        ),
+      ),
+    );
+  }
+
+  /// Tenta obter o plano ativo canônico da Nutrição.
+  NutritionActiveCanonicalPlan? _tryGetActiveCanonicalPlan() {
+    final snapshot = _nutritionReadController.snapshotOrNull;
+    if (snapshot == null) return null;
+    final plan = snapshot.activePlan;
+    if (plan is NutritionActiveCanonicalPlan) return plan;
+    return null;
+  }
+}
+
+/// Escolha de tipo de registro nutricional.
+enum _NutritionRegistrationChoice {
+  adhocMeal,
+  supplement,
+}
+
+/// Sheet de seleção de tipo de registro nutricional.
+class _NutritionRegistrationTypeSheet extends StatelessWidget {
+  const _NutritionRegistrationTypeSheet({required this.dogDisplayName});
+
+  final String dogDisplayName;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Icon(Icons.restaurant_rounded, color: AppTheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'REGISTRAR NUTRIÇÃO',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              dogDisplayName,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _RegistrationChoiceCard(
+              icon: Icons.restaurant_menu_rounded,
+              title: 'Alimentação avulsa',
+              subtitle: 'Registrar refeição fora do plano',
+              color: AppTheme.attention,
+              onTap: () => Navigator.pop(
+                context,
+                _NutritionRegistrationChoice.adhocMeal,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _RegistrationChoiceCard(
+              icon: Icons.medication_rounded,
+              title: 'Suplemento',
+              subtitle: 'Registrar administração de suplemento',
+              color: AppTheme.primary,
+              onTap: () => Navigator.pop(
+                context,
+                _NutritionRegistrationChoice.supplement,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RegistrationChoiceCard extends StatelessWidget {
+  const _RegistrationChoiceCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withAlpha(12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withAlpha(80)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withAlpha(25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: color),
+          ],
         ),
       ),
     );

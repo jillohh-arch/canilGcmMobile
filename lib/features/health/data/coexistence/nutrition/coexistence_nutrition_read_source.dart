@@ -471,13 +471,25 @@ final class CoexistenceNutritionReadSource {
         })
         .toList(growable: false);
 
+    // BLOCO A: filtrar SupplementLogs pelo dia local.
+    // MANTER fonte canônica completa (snap.canonicalSupplementLogs) para
+    // Timeline/Histórico futuro. A projeção diária é separada.
+    // §5D-Gate5C.4B: `startInclusive <= administeredAt < endExclusive`.
+    final supplementLogsToday = snap.canonicalSupplementLogs.where((log) {
+      final logDate = LocalServiceDate.fromInstant(
+        log.administeredAt,
+        timezone: tzName,
+      );
+      return logDate == localDate;
+    }).toList(growable: false);
+
     final today = NutritionTodayReadModel(
       dogId: dogId,
       localServiceDate: localDate.isoDate,
       timezone: tzName,
       activePlan: snap.activePlan,
       meals: mealsToday,
-      canonicalSupplementLogs: snap.canonicalSupplementLogs,
+      canonicalSupplementLogs: supplementLogsToday,
       legacySupplementRegimens: snap.legacySupplementRegimens,
     );
 
