@@ -7,6 +7,7 @@ import {
   Timestamp,
   type DocumentData,
   type Firestore,
+  type Transaction,
 } from "firebase-admin/firestore";
 import {
   compareProjection,
@@ -521,7 +522,16 @@ export interface HealthTimelineProjector {
   project(source: ValidatedProjectionSource): Promise<ProjectionRuntimeResult>;
 }
 
-export class FirestoreHealthTimelineRuntime implements HealthTimelineProjector {
+export interface TransactionalHealthTimelineProjector
+  extends HealthTimelineProjector {
+  projectInTransaction(
+    transaction: Transaction,
+    source: ValidatedProjectionSource,
+  ): Promise<ProjectionRuntimeResult>;
+}
+
+export class FirestoreHealthTimelineRuntime
+implements TransactionalHealthTimelineProjector {
   constructor(
     private readonly db: Firestore,
     private readonly clock: RuntimeClock,
@@ -529,6 +539,17 @@ export class FirestoreHealthTimelineRuntime implements HealthTimelineProjector {
   ) {}
 
   async project(
+    source: ValidatedProjectionSource,
+  ): Promise<ProjectionRuntimeResult> {
+    const result = await this.db.runTransaction(
+      (transaction) => this.projectInTransaction(transaction, source),
+    );
+    this.logCommittedResult(source, result);
+    return result;
+  }
+
+  async projectInTransaction(
+    transaction: Transaction,
     source: ValidatedProjectionSource,
   ): Promise<ProjectionRuntimeResult> {
     const dogId = assertSafeDocumentId(source.dogId, "dog");
@@ -541,32 +562,50 @@ export class FirestoreHealthTimelineRuntime implements HealthTimelineProjector {
     const destinationPath = timelineDocumentPath(dogId, timelineId);
     const destinationRef = this.db.doc(destinationPath);
 
-    const operation = await this.db.runTransaction(async (tx) => {
-      const existingSnapshot = await tx.get(destinationRef);
-      const now = this.clock.now();
-      if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
-        throw new Error("Runtime clock returned an invalid Date.");
-      }
-      const expected = expectedProjection(
-        source,
-        timelineId,
-        now.toISOString(),
+    const existingSnapshot = await transaction.get(destinationRef);
+    const now = this.clock.now();
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+      throw new Error("Runtime clock returned an invalid Date.");
+    }
+    const expected = expectedProjection(
+      source,
+      timelineId,
+      now.toISOString(),
+    );
+
+    let operation: ProjectionOperationResult;
+    if (!existingSnapshot.exists) {
+      transaction.create(
+        destinationRef,
+        serializeCanonicalTimeline(expected),
       );
-
-      if (!existingSnapshot.exists) {
-        tx.create(destinationRef, serializeCanonicalTimeline(expected));
-        return "created" as const;
-      }
-
+      operation = "created";
+    } else {
       const existing = existingTimelineToPure(existingSnapshot.data() ?? {});
-      if (existing !== null && compareProjection(expected, existing) === "equivalent") {
-        return "noop" as const;
+      if (
+        existing !== null &&
+        compareProjection(expected, existing) === "equivalent"
+      ) {
+        operation = "noop";
+      } else {
+        transaction.set(
+          destinationRef,
+          serializeCanonicalTimeline(expected),
+        );
+        operation = "repaired";
       }
+    }
 
-      tx.set(destinationRef, serializeCanonicalTimeline(expected));
-      return "repaired" as const;
-    });
+    return {operation, timelineId, destinationPath};
+  }
 
+  private logCommittedResult(
+    source: ValidatedProjectionSource,
+    result: ProjectionRuntimeResult,
+  ): void {
+    const {operation, timelineId} = result;
+    const dogId = source.dogId;
+    const sourceId = source.sourceId;
     const context = {sourceType: source.sourceType, dogId, sourceId, timelineId};
     if (operation === "repaired") {
       this.logger.warn("HealthTimeline projection repaired", context);
@@ -576,6 +615,5 @@ export class FirestoreHealthTimelineRuntime implements HealthTimelineProjector {
         operation,
       });
     }
-    return {operation, timelineId, destinationPath};
   }
 }
