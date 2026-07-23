@@ -1,8 +1,8 @@
 import 'package:canil_gcm/core/widgets/k9_ops_loading_derivation.dart';
 import 'package:canil_gcm/core/widgets/k9_ops_loading_stage.dart';
 
-/// Duração visual mínima oficial do loading K9 Ops Mobile (spec: 800ms).
-const Duration k9OpsLoadingMinDuration = Duration(milliseconds: 800);
+/// Duração visual mínima oficial do loading K9 Ops Mobile (spec experimental Gate 5B.4: 2300ms).
+const Duration k9OpsLoadingMinDuration = Duration(milliseconds: 2300);
 
 /// Helper puro para avaliação da política de tempo mínimo do loading Mobile.
 class K9OpsLoadingDurationPolicy {

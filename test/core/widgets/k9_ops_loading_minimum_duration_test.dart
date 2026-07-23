@@ -3,9 +3,9 @@ import 'package:canil_gcm/core/widgets/k9_ops_loading_minimum_duration.dart';
 import 'package:canil_gcm/core/widgets/k9_ops_loading_stage.dart';
 
 void main() {
-  group('K9OpsLoadingDurationPolicy — política de tempo mínimo (800ms)', () {
+  group('K9OpsLoadingDurationPolicy — política de tempo mínimo (2300ms)', () {
     test(
-      '1. Estado técnico ativo continua segurando visual independente de 800ms',
+      '1. Estado técnico ativo continua segurando visual independente de 2300ms',
       () {
         expect(
           K9OpsLoadingDurationPolicy.shouldHoldVisualLoading(
@@ -26,7 +26,7 @@ void main() {
     );
 
     test(
-      '2. Estado técnico concluído antes de 800ms continua segurando visualmente',
+      '2. Estado técnico concluído antes de 2300ms continua segurando visualmente',
       () {
         expect(
           K9OpsLoadingDurationPolicy.shouldHoldVisualLoading(
@@ -39,7 +39,7 @@ void main() {
     );
 
     test(
-      '3. Estado técnico concluído E 800ms cumpridos encerra o hold visual',
+      '3. Estado técnico concluído E 2300ms cumpridos encerra o hold visual',
       () {
         expect(
           K9OpsLoadingDurationPolicy.shouldHoldVisualLoading(

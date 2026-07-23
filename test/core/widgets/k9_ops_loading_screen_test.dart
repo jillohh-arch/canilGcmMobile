@@ -220,9 +220,9 @@ void main() {
     });
   });
 
-  group('K9OpsLoadingScreen — reduced motion', () {
+  group('K9OpsLoadingScreen — reduced motion e mídia animada', () {
     testWidgets(
-      'aplica configuracao com movimento reduzido ativado (disableAnimations = true)',
+      'aplica configuracao com movimento reduzido ativado (disableAnimations = true): usa PNG estatico',
       (tester) async {
         await tester.pumpWidget(
           wrap(const K9OpsLoadingScreen(), disableAnimations: true),
@@ -230,17 +230,46 @@ void main() {
 
         expect(find.text('INICIALIZANDO SISTEMA...'), findsOneWidget);
         expect(find.byType(K9OpsLoadingVisual), findsOneWidget);
+
+        final image = tester.widget<Image>(find.byType(Image));
+        final provider = image.image as AssetImage;
+        expect(
+          provider.assetName,
+          'assets/images/k9_ops_loading_dog_static_v1.png',
+        );
       },
     );
 
     testWidgets(
-      'aplica opacidade padrao quando movimento nao e reduzido (disableAnimations = false)',
+      'com movimento permitido (disableAnimations = false): prefere Animated WebP',
       (tester) async {
         await tester.pumpWidget(
           wrap(const K9OpsLoadingScreen(), disableAnimations: false),
         );
 
         expect(find.byType(K9OpsLoadingVisual), findsOneWidget);
+
+        final image = tester.widget<Image>(find.byType(Image));
+        final provider = image.image as AssetImage;
+        expect(
+          provider.assetName,
+          'assets/images/k9_ops_loading_dog_animated.webp',
+        );
+      },
+    );
+
+    testWidgets(
+      'K9OpsLoadingVisual com assetPath customizado respeita o caminho informado',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(
+            const K9OpsLoadingVisual(assetPath: 'assets/images/custom_dog.png'),
+          ),
+        );
+
+        final image = tester.widget<Image>(find.byType(Image));
+        final provider = image.image as AssetImage;
+        expect(provider.assetName, 'assets/images/custom_dog.png');
       },
     );
   });
