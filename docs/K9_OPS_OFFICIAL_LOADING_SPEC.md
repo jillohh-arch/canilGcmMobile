@@ -619,3 +619,15 @@ A etapa seguinte é:
 2. identificar os pontos reais de progresso e estados;
 3. produzir ou obter o asset Lottie final;
 4. integrar sem alterar contratos funcionais de autenticação, permissão ou bootstrap.
+
+---
+
+# 20. Fase 2A — Integração do Fallback Estático Oficial
+
+Nesta fase (2A), foi integrado o asset estático oficial aprovado:
+- `k9_ops_loading_dog_static_v1.png`
+
+**Arquitetura Visual:**
+- **Mobile:** `K9OpsLoadingVisual` (`lib/core/widgets/k9_ops_loading_visual.dart`) encapsula o asset estático local (`assets/images/k9_ops_loading_dog_static_v1.png`).
+- **Web:** `K9OpsLoadingVisual` (`src/components/feedback/k9-ops-loading-visual.tsx`) encapsula o asset estático public (`public/assets/loading/k9_ops_loading_dog_static_v1.png`).
+- **Resiliência:** Em ambos os ambientes, a tela aceita override visual (`visual` prop). Na ausência de override, o `K9OpsLoadingVisual` fornece o fallback estático oficial sem dependência de rede nem de bibliotecas externas de animação.

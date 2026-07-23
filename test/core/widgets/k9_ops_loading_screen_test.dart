@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/k9_ops_loading_screen.dart';
 import 'package:canil_gcm/core/widgets/k9_ops_loading_stage.dart';
+import 'package:canil_gcm/core/widgets/k9_ops_loading_visual.dart';
 
 void main() {
   /// Envolve o widget em um MaterialApp, opcionalmente com movimento reduzido.
   Widget wrap(Widget child, {bool disableAnimations = false}) {
     return MaterialApp(
-      home: MediaQuery(
-        data: MediaQueryData(disableAnimations: disableAnimations),
-        child: child,
+      home: Builder(
+        builder: (context) {
+          final mediaQuery = MediaQuery.of(context);
+          return MediaQuery(
+            data: mediaQuery.copyWith(disableAnimations: disableAnimations),
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -163,47 +168,80 @@ void main() {
     });
   });
 
-  group('K9OpsLoadingScreen — asset injetável', () {
-    testWidgets('usa marcador neutro quando visual é null', (tester) async {
-      await tester.pumpWidget(wrap(const K9OpsLoadingScreen()));
+  group('K9OpsLoadingScreen — asset injetável e fallback oficial', () {
+    testWidgets(
+      'sem visual customizado: renderiza o fallback oficial K9OpsLoadingVisual',
+      (tester) async {
+        await tester.pumpWidget(wrap(const K9OpsLoadingScreen()));
 
-      expect(find.byIcon(Icons.pets_rounded), findsOneWidget);
-    });
+        expect(find.byType(K9OpsLoadingVisual), findsOneWidget);
+        expect(find.byType(Image), findsOneWidget);
+      },
+    );
 
-    testWidgets('renderiza visual injetado no lugar do marcador', (
+    testWidgets(
+      'com visual customizado: o override continua sendo respeitado',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(
+            const K9OpsLoadingScreen(
+              visual: SizedBox(
+                key: Key('malinois-override'),
+                width: 100,
+                height: 100,
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byKey(const Key('malinois-override')), findsOneWidget);
+        expect(find.byType(K9OpsLoadingVisual), findsNothing);
+      },
+    );
+
+    testWidgets('ausência de dependência Lottie: opera sem erros', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        wrap(
-          const K9OpsLoadingScreen(
-            visual: SizedBox(key: Key('malinois'), width: 100, height: 100),
-          ),
-        ),
-      );
+      await tester.pumpWidget(wrap(const K9OpsLoadingScreen()));
 
-      expect(find.byKey(const Key('malinois')), findsOneWidget);
-      expect(find.byIcon(Icons.pets_rounded), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('não gera overflow em viewport mobile estreita (320x568)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(wrap(const K9OpsLoadingScreen(progress: 0.5)));
+
+      expect(tester.takeException(), isNull);
     });
   });
 
   group('K9OpsLoadingScreen — reduced motion', () {
-    testWidgets('aplica configuracao com movimento reduzido ativado (disableAnimations = true)', (tester) async {
-      await tester.pumpWidget(
-        wrap(const K9OpsLoadingScreen(), disableAnimations: true),
-      );
+    testWidgets(
+      'aplica configuracao com movimento reduzido ativado (disableAnimations = true)',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(const K9OpsLoadingScreen(), disableAnimations: true),
+        );
 
-      expect(find.text('INICIALIZANDO SISTEMA...'), findsOneWidget);
-      final icon = tester.widget<Icon>(find.byIcon(Icons.pets_rounded));
-      expect(icon.color, equals(AppTheme.primary.withAlpha(110)));
-    });
+        expect(find.text('INICIALIZANDO SISTEMA...'), findsOneWidget);
+        expect(find.byType(K9OpsLoadingVisual), findsOneWidget);
+      },
+    );
 
-    testWidgets('aplica opacidade padrao quando movimento nao e reduzido (disableAnimations = false)', (tester) async {
-      await tester.pumpWidget(
-        wrap(const K9OpsLoadingScreen(), disableAnimations: false),
-      );
+    testWidgets(
+      'aplica opacidade padrao quando movimento nao e reduzido (disableAnimations = false)',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(const K9OpsLoadingScreen(), disableAnimations: false),
+        );
 
-      final icon = tester.widget<Icon>(find.byIcon(Icons.pets_rounded));
-      expect(icon.color, equals(AppTheme.primary.withAlpha(140)));
-    });
+        expect(find.byType(K9OpsLoadingVisual), findsOneWidget);
+      },
+    );
   });
 }

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/theme/animation_constants.dart';
 import 'package:canil_gcm/core/widgets/k9_ops_loading_stage.dart';
+import 'package:canil_gcm/core/widgets/k9_ops_loading_visual.dart';
 
 /// Loading oficial do K9 Ops (Mobile) — camada **puramente apresentacional**.
 ///
@@ -82,9 +83,11 @@ class K9OpsLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final animate = shouldAnimate(context);
+    final bool animate = shouldAnimate(context);
+    final double? clampedProgress = progress?.clamp(0.0, 1.0);
+    final double horizontalPadding =
+        MediaQuery.of(context).size.width < 360 ? 16.0 : 24.0;
     final isError = stage.isError;
-    final clampedProgress = progress?.clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -101,7 +104,7 @@ class K9OpsLoadingScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Column(
               children: [
                 const Spacer(flex: 3),
@@ -113,14 +116,20 @@ class K9OpsLoadingScreen extends StatelessWidget {
                 // ── Título principal ────────────────────────────────────
                 Semantics(
                   header: true,
-                  child: Text(
-                    'INICIALIZANDO SISTEMA...',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.robotoMono(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                      letterSpacing: 2.5,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'INICIALIZANDO SISTEMA...',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.robotoMono(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 2.5,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -163,14 +172,20 @@ class K9OpsLoadingScreen extends StatelessWidget {
                 const Spacer(flex: 4),
 
                 // ── Footer institucional ────────────────────────────────
-                Text(
-                  'K9 OPS • INTELLIGENCE IN MOTION',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.robotoMono(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.primary.withAlpha(90),
-                    letterSpacing: 2,
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'K9 OPS • INTELLIGENCE IN MOTION',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.robotoMono(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.primary.withAlpha(90),
+                        letterSpacing: 2,
+                      ),
+                    ),
                   ),
                 ),
                 if (version != null) ...[
@@ -235,30 +250,11 @@ class _AssetStage extends StatelessWidget {
                 ),
               ),
             ),
-            // Visual injetável ou marcador neutro.
-            visual ?? _NeutralAssetMarker(animate: animate),
+            // Visual injetável ou fallback estático oficial (K9OpsLoadingVisual).
+            visual ?? const K9OpsLoadingVisual(),
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Marcador neutro exibido enquanto o asset oficial não está presente.
-///
-/// Não simula o Malinois nem finge ser o asset final — apenas mantém a
-/// composição legível e estável.
-class _NeutralAssetMarker extends StatelessWidget {
-  const _NeutralAssetMarker({required this.animate});
-
-  final bool animate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(
-      Icons.pets_rounded,
-      size: 64,
-      color: AppTheme.primary.withAlpha(animate ? 140 : 110),
     );
   }
 }
@@ -378,12 +374,15 @@ class _StepRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: labelColor,
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: labelColor,
+              ),
             ),
           ),
         ],
