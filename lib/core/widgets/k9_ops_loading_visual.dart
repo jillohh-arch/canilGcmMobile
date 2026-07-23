@@ -12,7 +12,7 @@ class K9OpsLoadingVisual extends StatelessWidget {
   const K9OpsLoadingVisual({
     super.key,
     this.assetPath = _defaultStaticAsset,
-    this.size = 140,
+    this.size = 156,
   });
 
   /// Path oficial do fallback estático no Mobile.

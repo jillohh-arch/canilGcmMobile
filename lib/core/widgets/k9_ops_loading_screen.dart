@@ -85,124 +85,157 @@ class K9OpsLoadingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool animate = shouldAnimate(context);
     final double? clampedProgress = progress?.clamp(0.0, 1.0);
-    final double horizontalPadding =
-        MediaQuery.of(context).size.width < 360 ? 16.0 : 24.0;
+    final double horizontalPadding = MediaQuery.of(context).size.width < 360
+        ? 16.0
+        : 24.0;
     final isError = stage.isError;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0.0, -0.35),
-            radius: 0.9,
-            colors: [
-              AppTheme.primaryChipBackground, // ciano translúcido no centro
-              AppTheme.transparent,
-            ],
+      backgroundColor: const Color(0xFF000000),
+      body: Stack(
+        children: [
+          // ── Fundo 1: Gradiente linear (topo 100% preto -> base dark navy) ──
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0.0, 0.42, 0.75, 1.0],
+                  colors: [
+                    Color(0xFF000000), // Topo 100% preto absorve o asset
+                    Color(0xFF000000), // Palco escuro integrado ao redor do cão
+                    Color(0xFF031015), // Transição suave em gradiente
+                    AppTheme
+                        .background, // Base dark navy institucional (0xFF050D10)
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              children: [
-                const Spacer(flex: 3),
 
-                // ── Área do asset (injetável/opcional) ──────────────────
-                _AssetStage(visual: visual, animate: animate),
-                const SizedBox(height: 32),
+          // ── Fundo 2: Glow ciano ambiente sutil na área de transição inferior ─
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(
+                    0.0,
+                    0.20,
+                  ), // Deslocado para a metade inferior
+                  radius: 0.70,
+                  colors: [
+                    AppTheme.primary.withAlpha(16),
+                    AppTheme.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
 
-                // ── Título principal ────────────────────────────────────
-                Semantics(
-                  header: true,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'INICIALIZANDO SISTEMA...',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.robotoMono(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: 2.5,
+          // ── Conteúdo em SafeArea ──────────────────────────────────────
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Column(
+                children: [
+                  const Spacer(flex: 3),
+
+                  // ── Área do asset (injetável/opcional) ──────────────────
+                  _AssetStage(visual: visual, animate: animate),
+                  const SizedBox(height: 32),
+
+                  // ── Título principal ────────────────────────────────────
+                  Semantics(
+                    header: true,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'INICIALIZANDO SISTEMA...',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.robotoMono(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                            letterSpacing: 2.5,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                // ── Status atual (apenas quando há mensagem explícita) ──
-                // Evita duplicar o rótulo de uma etapa visível; útil para
-                // estados prolongados (ex.: "Finalizando inicialização...").
-                if (message != null && !isError) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    message!,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-
-                if (isError)
-                  _ErrorBlock(
-                    message: errorMessage ?? 'Não foi possível iniciar.',
-                    onRetry: onRetry,
-                  )
-                else ...[
-                  // ── Barra de progresso ────────────────────────────────
-                  _ProgressBar(value: clampedProgress),
-                  const SizedBox(height: 28),
-
-                  // ── Etapas visuais ────────────────────────────────────
-                  _StepList(
-                    steps: _visibleSteps,
-                    currentOrder: _stageOrder(stage),
-                    isComplete: stage.isComplete,
-                    animate: animate,
-                  ),
-                ],
-
-                const Spacer(flex: 4),
-
-                // ── Footer institucional ────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'K9 OPS • INTELLIGENCE IN MOTION',
+                  // ── Status atual (apenas quando há mensagem explícita) ──
+                  // Evita duplicar o rótulo de uma etapa visível; útil para
+                  // estados prolongados (ex.: "Finalizando inicialização...").
+                  if (message != null && !isError) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      message!,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.robotoMono(
-                        fontSize: 10,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: AppTheme.primary.withAlpha(90),
-                        letterSpacing: 2,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+
+                  if (isError)
+                    _ErrorBlock(
+                      message: errorMessage ?? 'Não foi possível iniciar.',
+                      onRetry: onRetry,
+                    )
+                  else ...[
+                    // ── Barra de progresso ────────────────────────────────
+                    _ProgressBar(value: clampedProgress),
+                    const SizedBox(height: 28),
+
+                    // ── Etapas visuais ────────────────────────────────────
+                    _StepList(
+                      steps: _visibleSteps,
+                      currentOrder: _stageOrder(stage),
+                      isComplete: stage.isComplete,
+                      animate: animate,
+                    ),
+                  ],
+
+                  const Spacer(flex: 4),
+
+                  // ── Footer institucional ────────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'K9 OPS • INTELLIGENCE IN MOTION',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.robotoMono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.primary.withAlpha(90),
+                          letterSpacing: 2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (version != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    version!,
-                    style: GoogleFonts.robotoMono(
-                      fontSize: 10,
-                      color: AppTheme.textTertiary,
+                  if (version != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      version!,
+                      style: GoogleFonts.robotoMono(
+                        fontSize: 10,
+                        color: AppTheme.textTertiary,
+                      ),
                     ),
-                  ),
+                  ],
+                  const SizedBox(height: 24),
                 ],
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -210,9 +243,12 @@ class K9OpsLoadingScreen extends StatelessWidget {
 
 /// Área central que hospeda o visual do Malinois.
 ///
-/// Enquanto [visual] for `null` (asset oficial ainda não entregue), exibe um
-/// marcador HUD neutro. A moldura circular (anéis + glow) é nativa e não
-/// depende de nenhum asset.
+/// Enquanto [visual] for `null` (asset oficial ainda não entregue), exibe o
+/// [K9OpsLoadingVisual] estático oficial. A zona de mídia ao redor do asset
+/// permanece em preto puro (sem preenchimentos/glows radiais sob o container da
+/// imagem), garantindo que as bordas da mídia (PNG estático ou futuro MP4 16:9)
+/// fiquem totalmente invisíveis. Os anéis HUD vetoriais nativos são organizados em
+/// camadas (traseira e frontal sutil) para emoldurar o palco de forma holográfica.
 class _AssetStage extends StatelessWidget {
   const _AssetStage({required this.visual, required this.animate});
 
@@ -224,34 +260,64 @@ class _AssetStage extends StatelessWidget {
     return Semantics(
       label: 'Animação de carregamento do K9 Ops',
       child: SizedBox(
-        width: 176,
-        height: 176,
+        width: 184,
+        height: 184,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Glow de fundo — nativo.
+            // ── CAMADA TRASEIRA: Anéis HUD vetoriais (profundidade de fundo) ──
             Container(
-              width: 176,
-              height: 176,
+              width: 184,
+              height: 184,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.primary.withAlpha(15),
+                border: Border.all(
+                  color: AppTheme.primary.withAlpha(25),
+                  width: 1.0,
+                ),
               ),
             ),
-            // Anel HUD estático — nativo, não compete com o cão.
             Container(
               width: 168,
               height: 168,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppTheme.primary.withAlpha(60),
-                  width: 1.5,
+                  color: AppTheme.primary.withAlpha(45),
+                  width: 1.2,
                 ),
               ),
             ),
-            // Visual injetável ou fallback estático oficial (K9OpsLoadingVisual).
+
+            // ── CAMADA MÍDIA: Asset oficial (ou visual injetado / futuro MP4) ─
+            // Assentado sobre a zona de mídia em preto absoluto (0xFF000000).
             visual ?? const K9OpsLoadingVisual(),
+
+            // ── CAMADA FRONTAL: Anéis HUD sutis (integração holográfica) ─────
+            // Anel frontal primário — passa suavemente sobre o perímetro do palco
+            Container(
+              width: 176,
+              height: 176,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppTheme.primary.withAlpha(35),
+                  width: 1.0,
+                ),
+              ),
+            ),
+            // Anel frontal interno sutil — envolve a área da mídia sem corte
+            Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppTheme.primary.withAlpha(40),
+                  width: 1.0,
+                ),
+              ),
+            ),
           ],
         ),
       ),
