@@ -1952,6 +1952,13 @@ service cloud.firestore {
       match /nutrition_operations/{receiptId} {
         allow read, create, update, delete: if false;
       }
+
+      // Health Timeline v1 — projeção server‑side reconciliável
+      // Leitura cliente com acesso ao K9, writes canônicos exclusivamente via backend.
+      match /health_timeline/{timelineId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /occurrences/{occurrenceId} {
@@ -2131,6 +2138,12 @@ service cloud.firestore {
       allow create: if canCreateNotification(userId);
       allow update: if emailMatchesRa(userId) && canUpdateOwnNotification();
       allow delete: if false;
+    }
+
+    // Estado interno da projeção Health Timeline v1
+    // Invisível ao cliente — writes somente pelo backend Admin SDK.
+    match /_health_projection_state/{document=**} {
+      allow read, write: if false;
     }
 
     // ── Coleções legadas (somente leitura) ──────────────────────────────────

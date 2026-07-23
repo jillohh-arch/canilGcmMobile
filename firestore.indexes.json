@@ -90,6 +90,21 @@
         { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
         { "fieldPath": "scheduled_for", "order": "ASCENDING" }
       ]
+    },
+
+    {
+      "collectionGroup": "meal_logs",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "recorded_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supplement_logs",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "recorded_at", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
