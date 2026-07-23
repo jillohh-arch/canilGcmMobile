@@ -90,22 +90,44 @@
         { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
         { "fieldPath": "scheduled_for", "order": "ASCENDING" }
       ]
-    },
-
+    }
+  ],
+  "fieldOverrides": [
     {
       "collectionGroup": "meal_logs",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "recorded_at", "order": "ASCENDING" }
+      "fieldPath": "recorded_at",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
       ]
     },
     {
       "collectionGroup": "supplement_logs",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "recorded_at", "order": "ASCENDING" }
+      "fieldPath": "recorded_at",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
       ]
     }
-  ],
-  "fieldOverrides": []
+  ]
 }
