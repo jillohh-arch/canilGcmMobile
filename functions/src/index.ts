@@ -25,6 +25,16 @@ import {
   type HealthNutritionCallableDeps,
 } from "./health_nutrition_callables";
 import type {NutritionActor} from "./health_nutrition_engine";
+import {
+  healthTimelineProjectMealLogCreatedWrapper,
+  healthTimelineProjectSupplementLogCreatedWrapper,
+} from "./health_timeline_triggers";
+import {FirestoreAnomalySink} from "./health_timeline_anomaly_sink";
+import {FirestoreHealthTimelineRuntime} from "./health_timeline_runtime";
+import {
+  runHealthTimelineReconciliation,
+  DEFAULT_ORCHESTRATOR_CONFIG,
+} from "./health_timeline_orchestrator";
 
 admin.initializeApp();
 
@@ -7986,3 +7996,108 @@ export const healthNutritionUpdateActivePlan = onCall({region}, async (request) 
 export const healthNutritionCancelPlan = onCall({region}, async (request) => {
   return runHealthNutritionCancelPlan(request, healthNutritionDeps);
 });
+
+// =============================================================================
+// Health Timeline — Triggers + Scheduler (Gate 5C.5C.5)
+//
+// Local code — NOT DEPLOYED.
+// Triggers require retry: true for the approved transient-failure taxonomy.
+// Scheduler uses INITIAL ACTIVATION CONFIG (not SLA):
+//   - 03:00 America/Sao_Paulo — aligned with existing backend patterns
+//   - 1 bounded page per pass — anti-starvation guarantee
+//   - 10 min lease — conservative for 8 sequential pages
+// No production reconciliation until indexes + rules are deployed and READY.
+// =============================================================================
+
+const healthTimelineClock: import("./health_timeline_runtime").RuntimeClock = {
+  now: () => new Date(),
+};
+
+const healthTimelineRuntime = new FirestoreHealthTimelineRuntime(
+  db,
+  healthTimelineClock,
+  {
+    info: (message, context) => logger.info(message, context ?? {}),
+    warn: (message, context) => logger.warn(message, context ?? {}),
+    error: (message, context) => logger.error(message, context ?? {}),
+  },
+);
+
+const healthTimelineAnomalySink = new FirestoreAnomalySink(
+  db,
+  healthTimelineClock,
+);
+
+const healthTimelineTriggerDeps: import("./health_timeline_trigger_handlers").TriggerHandlerDependencies = {
+  projector: healthTimelineRuntime,
+  anomalySink: healthTimelineAnomalySink,
+  clock: healthTimelineClock,
+  logger: {
+    info: (message, context) => logger.info(message, context ?? {}),
+    warn: (message, context) => logger.warn(message, context ?? {}),
+    error: (message, context) => logger.error(message, context ?? {}),
+  },
+};
+
+/**
+ * HealthTimeline MealLog projection trigger.
+ *
+ * Firestore path: dogs/{dogId}/meal_logs/{mealId}
+ * Region: southamerica-east1
+ * Retry: enabled (transient failure taxonomy requires it)
+ */
+export const healthTimelineProjectMealLogCreated = onDocumentCreated(
+  {
+    document: "dogs/{dogId}/meal_logs/{mealId}",
+    region,
+    retry: true,
+  },
+  healthTimelineProjectMealLogCreatedWrapper(healthTimelineTriggerDeps),
+);
+
+/**
+ * HealthTimeline SupplementLog projection trigger.
+ *
+ * Firestore path: dogs/{dogId}/supplement_logs/{supplementLogId}
+ * Region: southamerica-east1
+ * Retry: enabled (transient failure taxonomy requires it)
+ */
+export const healthTimelineProjectSupplementLogCreated = onDocumentCreated(
+  {
+    document: "dogs/{dogId}/supplement_logs/{supplementLogId}",
+    region,
+    retry: true,
+  },
+  healthTimelineProjectSupplementLogCreatedWrapper(healthTimelineTriggerDeps),
+);
+
+/**
+ * HealthTimeline daily reconciliation scheduler.
+ *
+ * Region: southamerica-east1
+ * Schedule: every day at 03:00 America/Sao_Paulo
+ *   (aligned with existing backend temporal patterns and lower administrative activity —
+ *    K9 night shift 19h–07h remains operational; this is not a downtime window claim)
+ * Retry: default (intentional — reconciliation is idempotent, lease-protected,
+ *   cursor-committed, and stale-fenced; the default retry behavior is safe)
+ */
+export const healthTimelineReconcileDaily = onSchedule(
+  {
+    region,
+    schedule: "every day 03:00",
+    timeZone: "America/Sao_Paulo",
+  },
+  async () => {
+    await runHealthTimelineReconciliation(
+      db,
+      DEFAULT_ORCHESTRATOR_CONFIG,
+      healthTimelineClock,
+      {
+        info: (message, context) => logger.info(message, context ?? {}),
+        warn: (message, context) => logger.warn(message, context ?? {}),
+        error: (message, context) => logger.error(message, context ?? {}),
+      },
+      healthTimelineRuntime,
+    );
+  },
+);
