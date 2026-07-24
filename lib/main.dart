@@ -23,10 +23,11 @@ import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/onboarding_service.dart';
 import 'package:canil_gcm/core/services/push_notification_service.dart';
 import 'package:canil_gcm/features/app_shell/presentation/screens/main_root_screen.dart';
+import 'package:canil_gcm/core/widgets/k9_ops_loading_minimum_duration.dart';
+import 'package:canil_gcm/core/widgets/k9_ops_loading_screen.dart';
 import 'package:canil_gcm/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/shift_assumption_screen.dart';
 import 'package:canil_gcm/features/auth/presentation/screens/login_screen.dart';
-import 'package:canil_gcm/features/auth/presentation/screens/splash_screen.dart';
 
 final GlobalKey<NavigatorState> globalNavigatorKey =
     GlobalKey<NavigatorState>();
@@ -106,6 +107,38 @@ class _GcmK9AppState extends State<GcmK9App> {
   bool _showOnboarding = false;
   bool _onboardingChecked = false;
 
+  // Política visual de duração mínima (800ms)
+  Timer? _minDurationTimer;
+  bool _minDurationElapsed = false;
+  bool _hasStartedMinDuration = false;
+
+  void _startMinDurationIfNeeded() {
+    if (_hasStartedMinDuration) return;
+    _hasStartedMinDuration = true;
+    _minDurationElapsed = false;
+    _minDurationTimer?.cancel();
+    _minDurationTimer = Timer(k9OpsLoadingMinDuration, () {
+      if (mounted) {
+        setState(() {
+          _minDurationElapsed = true;
+        });
+      }
+    });
+  }
+
+  void _resetMinDuration() {
+    _minDurationTimer?.cancel();
+    _minDurationTimer = null;
+    _hasStartedMinDuration = false;
+    _minDurationElapsed = false;
+  }
+
+  @override
+  void dispose() {
+    _minDurationTimer?.cancel();
+    super.dispose();
+  }
+
   void _onOnboardingComplete() {
     setState(() {
       _showOnboarding = false;
@@ -139,20 +172,45 @@ class _GcmK9AppState extends State<GcmK9App> {
               !userVM.hasUserForRa(currentRa) &&
               !userVM.hasLoadedInitialData;
 
-          // Sem auth → Login
+          // Sem auth → Login (cancela e reseta qualquer janela de loading anterior)
           if (authVM.user == null) {
+            _resetMinDuration();
             return const LoginScreen();
           }
 
-          // Carregando dados do usuário/turno → Splash
-          if (isLoadingCurrentUser || shiftVM.isLoading) {
-            return const SplashScreen();
+          final isTechnicalLoadingActive =
+              isLoadingCurrentUser || shiftVM.isLoading;
+          final shouldHoldVisual =
+              K9OpsLoadingDurationPolicy.shouldHoldVisualLoading(
+                isTechnicalLoadingActive: isTechnicalLoadingActive,
+                isMinDurationElapsed: _minDurationElapsed,
+              );
+
+          // Carregando dados do usuário/turno ou segurando a janela visual mínima de 800ms
+          if (isTechnicalLoadingActive || shouldHoldVisual) {
+            _startMinDurationIfNeeded();
+            final loadingState = K9OpsLoadingDurationPolicy.resolveLoadingState(
+              isLoadingCurrentUser: isLoadingCurrentUser,
+              shiftIsLoading: shiftVM.isLoading,
+            );
+            return K9OpsLoadingScreen(
+              stage: loadingState.stage,
+              progress: loadingState.progress,
+            );
           }
 
-          // Check onboarding after data is loaded
+          // Check onboarding after data is loaded and minimum visual window completed
           if (!_onboardingChecked) {
             _checkOnboarding();
-            return const SplashScreen();
+            _startMinDurationIfNeeded();
+            final loadingState = K9OpsLoadingDurationPolicy.resolveLoadingState(
+              isLoadingCurrentUser: isLoadingCurrentUser,
+              shiftIsLoading: shiftVM.isLoading,
+            );
+            return K9OpsLoadingScreen(
+              stage: loadingState.stage,
+              progress: loadingState.progress,
+            );
           }
 
           // Show onboarding if needed
