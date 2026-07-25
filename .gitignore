@@ -94,6 +94,7 @@ temp/docs/SESSAO_*.md
 .env.local
 .env.*.local
 *.env
+functions/.env.canil-gcm
 secrets.json
 local.settings.json
 
