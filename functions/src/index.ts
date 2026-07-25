@@ -35,6 +35,7 @@ import {
   runHealthTimelineReconciliation,
   DEFAULT_ORCHESTRATOR_CONFIG,
 } from "./health_timeline_orchestrator";
+import {readActivationGuard} from "./health_timeline_activation_guard";
 
 admin.initializeApp();
 
@@ -8080,6 +8081,12 @@ export const healthTimelineProjectSupplementLogCreated = onDocumentCreated(
  *    K9 night shift 19h–07h remains operational; this is not a downtime window claim)
  * Retry: default (intentional — reconciliation is idempotent, lease-protected,
  *   cursor-committed, and stale-fenced; the default retry behavior is safe)
+ *
+ * Activation guard: HEALTH_TIMELINE_RECONCILIATION_ENABLED must be exactly "true"
+ * to allow reconciliation. Any other value (absent, "false", invalid) is fail-closed:
+ * the handler logs a structured no-op event and returns successfully without touching
+ * Firestore. This allows structural deployment during Stage D while keeping Stage E
+ * as the controlled first-execution gate.
  */
 export const healthTimelineReconcileDaily = onSchedule(
   {
@@ -8088,6 +8095,16 @@ export const healthTimelineReconcileDaily = onSchedule(
     timeZone: "America/Sao_Paulo",
   },
   async () => {
+    const guard = readActivationGuard();
+    if (!guard.enabled) {
+      logger.info("health_timeline_reconciliation_skipped", {
+        event: "health_timeline_reconciliation_skipped",
+        reason: "activation_guard_disabled",
+        enabled: false,
+        function: "healthTimelineReconcileDaily",
+      });
+      return;
+    }
     await runHealthTimelineReconciliation(
       db,
       DEFAULT_ORCHESTRATOR_CONFIG,
