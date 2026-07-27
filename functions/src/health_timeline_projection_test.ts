@@ -681,6 +681,56 @@ FORBIDDEN_COLLECTIONS.forEach(c => console.log(`   - ${c}`));
 console.log("✅ ZERO LEGACY WRITES: Verificação manual do código fonte");
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CROSS-LANGUAGE GOLDEN VECTORS (4C-B Gate)
+// ─────────────────────────────────────────────────────────────────────────────
+
+console.log("\n=== CROSS-LANGUAGE GOLDEN VECTORS ===\n");
+
+// Vector 1: dogId=dog123, sourceCollection=dogs/dog123/meal_logs, sourceId=mo1_test
+{
+  const actual = deriveTimelineId({
+    sourceCollection: "dogs/dog123/meal_logs",
+    sourceId: "mo1_test",
+  });
+  const expected = "tl1_7b4299c45102c070634956184e7dee96b5bb096e80f61f654ab69c993cbd066b";
+  assert.strictEqual(actual, expected, `Vector 1 must match exactly: expected ${expected}, got ${actual}`);
+  console.log("✅ Vector 1: mealLogs for dog123 — LITERAL MATCH");
+}
+
+// Vector 2: dogId=dog123, sourceCollection=dogs/dog123/supplement_logs, sourceId=sl1_test
+{
+  const actual = deriveTimelineId({
+    sourceCollection: "dogs/dog123/supplement_logs",
+    sourceId: "sl1_test",
+  });
+  const expected = "tl1_4ba3abd4c0dfe87b1987049b4cecb68a25782b825793a6b301ab3f10a9d08a63";
+  assert.strictEqual(actual, expected, `Vector 2 must match exactly: expected ${expected}, got ${actual}`);
+  console.log("✅ Vector 2: supplementLogs for dog123 — LITERAL MATCH");
+}
+
+// Vector 3: dogId=dog-001, sourceCollection=dogs/dog-001/meal_logs, sourceId=same-id
+{
+  const actual = deriveTimelineId({
+    sourceCollection: "dogs/dog-001/meal_logs",
+    sourceId: "same-id",
+  });
+  const expected = "tl1_35d4a55ecff81e213bca7fda08994a5015bf6e77d7c29e9d7c274709f56fb3a3";
+  assert.strictEqual(actual, expected, `Vector 3 must match exactly: expected ${expected}, got ${actual}`);
+  console.log("✅ Vector 3: mealLogs for dog-001 with shared id — LITERAL MATCH");
+}
+
+// Vector 4: dogId=dog-001, sourceCollection=dogs/dog-001/supplement_logs, sourceId=same-id
+{
+  const actual = deriveTimelineId({
+    sourceCollection: "dogs/dog-001/supplement_logs",
+    sourceId: "same-id",
+  });
+  const expected = "tl1_0219ee87a7de83a01308f4febaafb9fcab8d2c435fba607410471f3f4710187c";
+  assert.strictEqual(actual, expected, `Vector 4 must match exactly: expected ${expected}, got ${actual}`);
+  console.log("✅ Vector 4: supplementLogs for dog-001 with shared id — LITERAL MATCH");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SUMMARY
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -694,4 +744,5 @@ console.log("✅ Reconciliation States: VALIDATED");
 console.log("✅ Equal-Counts Inconsistency: DETECTED");
 console.log("✅ Legacy Classification: VALIDATED");
 console.log("✅ Zero Legacy Writes: VERIFIED (prototype is pure)");
-console.log("\n🎯 O3 BEHAVIOR VALIDATION: UNIT TESTS PASSED\n");
+console.log("✅ Cross-Language Golden Vectors: VALIDATED (4 literal vectors)");
+console.log("\n🎯 O3 + 4C-B BEHAVIOR VALIDATION: UNIT TESTS PASSED\n");
