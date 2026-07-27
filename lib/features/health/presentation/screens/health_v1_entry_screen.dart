@@ -12,6 +12,9 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/health/data/coexistence/summary/coexistence_health_summary_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
+import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
+import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dashboard.dart';
@@ -106,6 +109,13 @@ class HealthV1EntryScreen extends StatefulWidget {
   final Future<void> Function(HealthTimelineDetailTarget target)?
   onTimelineNavigate;
 
+  /// Provider de feature flag para resolução do modo da timeline.
+  ///
+  /// Produção: [LocalHealthTimelineFlagProvider] (síncrono, sempre legacyOnly).
+  /// Testes: injete mock/fake para testar precedência.
+  /// Remote Config: injeção explícita — não via default nesta Etapa 3B.
+  final HealthTimelineFlagProvider timelineFlagProvider;
+
   const HealthV1EntryScreen({
     super.key,
     required this.dogId,
@@ -118,6 +128,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.nutritionPendingIntentHolder,
     this.dogContextOverride,
     this.onTimelineNavigate,
+    this.timelineFlagProvider = const LocalHealthTimelineFlagProvider(),
   });
 
   @override
@@ -157,6 +168,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   /// Primeira carga do read model Nutrição canônico (lazy / pós-mutation).
   bool _nutritionReadPrimed = false;
+
+  /// Resolução da flag capturada uma única vez por instância do State.
+  ///
+  /// Etapa 3B: o resultado não参与到 escolha da source — a source é sempre
+  /// coexistência. O Future é capturado para evolução futura (shadowCompare /
+  /// canonicalPrimary), quando esses modos forem autorizados.
+  // ignore: unused_field
+  Future<HealthTimelineModeResolution>? _timelineModeResolutionFuture;
 
   HealthSummaryController get controllerForTest => _controller;
 
@@ -208,11 +227,19 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _controller = HealthSummaryController(source: _source);
     _controller.selectDog(widget.dogId);
 
-    // Ownership no entry: cria uma vez. Fallback vacinas permanece opt-in
-    // (default false — política 3C conservadora).
-    _timelineSource =
-        widget.timelineSource ??
-        CoexistenceHealthTimelineSourceFactory.forFirestore();
+    // Etapa 3B: criação imediata da source de coexistência.
+    // A resolução da flag roda em paralelo e não参与到 escolha da source.
+    final explicitTimelineSource = widget.timelineSource;
+    if (explicitTimelineSource != null) {
+      _timelineSource = explicitTimelineSource;
+      // Source injetada: não resolve provider — preserva precedência.
+    } else {
+      _timelineSource = CoexistenceHealthTimelineSourceFactory.forFirestore();
+      // Captura assíncrona única: não bloqueia criação do controller.
+      _timelineModeResolutionFuture = _resolveTimelineModeSafely(
+        widget.timelineFlagProvider,
+      );
+    }
     _timelineController = HealthTimelineController(source: _timelineSource);
     _filterSession = HealthTimelineFilterSession(
       controller: _timelineController,
@@ -307,6 +334,32 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     super.dispose();
   }
 
+  /// Timeout finito para a resolução da flag.
+  ///
+  /// Etapa 3B: 1 segundo. Não configurável por código produtivo.
+  static const Duration _timelineFlagResolutionTimeout = Duration(seconds: 1);
+
+  /// Resolução fail-closed: qualquer erro ou timeout retorna legacyOnly.
+  ///
+  /// O resultado é capturado e ignorado nesta Etapa 3B — a source permanece
+  /// coexistência em todos os casos. O Future existe para evolução futura.
+  Future<HealthTimelineModeResolution> _resolveTimelineModeSafely(
+    HealthTimelineFlagProvider provider,
+  ) async {
+    try {
+      return await provider.resolveMode().timeout(
+        _timelineFlagResolutionTimeout,
+      );
+    } catch (_) {
+      // Fail-closed: erro → legacyOnly + missingDefault.
+      // Sem setState, sem logging, sem swap de source.
+      return const HealthTimelineModeResolution(
+        mode: HealthTimelineMode.legacyOnly,
+        kind: HealthTimelineModeResolutionKind.missingDefault,
+      );
+    }
+  }
+
   void _selectSection(HealthShellSection section) {
     _shellKey.currentState?.selectSection(section);
   }
@@ -374,17 +427,20 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
           dogBreed: dogContext.breed,
           onRegisterNutrition: (hubContext) async {
             // Mostrar seleção entre Alimentação Avulsa e Suplemento.
-            final choice = await showModalBottomSheet<_NutritionRegistrationChoice>(
-              context: hubContext,
-              isScrollControlled: true,
-              backgroundColor: AppTheme.surfacePanel,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              builder: (_) => _NutritionRegistrationTypeSheet(
-                dogDisplayName: dogContext.name,
-              ),
-            );
+            final choice =
+                await showModalBottomSheet<_NutritionRegistrationChoice>(
+                  context: hubContext,
+                  isScrollControlled: true,
+                  backgroundColor: AppTheme.surfacePanel,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (_) => _NutritionRegistrationTypeSheet(
+                    dogDisplayName: dogContext.name,
+                  ),
+                );
 
             if (!hubContext.mounted) return false;
             if (choice == null) return false;
@@ -396,7 +452,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                     isScrollControlled: true,
                     backgroundColor: AppTheme.surfacePanel,
                     shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                     ),
                     builder: (_) => HealthAdhocMealFormSheet(
                       dogId: widget.dogId,
@@ -404,7 +462,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                       controller: _nutritionMutationController,
                       onRefreshRequested: () async {
                         _primeNutritionIfNeeded();
-                        await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                        await _nutritionReadController.ensureDogAndRefresh(
+                          widget.dogId,
+                        );
                         _controller.selectDog(widget.dogId);
                       },
                     ),
@@ -412,7 +472,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
               if (outcome is HealthNutritionMutationUiSuccess) {
                 _primeNutritionIfNeeded();
-                await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                await _nutritionReadController.ensureDogAndRefresh(
+                  widget.dogId,
+                );
                 _controller.selectDog(widget.dogId);
                 return true;
               }
@@ -421,7 +483,8 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
             // choice == _NutritionRegistrationChoice.supplement
             final activePlan = _tryGetActiveCanonicalPlan();
-            final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
+            final tz =
+                activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
 
             final outcome =
                 await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
@@ -429,7 +492,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                   isScrollControlled: true,
                   backgroundColor: AppTheme.surfacePanel,
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   builder: (_) => HealthSupplementFormSheet(
                     dogId: widget.dogId,
@@ -437,7 +502,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                     controller: _nutritionMutationController,
                     onRefreshRequested: () async {
                       _primeNutritionIfNeeded();
-                      await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
+                      await _nutritionReadController.ensureDogAndRefresh(
+                        widget.dogId,
+                      );
                       _controller.selectDog(widget.dogId);
                     },
                     timezone: tz,
@@ -570,7 +637,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
                     controller: _nutritionMutationController,
                     onRefreshRequested: () async {
                       _primeNutritionIfNeeded();
-                      await _nutritionReadController.ensureDogAndRefresh(dog.id);
+                      await _nutritionReadController.ensureDogAndRefresh(
+                        dog.id,
+                      );
                       _controller.selectDog(dog.id);
                     },
                   ),
@@ -665,10 +734,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 }
 
 /// Escolha de tipo de registro nutricional.
-enum _NutritionRegistrationChoice {
-  adhocMeal,
-  supplement,
-}
+enum _NutritionRegistrationChoice { adhocMeal, supplement }
 
 /// Sheet de seleção de tipo de registro nutricional.
 class _NutritionRegistrationTypeSheet extends StatelessWidget {
