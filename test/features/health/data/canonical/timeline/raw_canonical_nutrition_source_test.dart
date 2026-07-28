@@ -1,14 +1,16 @@
 // Copyright 2024 GCM Health. All rights reserved.
 //
-// READER-BACKED RAW CANONICAL NUTRITION FIRST-PAGE SOURCE TESTS — 24 tests.
+// READER-BACKED RAW CANONICAL NUTRITION FIRST-PAGE SOURCE TESTS — 37 tests.
 //
 // Pure Dart. NO Firestore, NO FakeFirebaseFirestore, NO sleep, NO real Timer,
-// NO network, NO HealthTimelinePage / HealthTimelineSource / sampler /
-// observer / bridge. Parallelism proven with Completer.
+// NO Future.delayed, NO timeout, NO Stopwatch, NO network, NO HealthTimelinePage
+// / HealthTimelineSource / sampler / observer / bridge. Parallelism proven with
+// Completer. Expected reader unavailability is a typed Failure, never a throw.
 
 import 'dart:async';
 
 import 'package:canil_gcm/features/health/data/canonical/timeline/raw_canonical_nutrition_first_page_merger.dart';
+import 'package:canil_gcm/features/health/data/canonical/timeline/raw_canonical_nutrition_first_page_result.dart';
 import 'package:canil_gcm/features/health/data/canonical/timeline/raw_canonical_nutrition_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
@@ -21,25 +23,19 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:flutter_test/flutter_test.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sensitive fictitious values — used to prove the sanitized exception never
-// leaks reader detail.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const _secretMessage = 'secret-reader-message';
-const _secretCode = 'permission-denied-private';
-const _secretPath = 'dogs/dog-secret/meal_logs/doc-secret';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fakes — record calls and return a configured batch, a Future error, or a
-// pending Completer future. They NEVER apply from/to filtering (period is the
-// merger's authority) and never touch Firestore.
+// Fakes — record calls and return a configured batch, a Future error, a
+// synchronous throw, or a pending Completer future. They NEVER apply from/to
+// filtering (period is the merger's authority) and never touch Firestore.
+// `syncThrow` throws directly in the method body BEFORE returning a Future —
+// distinct from `error`, which completes a Future with an exception.
 // ─────────────────────────────────────────────────────────────────────────────
 
 final class _FakeMealReader implements NutritionCanonicalMealReader {
-  _FakeMealReader({this.result, this.error, this.completer});
+  _FakeMealReader({this.result, this.error, this.syncThrow, this.completer});
 
   final NutritionSourceBatch<MealLog>? result;
   final Object? error;
+  final Object? syncThrow;
   final Completer<NutritionSourceBatch<MealLog>>? completer;
 
   int callCount = 0;
@@ -57,6 +53,8 @@ final class _FakeMealReader implements NutritionCanonicalMealReader {
     dogIds.add(dogId);
     froms.add(from);
     tos.add(to);
+    final s = syncThrow;
+    if (s != null) throw s;
     final c = completer;
     if (c != null) return c.future;
     final e = error;
@@ -67,10 +65,16 @@ final class _FakeMealReader implements NutritionCanonicalMealReader {
 
 final class _FakeSupplementReader
     implements NutritionCanonicalSupplementLogReader {
-  _FakeSupplementReader({this.result, this.error, this.completer});
+  _FakeSupplementReader({
+    this.result,
+    this.error,
+    this.syncThrow,
+    this.completer,
+  });
 
   final NutritionSourceBatch<SupplementLog>? result;
   final Object? error;
+  final Object? syncThrow;
   final Completer<NutritionSourceBatch<SupplementLog>>? completer;
 
   int callCount = 0;
@@ -80,6 +84,8 @@ final class _FakeSupplementReader
   Future<NutritionSourceBatch<SupplementLog>> loadSupplementLogs(String dogId) {
     callCount++;
     dogIds.add(dogId);
+    final s = syncThrow;
+    if (s != null) throw s;
     final c = completer;
     if (c != null) return c.future;
     final e = error;
@@ -152,30 +158,59 @@ HealthTimelineQuery _makeQuery({
 ReaderBackedRawCanonicalNutritionFirstPageSource _makeSource({
   required NutritionCanonicalMealReader mealReader,
   required NutritionCanonicalSupplementLogReader supplementReader,
+  RawCanonicalNutritionFirstPageMerger? merge,
 }) {
   return ReaderBackedRawCanonicalNutritionFirstPageSource(
     mealReader: mealReader,
     supplementReader: supplementReader,
+    merge: merge,
   );
+}
+
+RawCanonicalNutritionFirstPageSuccess _expectSuccess(
+  RawCanonicalNutritionFirstPageResult result,
+) {
+  expect(result, isA<RawCanonicalNutritionFirstPageSuccess>());
+  return result as RawCanonicalNutritionFirstPageSuccess;
+}
+
+RawCanonicalNutritionFirstPageFailure _expectFailure(
+  RawCanonicalNutritionFirstPageResult result,
+) {
+  expect(result, isA<RawCanonicalNutritionFirstPageFailure>());
+  return result as RawCanonicalNutritionFirstPageFailure;
 }
 
 void main() {
   group('ReaderBackedRawCanonicalNutritionFirstPageSource', () {
     // ── Test 1 ───────────────────────────────────────────────────────────────
+    test(
+      'loadFirstPage returns a RawCanonicalNutritionFirstPageResult',
+      () async {
+        final mealReader = _FakeMealReader(
+          result: const NutritionSourceBatch<MealLog>.empty(),
+        );
+        final supplementReader = _FakeSupplementReader(
+          result: const NutritionSourceBatch<SupplementLog>.empty(),
+        );
+        final source = _makeSource(
+          mealReader: mealReader,
+          supplementReader: supplementReader,
+        );
+
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+        expect(result, isA<RawCanonicalNutritionFirstPageResult>());
+      },
+    );
+
+    // ── Test 2 ───────────────────────────────────────────────────────────────
     test('eligible query invokes both readers exactly once', () async {
       final mealReader = _FakeMealReader(
-        result: NutritionSourceBatch<MealLog>.available([
-          _makeMeal(id: 'ml_1', dogId: 'dog123', fedAt: DateTime(2024, 3, 15)),
-        ]),
+        result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
-        result: NutritionSourceBatch<SupplementLog>.available([
-          _makeSupplement(
-            id: 'sl_1',
-            dogId: 'dog123',
-            administeredAt: DateTime(2024, 3, 14),
-          ),
-        ]),
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
       );
       final source = _makeSource(
         mealReader: mealReader,
@@ -190,8 +225,8 @@ void main() {
       expect(supplementReader.dogIds, equals(['dog123']));
     });
 
-    // ── Test 2 ───────────────────────────────────────────────────────────────
-    test('eligibility is evaluated before any reader I/O', () async {
+    // ── Test 3 ───────────────────────────────────────────────────────────────
+    test('eligibility is evaluated before reader I/O', () async {
       final mealReader = _FakeMealReader();
       final supplementReader = _FakeSupplementReader();
       final source = _makeSource(
@@ -212,7 +247,7 @@ void main() {
       expect(supplementReader.callCount, equals(0));
     });
 
-    // ── Test 3 ───────────────────────────────────────────────────────────────
+    // ── Test 4 ───────────────────────────────────────────────────────────────
     test('cursor query throws ArgumentError with zero reader calls', () async {
       final mealReader = _FakeMealReader();
       final supplementReader = _FakeSupplementReader();
@@ -234,7 +269,7 @@ void main() {
       expect(supplementReader.callCount, equals(0));
     });
 
-    // ── Test 4 ───────────────────────────────────────────────────────────────
+    // ── Test 5 ───────────────────────────────────────────────────────────────
     test('types query throws ArgumentError with zero reader calls', () async {
       final mealReader = _FakeMealReader();
       final supplementReader = _FakeSupplementReader();
@@ -256,7 +291,7 @@ void main() {
       expect(supplementReader.callCount, equals(0));
     });
 
-    // ── Test 5 ───────────────────────────────────────────────────────────────
+    // ── Test 6 ───────────────────────────────────────────────────────────────
     test('caseId query throws ArgumentError with zero reader calls', () async {
       final mealReader = _FakeMealReader();
       final supplementReader = _FakeSupplementReader();
@@ -275,7 +310,7 @@ void main() {
       expect(supplementReader.callCount, equals(0));
     });
 
-    // ── Test 6 ───────────────────────────────────────────────────────────────
+    // ── Test 7 ───────────────────────────────────────────────────────────────
     test(
       'professional query throws ArgumentError with zero reader calls',
       () async {
@@ -300,8 +335,8 @@ void main() {
       },
     );
 
-    // ── Test 7 ───────────────────────────────────────────────────────────────
-    test('both readers start in parallel using Completers', () async {
+    // ── Test 8 ───────────────────────────────────────────────────────────────
+    test('both captures start in parallel using Completers', () async {
       final mealCompleter = Completer<NutritionSourceBatch<MealLog>>();
       final supplementCompleter =
           Completer<NutritionSourceBatch<SupplementLog>>();
@@ -314,30 +349,31 @@ void main() {
         supplementReader: supplementReader,
       );
 
-      final pageFuture = source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+      final resultFuture = source.loadFirstPage(_makeQuery(dogId: 'dog123'));
 
-      // Both readers were started before either future completed.
+      // Let microtasks up to the joint await run: both readers already invoked.
+      await Future<void>.value();
       expect(mealReader.callCount, equals(1));
       expect(supplementReader.callCount, equals(1));
       expect(mealCompleter.isCompleted, isFalse);
       expect(supplementCompleter.isCompleted, isFalse);
 
-      mealCompleter.complete(NutritionSourceBatch<MealLog>.available([]));
+      mealCompleter.complete(const NutritionSourceBatch<MealLog>.empty());
       supplementCompleter.complete(
-        NutritionSourceBatch<SupplementLog>.available([]),
+        const NutritionSourceBatch<SupplementLog>.empty(),
       );
 
-      final page = await pageFuture;
-      expect(page, isA<RawCanonicalNutritionFirstPage>());
+      final result = await resultFuture;
+      _expectSuccess(result);
     });
 
-    // ── Test 8 ───────────────────────────────────────────────────────────────
-    test('meal reader is called with from null and to null', () async {
+    // ── Test 9 ───────────────────────────────────────────────────────────────
+    test('Meal Reader receives no from/to', () async {
       final mealReader = _FakeMealReader(
-        result: NutritionSourceBatch<MealLog>.available([]),
+        result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
-        result: NutritionSourceBatch<SupplementLog>.available([]),
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
       );
       final source = _makeSource(
         mealReader: mealReader,
@@ -352,119 +388,16 @@ void main() {
         ),
       );
 
-      expect(mealReader.froms, equals([null]));
-      expect(mealReader.tos, equals([null]));
-    });
-
-    // ── Test 9 ───────────────────────────────────────────────────────────────
-    test('available + available feeds the merger', () async {
-      final mealReader = _FakeMealReader(
-        result: NutritionSourceBatch<MealLog>.available([
-          _makeMeal(
-            id: 'ml_1',
-            dogId: 'dog123',
-            fedAt: DateTime(2024, 3, 15, 8),
-          ),
-        ]),
-      );
-      final supplementReader = _FakeSupplementReader(
-        result: NutritionSourceBatch<SupplementLog>.available([
-          _makeSupplement(
-            id: 'sl_1',
-            dogId: 'dog123',
-            administeredAt: DateTime(2024, 3, 14, 8),
-          ),
-        ]),
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
-
-      final page = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
-
-      expect(page.entries.length, equals(2));
-      expect(page.hasMore, isFalse);
+      expect(mealReader.froms, equals(<DateTime?>[null]));
+      expect(mealReader.tos, equals(<DateTime?>[null]));
     });
 
     // ── Test 10 ──────────────────────────────────────────────────────────────
-    test('empty + available returns supplements only', () async {
-      final mealReader = _FakeMealReader(
-        result: const NutritionSourceBatch<MealLog>.empty(),
-      );
-      final supplementReader = _FakeSupplementReader(
-        result: NutritionSourceBatch<SupplementLog>.available([
-          _makeSupplement(
-            id: 'sl_1',
-            dogId: 'dog123',
-            administeredAt: DateTime(2024, 3, 14, 8),
-          ),
-        ]),
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
-
-      final page = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
-
-      expect(page.entries.length, equals(1));
-      expect(page.entries.single.sourceId, equals('sl_1'));
-      expect(page.hasMore, isFalse);
-    });
-
-    // ── Test 11 ──────────────────────────────────────────────────────────────
-    test('available + empty returns meals only', () async {
+    test('available + available returns Success', () async {
       final mealReader = _FakeMealReader(
         result: NutritionSourceBatch<MealLog>.available([
-          _makeMeal(
-            id: 'ml_1',
-            dogId: 'dog123',
-            fedAt: DateTime(2024, 3, 15, 8),
-          ),
+          _makeMeal(id: 'ml_1', dogId: 'dog123', fedAt: DateTime(2024, 3, 15)),
         ]),
-      );
-      final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.empty(),
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
-
-      final page = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
-
-      expect(page.entries.length, equals(1));
-      expect(page.entries.single.sourceId, equals('ml_1'));
-      expect(page.hasMore, isFalse);
-    });
-
-    // ── Test 12 ──────────────────────────────────────────────────────────────
-    test('empty + empty returns an empty page with hasMore false', () async {
-      final mealReader = _FakeMealReader(
-        result: const NutritionSourceBatch<MealLog>.empty(),
-      );
-      final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.empty(),
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
-
-      final page = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
-
-      expect(page.entries, isEmpty);
-      expect(page.hasMore, isFalse);
-    });
-
-    // ── Test 13 ──────────────────────────────────────────────────────────────
-    test('meal error throws sanitized source exception', () async {
-      final mealReader = _FakeMealReader(
-        result: const NutritionSourceBatch<MealLog>.error(
-          message: _secretMessage,
-          code: _secretCode,
-        ),
       );
       final supplementReader = _FakeSupplementReader(
         result: NutritionSourceBatch<SupplementLog>.available([
@@ -480,120 +413,257 @@ void main() {
         supplementReader: supplementReader,
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
-      );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      final success = _expectSuccess(result);
+      expect(success.page.entries.length, equals(2));
     });
 
-    // ── Test 14 ──────────────────────────────────────────────────────────────
-    test('meal offline throws sanitized source exception', () async {
+    // ── Test 11 ──────────────────────────────────────────────────────────────
+    test('empty + available returns Success', () async {
       final mealReader = _FakeMealReader(
-        result: const NutritionSourceBatch<MealLog>.offline(
-          message: _secretMessage,
-          code: _secretCode,
-        ),
+        result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.empty(),
+        result: NutritionSourceBatch<SupplementLog>.available([
+          _makeSupplement(
+            id: 'sl_1',
+            dogId: 'dog123',
+            administeredAt: DateTime(2024, 3, 14),
+          ),
+        ]),
       );
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
-      );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      final success = _expectSuccess(result);
+      expect(success.page.entries.length, equals(1));
     });
 
-    // ── Test 15 ──────────────────────────────────────────────────────────────
-    test('meal notConfigured throws sanitized source exception', () async {
-      final mealReader = _FakeMealReader(
-        result: NutritionSourceBatch<MealLog>(
-          availability: NutritionSourceAvailability.notConfigured,
-          message: _secretMessage,
-          code: _secretCode,
-        ),
-      );
-      final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.empty(),
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
-
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
-      );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
-    });
-
-    // ── Test 16 ──────────────────────────────────────────────────────────────
-    test('supplement error throws sanitized source exception', () async {
+    // ── Test 12 ──────────────────────────────────────────────────────────────
+    test('available + empty returns Success', () async {
       final mealReader = _FakeMealReader(
         result: NutritionSourceBatch<MealLog>.available([
           _makeMeal(id: 'ml_1', dogId: 'dog123', fedAt: DateTime(2024, 3, 15)),
         ]),
       );
       final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.error(
-          message: _secretMessage,
-          code: _secretCode,
-        ),
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
       );
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
-      );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      final success = _expectSuccess(result);
+      expect(success.page.entries.length, equals(1));
     });
 
-    // ── Test 17 ──────────────────────────────────────────────────────────────
-    test('supplement offline throws sanitized source exception', () async {
+    // ── Test 13 ──────────────────────────────────────────────────────────────
+    test('empty + empty returns empty Success with hasMore false', () async {
       final mealReader = _FakeMealReader(
         result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.offline(
-          message: _secretMessage,
-          code: _secretCode,
-        ),
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
       );
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      final success = _expectSuccess(result);
+      expect(success.page.entries, isEmpty);
+      expect(success.page.hasMore, isFalse);
+    });
+
+    // ── Test 14 ──────────────────────────────────────────────────────────────
+    test('Meal offline maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.offline(),
       );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+    });
+
+    // ── Test 15 ──────────────────────────────────────────────────────────────
+    test('Meal error maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.error(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+    });
+
+    // ── Test 16 ──────────────────────────────────────────────────────────────
+    test('Meal notConfigured maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>(
+          availability: NutritionSourceAvailability.notConfigured,
+        ),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+    });
+
+    // ── Test 17 ──────────────────────────────────────────────────────────────
+    test('Meal synchronous throw maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(syncThrow: StateError('meal sync'));
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
     });
 
     // ── Test 18 ──────────────────────────────────────────────────────────────
+    test('Meal Future exception maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(error: Exception('meal future'));
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+    });
+
+    // ── Test 19 ──────────────────────────────────────────────────────────────
+    test('Meal invalidBatch maps to mealReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>(
+          availability: NutritionSourceAvailability.available,
+          items: <MealLog>[],
+        ),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+    });
+
+    // ── Test 20 ──────────────────────────────────────────────────────────────
+    test('Supplement offline maps to supplementReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.empty(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.offline(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
+      );
+    });
+
+    // ── Test 21 ──────────────────────────────────────────────────────────────
+    test('Supplement error maps to supplementReaderUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.empty(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.error(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
+      );
+    });
+
+    // ── Test 22 ──────────────────────────────────────────────────────────────
     test(
-      'supplement notConfigured throws sanitized source exception',
+      'Supplement notConfigured maps to supplementReaderUnavailable',
       () async {
         final mealReader = _FakeMealReader(
           result: const NutritionSourceBatch<MealLog>.empty(),
         );
         final supplementReader = _FakeSupplementReader(
-          result: NutritionSourceBatch<SupplementLog>(
+          result: const NutritionSourceBatch<SupplementLog>(
             availability: NutritionSourceAvailability.notConfigured,
-            message: _secretMessage,
-            code: _secretCode,
           ),
         );
         final source = _makeSource(
@@ -601,96 +671,224 @@ void main() {
           supplementReader: supplementReader,
         );
 
-        final error = await _captureError(
-          () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+        expect(
+          _expectFailure(result).kind,
+          RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
         );
-        expect(error, isA<RawCanonicalNutritionSourceException>());
-        _expectNoLeak(error);
       },
     );
 
-    // ── Test 19 ──────────────────────────────────────────────────────────────
-    test('meal Future exception is sanitized', () async {
-      final mealReader = _FakeMealReader(error: Exception(_secretPath));
+    // ── Test 23 ──────────────────────────────────────────────────────────────
+    test(
+      'Supplement synchronous throw maps to supplementReaderUnavailable',
+      () async {
+        final mealReader = _FakeMealReader(
+          result: const NutritionSourceBatch<MealLog>.empty(),
+        );
+        final supplementReader = _FakeSupplementReader(
+          syncThrow: StateError('supplement sync'),
+        );
+        final source = _makeSource(
+          mealReader: mealReader,
+          supplementReader: supplementReader,
+        );
+
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+        expect(
+          _expectFailure(result).kind,
+          RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
+        );
+      },
+    );
+
+    // ── Test 24 ──────────────────────────────────────────────────────────────
+    test(
+      'Supplement Future exception maps to supplementReaderUnavailable',
+      () async {
+        final mealReader = _FakeMealReader(
+          result: const NutritionSourceBatch<MealLog>.empty(),
+        );
+        final supplementReader = _FakeSupplementReader(
+          error: Exception('supplement future'),
+        );
+        final source = _makeSource(
+          mealReader: mealReader,
+          supplementReader: supplementReader,
+        );
+
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+        expect(
+          _expectFailure(result).kind,
+          RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
+        );
+      },
+    );
+
+    // ── Test 25 ──────────────────────────────────────────────────────────────
+    test(
+      'Supplement invalidBatch maps to supplementReaderUnavailable',
+      () async {
+        final mealReader = _FakeMealReader(
+          result: const NutritionSourceBatch<MealLog>.empty(),
+        );
+        final supplementReader = _FakeSupplementReader(
+          result: const NutritionSourceBatch<SupplementLog>(
+            availability: NutritionSourceAvailability.available,
+            items: <SupplementLog>[],
+          ),
+        );
+        final source = _makeSource(
+          mealReader: mealReader,
+          supplementReader: supplementReader,
+        );
+
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+        expect(
+          _expectFailure(result).kind,
+          RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
+        );
+      },
+    );
+
+    // ── Test 26 ──────────────────────────────────────────────────────────────
+    test('two unavailable captures of different kinds map to '
+        'multipleReadersUnavailable', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.offline(),
+      );
       final supplementReader = _FakeSupplementReader(
-        result: const NutritionSourceBatch<SupplementLog>.empty(),
+        result: const NutritionSourceBatch<SupplementLog>.error(),
       );
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.multipleReadersUnavailable,
       );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
     });
 
-    // ── Test 20 ──────────────────────────────────────────────────────────────
-    test('supplement Future exception is sanitized', () async {
+    // ── Test 27 ──────────────────────────────────────────────────────────────
+    test('both readers throwing map to multipleReadersUnavailable', () async {
+      final mealReader = _FakeMealReader(syncThrow: StateError('meal'));
+      final supplementReader = _FakeSupplementReader(
+        error: Exception('supplement'),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.multipleReadersUnavailable,
+      );
+    });
+
+    // ── Test 28 ──────────────────────────────────────────────────────────────
+    test('merger is not called when Meal is unavailable', () async {
+      var mergeCalls = 0;
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.error(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) {
+          mergeCalls++;
+          return RawCanonicalNutritionFirstPage(
+            entries: const [],
+            hasMore: false,
+          );
+        },
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
+      expect(mergeCalls, equals(0));
+    });
+
+    // ── Test 29 ──────────────────────────────────────────────────────────────
+    test('merger is not called when Supplement is unavailable', () async {
+      var mergeCalls = 0;
       final mealReader = _FakeMealReader(
         result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
-        error: Exception(_secretPath),
+        result: const NutritionSourceBatch<SupplementLog>.error(),
       );
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) {
+          mergeCalls++;
+          return RawCanonicalNutritionFirstPage(
+            entries: const [],
+            hasMore: false,
+          );
+        },
       );
 
-      final error = await _captureError(
-        () => source.loadFirstPage(_makeQuery(dogId: 'dog123')),
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.supplementReaderUnavailable,
       );
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
+      expect(mergeCalls, equals(0));
     });
 
-    // ── Test 21 ──────────────────────────────────────────────────────────────
-    test('both Future exceptions are jointly observed and sanitized', () async {
-      // Both readers fail via Completers. Record `.wait` registers listeners on
-      // BOTH futures up front and only settles after observing both, so the
-      // source's returned Future is itself the synchronization point — no timer
-      // or microtask flush is needed and no unobserved async error can escape.
-      final mealCompleter = Completer<NutritionSourceBatch<MealLog>>();
-      final supplementCompleter =
-          Completer<NutritionSourceBatch<SupplementLog>>();
-      final mealReader = _FakeMealReader(completer: mealCompleter);
-      final supplementReader = _FakeSupplementReader(
-        completer: supplementCompleter,
-      );
-      final source = _makeSource(
-        mealReader: mealReader,
-        supplementReader: supplementReader,
-      );
+    // ── Test 30 ──────────────────────────────────────────────────────────────
+    test(
+      'merger StateError dog mismatch maps to mergeInvariantFailed',
+      () async {
+        final mealReader = _FakeMealReader(
+          result: const NutritionSourceBatch<MealLog>.empty(),
+        );
+        final supplementReader = _FakeSupplementReader(
+          result: const NutritionSourceBatch<SupplementLog>.empty(),
+        );
+        final source = _makeSource(
+          mealReader: mealReader,
+          supplementReader: supplementReader,
+          merge: ({required query, required meals, required supplements}) {
+            throw StateError('dog_mismatch');
+          },
+        );
 
-      final resultFuture = source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+        final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
 
-      // Both readers were started before either future settled.
-      expect(mealReader.callCount, equals(1));
-      expect(supplementReader.callCount, equals(1));
+        final failure = _expectFailure(result);
+        expect(
+          failure.kind,
+          RawCanonicalNutritionSourceFailureKind.mergeInvariantFailed,
+        );
+        expect(failure.toString(), isNot(contains('dog_mismatch')));
+      },
+    );
 
-      mealCompleter.completeError(Exception(_secretPath));
-      supplementCompleter.completeError(Exception(_secretMessage));
-
-      final error = await _captureError(() => resultFuture);
-      expect(error, isA<RawCanonicalNutritionSourceException>());
-      _expectNoLeak(error);
-      expect(mealReader.callCount, equals(1));
-      expect(supplementReader.callCount, equals(1));
-    });
-
-    // ── Test 22 ──────────────────────────────────────────────────────────────
-    test('dog mismatch propagates merger StateError', () async {
+    // ── Test 31 ──────────────────────────────────────────────────────────────
+    test('merger StateError duplicate maps to mergeInvariantFailed', () async {
       final mealReader = _FakeMealReader(
-        result: NutritionSourceBatch<MealLog>.available([
-          _makeMeal(
-            id: 'ml_1',
-            dogId: 'other-dog',
-            fedAt: DateTime(2024, 3, 15),
-          ),
-        ]),
+        result: const NutritionSourceBatch<MealLog>.empty(),
       );
       final supplementReader = _FakeSupplementReader(
         result: const NutritionSourceBatch<SupplementLog>.empty(),
@@ -698,16 +896,67 @@ void main() {
       final source = _makeSource(
         mealReader: mealReader,
         supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) {
+          throw StateError('duplicate_raw_canonical_entry');
+        },
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mergeInvariantFailed,
+      );
+    });
+
+    // ── Test 32 ──────────────────────────────────────────────────────────────
+    test('merger StateError collision maps to mergeInvariantFailed', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.empty(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) {
+          throw StateError('derived_timeline_id_collision');
+        },
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mergeInvariantFailed,
+      );
+    });
+
+    // ── Test 33 ──────────────────────────────────────────────────────────────
+    test('unexpected non-StateError from injected merger propagates', () async {
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.empty(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) {
+          throw ArgumentError('unexpected merger contract error');
+        },
       );
 
       await expectLater(
         source.loadFirstPage(_makeQuery(dogId: 'dog123')),
-        throwsA(isA<StateError>()),
+        throwsA(isA<ArgumentError>()),
       );
     });
 
-    // ── Test 23 ──────────────────────────────────────────────────────────────
-    test('period start remains inclusive', () async {
+    // ── Test 34 ──────────────────────────────────────────────────────────────
+    test('start boundary remains inclusive', () async {
       final start = DateTime(2024, 3, 1, 0, 0);
       final mealReader = _FakeMealReader(
         result: NutritionSourceBatch<MealLog>.available([
@@ -722,16 +971,17 @@ void main() {
         supplementReader: supplementReader,
       );
 
-      final page = await source.loadFirstPage(
+      final result = await source.loadFirstPage(
         _makeQuery(dogId: 'dog123', start: start, end: DateTime(2024, 3, 31)),
       );
 
-      expect(page.entries.length, equals(1));
-      expect(page.entries.single.sourceId, equals('ml_start'));
+      final success = _expectSuccess(result);
+      expect(success.page.entries.length, equals(1));
+      expect(success.page.entries.single.sourceId, equals('ml_start'));
     });
 
-    // ── Test 24 ──────────────────────────────────────────────────────────────
-    test('period end remains inclusive', () async {
+    // ── Test 35 ──────────────────────────────────────────────────────────────
+    test('end boundary remains inclusive', () async {
       final end = DateTime(2024, 3, 31, 0, 0);
       final mealReader = _FakeMealReader(
         result: NutritionSourceBatch<MealLog>.available([
@@ -746,35 +996,77 @@ void main() {
         supplementReader: supplementReader,
       );
 
-      final page = await source.loadFirstPage(
+      final result = await source.loadFirstPage(
         _makeQuery(dogId: 'dog123', start: DateTime(2024, 3, 1), end: end),
       );
 
-      expect(page.entries.length, equals(1));
-      expect(page.entries.single.sourceId, equals('ml_end'));
+      final success = _expectSuccess(result);
+      expect(success.page.entries.length, equals(1));
+      expect(success.page.entries.single.sourceId, equals('ml_end'));
+    });
+
+    // ── Test 36 ──────────────────────────────────────────────────────────────
+    test('Success preserves the exact injected merger page instance', () async {
+      final injectedPage = RawCanonicalNutritionFirstPage(
+        entries: const [],
+        hasMore: false,
+      );
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.empty(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        result: const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+        merge: ({required query, required meals, required supplements}) =>
+            injectedPage,
+      );
+
+      final result = await source.loadFirstPage(_makeQuery(dogId: 'dog123'));
+
+      final success = _expectSuccess(result);
+      expect(identical(success.page, injectedPage), isTrue);
+    });
+
+    // ── Test 37 ──────────────────────────────────────────────────────────────
+    test('source waits for both captures before classifying an unavailable '
+        'result', () async {
+      final supplementCompleter =
+          Completer<NutritionSourceBatch<SupplementLog>>();
+      // Meal resolves unavailable immediately; supplement stays pending.
+      final mealReader = _FakeMealReader(
+        result: const NutritionSourceBatch<MealLog>.error(),
+      );
+      final supplementReader = _FakeSupplementReader(
+        completer: supplementCompleter,
+      );
+      final source = _makeSource(
+        mealReader: mealReader,
+        supplementReader: supplementReader,
+      );
+
+      var done = false;
+      final resultFuture = source.loadFirstPage(_makeQuery(dogId: 'dog123'))
+        ..then((_) => done = true);
+
+      // Even after microtask flushes, the source must NOT classify while the
+      // supplement capture is still pending.
+      await Future<void>.value();
+      await Future<void>.value();
+      expect(done, isFalse);
+      expect(supplementCompleter.isCompleted, isFalse);
+
+      supplementCompleter.complete(
+        const NutritionSourceBatch<SupplementLog>.empty(),
+      );
+
+      final result = await resultFuture;
+      expect(
+        _expectFailure(result).kind,
+        RawCanonicalNutritionSourceFailureKind.mealReaderUnavailable,
+      );
     });
   });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Runs [action] and returns the thrown error, failing if none is thrown.
-Future<Object> _captureError(Future<void> Function() action) async {
-  try {
-    await action();
-  } catch (e) {
-    return e;
-  }
-  fail('expected an exception but none was thrown');
-}
-
-/// Asserts the sanitized exception's string form leaks no reader detail.
-void _expectNoLeak(Object error) {
-  final text = error.toString();
-  expect(text, isNot(contains(_secretMessage)));
-  expect(text, isNot(contains(_secretCode)));
-  expect(text, isNot(contains(_secretPath)));
-  expect(text, equals('raw canonical nutrition source unavailable'));
 }
