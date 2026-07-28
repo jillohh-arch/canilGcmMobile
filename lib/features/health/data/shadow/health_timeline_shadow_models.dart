@@ -180,6 +180,40 @@ final class HealthTimelineShadowFailure extends HealthTimelineShadowOutcome {
   final int? shadowLatencyMs;
 }
 
+/// Neutral comparable item for correlation.
+///
+/// Contains ONLY the four locator fields.
+/// All four are nullable because a source entry may have:
+/// - canonical locator only (sourceCollection + sourceId)
+/// - legacy locator only (legacySource + legacyId)
+/// - both
+/// - neither (uncorrelated)
+///
+/// Does NOT contain: dogId, occurredAt, derivedTimelineId, hasMore,
+/// entry, payload, type, status, title.
+///
+/// This class is not part of any outcome sent to the observer.
+final class HealthTimelineComparableItem {
+  const HealthTimelineComparableItem({
+    this.sourceCollection,
+    this.sourceId,
+    this.legacySource,
+    this.legacyId,
+  });
+
+  /// Canonical source collection name (e.g. "meal_logs").
+  final String? sourceCollection;
+
+  /// Document ID from the canonical source collection.
+  final String? sourceId;
+
+  /// Legacy source path or collection name.
+  final String? legacySource;
+
+  /// Legacy document ID.
+  final String? legacyId;
+}
+
 /// Observer interface for shadow outcomes.
 ///
 /// All methods accept FutureOr to support both sync and async observers.

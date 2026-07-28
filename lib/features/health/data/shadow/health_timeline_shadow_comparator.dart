@@ -9,8 +9,6 @@
 
 library;
 
-import 'dart:async';
-
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_entry_view.dart';
 
 import 'health_timeline_shadow_models.dart';
@@ -98,38 +96,59 @@ HealthTimelineCorrelationLocator? normalizeHealthTimelineLocator({
   );
 }
 
-/// Extracts all locators from an entry via traceability fields.
-Set<HealthTimelineCorrelationLocator> extractHealthTimelineLocators(
-  HealthTimelineEntryView entry,
+/// Extracts all locators from a neutral comparable item.
+///
+/// Uses normalizeHealthTimelineLocator as the single normalization authority.
+/// Deduplicates equivalent locators via Set.
+Set<HealthTimelineCorrelationLocator> extractHealthTimelineComparableLocators(
+  HealthTimelineComparableItem item,
 ) {
   final result = <HealthTimelineCorrelationLocator>{};
-  final t = entry.traceability;
-  if (t == null) return result;
 
   // Locator 1: sourceCollection + sourceId
   final loc1 = normalizeHealthTimelineLocator(
-    collectionOrPath: t.sourceCollection,
-    documentId: t.sourceId,
+    collectionOrPath: item.sourceCollection,
+    documentId: item.sourceId,
   );
   if (loc1 != null) result.add(loc1);
 
   // Locator 2: legacySource + legacyId
   final loc2 = normalizeHealthTimelineLocator(
-    collectionOrPath: t.legacySource,
-    documentId: t.legacyId,
+    collectionOrPath: item.legacySource,
+    documentId: item.legacyId,
   );
   if (loc2 != null) result.add(loc2);
 
   return result;
 }
 
-/// Correlates primary and shadow entries using bipartite graph matching.
+/// Extracts all locators from an entry via traceability fields.
 ///
-/// Uses indices as nodes to avoid equality issues with entry objects.
+/// Converts entry.traceability to HealthTimelineComparableItem
+/// and delegates to the neutral extractor.
+Set<HealthTimelineCorrelationLocator> extractHealthTimelineLocators(
+  HealthTimelineEntryView entry,
+) {
+  final t = entry.traceability;
+  return extractHealthTimelineComparableLocators(
+    HealthTimelineComparableItem(
+      sourceCollection: t?.sourceCollection,
+      sourceId: t?.sourceId,
+      legacySource: t?.legacySource,
+      legacyId: t?.legacyId,
+    ),
+  );
+}
+
+/// Correlates primary and shadow comparable items using bipartite graph matching.
+///
+/// Uses indices as nodes to avoid equality issues with item objects.
 /// Each index appears in exactly one category.
-HealthTimelineCorrelationResult correlateHealthTimelineEntries({
-  required List<HealthTimelineEntryView> primaryItems,
-  required List<HealthTimelineEntryView> shadowItems,
+///
+/// This is the single authoritative algorithm for health timeline correlation.
+HealthTimelineCorrelationResult correlateHealthTimelineComparableItems({
+  required List<HealthTimelineComparableItem> primaryItems,
+  required List<HealthTimelineComparableItem> shadowItems,
 }) {
   final n = primaryItems.length;
   final m = shadowItems.length;
@@ -139,7 +158,7 @@ HealthTimelineCorrelationResult correlateHealthTimelineEntries({
   final primaryHasLocator = <int>{};
 
   for (var i = 0; i < n; i++) {
-    final locs = extractHealthTimelineLocators(primaryItems[i]);
+    final locs = extractHealthTimelineComparableLocators(primaryItems[i]);
     primaryLocators[i] = locs;
     if (locs.isNotEmpty) primaryHasLocator.add(i);
   }
@@ -148,12 +167,12 @@ HealthTimelineCorrelationResult correlateHealthTimelineEntries({
   final shadowHasLocator = <int>{};
 
   for (var j = 0; j < m; j++) {
-    final locs = extractHealthTimelineLocators(shadowItems[j]);
+    final locs = extractHealthTimelineComparableLocators(shadowItems[j]);
     shadowLocators[j] = locs;
     if (locs.isNotEmpty) shadowHasLocator.add(j);
   }
 
-  // Pre-classify: entries without locators → uncorrelated
+  // Pre-classify: items without locators → uncorrelated
   final uncorrelatedPrimaryIndices = <int>[];
   final uncorrelatedShadowIndices = <int>[];
   final primaryWithLocator = <int>{};
@@ -295,6 +314,40 @@ HealthTimelineCorrelationResult correlateHealthTimelineEntries({
     ambiguousShadowIndices: ambiguousShadowIndices,
     uncorrelatedPrimaryIndices: uncorrelatedPrimaryIndices,
     uncorrelatedShadowIndices: uncorrelatedShadowIndices,
+  );
+}
+
+/// Correlates primary and shadow entries using bipartite graph matching.
+///
+/// Converts HealthTimelineEntryView items to HealthTimelineComparableItem
+/// and delegates to the neutral correlator. Preserves backward compatibility.
+HealthTimelineCorrelationResult correlateHealthTimelineEntries({
+  required List<HealthTimelineEntryView> primaryItems,
+  required List<HealthTimelineEntryView> shadowItems,
+}) {
+  final primary = primaryItems.map((e) {
+    final t = e.traceability;
+    return HealthTimelineComparableItem(
+      sourceCollection: t?.sourceCollection,
+      sourceId: t?.sourceId,
+      legacySource: t?.legacySource,
+      legacyId: t?.legacyId,
+    );
+  }).toList();
+
+  final shadow = shadowItems.map((e) {
+    final t = e.traceability;
+    return HealthTimelineComparableItem(
+      sourceCollection: t?.sourceCollection,
+      sourceId: t?.sourceId,
+      legacySource: t?.legacySource,
+      legacyId: t?.legacyId,
+    );
+  }).toList();
+
+  return correlateHealthTimelineComparableItems(
+    primaryItems: primary,
+    shadowItems: shadow,
   );
 }
 

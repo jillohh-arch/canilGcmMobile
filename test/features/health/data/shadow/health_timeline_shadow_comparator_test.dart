@@ -1,6 +1,6 @@
 // Copyright 2024 GCM Health. All rights reserved.
 //
-// HEALTH TIMELINE SHADOW COMPARATOR TESTS — 14 tests.
+// HEALTH TIMELINE SHADOW COMPARATOR TESTS — 26 tests.
 
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_comparator.dart';
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_models.dart';
@@ -354,6 +354,374 @@ void main() {
       expect(
         detectHealthTimelineOrderingMismatch(matchedPairs: pairsInverted),
         isTrue,
+      );
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Neutral comparator tests — 12 new tests (tests 15–26)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  group('extractHealthTimelineComparableLocators', () {
+    test('extracts a neutral canonical locator', () {
+      final item = HealthTimelineComparableItem(
+        sourceCollection: 'dogs/d1/meal_logs',
+        sourceId: 'ml_abc',
+      );
+
+      final locators = extractHealthTimelineComparableLocators(item);
+
+      expect(locators.length, equals(1));
+      expect(locators.first.collection, equals('meal_logs'));
+      expect(locators.first.documentId, equals('ml_abc'));
+    });
+
+    test('extracts a neutral legacy locator', () {
+      final item = HealthTimelineComparableItem(
+        legacySource: 'feeding_events',
+        legacyId: 'fe_xyz',
+      );
+
+      final locators = extractHealthTimelineComparableLocators(item);
+
+      expect(locators.length, equals(1));
+      expect(locators.first.collection, equals('feeding_events'));
+      expect(locators.first.documentId, equals('fe_xyz'));
+    });
+
+    test('deduplicates equivalent neutral canonical and legacy locators', () {
+      // Same collection + docId via both paths → deduplicated to 1
+      final item = HealthTimelineComparableItem(
+        sourceCollection: 'dogs/d1/vacinas',
+        sourceId: 'vac_1',
+        legacySource: 'vacinas',
+        legacyId: 'vac_1',
+      );
+
+      final locators = extractHealthTimelineComparableLocators(item);
+
+      expect(locators.length, equals(1));
+      expect(locators.first.collection, equals('vacinas'));
+      expect(locators.first.documentId, equals('vac_1'));
+    });
+
+    test('extracts distinct neutral canonical and legacy locators', () {
+      final item = HealthTimelineComparableItem(
+        sourceCollection: 'dogs/d1/meal_logs',
+        sourceId: 'ml_1',
+        legacySource: 'feeding_events',
+        legacyId: 'fe_1',
+      );
+
+      final locators = extractHealthTimelineComparableLocators(item);
+
+      expect(locators.length, equals(2));
+      final collections = locators.map((l) => l.collection).toSet();
+      expect(collections, containsAll(['meal_logs', 'feeding_events']));
+    });
+
+    test('returns no locator for an all-null neutral item', () {
+      final item = HealthTimelineComparableItem(
+        sourceCollection: null,
+        sourceId: null,
+        legacySource: null,
+        legacyId: null,
+      );
+
+      final locators = extractHealthTimelineComparableLocators(item);
+
+      expect(locators.isEmpty, isTrue);
+    });
+  });
+
+  group('correlateHealthTimelineComparableItems', () {
+    test('correlates neutral items as a unique one-to-one match', () {
+      final primary = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+      ];
+      final shadow = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+      ];
+
+      final result = correlateHealthTimelineComparableItems(
+        primaryItems: primary,
+        shadowItems: shadow,
+      );
+
+      expect(result.matchedCount, equals(2));
+      expect(result.matchedPairs.length, equals(2));
+      expect(result.matchedPairs[0].primaryIndex, equals(0));
+      expect(result.matchedPairs[0].shadowIndex, equals(0));
+      expect(result.matchedPairs[1].primaryIndex, equals(1));
+      expect(result.matchedPairs[1].shadowIndex, equals(1));
+      expect(result.missingCount, equals(0));
+      expect(result.extraCount, equals(0));
+      expect(result.ambiguousPrimaryCount, equals(0));
+      expect(result.ambiguousShadowCount, equals(0));
+      expect(result.uncorrelatedPrimaryCount, equals(0));
+      expect(result.uncorrelatedShadowCount, equals(0));
+    });
+
+    test('classifies neutral missing extra and uncorrelated indices', () {
+      final primary = [
+        // Missing: has locator but no shadow partner
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'p_missing',
+        ),
+        // Uncorrelated: no locator
+        HealthTimelineComparableItem(),
+      ];
+      final shadow = [
+        // Extra: has locator but no primary partner
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 's_extra',
+        ),
+        // Uncorrelated: no locator
+        HealthTimelineComparableItem(),
+      ];
+
+      final result = correlateHealthTimelineComparableItems(
+        primaryItems: primary,
+        shadowItems: shadow,
+      );
+
+      expect(result.matchedCount, equals(0));
+      expect(result.missingPrimaryIndices, equals([0]));
+      expect(result.extraShadowIndices, equals([0]));
+      expect(result.uncorrelatedPrimaryIndices, equals([1]));
+      expect(result.uncorrelatedShadowIndices, equals([1]));
+    });
+
+    test('classifies a neutral duplicate component as ambiguous', () {
+      // Two primary share same locator; one shadow shares same locator
+      final primary = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'shared',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'shared',
+        ),
+      ];
+      final shadow = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'shared',
+        ),
+      ];
+
+      final result = correlateHealthTimelineComparableItems(
+        primaryItems: primary,
+        shadowItems: shadow,
+      );
+
+      expect(result.matchedCount, equals(0));
+      expect(result.ambiguousPrimaryIndices, equals([0, 1]));
+      expect(result.ambiguousShadowIndices, equals([0]));
+    });
+
+    test('preserves equal positional ordering for neutral matched pairs', () {
+      // primary[a, b] × shadow[a, b] → equal order, no mismatch
+      final primary = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+      ];
+      final shadow = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+      ];
+
+      final result = correlateHealthTimelineComparableItems(
+        primaryItems: primary,
+        shadowItems: shadow,
+      );
+
+      expect(
+        detectHealthTimelineOrderingMismatch(matchedPairs: result.matchedPairs),
+        isFalse,
+      );
+    });
+
+    test('detects inverted positional ordering from neutral correlation', () {
+      // primary[a, b] × shadow[b, a] → inverted order, mismatch detected
+      final primary = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+      ];
+      final shadow = [
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'b',
+        ),
+        HealthTimelineComparableItem(
+          sourceCollection: 'dogs/d1/meal_logs',
+          sourceId: 'a',
+        ),
+      ];
+
+      final result = correlateHealthTimelineComparableItems(
+        primaryItems: primary,
+        shadowItems: shadow,
+      );
+
+      expect(
+        detectHealthTimelineOrderingMismatch(matchedPairs: result.matchedPairs),
+        isTrue,
+      );
+    });
+  });
+
+  group('entry-view extractor wrapper', () {
+    test('entry-view extractor wrapper matches the neutral extractor', () {
+      // Create entry with both canonical and legacy locators
+      final entry = _makeEntry(
+        sourceCollection: 'dogs/d1/meal_logs',
+        sourceId: 'ml_1',
+        legacySource: 'feeding_events',
+        legacyId: 'fe_1',
+      );
+
+      final t = entry.traceability!;
+      final comparable = HealthTimelineComparableItem(
+        sourceCollection: t.sourceCollection,
+        sourceId: t.sourceId,
+        legacySource: t.legacySource,
+        legacyId: t.legacyId,
+      );
+
+      final fromEntry = extractHealthTimelineLocators(entry);
+      final fromComparable = extractHealthTimelineComparableLocators(
+        comparable,
+      );
+
+      // Same set of locators
+      expect(fromEntry.length, equals(fromComparable.length));
+      final entryCollections = fromEntry.map((l) => l.collection).toList();
+      final comparableCollections = fromComparable
+          .map((l) => l.collection)
+          .toList();
+      expect(entryCollections.toSet(), equals(comparableCollections.toSet()));
+    });
+  });
+
+  group('entry-view correlation wrapper', () {
+    test('entry-view correlation wrapper matches the neutral correlation', () {
+      // Mixed scenario: match, missing, extra, ambiguous, uncorrelated
+      final primaryEntries = [
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'matched'),
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'missing'),
+        _makeEntry(legacySource: 'vacinas', legacyId: 'legacy_matched'),
+        _makeEntry(), // uncorrelated
+      ];
+
+      final shadowEntries = [
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'matched'),
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'extra'),
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'dup'),
+        _makeEntry(sourceCollection: 'dogs/d1/meal_logs', sourceId: 'dup'),
+        _makeEntry(legacySource: 'vacinas', legacyId: 'legacy_matched'),
+        _makeEntry(), // uncorrelated
+      ];
+
+      // Convert entries to comparable
+      List<HealthTimelineComparableItem> toComparable(
+        List<HealthTimelineEntryView> entries,
+      ) {
+        return entries.map((e) {
+          final t = e.traceability;
+          return HealthTimelineComparableItem(
+            sourceCollection: t?.sourceCollection,
+            sourceId: t?.sourceId,
+            legacySource: t?.legacySource,
+            legacyId: t?.legacyId,
+          );
+        }).toList();
+      }
+
+      final fromEntry = correlateHealthTimelineEntries(
+        primaryItems: primaryEntries,
+        shadowItems: shadowEntries,
+      );
+
+      final fromComparable = correlateHealthTimelineComparableItems(
+        primaryItems: toComparable(primaryEntries),
+        shadowItems: toComparable(shadowEntries),
+      );
+
+      // Structural comparison of all fields
+      expect(
+        fromEntry.matchedPairs.length,
+        equals(fromComparable.matchedPairs.length),
+      );
+      for (var i = 0; i < fromEntry.matchedPairs.length; i++) {
+        expect(
+          fromEntry.matchedPairs[i].primaryIndex,
+          equals(fromComparable.matchedPairs[i].primaryIndex),
+        );
+        expect(
+          fromEntry.matchedPairs[i].shadowIndex,
+          equals(fromComparable.matchedPairs[i].shadowIndex),
+        );
+      }
+
+      expect(
+        fromEntry.missingPrimaryIndices,
+        equals(fromComparable.missingPrimaryIndices),
+      );
+      expect(
+        fromEntry.extraShadowIndices,
+        equals(fromComparable.extraShadowIndices),
+      );
+      expect(
+        fromEntry.ambiguousPrimaryIndices,
+        equals(fromComparable.ambiguousPrimaryIndices),
+      );
+      expect(
+        fromEntry.ambiguousShadowIndices,
+        equals(fromComparable.ambiguousShadowIndices),
+      );
+      expect(
+        fromEntry.uncorrelatedPrimaryIndices,
+        equals(fromComparable.uncorrelatedPrimaryIndices),
+      );
+      expect(
+        fromEntry.uncorrelatedShadowIndices,
+        equals(fromComparable.uncorrelatedShadowIndices),
       );
     });
   });
