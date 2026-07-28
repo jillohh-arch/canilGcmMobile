@@ -1,6 +1,6 @@
 // Copyright 2024 GCM Health. All rights reserved.
 //
-// HEALTH TIMELINE RAW CANONICAL FIRST-PAGE MERGER TESTS — 20 tests.
+// HEALTH TIMELINE RAW CANONICAL FIRST-PAGE MERGER TESTS — 25 tests.
 
 import 'package:canil_gcm/features/health/data/canonical/timeline/canonical_timeline_id_deriver.dart';
 import 'package:canil_gcm/features/health/data/canonical/timeline/raw_canonical_nutrition_first_page_merger.dart';
@@ -630,6 +630,72 @@ void main() {
           equals(result2.entries[i].derivedTimelineId),
         );
       }
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Shared query eligibility validator tests — 5 new tests (21–25)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  group('validateRawCanonicalNutritionFirstPageQuery', () {
+    test('accepts an eligible first-page query', () {
+      // An eligible first-page query has no cursor, types, caseId, or professional
+      final eligibleQuery = _makeQuery(dogId: 'dog123');
+
+      // Must not throw
+      expect(
+        () => validateRawCanonicalNutritionFirstPageQuery(eligibleQuery),
+        returnsNormally,
+      );
+    });
+
+    test('rejects a cursor', () {
+      final queryWithCursor = HealthTimelineQuery(
+        dogId: 'dog123',
+        cursor: HealthTimelineCursor('some-cursor'),
+      );
+
+      expect(
+        () => validateRawCanonicalNutritionFirstPageQuery(queryWithCursor),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('rejects type filters', () {
+      final queryWithTypes = HealthTimelineQuery(
+        dogId: 'dog123',
+        types: {HealthTimelineType.meal},
+      );
+
+      expect(
+        () => validateRawCanonicalNutritionFirstPageQuery(queryWithTypes),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('rejects a case filter', () {
+      final queryWithCaseId = HealthTimelineQuery(
+        dogId: 'dog123',
+        caseId: 'case_abc',
+      );
+
+      expect(
+        () => validateRawCanonicalNutritionFirstPageQuery(queryWithCaseId),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('rejects a professional filter', () {
+      final queryWithProfessional = HealthTimelineQuery(
+        dogId: 'dog123',
+        professional: HealthTimelineProfessionalFilter(name: 'Dr. Smith'),
+      );
+
+      expect(
+        () =>
+            validateRawCanonicalNutritionFirstPageQuery(queryWithProfessional),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 }

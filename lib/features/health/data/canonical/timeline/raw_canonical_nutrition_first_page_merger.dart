@@ -114,7 +114,7 @@ RawCanonicalNutritionFirstPage mergeRawCanonicalNutritionFirstPage({
   required List<MealLog> meals,
   required List<SupplementLog> supplements,
 }) {
-  _validateQueryEligibility(query);
+  validateRawCanonicalNutritionFirstPageQuery(query);
 
   final entries = <RawCanonicalNutritionComparableEntry>[];
 
@@ -217,10 +217,22 @@ RawCanonicalNutritionFirstPage mergeRawCanonicalNutritionFirstPage({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Query eligibility validation
+// Query eligibility policy — single authoritative implementation
 // ─────────────────────────────────────────────────────────────────────────────
 
-void _validateQueryEligibility(HealthTimelineQuery query) {
+/// Validates that [query] is eligible for a first-page raw canonical merge.
+///
+/// This is the single policy authority for first-page eligibility.
+/// Throws [ArgumentError] if any of the following conditions are violated:
+/// - cursor must be null (first-page only)
+/// - types must be empty (no type filtering)
+/// - caseId must be null (not supported)
+/// - professional must be null (not supported)
+///
+/// Does NOT validate:
+/// - dogId, period, pageSize (caller's responsibility)
+/// - Firestore, readers, or any I/O
+void validateRawCanonicalNutritionFirstPageQuery(HealthTimelineQuery query) {
   if (query.cursor != null) {
     throw ArgumentError.value(
       query,
