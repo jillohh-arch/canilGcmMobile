@@ -36,6 +36,8 @@ import {
   DEFAULT_ORCHESTRATOR_CONFIG,
 } from "./health_timeline_orchestrator";
 import {readActivationGuard} from "./health_timeline_activation_guard";
+import {runHealthTimelineRecordShadowTelemetry} from "./health_timeline_shadow_telemetry_callable";
+import {FirestoreHealthTimelineShadowTelemetryAggregateWriter} from "./health_timeline_shadow_telemetry_firestore_adapter";
 
 admin.initializeApp();
 
@@ -8116,5 +8118,21 @@ export const healthTimelineReconcileDaily = onSchedule(
       },
       healthTimelineRuntime,
     );
+  },
+);
+
+export const healthTimelineRecordShadowTelemetry = onCall(
+  {
+    region,
+    timeoutSeconds: 10,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const writer =
+      new FirestoreHealthTimelineShadowTelemetryAggregateWriter(db);
+    return runHealthTimelineRecordShadowTelemetry(request, {
+      recordAggregate: (plan) => writer.recordAggregate(plan),
+      now: () => new Date(),
+    });
   },
 );
