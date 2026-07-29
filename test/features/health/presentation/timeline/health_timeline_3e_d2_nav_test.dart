@@ -17,6 +17,8 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_do
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_view_data.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_navigation_coordinator.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_controller.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_entry_view.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/models/health_timeline_detail_reference.dart';
@@ -63,6 +65,23 @@ HealthTimelineEntryView _e({
       sourceId: sourceId,
     ),
   );
+}
+
+/// Helper de promoção null-safety para getters de teste.
+HealthTimelineController _requireTimelineController(
+  HealthV1EntryScreenState state,
+) {
+  final controller = state.timelineControllerForTest;
+  expect(controller, isNotNull);
+  return controller!;
+}
+
+HealthTimelineFilterSession _requireFilterSession(
+  HealthV1EntryScreenState state,
+) {
+  final session = state.filterSessionForTest;
+  expect(session, isNotNull);
+  return session!;
 }
 
 void main() {
@@ -181,7 +200,11 @@ void main() {
   }) async {
     final card = find.text(cardTitle);
     expect(card, findsOneWidget);
-    await tester.scrollUntilVisible(card, 120, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(
+      card,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pump();
     await tester.tap(card);
     await tester.pump();
@@ -272,8 +295,8 @@ void main() {
       final entryState = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      final timelineBefore = entryState.timelineControllerForTest;
-      final sessionBefore = entryState.filterSessionForTest;
+      final timelineBefore = _requireTimelineController(entryState);
+      final sessionBefore = _requireFilterSession(entryState);
       final filterCountBefore = sessionBefore.activeFilterCount;
 
       await tapCardAndExpectDestination(
@@ -292,10 +315,7 @@ void main() {
         identical(entryAfter.timelineControllerForTest, timelineBefore),
         isTrue,
       );
-      expect(
-        identical(entryAfter.filterSessionForTest, sessionBefore),
-        isTrue,
-      );
+      expect(identical(entryAfter.filterSessionForTest, sessionBefore), isTrue);
       expect(sessionBefore.activeFilterCount, filterCountBefore);
       expect(find.text('Item weight_records:w1'), findsOneWidget);
     });
@@ -347,45 +367,44 @@ void main() {
   });
 
   group('GATE 3E-D3 — Vacinação via health_events (CRUD mobile)', () {
-    testWidgets(
-      'tap health_events vaccination abre VaccinationHistoryScreen',
-      (tester) async {
-        await setPhoneSurface(tester);
-        final items = [
-          _e(
-            id: 'health_events:hv1',
-            at: DateTime.utc(2026, 5, 11, 9),
-            type: HealthTimelineType.vaccination,
-            sourceType: 'health_events',
-            sourceId: 'hv1',
-          ),
-        ];
-        await tester.pumpWidget(
-          wrapProductionNav(
-            HealthV1EntryScreen(
-              dogId: 'dog-1',
-              source: _FixedSummarySource.single(
-                HealthSummaryViewData(dogId: 'dog-1'),
-              ),
-              timelineSource: CoexistenceHealthTimelineSourceFactory.forReaders([
-                MemoryTimelineSourceReader(sourceKey: 'd3', items: items),
-              ]),
-              dogContextOverride: dogContext,
+    testWidgets('tap health_events vaccination abre VaccinationHistoryScreen', (
+      tester,
+    ) async {
+      await setPhoneSurface(tester);
+      final items = [
+        _e(
+          id: 'health_events:hv1',
+          at: DateTime.utc(2026, 5, 11, 9),
+          type: HealthTimelineType.vaccination,
+          sourceType: 'health_events',
+          sourceId: 'hv1',
+        ),
+      ];
+      await tester.pumpWidget(
+        wrapProductionNav(
+          HealthV1EntryScreen(
+            dogId: 'dog-1',
+            source: _FixedSummarySource.single(
+              HealthSummaryViewData(dogId: 'dog-1'),
             ),
+            timelineSource: CoexistenceHealthTimelineSourceFactory.forReaders([
+              MemoryTimelineSourceReader(sourceKey: 'd3', items: items),
+            ]),
+            dogContextOverride: dogContext,
           ),
-        );
-        await tester.pump();
-        await tester.tap(find.text('Histórico'));
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Histórico'));
+      await tester.pumpAndSettle();
 
-        await tapCardAndExpectDestination(
-          tester,
-          cardTitle: 'Item health_events:hv1',
-          destinationType: VaccinationHistoryScreen,
-          expectedDogId: 'dog-1',
-        );
-      },
-    );
+      await tapCardAndExpectDestination(
+        tester,
+        cardTitle: 'Item health_events:hv1',
+        destinationType: VaccinationHistoryScreen,
+        expectedDogId: 'dog-1',
+      );
+    });
   });
 
   group('GATE H — Dog não resolvido no catálogo', () {

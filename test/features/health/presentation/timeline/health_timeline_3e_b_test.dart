@@ -16,6 +16,8 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_vi
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_period_preset.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_quick_type_chips.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_controller.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_cursor.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_entry_view.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_page.dart';
@@ -140,6 +142,23 @@ HealthTimelineEntryView _e({
   );
 }
 
+/// Helper de promoção null-safety para getters de teste.
+HealthTimelineController _requireTimelineController(
+  HealthV1EntryScreenState state,
+) {
+  final controller = state.timelineControllerForTest;
+  expect(controller, isNotNull);
+  return controller!;
+}
+
+HealthTimelineFilterSession _requireFilterSession(
+  HealthV1EntryScreenState state,
+) {
+  final session = state.filterSessionForTest;
+  expect(session, isNotNull);
+  return session!;
+}
+
 void main() {
   setUpAll(() {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -195,8 +214,8 @@ void main() {
         ),
       );
 
-      final c1 = state.timelineControllerForTest;
-      final s1 = state.filterSessionForTest;
+      final c1 = _requireTimelineController(state);
+      final s1 = _requireFilterSession(state);
       final loadsAfterFirst = recording.queries.length;
       expect(loadsAfterFirst, 1);
 
@@ -278,22 +297,17 @@ void main() {
         ),
       );
 
-      await state.filterSessionForTest.applyQuickType(
-        HealthTimelineType.weight,
-      );
+      final filterSession = _requireFilterSession(state);
+      await filterSession.applyQuickType(HealthTimelineType.weight);
       await tester.pumpAndSettle();
-      expect(state.filterSessionForTest.applied.types, {
-        HealthTimelineType.weight,
-      });
+      expect(filterSession.applied.types, {HealthTimelineType.weight});
 
       await tester.tap(find.text('Resumo'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Histórico'));
       await tester.pumpAndSettle();
 
-      expect(state.filterSessionForTest.applied.types, {
-        HealthTimelineType.weight,
-      });
+      expect(filterSession.applied.types, {HealthTimelineType.weight});
       expect(find.text('Item w1'), findsOneWidget);
       expect(find.text('Item c1'), findsNothing);
     });
@@ -366,7 +380,8 @@ void main() {
       final state = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      expect(state.timelineControllerForTest.activeDogId, 'dog-B');
+      final controller = _requireTimelineController(state);
+      expect(controller.activeDogId, 'dog-B');
       expect(find.text('Item a1'), findsNothing);
       expect(find.text('Item b1'), findsOneWidget);
       expect(recording.queries.last.dogId, 'dog-B');
@@ -408,9 +423,8 @@ void main() {
         ),
       );
 
-      await state.filterSessionForTest.applyQuickType(
-        HealthTimelineType.weight,
-      );
+      final filterSession = _requireFilterSession(state);
+      await filterSession.applyQuickType(HealthTimelineType.weight);
       await tester.pumpAndSettle();
       final q = recording.queries.last;
       expect(q.types, {HealthTimelineType.weight});
@@ -436,28 +450,28 @@ void main() {
         ),
       );
 
-      final session = state.filterSessionForTest;
+      final filterSession = _requireFilterSession(state);
       final now = DateTime(2026, 5, 15, 12);
-      session.openDraft();
-      session.setDraftTypes({
+      filterSession.openDraft();
+      filterSession.setDraftTypes({
         HealthTimelineType.weight,
         HealthTimelineType.exam,
       });
-      session.setDraftPeriod(
+      filterSession.setDraftPeriod(
         HealthTimelinePeriodPresets.resolve(
           HealthTimelinePeriodPreset.days30,
           now: now,
         ),
         origin: HealthTimelinePeriodPreset.days30,
       );
-      await session.apply();
+      await filterSession.apply();
       await tester.pumpAndSettle();
 
       final q = recording.queries.last;
       expect(q.types, {HealthTimelineType.weight, HealthTimelineType.exam});
       expect(q.period.isUnbounded, isFalse);
 
-      await session.clearApplied();
+      await filterSession.clearApplied();
       await tester.pumpAndSettle();
       final cleared = recording.queries.last;
       expect(cleared.types, isEmpty);
@@ -583,9 +597,10 @@ void main() {
       await tester.pump();
       await source.waitEntered();
 
-      final timeline = tester
-          .state<HealthV1EntryScreenState>(find.byType(HealthV1EntryScreen))
-          .timelineControllerForTest;
+      final timelineState = tester.state<HealthV1EntryScreenState>(
+        find.byType(HealthV1EntryScreen),
+      );
+      final timeline = _requireTimelineController(timelineState);
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
       await tester.pump();
@@ -614,7 +629,8 @@ void main() {
       final state = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      expect(state.timelineControllerForTest.state, isA<HealthTimelineError>());
+      final controller = _requireTimelineController(state);
+      expect(controller.state, isA<HealthTimelineError>());
     });
 
     testWidgets('offline distinto', (tester) async {
@@ -632,10 +648,8 @@ void main() {
       final state = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      expect(
-        state.timelineControllerForTest.state,
-        isA<HealthTimelineOffline>(),
-      );
+      final controller = _requireTimelineController(state);
+      expect(controller.state, isA<HealthTimelineOffline>());
     });
   });
 
@@ -671,15 +685,17 @@ void main() {
       final state = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      state.filterSessionForTest.updatePageSize(2);
+      final filterSession = _requireFilterSession(state);
+      final controller = _requireTimelineController(state);
+      filterSession.updatePageSize(2);
       await tester.tap(find.text('Histórico'));
       // After prime selectDog uses default pageSize from session constructor (20).
       // Override: apply empty to push pageSize 2.
-      await state.filterSessionForTest.clearApplied();
+      await filterSession.clearApplied();
       await tester.pumpAndSettle();
 
       // Re-set query with pageSize 2 via session update + setQuery path
-      await state.timelineControllerForTest.setQuery(
+      await controller.setQuery(
         HealthTimelineQuery(dogId: 'dog-1', pageSize: 2),
       );
       await tester.pumpAndSettle();
@@ -688,7 +704,7 @@ void main() {
       expect(find.text('Item p1'), findsOneWidget);
       expect(find.text('Item p2'), findsNothing);
 
-      await state.timelineControllerForTest.loadMore();
+      await controller.loadMore();
       await tester.pumpAndSettle();
 
       expect(find.text('Item p0'), findsOneWidget);
@@ -734,22 +750,24 @@ void main() {
 
       // Bloqueia próximo load (loadMore simulado via setQuery).
       gated.blockNext = true;
+      final filterSession = _requireFilterSession(state);
+      final controller = _requireTimelineController(state);
       // ignore: discarded_futures
-      final pending = state.timelineControllerForTest.setQuery(
+      final pending = controller.setQuery(
         HealthTimelineQuery(dogId: 'dog-1', types: {HealthTimelineType.weight}),
       );
       await gated.waitEntered();
 
       // Filtro “rápido” vence com exam (query nova libera gate desligado).
       gated.blockNext = false;
-      await state.filterSessionForTest.applyQuickType(HealthTimelineType.exam);
+      await filterSession.applyQuickType(HealthTimelineType.exam);
       await tester.pumpAndSettle();
 
       gated.release();
       await pending;
       await tester.pumpAndSettle();
 
-      final active = state.timelineControllerForTest.activeQuery;
+      final active = controller.activeQuery;
       expect(active?.types, {HealthTimelineType.exam});
       // Itens weight da query antiga não devem dominar se filter exam venceu.
       expect(find.text('Item w1'), findsNothing);
@@ -775,7 +793,7 @@ void main() {
       final state = tester.state<HealthV1EntryScreenState>(
         find.byType(HealthV1EntryScreen),
       );
-      final timeline = state.timelineControllerForTest;
+      final timeline = _requireTimelineController(state);
 
       await tester.tap(find.text('Resumo'));
       await tester.pumpAndSettle();
