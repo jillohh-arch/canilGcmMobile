@@ -15,13 +15,53 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 
 import 'health_timeline_shadow_comparator.dart';
 import 'health_timeline_shadow_models.dart';
+import 'health_timeline_shadow_runner.dart';
+import 'health_timeline_shadow_runner_executor.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Execution Mode Union
+// ─────────────────────────────────────────────────────────────────────────────
+
+sealed class _HealthTimelineShadowExecutionMode {
+  const _HealthTimelineShadowExecutionMode();
+}
+
+final class _LegacyShadowExecutionMode
+    extends _HealthTimelineShadowExecutionMode {
+  const _LegacyShadowExecutionMode({
+    required this.shadowSource,
+    required this.correlate,
+  });
+
+  final HealthTimelineSource shadowSource;
+  final HealthTimelineCorrelationResult Function({
+    required List<HealthTimelineEntryView> primaryItems,
+    required List<HealthTimelineEntryView> shadowItems,
+  })
+  correlate;
+}
+
+final class _RunnerShadowExecutionMode
+    extends _HealthTimelineShadowExecutionMode {
+  const _RunnerShadowExecutionMode({
+    required this.runner,
+    required this.executor,
+  });
+
+  final HealthTimelineShadowRunner runner;
+  final HealthTimelineShadowRunnerExecutor executor;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sampler
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// HealthTimelineShadowSampler.
 ///
-/// Observes primary and shadow in parallel, fire-and-forget.
+/// Observes primary and shadow (legacy or runner mode) in parallel, fire-and-forget.
 /// Does NOT return a page. Does NOT throw to caller.
 final class HealthTimelineShadowSampler {
-  const HealthTimelineShadowSampler({
+  HealthTimelineShadowSampler({
     required HealthTimelineSource shadowSource,
     required HealthTimelineShadowObserver? observer,
     Duration shadowTimeout = const Duration(seconds: 5),
@@ -31,19 +71,25 @@ final class HealthTimelineShadowSampler {
         })
         correlate =
         correlateHealthTimelineEntries,
-  }) : _shadowSource = shadowSource,
+  }) : _mode = _LegacyShadowExecutionMode(
+         shadowSource: shadowSource,
+         correlate: correlate,
+       ),
        _observer = observer,
-       _shadowTimeout = shadowTimeout,
-       _correlate = correlate;
+       _shadowTimeout = shadowTimeout;
 
-  final HealthTimelineSource _shadowSource;
+  HealthTimelineShadowSampler.withRunner({
+    required HealthTimelineShadowRunner runner,
+    required HealthTimelineShadowRunnerExecutor executor,
+    required HealthTimelineShadowObserver? observer,
+    Duration shadowTimeout = const Duration(seconds: 5),
+  }) : _mode = _RunnerShadowExecutionMode(runner: runner, executor: executor),
+       _observer = observer,
+       _shadowTimeout = shadowTimeout;
+
+  final _HealthTimelineShadowExecutionMode _mode;
   final HealthTimelineShadowObserver? _observer;
   final Duration _shadowTimeout;
-  final HealthTimelineCorrelationResult Function({
-    required List<HealthTimelineEntryView> primaryItems,
-    required List<HealthTimelineEntryView> shadowItems,
-  })
-  _correlate;
 
   /// Evaluates eligibility and observes shadow if eligible.
   ///
@@ -63,7 +109,25 @@ final class HealthTimelineShadowSampler {
       return;
     }
 
-    unawaited(_observeAsync(query, primaryFuture));
+    switch (_mode) {
+      case _LegacyShadowExecutionMode legacy:
+        unawaited(
+          _observeLegacyAsync(
+            query: query,
+            primaryFuture: primaryFuture,
+            mode: legacy,
+          ),
+        );
+
+      case _RunnerShadowExecutionMode runner:
+        unawaited(
+          _observeRunnerAsync(
+            query: query,
+            primaryFuture: primaryFuture,
+            mode: runner,
+          ),
+        );
+    }
   }
 
   HealthTimelineShadowSkipKind? _evaluateEligibility(
@@ -82,12 +146,13 @@ final class HealthTimelineShadowSampler {
     return null;
   }
 
-  Future<void> _observeAsync(
-    HealthTimelineQuery query,
-    Future<HealthTimelinePage> primaryFuture,
-  ) async {
+  Future<void> _observeLegacyAsync({
+    required HealthTimelineQuery query,
+    required Future<HealthTimelinePage> primaryFuture,
+    required _LegacyShadowExecutionMode mode,
+  }) async {
     // Capture shadow with its own timing
-    final shadowCapture = await _captureShadow(query);
+    final shadowCapture = await _captureShadowLegacy(query, mode.shadowSource);
 
     // Wait for primary to complete (needed to compare)
     HealthTimelinePage? primaryPage;
@@ -108,7 +173,7 @@ final class HealthTimelineShadowSampler {
     switch (shadowCapture) {
       case _ShadowCaptureSuccess(:final page, :final elapsedMilliseconds):
         try {
-          final correlation = _correlate(
+          final correlation = mode.correlate(
             primaryItems: primaryPage.items,
             shadowItems: page.items,
           );
@@ -159,11 +224,115 @@ final class HealthTimelineShadowSampler {
     }
   }
 
-  Future<_ShadowCaptureResult> _captureShadow(HealthTimelineQuery query) async {
+  Future<void> _observeRunnerAsync({
+    required HealthTimelineQuery query,
+    required Future<HealthTimelinePage> primaryFuture,
+    required _RunnerShadowExecutionMode mode,
+  }) async {
+    HealthTimelinePage primaryPage;
+
+    try {
+      primaryPage = await primaryFuture;
+    } on Object {
+      await safelyObserveHealthTimelineShadowOutcome(
+        const HealthTimelineShadowFailure(
+          failureKind: HealthTimelineShadowFailureKind.primaryFailure,
+          shadowLatencyMs: null,
+        ),
+        _observer,
+      );
+      return;
+    }
+
+    HealthTimelineShadowRunnerExecutionResult executionResult;
+
+    try {
+      executionResult = await mode.executor.execute(
+        operation: () =>
+            mode.runner.run(query: query, primaryItems: primaryPage.items),
+        timeout: _shadowTimeout,
+      );
+    } on Object {
+      await safelyObserveHealthTimelineShadowOutcome(
+        const HealthTimelineShadowFailure(
+          failureKind: HealthTimelineShadowFailureKind.comparatorFailure,
+          shadowLatencyMs: null,
+        ),
+        _observer,
+      );
+      return;
+    }
+
+    switch (executionResult) {
+      case HealthTimelineShadowRunnerCompleted(
+        :final result,
+        :final elapsedMilliseconds,
+      ):
+        switch (result) {
+          case HealthTimelineShadowRunSuccess success:
+            final outcome = HealthTimelineShadowComparison(
+              primaryCount: success.primaryCount,
+              shadowCount: success.shadowCount,
+              matchedCount: success.matchedCount,
+              missingCount: success.missingCount,
+              extraCount: success.extraCount,
+              uncorrelatedPrimaryCount: success.uncorrelatedPrimaryCount,
+              uncorrelatedShadowCount: success.uncorrelatedShadowCount,
+              ambiguousPrimaryCount: success.ambiguousPrimaryCount,
+              ambiguousShadowCount: success.ambiguousShadowCount,
+              orderingMismatch: success.orderingMismatch,
+              shadowLatencyMs: elapsedMilliseconds,
+            );
+            await safelyObserveHealthTimelineShadowOutcome(outcome, _observer);
+
+          case HealthTimelineShadowRunFailure failure:
+            final outcome = HealthTimelineShadowFailure(
+              failureKind: _normalizeRunnerFailureKind(failure.kind),
+              shadowLatencyMs: elapsedMilliseconds,
+            );
+            await safelyObserveHealthTimelineShadowOutcome(outcome, _observer);
+        }
+
+      case HealthTimelineShadowRunnerTimedOut(:final elapsedMilliseconds):
+        final outcome = HealthTimelineShadowFailure(
+          failureKind: HealthTimelineShadowFailureKind.shadowTimeout,
+          shadowLatencyMs: elapsedMilliseconds,
+        );
+        await safelyObserveHealthTimelineShadowOutcome(outcome, _observer);
+
+      case HealthTimelineShadowRunnerThrew(:final elapsedMilliseconds):
+        final outcome = HealthTimelineShadowFailure(
+          failureKind: HealthTimelineShadowFailureKind.comparatorFailure,
+          shadowLatencyMs: elapsedMilliseconds,
+        );
+        await safelyObserveHealthTimelineShadowOutcome(outcome, _observer);
+    }
+  }
+
+  HealthTimelineShadowFailureKind _normalizeRunnerFailureKind(
+    HealthTimelineShadowFailureKind kind,
+  ) {
+    return switch (kind) {
+      HealthTimelineShadowFailureKind.shadowFailure =>
+        HealthTimelineShadowFailureKind.shadowFailure,
+
+      HealthTimelineShadowFailureKind.comparatorFailure =>
+        HealthTimelineShadowFailureKind.comparatorFailure,
+
+      HealthTimelineShadowFailureKind.primaryFailure ||
+      HealthTimelineShadowFailureKind.shadowTimeout =>
+        HealthTimelineShadowFailureKind.comparatorFailure,
+    };
+  }
+
+  Future<_ShadowCaptureResult> _captureShadowLegacy(
+    HealthTimelineQuery query,
+    HealthTimelineSource shadowSource,
+  ) async {
     final stopwatch = Stopwatch()..start();
 
     try {
-      final page = await _shadowSource.loadPage(query).timeout(_shadowTimeout);
+      final page = await shadowSource.loadPage(query).timeout(_shadowTimeout);
       stopwatch.stop();
       return _ShadowCaptureSuccess(
         page: page,
@@ -206,6 +375,10 @@ final class _ShadowCaptureFailure extends _ShadowCaptureResult {
   const _ShadowCaptureFailure({required super.elapsedMilliseconds});
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Decorator
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// ShadowComparingHealthTimelineSource.
 ///
 /// Decorator that observes primary and shadow in parallel without affecting
@@ -229,6 +402,21 @@ final class ShadowComparingHealthTimelineSource
          observer: observer,
          shadowTimeout: shadowTimeout,
          correlate: correlate,
+       );
+
+  ShadowComparingHealthTimelineSource.withRunner({
+    required HealthTimelineSource primarySource,
+    required HealthTimelineShadowRunner runner,
+    required HealthTimelineShadowObserver? observer,
+    Duration shadowTimeout = const Duration(seconds: 5),
+    HealthTimelineShadowRunnerExecutor runnerExecutor =
+        const DefaultHealthTimelineShadowRunnerExecutor(),
+  }) : _primarySource = primarySource,
+       _sampler = HealthTimelineShadowSampler.withRunner(
+         runner: runner,
+         executor: runnerExecutor,
+         observer: observer,
+         shadowTimeout: shadowTimeout,
        );
 
   final HealthTimelineSource _primarySource;
