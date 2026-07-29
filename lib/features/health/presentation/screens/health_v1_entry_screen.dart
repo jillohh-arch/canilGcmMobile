@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -9,46 +11,51 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/vaccination_history_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/screens/weight_history_screen.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
+import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/coexistence_health_summary_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
 import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
-import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_dashboard.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
-import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
-import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
-import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
-import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
-import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_screen.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_source.dart';
+import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
+import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_dashboard.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/filters/health_timeline_filter_session.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_controller.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_status_views.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
-import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
-import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
-import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
-import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
+
+/// Factory injetável para construir a [HealthTimelineSource] a partir da resolução de modo.
+typedef HealthTimelineSourceForResolution =
+    HealthTimelineSource Function(HealthTimelineModeResolution resolution);
 
 /// Entrada de produção controlada do Health v1.0 (Fase 2E + 3E-B + 4B).
 ///
@@ -69,6 +76,12 @@ class HealthV1EntryScreen extends StatefulWidget {
 
   /// Source da timeline injetável (testes). Produção: Firestore read-only 3C.
   final HealthTimelineSource? timelineSource;
+
+  /// Callback de composição para construir a source a partir da resolução de modo (H3B2).
+  final HealthTimelineSourceForResolution? timelineSourceForResolution;
+
+  /// Timeout para resolução da flag de modo da timeline (H3B2). Default: 1 segundo.
+  final Duration timelineFlagResolutionTimeout;
 
   /// Source da agenda injetável (testes). Produção: [FirestoreHealthScheduleSource].
   final HealthScheduleSource? scheduleSource;
@@ -121,6 +134,8 @@ class HealthV1EntryScreen extends StatefulWidget {
     required this.dogId,
     this.source,
     this.timelineSource,
+    this.timelineSourceForResolution,
+    this.timelineFlagResolutionTimeout = const Duration(seconds: 1),
     this.scheduleSource,
     this.scheduleMutationGateway,
     this.nutritionMutationGateway,
@@ -143,9 +158,9 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   late final HealthSummarySource _source;
   late final HealthSummaryController _controller;
 
-  late final HealthTimelineSource _timelineSource;
-  late final HealthTimelineController _timelineController;
-  late final HealthTimelineFilterSession _filterSession;
+  HealthTimelineSource? _timelineSource;
+  HealthTimelineController? _timelineController;
+  HealthTimelineFilterSession? _filterSession;
 
   late final HealthScheduleSource _scheduleSource;
   late final HealthScheduleController _scheduleController;
@@ -169,21 +184,17 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   /// Primeira carga do read model Nutrição canônico (lazy / pós-mutation).
   bool _nutritionReadPrimed = false;
 
-  /// Resolução da flag capturada uma única vez por instância do State.
-  ///
-  /// Etapa 3B: o resultado não参与到 escolha da source — a source é sempre
-  /// coexistência. O Future é capturado para evolução futura (shadowCompare /
-  /// canonicalPrimary), quando esses modos forem autorizados.
-  // ignore: unused_field
-  Future<HealthTimelineModeResolution>? _timelineModeResolutionFuture;
-
   HealthSummaryController get controllerForTest => _controller;
 
   @visibleForTesting
-  HealthTimelineController get timelineControllerForTest => _timelineController;
+  HealthTimelineSource? get timelineSourceForTest => _timelineSource;
 
   @visibleForTesting
-  HealthTimelineFilterSession get filterSessionForTest => _filterSession;
+  HealthTimelineController? get timelineControllerForTest =>
+      _timelineController;
+
+  @visibleForTesting
+  HealthTimelineFilterSession? get filterSessionForTest => _filterSession;
 
   @visibleForTesting
   bool get timelinePrimedForTest => _timelinePrimed;
@@ -227,38 +238,20 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _controller = HealthSummaryController(source: _source);
     _controller.selectDog(widget.dogId);
 
-    // Etapa 3B: criação imediata da source de coexistência.
-    // A resolução da flag roda em paralelo e não参与到 escolha da source.
+    // H3B2: Precedência absoluta da timelineSource explícita.
     final explicitTimelineSource = widget.timelineSource;
     if (explicitTimelineSource != null) {
-      _timelineSource = explicitTimelineSource;
-      // Source injetada: não resolve provider — preserva precedência.
+      _installTimelineSource(explicitTimelineSource, notify: false);
     } else {
-      _timelineSource = CoexistenceHealthTimelineSourceFactory.forFirestore();
-      // Captura assíncrona única: não bloqueia criação do controller.
-      _timelineModeResolutionFuture = _resolveTimelineModeSafely(
-        widget.timelineFlagProvider,
-      );
+      unawaited(_initializeTimelineFromMode());
     }
-    _timelineController = HealthTimelineController(source: _timelineSource);
-    _filterSession = HealthTimelineFilterSession(
-      controller: _timelineController,
-      dogId: widget.dogId,
-    );
 
-    // Agenda 4D Gate 2: default de produção = Firestore read-only após
-    // índice READY + Rules publicadas + query autenticada real OK.
-    // Injete [scheduleSource] nos testes (fake/empty). Sem fallback
-    // silencioso para Empty em erro de rede/permissão.
-    // Ver docs/health/HEALTH_V1_PHASE_4D_ACTIVATION_REPORT.md.
     _scheduleSource =
         widget.scheduleSource ?? FirestoreHealthScheduleSource.forDefault();
     _scheduleController = HealthScheduleController(
       source: _scheduleSource,
       temporalPolicy: healthSchedulePresentationPolicy(),
     );
-    // Gate 4/5: gateway real como default. Mutações apenas por ação explícita
-    // do usuário (forms/menu) — sem auto-write, sem listener de mutação.
     _scheduleMutationGateway =
         widget.scheduleMutationGateway ??
         FirebaseFunctionsHealthScheduleMutationGateway();
@@ -266,36 +259,81 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
       gateway: _scheduleMutationGateway,
       scheduleController: _scheduleController,
     );
-    // 5D Gate 4: read source Firestore real como default (não Empty/fake).
-    // Lazy first-load: evita I/O canônico até refresh pós-mutation ou
-    // UI futura. Rules canônicas ainda não deployadas em produção.
     _nutritionReadSource =
         widget.nutritionReadSource ??
         CoexistenceNutritionReadSourceFactory.forFirestore();
     _nutritionReadController = HealthNutritionReadController(
       source: _nutritionReadSource,
     );
-    // 5D Gate 3+4: gateway real + read-after-write no read controller canônico.
-    // Sem botão operacional / cutover de FeedingRegistrationScreen.
     _nutritionMutationGateway =
         widget.nutritionMutationGateway ??
         FirebaseFunctionsHealthNutritionMutationGateway();
-    // Preferir holder injetado (sessão MainRoot / dog-keyed). Fallback local
-    // só para testes sem host — NÃO é o owner de produção.
     _nutritionPendingIntentHolder =
         widget.nutritionPendingIntentHolder ??
         HealthNutritionPendingIntentHolder();
     _nutritionMutationController = HealthNutritionMutationController(
       gateway: _nutritionMutationGateway,
       pendingIntentHolder: _nutritionPendingIntentHolder,
-      // Mutation success + refresh failure ≠ mutation failure (Gate 3/4).
       onRefreshAfterSuccess: () async {
         _nutritionReadPrimed = true;
         await _nutritionReadController.ensureDogAndRefresh(widget.dogId);
       },
     );
-    // Sem selectDog de timeline/agenda/nutrição aqui: evita I/O se o usuário
-    // não abrir a seção (ou até a 1ª mutation canônica).
+  }
+
+  void _installTimelineSource(
+    HealthTimelineSource source, {
+    required bool notify,
+  }) {
+    if (_timelineController != null) return;
+    _timelineSource = source;
+    _timelineController = HealthTimelineController(source: source);
+    _filterSession = HealthTimelineFilterSession(
+      controller: _timelineController!,
+      dogId: widget.dogId,
+    );
+    if (notify && mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _initializeTimelineFromMode() async {
+    final resolution = await _resolveTimelineModeSafely(
+      widget.timelineFlagProvider,
+      widget.timelineFlagResolutionTimeout,
+    );
+
+    if (!mounted) return;
+    if (_timelineController != null) return;
+
+    final resolver =
+        widget.timelineSourceForResolution ??
+        ((_) => CoexistenceHealthTimelineSourceFactory.forFirestore());
+
+    final source = resolver(resolution);
+
+    if (!mounted) return;
+    _installTimelineSource(source, notify: true);
+
+    if (_timelinePrimed) {
+      _timelineController?.selectDog(widget.dogId);
+    }
+  }
+
+  Future<HealthTimelineModeResolution> _resolveTimelineModeSafely(
+    HealthTimelineFlagProvider provider,
+    Duration timeout,
+  ) async {
+    try {
+      return await Future<HealthTimelineModeResolution>.sync(
+        provider.resolveMode,
+      ).timeout(timeout);
+    } catch (_) {
+      return const HealthTimelineModeResolution(
+        mode: HealthTimelineMode.legacyOnly,
+        kind: HealthTimelineModeResolutionKind.missingDefault,
+      );
+    }
   }
 
   @override
@@ -305,11 +343,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     final prev = oldWidget.dogId.trim();
     if (next.isNotEmpty && next != prev) {
       _controller.selectDog(next);
-      _filterSession.updateDogId(next);
-      // Só recarrega timeline/agenda/nutrição se já foram abertas nesta vida.
+      _filterSession?.updateDogId(next);
       if (_timelinePrimed) {
         // ignore: discarded_futures
-        _timelineController.selectDog(next);
+        _timelineController?.selectDog(next);
       }
       if (_schedulePrimed) {
         // ignore: discarded_futures
@@ -324,40 +361,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   @override
   void dispose() {
-    _filterSession.dispose();
-    _timelineController.dispose();
+    _filterSession?.dispose();
+    _timelineController?.dispose();
     _scheduleMutationController.dispose();
     _nutritionMutationController.dispose();
     _nutritionReadController.dispose();
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
-  }
-
-  /// Timeout finito para a resolução da flag.
-  ///
-  /// Etapa 3B: 1 segundo. Não configurável por código produtivo.
-  static const Duration _timelineFlagResolutionTimeout = Duration(seconds: 1);
-
-  /// Resolução fail-closed: qualquer erro ou timeout retorna legacyOnly.
-  ///
-  /// O resultado é capturado e ignorado nesta Etapa 3B — a source permanece
-  /// coexistência em todos os casos. O Future existe para evolução futura.
-  Future<HealthTimelineModeResolution> _resolveTimelineModeSafely(
-    HealthTimelineFlagProvider provider,
-  ) async {
-    try {
-      return await provider.resolveMode().timeout(
-        _timelineFlagResolutionTimeout,
-      );
-    } catch (_) {
-      // Fail-closed: erro → legacyOnly + missingDefault.
-      // Sem setState, sem logging, sem swap de source.
-      return const HealthTimelineModeResolution(
-        mode: HealthTimelineMode.legacyOnly,
-        kind: HealthTimelineModeResolutionKind.missingDefault,
-      );
-    }
   }
 
   void _selectSection(HealthShellSection section) {
@@ -381,7 +392,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     if (_timelinePrimed) return;
     _timelinePrimed = true;
     // ignore: discarded_futures
-    _timelineController.selectDog(widget.dogId);
+    _timelineController?.selectDog(widget.dogId);
   }
 
   void _primeScheduleIfNeeded() {
@@ -700,13 +711,20 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
             _selectSection(HealthShellSection.historico);
           },
         ),
-        historico: (_) => HealthTimelineScreen(
-          controller: _timelineController,
-          filterSession: _filterSession,
-          dogDisplayName: dogContext.name,
-          bottomPadding: _timelineBottomPadding(context),
-          onNavigate: _onTimelineNavigate,
-        ),
+        historico: (_) {
+          final controller = _timelineController;
+          final filterSession = _filterSession;
+          if (controller == null || filterSession == null) {
+            return const HealthTimelineLoadingView();
+          }
+          return HealthTimelineScreen(
+            controller: controller,
+            filterSession: filterSession,
+            dogDisplayName: dogContext.name,
+            bottomPadding: _timelineBottomPadding(context),
+            onNavigate: _onTimelineNavigate,
+          );
+        },
         agenda: (_) => HealthScheduleScreen(
           controller: _scheduleController,
           mutationController: _scheduleMutationController,

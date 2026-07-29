@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/memory_timeline_source_reader.dart';
+import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_flags.dart';
@@ -18,6 +20,7 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_se
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_view_data.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/detail/health_timeline_detail_target.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_cursor.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_entry_view.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_page.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_query.dart';
@@ -25,6 +28,7 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_state.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/models/health_timeline_detail_reference.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_status_views.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_user_copy.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_module_header.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section_placeholder.dart';
@@ -367,14 +371,14 @@ void main() {
     );
     expect(state.controllerForTest.activeDogId, 'dog-1');
     expect(state.timelinePrimedForTest, isFalse);
-    expect(state.timelineControllerForTest.activeDogId, isNull);
-    expect(state.filterSessionForTest.dogId, 'dog-1');
+    expect(state.timelineControllerForTest?.activeDogId, isNull);
+    expect(state.filterSessionForTest?.dogId, 'dog-1');
 
     await tester.tap(find.text('Histórico'));
     await tester.pumpAndSettle();
 
     expect(state.timelinePrimedForTest, isTrue);
-    expect(state.timelineControllerForTest.activeDogId, 'dog-1');
+    expect(state.timelineControllerForTest?.activeDogId, 'dog-1');
   });
 
   testWidgets('troca dog A→B atualiza contexto e selectDog sem misturar', (
@@ -443,7 +447,7 @@ void main() {
     expect(state.controllerForTest.activeDogId, 'dog-B');
     // Nova key = novo entry; timeline ainda lazy até abrir Histórico.
     expect(state.timelinePrimedForTest, isFalse);
-    expect(state.filterSessionForTest.dogId, 'dog-B');
+    expect(state.filterSessionForTest?.dogId, 'dog-B');
   });
 
   testWidgets(
@@ -498,8 +502,8 @@ void main() {
       );
       expect(state.controllerForTest.activeDogId, 'dog-B');
       expect(state.timelinePrimedForTest, isTrue);
-      expect(state.timelineControllerForTest.activeDogId, 'dog-B');
-      expect(state.filterSessionForTest.dogId, 'dog-B');
+      expect(state.timelineControllerForTest?.activeDogId, 'dog-B');
+      expect(state.filterSessionForTest?.dogId, 'dog-B');
       expect(source.watchCalls, containsAll(['dog-A', 'dog-B']));
     },
   );
@@ -529,7 +533,7 @@ void main() {
     await tester.pump();
 
     expect(controller.isDisposedForTest, isTrue);
-    expect(timeline.isDisposedForTest, isTrue);
+    expect(timeline?.isDisposedForTest, isTrue);
   });
 
   testWidgets('timeline carrega estado empty sem Firestore após abrir aba', (
@@ -556,7 +560,7 @@ void main() {
     final state = tester.state<HealthV1EntryScreenState>(
       find.byType(HealthV1EntryScreen),
     );
-    expect(state.timelineControllerForTest.state, isA<HealthTimelineEmpty>());
+    expect(state.timelineControllerForTest?.state, isA<HealthTimelineEmpty>());
   });
 
   testWidgets('load em voo + dispose do entry não crasha', (tester) async {
@@ -587,13 +591,755 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
     await tester.pump();
-    expect(timeline.isDisposedForTest, isTrue);
+    expect(timeline?.isDisposedForTest, isTrue);
 
     // Completa o Future após dispose — não deve crashar.
     gate.complete();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
   });
+
+  group('Subgate 4C-C-C-H3B2 — Session-Stable Mode Capture', () {
+    testWidgets(
+      'explicit timeline source is installed immediately by identity',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final explicitSource = _emptyTimelineSource();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineSource: explicitSource,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final state = tester.state<HealthV1EntryScreenState>(
+          find.byType(HealthV1EntryScreen),
+        );
+        expect(state.timelineControllerForTest, isNotNull);
+        expect(identical(state.timelineSourceForTest, explicitSource), isTrue);
+      },
+    );
+
+    testWidgets('explicit timeline source does not call the flag provider', (
+      tester,
+    ) async {
+      await setPhoneSurface(tester);
+      final explicitSource = _emptyTimelineSource();
+      final provider = _RecordingHealthTimelineFlagProvider();
+
+      await tester.pumpWidget(
+        wrap(
+          HealthV1EntryScreen(
+            dogId: 'dog-1',
+            source: _FixedSummarySource.single(
+              HealthSummaryViewData(dogId: 'dog-1'),
+            ),
+            timelineSource: explicitSource,
+            timelineFlagProvider: provider,
+            dogContextOverride: dogContext,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(provider.calls, 0);
+    });
+
+    testWidgets(
+      'explicit timeline source does not call the resolution source factory',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final explicitSource = _emptyTimelineSource();
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineSource: explicitSource,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 0);
+      },
+    );
+
+    testWidgets(
+      'timeline mode provider is called exactly once per entry screen state',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final provider = _RecordingHealthTimelineFlagProvider();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(provider.calls, 1);
+      },
+    );
+
+    testWidgets(
+      'legacyOnly resolution is forwarded once to the source factory',
+      (tester) async {
+        await setPhoneSurface(tester);
+        const expectedRes = HealthTimelineModeResolution(
+          mode: HealthTimelineMode.legacyOnly,
+          kind: HealthTimelineModeResolutionKind.configured,
+        );
+        final provider = _RecordingHealthTimelineFlagProvider(
+          resolution: expectedRes,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(resolver.receivedResolution, equals(expectedRes));
+      },
+    );
+
+    testWidgets(
+      'shadowCompare resolution is forwarded once to the source factory',
+      (tester) async {
+        await setPhoneSurface(tester);
+        const expectedRes = HealthTimelineModeResolution(
+          mode: HealthTimelineMode.shadowCompare,
+          kind: HealthTimelineModeResolutionKind.configured,
+        );
+        final provider = _RecordingHealthTimelineFlagProvider(
+          resolution: expectedRes,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(resolver.receivedResolution, equals(expectedRes));
+      },
+    );
+
+    testWidgets(
+      'canonicalPrimary resolution is forwarded once to the source factory',
+      (tester) async {
+        await setPhoneSurface(tester);
+        const expectedRes = HealthTimelineModeResolution(
+          mode: HealthTimelineMode.canonicalPrimary,
+          kind: HealthTimelineModeResolutionKind.configured,
+        );
+        final provider = _RecordingHealthTimelineFlagProvider(
+          resolution: expectedRes,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(resolver.receivedResolution, equals(expectedRes));
+      },
+    );
+
+    testWidgets(
+      'missingDefault resolution is forwarded without being rewritten',
+      (tester) async {
+        await setPhoneSurface(tester);
+        const expectedRes = HealthTimelineModeResolution(
+          mode: HealthTimelineMode.legacyOnly,
+          kind: HealthTimelineModeResolutionKind.missingDefault,
+        );
+        final provider = _RecordingHealthTimelineFlagProvider(
+          resolution: expectedRes,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(resolver.receivedResolution, equals(expectedRes));
+      },
+    );
+
+    testWidgets(
+      'invalidDefault resolution is forwarded without being rewritten',
+      (tester) async {
+        await setPhoneSurface(tester);
+        const expectedRes = HealthTimelineModeResolution(
+          mode: HealthTimelineMode.legacyOnly,
+          kind: HealthTimelineModeResolutionKind.invalidDefault,
+        );
+        final provider = _RecordingHealthTimelineFlagProvider(
+          resolution: expectedRes,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(resolver.receivedResolution, equals(expectedRes));
+      },
+    );
+
+    testWidgets(
+      'synchronous provider throw falls back to legacyOnly missingDefault',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final provider = _RecordingHealthTimelineFlagProvider(
+          syncException: Exception('Provider sync throw'),
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(
+          resolver.receivedResolution,
+          equals(
+            const HealthTimelineModeResolution(
+              mode: HealthTimelineMode.legacyOnly,
+              kind: HealthTimelineModeResolutionKind.missingDefault,
+            ),
+          ),
+        );
+      },
+    );
+
+    testWidgets(
+      'provider future error falls back to legacyOnly missingDefault',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final provider = _RecordingHealthTimelineFlagProvider(
+          futureError: StateError('Provider future error'),
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+        expect(
+          resolver.receivedResolution,
+          equals(
+            const HealthTimelineModeResolution(
+              mode: HealthTimelineMode.legacyOnly,
+              kind: HealthTimelineModeResolutionKind.missingDefault,
+            ),
+          ),
+        );
+      },
+    );
+
+    testWidgets(
+      'provider timeout falls back once and ignores late completion',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final completer = Completer<HealthTimelineModeResolution>();
+        final provider = _RecordingHealthTimelineFlagProvider(
+          completer: completer,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              timelineFlagResolutionTimeout: const Duration(milliseconds: 100),
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(resolver.calls, 0);
+
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(resolver.calls, 1);
+        expect(
+          resolver.receivedResolution,
+          equals(
+            const HealthTimelineModeResolution(
+              mode: HealthTimelineMode.legacyOnly,
+              kind: HealthTimelineModeResolutionKind.missingDefault,
+            ),
+          ),
+        );
+
+        completer.complete(
+          const HealthTimelineModeResolution(
+            mode: HealthTimelineMode.shadowCompare,
+            kind: HealthTimelineModeResolutionKind.configured,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 1);
+      },
+    );
+
+    testWidgets('rebuild during mode resolution does not call provider again', (
+      tester,
+    ) async {
+      await setPhoneSurface(tester);
+      final completer = Completer<HealthTimelineModeResolution>();
+      final provider = _RecordingHealthTimelineFlagProvider(
+        completer: completer,
+      );
+      final resolver = _RecordingTimelineSourceForResolution();
+
+      await tester.pumpWidget(
+        wrap(
+          HealthV1EntryScreen(
+            key: const ValueKey('rebuild-entry'),
+            dogId: 'dog-1',
+            source: _FixedSummarySource.single(
+              HealthSummaryViewData(dogId: 'dog-1'),
+            ),
+            timelineFlagProvider: provider,
+            timelineSourceForResolution: resolver.resolve,
+            dogContextOverride: dogContext,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(provider.calls, 1);
+
+      await tester.pumpWidget(
+        wrap(
+          HealthV1EntryScreen(
+            key: const ValueKey('rebuild-entry'),
+            dogId: 'dog-1',
+            source: _FixedSummarySource.single(
+              HealthSummaryViewData(dogId: 'dog-1'),
+            ),
+            timelineFlagProvider: provider,
+            timelineSourceForResolution: resolver.resolve,
+            dogContextOverride: dogContext,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(provider.calls, 1);
+
+      completer.complete(
+        const HealthTimelineModeResolution(
+          mode: HealthTimelineMode.legacyOnly,
+          kind: HealthTimelineModeResolutionKind.configured,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(provider.calls, 1);
+      expect(resolver.calls, 1);
+    });
+
+    testWidgets(
+      'opening history while resolving shows loading and primes once after resolution',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final completer = Completer<HealthTimelineModeResolution>();
+        final provider = _RecordingHealthTimelineFlagProvider(
+          completer: completer,
+        );
+        final recordingSource = _RecordingHealthTimelineSource();
+        final resolver = _RecordingTimelineSourceForResolution()
+          ..sourceToReturn = recordingSource;
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Histórico'));
+        await tester.pump();
+
+        expect(find.byType(HealthTimelineLoadingView), findsOneWidget);
+        expect(recordingSource.loadCalls, isEmpty);
+
+        completer.complete(
+          const HealthTimelineModeResolution(
+            mode: HealthTimelineMode.legacyOnly,
+            kind: HealthTimelineModeResolutionKind.configured,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(find.byType(HealthTimelineScreen), findsOneWidget);
+        expect(recordingSource.loadCalls, hasLength(1));
+        expect(provider.calls, 1);
+        expect(resolver.calls, 1);
+      },
+    );
+
+    testWidgets(
+      'dispose before mode resolution prevents source and controller installation',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final completer = Completer<HealthTimelineModeResolution>();
+        final provider = _RecordingHealthTimelineFlagProvider(
+          completer: completer,
+        );
+        final resolver = _RecordingTimelineSourceForResolution();
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+        await tester.pump();
+
+        completer.complete(
+          const HealthTimelineModeResolution(
+            mode: HealthTimelineMode.legacyOnly,
+            kind: HealthTimelineModeResolutionKind.configured,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(resolver.calls, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'refresh and loadMore after resolution do not resolve the mode again',
+      (tester) async {
+        await setPhoneSurface(tester);
+        final provider = _RecordingHealthTimelineFlagProvider();
+
+        const cursorInitial = HealthTimelineCursor('cursor_page_1');
+        const cursorAfterRefresh = HealthTimelineCursor('cursor_page_2');
+
+        final item1 = _entry(
+          id: 'w1',
+          dogId: 'dog-1',
+          at: DateTime.utc(2026, 5, 10),
+          type: HealthTimelineType.weight,
+          sourceType: 'weight_records',
+          sourceId: 'w1',
+        );
+        final item2 = _entry(
+          id: 'w2',
+          dogId: 'dog-1',
+          at: DateTime.utc(2026, 5, 9),
+          type: HealthTimelineType.weight,
+          sourceType: 'weight_records',
+          sourceId: 'w2',
+        );
+        final item3 = _entry(
+          id: 'w3',
+          dogId: 'dog-1',
+          at: DateTime.utc(2026, 5, 8),
+          type: HealthTimelineType.weight,
+          sourceType: 'weight_records',
+          sourceId: 'w3',
+        );
+
+        final page1 = HealthTimelinePage(
+          items: [item1],
+          nextCursor: cursorInitial,
+          hasMore: true,
+        );
+        final page2 = HealthTimelinePage(
+          items: [item2],
+          nextCursor: cursorAfterRefresh,
+          hasMore: true,
+        );
+        final page3 = HealthTimelinePage(
+          items: [item3],
+          nextCursor: null,
+          hasMore: false,
+        );
+
+        final recordingSource = _RecordingHealthTimelineSource(
+          pagesToReturn: [page1, page2, page3],
+        );
+        final resolver = _RecordingTimelineSourceForResolution()
+          ..sourceToReturn = recordingSource;
+
+        await tester.pumpWidget(
+          wrap(
+            HealthV1EntryScreen(
+              dogId: 'dog-1',
+              source: _FixedSummarySource.single(
+                HealthSummaryViewData(dogId: 'dog-1'),
+              ),
+              timelineFlagProvider: provider,
+              timelineSourceForResolution: resolver.resolve,
+              dogContextOverride: dogContext,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await tester.tap(find.text('Histórico'));
+        await tester.pumpAndSettle();
+
+        expect(provider.calls, 1);
+        expect(resolver.calls, 1);
+        expect(resolver.createdSources.length, 1);
+
+        final state = tester.state<HealthV1EntryScreenState>(
+          find.byType(HealthV1EntryScreen),
+        );
+        final controller = state.timelineControllerForTest;
+        expect(controller, isNotNull);
+
+        // 1. Primeira página carregada
+        expect(recordingSource.loadCalls, hasLength(1));
+        expect(recordingSource.loadCalls[0].dogId, 'dog-1');
+        expect(recordingSource.loadCalls[0].cursor, isNull);
+
+        // 2. Refresh real
+        await controller!.refresh();
+        await tester.pumpAndSettle();
+
+        expect(recordingSource.loadCalls, hasLength(2));
+        expect(recordingSource.loadCalls[1].dogId, 'dog-1');
+        expect(recordingSource.loadCalls[1].cursor, isNull);
+
+        // 3. LoadMore real com cursor
+        await controller.loadMore();
+        await tester.pumpAndSettle();
+
+        expect(recordingSource.loadCalls, hasLength(3));
+        expect(recordingSource.loadCalls[2].dogId, 'dog-1');
+        expect(recordingSource.loadCalls[2].cursor, equals(cursorAfterRefresh));
+        expect(
+          identical(recordingSource.loadCalls[2].cursor, cursorAfterRefresh),
+          isTrue,
+        );
+
+        // provider e resolver permanecem com exatamente 1 chamada
+        expect(provider.calls, 1);
+        expect(resolver.calls, 1);
+      },
+    );
+  });
+}
+
+class _RecordingHealthTimelineFlagProvider
+    implements HealthTimelineFlagProvider {
+  _RecordingHealthTimelineFlagProvider({
+    this.resolution,
+    this.completer,
+    this.syncException,
+    this.futureError,
+  });
+
+  final HealthTimelineModeResolution? resolution;
+  final Completer<HealthTimelineModeResolution>? completer;
+  final Object? syncException;
+  final Object? futureError;
+
+  int calls = 0;
+
+  @override
+  Future<HealthTimelineModeResolution> resolveMode() {
+    calls++;
+    if (syncException != null) {
+      throw syncException!;
+    }
+    if (futureError != null) {
+      return Future.error(futureError!);
+    }
+    if (completer != null) {
+      return completer!.future;
+    }
+    return Future.value(
+      resolution ??
+          const HealthTimelineModeResolution(
+            mode: HealthTimelineMode.legacyOnly,
+            kind: HealthTimelineModeResolutionKind.configured,
+          ),
+    );
+  }
+}
+
+class _RecordingTimelineSourceForResolution {
+  int calls = 0;
+  HealthTimelineModeResolution? receivedResolution;
+  HealthTimelineSource? sourceToReturn;
+  final List<HealthTimelineSource> createdSources = [];
+
+  HealthTimelineSource resolve(HealthTimelineModeResolution resolution) {
+    calls++;
+    receivedResolution = resolution;
+    final source = sourceToReturn ?? _emptyTimelineSource();
+    createdSources.add(source);
+    return source;
+  }
+}
+
+class _RecordingHealthTimelineSource implements HealthTimelineSource {
+  _RecordingHealthTimelineSource({this.pagesToReturn = const []});
+
+  final List<HealthTimelinePage> pagesToReturn;
+  final List<HealthTimelineQuery> loadCalls = [];
+
+  @override
+  Future<HealthTimelinePage> loadPage(HealthTimelineQuery query) async {
+    loadCalls.add(query);
+    if (pagesToReturn.isNotEmpty) {
+      if (loadCalls.length <= pagesToReturn.length) {
+        return pagesToReturn[loadCalls.length - 1];
+      }
+      return pagesToReturn.last;
+    }
+    return HealthTimelinePage.empty();
+  }
 }
 
 /// Source que só resolve após [release] — para race dispose vs load.
