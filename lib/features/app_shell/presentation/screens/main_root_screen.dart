@@ -10,7 +10,7 @@ import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
-import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/config/production_health_timeline_flag_provider_factory.dart';
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_composition_factory.dart';
 import 'package:canil_gcm/features/health/data/shadow/production_health_timeline_shadow_composition_factory.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent_session.dart';
@@ -63,7 +63,8 @@ class _MainRootScreenState extends State<MainRootScreen> {
     super.initState();
 
     // H3B3A: inicialização única das dependências de timeline.
-    _healthTimelineFlagProvider = const LocalHealthTimelineFlagProvider();
+    _healthTimelineFlagProvider =
+        ProductionHealthTimelineFlagProviderFactory.forRemoteConfig();
     _healthTimelineCompositionFactory =
         ProductionHealthTimelineShadowCompositionFactory.forFirestore();
 
