@@ -9,6 +9,10 @@ import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_composition_factory.dart';
+import 'package:canil_gcm/features/health/data/shadow/production_health_timeline_shadow_composition_factory.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent_session.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_flags.dart';
@@ -45,16 +49,36 @@ class _MainRootScreenState extends State<MainRootScreen> {
   final HealthNutritionPendingIntentSession _nutritionPendingSession =
       HealthNutritionPendingIntentSession();
 
+  /// Provider de feature flag da timeline (H3B3A).
+  /// Criado uma única vez — lifecycle = MainRootScreen State.
+  late final HealthTimelineFlagProvider _healthTimelineFlagProvider;
+
+  /// Factory de composição produtiva da timeline (H3B3A).
+  /// Criado uma única vez — lifecycle = MainRootScreen State.
+  late final HealthTimelineShadowCompositionFactory
+  _healthTimelineCompositionFactory;
+
   @override
   void initState() {
     super.initState();
+
+    // H3B3A: inicialização única das dependências de timeline.
+    _healthTimelineFlagProvider = const LocalHealthTimelineFlagProvider();
+    _healthTimelineCompositionFactory =
+        ProductionHealthTimelineShadowCompositionFactory.forFirestore();
+
     _screens = [
       ActiveShiftDashboardScreen(
         onOpenTrainingHub: () => _onTabTapped(1),
         onOpenHealthTab: () => _onTabTapped(2),
       ),
       const TrainingHubScreen(),
-      _MainRootHealthTab(nutritionPendingSession: _nutritionPendingSession),
+      _MainRootHealthTab(
+        nutritionPendingSession: _nutritionPendingSession,
+        timelineFlagProvider: _healthTimelineFlagProvider,
+        timelineSourceForResolution:
+            _healthTimelineCompositionFactory.createForResolution,
+      ),
       const HistoryScreen(),
     ];
     PermissionService.requestInitialPermissions();

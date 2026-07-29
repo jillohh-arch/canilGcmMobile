@@ -30,10 +30,20 @@ class _ActiveOccurrenceBanner extends StatelessWidget {
 }
 
 class _MainRootHealthTab extends StatelessWidget {
-  const _MainRootHealthTab({required this.nutritionPendingSession});
+  const _MainRootHealthTab({
+    required this.nutritionPendingSession,
+    required this.timelineFlagProvider,
+    required this.timelineSourceForResolution,
+  });
 
   /// Owner de lifecycle maior que [HealthV1EntryScreen] (MainRoot).
   final HealthNutritionPendingIntentSession nutritionPendingSession;
+
+  /// Provider de feature flag da timeline (H3B3A).
+  final HealthTimelineFlagProvider timelineFlagProvider;
+
+  /// Callback de composição da source via factory (H3B3A).
+  final HealthTimelineSourceForResolution timelineSourceForResolution;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +78,9 @@ class _MainRootHealthTab extends StatelessWidget {
         key: ValueKey<String>('health-v1-$id'),
         dogId: id,
         nutritionPendingIntentHolder: nutritionPendingSession.holderFor(id),
+        // H3B3A: injeção de dependências de timeline via composition root.
+        timelineFlagProvider: timelineFlagProvider,
+        timelineSourceForResolution: timelineSourceForResolution,
       );
     }
 
