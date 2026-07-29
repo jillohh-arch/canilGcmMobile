@@ -4,11 +4,13 @@ import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_mod
 
 /// Tipos de outcome sanitizados para observabilidade do shadow.
 enum HealthTimelineShadowTelemetryOutcomeType {
-  comparison,
-  skipped,
-  failure;
+  comparison('comparison'),
+  skipped('skipped'),
+  failure('failure');
 
-  String get wireValue => name;
+  const HealthTimelineShadowTelemetryOutcomeType(this.wireValue);
+
+  final String wireValue;
 }
 
 /// Buckets de contagens numéricas para eliminar cardinalidade e reidentificação.
