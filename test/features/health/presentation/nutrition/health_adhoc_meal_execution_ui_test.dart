@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_commands.dart';
-import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_errors.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
-import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 
 final class _SpyAdhocGateway implements HealthNutritionMutationGateway {
   int calls = 0;
@@ -67,9 +65,7 @@ void main() {
 
   Widget buildApp(Widget child) {
     return MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(child: child),
-      ),
+      home: Scaffold(body: SingleChildScrollView(child: child)),
     );
   }
 
@@ -116,7 +112,10 @@ void main() {
     expect(gateway.lastCommand!.dogId, equals('dog-1'));
     expect(gateway.lastCommand!.offeredGrams, equals(150.0));
     expect(gateway.lastCommand!.consumedGrams, isNull);
-    expect(gateway.lastCommand!.acceptance.value, equals(MealAcceptance.unknown));
+    expect(
+      gateway.lastCommand!.acceptance.value,
+      equals(MealAcceptance.unknown),
+    );
     expect(gateway.lastCommand!.attachmentRefs, isEmpty);
     expect(gateway.lastCommand!.operationId, equals('op-adhoc-1'));
   });
@@ -152,10 +151,7 @@ void main() {
     await tester.tap(submitFinder);
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Informe uma quantidade maior que zero.'),
-      findsOneWidget,
-    );
+    expect(find.text('Informe uma quantidade maior que zero.'), findsOneWidget);
     expect(gateway.calls, equals(0));
   });
 

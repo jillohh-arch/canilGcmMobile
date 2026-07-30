@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_commands.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
-import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 
@@ -63,9 +62,18 @@ void main() {
 
       // Verificar que não há campos de pending/completed
       expect(find.textContaining('pending', skipOffstage: false), findsNothing);
-      expect(find.textContaining('completed', skipOffstage: false), findsNothing);
-      expect(find.textContaining('concluído', skipOffstage: false), findsNothing);
-      expect(find.textContaining('Pendente', skipOffstage: false), findsNothing);
+      expect(
+        find.textContaining('completed', skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('concluído', skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Pendente', skipOffstage: false),
+        findsNothing,
+      );
     });
 
     testWidgets('unidade default é tablet', (tester) async {
@@ -111,7 +119,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Entrada de texto no campo de nome
-      final nameField = find.widgetWithText(TextFormField, 'Nome do suplemento');
+      final nameField = find.widgetWithText(
+        TextFormField,
+        'Nome do suplemento',
+      );
       expect(nameField, findsOneWidget);
       await tester.enterText(nameField, 'Vitamina C');
 

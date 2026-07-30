@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
@@ -41,7 +40,11 @@ final class _FakeCanonicalMealReader implements NutritionCanonicalMealReader {
 }
 
 void main() {
-  final actor = RecordedBy(uid: 'user-1', name: 'Operador', internalRole: 'operator');
+  final actor = RecordedBy(
+    uid: 'user-1',
+    name: 'Operador',
+    internalRole: 'operator',
+  );
 
   test(
     'F-04 Adhoc Non-Contamination: 1 planned meal completed + 1 adhoc meal log => planned completed = 1 / 3, total offered = 175g, known consumed = 50g',
@@ -127,11 +130,13 @@ void main() {
       final mealsList = [plannedMeal, adhocMeal];
 
       final readItems = mealsList
-          .map((m) => NutritionMealReadItem(
-                meal: m,
-                origin: NutritionDataOrigin.canonical,
-                mergeKey: m.id,
-              ))
+          .map(
+            (m) => NutritionMealReadItem(
+              meal: m,
+              origin: NutritionDataOrigin.canonical,
+              mergeKey: m.id,
+            ),
+          )
           .toList();
 
       final todayModel = NutritionTodayReadModel(
@@ -151,7 +156,9 @@ void main() {
       final offeredSum = HealthNutritionTodayFormatters.offeredSum(readItems);
       expect(offeredSum, 175.0); // 125g + 50g
 
-      final consumedAgg = HealthNutritionTodayFormatters.consumedAggregation(readItems);
+      final consumedAgg = HealthNutritionTodayFormatters.consumedAggregation(
+        readItems,
+      );
       expect(consumedAgg.knownSum, 50.0); // Only adhoc 50g is known
       expect(consumedAgg.hasUnknownConsumed, isTrue); // Planned 125g is null
 

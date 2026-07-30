@@ -6,7 +6,6 @@ import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
-import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 
 final class _FakeCanonicalPlanReader implements NutritionCanonicalPlanReader {
@@ -38,7 +37,11 @@ final class _FakeCanonicalMealReader implements NutritionCanonicalMealReader {
 }
 
 void main() {
-  final actor = RecordedBy(uid: 'user-1', name: 'Operador', internalRole: 'operator');
+  final actor = RecordedBy(
+    uid: 'user-1',
+    name: 'Operador',
+    internalRole: 'operator',
+  );
 
   test(
     'F-02 Canonical Summary Consistency & 125g Semantics: Active canonical plan + 1 planned meal (offered=125, consumed=null) returns available, offeredAmount=125, consumedAmount=null',

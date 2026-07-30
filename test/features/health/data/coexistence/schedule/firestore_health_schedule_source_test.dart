@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/health_schedule_cursor_codec.dart';
-import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_cursor.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_query.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_source.dart';

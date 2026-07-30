@@ -45,7 +45,6 @@ void main() {
       when(() => mockVm.addListener(any())).thenReturn(null);
       when(() => mockVm.removeListener(any())).thenReturn(null);
       when(() => mockVm.dispose()).thenReturn(null);
-      when(() => mockVm.hasListeners).thenReturn(false);
       when(
         () => mockVm.loadForDog(any(), forceReload: any(named: 'forceReload')),
       ).thenAnswer((_) async {});

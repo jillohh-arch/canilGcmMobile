@@ -13,7 +13,6 @@ import 'package:canil_gcm/features/health/data/coexistence/summary/health_summar
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_state.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 

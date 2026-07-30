@@ -1,6 +1,5 @@
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
-import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_document_parser.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,7 +54,10 @@ void main() {
       expect(plan.mealSchedule, hasLength(2));
       expect(plan.professional, isNotNull);
       expect(plan.professional!.name, 'Dr. Ana');
-      expect(plan.professional!.registrationType, ProfessionalRegistrationType.crmv);
+      expect(
+        plan.professional!.registrationType,
+        ProfessionalRegistrationType.crmv,
+      );
       expect(plan.professional!.registrationNumber, '12345');
       expect(plan.professional!.clinic, 'Clínica K9');
       expect(plan.professional!.specialty, 'Nutrologia');
@@ -172,7 +174,10 @@ void main() {
         },
       );
       expect(plan.professional, isNotNull);
-      expect(plan.professional!.registrationType, ProfessionalRegistrationType.other);
+      expect(
+        plan.professional!.registrationType,
+        ProfessionalRegistrationType.other,
+      );
     });
 
     test('source_document com id = parseado', () {
@@ -190,9 +195,7 @@ void main() {
           'schema_version': 1,
           'revision': 1,
           'meal_schedule': <Map<String, Object>>[],
-          'source_document': {
-            'health_document_id': 'doc-123',
-          },
+          'source_document': {'health_document_id': 'doc-123'},
         },
       );
       expect(plan.sourceDocument, isNotNull);
@@ -473,13 +476,19 @@ void main() {
 
     test('todos os 7 units canônicos aceitos', () {
       final units = ['mg', 'g', 'ml', 'scoop', 'tablet', 'drop', 'other'];
-      final supplements = units.asMap().entries.map((e) => {
-        'id': 'sup-${e.key}',
-        'name': 'Suplemento ${e.key}',
-        'dose': 1.0,
-        'unit': e.value,
-        'frequency': 'QD',
-      }).toList();
+      final supplements = units
+          .asMap()
+          .entries
+          .map(
+            (e) => {
+              'id': 'sup-${e.key}',
+              'name': 'Suplemento ${e.key}',
+              'dose': 1.0,
+              'unit': e.value,
+              'frequency': 'QD',
+            },
+          )
+          .toList();
 
       final plan = NutritionPlanDocumentParser.parse(
         id: 'p1',
@@ -532,39 +541,43 @@ void main() {
       );
     });
 
-    test('dose textual legado (string numérica) rejeitada — contrato canônico é number', () {
-      // String numérica em documento canônico deve ser rejeitada.
-      // O backend também rejeita strings (functions/invalid-argument).
-      // O Web sempre envia number — strings indicam documento malformado.
-      expect(
-        () => NutritionPlanDocumentParser.parse(
-          id: 'p1',
-          dogId: 'dog-1',
-          data: {
-            'food_type': 'Ração',
-            'amount_grams_per_day': 400,
-            'meals_per_day': 2,
-            'valid_from': '2026-07-01T00:00:00Z',
-            'timezone': 'America/Sao_Paulo',
-            'status': 'active',
-            'recorded_by': recordedBy,
-            'schema_version': 1,
-            'revision': 1,
-            'meal_schedule': <Map<String, Object>>[],
-            'supplements': [
-              {
-                'id': 'sup-1',
-                'name': 'Glucosamina',
-                'dose': '500', // string numérica — rejeitada no contrato canônico
-                'unit': 'mg',
-                'frequency': 'QD',
-              },
-            ],
-          },
-        ),
-        throwsA(isA<HealthDomainException>()),
-      );
-    });
+    test(
+      'dose textual legado (string numérica) rejeitada — contrato canônico é number',
+      () {
+        // String numérica em documento canônico deve ser rejeitada.
+        // O backend também rejeita strings (functions/invalid-argument).
+        // O Web sempre envia number — strings indicam documento malformado.
+        expect(
+          () => NutritionPlanDocumentParser.parse(
+            id: 'p1',
+            dogId: 'dog-1',
+            data: {
+              'food_type': 'Ração',
+              'amount_grams_per_day': 400,
+              'meals_per_day': 2,
+              'valid_from': '2026-07-01T00:00:00Z',
+              'timezone': 'America/Sao_Paulo',
+              'status': 'active',
+              'recorded_by': recordedBy,
+              'schema_version': 1,
+              'revision': 1,
+              'meal_schedule': <Map<String, Object>>[],
+              'supplements': [
+                {
+                  'id': 'sup-1',
+                  'name': 'Glucosamina',
+                  'dose':
+                      '500', // string numérica — rejeitada no contrato canônico
+                  'unit': 'mg',
+                  'frequency': 'QD',
+                },
+              ],
+            },
+          ),
+          throwsA(isA<HealthDomainException>()),
+        );
+      },
+    );
 
     test('dose zero rejeitada', () {
       expect(

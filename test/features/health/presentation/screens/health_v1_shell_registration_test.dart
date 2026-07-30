@@ -8,7 +8,6 @@ import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gatew
 import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_screen.dart';
-import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
@@ -130,10 +129,7 @@ void main() {
       expect(find.byType(FeedingRegistrationScreen), findsNothing);
 
       // CRITICAL ASSERTION 3: Placeholder toast string is NOT present
-      expect(
-        find.textContaining('Registro Health v1 em breve'),
-        findsNothing,
-      );
+      expect(find.textContaining('Registro Health v1 em breve'), findsNothing);
     },
   );
 }

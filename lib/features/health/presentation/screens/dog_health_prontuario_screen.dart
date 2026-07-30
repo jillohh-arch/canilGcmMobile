@@ -22,7 +22,6 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
-import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
@@ -30,7 +29,6 @@ import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
-import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -231,7 +229,8 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
     BuildContext? hostContext,
     HealthNutritionMutationController? mutationControllerOverride,
   }) async {
-    final controller = mutationControllerOverride ??
+    final controller =
+        mutationControllerOverride ??
         HealthNutritionMutationController(
           gateway: FirebaseFunctionsHealthNutritionMutationGateway(),
         );

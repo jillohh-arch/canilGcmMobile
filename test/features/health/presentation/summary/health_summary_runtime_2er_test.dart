@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
-import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dashboard.dart';

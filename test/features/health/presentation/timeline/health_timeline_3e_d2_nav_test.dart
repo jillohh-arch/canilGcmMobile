@@ -134,7 +134,6 @@ void main() {
     when(() => mock.addListener(any())).thenReturn(null);
     when(() => mock.removeListener(any())).thenReturn(null);
     when(() => mock.dispose()).thenReturn(null);
-    when(() => mock.hasListeners).thenReturn(false);
     when(
       () => mock.loadForDog(any(), forceReload: any(named: 'forceReload')),
     ).thenAnswer((_) async {});

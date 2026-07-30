@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
-import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
@@ -120,7 +119,7 @@ class HealthSummaryNutritionReader {
 
       for (final item in meals) {
         final o = item.meal.offeredGrams;
-        if (o != null && o.isFinite) {
+        if (o.isFinite) {
           anyOffered = true;
           sumOffered += o;
         }
@@ -135,7 +134,9 @@ class HealthSummaryNutritionReader {
       if (anyConsumed) consumedTotal = sumConsumed;
 
       final plannedAmountDouble = plannedGrams?.toDouble();
-      final plannedCompleted = meals.where((item) => item.meal.isPlanned).length;
+      final plannedCompleted = meals
+          .where((item) => item.meal.isPlanned)
+          .length;
 
       return HealthSummarySectionData.available(
         HealthSummaryNutritionTodayView(
