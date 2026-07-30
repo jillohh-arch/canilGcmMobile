@@ -6,8 +6,8 @@ import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart'
 import 'package:canil_gcm/features/health/data/config/health_timeline_remote_config_client.dart';
 import 'package:canil_gcm/features/health/data/config/remote_config_health_timeline_flag_provider.dart';
 
-/// Factory produtiva que encapsula a composição completa do provider de feature flag
-/// da timeline Health com lock local explícito em legacyOnly.
+/// Factory produtiva que encapsula a composição completa do provider de feature
+/// flag da timeline Health com lock local que bloqueia canonicalPrimary.
 ///
 /// O shell não precisa conhecer FirebaseRemoteConfig, o client SDK, nem o
 /// provider cache-first. Esta factory resolve todos esses detalhes internamente.
@@ -49,29 +49,34 @@ abstract final class ProductionHealthTimelineFlagProviderFactory {
       fetchTimeout: fetchTimeout,
       minimumFetchInterval: minimumFetchInterval,
     );
-    return withLegacyOnlyLock(delegate: delegate);
+    return withCanonicalPrimaryLock(delegate: delegate);
   }
 
-  /// Envolve [delegate] com o lock produtivo que permite somente legacyOnly.
+  /// Envolve [delegate] com o lock produtivo que bloqueia canonicalPrimary.
   ///
   /// O delegate continua sendo executado normalmente, preservando leitura
-  /// cache-first e refresh em background. Modos não autorizados são
-  /// convertidos para legacyOnly/invalidDefault.
-  static HealthTimelineFlagProvider withLegacyOnlyLock({
+  /// cache-first e refresh em background. legacyOnly e shadowCompare são
+  /// permitidos; canonicalPrimary é convertido para
+  /// legacyOnly/invalidDefault. Valores inválidos e exceptions permanecem
+  /// fail-closed pelo provider remoto e por este guard.
+  static HealthTimelineFlagProvider withCanonicalPrimaryLock({
     required HealthTimelineFlagProvider delegate,
   }) {
-    return _LegacyOnlyLockedHealthTimelineFlagProvider(delegate: delegate);
+    return _CanonicalPrimaryLockedHealthTimelineFlagProvider(
+      delegate: delegate,
+    );
   }
 }
 
-/// Guard local que restringe o modo entregue ao composition root a legacyOnly.
+/// Guard local que impede canonicalPrimary no composition root.
 ///
 /// O delegate pode ler cache, instalar defaults e iniciar refresh background
-/// normalmente. O guard apenas converte qualquer modo diferente de legacyOnly
-/// para legacyOnly/invalidDefault antes de entregar ao consumidor.
-final class _LegacyOnlyLockedHealthTimelineFlagProvider
+/// normalmente. legacyOnly e shadowCompare atravessam inalterados;
+/// canonicalPrimary é convertido para legacyOnly/invalidDefault. Valores
+/// inválidos e exceptions continuam fechando em legacyOnly.
+final class _CanonicalPrimaryLockedHealthTimelineFlagProvider
     implements HealthTimelineFlagProvider {
-  const _LegacyOnlyLockedHealthTimelineFlagProvider({
+  const _CanonicalPrimaryLockedHealthTimelineFlagProvider({
     required HealthTimelineFlagProvider delegate,
   }) : _delegate = delegate;
 
@@ -90,15 +95,16 @@ final class _LegacyOnlyLockedHealthTimelineFlagProvider
       );
     }
 
-    // Permitir somente legacyOnly — preservar kind original.
-    if (resolution.mode == HealthTimelineMode.legacyOnly) {
-      return resolution;
-    }
+    switch (resolution.mode) {
+      case HealthTimelineMode.legacyOnly:
+      case HealthTimelineMode.shadowCompare:
+        return resolution;
 
-    // shadowCompare ou canonicalPrimary → bloquear.
-    return const HealthTimelineModeResolution(
-      mode: HealthTimelineMode.legacyOnly,
-      kind: HealthTimelineModeResolutionKind.invalidDefault,
-    );
+      case HealthTimelineMode.canonicalPrimary:
+        return const HealthTimelineModeResolution(
+          mode: HealthTimelineMode.legacyOnly,
+          kind: HealthTimelineModeResolutionKind.invalidDefault,
+        );
+    }
   }
 }

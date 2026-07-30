@@ -165,7 +165,7 @@ void main() {
     });
 
     test(
-      'F6 — remote shadowCompare é bloqueado para legacyOnly/invalidDefault',
+      'F6 — remote shadowCompare/configured atravessa o guard inalterado',
       () async {
         final client = _FakeClient()
           ..returnValue = const HealthTimelineRemoteValue(
@@ -179,11 +179,8 @@ void main() {
 
         final res = await provider.resolveMode();
 
-        expect(res.mode, equals(HealthTimelineMode.legacyOnly));
-        expect(
-          res.kind,
-          equals(HealthTimelineModeResolutionKind.invalidDefault),
-        );
+        expect(res.mode, equals(HealthTimelineMode.shadowCompare));
+        expect(res.kind, equals(HealthTimelineModeResolutionKind.configured));
       },
     );
 
@@ -233,8 +230,8 @@ void main() {
       },
     );
 
-    test('F9 — refresh background ainda é iniciado mesmo quando '
-        'shadowCompare é bloqueado pelo guard', () async {
+    test('F9 — refresh background continua sendo iniciado quando '
+        'shadowCompare é permitido pelo guard', () async {
       final fetchBlocker = Completer<void>();
       final client = _FakeClient()
         ..fetchBlocker = fetchBlocker
@@ -249,9 +246,9 @@ void main() {
 
       final res = await provider.resolveMode();
 
-      // Guard bloqueou shadowCompare.
-      expect(res.mode, equals(HealthTimelineMode.legacyOnly));
-      expect(res.kind, equals(HealthTimelineModeResolutionKind.invalidDefault));
+      // Guard permitiu shadowCompare sem alterar a resolução.
+      expect(res.mode, equals(HealthTimelineMode.shadowCompare));
+      expect(res.kind, equals(HealthTimelineModeResolutionKind.configured));
 
       // fetchAndActivate foi chamado (refresh background iniciado).
       expect(
@@ -263,22 +260,19 @@ void main() {
       fetchBlocker.complete();
     });
 
-    test(
-      'F10 — delegate exception retorna legacyOnly/missingDefault',
-      () async {
-        final provider =
-            ProductionHealthTimelineFlagProviderFactory.withLegacyOnlyLock(
-              delegate: const _ThrowingHealthTimelineFlagProvider(),
-            );
+    test('F10 — delegate exception retorna legacyOnly/missingDefault', () async {
+      final provider =
+          ProductionHealthTimelineFlagProviderFactory.withCanonicalPrimaryLock(
+            delegate: const _ThrowingHealthTimelineFlagProvider(),
+          );
 
-        final resolution = await provider.resolveMode();
+      final resolution = await provider.resolveMode();
 
-        expect(resolution.mode, equals(HealthTimelineMode.legacyOnly));
-        expect(
-          resolution.kind,
-          equals(HealthTimelineModeResolutionKind.missingDefault),
-        );
-      },
-    );
+      expect(resolution.mode, equals(HealthTimelineMode.legacyOnly));
+      expect(
+        resolution.kind,
+        equals(HealthTimelineModeResolutionKind.missingDefault),
+      );
+    });
   });
 }
