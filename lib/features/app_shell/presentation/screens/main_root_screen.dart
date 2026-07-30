@@ -12,7 +12,9 @@ import 'package:canil_gcm/features/history/presentation/screens/history_screen.d
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/config/production_health_timeline_flag_provider_factory.dart';
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_composition_factory.dart';
+import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_models.dart';
 import 'package:canil_gcm/features/health/data/shadow/production_health_timeline_shadow_composition_factory.dart';
+import 'package:canil_gcm/features/health/data/shadow/telemetry/production_health_timeline_shadow_telemetry_factory.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_pending_intent_session.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_flags.dart';
@@ -58,6 +60,12 @@ class _MainRootScreenState extends State<MainRootScreen> {
   late final HealthTimelineShadowCompositionFactory
   _healthTimelineCompositionFactory;
 
+  /// Observer de telemetria shadow (H3B3E-D1).
+  /// Criado uma única vez — lifecycle = MainRootScreen State.
+  /// Fail-silent por design: nenhum outcome é transmitido até que
+  /// shadowCompare seja ativado via Remote Config.
+  late final HealthTimelineShadowObserver _healthTimelineShadowObserver;
+
   @override
   void initState() {
     super.initState();
@@ -65,8 +73,16 @@ class _MainRootScreenState extends State<MainRootScreen> {
     // H3B3A: inicialização única das dependências de timeline.
     _healthTimelineFlagProvider =
         ProductionHealthTimelineFlagProviderFactory.forRemoteConfig();
+
+    // H3B3E-D1: observer de telemetria shadow (fail-silent).
+    // Nenhum callable é invocado até que shadowCompare seja ativado.
+    _healthTimelineShadowObserver =
+        ProductionHealthTimelineShadowTelemetryFactory.create();
+
     _healthTimelineCompositionFactory =
-        ProductionHealthTimelineShadowCompositionFactory.forFirestore();
+        ProductionHealthTimelineShadowCompositionFactory.forFirestore(
+          observer: _healthTimelineShadowObserver,
+        );
 
     _screens = [
       ActiveShiftDashboardScreen(
