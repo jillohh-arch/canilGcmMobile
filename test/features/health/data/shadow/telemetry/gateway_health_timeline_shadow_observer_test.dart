@@ -2,7 +2,7 @@
 //
 // Tests for GatewayHealthTimelineShadowObserver.
 //
-// Exactly 10 declarations covering:
+// 8 test declarations covering:
 // - O1: comparison mapped and recorded once
 // - O2: skipped mapped and recorded once
 // - O3: failure mapped and recorded once
@@ -51,6 +51,26 @@ class FakeHealthTimelineShadowTelemetryGateway
   }
 }
 
+final class _SyncThrowGateway implements HealthTimelineShadowTelemetryGateway {
+  int calls = 0;
+
+  @override
+  Future<void> record(HealthTimelineShadowTelemetryRecord record) {
+    calls++;
+    throw StateError('sync gateway failure');
+  }
+}
+
+final class _AsyncThrowGateway implements HealthTimelineShadowTelemetryGateway {
+  int calls = 0;
+
+  @override
+  Future<void> record(HealthTimelineShadowTelemetryRecord record) {
+    calls++;
+    return Future<void>.error(StateError('async gateway failure'));
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,37 +85,42 @@ void main() {
   });
 
   group('O1 — comparison mapped and recorded once', () {
-    test('onComparison maps to record and calls gateway exactly once', () {
-      observer.onComparison(
-        const HealthTimelineShadowComparison(
-          primaryCount: 5,
-          shadowCount: 3,
-          matchedCount: 2,
-          missingCount: 1,
-          extraCount: 0,
-          uncorrelatedPrimaryCount: 1,
-          uncorrelatedShadowCount: 1,
-          ambiguousPrimaryCount: 0,
-          ambiguousShadowCount: 0,
-          orderingMismatch: false,
-          shadowLatencyMs: 150,
-        ),
-      );
-      expect(fakeGateway.records.length, 1);
-      expect(
-        fakeGateway.records.single,
-        isA<HealthTimelineShadowTelemetryComparison>(),
-      );
-    });
+    test(
+      'onComparison maps to record and calls gateway exactly once',
+      () async {
+        observer.onComparison(
+          const HealthTimelineShadowComparison(
+            primaryCount: 5,
+            shadowCount: 3,
+            matchedCount: 2,
+            missingCount: 1,
+            extraCount: 0,
+            uncorrelatedPrimaryCount: 1,
+            uncorrelatedShadowCount: 1,
+            ambiguousPrimaryCount: 0,
+            ambiguousShadowCount: 0,
+            orderingMismatch: false,
+            shadowLatencyMs: 150,
+          ),
+        );
+        await pumpEventQueue();
+        expect(fakeGateway.records.length, 1);
+        expect(
+          fakeGateway.records.single,
+          isA<HealthTimelineShadowTelemetryComparison>(),
+        );
+      },
+    );
   });
 
   group('O2 — skipped mapped and recorded once', () {
-    test('onSkipped maps to record and calls gateway exactly once', () {
+    test('onSkipped maps to record and calls gateway exactly once', () async {
       observer.onSkipped(
         const HealthTimelineShadowSkipped(
           skipKind: HealthTimelineShadowSkipKind.notFirstPage,
         ),
       );
+      await pumpEventQueue();
       expect(fakeGateway.records.length, 1);
       expect(
         fakeGateway.records.single,
@@ -105,13 +130,14 @@ void main() {
   });
 
   group('O3 — failure mapped and recorded once', () {
-    test('onFailure maps to record and calls gateway exactly once', () {
+    test('onFailure maps to record and calls gateway exactly once', () async {
       observer.onFailure(
         const HealthTimelineShadowFailure(
           failureKind: HealthTimelineShadowFailureKind.comparatorFailure,
           shadowLatencyMs: 6000,
         ),
       );
+      await pumpEventQueue();
       expect(fakeGateway.records.length, 1);
       expect(
         fakeGateway.records.single,
@@ -121,71 +147,77 @@ void main() {
   });
 
   group('O4 — gateway sync throw absorbed', () {
-    test('O7 — O8 — O9: sync throw is absorbed, no rethrow, zero retry', () {
-      fakeGateway.whenError(Exception('sync error'));
-      // Should not throw
-      observer.onSkipped(
-        const HealthTimelineShadowSkipped(
-          skipKind: HealthTimelineShadowSkipKind.unsupportedTypes,
-        ),
-      );
-      // Should complete normally
-      expect(fakeGateway.records.length, 0);
-    });
+    test(
+      'O7 — O8 — O9: sync throw is absorbed, no rethrow, zero retry',
+      () async {
+        final syncGateway = _SyncThrowGateway();
+        final syncObserver = GatewayHealthTimelineShadowObserver(
+          gateway: syncGateway,
+        );
+
+        syncObserver.onSkipped(
+          const HealthTimelineShadowSkipped(
+            skipKind: HealthTimelineShadowSkipKind.unsupportedTypes,
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(syncGateway.calls, equals(1));
+      },
+    );
   });
 
   group('O5 — gateway async throw absorbed', () {
     test('async throw is absorbed and completes normally', () async {
-      fakeGateway.whenError(Exception('async error'));
-      // Should not throw even though gateway throws
-      observer.onSkipped(
+      final asyncGateway = _AsyncThrowGateway();
+      final asyncObserver = GatewayHealthTimelineShadowObserver(
+        gateway: asyncGateway,
+      );
+
+      asyncObserver.onSkipped(
         const HealthTimelineShadowSkipped(
           skipKind: HealthTimelineShadowSkipKind.unsupportedProfessional,
         ),
       );
-      // Observer swallows the exception; callback completes normally
-      expect(fakeGateway.records.length, 0);
+      await pumpEventQueue();
+
+      expect(asyncGateway.calls, equals(1));
     });
   });
 
   group('O6 — mapper throw absorbed', () {
-    test('mapper throw does not propagate', () {
-      // The mapper is static and pure, so it won't throw for valid outcomes.
-      // This test verifies the fail-silent wrapper catches any potential error.
-      // Since we can't inject a failing mapper, we verify the structure:
-      // - observer wraps mapper + gateway in try-catch
-      // - O4/O5 already prove the catch works
-    });
-    test('valid outcomes complete without throwing', () {
-      expect(
-        () => observer.onComparison(
-          const HealthTimelineShadowComparison(
-            primaryCount: 0,
-            shadowCount: 0,
-            matchedCount: 0,
-            missingCount: 0,
-            extraCount: 0,
-            uncorrelatedPrimaryCount: 0,
-            uncorrelatedShadowCount: 0,
-            ambiguousPrimaryCount: 0,
-            ambiguousShadowCount: 0,
-            orderingMismatch: false,
-            shadowLatencyMs: 0,
-          ),
-        ),
-        returnsNormally,
+    test('mapper throw is absorbed and gateway is not called', () async {
+      int mapperCallCount = 0;
+      final observerWithFailingMapper = GatewayHealthTimelineShadowObserver(
+        gateway: fakeGateway,
+        mapper: (outcome) {
+          mapperCallCount++;
+          throw StateError('mapper failure');
+        },
       );
+
+      observerWithFailingMapper.onSkipped(
+        const HealthTimelineShadowSkipped(
+          skipKind: HealthTimelineShadowSkipKind.notFirstPage,
+        ),
+      );
+
+      await pumpEventQueue();
+
+      expect(mapperCallCount, equals(1));
+      expect(fakeGateway.records, isEmpty);
     });
   });
 
   group('O9 — callbacks complete normally after failure', () {
-    test('subsequent callbacks work after a failure', () {
+    test('subsequent callbacks work after a failure', () async {
       fakeGateway.whenError(Exception('first error'));
       observer.onSkipped(
         const HealthTimelineShadowSkipped(
           skipKind: HealthTimelineShadowSkipKind.notFirstPage,
         ),
       );
+      await pumpEventQueue();
 
       fakeGateway.clear();
       observer.onSkipped(
@@ -193,6 +225,7 @@ void main() {
           skipKind: HealthTimelineShadowSkipKind.unsupportedTypes,
         ),
       );
+      await pumpEventQueue();
 
       expect(fakeGateway.records.length, 1);
     });

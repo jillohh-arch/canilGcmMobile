@@ -2,7 +2,7 @@
 //
 // Tests for FirebaseFunctionsHealthTimelineShadowTelemetryGateway.
 //
-// Exactly 16 declarations covering:
+// 15 test declarations covering:
 // - Callable name exact
 // - Payload sent exactly once
 // - Payload is record.toJson()
@@ -80,17 +80,20 @@ void main() {
     );
   });
 
-  group('G1 — callable name', () {
-    test('uses the exact callable name', () {
-      // G1: The gateway uses httpsCallable with the correct name.
-      // We verify this indirectly by checking that a single call works.
-      fakeClient.whenResponse({'accepted': true});
-      gateway.record(
-        const HealthTimelineShadowTelemetrySkipped(
-          skipKind: HealthTimelineShadowSkipKind.notFirstPage,
-        ),
+  group('G1 — exposes and uses the exact production callable contract', () {
+    test('exposes exact production region, callable name, and timeout', () {
+      expect(
+        FirebaseFunctionsHealthTimelineShadowTelemetryGateway.region,
+        'southamerica-east1',
       );
-      expect(fakeClient.calls.length, 1);
+      expect(
+        FirebaseFunctionsHealthTimelineShadowTelemetryGateway.callableName,
+        'healthTimelineRecordShadowTelemetry',
+      );
+      expect(
+        FirebaseFunctionsHealthTimelineShadowTelemetryGateway.timeout,
+        const Duration(seconds: 10),
+      );
     });
   });
 

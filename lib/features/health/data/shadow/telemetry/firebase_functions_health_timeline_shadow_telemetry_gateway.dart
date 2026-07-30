@@ -32,9 +32,9 @@ final class FirebaseFunctionsHealthTimelineShadowTelemetryGateway
   final FirebaseFunctions? _functions;
   final HealthTimelineShadowTelemetryCallableClient? _client;
 
-  static const String _region = 'southamerica-east1';
-  static const String _callableName = 'healthTimelineRecordShadowTelemetry';
-  static const Duration _timeout = Duration(seconds: 10);
+  static const String region = 'southamerica-east1';
+  static const String callableName = 'healthTimelineRecordShadowTelemetry';
+  static const Duration timeout = Duration(seconds: 10);
 
   @override
   Future<void> record(HealthTimelineShadowTelemetryRecord record) async {
@@ -49,11 +49,11 @@ final class FirebaseFunctionsHealthTimelineShadowTelemetryGateway
       return c;
     }
     final functions =
-        _functions ?? FirebaseFunctions.instanceFor(region: _region);
+        _functions ?? FirebaseFunctions.instanceFor(region: region);
     return _FirebaseFunctionsCallableClient(
       httpsCallable: functions.httpsCallable(
-        _callableName,
-        options: HttpsCallableOptions(timeout: _timeout),
+        callableName,
+        options: HttpsCallableOptions(timeout: timeout),
       ),
     );
   }
