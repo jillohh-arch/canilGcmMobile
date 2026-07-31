@@ -28,6 +28,7 @@ const SERVER_TIMESTAMP_FIELDS = new Set([
   "createdAt",
   "created_at",
   "updated_at",
+  "superseded_at",
 ]);
 
 /** Fatos temporais do cliente / derivados de materialização (não sentinels). */
@@ -210,7 +211,7 @@ export function decodeNutritionReceiptDoc(
       throw nutritionError(
         "integrity",
         `Receipt malformado: campo obrigatório ausente (${key}).`,
-        "receipt_integrity",
+        "receipt-integrity",
       );
     }
   }
@@ -218,7 +219,7 @@ export function decodeNutritionReceiptDoc(
     throw nutritionError(
       "integrity",
       "Receipt malformado: result inválido.",
-      "receipt_integrity",
+      "receipt-integrity",
     );
   }
   return snap;
@@ -249,6 +250,8 @@ export type NutritionFirestoreAdapterOptions = {
   /** Relógio injetável (testes). Default: new Date(). */
   serverNow?: () => Date;
   isAdmin?: (actor: NutritionActor) => boolean | Promise<boolean>;
+  onPlanTransactionPhase?: NutritionEngineDeps["onPlanTransactionPhase"];
+  onPlanActiveSnapshot?: NutritionEngineDeps["onPlanActiveSnapshot"];
 };
 
 /**
@@ -261,6 +264,8 @@ export function createNutritionFirestoreEngineDeps(
   return {
     serverNow: options.serverNow ?? (() => new Date()),
     isAdmin: options.isAdmin ?? (() => false),
+    onPlanTransactionPhase: options.onPlanTransactionPhase,
+    onPlanActiveSnapshot: options.onPlanActiveSnapshot,
     getDoc: async (path: string): Promise<TxDocSnap> => {
       const snap = await docRefFromPath(db, path).get();
       const plain = snapFromFirestore(snap);

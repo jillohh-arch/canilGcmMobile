@@ -6,6 +6,7 @@
  * npm run build && node lib/health_nutrition_firestore_adapter_test.js
  */
 import * as assert from "assert";
+import {Timestamp} from "firebase-admin/firestore";
 import {
   createNutritionFirestoreEngineDeps,
   decodeMealLogDoc,
@@ -65,6 +66,7 @@ async function main(): Promise<void> {
       processed_at: "2026-07-18T15:00:00.000Z",
       performed_at: "2026-07-18T15:00:00.000Z",
       createdAt: "2026-07-18T15:00:00.000Z",
+      superseded_at: "2026-07-18T15:00:00.000Z",
       fed_at: "2026-07-10T10:00:00.000Z",
       offered_grams: 300,
     });
@@ -74,6 +76,7 @@ async function main(): Promise<void> {
       "processed_at",
       "performed_at",
       "createdAt",
+      "superseded_at",
     ]) {
       const v = prepared[k] as {_methodName?: string; methodName?: string};
       const name = v?._methodName ?? v?.methodName ?? String(v);
@@ -102,7 +105,7 @@ async function main(): Promise<void> {
         }),
       (e: Error & {appCode?: string; detailCode?: string}) =>
         e.appCode === "integrity" ||
-        e.detailCode === "receipt_integrity",
+        e.detailCode === "receipt-integrity",
     );
   });
 
@@ -121,6 +124,17 @@ async function main(): Promise<void> {
       },
     });
     assert.strictEqual(r.exists, true);
+  });
+
+  await test("Firestore Timestamp decode is canonical ISO with milliseconds and Z", () => {
+    const minimum = new Date("0001-01-01T00:00:00.000Z");
+    const maximum = new Date("9999-12-31T23:59:59.999Z");
+    const decoded = firestoreDataToPlain({
+      processed_at: Timestamp.fromDate(minimum),
+      created_at: Timestamp.fromDate(maximum),
+    });
+    assert.strictEqual(decoded.processed_at, "0001-01-01T00:00:00.000Z");
+    assert.strictEqual(decoded.created_at, "9999-12-31T23:59:59.999Z");
   });
 
   await test("decode meal malformed → integrity", () => {
@@ -320,7 +334,7 @@ async function main(): Promise<void> {
           data: firestoreDataToPlain(snap.data()),
         }),
       (e: Error & {detailCode?: string}) =>
-        e.detailCode === "receipt_integrity",
+        e.detailCode === "receipt-integrity",
     );
     void deps;
   });

@@ -457,6 +457,12 @@ export function sha256Hex(material: string): string {
   return crypto.createHash("sha256").update(material, "utf8").digest("hex");
 }
 
+/** Comparação ordinal determinística, independente de locale/Intl/SO. */
+export function compareOrdinal(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Preimage JSON canônico (array) versionado.
  * NÃO usa Object.hash / locale / server TZ.
@@ -1376,6 +1382,9 @@ export interface NutritionPlanSupplement {
 export interface CreateAndActivateNutritionPlanRequest {
   dogId: string;
   operationId: string;
+  intent: "create" | "replace";
+  expectedActivePlanId: string | null;
+  expectedActiveRevision: number | null;
   planData: {
     food_type: string;
     amount_grams_per_day: number;
@@ -1519,6 +1528,21 @@ export function parseCreateAndActivateNutritionPlan(
       throw nutritionError("validation", `Campo controlado pelo servidor não permitido na raiz: ${k}.`);
     }
   }
+  const allowedRootFields = new Set([
+    "dogId", "dog_id",
+    "operationId", "operation_id",
+    "planData", "plan_data",
+    "expectedActivePlanId", "expectedActiveRevision",
+    "expected_active_plan_id", "expected_active_revision",
+  ]);
+  for (const key of Object.keys(data)) {
+    if (!allowedRootFields.has(key)) {
+      throw nutritionError(
+        "validation",
+        `Campo não permitido no payload de NutritionPlan: ${key}.`,
+      );
+    }
+  }
 
   const dogId = stringValue(data.dogId) ?? stringValue(data.dog_id);
   if (!dogId) throw nutritionError("validation", "dogId é obrigatório.");
@@ -1531,6 +1555,70 @@ export function parseCreateAndActivateNutritionPlan(
     throw nutritionError("validation", "operationId deve ser string.");
   }
   const operationId = normalizeOperationId(rawOpId, true);
+
+  for (const unsupportedAlias of [
+    "expected_active_plan_id",
+    "expected_active_revision",
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(data, unsupportedAlias)) {
+      throw nutritionError(
+        "validation",
+        `Campo não suportado; use camelCase: ${unsupportedAlias}.`,
+      );
+    }
+  }
+  const hasExpectedActivePlanId = Object.prototype.hasOwnProperty.call(
+    data,
+    "expectedActivePlanId",
+  );
+  const hasExpectedActiveRevision = Object.prototype.hasOwnProperty.call(
+    data,
+    "expectedActiveRevision",
+  );
+  if (hasExpectedActivePlanId !== hasExpectedActiveRevision) {
+    throw nutritionError(
+      "validation",
+      "expectedActivePlanId e expectedActiveRevision devem ser enviados juntos.",
+    );
+  }
+
+  let intent: "create" | "replace" = "create";
+  let expectedActivePlanId: string | null = null;
+  let expectedActiveRevision: number | null = null;
+  if (hasExpectedActivePlanId) {
+    const rawExpectedPlanId = data.expectedActivePlanId;
+    if (typeof rawExpectedPlanId !== "string") {
+      throw nutritionError(
+        "validation",
+        "expectedActivePlanId deve ser string não vazia.",
+      );
+    }
+    expectedActivePlanId = rawExpectedPlanId.trim();
+    if (
+      expectedActivePlanId.length === 0 ||
+      expectedActivePlanId.includes("/") ||
+      expectedActivePlanId.length > 128
+    ) {
+      throw nutritionError(
+        "validation",
+        "expectedActivePlanId inválido.",
+      );
+    }
+    const rawExpectedRevision = data.expectedActiveRevision;
+    if (
+      typeof rawExpectedRevision !== "number" ||
+      !Number.isFinite(rawExpectedRevision) ||
+      !Number.isInteger(rawExpectedRevision) ||
+      rawExpectedRevision < 1
+    ) {
+      throw nutritionError(
+        "validation",
+        "expectedActiveRevision deve ser inteiro positivo.",
+      );
+    }
+    expectedActiveRevision = rawExpectedRevision;
+    intent = "replace";
+  }
 
   const planDataRaw = data.planData ?? data.plan_data;
   if (!planDataRaw || typeof planDataRaw !== "object" || Array.isArray(planDataRaw)) {
@@ -1720,6 +1808,9 @@ export function parseCreateAndActivateNutritionPlan(
   return {
     dogId,
     operationId,
+    intent,
+    expectedActivePlanId,
+    expectedActiveRevision,
     planData: {
       food_type,
       amount_grams_per_day: Number(amount_grams_per_day),
@@ -1873,10 +1964,12 @@ export function parseCancelNutritionPlan(
   };
 }
 
-export function fingerprintNutritionPlan(
+export const NUTRITION_PLAN_FINGERPRINT_VERSION = 2;
+
+function canonicalNutritionPlanForFingerprint(
   planData: CreateAndActivateNutritionPlanRequest["planData"],
-): string {
-  const structural = {
+): Record<string, unknown> {
+  return {
     food_type: stringValue(planData.food_type) ?? "",
     amount_grams_per_day: Number(planData.amount_grams_per_day ?? 0),
     meals_per_day: Number(planData.meals_per_day ?? 0),
@@ -1890,7 +1983,7 @@ export function fingerprintNutritionPlan(
           period: stringValue(m.period) ?? "",
           scheduled_time: stringValue(m.scheduled_time) ?? "",
           target_grams: Number(m.target_grams ?? 0),
-        })).sort((a, b) => a.id.localeCompare(b.id))
+        })).sort((a, b) => compareOrdinal(stableStringify(a), stableStringify(b)))
       : [],
     supplements: Array.isArray(planData.supplements)
       ? planData.supplements.map((s) => ({
@@ -1902,8 +1995,45 @@ export function fingerprintNutritionPlan(
           instructions: stringValue(s.instructions) ?? null,
           valid_from: stringValue(s.valid_from) ?? null,
           valid_until: stringValue(s.valid_until) ?? null,
-        })).sort((a, b) => a.id.localeCompare(b.id))
+        })).sort((a, b) => compareOrdinal(stableStringify(a), stableStringify(b)))
       : [],
+    special_instructions: stringValue(planData.special_instructions) ?? null,
+    professional: planData.professional ? {
+      name: stringValue(planData.professional.name) ?? "",
+      registration_type: stringValue(planData.professional.registration_type) ?? "",
+      registration_number: stringValue(planData.professional.registration_number) ?? "",
+      clinic: stringValue(planData.professional.clinic) ?? null,
+      specialty: stringValue(planData.professional.specialty) ?? null,
+    } : null,
+    source_document: planData.source_document ? {
+      health_document_id: stringValue(planData.source_document.health_document_id) ?? "",
+      description: stringValue(planData.source_document.description) ?? null,
+    } : null,
+    attachment_refs: Array.isArray(planData.attachment_refs) ?
+      planData.attachment_refs
+        .map((value) => stringValue(value) ?? "")
+        .sort(compareOrdinal) : [],
   };
-  return sha256Hex(stableStringify(structural));
+}
+
+/** Fingerprint estrutural completo do plano, independente da ordem de arrays sem semântica. */
+export function fingerprintNutritionPlan(
+  planData: CreateAndActivateNutritionPlanRequest["planData"],
+): string {
+  return sha256Hex(stableStringify(canonicalNutritionPlanForFingerprint(planData)));
+}
+
+/** Fingerprint v2 autoritativo do comando CREATE/REPLACE já parseado e normalizado. */
+export function buildCanonicalNutritionPlanOperationFingerprint(
+  command: CreateAndActivateNutritionPlanRequest,
+): string {
+  return sha256Hex(stableStringify({
+    fingerprint_version: NUTRITION_PLAN_FINGERPRINT_VERSION,
+    operation_type: "create_nutrition_plan",
+    dog_id: command.dogId,
+    intent: command.intent,
+    expected_active_plan_id: command.expectedActivePlanId,
+    expected_active_revision: command.expectedActiveRevision,
+    plan: canonicalNutritionPlanForFingerprint(command.planData),
+  }));
 }

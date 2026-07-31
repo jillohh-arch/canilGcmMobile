@@ -14,6 +14,7 @@
  * Zero produção.
  */
 import assert from "node:assert/strict";
+import {createRequire} from "node:module";
 import {
   initializeApp as initializeAdminApp,
   getApps,
@@ -37,6 +38,11 @@ import {
   httpsCallable,
 } from "firebase/functions";
 
+const require = createRequire(import.meta.url);
+const {
+  nutritionOperationReceiptIdV1,
+} = require("../../functions/lib/health_nutrition_logic.js");
+
 const PROJECT_ID =
   process.env.GCLOUD_PROJECT ||
   process.env.GCLOUD_PROJECT_ID ||
@@ -48,6 +54,7 @@ const FS_HOST = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
 const PASSWORD = "Gate2-Nutrition-Emulator-Only-Not-Prod!";
 const DOG_A = "dog-nutri-e2e-a";
 const DOG_OTHER = "dog-nutri-e2e-other";
+const DOG_PLAN = "dog-nutri-plan-contract-e2e";
 const PLAN_ID = "plan-nutri-1";
 
 const OP = {
@@ -267,7 +274,12 @@ async function seedBase() {
     status: "active",
     scope: "own_records",
     permissions: {
-      health: {view: true, create: true, edit: true},
+      health: {
+        view: true,
+        create: true,
+        edit: true,
+        manage_nutrition_plan: true,
+      },
     },
   });
   await adminDb.collection("access_profiles").doc("sem_saude").set({
@@ -314,6 +326,11 @@ async function seedBase() {
     conductor_ra: "999999",
     status: "active",
   });
+  await adminDb.collection("dogs").doc(DOG_PLAN).set({
+    name: "K9 Plano Atômico E2E",
+    conductor_ra: OP.ra,
+    status: "active",
+  });
 
   await adminDb
     .collection("dogs")
@@ -341,6 +358,39 @@ function plannedPayload(overrides = {}) {
   };
 }
 
+function planPayload(operationId, validFrom, overrides = {}) {
+  return {
+    dogId: DOG_PLAN,
+    operationId,
+    planData: {
+      food_type: "Ração Contrato Atômico",
+      amount_grams_per_day: 300,
+      meals_per_day: 2,
+      timezone: "Etc/UTC",
+      valid_from: validFrom,
+      meal_schedule: [
+        {
+          id: "slot-contract",
+          period: "morning",
+          scheduled_time: "07:00",
+          target_grams: 150,
+        },
+        {
+          id: "slot-contract-pm",
+          period: "evening",
+          scheduled_time: "19:00",
+          target_grams: 150,
+        },
+      ],
+      supplements: [
+        {id: "supp-a", name: "A", dose: 1, unit: "tablet", frequency: "daily"},
+        {id: "supp-b", name: "B", dose: 2, unit: "tablet", frequency: "daily"},
+      ],
+    },
+    ...overrides,
+  };
+}
+
 async function countSub(dogId, col) {
   const snap = await adminDb
     .collection("dogs")
@@ -356,6 +406,22 @@ async function countAuditsForEntity(entityId) {
     .where("entity_id", "==", entityId)
     .get();
   return snap.size;
+}
+
+async function countAuditsForOperation(operationId) {
+  const snap = await adminDb
+    .collection("auditLogs")
+    .where("metadata.operation_id", "==", operationId)
+    .get();
+  return snap.size;
+}
+
+function receiptIdForPlanOperation(operationId) {
+  return nutritionOperationReceiptIdV1({
+    actorUid: OP.uid,
+    operationType: "create_nutrition_plan",
+    operationId,
+  });
 }
 
 async function countLegacy(dogId) {
@@ -462,6 +528,474 @@ await test(
     assert.equal(await countSub(DOG_A, "nutrition_operations"), beforeOps);
   },
 );
+
+// -----------------------------------------------------------------------------
+// Atomic CREATE/REPLACE NutritionPlan contract
+// -----------------------------------------------------------------------------
+const planClock = Date.now();
+const planCreateAt = new Date(planClock - 120_000).toISOString();
+const planReplaceAt = new Date(planClock - 60_000).toISOString();
+const planStaleAt = new Date(planClock - 30_000).toISOString();
+let atomicPlanId = "";
+let replacementPlanId = "";
+let atomicReplaceReceipt = null;
+
+await test("callable plan sem manage_nutrition_plan → permission-denied", async () => {
+  await signIn(NO_PERM);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-no-perm", planCreateAt),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "permission-denied");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan CREATE sem expectations", async () => {
+  await signIn(OP);
+  const res = await callable("healthNutritionCreateAndActivatePlan")(
+    planPayload("plan-create", planCreateAt),
+  );
+  assert.equal(res.data.wasNoOp, false);
+  assert.equal(res.data.status, "active");
+  atomicPlanId = String(res.data.planId);
+  assert.ok(atomicPlanId.startsWith("nutrition_plan_"));
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), 1);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), 1);
+});
+
+await test("callable plan payload parcial → invalid-argument e zero writes", async () => {
+  await signIn(OP);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-partial", planReplaceAt, {
+        expectedActivePlanId: atomicPlanId,
+      }),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "invalid-argument");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan snake_case expectations → invalid-argument e zero writes", async () => {
+  await signIn(OP);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-snake-case", planReplaceAt, {
+        expected_active_plan_id: atomicPlanId,
+        expected_active_revision: 1,
+      }),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "invalid-argument");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan CREATE com active → active-plan-conflict", async () => {
+  await signIn(OP);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-create-conflict", planReplaceAt),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "active-plan-conflict");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan REPLACE com expectations exatas", async () => {
+  await signIn(OP);
+  const payload = planPayload("plan-replace", planReplaceAt, {
+    expectedActivePlanId: atomicPlanId,
+    expectedActiveRevision: 1,
+  });
+  const res = await callable("healthNutritionCreateAndActivatePlan")(payload);
+  assert.equal(res.data.wasNoOp, false);
+  assert.equal(res.data.supersededPlanId, atomicPlanId);
+  replacementPlanId = String(res.data.planId);
+  const oldPlan = await adminDb.collection("dogs").doc(DOG_PLAN)
+    .collection("nutrition_plans").doc(atomicPlanId).get();
+  const newPlan = await adminDb.collection("dogs").doc(DOG_PLAN)
+    .collection("nutrition_plans").doc(replacementPlanId).get();
+  assert.equal(oldPlan.data()?.status, "superseded");
+  assert.equal(oldPlan.data()?.superseded_by_plan_id, replacementPlanId);
+  assert.equal(newPlan.data()?.status, "active");
+  assert.equal(newPlan.data()?.supersedes_plan_id, atomicPlanId);
+  const receipt = await adminDb.collection("dogs").doc(DOG_PLAN)
+    .collection("nutrition_operations").where("operation_id", "==", "plan-replace").get();
+  assert.equal(receipt.size, 1);
+  const receiptData = receipt.docs[0].data();
+  atomicReplaceReceipt = receiptData;
+  assert.equal(receiptData?.receipt_schema_version, 2);
+  assert.equal(receiptData?.fingerprint_version, 2);
+  assert.equal(receiptData?.dog_id, DOG_PLAN);
+  assert.equal(receiptData?.new_plan_id, replacementPlanId);
+  assert.equal(receiptData?.entity_id, replacementPlanId);
+  assert.ok(receiptData?.created_at?.toDate);
+  assert.equal(receiptData?.result?.mode, "replace");
+  assert.equal(receiptData?.result?.expectedActivePlanId, atomicPlanId);
+  assert.equal(receiptData?.result?.expectedActiveRevision, 1);
+  const audit = await adminDb.collection("auditLogs")
+    .where("metadata.operation_id", "==", "plan-replace").get();
+  assert.equal(audit.size, 1);
+  const auditData = audit.docs[0].data();
+  const metadata = auditData.metadata;
+  assert.equal(metadata.dog_id, receiptData.dog_id);
+  assert.equal(metadata.operation_id, receiptData.operation_id);
+  assert.equal(metadata.intent, receiptData.intent);
+  assert.equal(metadata.expected_active_plan_id, receiptData.expected_active_plan_id);
+  assert.equal(metadata.expected_active_revision, receiptData.expected_active_revision);
+  assert.equal(metadata.replaced_plan_id, receiptData.replaced_plan_id);
+  assert.equal(metadata.new_plan_id, receiptData.new_plan_id);
+  assert.equal(metadata.actor_uid, receiptData.actor_uid);
+  assert.equal(metadata.fingerprint, receiptData.fingerprint);
+  assert.equal(metadata.fingerprint_version, receiptData.fingerprint_version);
+  assert.equal(metadata.replaced_plan_revision, 1);
+  assert.equal(metadata.previous_status, "active");
+  assert.equal(metadata.new_status, "active");
+  assert.equal(metadata.source, "web");
+  assert.ok(auditData.performed_at?.toDate);
+});
+
+await test("callable plan replay retorna receipt antes do estado atual", async () => {
+  await signIn(OP);
+  const payload = planPayload("plan-replace", planReplaceAt, {
+    expectedActivePlanId: atomicPlanId,
+    expectedActiveRevision: 1,
+  });
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  const res = await callable("healthNutritionCreateAndActivatePlan")(payload);
+  assert.equal(res.data.wasNoOp, true);
+  assert.equal(res.data.planId, replacementPlanId);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan replay com arrays reordenados é semanticamente idêntico", async () => {
+  await signIn(OP);
+  const payload = planPayload("plan-replace", planReplaceAt, {
+    expectedActivePlanId: atomicPlanId,
+    expectedActiveRevision: 1,
+  });
+  payload.planData.meal_schedule.reverse();
+  payload.planData.supplements.reverse();
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  const beforeAudits = await countAuditsForEntity(replacementPlanId);
+  const res = await callable("healthNutritionCreateAndActivatePlan")(payload);
+  assert.equal(res.data.wasNoOp, true);
+  assert.equal(res.data.planId, replacementPlanId);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+  assert.equal(await countAuditsForEntity(replacementPlanId), beforeAudits);
+});
+
+async function seedV2PlanReceipt(operationId, mutate = () => undefined) {
+  assert.ok(atomicReplaceReceipt);
+  const receiptId = receiptIdForPlanOperation(operationId);
+  const data = {
+    ...atomicReplaceReceipt,
+    receipt_id: receiptId,
+    operation_id: operationId,
+    result: {...atomicReplaceReceipt.result},
+  };
+  mutate(data);
+  const ref = adminDb.collection("dogs").doc(DOG_PLAN)
+    .collection("nutrition_operations").doc(receiptId);
+  await ref.set(data);
+  return ref;
+}
+
+async function assertReceiptIntegrityTransport(operationId, payload, receiptRef) {
+  const plansBefore = await countSub(DOG_PLAN, "nutrition_plans");
+  const receiptsBefore = await countSub(DOG_PLAN, "nutrition_operations");
+  const auditsBefore = await countAuditsForOperation(operationId);
+  const receiptBefore = (await receiptRef.get()).data();
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(payload);
+    assert.fail("receipt corrompido deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "receipt-integrity");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), plansBefore);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), receiptsBefore);
+  assert.equal(await countAuditsForOperation(operationId), auditsBefore);
+  assert.deepEqual((await receiptRef.get()).data(), receiptBefore);
+}
+
+await test("callable receipt v2 íntegro replay", async () => {
+  await signIn(OP);
+  const operationId = "receipt-v2-valid";
+  await seedV2PlanReceipt(operationId);
+  const res = await callable("healthNutritionCreateAndActivatePlan")(
+    planPayload(operationId, planReplaceAt, {
+      expectedActivePlanId: atomicPlanId,
+      expectedActiveRevision: 1,
+    }),
+  );
+  assert.equal(res.data.wasNoOp, true);
+  assert.equal(res.data.planId, replacementPlanId);
+});
+
+await test("callable receipt v2 schema desconhecido falha fechado", async () => {
+  await signIn(OP);
+  const operationId = "receipt-v2-schema-999";
+  const ref = await seedV2PlanReceipt(operationId, (data) => {
+    data.receipt_schema_version = 999;
+  });
+  await assertReceiptIntegrityTransport(
+    operationId,
+    planPayload(operationId, planReplaceAt, {
+      expectedActivePlanId: atomicPlanId,
+      expectedActiveRevision: 1,
+    }),
+    ref,
+  );
+});
+
+await test("callable receipt v2 IDs divergentes falha fechado", async () => {
+  await signIn(OP);
+  const operationId = "receipt-v2-ids-diverge";
+  const ref = await seedV2PlanReceipt(operationId, (data) => {
+    data.new_plan_id = "different-plan";
+  });
+  await assertReceiptIntegrityTransport(
+    operationId,
+    planPayload(operationId, planReplaceAt, {
+      expectedActivePlanId: atomicPlanId,
+      expectedActiveRevision: 1,
+    }),
+    ref,
+  );
+});
+
+function legacyReceiptFor(operationId) {
+  const request = planPayload(operationId, planCreateAt);
+  const receiptId = receiptIdForPlanOperation(operationId);
+  return {
+    request,
+    receiptId,
+    data: {
+      receipt_id: receiptId,
+      operation_id: operationId,
+      operation_type: "create_nutrition_plan",
+      actor_uid: OP.uid,
+      fingerprint: "a".repeat(64),
+      entity_type: "nutrition_plan",
+      entity_id: "legacy-seeded-plan",
+      result: {
+        success: true,
+        planId: "legacy-seeded-plan",
+        status: "active",
+        revision: 1,
+        supersededPlanId: null,
+      },
+      processed_at: new Date(),
+    },
+  };
+}
+
+async function seedLegacyReceipt(operationId, mutate = () => undefined) {
+  const seeded = legacyReceiptFor(operationId);
+  mutate(seeded.data);
+  const ref = adminDb.collection("dogs").doc(DOG_PLAN)
+    .collection("nutrition_operations").doc(seeded.receiptId);
+  await ref.set(seeded.data);
+  return {...seeded, ref};
+}
+
+async function assertLegacyUnsupportedTransport(operationId, payload, receiptRef) {
+  const plansBefore = await countSub(DOG_PLAN, "nutrition_plans");
+  const receiptsBefore = await countSub(DOG_PLAN, "nutrition_operations");
+  const auditsBefore = await countAuditsForOperation(operationId);
+  const receiptBefore = (await receiptRef.get()).data();
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(payload);
+    assert.fail("receipt legado não deve autorizar replay");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "legacy-receipt-replay-unsupported");
+    const message = String(e?.message ?? "").toLowerCase();
+    for (const forbidden of ["locale", "icu", "hash", "fingerprint", "nutrition_operations", OP.uid]) {
+      assert.equal(message.includes(forbidden.toLowerCase()), false);
+    }
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), plansBefore);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), receiptsBefore);
+  assert.equal(await countAuditsForOperation(operationId), auditsBefore);
+  assert.deepEqual((await receiptRef.get()).data(), receiptBefore);
+}
+
+await test("callable receipt legado válido retorna replay unsupported", async () => {
+  await signIn(OP);
+  const seeded = await seedLegacyReceipt("receipt-legacy-valid");
+  await assertLegacyUnsupportedTransport("receipt-legacy-valid", seeded.request, seeded.ref);
+});
+
+await test("callable receipt legado Unicode retorna replay unsupported", async () => {
+  await signIn(OP);
+  const operationId = "receipt-legacy-unicode";
+  const seeded = await seedLegacyReceipt(operationId, (data) => {
+    data.fingerprint = "f".repeat(64);
+    data.entity_id = "plano-á-🐕";
+    data.result = {...data.result, planId: "plano-á-🐕"};
+  });
+  await assertLegacyUnsupportedTransport(operationId, seeded.request, seeded.ref);
+});
+
+await test("callable receipt legado fingerprint diferente continua unsupported", async () => {
+  await signIn(OP);
+  const operationId = "receipt-legacy-fingerprint-ignored";
+  const seeded = await seedLegacyReceipt(operationId, (data) => {
+    data.fingerprint = "0".repeat(64);
+  });
+  await assertLegacyUnsupportedTransport(operationId, seeded.request, seeded.ref);
+});
+
+await test("callable receipt legado com campo extra falha fechado", async () => {
+  await signIn(OP);
+  const operationId = "receipt-legacy-extra";
+  const seeded = await seedLegacyReceipt(operationId, (data) => {
+    data.suspicious_admin_override = true;
+  });
+  await assertReceiptIntegrityTransport(operationId, seeded.request, seeded.ref);
+});
+
+await test("callable receipt legado usado em REPLACE falha fechado", async () => {
+  await signIn(OP);
+  const operationId = "receipt-legacy-replace";
+  const seeded = await seedLegacyReceipt(operationId);
+  const request = {
+    ...seeded.request,
+    expectedActivePlanId: atomicPlanId,
+    expectedActiveRevision: 1,
+  };
+  await assertReceiptIntegrityTransport(operationId, request, seeded.ref);
+});
+
+await test("callable receipt legado timestamp inválido falha fechado", async () => {
+  await signIn(OP);
+  const operationId = "receipt-legacy-invalid-time";
+  const seeded = await seedLegacyReceipt(operationId, (data) => {
+    data.processed_at = "+010000-01-01T00:00:00.000Z";
+  });
+  await assertReceiptIntegrityTransport(operationId, seeded.request, seeded.ref);
+});
+
+for (const [name, field, value] of [
+  ["extended-year", "processed_at", "+010000-01-01T00:00:00.000Z"],
+  ["offset", "created_at", "2026-07-19T12:00:00.000-03:00"],
+  ["no-milliseconds", "processed_at", "2026-07-19T15:00:00Z"],
+]) {
+  await test(`callable receipt v2 timestamp ${name} falha fechado`, async () => {
+    await signIn(OP);
+    const operationId = `receipt-v2-time-${name}`;
+    const ref = await seedV2PlanReceipt(operationId, (data) => {
+      data[field] = value;
+    });
+    await assertReceiptIntegrityTransport(
+      operationId,
+      planPayload(operationId, planReplaceAt, {
+        expectedActivePlanId: atomicPlanId,
+        expectedActiveRevision: 1,
+      }),
+      ref,
+    );
+  });
+}
+
+await test("callable plan expectedActivePlanId divergente → active-plan-conflict e zero receipt/audit", async () => {
+  await signIn(OP);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  const beforeAudits = await countAuditsForEntity(replacementPlanId);
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-id-mismatch", planStaleAt, {
+        expectedActivePlanId: atomicPlanId,
+        expectedActiveRevision: 1,
+      }),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "active-plan-conflict");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+  assert.equal(await countAuditsForEntity(replacementPlanId), beforeAudits);
+});
+
+await test("callable plan same operationId + revision diferente → idempotency-conflict", async () => {
+  await signIn(OP);
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-replace", planReplaceAt, {
+        expectedActivePlanId: atomicPlanId,
+        expectedActiveRevision: 2,
+      }),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "idempotency-conflict");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+});
+
+await test("callable plan stale revision após UPDATE → revision-conflict", async () => {
+  await signIn(OP);
+  await callable("healthNutritionUpdateActivePlan")({
+    dogId: DOG_PLAN,
+    planId: replacementPlanId,
+    operationId: "plan-update-winner",
+    expectedRevision: 1,
+    planData: {special_instructions: "mudança concorrente"},
+  });
+  const beforePlans = await countSub(DOG_PLAN, "nutrition_plans");
+  const beforeOps = await countSub(DOG_PLAN, "nutrition_operations");
+  const beforeAudits = await countAuditsForEntity(replacementPlanId);
+  try {
+    await callable("healthNutritionCreateAndActivatePlan")(
+      planPayload("plan-stale", planStaleAt, {
+        expectedActivePlanId: replacementPlanId,
+        expectedActiveRevision: 1,
+      }),
+    );
+    assert.fail("deveria falhar");
+  } catch (e) {
+    assertHttpsCode(e, "failed-precondition");
+    assertDetailsCode(e, "revision-conflict");
+  }
+  assert.equal(await countSub(DOG_PLAN, "nutrition_plans"), beforePlans);
+  assert.equal(await countSub(DOG_PLAN, "nutrition_operations"), beforeOps);
+  assert.equal(await countAuditsForEntity(replacementPlanId), beforeAudits);
+});
 
 // -----------------------------------------------------------------------------
 // Planned happy path
@@ -1040,7 +1574,8 @@ await test("exports callable na região southamerica-east1", async () => {
   log(
     `  endpoints=` +
       `${FUNCTIONS_BASE_URL}/healthNutritionCreateMealLog , ` +
-      `${FUNCTIONS_BASE_URL}/healthNutritionCreateSupplementLog`,
+      `${FUNCTIONS_BASE_URL}/healthNutritionCreateSupplementLog , ` +
+      `${FUNCTIONS_BASE_URL}/healthNutritionCreateAndActivatePlan`,
   );
 });
 

@@ -627,6 +627,27 @@ async function main(): Promise<void> {
     }
   });
 
+  await test("legacy replay unsupported maps to sanitized failed-precondition", async () => {
+    const safeMessage = "Esta operação foi registrada por uma versão anterior e não pode ser repetida automaticamente. " +
+      "Atualize os dados antes de tentar novamente.";
+    try {
+      mapNutritionError(nutritionError(
+        "failed-precondition",
+        safeMessage,
+        "legacy-receipt-replay-unsupported",
+      ));
+      assert.fail("expected throw");
+    } catch (e) {
+      const err = e as {code?: string; details?: {code?: string}; message?: string};
+      assert.strictEqual(err.code, "failed-precondition");
+      assert.strictEqual(err.details?.code, "legacy-receipt-replay-unsupported");
+      assert.ok(String(err.message).includes("versão anterior"));
+      for (const forbidden of ["locale", "ICU", "hash", "fingerprint", "nutrition_operations", actor.uid]) {
+        assert.strictEqual(String(err.message).toLowerCase().includes(forbidden.toLowerCase()), false);
+      }
+    }
+  });
+
   await test("auth order: no engine without dog access (no writes)", async () => {
     const db = createFakeDb({
       "dogs/dog-1": {name: "Rex"},
@@ -715,6 +736,45 @@ async function main(): Promise<void> {
       operationId: "p-cancel", expectedRevision: 2, reason: "clínico"},
     {uid: actor.uid, token: {}}), deps);
     assert.strictEqual(cancelled.status, "cancelled");
+  });
+  await test("plan callable CREATE conflict, partial payload and exact REPLACE mapping", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "K9"}});
+    const deps = depsFor({db, allowManage: true, dogAccess: true, admin: true});
+    const auth = {uid: actor.uid, token: {}};
+    const created = await runHealthNutritionCreateAndActivatePlan(
+      mockRequest(planCreate("atomic-create"), auth),
+      deps,
+    );
+    const planId = created.planId as string;
+    const writesBeforeConflict = db._store.size;
+    await assert.rejects(
+      () => runHealthNutritionCreateAndActivatePlan(
+        mockRequest(planCreate("implicit-replace"), auth),
+        deps,
+      ),
+      (e: {code?: string; details?: {code?: string}}) =>
+        e.code === "failed-precondition" &&
+        e.details?.code === "active-plan-conflict",
+    );
+    assert.strictEqual(db._store.size, writesBeforeConflict);
+    await assert.rejects(
+      () => runHealthNutritionCreateAndActivatePlan(
+        mockRequest({...planCreate("partial"), expectedActivePlanId: planId}, auth),
+        deps,
+      ),
+      (e: {code?: string}) => e.code === "invalid-argument",
+    );
+    assert.strictEqual(db._store.size, writesBeforeConflict);
+    const replacement: JsonMap = planCreate("atomic-replace");
+    (replacement.planData as JsonMap).valid_from = "2026-07-18T14:30:00.000Z";
+    replacement.expectedActivePlanId = planId;
+    replacement.expectedActiveRevision = 1;
+    const replaced = await runHealthNutritionCreateAndActivatePlan(
+      mockRequest(replacement, auth),
+      deps,
+    );
+    assert.strictEqual(replaced.supersededPlanId, planId);
+    assert.strictEqual(replaced.status, "active");
   });
 
   console.log("\nAll health_nutrition_callables tests passed.");

@@ -30,6 +30,8 @@ import {
   parseUpdateActiveNutritionPlan,
   parseCancelNutritionPlan,
   fingerprintNutritionPlan,
+  buildCanonicalNutritionPlanOperationFingerprint,
+  compareOrdinal,
 } from "./health_nutrition_logic";
 
 function test(name: string, fn: () => void): void {
@@ -635,6 +637,9 @@ test("parseCreateAndActivateNutritionPlan: valid payload success", () => {
   const result = parseCreateAndActivateNutritionPlan(baseValidPlanPayload as any, testServerNow);
   assert.strictEqual(result.dogId, "dog-test-123");
   assert.strictEqual(result.operationId, "op-create-123");
+  assert.strictEqual(result.intent, "create");
+  assert.strictEqual(result.expectedActivePlanId, null);
+  assert.strictEqual(result.expectedActiveRevision, null);
   assert.strictEqual(result.planData.food_type, "ração super premium light");
   assert.strictEqual(result.planData.amount_grams_per_day, 400);
   assert.strictEqual(result.planData.meals_per_day, 2);
@@ -655,6 +660,109 @@ test("parseCreateAndActivateNutritionPlan: valid payload success", () => {
   // attachment_refs: array de health_document_id
   assert.strictEqual(result.planData.attachment_refs?.length, 2);
   assert.deepStrictEqual(result.planData.attachment_refs, ["doc-lab-result-1", "doc-prescription-11"]);
+});
+
+test("parseCreateAndActivateNutritionPlan: REPLACE exige par ID/revision válido", () => {
+  const result = parseCreateAndActivateNutritionPlan({
+    ...baseValidPlanPayload,
+    expectedActivePlanId: "  plan-active-7  ",
+    expectedActiveRevision: 3,
+  } as any, testServerNow);
+  assert.strictEqual(result.intent, "replace");
+  assert.strictEqual(result.expectedActivePlanId, "plan-active-7");
+  assert.strictEqual(result.expectedActiveRevision, 3);
+});
+
+test("parseCreateAndActivateNutritionPlan: expectations parciais falham", () => {
+  for (const expectation of [
+    {expectedActivePlanId: "plan-active-7"},
+    {expectedActiveRevision: 3},
+  ]) {
+    assert.throws(
+      () => parseCreateAndActivateNutritionPlan({
+        ...baseValidPlanPayload,
+        ...expectation,
+      } as any, testServerNow),
+      /devem ser enviados juntos/,
+    );
+  }
+});
+
+test("parseCreateAndActivateNutritionPlan: expectations inválidas falham fechadas", () => {
+  const invalidPairs = [
+    {expectedActivePlanId: null, expectedActiveRevision: 1},
+    {expectedActivePlanId: "", expectedActiveRevision: 1},
+    {expectedActivePlanId: "dogs/dog/plans/p", expectedActiveRevision: 1},
+    {expectedActivePlanId: "p", expectedActiveRevision: null},
+    {expectedActivePlanId: "p", expectedActiveRevision: 0},
+    {expectedActivePlanId: "p", expectedActiveRevision: -1},
+    {expectedActivePlanId: "p", expectedActiveRevision: 1.5},
+    {expectedActivePlanId: "p", expectedActiveRevision: "1"},
+    {expectedActivePlanId: "p", expectedActiveRevision: Number.NaN},
+    {expectedActivePlanId: "p", expectedActiveRevision: Number.POSITIVE_INFINITY},
+  ];
+  for (const expectation of invalidPairs) {
+    assert.throws(() => parseCreateAndActivateNutritionPlan({
+      ...baseValidPlanPayload,
+      ...expectation,
+    } as any, testServerNow));
+  }
+});
+
+test("parseCreateAndActivateNutritionPlan: matriz extrema completa de expectations", () => {
+  const invalidIds: unknown[] = [
+    undefined, null, "", "   ", "/", "dogs/dog/plans/p", "x".repeat(129),
+    true, 7, {}, [],
+  ];
+  for (const expectedActivePlanId of invalidIds) {
+    assert.throws(() => parseCreateAndActivateNutritionPlan({
+      ...baseValidPlanPayload,
+      expectedActivePlanId,
+      expectedActiveRevision: 1,
+    } as any, testServerNow));
+  }
+  const invalidRevisions: unknown[] = [
+    undefined, null, "1", "abc", 0, -1, 1.5, Number.NaN,
+    Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, true, {}, [],
+  ];
+  for (const expectedActiveRevision of invalidRevisions) {
+    assert.throws(() => parseCreateAndActivateNutritionPlan({
+      ...baseValidPlanPayload,
+      expectedActivePlanId: "plan-active-7",
+      expectedActiveRevision,
+    } as any, testServerNow));
+  }
+  for (const partial of [
+    {expectedActivePlanId: "plan-active-7"},
+    {expectedActiveRevision: 3},
+    {expectedActivePlanId: undefined, expectedActiveRevision: 3},
+    {expectedActivePlanId: "plan-active-7", expectedActiveRevision: undefined},
+  ]) {
+    assert.throws(() => parseCreateAndActivateNutritionPlan({
+      ...baseValidPlanPayload,
+      ...partial,
+    } as any, testServerNow));
+  }
+  assert.throws(() => parseCreateAndActivateNutritionPlan({
+    ...baseValidPlanPayload,
+    intent: "replace",
+  } as any, testServerNow), /Campo não permitido/);
+});
+
+test("parseCreateAndActivateNutritionPlan: aliases snake_case não viram CREATE", () => {
+  assert.throws(() => parseCreateAndActivateNutritionPlan({
+    ...baseValidPlanPayload,
+    expected_active_plan_id: "plan-active-7",
+    expected_active_revision: 3,
+  } as any, testServerNow), /use camelCase/);
+});
+
+test("parseCreateAndActivateNutritionPlan: expectation desconhecida não vira CREATE", () => {
+  assert.throws(() => parseCreateAndActivateNutritionPlan({
+    ...baseValidPlanPayload,
+    expectedActivePlanID: "plan-active-7",
+    expectedActiveRevision: 3,
+  } as any, testServerNow), /Campo não permitido no payload/);
 });
 
 test("parseCreateAndActivateNutritionPlan: validations reject invalid timezone", () => {
@@ -734,6 +842,113 @@ test("fingerprintNutritionPlan: deterministic ordering & hashing", () => {
 
   const fpB = fingerprintNutritionPlan(shuffledPlanData as any);
   assert.strictEqual(fpA, fpB, "Fingerprint should be identical regardless of schedule order");
+});
+
+test("canonical NutritionPlan operation fingerprint: igualdade e diferença semânticas", () => {
+  const parsed = parseCreateAndActivateNutritionPlan(baseValidPlanPayload as any, testServerNow);
+  const reordered = parseCreateAndActivateNutritionPlan({
+    operationId: baseValidPlanPayload.operationId,
+    dogId: baseValidPlanPayload.dogId,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      meal_schedule: [...baseValidPlanPayload.planData.meal_schedule].reverse(),
+      supplements: [...baseValidPlanPayload.planData.supplements].reverse(),
+      attachment_refs: [...baseValidPlanPayload.planData.attachment_refs].reverse(),
+    },
+  } as any, testServerNow);
+  assert.strictEqual(
+    buildCanonicalNutritionPlanOperationFingerprint(parsed),
+    buildCanonicalNutritionPlanOperationFingerprint(reordered),
+  );
+  const optionalAbsent = structuredClone(baseValidPlanPayload) as any;
+  delete optionalAbsent.planData.valid_until;
+  delete optionalAbsent.planData.special_instructions;
+  const optionalUndefined = structuredClone(optionalAbsent) as any;
+  optionalUndefined.planData.valid_until = undefined;
+  optionalUndefined.planData.special_instructions = undefined;
+  const optionalNull = structuredClone(optionalAbsent) as any;
+  optionalNull.planData.valid_until = null;
+  optionalNull.planData.special_instructions = null;
+  assert.strictEqual(
+    buildCanonicalNutritionPlanOperationFingerprint(parseCreateAndActivateNutritionPlan(optionalAbsent, testServerNow)),
+    buildCanonicalNutritionPlanOperationFingerprint(parseCreateAndActivateNutritionPlan(optionalUndefined, testServerNow)),
+  );
+  assert.strictEqual(
+    buildCanonicalNutritionPlanOperationFingerprint(parseCreateAndActivateNutritionPlan(optionalAbsent, testServerNow)),
+    buildCanonicalNutritionPlanOperationFingerprint(parseCreateAndActivateNutritionPlan(optionalNull, testServerNow)),
+  );
+  const changedAmount = parseCreateAndActivateNutritionPlan({
+    ...baseValidPlanPayload,
+    planData: {
+      ...baseValidPlanPayload.planData,
+      amount_grams_per_day: 420,
+      meal_schedule: baseValidPlanPayload.planData.meal_schedule.map((slot) => ({
+        ...slot,
+        target_grams: slot.target_grams + 10,
+      })),
+    },
+  } as any, testServerNow);
+  assert.notStrictEqual(
+    buildCanonicalNutritionPlanOperationFingerprint(parsed),
+    buildCanonicalNutritionPlanOperationFingerprint(changedAmount),
+  );
+  const changedSlot = structuredClone(parsed);
+  changedSlot.planData.meal_schedule[0].scheduled_time = "08:30";
+  assert.notStrictEqual(
+    buildCanonicalNutritionPlanOperationFingerprint(parsed),
+    buildCanonicalNutritionPlanOperationFingerprint(changedSlot),
+  );
+  const replaceA = {...parsed, intent: "replace" as const, expectedActivePlanId: "A", expectedActiveRevision: 3};
+  const replaceB = {...replaceA, expectedActivePlanId: "B"};
+  const replaceA4 = {...replaceA, expectedActiveRevision: 4};
+  assert.notStrictEqual(buildCanonicalNutritionPlanOperationFingerprint(parsed), buildCanonicalNutritionPlanOperationFingerprint(replaceA));
+  assert.notStrictEqual(buildCanonicalNutritionPlanOperationFingerprint(replaceA), buildCanonicalNutritionPlanOperationFingerprint(replaceB));
+  assert.notStrictEqual(buildCanonicalNutritionPlanOperationFingerprint(replaceA), buildCanonicalNutritionPlanOperationFingerprint(replaceA4));
+});
+
+test("compareOrdinal: ordem total determinística e arrays equivalentes", () => {
+  const longId = "a".repeat(5000);
+  const values = [
+    "", "a", "A", "a1", "a01", "á", "ç", "Ω", "中", "🐕",
+    "\uD800", "\uDC00", "a", "prefix-2", "prefix-10", longId,
+  ];
+  for (const a of values) {
+    for (const b of values) {
+      if (a === b) {
+        assert.strictEqual(compareOrdinal(a, b), 0);
+      } else {
+        assert.strictEqual(compareOrdinal(a, b), -compareOrdinal(b, a));
+      }
+      assert.strictEqual(compareOrdinal(a, b) === 0, a === b);
+    }
+  }
+  const expectedCore = [
+    "", "A", "a", "a01", "a1", "prefix-10", "prefix-2",
+    "á", "ç", "Ω", "中", "\uD800", "🐕", "\uDC00",
+  ];
+  assert.deepStrictEqual(
+    expectedCore.slice().reverse().sort(compareOrdinal),
+    expectedCore,
+  );
+  for (let seed = 1; seed <= 20; seed++) {
+    const permuted = [...expectedCore].sort((a, b) => {
+      const left = sha256Hex(`${seed}|${a}`);
+      const right = sha256Hex(`${seed}|${b}`);
+      return compareOrdinal(left, right);
+    });
+    assert.deepStrictEqual(permuted.sort(compareOrdinal), expectedCore);
+  }
+  for (let i = 0; i < expectedCore.length - 2; i++) {
+    assert.ok(compareOrdinal(expectedCore[i], expectedCore[i + 1]) < 0);
+    assert.ok(compareOrdinal(expectedCore[i + 1], expectedCore[i + 2]) < 0);
+    assert.ok(compareOrdinal(expectedCore[i], expectedCore[i + 2]) < 0);
+  }
+  assert.ok(compareOrdinal("a", "a1") < 0, "prefixo menor deve vir primeiro");
+  assert.ok(compareOrdinal("a1", longId) < 0, "ID longo mantém ordem ordinal");
+  const withDuplicates = ["ç", "a", "ç", "A", "a"].sort(compareOrdinal);
+  assert.deepStrictEqual(withDuplicates, ["A", "a", "a", "ç", "ç"]);
+  assert.strictEqual(withDuplicates.filter((value) => value === "ç").length, 2);
+  assert.strictEqual(withDuplicates.filter((value) => value === "a").length, 2);
 });
 
 test("parseUpdateActiveNutritionPlan: allows administrative changes", () => {
