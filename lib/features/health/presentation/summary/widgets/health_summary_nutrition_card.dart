@@ -117,26 +117,15 @@ class HealthSummaryNutritionCard extends StatelessWidget {
     final consumed = view.consumedAmount;
     final offered = view.offeredAmount;
     final planned = view.plannedAmount;
-
-    final effectiveAmount = consumed ?? offered;
-    final headline = _headline(
-      consumed: consumed,
-      offered: offered,
-      planned: planned,
-      unit: unit,
-    );
     final mealsLine = _mealsLine(view.mealsRecorded, view.mealsPlanned);
-    final progress = _progress(effectiveAmount, planned);
-    final percentLabel = progress == null
-        ? null
-        : '${(progress * 100).clamp(0, 999).round()}%';
-    final barValue = progress?.clamp(0.0, 1.0).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          headline,
+          planned == null || !planned.isFinite || planned <= 0
+              ? 'Meta diária não informada'
+              : 'Meta diária: ${HealthSummaryFormatters.amount(planned, unit)}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
@@ -146,8 +135,25 @@ class HealthSummaryNutritionCard extends StatelessWidget {
             height: 1.15,
           ),
         ),
+        const SizedBox(height: 14),
+        _ProgressMetric(
+          label: 'Oferecido',
+          amount: offered,
+          planned: planned,
+          unit: unit,
+          color: AppTheme.attention,
+        ),
+        const SizedBox(height: 12),
+        _ProgressMetric(
+          label: 'Consumido',
+          amount: consumed,
+          planned: planned,
+          unit: unit,
+          color: AppTheme.success,
+          unknownLabel: 'Consumo não informado',
+        ),
         if (mealsLine != null) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             mealsLine,
             style: GoogleFonts.inter(
@@ -157,83 +163,30 @@ class HealthSummaryNutritionCard extends StatelessWidget {
             ),
           ),
         ],
-        if (barValue != null) ...[
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: barValue,
-                    minHeight: 8,
-                    backgroundColor: AppTheme.surfaceWhiteOverlay,
-                    color: AppTheme.primary,
-                  ),
-                ),
-              ),
-              if (percentLabel != null) ...[
-                const SizedBox(width: 10),
-                Text(
-                  percentLabel,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (consumed != null &&
-              planned != null &&
-              planned.isFinite &&
-              consumed.isFinite &&
-              planned > 0 &&
-              consumed > planned) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Consumo acima da meta',
-              style: GoogleFonts.inter(
-                color: AppTheme.warningAccent,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
+        if (consumed != null &&
+            planned != null &&
+            planned.isFinite &&
+            consumed.isFinite &&
+            planned > 0 &&
+            consumed > planned) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Consumo acima da meta',
+            style: GoogleFonts.inter(
+              color: AppTheme.warningAccent,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
             ),
-          ],
+          ),
         ],
       ],
     );
   }
 
-  static String _headline({
-    double? consumed,
-    double? offered,
-    double? planned,
-    String? unit,
-  }) {
-    if (consumed == null && offered == null && planned == null) {
-      return 'Sem quantidades';
-    }
-
-    final amount = consumed ?? offered;
-    final isOfferedOnly = consumed == null && offered != null;
-    final suffix = isOfferedOnly ? ' oferecidos' : '';
-
-    if (amount != null && planned != null) {
-      return '${HealthSummaryFormatters.amount(amount, unit)}$suffix de '
-          '${HealthSummaryFormatters.amount(planned, unit)}';
-    }
-    if (amount != null) {
-      return '${HealthSummaryFormatters.amount(amount, unit)}$suffix';
-    }
-    return 'Meta ${HealthSummaryFormatters.amount(planned!, unit)}';
-  }
-
   static String? _mealsLine(int? recorded, int? planned) {
     if (recorded == null && planned == null) return null;
     if (recorded != null && planned != null) {
-      return '$recorded de $planned refeições registradas';
+      return '$recorded de $planned refeições executadas';
     }
     if (recorded != null) {
       return recorded == 1
@@ -242,16 +195,82 @@ class HealthSummaryNutritionCard extends StatelessWidget {
     }
     return '$planned refeições planejadas';
   }
+}
 
-  /// Progresso visual trivial. Meta zero / null / não-finito → sem barra.
-  /// Nunca retorna NaN ou Infinity.
-  static double? _progress(double? consumed, double? planned) {
-    if (consumed == null || planned == null) return null;
-    if (!consumed.isFinite || !planned.isFinite) return null;
-    if (planned <= 0) return null;
-    final ratio = consumed / planned;
-    if (!ratio.isFinite) return null;
-    return ratio;
+class _ProgressMetric extends StatelessWidget {
+  const _ProgressMetric({
+    required this.label,
+    required this.amount,
+    required this.planned,
+    required this.unit,
+    required this.color,
+    this.unknownLabel,
+  });
+
+  final String label;
+  final double? amount;
+  final double? planned;
+  final String? unit;
+  final Color color;
+  final String? unknownLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final validAmount = amount != null && amount!.isFinite;
+    final validPlan = planned != null && planned!.isFinite && planned! > 0;
+    final ratio = validAmount && validPlan ? amount! / planned! : null;
+    final visualProgress = ratio?.clamp(0.0, 1.0).toDouble();
+    final text = !validAmount
+        ? (unknownLabel ?? '$label não informado')
+        : validPlan
+        ? '$label: ${HealthSummaryFormatters.amount(amount!, unit)} de '
+              '${HealthSummaryFormatters.amount(planned!, unit)}'
+        : '$label: ${HealthSummaryFormatters.amount(amount!, unit)}';
+    final semanticsLabel = !validAmount
+        ? '$label, quantidade não informada.'
+        : validPlan
+        ? '$label, ${_semanticAmount(amount!)} de uma meta de '
+              '${_semanticAmount(planned!)}, '
+              '${(visualProgress! * 100).round()} por cento.'
+        : '$label, ${_semanticAmount(amount!)}. '
+              'Meta diária não informada.';
+
+    return Semantics(
+      label: semanticsLabel,
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              color: validAmount ? AppTheme.textPrimary : AppTheme.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (visualProgress != null) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: visualProgress,
+                minHeight: 8,
+                backgroundColor: AppTheme.surfaceWhiteOverlay,
+                color: color,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _semanticAmount(double value) {
+    final formatted = HealthSummaryFormatters.amount(value, unit);
+    return unit?.trim().toLowerCase() == 'g'
+        ? formatted.replaceFirst(RegExp(r'\s*g$'), ' gramas')
+        : formatted;
   }
 }
 

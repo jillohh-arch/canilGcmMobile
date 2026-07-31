@@ -126,6 +126,7 @@ void main() {
           const HealthSummarySectionData.available(
             HealthSummaryNutritionTodayView(
               consumedAmount: 250,
+              offeredAmount: 500,
               plannedAmount: 600,
               mealsRecorded: 1,
               mealsPlanned: 3,
@@ -569,9 +570,9 @@ void main() {
 
       await pumpDashboard(tester, source: source, emitData: fullData());
 
-      expect(find.textContaining('250 g de 600 g'), findsOneWidget);
-      expect(find.textContaining('1 de 3 refeições'), findsOneWidget);
-      expect(find.text('42%'), findsOneWidget);
+      expect(find.text('Oferecido: 500 g de 600 g'), findsOneWidget);
+      expect(find.text('Consumido: 250 g de 600 g'), findsOneWidget);
+      expect(find.text('1 de 3 refeições executadas'), findsOneWidget);
     });
 
     testWidgets('nulls e meta zero', (tester) async {

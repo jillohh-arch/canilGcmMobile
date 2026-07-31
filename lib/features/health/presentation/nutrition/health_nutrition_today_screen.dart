@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
@@ -167,6 +168,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 legacyRegimens:
                     todayModel?.legacySupplementRegimens ??
                     snapshot.legacySupplementRegimens,
+                timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
                 mutationController: mutationController,
                 dogDisplayName: dogDisplayName,
                 onRefreshRequested: controller.refresh,
@@ -424,24 +426,7 @@ class _TodaySummaryCard extends StatelessWidget {
     };
     final completed = meals.where((m) => m.meal.isPlanned).length;
 
-    final consumedLabel = consumed.knownSum == null
-        ? '—'
-        : HealthNutritionTodayFormatters.grams(consumed.knownSum);
-    final consumedColor = consumed.knownSum == null
-        ? AppTheme.textMuted
-        : AppTheme.success;
-
-    String? pctLabel;
-    double progress = 0;
-    if (planned != null &&
-        planned > 0 &&
-        consumed.knownSum != null &&
-        !consumed.hasUnknownConsumed) {
-      progress = (consumed.knownSum! / planned).clamp(0.0, 1.0);
-      pctLabel = '${(progress * 100).round()}% da meta diária';
-    } else if (consumed.hasUnknownConsumed) {
-      pctLabel = 'Consumo parcialmente informado';
-    }
+    final validPlan = planned != null && planned.isFinite && planned > 0;
 
     return HealthSummaryCardSurface(
       child: Column(
@@ -468,97 +453,53 @@ class _TodaySummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: planned == null
-                      ? 'Sem meta ativa'
-                      : consumed.knownSum == null
-                      ? '—'
-                      : '${consumed.knownSum!.round()} g',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontSize: planned == null ? 20 : 28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (planned != null)
-                  TextSpan(
-                    text: ' de ${planned.round()} g',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textSecondary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
+          Text(
+            validPlan
+                ? 'Meta diária: ${HealthNutritionTodayFormatters.grams(planned)}'
+                : 'Meta diária não informada',
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          if (pctLabel != null) ...[
-            const SizedBox(height: 4),
+          const SizedBox(height: 14),
+          _DailyProgressMetric(
+            label: 'Oferecido',
+            amount: offered,
+            planned: validPlan ? planned : null,
+            color: AppTheme.attention,
+          ),
+          const SizedBox(height: 12),
+          _DailyProgressMetric(
+            label: consumed.hasUnknownConsumed && consumed.knownSum != null
+                ? 'Consumido conhecido'
+                : 'Consumido',
+            amount: consumed.knownSum,
+            planned: validPlan ? planned : null,
+            color: AppTheme.success,
+            unknownText: 'Consumido: não informado',
+          ),
+          if (consumed.hasUnknownConsumed && consumed.knownSum != null) ...[
+            const SizedBox(height: 6),
             Text(
-              pctLabel,
+              'Há refeições sem quantidade consumida',
               style: GoogleFonts.inter(
-                color: AppTheme.textMuted,
+                color: AppTheme.warningAccent,
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-          if (planned != null && consumed.knownSum != null) ...[
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: AppTheme.outlineVariant,
-                valueColor: const AlwaysStoppedAnimation(AppTheme.primary),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              _metric(
-                'Oferecido',
-                HealthNutritionTodayFormatters.grams(offered),
-              ),
-              _metric('Consumido', consumedLabel, valueColor: consumedColor),
-              _metric(
-                'Refeições',
-                mealsPlanned == null
-                    ? '$completed'
-                    : '$completed / $mealsPlanned',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metric(String label, String value, {Color? valueColor}) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
           Text(
-            label,
+            mealsPlanned == null
+                ? '$completed refeições executadas'
+                : '$completed de $mealsPlanned refeições executadas',
             style: GoogleFonts.inter(
-              color: AppTheme.textMuted,
-              fontSize: 11,
+              color: AppTheme.textSecondary,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.inter(
-              color: valueColor ?? AppTheme.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -581,6 +522,73 @@ class _TodaySummaryCard extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),
+      ),
+    );
+  }
+}
+
+class _DailyProgressMetric extends StatelessWidget {
+  const _DailyProgressMetric({
+    required this.label,
+    required this.amount,
+    required this.planned,
+    required this.color,
+    this.unknownText,
+  });
+
+  final String label;
+  final double? amount;
+  final num? planned;
+  final Color color;
+  final String? unknownText;
+
+  @override
+  Widget build(BuildContext context) {
+    final validAmount = amount != null && amount!.isFinite;
+    final validPlan = planned != null && planned!.isFinite && planned! > 0;
+    final progress = validAmount && validPlan
+        ? (amount! / planned!).clamp(0.0, 1.0).toDouble()
+        : null;
+    final text = !validAmount
+        ? (unknownText ?? '$label: não informado')
+        : validPlan
+        ? '$label: ${HealthNutritionTodayFormatters.grams(amount)} de '
+              '${HealthNutritionTodayFormatters.grams(planned)}'
+        : '$label: ${HealthNutritionTodayFormatters.grams(amount)}';
+    final semanticsLabel = !validAmount
+        ? '$label, quantidade não informada.'
+        : validPlan
+        ? '$label, ${amount!.round()} gramas de uma meta de '
+              '${planned!.round()} gramas, ${(progress! * 100).round()} por cento.'
+        : '$label, ${amount!.round()} gramas. Meta diária não informada.';
+
+    return Semantics(
+      label: semanticsLabel,
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              color: validAmount ? AppTheme.textPrimary : AppTheme.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 7,
+                backgroundColor: AppTheme.outlineVariant,
+                color: color,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -824,7 +832,7 @@ class _MealsSection extends StatelessWidget {
               .map(
                 (m) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _AdhocMealCard(item: m),
+                  child: _AdhocMealCard(item: m, timezone: timezone),
                 ),
               ),
         ] else if (mealsToday.isEmpty) ...[
@@ -845,7 +853,11 @@ class _MealsSection extends StatelessWidget {
           ...mealsToday.map(
             (m) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: _AdhocMealCard(item: m, legacyPreferred: true),
+              child: _AdhocMealCard(
+                item: m,
+                timezone: timezone,
+                legacyPreferred: true,
+              ),
             ),
           ),
         ],
@@ -932,7 +944,7 @@ class _MealSlotCard extends StatelessWidget {
                 _kv(
                   'Consumido',
                   meal!.meal.consumedGrams == null
-                      ? '—'
+                      ? 'Não informado'
                       : HealthNutritionTodayFormatters.grams(
                           meal!.meal.consumedGrams,
                         ),
@@ -948,6 +960,18 @@ class _MealSlotCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (meal!.meal.acceptance.value == MealAcceptance.full &&
+                meal!.meal.consumedGrams == null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Quantidade consumida não medida',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textMuted,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ] else if (onRegister != null) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -999,9 +1023,14 @@ class _MealSlotCard extends StatelessWidget {
 }
 
 class _AdhocMealCard extends StatelessWidget {
-  const _AdhocMealCard({required this.item, this.legacyPreferred = false});
+  const _AdhocMealCard({
+    required this.item,
+    required this.timezone,
+    this.legacyPreferred = false,
+  });
 
   final NutritionMealReadItem item;
+  final String timezone;
   final bool legacyPreferred;
 
   @override
@@ -1040,7 +1069,10 @@ class _AdhocMealCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            HealthNutritionTodayFormatters.timeShort(meal.fedAt),
+            HealthNutritionTodayFormatters.timeShort(
+              meal.fedAt,
+              timezone: timezone,
+            ),
             style: GoogleFonts.inter(
               color: AppTheme.textMuted,
               fontSize: 12,
@@ -1063,7 +1095,7 @@ class _AdhocMealCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   meal.consumedGrams == null
-                      ? 'Consumido: —'
+                      ? 'Consumido: não informado'
                       : 'Consumido: ${HealthNutritionTodayFormatters.grams(meal.consumedGrams)}',
                   style: GoogleFonts.inter(
                     color: meal.consumedGrams == null
@@ -1086,6 +1118,18 @@ class _AdhocMealCard extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
+            if (meal.acceptance.value == MealAcceptance.full &&
+                meal.consumedGrams == null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Quantidade consumida não medida',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textMuted,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -1098,6 +1142,7 @@ class _SupplementsSection extends StatefulWidget {
     required this.plan,
     required this.administrations,
     required this.legacyRegimens,
+    required this.timezone,
     this.mutationController,
     required this.dogDisplayName,
     required this.onRefreshRequested,
@@ -1106,6 +1151,7 @@ class _SupplementsSection extends StatefulWidget {
   final NutritionActivePlanRef? plan;
   final List<SupplementLog> administrations;
   final List<LegacySupplementRegimenView> legacyRegimens;
+  final String timezone;
   final HealthNutritionMutationController? mutationController;
   final String dogDisplayName;
   final Future<void> Function() onRefreshRequested;
@@ -1129,22 +1175,23 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
     final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
     final dogId = activePlan?.plan.dogId ?? '';
 
-    final outcome = await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surfacePanel,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => HealthSupplementFormSheet(
-        dogId: dogId,
-        dogDisplayName: widget.dogDisplayName,
-        controller: mutation,
-        onRefreshRequested: widget.onRefreshRequested,
-        timezone: tz,
-        activePlan: activePlan,
-      ),
-    );
+    final outcome =
+        await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: AppTheme.surfacePanel,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => HealthSupplementFormSheet(
+            dogId: dogId,
+            dogDisplayName: widget.dogDisplayName,
+            controller: mutation,
+            onRefreshRequested: widget.onRefreshRequested,
+            timezone: tz,
+            activePlan: activePlan,
+          ),
+        );
 
     if (!mounted) return;
     if (outcome is HealthNutritionMutationUiSuccess) {
@@ -1348,7 +1395,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
                     const SizedBox(height: 4),
                     Text(
                       '${a.dose} ${a.unit.displayLabel} · '
-                      '${HealthNutritionTodayFormatters.timeShort(a.administeredAt)}',
+                      '${HealthNutritionTodayFormatters.timeShort(a.administeredAt, timezone: widget.timezone)}',
                       style: GoogleFonts.inter(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
@@ -1415,7 +1462,7 @@ class _RecentMealsSection extends StatelessWidget {
           ...meals.map((m) {
             final consumed = m.meal.consumedGrams;
             final line = consumed == null
-                ? '${HealthNutritionTodayFormatters.grams(m.meal.offeredGrams)} oferecidos'
+                ? '${HealthNutritionTodayFormatters.grams(m.meal.offeredGrams)} oferecidos · consumo não informado'
                 : '${HealthNutritionTodayFormatters.grams(consumed)} consumidos';
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),

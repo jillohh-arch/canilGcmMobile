@@ -137,12 +137,14 @@ final actor = RecordedBy(uid: 'u1', name: 'Silva', internalRole: 'condutor');
 NutritionPlan canonicalPlan({
   String dogId = 'dog-a',
   String foodType = 'Ração Premium',
+  double amountGramsPerDay = 600,
+  String timezone = NutritionPlan.defaultTimezone,
 }) {
   return NutritionPlan(
     id: 'plan-1',
     dogId: dogId,
     foodType: foodType,
-    amountGramsPerDay: 600,
+    amountGramsPerDay: amountGramsPerDay,
     mealsPerDay: 2,
     mealSchedule: [
       MealScheduleSlot(
@@ -159,7 +161,7 @@ NutritionPlan canonicalPlan({
       ),
     ],
     validFrom: DateTime.utc(2026, 1, 1),
-    timezone: NutritionPlan.defaultTimezone,
+    timezone: timezone,
     recordedBy: actor,
     status: NutritionPlanStatus.active,
     schemaVersion: 1,
@@ -171,6 +173,7 @@ MealLog mealLog({
   required String id,
   double offered = 200,
   double? consumed = 200,
+  String? acceptance,
   String? plannedMealId,
   DateTime? fedAt,
 }) {
@@ -179,7 +182,9 @@ MealLog mealLog({
     dogId: 'dog-a',
     period: MealPeriodWire.parseCanonical('morning'),
     offeredGrams: offered,
-    acceptance: MealAcceptanceWire.parse(consumed == null ? 'unknown' : 'full'),
+    acceptance: MealAcceptanceWire.parse(
+      acceptance ?? (consumed == null ? 'unknown' : 'full'),
+    ),
     fedAt: fedAt ?? DateTime.now().toUtc(),
     recordedBy: actor,
     schemaVersion: 1,
@@ -257,6 +262,144 @@ void main() {
     expect(find.textContaining('Registrar refeição'), findsNothing);
     expect(find.textContaining('Registrar administração'), findsNothing);
     controller.dispose();
+  });
+
+  testWidgets('resumo separa oferta de consumo parcial conhecido', (
+    tester,
+  ) async {
+    final source = CoexistenceNutritionReadSource(
+      canonicalPlanReader: _MemPlan(
+        NutritionSourceBatch.available([canonicalPlan(amountGramsPerDay: 500)]),
+      ),
+      canonicalMealReader: _MemMeal(
+        NutritionSourceBatch.available([
+          mealLog(
+            id: 'known',
+            offered: 300,
+            consumed: 250,
+            acceptance: 'partial',
+            plannedMealId: 's-m',
+          ),
+          mealLog(
+            id: 'unknown',
+            offered: 200,
+            consumed: null,
+            plannedMealId: 's-n',
+          ),
+        ]),
+      ),
+    );
+    final controller = HealthNutritionReadController(source: source);
+    await controller.selectDog('dog-a');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HealthNutritionTodayScreen(
+            controller: controller,
+            dogDisplayName: 'Bono',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oferecido: 500 g de 500 g'), findsOneWidget);
+    expect(find.text('Consumido conhecido: 250 g de 500 g'), findsOneWidget);
+    expect(find.text('Há refeições sem quantidade consumida'), findsOneWidget);
+    final bars = tester
+        .widgetList<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
+        )
+        .toList();
+    expect(bars[0].value, 1);
+    expect(bars[1].value, 0.5);
+  });
+
+  testWidgets('aceitação full sem consumo explica ausência de medição', (
+    tester,
+  ) async {
+    final source = CoexistenceNutritionReadSource(
+      canonicalPlanReader: _MemPlan(
+        NutritionSourceBatch.available([canonicalPlan()]),
+      ),
+      canonicalMealReader: _MemMeal(
+        NutritionSourceBatch.available([
+          mealLog(
+            id: 'full-null',
+            offered: 300,
+            consumed: null,
+            acceptance: 'full',
+            plannedMealId: 's-m',
+          ),
+        ]),
+      ),
+    );
+    final controller = HealthNutritionReadController(source: source);
+    await controller.selectDog('dog-a');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HealthNutritionTodayScreen(
+            controller: controller,
+            dogDisplayName: 'Bono',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Quantidade consumida não medida'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Aceitou tudo'), findsOneWidget);
+    expect(find.text('Quantidade consumida não medida'), findsOneWidget);
+    expect(find.text('Não informado'), findsOneWidget);
+  });
+
+  testWidgets('refeição avulsa preserva horário no timezone normativo', (
+    tester,
+  ) async {
+    final source = CoexistenceNutritionReadSource(
+      canonicalPlanReader: _MemPlan(
+        NutritionSourceBatch.available([canonicalPlan()]),
+      ),
+      canonicalMealReader: _MemMeal(
+        NutritionSourceBatch.available([
+          mealLog(
+            id: 'adhoc-timezone',
+            fedAt: DateTime.utc(2026, 7, 31, 4, 30),
+          ),
+        ]),
+      ),
+    );
+    final controller = HealthNutritionReadController(source: source);
+    await controller.selectDog('dog-a');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HealthNutritionTodayScreen(
+            controller: controller,
+            dogDisplayName: 'Bono',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('01:30'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('01:30'), findsOneWidget);
   });
 
   testWidgets('legacy fallback shows plan anterior and meals', (tester) async {

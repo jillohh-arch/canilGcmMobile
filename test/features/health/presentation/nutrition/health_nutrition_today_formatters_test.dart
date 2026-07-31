@@ -149,6 +149,19 @@ void main() {
   group('contexto temporal America/Sao_Paulo', () {
     const timezone = NutritionPlan.defaultTimezone;
 
+    test(
+      'timeShort usa o timezone normativo, não o timezone do dispositivo',
+      () {
+        expect(
+          HealthNutritionTodayFormatters.timeShort(
+            DateTime.utc(2026, 7, 19, 0, 30),
+            timezone: timezone,
+          ),
+          '21:30',
+        );
+      },
+    );
+
     test('23:30 UTC permanece na data local correta', () {
       expect(
         HealthNutritionTodayFormatters.recentDateTimeLabel(

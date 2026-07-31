@@ -88,8 +88,8 @@ abstract final class HealthNutritionTodayFormatters {
     return DateFormat('dd/MM/yyyy').format(d);
   }
 
-  static String timeShort(DateTime utcOrLocal) {
-    final d = utcOrLocal.toLocal();
+  static String timeShort(DateTime instant, {required String timezone}) {
+    final d = LocalServiceDate.instantInTimezone(instant, timezone: timezone);
     return DateFormat('HH:mm').format(d);
   }
 
