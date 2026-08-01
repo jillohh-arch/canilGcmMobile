@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
@@ -14,8 +15,11 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_so
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_state.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_view_data.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_formatters.dart';
+import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_metric_card.dart';
+import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_nutrition_card.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_readiness_card.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_recent_records.dart';
+import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_weight_trend_card.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section_placeholder.dart';
 
@@ -1023,5 +1027,160 @@ void main() {
       );
       expect(HealthSummaryFormatters.shortDate(DateTime(2026, 6, 8)), '08/06');
     });
+  });
+
+  group('Cores Semânticas UX-03B', () {
+    testWidgets('1. Peso usa AppTheme.info', (tester) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final weightCard = tester.widget<HealthSummaryMetricCard>(
+        find.byKey(const ValueKey('metric-weight')),
+      );
+      expect(weightCard.accentColor, equals(AppTheme.info));
+    });
+
+    testWidgets('2. Vacinação usa AppTheme.success', (tester) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final vaccCard = tester.widget<HealthSummaryMetricCard>(
+        find.byKey(const ValueKey('metric-vaccination')),
+      );
+      expect(vaccCard.accentColor, equals(AppTheme.success));
+    });
+
+    testWidgets('3. Medicação usa AppTheme.primary (cyan categoria clínica)', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final treatCard = tester.widget<HealthSummaryMetricCard>(
+        find.byKey(const ValueKey('metric-treatments')),
+      );
+      expect(treatCard.accentColor, equals(AppTheme.primary));
+    });
+
+    testWidgets('4. Atenção com pendências usa AppTheme.warningAccent', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final attCard = tester.widget<HealthSummaryMetricCard>(
+        find.byKey(const ValueKey('metric-attention')),
+      );
+      expect(attCard.accentColor, equals(AppTheme.warningAccent));
+    });
+
+    testWidgets('5. Atenção sem pendências usa AppTheme.success', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      final emptyAttentionData = HealthSummaryViewData(
+        dogId: 'dog-1',
+        readiness: const HealthSummarySectionData.available(
+          HealthSummaryReadinessView(status: ReadinessStatus.operational),
+        ),
+        weight: const HealthSummarySectionData.unavailable(),
+        vaccination: const HealthSummarySectionData.unavailable(),
+        treatments: const HealthSummarySectionData.unavailable(),
+        attention: const HealthSummarySectionData.available(
+          HealthSummaryAttentionView(items: []),
+        ),
+        nutritionToday: const HealthSummarySectionData.unavailable(),
+        weightTrend: const HealthSummarySectionData.unavailable(),
+        recentRecords: const HealthSummarySectionData.unavailable(),
+        metadata: HealthSummarySourceMetadata(updatedAt: DateTime(2026, 7, 15)),
+      );
+
+      await pumpDashboard(tester, source: source, emitData: emptyAttentionData);
+
+      final attCard = tester.widget<HealthSummaryMetricCard>(
+        find.byKey(const ValueKey('metric-attention')),
+      );
+      expect(attCard.accentColor, equals(AppTheme.success));
+    });
+
+    testWidgets('6. Alimentação usa AppTheme.attention como acento categórico', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final iconFinder = find.descendant(
+        of: find.byType(HealthSummaryNutritionCard),
+        matching: find.byIcon(Icons.restaurant_rounded),
+      );
+      final icon = tester.widget<Icon>(iconFinder);
+      expect(icon.color, equals(AppTheme.attention));
+    });
+
+    testWidgets('7. Consumo confirmado permanece AppTheme.success', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final progressIndicators = tester.widgetList<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      // Oferecido (primeiro) vs Consumido (segundo)
+      expect(progressIndicators.first.color, equals(AppTheme.attention));
+      expect(progressIndicators.elementAt(1).color, equals(AppTheme.success));
+    });
+
+    testWidgets('8. Evolução do peso usa AppTheme.info', (tester) async {
+      final source = FakeHealthSummarySource();
+      addTearDown(source.disposeAll);
+      await pumpDashboard(tester, source: source, emitData: fullData());
+
+      final chartIcon = tester.widget<Icon>(
+        find.byIcon(Icons.show_chart_rounded),
+      );
+      expect(chartIcon.color, equals(AppTheme.info));
+
+      final painterFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is HealthSummaryWeightChartPainter,
+      );
+      final customPaint = tester.widget<CustomPaint>(painterFinder);
+      final painter = customPaint.painter as HealthSummaryWeightChartPainter;
+      expect(painter.points, isNotEmpty);
+    });
+
+    testWidgets(
+      '10. Loading e indisponível não aparecem como sucesso indevido',
+      (tester) async {
+        final source = FakeHealthSummarySource();
+        addTearDown(source.disposeAll);
+        final unavailableData = HealthSummaryViewData(
+          dogId: 'dog-1',
+          readiness: const HealthSummarySectionData.unavailable(),
+          weight: const HealthSummarySectionData.unavailable(),
+          vaccination: const HealthSummarySectionData.unavailable(),
+          treatments: const HealthSummarySectionData.unavailable(),
+          attention: const HealthSummarySectionData.unavailable(),
+          nutritionToday: const HealthSummarySectionData.unavailable(),
+          weightTrend: const HealthSummarySectionData.unavailable(),
+          recentRecords: const HealthSummarySectionData.unavailable(),
+          metadata: HealthSummarySourceMetadata(updatedAt: DateTime(2026, 7, 15)),
+        );
+
+        await pumpDashboard(tester, source: source, emitData: unavailableData);
+
+        final attCard = tester.widget<HealthSummaryMetricCard>(
+          find.byKey(const ValueKey('metric-attention')),
+        );
+        expect(attCard.accentColor, equals(AppTheme.textSoft));
+      },
+    );
   });
 }

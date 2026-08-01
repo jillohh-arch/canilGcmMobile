@@ -75,7 +75,7 @@ class HealthSummaryMetricsGrid extends StatelessWidget {
       key: const ValueKey('metric-weight'),
       label: 'PESO',
       icon: Icons.monitor_weight_outlined,
-      accentColor: AppTheme.primary,
+      accentColor: AppTheme.info,
       primaryValue: primary,
       secondaryValue: secondary,
       isLoading: section.isLoading,

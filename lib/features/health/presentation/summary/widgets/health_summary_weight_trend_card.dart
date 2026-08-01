@@ -30,7 +30,7 @@ class HealthSummaryWeightTrendCard extends StatelessWidget {
               const Icon(
                 Icons.show_chart_rounded,
                 size: 16,
-                color: AppTheme.primary,
+                color: AppTheme.info,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -356,14 +356,14 @@ class HealthSummaryWeightChartPainter extends CustomPainter {
     if (offsets.isEmpty) return;
 
     final linePaint = Paint()
-      ..color = AppTheme.primary
+      ..color = AppTheme.info
       ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     if (offsets.length == 1) {
-      canvas.drawCircle(offsets.first, 4.5, Paint()..color = AppTheme.primary);
+      canvas.drawCircle(offsets.first, 4.5, Paint()..color = AppTheme.info);
       canvas.drawCircle(
         offsets.first,
         4.5,
@@ -391,7 +391,7 @@ class HealthSummaryWeightChartPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.primary.withValues(alpha: 0.22),
+            AppTheme.info.withValues(alpha: 0.22),
             AppTheme.transparent,
           ],
         ).createShader(Offset.zero & size),
@@ -400,7 +400,7 @@ class HealthSummaryWeightChartPainter extends CustomPainter {
 
     for (var i = 0; i < offsets.length; i++) {
       final radius = i == offsets.length - 1 ? 4.0 : 3.0;
-      canvas.drawCircle(offsets[i], radius, Paint()..color = AppTheme.primary);
+      canvas.drawCircle(offsets[i], radius, Paint()..color = AppTheme.info);
     }
   }
 

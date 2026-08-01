@@ -32,7 +32,7 @@ class HealthSummaryNutritionCard extends StatelessWidget {
               const Icon(
                 Icons.restaurant_rounded,
                 size: 16,
-                color: AppTheme.primary,
+                color: AppTheme.attention,
               ),
               const SizedBox(width: 6),
               Expanded(
