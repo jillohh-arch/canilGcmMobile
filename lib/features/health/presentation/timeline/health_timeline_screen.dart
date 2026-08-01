@@ -77,7 +77,7 @@ class _HealthTimelineScreenState extends State<HealthTimelineScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.info(context, message);
   }
 
   void _forwardNavigateError(Object error, StackTrace stackTrace) {

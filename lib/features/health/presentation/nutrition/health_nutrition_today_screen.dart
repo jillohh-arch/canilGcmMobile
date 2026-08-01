@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
@@ -223,7 +224,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
           backgroundColor: AppTheme.surfacePanel,
           title: const Text('Registro pendente'),
           content: const Text(
-            'Existe um registro de alimentação pendente de confirmação. '
+            'Existe um registro de refeição pendente de confirmação. '
             'Conclua ou descarte essa tentativa antes de iniciar outra.',
           ),
           actions: [
@@ -301,8 +302,10 @@ class HealthNutritionTodayScreen extends StatelessWidget {
         );
     if (!context.mounted || outcome == null) return;
     if (outcome is HealthNutritionMutationUiSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Refeição registrada com sucesso.')),
+      AppFeedback.success(
+        context,
+        'Refeição registrada com sucesso.',
+        title: 'Refeição',
       );
     }
   }
@@ -1195,8 +1198,10 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
 
     if (!mounted) return;
     if (outcome is HealthNutritionMutationUiSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Suplemento registrado com sucesso.')),
+      AppFeedback.success(
+        context,
+        'Suplemento registrado com sucesso.',
+        title: 'Suplemento',
       );
     }
   }

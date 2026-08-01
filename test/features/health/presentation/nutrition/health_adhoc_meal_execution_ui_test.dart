@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +14,7 @@ final class _SpyAdhocGateway implements HealthNutritionMutationGateway {
   CreateAdhocMealLogCommand? lastCommand;
   HealthNutritionMutationResult Function(CreateAdhocMealLogCommand cmd)?
   handler;
+  Completer<void>? gate;
 
   @override
   Future<HealthNutritionMutationResult> createPlannedMealLog(
@@ -26,6 +29,7 @@ final class _SpyAdhocGateway implements HealthNutritionMutationGateway {
   ) async {
     calls++;
     lastCommand = command;
+    await gate?.future;
     if (handler != null) return handler!(command);
     return CreateMealLogSuccess(
       dogId: command.dogId,
@@ -88,7 +92,7 @@ void main() {
       ),
     );
 
-    expect(find.text('REGISTRAR ALIMENTAÇÃO'), findsOneWidget);
+    expect(find.text('REGISTRAR REFEIÇÃO'), findsOneWidget);
     expect(find.text('Registro avulso'), findsOneWidget);
 
     // Enter offered grams = 150
@@ -101,7 +105,7 @@ void main() {
     // Tap submit button
     final submitFinder = find.widgetWithText(
       FilledButton,
-      'REGISTRAR ALIMENTAÇÃO AVULSA',
+      'REGISTRAR REFEIÇÃO AVULSA',
     );
     await tester.ensureVisible(submitFinder);
     await tester.tap(submitFinder);
@@ -145,7 +149,7 @@ void main() {
 
     final submitFinder = find.widgetWithText(
       FilledButton,
-      'REGISTRAR ALIMENTAÇÃO AVULSA',
+      'REGISTRAR REFEIÇÃO AVULSA',
     );
     await tester.ensureVisible(submitFinder);
     await tester.tap(submitFinder);
@@ -186,7 +190,7 @@ void main() {
 
     final submitFinder = find.widgetWithText(
       FilledButton,
-      'REGISTRAR ALIMENTAÇÃO AVULSA',
+      'REGISTRAR REFEIÇÃO AVULSA',
     );
     await tester.ensureVisible(submitFinder);
     await tester.tap(submitFinder);
@@ -224,13 +228,12 @@ void main() {
     );
     await tester.enterText(offeredFinder, '100');
 
-    // Change acceptance to Recusou
-    final dropdownFinder = find.byType(DropdownButtonFormField<MealAcceptance>);
-    await tester.tap(dropdownFinder);
+    // Change acceptance to Recusou via HUD selector (label is uppercase in HUD)
+    await tester.tap(find.text('ACEITAÇÃO'));
     await tester.pumpAndSettle();
 
-    final itemFinder = find.text('Recusou').last;
-    await tester.tap(itemFinder);
+    // HUD bottom sheet opens; tap Recusou to select
+    await tester.tap(find.text('Recusou'));
     await tester.pumpAndSettle();
 
     // Verify consumed field was automatically populated with 0
@@ -280,7 +283,7 @@ void main() {
 
     final submitFinder = find.widgetWithText(
       FilledButton,
-      'REGISTRAR ALIMENTAÇÃO AVULSA',
+      'REGISTRAR REFEIÇÃO AVULSA',
     );
 
     await tester.ensureVisible(submitFinder);
@@ -289,5 +292,124 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(gateway.calls, equals(1));
+  });
+
+  testWidgets('adhoc meal loading textual: spinner + texto visível durante submit', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    // Block gateway to observe loading state
+    gateway.gate = Completer<void>();
+
+    await tester.pumpWidget(
+      buildApp(
+        HealthAdhocMealFormSheet(
+          dogId: 'dog-1',
+          dogDisplayName: 'Bono',
+          controller: controller,
+          onRefreshRequested: () async => refreshCalls++,
+          clock: () => DateTime.utc(2026, 7, 21, 12, 0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Fill required field
+    final offeredFinder = find.widgetWithText(
+      TextFormField,
+      'Quantidade oferecida (g)',
+    );
+    await tester.enterText(offeredFinder, '200');
+    await tester.pumpAndSettle();
+
+    // Submit
+    final submitFinder = find.widgetWithText(
+      FilledButton,
+      'REGISTRAR REFEIÇÃO AVULSA',
+    );
+    await tester.ensureVisible(submitFinder);
+    await tester.tap(submitFinder);
+    await tester.pump();
+
+    // Verify loading state
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Registrando refeição…'), findsOneWidget);
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Registrando refeição…'),
+    );
+    expect(button.onPressed, isNull);
+
+    // Complete gateway and settle
+    gateway.gate!.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('adhoc meal em 320px real com text scale 1.3: loading + zero overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    gateway.gate = Completer<void>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: HealthAdhocMealFormSheet(
+                dogId: 'dog-1',
+                dogDisplayName: 'Bono',
+                controller: controller,
+                onRefreshRequested: () async => refreshCalls++,
+                clock: () => DateTime.utc(2026, 7, 21, 12, 0),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final offeredFinder = find.widgetWithText(
+      TextFormField,
+      'Quantidade oferecida (g)',
+    );
+    await tester.enterText(offeredFinder, '200');
+    await tester.pumpAndSettle();
+
+    final submitFinder = find.widgetWithText(
+      FilledButton,
+      'REGISTRAR REFEIÇÃO AVULSA',
+    );
+    await tester.ensureVisible(submitFinder);
+    await tester.tap(submitFinder);
+    await tester.tap(submitFinder, warnIfMissed: false);
+    await tester.pump();
+
+    // Verify loading state and text
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Registrando refeição…'), findsOneWidget);
+
+    // Button disabled
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Registrando refeição…'),
+    );
+    expect(button.onPressed, isNull);
+
+    // Double submit blocked (only 1 gateway call)
+    expect(gateway.calls, equals(1));
+
+    // Zero overflow
+    expect(tester.takeException(), isNull);
+
+    gateway.gate!.complete();
+    await tester.pumpAndSettle();
   });
 }

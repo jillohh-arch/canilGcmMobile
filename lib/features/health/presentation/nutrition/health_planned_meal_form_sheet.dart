@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/hud_controls.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_errors.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
@@ -10,6 +11,7 @@ import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
 
 /// Sheet operacional Health v1 para criação exclusiva de MealLog planned.
 class HealthPlannedMealFormSheet extends StatefulWidget {
@@ -162,42 +164,15 @@ class _HealthPlannedMealFormSheetState
                   },
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<MealAcceptance>(
-                  initialValue: _acceptance,
-                  dropdownColor: AppTheme.surfacePanel,
-                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Aceitação'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: MealAcceptance.full,
-                      child: Text('Aceitou tudo'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.partial,
-                      child: Text('Aceitação parcial'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.refused,
-                      child: Text('Recusou'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.unknown,
-                      child: Text('Não informado'),
-                    ),
-                  ],
-                  onChanged: _submitting
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _acceptance = value;
-                            if (value == MealAcceptance.refused) {
-                              _consumed.text = '0';
-                            } else if (value == MealAcceptance.unknown) {
-                              _consumed.clear();
-                            }
-                          });
-                        },
+                HudSelectField<MealAcceptance>(
+                  label: 'Aceitação',
+                  icon: Icons.restaurant_rounded,
+                  value: _acceptance,
+                  items: MealAcceptance.values,
+                  labelBuilder: (a) => _acceptanceLabel(a),
+                  accent: AppTheme.primary,
+                  placeholder: 'Selecione',
+                  onChanged: _onAcceptanceChanged,
                 ),
                 const SizedBox(height: 14),
                 _numberField(
@@ -211,7 +186,7 @@ class _HealthPlannedMealFormSheetState
                   onTap: _submitting ? null : _pickTime,
                   borderRadius: BorderRadius.circular(10),
                   child: InputDecorator(
-                    decoration: _inputDecoration('Horário da alimentação'),
+                    decoration: _inputDecoration('Oferecido às'),
                     child: Row(
                       children: [
                         const Icon(
@@ -228,11 +203,15 @@ class _HealthPlannedMealFormSheetState
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          widget.plan.timezone,
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
+                        Flexible(
+                          child: Text(
+                            widget.plan.timezone,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textMuted,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
@@ -262,6 +241,7 @@ class _HealthPlannedMealFormSheetState
                 else
                   SizedBox(
                     height: 50,
+                    width: double.infinity,
                     child: FilledButton(
                       onPressed: _submitting ? null : _submit,
                       style: FilledButton.styleFrom(
@@ -270,14 +250,36 @@ class _HealthPlannedMealFormSheetState
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.background,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text('Registrando refeição…'),
+                                  ),
+                                ),
+                              ],
                             )
-                          : const Text('REGISTRAR REFEIÇÃO'),
+                          : const Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('REGISTRAR REFEIÇÃO'),
+                              ),
+                            ),
                     ),
                   ),
               ],
@@ -307,7 +309,7 @@ class _HealthPlannedMealFormSheetState
         ),
         const SizedBox(height: 6),
         Text(
-          '${widget.slot.period.value?.wireName.toUpperCase() ?? 'REFEIÇÃO'} · '
+          '${HealthNutritionTodayFormatters.periodLabel(widget.slot.period)} · '
           '${widget.slot.scheduledTime.value} · '
           '${_gramsText(widget.slot.targetGrams)} g planejados',
           style: GoogleFonts.inter(color: AppTheme.textSecondary),
@@ -407,7 +409,7 @@ class _HealthPlannedMealFormSheetState
     final fedAt = _fedAtUtc();
     if (fedAt.isAfter(_now)) {
       setState(
-        () => _message = 'O horário da alimentação não pode estar no futuro.',
+        () => _message = 'O horário da refeição não pode estar no futuro.',
       );
       return;
     }
@@ -500,6 +502,25 @@ class _HealthPlannedMealFormSheetState
     final normalized = raw?.trim().replaceAll(',', '.');
     if (normalized == null || normalized.isEmpty) return null;
     return double.tryParse(normalized);
+  }
+
+  String _acceptanceLabel(MealAcceptance a) => switch (a) {
+    MealAcceptance.full => 'Aceitou tudo',
+    MealAcceptance.partial => 'Aceitação parcial',
+    MealAcceptance.refused => 'Recusou',
+    MealAcceptance.unknown => 'Não informado',
+  };
+
+  void _onAcceptanceChanged(MealAcceptance? value) {
+    if (value == null || _submitting) return;
+    setState(() {
+      _acceptance = value;
+      if (value == MealAcceptance.refused) {
+        _consumed.text = '0';
+      } else if (value == MealAcceptance.unknown) {
+        _consumed.clear();
+      }
+    });
   }
 
   static String _gramsText(num value) =>

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/hud_controls.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan_regimen.dart';
@@ -106,6 +107,22 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
     _doseController.text = regimen.dose.toString();
     _unit = regimen.unit;
   }
+
+  void _onUnitChanged(SupplementDoseUnit? value) {
+    if (value == null || _submitting || _isPrescribed) return;
+    setState(() => _unit = value);
+  }
+
+  void _onRegimenChanged(NutritionPlanSupplementRegimen? value) {
+    if (value == null || _submitting) return;
+    setState(() {
+      _selectedRegimen = value;
+      _applyRegimen(value);
+    });
+  }
+
+  String _regimenLabel(NutritionPlanSupplementRegimen r) =>
+      '${r.name} · ${r.dose} ${r.unit.displayLabel}';
 
   @override
   void dispose() {
@@ -214,23 +231,15 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 const SizedBox(height: 14),
 
                 // Unidade.
-                DropdownButtonFormField<SupplementDoseUnit>(
+                HudSelectField<SupplementDoseUnit>(
+                  label: 'Unidade',
+                  icon: Icons.medical_services_rounded,
                   value: _unit,
-                  dropdownColor: AppTheme.surfacePanel,
-                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Unidade'),
-                  items: SupplementDoseUnit.values.map((u) {
-                    return DropdownMenuItem(
-                      value: u,
-                      child: Text(_unitLabel(u)),
-                    );
-                  }).toList(),
-                  onChanged: _submitting || _isPrescribed
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() => _unit = value);
-                        },
+                  items: SupplementDoseUnit.values,
+                  labelBuilder: _unitLabel,
+                  accent: AppTheme.primary,
+                  placeholder: 'Selecione',
+                  onChanged: _onUnitChanged,
                 ),
                 const SizedBox(height: 14),
 
@@ -256,11 +265,15 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          _tz,
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
+                        Flexible(
+                          child: Text(
+                            _tz,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textMuted,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
@@ -303,6 +316,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 else
                   SizedBox(
                     height: 50,
+                    width: double.infinity,
                     child: FilledButton(
                       onPressed: _submitting ? null : _submit,
                       style: FilledButton.styleFrom(
@@ -311,17 +325,47 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.background,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _isPrescribed
+                                          ? 'Registrando administração do plano…'
+                                          : 'Registrando suplemento…',
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             )
-                          : Text(
-                              _isPrescribed
-                                  ? 'REGISTRAR ADMINISTRAÇÃO DO PLANO'
-                                  : 'REGISTRAR SUPLEMENTO AVULSO',
+                          : Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _isPrescribed
+                                      ? 'REGISTRAR ADMINISTRAÇÃO DO PLANO'
+                                      : 'REGISTRAR SUPLEMENTO AVULSO',
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
                     ),
                   ),
@@ -433,35 +477,15 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
   }
 
   Widget _regimenDropdown() {
-    return DropdownButtonFormField<NutritionPlanSupplementRegimen>(
+    return HudSelectField<NutritionPlanSupplementRegimen>(
+      label: 'Suplemento do plano',
+      icon: Icons.list_alt_rounded,
       value: _selectedRegimen,
-      dropdownColor: AppTheme.surfacePanel,
-      style: GoogleFonts.inter(color: AppTheme.textPrimary),
-      decoration: _inputDecoration('Suplemento do plano'),
-      items: _availableRegimens.map((r) {
-        return DropdownMenuItem(
-          value: r,
-          child: Text(
-            '${r.name} · ${r.dose} ${r.unit.displayLabel}',
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
-      onChanged: _submitting
-          ? null
-          : (value) {
-              if (value == null) return;
-              setState(() {
-                _selectedRegimen = value;
-                _applyRegimen(value);
-              });
-            },
-      validator: (value) {
-        if (_isPrescribed && value == null) {
-          return 'Selecione um suplemento do plano.';
-        }
-        return null;
-      },
+      items: _availableRegimens,
+      labelBuilder: _regimenLabel,
+      accent: AppTheme.primary,
+      placeholder: 'Selecione',
+      onChanged: _onRegimenChanged,
     );
   }
 
@@ -684,28 +708,46 @@ class _ModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onPressed : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.primary.withValues(alpha: 0.15)
-              : AppTheme.surfacePanel,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppTheme.primary : AppTheme.outline,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            color: selected ? AppTheme.primary : AppTheme.textSecondary,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            fontSize: 14,
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      label: label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            borderRadius: BorderRadius.circular(10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppTheme.primary.withValues(alpha: 0.15)
+                    : AppTheme.surfacePanel,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected ? AppTheme.primary : AppTheme.outline,
+                  width: selected ? 1.5 : 1,
+                ),
+              ),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: enabled
+                      ? (selected ? AppTheme.primary : AppTheme.textSecondary)
+                      : AppTheme.textMuted,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
           ),
         ),
       ),

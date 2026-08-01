@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/hud_controls.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_errors.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
@@ -119,7 +120,7 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'REGISTRAR ALIMENTAÇÃO',
+                        'REGISTRAR REFEIÇÃO',
                         style: GoogleFonts.inter(
                           color: AppTheme.textPrimary,
                           fontSize: 16,
@@ -141,39 +142,15 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                 const SizedBox(height: 12),
                 _contextCard(),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<MealPeriod>(
+                HudSelectField<MealPeriod>(
+                  label: 'Período',
+                  icon: Icons.schedule_rounded,
                   value: _period,
-                  dropdownColor: AppTheme.surfacePanel,
-                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Período'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: MealPeriod.morning,
-                      child: Text('Manhã'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealPeriod.afternoon,
-                      child: Text('Tarde'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealPeriod.evening,
-                      child: Text('Noite'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealPeriod.night,
-                      child: Text('Madrugada'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealPeriod.extra,
-                      child: Text('Extra / Intermediária'),
-                    ),
-                  ],
-                  onChanged: _submitting
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() => _period = value);
-                        },
+                  items: MealPeriod.values,
+                  labelBuilder: (p) => _periodLabel(p),
+                  accent: AppTheme.primary,
+                  placeholder: 'Selecione',
+                  onChanged: _onPeriodChanged,
                 ),
                 const SizedBox(height: 14),
                 _numberField(
@@ -187,42 +164,15 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                   },
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<MealAcceptance>(
+                HudSelectField<MealAcceptance>(
+                  label: 'Aceitação',
+                  icon: Icons.restaurant_rounded,
                   value: _acceptance,
-                  dropdownColor: AppTheme.surfacePanel,
-                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Aceitação'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: MealAcceptance.full,
-                      child: Text('Aceitou tudo'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.partial,
-                      child: Text('Aceitação parcial'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.refused,
-                      child: Text('Recusou'),
-                    ),
-                    DropdownMenuItem(
-                      value: MealAcceptance.unknown,
-                      child: Text('Não informado'),
-                    ),
-                  ],
-                  onChanged: _submitting
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _acceptance = value;
-                            if (value == MealAcceptance.refused) {
-                              _consumed.text = '0';
-                            } else if (value == MealAcceptance.unknown) {
-                              _consumed.clear();
-                            }
-                          });
-                        },
+                  items: MealAcceptance.values,
+                  labelBuilder: (a) => _acceptanceLabel(a),
+                  accent: AppTheme.primary,
+                  placeholder: 'Selecione',
+                  onChanged: _onAcceptanceChanged,
                 ),
                 const SizedBox(height: 14),
                 _numberField(
@@ -236,7 +186,7 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                   onTap: _submitting ? null : _pickTime,
                   borderRadius: BorderRadius.circular(10),
                   child: InputDecorator(
-                    decoration: _inputDecoration('Horário da alimentação'),
+                    decoration: _inputDecoration('Oferecido às'),
                     child: Row(
                       children: [
                         const Icon(
@@ -253,11 +203,15 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          _tz,
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
+                        Flexible(
+                          child: Text(
+                            _tz,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textMuted,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
@@ -287,6 +241,7 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                 else
                   SizedBox(
                     height: 50,
+                    width: double.infinity,
                     child: FilledButton(
                       onPressed: _submitting ? null : _submit,
                       style: FilledButton.styleFrom(
@@ -295,14 +250,36 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.background,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text('Registrando refeição…'),
+                                  ),
+                                ),
+                              ],
                             )
-                          : const Text('REGISTRAR ALIMENTAÇÃO AVULSA'),
+                          : const Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('REGISTRAR REFEIÇÃO AVULSA'),
+                              ),
+                            ),
                     ),
                   ),
               ],
@@ -353,7 +330,7 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Alimentação independente de plano nutricional',
+          'Refeição independente de plano nutricional',
           style: GoogleFonts.inter(
             color: AppTheme.textSecondary,
             fontSize: 12,
@@ -473,7 +450,7 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
     final fedAt = _fedAtUtc();
     if (fedAt.isAfter(_now)) {
       setState(
-        () => _message = 'O horário da alimentação não pode estar no futuro.',
+        () => _message = 'O horário da refeição não pode estar no futuro.',
       );
       return;
     }
@@ -548,4 +525,36 @@ class _HealthAdhocMealFormSheetState extends State<HealthAdhocMealFormSheet> {
   String _failureMessage(HealthNutritionMutationFailure failure) {
     return failure.message;
   }
+
+  String _periodLabel(MealPeriod p) => switch (p) {
+    MealPeriod.morning => 'Manhã',
+    MealPeriod.afternoon => 'Tarde',
+    MealPeriod.evening => 'Noite',
+    MealPeriod.night => 'Madrugada',
+    MealPeriod.extra => 'Extra / Intermediária',
+  };
+
+  void _onPeriodChanged(MealPeriod? value) {
+    if (value == null || _submitting) return;
+    setState(() => _period = value);
+  }
+
+  void _onAcceptanceChanged(MealAcceptance? value) {
+    if (value == null || _submitting) return;
+    setState(() {
+      _acceptance = value;
+      if (value == MealAcceptance.refused) {
+        _consumed.text = '0';
+      } else if (value == MealAcceptance.unknown) {
+        _consumed.clear();
+      }
+    });
+  }
+
+  String _acceptanceLabel(MealAcceptance a) => switch (a) {
+    MealAcceptance.full => 'Aceitou tudo',
+    MealAcceptance.partial => 'Aceitação parcial',
+    MealAcceptance.refused => 'Recusou',
+    MealAcceptance.unknown => 'Não informado',
+  };
 }

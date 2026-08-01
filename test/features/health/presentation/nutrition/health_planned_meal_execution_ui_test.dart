@@ -127,6 +127,7 @@ _pump(
   bool degraded = false,
   bool completed = false,
   HealthNutritionPendingIntentHolder? holder,
+  TextScaler? textScaler,
 }) async {
   final planReader = _PlanReader(NutritionSourceBatch.available([_plan()]));
   final mealReader = _MealReader(
@@ -156,10 +157,19 @@ _pump(
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: HealthNutritionTodayScreen(
-          controller: read,
-          mutationController: mutation,
-          dogDisplayName: 'Bono',
+        body: MediaQuery(
+          data: MediaQueryData(
+            size: Size(
+              tester.view.physicalSize.width / tester.view.devicePixelRatio,
+              tester.view.physicalSize.height / tester.view.devicePixelRatio,
+            ),
+            textScaler: textScaler ?? TextScaler.noScaling,
+          ),
+          child: HealthNutritionTodayScreen(
+            controller: read,
+            mutationController: mutation,
+            dogDisplayName: 'Bono',
+          ),
         ),
       ),
     ),
@@ -169,12 +179,13 @@ _pump(
 }
 
 Future<void> _openFirstForm(WidgetTester tester) async {
+  final btn = find.textContaining('Registrar').first;
   await tester.scrollUntilVisible(
-    find.text('Registrar refeição').first,
+    btn,
     300,
     scrollable: find.byType(Scrollable).first,
   );
-  await tester.tap(find.text('Registrar refeição').first);
+  await tester.tap(btn);
   await tester.pumpAndSettle();
   expect(find.text('REGISTRAR REFEIÇÃO'), findsWidgets);
 }
@@ -300,4 +311,150 @@ void main() {
     expect(host.gateway.commands, hasLength(2));
     expect(host.gateway.commands.last.operationId, firstOp);
   });
+
+  testWidgets('planned meal loading textual: spinner + texto durante submit', (
+    tester,
+  ) async {
+    final host = await _pump(tester);
+    // Block gateway to observe loading state
+    host.gateway.gate = Completer<void>();
+
+    // Open form
+    await _openFirstForm(tester);
+
+    // Fill required field to enable submit
+    final offered = find.widgetWithText(TextFormField, 'Quantidade oferecida (g)');
+    await tester.enterText(offered, '300');
+    await tester.pumpAndSettle();
+
+    // Find submit button
+    final submit = find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO');
+    await tester.scrollUntilVisible(
+      submit,
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+
+    // Tap to submit — gateway is blocked so loading state is visible
+    await tester.tap(submit);
+    await tester.pump();
+
+    // Spinner should be visible
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Loading text should be visible (button text replaced)
+    expect(find.text('Registrando refeição…'), findsOneWidget);
+
+    // Button should be disabled
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Registrando refeição…'),
+    );
+    expect(button.onPressed, isNull);
+
+    // Complete the gateway and settle
+    host.gateway.gate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(HealthPlannedMealFormSheet), findsNothing);
+  });
+
+  testWidgets('planned meal em 320px real com text scale 1.3: loading + zero overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mealGate = Completer<HealthNutritionMutationResult>();
+    final loadingGateway = _LoadingGateway(mealGate.future);
+    final loadingController = HealthNutritionMutationController(
+      gateway: loadingGateway,
+      operationIdFactory: () => 'op-plan-320',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: HealthPlannedMealFormSheet(
+                localServiceDate: '2026-08-01',
+                dogDisplayName: 'Bono',
+                slot: _plan().mealSchedule.first,
+                plan: _plan(),
+                controller: loadingController,
+                onRefreshRequested: () async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    addTearDown(loadingController.dispose);
+
+    final offered = find.widgetWithText(TextFormField, 'Quantidade oferecida (g)');
+    await tester.enterText(offered, '300');
+    await tester.pumpAndSettle();
+
+    final submit = find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO');
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pump();
+
+    // CircularProgressIndicator visível
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Texto exato durante loading
+    expect(find.text('Registrando refeição…'), findsOneWidget);
+
+    // Botão desabilitado
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Registrando refeição…'),
+    );
+    expect(button.onPressed, isNull);
+
+    // Somente uma chamada ao gateway
+    expect(loadingGateway.plannedCallCount, 1);
+
+    // Zero overflow
+    expect(tester.takeException(), isNull);
+
+    mealGate.complete(const CreateMealLogSuccess(
+      dogId: 'dog-a',
+      mealId: 'mo-320',
+      revision: 1,
+      wasNoOp: false,
+      operationId: 'op-plan-320',
+      mealOccurrenceId: 'mo-320',
+    ));
+    await tester.pumpAndSettle();
+  });
+}
+
+class _LoadingGateway implements HealthNutritionMutationGateway {
+  _LoadingGateway(Future<HealthNutritionMutationResult> mealFuture)
+      : _mealFuture = mealFuture;
+
+  final Future<HealthNutritionMutationResult> _mealFuture;
+  int plannedCallCount = 0;
+
+  @override
+  Future<HealthNutritionMutationResult> createAdhocMealLog(
+    CreateAdhocMealLogCommand command,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<HealthNutritionMutationResult> createPlannedMealLog(
+    CreatePlannedMealLogCommand command,
+  ) {
+    plannedCallCount++;
+    return _mealFuture;
+  }
+
+  @override
+  Future<HealthNutritionMutationResult> createSupplementLog(
+    CreateSupplementLogCommand command,
+  ) async => throw UnimplementedError();
 }

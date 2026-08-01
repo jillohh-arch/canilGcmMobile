@@ -196,6 +196,26 @@ MealLog mealLog({
   );
 }
 
+/// Creates a UTC instant that, when displayed in the America/Sao_Paulo
+/// timezone, shows [timeStr] (e.g., '01:30').
+///
+/// The test asserts that the interface renders '01:30' in São Paulo time,
+/// regardless of the local timezone of the test device.
+///
+/// Example:
+///   Input:  '01:30' in America/Sao_Paulo (UTC-3 in July/winter)
+///   Output: DateTime.utc(now, now, now, 4, 30) — the equivalent UTC instant
+DateTime _utcForLocalTimeInSaoPaulo(String timeStr) {
+  final parts = timeStr.split(':');
+  final localHour = int.parse(parts[0]);
+  final localMinute = int.parse(parts[1]);
+  // São Paulo UTC offset is -3 hours during July (winter in Southern Hemisphere)
+  const utcOffsetHours = 3;
+  final utcHour = (localHour + utcOffsetHours) % 24;
+  final now = DateTime.now();
+  return DateTime.utc(now.year, now.month, now.day, utcHour, localMinute);
+}
+
 void main() {
   testWidgets('loading state', (tester) async {
     final gate = Completer<void>();
@@ -365,6 +385,9 @@ void main() {
   testWidgets('refeição avulsa preserva horário no timezone normativo', (
     tester,
   ) async {
+    // fedAt that displays as 01:30 in São Paulo timezone, today
+    final fedAtUtc = _utcForLocalTimeInSaoPaulo('01:30');
+
     final source = CoexistenceNutritionReadSource(
       canonicalPlanReader: _MemPlan(
         NutritionSourceBatch.available([canonicalPlan()]),
@@ -373,7 +396,7 @@ void main() {
         NutritionSourceBatch.available([
           mealLog(
             id: 'adhoc-timezone',
-            fedAt: DateTime.utc(2026, 7, 31, 4, 30),
+            fedAt: fedAtUtc,
           ),
         ]),
       ),
@@ -393,6 +416,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // The adhoc meal should appear in "REFEIÇÕES DE HOJE" section (no plannedMealId)
+    // Scroll to find the 01:30 time label within the adhoc meal card
     await tester.scrollUntilVisible(
       find.text('01:30'),
       300,
