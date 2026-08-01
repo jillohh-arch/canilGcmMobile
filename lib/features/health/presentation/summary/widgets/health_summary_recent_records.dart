@@ -121,23 +121,21 @@ class HealthSummaryRecentRecords extends StatelessWidget {
         if (items.isEmpty) {
           return _message('Nenhum registro recente', AppTheme.textSecondary);
         }
-        return Column(
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0)
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: AppTheme.surfaceWhiteBorder,
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++)
+                _RecentTile(
+                  record: items[i],
+                  isFirst: i == 0,
+                  isLast: i == items.length - 1,
+                  onTap: onRecentRecordTap == null
+                      ? null
+                      : () => onRecentRecordTap!(items[i]),
                 ),
-              _RecentTile(
-                record: items[i],
-                onTap: onRecentRecordTap == null
-                    ? null
-                    : () => onRecentRecordTap!(items[i]),
-              ),
             ],
-          ],
+          ),
         );
     }
   }
@@ -159,13 +157,21 @@ class HealthSummaryRecentRecords extends StatelessWidget {
 
 class _RecentTile extends StatelessWidget {
   final HealthSummaryRecentRecordView record;
+  final bool isFirst;
+  final bool isLast;
   final VoidCallback? onTap;
 
-  const _RecentTile({required this.record, this.onTap});
+  const _RecentTile({
+    required this.record,
+    required this.isFirst,
+    required this.isLast,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final icon = HealthSummaryRecentRecordIconMapper.iconFor(record.type);
+    final color = HealthSummaryRecentRecordColorMapper.colorFor(record.type);
     final dateLabel = record.occurredAt == null
         ? null
         : HealthSummaryFormatters.shortDate(record.occurredAt!);
@@ -178,6 +184,7 @@ class _RecentTile extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
+      enabled: onTap != null,
       label:
           '${record.title}'
           '${subtitle != null ? '. $subtitle' : ''}',
@@ -187,73 +194,147 @@ class _RecentTile extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, size: 18, color: AppTheme.primary),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        record.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: 32,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: isFirst
+                              ? const SizedBox()
+                              : Center(
+                                  child: Container(
+                                    width: 2,
+                                    color: AppTheme.surfaceWhiteBorder,
+                                  ),
+                                ),
                         ),
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textSoft,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(9),
                           ),
+                          alignment: Alignment.center,
+                          child: Icon(icon, size: 17, color: color),
+                        ),
+                        Expanded(
+                          child: isLast
+                              ? const SizedBox()
+                              : Center(
+                                  child: Container(
+                                    width: 2,
+                                    color: AppTheme.surfaceWhiteBorder,
+                                  ),
+                                ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                // Marcador decorativo neutro — sem inferir status clínico/sucesso.
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.55),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            record.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                color: AppTheme.textSoft,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: onTap != null
-                      ? AppTheme.textMuted
-                      : AppTheme.textMuted.withValues(alpha: 0.5),
-                ),
-              ],
+                  if (onTap != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+/// Mapper local de cor semântica para registros recentes do Resumo.
+abstract final class HealthSummaryRecentRecordColorMapper {
+  static Color colorFor(String type) {
+    final t = type.trim().toLowerCase();
+    if (t.isEmpty) return AppTheme.textSoft;
+
+    if (t.contains('feed') ||
+        t.contains('aliment') ||
+        t.contains('nutrition') ||
+        t.contains('refeic')) {
+      return AppTheme.attention;
+    }
+    if (t.contains('weight') || t.contains('peso') || t.contains('pesagem')) {
+      return AppTheme.info;
+    }
+    if (t.contains('vaccin') || t.contains('vacina')) {
+      return AppTheme.success;
+    }
+    if (t.contains('consult') || t.contains('vet') || t.contains('clin')) {
+      return AppTheme.healthAccent;
+    }
+    if (t.contains('exam') || t.contains('exame')) {
+      return AppTheme.healthAccent;
+    }
+    if (t.contains('treat') ||
+        t.contains('medica') ||
+        t.contains('dose') ||
+        t.contains('protocol')) {
+      return AppTheme.primary;
+    }
+    if (t.contains('surger') || t.contains('cirurg')) {
+      return AppTheme.healthAccent;
+    }
+    if (t.contains('antiparasit')) {
+      return AppTheme.success;
+    }
+    if (t.contains('symptom') || t.contains('sintoma')) {
+      return AppTheme.warningAccent;
+    }
+    if (t.contains('restrict') || t.contains('restric')) {
+      return AppTheme.error;
+    }
+    return AppTheme.textSoft;
   }
 }
 
@@ -275,11 +356,11 @@ abstract final class HealthSummaryRecentRecordIconMapper {
     if (t.contains('vaccin') || t.contains('vacina')) {
       return Icons.verified_user_outlined;
     }
-    if (t.contains('consult') ||
-        t.contains('exam') ||
-        t.contains('vet') ||
-        t.contains('clin')) {
+    if (t.contains('consult') || t.contains('vet') || t.contains('clin')) {
       return Icons.medical_services_outlined;
+    }
+    if (t.contains('exam') || t.contains('exame')) {
+      return Icons.assignment_outlined;
     }
     if (t.contains('treat') ||
         t.contains('medica') ||
@@ -287,7 +368,16 @@ abstract final class HealthSummaryRecentRecordIconMapper {
         t.contains('protocol')) {
       return Icons.medication_outlined;
     }
-    if (t.contains('restrict')) {
+    if (t.contains('surger') || t.contains('cirurg')) {
+      return Icons.medical_services_outlined;
+    }
+    if (t.contains('antiparasit')) {
+      return Icons.shield_outlined;
+    }
+    if (t.contains('symptom') || t.contains('sintoma')) {
+      return Icons.warning_amber_rounded;
+    }
+    if (t.contains('restrict') || t.contains('restric')) {
       return Icons.gpp_maybe_outlined;
     }
     return Icons.note_outlined;

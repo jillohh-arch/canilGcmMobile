@@ -1183,4 +1183,548 @@ void main() {
       },
     );
   });
+
+  group('Mini-Timeline de Registros Recentes UX-03C', () {
+    test('1. Mapeamento semântico de cores por tipo (11 tipos)', () {
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('feeding'),
+        equals(AppTheme.attention),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('weight'),
+        equals(AppTheme.info),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('vaccination'),
+        equals(AppTheme.success),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('consultation'),
+        equals(AppTheme.healthAccent),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('exam'),
+        equals(AppTheme.healthAccent),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('medication'),
+        equals(AppTheme.primary),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('surgery'),
+        equals(AppTheme.healthAccent),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('antiparasitic'),
+        equals(AppTheme.success),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('symptom'),
+        equals(AppTheme.warningAccent),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('restriction'),
+        equals(AppTheme.error),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('other'),
+        equals(AppTheme.textSoft),
+      );
+      expect(
+        HealthSummaryRecentRecordColorMapper.colorFor('desconhecido_abc'),
+        equals(AppTheme.textSoft),
+      );
+    });
+
+    test('2. Mapeamento tolerante de ícones por tipo (preservado)', () {
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('feeding'),
+        equals(Icons.restaurant_rounded),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('weight'),
+        equals(Icons.monitor_weight_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('vaccination'),
+        equals(Icons.verified_user_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('consultation'),
+        equals(Icons.medical_services_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('exam'),
+        equals(Icons.assignment_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('medication'),
+        equals(Icons.medication_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('surgery'),
+        equals(Icons.medical_services_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('antiparasitic'),
+        equals(Icons.shield_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('symptom'),
+        equals(Icons.warning_amber_rounded),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('restriction'),
+        equals(Icons.gpp_maybe_outlined),
+      );
+      expect(
+        HealthSummaryRecentRecordIconMapper.iconFor('desconhecido_xyz'),
+        equals(Icons.note_outlined),
+      );
+    });
+
+    testWidgets('3. Renderização da mini-timeline com conectores e acentos semânticos', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'feeding',
+          title: 'Alimentação matutina',
+          subtitle: 'Ração Seca 350g',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+        HealthSummaryRecentRecordView(
+          id: 'rec-2',
+          type: 'weight',
+          title: 'Pesagem quinzenal',
+          subtitle: '32.4 kg',
+          occurredAt: DateTime(2026, 7, 14, 10, 0),
+        ),
+        HealthSummaryRecentRecordView(
+          id: 'rec-3',
+          type: 'vaccination',
+          title: 'Vacina V10',
+          subtitle: 'Dose anual',
+          occurredAt: DateTime(2026, 7, 10, 9, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Alimentação matutina'), findsOneWidget);
+      expect(find.text('Pesagem quinzenal'), findsOneWidget);
+      expect(find.text('Vacina V10'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('4. Item único renderiza sem exceção ou quebra visual', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'medication',
+          title: 'Dose única vermífugo',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Dose única vermífugo'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('5. Callbacks de histórico e de toque no registro mantidos', (
+      tester,
+    ) async {
+      bool historyTapped = false;
+      HealthSummaryRecentRecordView? recordTapped;
+
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'consultation',
+          title: 'Consulta veterinária',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+              onOpenHistory: () => historyTapped = true,
+              onRecentRecordTap: (r) => recordTapped = r,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Ver histórico'));
+      expect(historyTapped, isTrue);
+
+      await tester.tap(find.text('Consulta veterinária'));
+      expect(recordTapped?.id, equals('rec-1'));
+    });
+
+    testWidgets('6. Responsividade 320px com múltiplos registros e zero overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final records = List.generate(
+        6,
+        (i) => HealthSummaryRecentRecordView(
+          id: 'rec-$i',
+          type: i % 2 == 0 ? 'symptom' : 'restriction',
+          title: 'Registro longo número $i para teste de responsividade extrema',
+          subtitle: 'Detalhe suplementar do registro $i',
+          occurredAt: DateTime(2026, 7, 15 - i, 8, 0),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 1600),
+            ),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: HealthSummaryRecentRecords(
+                  recentRecords: HealthSummarySectionData.available(
+                    HealthSummaryRecentRecordsView(items: records),
+                  ),
+                  onRecentRecordTap: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final mediaQuery = tester.widget<MediaQuery>(find.byType(MediaQuery).last);
+      expect(mediaQuery.data.size.width, equals(320.0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('7. Responsividade 360px com textScale 1.3 e zero overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'exam',
+          title: 'Exame de ultrassom abdominal completo com sedação leve',
+          subtitle: 'Clínica Veterinária Central K9',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 1600),
+              textScaler: TextScaler.linear(1.3),
+            ),
+            child: Scaffold(
+              body: HealthSummaryRecentRecords(
+                recentRecords: HealthSummarySectionData.available(
+                  HealthSummaryRecentRecordsView(items: records),
+                ),
+                onRecentRecordTap: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final mediaQuery = tester.widget<MediaQuery>(find.byType(MediaQuery).last);
+      expect(mediaQuery.data.size.width, equals(360.0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('8. Responsividade com textScale 1.5 e título multi-linha com zero overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'surgery',
+          title: 'Procedimento cirúrgico de sutura em pata dianteira esquerda pós-operação tática',
+          subtitle: 'Hospital Veterinário de Especialidades K9 · Dr. Ricardo Silva',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: HealthSummaryRecentRecords(
+                  recentRecords: HealthSummarySectionData.available(
+                    HealthSummaryRecentRecordsView(items: records),
+                  ),
+                  onRecentRecordTap: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('9. Semantics de tile acionável possui button: true, label completo e chevron', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'vaccination',
+          title: 'Vacina V10 Anual',
+          subtitle: 'Clínica K9 Central',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+              onRecentRecordTap: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      final recentTileFinder = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_RecentTile',
+      );
+      final tileChevronFinder = find.descendant(
+        of: recentTileFinder,
+        matching: find.byIcon(Icons.chevron_right_rounded),
+      );
+      expect(tileChevronFinder, findsOneWidget);
+
+      final semanticsFinder = find.descendant(
+        of: recentTileFinder,
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.button == true,
+        ),
+      );
+      expect(semanticsFinder, findsOneWidget);
+
+      final semantics = tester.widget<Semantics>(semanticsFinder);
+      expect(semantics.properties.enabled, isTrue);
+      expect(semantics.properties.label, contains('Vacina V10 Anual'));
+      expect(semantics.properties.label, contains('Clínica K9 Central'));
+    });
+
+    testWidgets('10. Semantics de tile sem callback não anuncia botão e oculta chevron', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'weight',
+          title: 'Pesagem de controle',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+              onRecentRecordTap: null,
+            ),
+          ),
+        ),
+      );
+
+      final recentTileFinder = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_RecentTile',
+      );
+      final tileChevronFinder = find.descendant(
+        of: recentTileFinder,
+        matching: find.byIcon(Icons.chevron_right_rounded),
+      );
+      expect(tileChevronFinder, findsNothing);
+
+      final buttonSemanticsFinder = find.descendant(
+        of: recentTileFinder,
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.button == true,
+        ),
+      );
+      expect(buttonSemanticsFinder, findsNothing);
+      expect(find.text('Pesagem de controle'), findsOneWidget);
+    });
+
+    testWidgets('11. Elementos decorativos (nó, ícone e conector) excluídos da árvore semântica', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'feeding',
+          title: 'Refeição Matutina 300g',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+              onRecentRecordTap: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      final recentTileFinder = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_RecentTile',
+      );
+      final tileSemantics = tester.widget<Semantics>(
+        find.descendant(
+          of: recentTileFinder,
+          matching: find.byWidgetPredicate((w) => w is Semantics && w.excludeSemantics == true),
+        ),
+      );
+      expect(tileSemantics.excludeSemantics, isTrue);
+    });
+
+    testWidgets('12. Touch target do tile acionável possui dimensões >= 48x48 dp', (
+      tester,
+    ) async {
+      bool tapped = false;
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'medication',
+          title: 'Aplicação de Antiparassitário',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+              onRecentRecordTap: (_) => tapped = true,
+            ),
+          ),
+        ),
+      );
+
+      final recentTileFinder = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_RecentTile',
+      );
+      final inkWellFinder = find.descendant(
+        of: recentTileFinder,
+        matching: find.byType(InkWell),
+      );
+      expect(inkWellFinder, findsOneWidget);
+
+      final size = tester.getSize(inkWellFinder);
+      expect(size.width, greaterThanOrEqualTo(48.0));
+      expect(size.height, greaterThanOrEqualTo(48.0));
+
+      await tester.tap(inkWellFinder);
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('13. Validação de conectores (primeiro sem top, último sem bottom, único sem ambos)', (
+      tester,
+    ) async {
+      final records = [
+        HealthSummaryRecentRecordView(
+          id: 'rec-1',
+          type: 'feeding',
+          title: 'Refeição 1',
+          occurredAt: DateTime(2026, 7, 15, 8, 0),
+        ),
+        HealthSummaryRecentRecordView(
+          id: 'rec-2',
+          type: 'weight',
+          title: 'Pesagem 2',
+          occurredAt: DateTime(2026, 7, 14, 8, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthSummaryRecentRecords(
+              recentRecords: HealthSummarySectionData.available(
+                HealthSummaryRecentRecordsView(items: records),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Refeição 1'), findsOneWidget);
+      expect(find.text('Pesagem 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
