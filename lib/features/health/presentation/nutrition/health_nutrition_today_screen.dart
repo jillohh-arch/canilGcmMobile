@@ -102,6 +102,11 @@ class HealthNutritionTodayScreen extends StatelessWidget {
         final integrityConflict =
             snapshot.activePlan is NutritionActivePlanIntegrityConflict ||
             (todayModel?.hasActivePlanIntegrityConflict ?? false);
+        final occurrenceIntegrityConflict =
+            todayModel?.plannedSlotViews.any(
+              (slot) => slot.hasOccurrenceConflict,
+            ) ??
+            false;
         final mutationHealthy =
             !degraded &&
             !integrityConflict &&
@@ -139,10 +144,19 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                       'há mais de um plano canônico ativo.',
                 ),
               ],
+              if (occurrenceIntegrityConflict) ...[
+                const SizedBox(height: 10),
+                const _DegradedBanner(
+                  message:
+                      'Dados inconsistentes: execução duplicada detectada. '
+                      'A ação deste slot está temporariamente indisponível.',
+                ),
+              ],
               const SizedBox(height: 14),
               _TodaySummaryCard(
                 plan: snapshot.activePlan,
-                meals: todayModel?.meals ?? const [],
+                meals: todayModel?.mealsForDailyTotals ?? const [],
+                plannedMealsCompleted: todayModel?.plannedMealsCompleted ?? 0,
               ),
               const SizedBox(height: 14),
               _PlanCard(plan: snapshot.activePlan),
@@ -152,6 +166,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 mealsToday: todayModel?.meals ?? const [],
                 serverNow: DateTime.now().toUtc(),
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
+                localServiceDate: todayModel?.localServiceDate,
                 mutationEnabled: mutationHealthy,
                 onRegister: (plan, slot) => _openPlannedMealForm(
                   context,
@@ -408,10 +423,15 @@ class _DegradedBanner extends StatelessWidget {
 }
 
 class _TodaySummaryCard extends StatelessWidget {
-  const _TodaySummaryCard({required this.plan, required this.meals});
+  const _TodaySummaryCard({
+    required this.plan,
+    required this.meals,
+    required this.plannedMealsCompleted,
+  });
 
   final NutritionActivePlanRef? plan;
   final List<NutritionMealReadItem> meals;
+  final int plannedMealsCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +447,7 @@ class _TodaySummaryCard extends StatelessWidget {
       NutritionActiveLegacyPlan(:final view) => view.mealsPerDay,
       _ => null,
     };
-    final completed = meals.where((m) => m.meal.isPlanned).length;
+    final completed = plannedMealsCompleted;
 
     final validPlan = planned != null && planned.isFinite && planned > 0;
 
@@ -770,6 +790,7 @@ class _MealsSection extends StatelessWidget {
     required this.mealsToday,
     required this.serverNow,
     required this.timezone,
+    required this.localServiceDate,
     required this.mutationEnabled,
     required this.onRegister,
   });
@@ -778,6 +799,7 @@ class _MealsSection extends StatelessWidget {
   final List<NutritionMealReadItem> mealsToday;
   final DateTime serverNow;
   final String timezone;
+  final String? localServiceDate;
   final bool mutationEnabled;
   final void Function(NutritionPlan plan, MealScheduleSlot slot) onRegister;
 
@@ -801,34 +823,48 @@ class _MealsSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         if (canonical != null) ...[
-          ...NutritionSlotDayDerivation.derive(
-            plan: canonical,
-            mealsForDay: mealsToday,
-          ).map((slotView) {
-            final uiStatus = NutritionTodaySlotUi.statusFor(
-              slot: slotView.slot,
-              meal: slotView.meal,
-              serverNow: serverNow,
-              timezone: timezone,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _MealSlotCard(
-                periodLabel: HealthNutritionTodayFormatters.periodLabel(
-                  slotView.slot.period,
-                ),
-                timeLabel: slotView.slot.scheduledTime.value,
-                targetGrams: slotView.slot.targetGrams,
-                meal: slotView.meal,
-                status: uiStatus,
-                onRegister:
-                    mutationEnabled &&
-                        uiStatus != NutritionTodaySlotUiStatus.completed
-                    ? () => onRegister(canonical, slotView.slot)
-                    : null,
-              ),
-            );
-          }),
+          ...(localServiceDate == null
+                  ? canonical.mealSchedule.map(
+                      (slot) => NutritionSlotDayView(
+                        slot: slot,
+                        status: NutritionSlotDayStatus.pending,
+                      ),
+                    )
+                  : NutritionSlotDayDerivation.derive(
+                      plan: canonical,
+                      mealsForDay: mealsToday,
+                      localServiceDate: LocalServiceDate.fromIso(
+                        localServiceDate!,
+                      ),
+                    ))
+              .map((slotView) {
+                final uiStatus = NutritionTodaySlotUi.statusFor(
+                  slot: slotView.slot,
+                  meal: slotView.meal,
+                  serverNow: serverNow,
+                  timezone: timezone,
+                );
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _MealSlotCard(
+                    periodLabel: HealthNutritionTodayFormatters.periodLabel(
+                      slotView.slot.period,
+                    ),
+                    timeLabel: slotView.slot.scheduledTime.value,
+                    targetGrams: slotView.slot.targetGrams,
+                    meal: slotView.meal,
+                    status: uiStatus,
+                    integrityConflict: slotView.hasOccurrenceConflict,
+                    onRegister:
+                        mutationEnabled &&
+                            localServiceDate != null &&
+                            !slotView.hasOccurrenceConflict &&
+                            uiStatus != NutritionTodaySlotUiStatus.completed
+                        ? () => onRegister(canonical, slotView.slot)
+                        : null,
+                  ),
+                );
+              }),
           // Meals do dia sem slot (ad hoc canônico / não planejado)
           ...mealsToday
               .where((m) => m.meal.plannedMealId == null)
@@ -876,6 +912,7 @@ class _MealSlotCard extends StatelessWidget {
     required this.targetGrams,
     required this.status,
     this.meal,
+    this.integrityConflict = false,
     this.onRegister,
   });
 
@@ -884,15 +921,18 @@ class _MealSlotCard extends StatelessWidget {
   final double targetGrams;
   final NutritionTodaySlotUiStatus status;
   final NutritionMealReadItem? meal;
+  final bool integrityConflict;
   final VoidCallback? onRegister;
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = switch (status) {
-      NutritionTodaySlotUiStatus.completed => AppTheme.success,
-      NutritionTodaySlotUiStatus.late => AppTheme.warning,
-      NutritionTodaySlotUiStatus.pending => AppTheme.warningAccent,
-    };
+    final statusColor = integrityConflict
+        ? AppTheme.error
+        : switch (status) {
+            NutritionTodaySlotUiStatus.completed => AppTheme.success,
+            NutritionTodaySlotUiStatus.late => AppTheme.warning,
+            NutritionTodaySlotUiStatus.pending => AppTheme.warningAccent,
+          };
 
     return HealthSummaryCardSurface(
       child: Column(
@@ -917,7 +957,9 @@ class _MealSlotCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  NutritionTodaySlotUi.label(status),
+                  integrityConflict
+                      ? 'Dados inconsistentes'
+                      : NutritionTodaySlotUi.label(status),
                   style: GoogleFonts.inter(
                     color: statusColor,
                     fontSize: 10,
@@ -936,6 +978,27 @@ class _MealSlotCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (integrityConflict) ...[
+            const SizedBox(height: 10),
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label:
+                  'Execução duplicada detectada. '
+                  'Ação temporariamente indisponível.',
+              excludeSemantics: true,
+              child: Text(
+                'Execução duplicada detectada. '
+                'Ação temporariamente indisponível.',
+                style: GoogleFonts.inter(
+                  color: AppTheme.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
           if (meal != null) ...[
             const SizedBox(height: 10),
             Row(

@@ -73,20 +73,15 @@ class HealthSummaryNutritionReader {
 
   Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>>
   _readViaCoexistence(String dogId) async {
-    final now = _clock();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 1));
-
-    final result = await _coexistenceReadSource!.loadSnapshot(
+    final result = await _coexistenceReadSource!.loadToday(
       dogId,
-      mealsFrom: start,
-      mealsTo: end,
+      serverNow: _clock().toUtc(),
     );
 
     if ((result.isData || result.isDegraded) && result.value != null) {
-      final snap = result.value!;
-      final activePlanRef = snap.activePlan;
-      final meals = snap.mergedMeals;
+      final today = result.value!;
+      final activePlanRef = today.activePlan;
+      final meals = today.mealsForDailyTotals;
 
       if (meals.isEmpty && activePlanRef == null) {
         return const HealthSummarySectionData.notRecorded(
@@ -134,9 +129,7 @@ class HealthSummaryNutritionReader {
       if (anyConsumed) consumedTotal = sumConsumed;
 
       final plannedAmountDouble = plannedGrams?.toDouble();
-      final plannedCompleted = meals
-          .where((item) => item.meal.isPlanned)
-          .length;
+      final plannedCompleted = today.plannedMealsCompleted;
 
       return HealthSummarySectionData.available(
         HealthSummaryNutritionTodayView(

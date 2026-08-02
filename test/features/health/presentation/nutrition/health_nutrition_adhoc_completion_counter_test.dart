@@ -4,6 +4,7 @@ import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
@@ -91,7 +92,17 @@ void main() {
         dogId: 'dog-bono',
         planId: 'plan_bono_1',
         plannedMealId: 'slot-1',
-        mealOccurrenceId: 'occ-1',
+        mealOccurrenceId: MealOccurrenceId.v1(
+          MealOccurrenceKey(
+            dogId: 'dog-bono',
+            planId: 'plan_bono_1',
+            plannedMealId: 'slot-1',
+            localServiceDate: LocalServiceDate.fromInstant(
+              now,
+              timezone: plan.timezone,
+            ),
+          ),
+        ).value,
         offeredGrams: 125,
         consumedGrams: null,
         acceptance: MealAcceptanceWire.parse('unknown'),
@@ -141,7 +152,10 @@ void main() {
 
       final todayModel = NutritionTodayReadModel(
         dogId: 'dog-bono',
-        localServiceDate: '2026-07-21',
+        localServiceDate: LocalServiceDate.fromInstant(
+          now,
+          timezone: plan.timezone,
+        ).isoDate,
         timezone: 'America/Sao_Paulo',
         activePlan: NutritionActiveCanonicalPlan(plan),
         meals: readItems,
@@ -228,7 +242,17 @@ void main() {
         dogId: 'dog-bono',
         planId: 'plan_bono_1',
         plannedMealId: 'slot-1',
-        mealOccurrenceId: 'occ-1',
+        mealOccurrenceId: MealOccurrenceId.v1(
+          MealOccurrenceKey(
+            dogId: 'dog-bono',
+            planId: 'plan_bono_1',
+            plannedMealId: 'slot-1',
+            localServiceDate: LocalServiceDate.fromInstant(
+              now,
+              timezone: plan.timezone,
+            ),
+          ),
+        ).value,
         offeredGrams: 125,
         consumedGrams: null, // unknown — no false inference
         acceptance: MealAcceptanceWire.parse('unknown'),

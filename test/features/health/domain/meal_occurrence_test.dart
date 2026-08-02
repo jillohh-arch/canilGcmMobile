@@ -181,6 +181,39 @@ void main() {
   });
 
   group('MealOccurrenceId (opaco físico)', () {
+    test('v1 reproduz vetor fixo do backend byte a byte', () {
+      final id = MealOccurrenceId.v1(
+        MealOccurrenceKey(
+          dogId: 'dog-1',
+          planId: 'plan-1',
+          plannedMealId: 'slot-am',
+          localServiceDate: LocalServiceDate.fromIso('2026-07-18'),
+        ),
+      );
+
+      expect(
+        id.value,
+        'mo1_b8227a81de279403afa97d01e64fbbba7028674e139849fa03f857a633b46e40',
+      );
+      expect(id.value, matches(RegExp(r'^mo1_[0-9a-f]{64}$')));
+    });
+
+    test('v1 preserva vetor UTF-8 do backend', () {
+      final id = MealOccurrenceId.v1(
+        MealOccurrenceKey(
+          dogId: 'cão-α',
+          planId: 'plano-2',
+          plannedMealId: 'slot-noite',
+          localServiceDate: LocalServiceDate.fromIso('2026-12-31'),
+        ),
+      );
+
+      expect(
+        id.value,
+        'mo1_c46a51b23c505f1ba4d5790866782acf9772f1c9798617a52ffb7450a87f32a5',
+      );
+    });
+
     test('valor vazio rejeitado', () {
       expect(() => MealOccurrenceId(''), throwsA(isA<HealthDomainException>()));
       expect(

@@ -9,6 +9,7 @@ import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_error
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
@@ -47,21 +48,39 @@ NutritionPlan _plan() => NutritionPlan(
   revision: 1,
 );
 
-MealLog _completedMeal() => MealLog(
-  id: 'mo1-completed',
-  dogId: 'dog-a',
-  period: MealPeriodWire.parseCanonical('morning'),
-  offeredGrams: 300,
-  consumedGrams: 300,
-  acceptance: MealAcceptanceWire.parse('full'),
-  fedAt: DateTime.now().toUtc(),
-  recordedBy: _actor,
-  schemaVersion: 1,
-  revision: 1,
-  planId: 'plan-1',
-  plannedMealId: 'slot-am',
-  mealOccurrenceId: 'mo1-completed',
-);
+MealLog _completedMeal({
+  String planId = 'plan-1',
+  String idSuffix = 'completed',
+}) {
+  final fedAt = DateTime.now().toUtc();
+  final localServiceDate = LocalServiceDate.fromInstant(
+    fedAt,
+    timezone: NutritionPlan.defaultTimezone,
+  );
+  final occurrence = MealOccurrenceId.v1(
+    MealOccurrenceKey(
+      dogId: 'dog-a',
+      planId: planId,
+      plannedMealId: 'slot-am',
+      localServiceDate: localServiceDate,
+    ),
+  ).value;
+  return MealLog(
+    id: 'mo1-$idSuffix-$planId',
+    dogId: 'dog-a',
+    period: MealPeriodWire.parseCanonical('morning'),
+    offeredGrams: 300,
+    consumedGrams: 300,
+    acceptance: MealAcceptanceWire.parse('full'),
+    fedAt: fedAt,
+    recordedBy: _actor,
+    schemaVersion: 1,
+    revision: 1,
+    planId: planId,
+    plannedMealId: 'slot-am',
+    mealOccurrenceId: occurrence,
+  );
+}
 
 final class _PlanReader implements NutritionCanonicalPlanReader {
   _PlanReader(this.batch);
@@ -126,6 +145,8 @@ _pump(
   WidgetTester tester, {
   bool degraded = false,
   bool completed = false,
+  MealLog? mealOverride,
+  List<MealLog>? mealOverrides,
   HealthNutritionPendingIntentHolder? holder,
   TextScaler? textScaler,
 }) async {
@@ -134,7 +155,12 @@ _pump(
     degraded
         ? const NutritionSourceBatch.error(code: 'down', message: 'down')
         : NutritionSourceBatch.available(
-            completed ? [_completedMeal()] : const <MealLog>[],
+            mealOverrides ??
+                (mealOverride != null
+                ? [mealOverride]
+                : completed
+                ? [_completedMeal()]
+                : const <MealLog>[]),
           ),
   );
   final read = HealthNutritionReadController(
@@ -214,6 +240,49 @@ void main() {
     expect(find.text('Concluída'), findsOneWidget);
   });
 
+  testWidgets('same slot from another plan keeps active-plan CTA', (
+    tester,
+  ) async {
+    await _pump(tester, mealOverride: _completedMeal(planId: 'plan-2'));
+    await tester.scrollUntilVisible(
+      find.text('Registrar refeição').first,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Registrar refeição'), findsNWidgets(2));
+    expect(find.text('Concluída'), findsNothing);
+  });
+
+  testWidgets('duplicate occurrence communicates integrity and blocks slot CTA', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(
+      tester,
+      mealOverrides: [
+        _completedMeal(idSuffix: 'duplicate-a'),
+        _completedMeal(idSuffix: 'duplicate-b'),
+      ],
+    );
+
+    expect(find.text('Dados inconsistentes'), findsWidgets);
+    expect(
+      find.text(
+        'Execução duplicada detectada. Ação temporariamente indisponível.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        'Execução duplicada detectada. Ação temporariamente indisponível.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Registrar refeição'), findsOneWidget);
+    expect(find.text('Concluída'), findsNothing);
+    semantics.dispose();
+  });
+
   testWidgets('canonical degraded fails closed with zero CTA', (tester) async {
     await _pump(tester, degraded: true);
     expect(find.text('Registrar refeição'), findsNothing);
@@ -281,10 +350,7 @@ void main() {
       HealthNutritionMutationUnavailable(),
     );
     await _openFirstForm(tester);
-    final offered = find.widgetWithText(
-      TextFormField,
-      'Quantidade oferecida (g)',
-    );
+    final offered = find.widgetWithText(TextFormField, 'Quantidade oferecida (g)');
     await tester.enterText(offered, '275');
     final submit = find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO');
     await tester.scrollUntilVisible(
@@ -323,7 +389,10 @@ void main() {
     await _openFirstForm(tester);
 
     // Fill required field to enable submit
-    final offered = find.widgetWithText(TextFormField, 'Quantidade oferecida (g)');
+    final offered = find.widgetWithText(
+      TextFormField,
+      'Quantidade oferecida (g)',
+    );
     await tester.enterText(offered, '300');
     await tester.pumpAndSettle();
 

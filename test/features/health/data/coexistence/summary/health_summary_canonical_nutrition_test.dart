@@ -4,6 +4,7 @@ import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
@@ -88,7 +89,17 @@ void main() {
         dogId: 'dog-bono',
         planId: 'plan_bono_1',
         plannedMealId: 'slot-1',
-        mealOccurrenceId: 'occ-1',
+        mealOccurrenceId: MealOccurrenceId.v1(
+          MealOccurrenceKey(
+            dogId: 'dog-bono',
+            planId: 'plan_bono_1',
+            plannedMealId: 'slot-1',
+            localServiceDate: LocalServiceDate.fromInstant(
+              now,
+              timezone: plan.timezone,
+            ),
+          ),
+        ).value,
         offeredGrams: 125,
         consumedGrams: null, // Explicitly NULL per 5C.2B planned execution
         acceptance: MealAcceptanceWire.parse('unknown'),
@@ -158,7 +169,17 @@ void main() {
         dogId: 'dog-bono',
         planId: 'plan_bono_1',
         plannedMealId: 'slot-1',
-        mealOccurrenceId: 'occ-1',
+        mealOccurrenceId: MealOccurrenceId.v1(
+          MealOccurrenceKey(
+            dogId: 'dog-bono',
+            planId: 'plan_bono_1',
+            plannedMealId: 'slot-1',
+            localServiceDate: LocalServiceDate.fromInstant(
+              now,
+              timezone: plan.timezone,
+            ),
+          ),
+        ).value,
         offeredGrams: 125,
         consumedGrams: 125,
         acceptance: MealAcceptanceWire.parse('full'),
@@ -185,6 +206,80 @@ void main() {
 
       expect(data.consumedAmount, 125.0);
       expect(data.offeredAmount, 125.0);
+    },
+  );
+
+  test(
+    'Summary fails closed for cross-plan and duplicate occurrence',
+    () async {
+      final now = DateTime.utc(2026, 7, 18, 12);
+      final plan = NutritionPlan(
+        id: 'plan-active',
+        dogId: 'dog-bono',
+        foodType: 'Racao',
+        amountGramsPerDay: 125,
+        mealsPerDay: 1,
+        mealSchedule: [
+          MealScheduleSlot(
+            id: 'slot-1',
+            period: MealPeriodWire.parseCanonical('morning'),
+            scheduledTime: ScheduledTimeOfDay('07:00'),
+            targetGrams: 125,
+          ),
+        ],
+        validFrom: DateTime.utc(2026, 1, 1),
+        timezone: 'America/Sao_Paulo',
+        recordedBy: actor,
+        status: NutritionPlanStatus.active,
+        schemaVersion: 1,
+        revision: 1,
+      );
+      String occurrence(String planId) => MealOccurrenceId.v1(
+        MealOccurrenceKey(
+          dogId: plan.dogId,
+          planId: planId,
+          plannedMealId: 'slot-1',
+          localServiceDate: LocalServiceDate.fromInstant(
+            now,
+            timezone: plan.timezone,
+          ),
+        ),
+      ).value;
+      MealLog meal(String id, String planId) => MealLog(
+        id: id,
+        dogId: plan.dogId,
+        planId: planId,
+        plannedMealId: 'slot-1',
+        mealOccurrenceId: occurrence(planId),
+        offeredGrams: 125,
+        consumedGrams: null,
+        acceptance: MealAcceptanceWire.parse('unknown'),
+        period: MealPeriodWire.parseCanonical('morning'),
+        fedAt: now,
+        recordedBy: actor,
+        revision: 1,
+        schemaVersion: 1,
+      );
+      Future<(int?, double?)> projection(List<MealLog> meals) async {
+        final source = CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(plan),
+          canonicalMealReader: _FakeCanonicalMealReader(meals),
+        );
+        final result = await HealthSummaryNutritionReader(
+          coexistenceReadSource: source,
+          clock: () => now,
+        ).readToday(plan.dogId);
+        return (result.value!.mealsRecorded, result.value!.offeredAmount);
+      }
+
+      expect(await projection([meal('cross-plan', 'plan-old')]), (0, 125.0));
+      expect(
+        await projection([
+          meal('duplicate-a', plan.id),
+          meal('duplicate-b', plan.id),
+        ]),
+        (0, null),
+      );
     },
   );
 }

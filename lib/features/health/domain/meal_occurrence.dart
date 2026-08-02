@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -5,7 +8,7 @@ import 'health_v1_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Meal occurrence (D39) — identidade semântica ≠ ID físico opaco.
-// Hash/ID de persistência: DEFERRED 5D (Q7).
+// ID físico v1 congelado em 5D: mo1_ + SHA-256 da preimage canônica.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Identidade **semântica** da ocorrência planejada no dia operacional local.
@@ -67,6 +70,25 @@ typedef MealOccurrenceIdentity = MealOccurrenceKey;
 final class MealOccurrenceId {
   MealOccurrenceId(String raw) : value = _require(raw);
 
+  /// Deriva o ID físico v1 exatamente como `mealOccurrenceIdV1` no backend.
+  ///
+  /// Preimage UTF-8:
+  /// `jsonEncode(["meal_occurrence_v1", dogId, planId, plannedMealId,
+  /// localServiceDate])`.
+  ///
+  /// Resultado: `mo1_` + digest SHA-256 hexadecimal lowercase.
+  factory MealOccurrenceId.v1(MealOccurrenceKey key) {
+    final preimage = jsonEncode(<String>[
+      _mealOccurrenceVersionV1,
+      key.dogId,
+      key.planId,
+      key.plannedMealId,
+      key.localServiceDate.isoDate,
+    ]);
+    final digest = sha256.convert(utf8.encode(preimage));
+    return MealOccurrenceId('$_mealOccurrencePrefixV1$digest');
+  }
+
   final String value;
 
   static String _require(String raw) {
@@ -90,6 +112,9 @@ final class MealOccurrenceId {
   @override
   String toString() => value;
 }
+
+const String _mealOccurrenceVersionV1 = 'meal_occurrence_v1';
+const String _mealOccurrencePrefixV1 = 'mo1_';
 
 /// Data operacional local `YYYY-MM-DD` (sem horário; sem TZ embutido no valor).
 ///

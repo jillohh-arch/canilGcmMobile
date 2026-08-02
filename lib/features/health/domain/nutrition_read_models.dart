@@ -1,5 +1,6 @@
 import 'health_v1_models.dart';
 import 'legacy_nutrition_views.dart';
+import 'meal_occurrence.dart';
 import 'meal_schedule_slot.dart';
 import 'nutrition_plan.dart';
 import 'nutrition_read_state.dart';
@@ -41,7 +42,8 @@ final class NutritionActiveLegacyPlan extends NutritionActivePlanRef {
 ///
 /// **Não** escolhe “mais recente” / maior revision / primeiro.
 /// A UI futura deve tratar como integridade, não como plano único.
-final class NutritionActivePlanIntegrityConflict extends NutritionActivePlanRef {
+final class NutritionActivePlanIntegrityConflict
+    extends NutritionActivePlanRef {
   NutritionActivePlanIntegrityConflict(List<NutritionPlan> activePlans)
     : activePlans = List.unmodifiable(activePlans) {
     if (this.activePlans.length < 2) {
@@ -143,8 +145,47 @@ final class NutritionTodayReadModel {
 
   int get mealsRecorded => meals.length;
 
-  int get plannedMealsCompleted =>
-      meals.where((item) => item.meal.isPlanned).length;
+  /// Logs elegíveis para totais diários, sem somar ocorrências ambíguas.
+  ///
+  /// Os registros continuam preservados em [meals] para histórico/diagnóstico.
+  List<NutritionMealReadItem> get mealsForDailyTotals {
+    final occurrenceCounts = <String, int>{};
+    for (final item in meals) {
+      final occurrenceId = item.meal.mealOccurrenceId;
+      if (item.origin == NutritionDataOrigin.canonical &&
+          item.meal.isPlanned &&
+          occurrenceId != null) {
+        occurrenceCounts.update(
+          occurrenceId,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    return [
+      for (final item in meals)
+        if (!_belongsToDuplicateCanonicalOccurrence(item, occurrenceCounts))
+          item,
+    ];
+  }
+
+  /// Slots concluídos por vínculo canônico completo da ocorrência atual.
+  ///
+  /// Refeições avulsas, legadas, de outro plano/data ou com ocorrência
+  /// incompatível não entram no contador. Duplicidade fica fail-closed.
+  int get plannedMealsCompleted => plannedSlotViews
+      .where((view) => view.status == NutritionSlotDayStatus.completed)
+      .length;
+
+  List<NutritionSlotDayView> get plannedSlotViews {
+    final p = activePlan;
+    if (p is! NutritionActiveCanonicalPlan) return const [];
+    return NutritionSlotDayDerivation.derive(
+      plan: p.plan,
+      mealsForDay: meals,
+      localServiceDate: LocalServiceDate.fromIso(localServiceDate),
+    );
+  }
 
   int? get mealsPlanned {
     final p = activePlan;
@@ -178,6 +219,17 @@ final class NutritionTodayReadModel {
 
   bool get hasActivePlanIntegrityConflict =>
       activePlan is NutritionActivePlanIntegrityConflict;
+
+  static bool _belongsToDuplicateCanonicalOccurrence(
+    NutritionMealReadItem item,
+    Map<String, int> occurrenceCounts,
+  ) {
+    final occurrenceId = item.meal.mealOccurrenceId;
+    return item.origin == NutritionDataOrigin.canonical &&
+        item.meal.isPlanned &&
+        occurrenceId != null &&
+        (occurrenceCounts[occurrenceId] ?? 0) > 1;
+  }
 }
 
 /// Slot do dia com status derivado (D11) — read-only.
@@ -188,11 +240,17 @@ final class NutritionSlotDayView {
     required this.slot,
     required this.status,
     this.meal,
+    this.hasOccurrenceConflict = false,
   });
 
   final MealScheduleSlot slot;
   final NutritionSlotDayStatus status;
   final NutritionMealReadItem? meal;
+
+  /// Mais de um MealLog canônico reivindica a mesma ocorrência esperada.
+  ///
+  /// Nenhum vencedor é escolhido e um novo registro deve permanecer bloqueado.
+  final bool hasOccurrenceConflict;
 }
 
 abstract final class NutritionSlotDayDerivation {
@@ -201,21 +259,65 @@ abstract final class NutritionSlotDayDerivation {
   static List<NutritionSlotDayView> derive({
     required NutritionPlan plan,
     required Iterable<NutritionMealReadItem> mealsForDay,
+    required LocalServiceDate localServiceDate,
   }) {
-    final bySlot = <String, NutritionMealReadItem>{};
-    for (final item in mealsForDay) {
-      final slotId = item.meal.plannedMealId;
-      if (slotId != null) bySlot.putIfAbsent(slotId, () => item);
-    }
     return [
       for (final slot in plan.mealSchedule)
-        NutritionSlotDayView(
+        _deriveSlot(
+          plan: plan,
           slot: slot,
-          status: bySlot[slot.id] != null
-              ? NutritionSlotDayStatus.completed
-              : NutritionSlotDayStatus.pending,
-          meal: bySlot[slot.id],
+          mealsForDay: mealsForDay,
+          localServiceDate: localServiceDate,
         ),
     ];
+  }
+
+  static NutritionSlotDayView _deriveSlot({
+    required NutritionPlan plan,
+    required MealScheduleSlot slot,
+    required Iterable<NutritionMealReadItem> mealsForDay,
+    required LocalServiceDate localServiceDate,
+  }) {
+    final expectedOccurrence = MealOccurrenceId.v1(
+      MealOccurrenceKey(
+        dogId: plan.dogId,
+        planId: plan.id,
+        plannedMealId: slot.id,
+        localServiceDate: localServiceDate,
+      ),
+    ).value;
+
+    final matches = <NutritionMealReadItem>[];
+    for (final item in mealsForDay) {
+      final meal = item.meal;
+      if (item.origin != NutritionDataOrigin.canonical || !meal.isPlanned) {
+        continue;
+      }
+      if (meal.dogId != plan.dogId ||
+          meal.planId != plan.id ||
+          meal.plannedMealId != slot.id ||
+          meal.mealOccurrenceId != expectedOccurrence) {
+        continue;
+      }
+      final mealServiceDate = LocalServiceDate.fromInstant(
+        meal.fedAt,
+        timezone: plan.timezone,
+      );
+      if (mealServiceDate != localServiceDate) continue;
+      matches.add(item);
+    }
+
+    if (matches.length == 1) {
+      return NutritionSlotDayView(
+        slot: slot,
+        status: NutritionSlotDayStatus.completed,
+        meal: matches.single,
+      );
+    }
+    return NutritionSlotDayView(
+      slot: slot,
+      status: NutritionSlotDayStatus.pending,
+      hasOccurrenceConflict: matches.length > 1,
+    );
   }
 }

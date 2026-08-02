@@ -7,6 +7,7 @@ import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
+import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
@@ -177,6 +178,20 @@ MealLog mealLog({
   String? plannedMealId,
   DateTime? fedAt,
 }) {
+  final effectiveFedAt = fedAt ?? DateTime.now().toUtc();
+  final occurrence = plannedMealId == null
+      ? null
+      : MealOccurrenceId.v1(
+          MealOccurrenceKey(
+            dogId: 'dog-a',
+            planId: 'plan-1',
+            plannedMealId: plannedMealId,
+            localServiceDate: LocalServiceDate.fromInstant(
+              effectiveFedAt,
+              timezone: NutritionPlan.defaultTimezone,
+            ),
+          ),
+        ).value;
   return MealLog(
     id: id,
     dogId: 'dog-a',
@@ -185,14 +200,14 @@ MealLog mealLog({
     acceptance: MealAcceptanceWire.parse(
       acceptance ?? (consumed == null ? 'unknown' : 'full'),
     ),
-    fedAt: fedAt ?? DateTime.now().toUtc(),
+    fedAt: effectiveFedAt,
     recordedBy: actor,
     schemaVersion: 1,
     revision: 1,
     consumedGrams: consumed,
     plannedMealId: plannedMealId,
     planId: plannedMealId == null ? null : 'plan-1',
-    mealOccurrenceId: plannedMealId == null ? null : 'occ-$id',
+    mealOccurrenceId: occurrence,
   );
 }
 
@@ -394,10 +409,7 @@ void main() {
       ),
       canonicalMealReader: _MemMeal(
         NutritionSourceBatch.available([
-          mealLog(
-            id: 'adhoc-timezone',
-            fedAt: fedAtUtc,
-          ),
+          mealLog(id: 'adhoc-timezone', fedAt: fedAtUtc),
         ]),
       ),
     );
