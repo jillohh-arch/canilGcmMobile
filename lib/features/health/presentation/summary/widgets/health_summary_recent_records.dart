@@ -43,37 +43,40 @@ class HealthSummaryRecentRecords extends StatelessWidget {
               enabled: onOpenHistory != null,
               label: 'Ver histórico',
               excludeSemantics: true,
-              child: Material(
-                color: AppTheme.transparent,
-                child: InkWell(
-                  onTap: onOpenHistory,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Ver histórico',
-                          style: GoogleFonts.inter(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                child: Material(
+                  color: AppTheme.transparent,
+                  child: InkWell(
+                    onTap: onOpenHistory,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Ver histórico',
+                            style: GoogleFonts.inter(
+                              color: onOpenHistory != null
+                                  ? AppTheme.primary
+                                  : AppTheme.textMuted,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
                             color: onOpenHistory != null
                                 ? AppTheme.primary
                                 : AppTheme.textMuted,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: onOpenHistory != null
-                              ? AppTheme.primary
-                              : AppTheme.textMuted,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

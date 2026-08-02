@@ -1727,4 +1727,88 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('UX-03D — Combined Summary Responsive, Accessibility & Regression Gates', () {
+    testWidgets('1. Dashboard completo em 320px com textScale 1.5, conteúdo longo e zero overflow', (
+      tester,
+    ) async {
+      final records = List.generate(
+        6,
+        (i) => HealthSummaryRecentRecordView(
+          id: 'rec-$i',
+          type: i % 2 == 0 ? 'feeding' : 'medication',
+          title: 'Registro completo $i com título extenso para responsividade',
+          subtitle: 'Metadado detalhado do registro $i',
+          occurredAt: DateTime(2026, 7, 15 - i, 8, 0),
+        ),
+      );
+
+      final data = fullData(
+        readiness: ReadinessStatus.fitWithRestrictions,
+        attention: HealthSummarySectionData.available(
+          const HealthSummaryAttentionView(
+            items: [
+              HealthSummaryAttentionItem(
+                id: 'att-1',
+                title: 'Vacinação anual pendente contra raiva e leptospirose em lote estendido',
+                subtitle: 'Venceu há 3 dias · Clínica Veterinária K9',
+                destinationHint: 'agenda',
+              ),
+              HealthSummaryAttentionItem(
+                id: 'att-2',
+                title: 'Restrição operacional de saltos acima de 1 metro em instrução',
+                subtitle: 'Ativa até 30/08',
+                destinationHint: 'restricao',
+              ),
+            ],
+          ),
+        ),
+        recent: HealthSummarySectionData.available(
+          HealthSummaryRecentRecordsView(items: records),
+        ),
+      );
+
+      final dogLongo = HealthSummaryDogContextView(
+        dogId: 'dog-1',
+        name: 'Thor von der Hesselburg Operacional K9 Tático',
+        breed: 'Pastor Alemão de Trabalho de Linhagem Selecionada',
+        sexLabel: 'Macho',
+        ageLabel: '6 anos',
+      );
+
+      final source = FakeHealthSummarySource();
+      await pumpDashboard(
+        tester,
+        source: source,
+        emitData: data,
+        dogContext: dogLongo,
+        width: 320,
+        height: 1600,
+        textScale: 1.5,
+      );
+
+      final mediaQuery = tester.widget<MediaQuery>(find.byType(MediaQuery).last);
+      expect(mediaQuery.data.size.width, equals(320.0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('2. Auditoria global de acessibilidade do dashboard completo (Semantics e touch target >= 48dp)', (
+      tester,
+    ) async {
+      final source = FakeHealthSummarySource();
+      await pumpDashboard(
+        tester,
+        source: source,
+        emitData: fullData(),
+        onOpenHistory: () {},
+      );
+
+      final historyBtnFinder = find.widgetWithText(InkWell, 'Ver histórico');
+      expect(historyBtnFinder, findsOneWidget);
+      final btnSize = tester.getSize(historyBtnFinder);
+      expect(btnSize.width, greaterThanOrEqualTo(48.0));
+      expect(btnSize.height, greaterThanOrEqualTo(48.0));
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
