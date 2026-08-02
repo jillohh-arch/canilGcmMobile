@@ -97,7 +97,8 @@ class HealthNutritionTodayScreen extends StatelessWidget {
         }
 
         final todayModel = today?.valueOrNull;
-        final degraded = snap.isDegraded;
+        final hasSafeToday = today?.hasUsableValue == true;
+        final degraded = snap.isDegraded || today?.isDegraded == true;
         // Integrity conflict com dados utilizáveis: manter tela + aviso (não empty).
         final integrityConflict =
             snapshot.activePlan is NutritionActivePlanIntegrityConflict ||
@@ -125,13 +126,14 @@ class HealthNutritionTodayScreen extends StatelessWidget {
               _Header(
                 dogName: dogDisplayName,
                 degraded: degraded,
-                degradedMessage: snap.message,
+                degradedMessage: today?.message ?? snap.message,
                 localDate: todayModel?.localServiceDate,
               ),
               if (degraded) ...[
                 const SizedBox(height: 10),
                 _DegradedBanner(
                   message:
+                      today?.message ??
                       snap.message ??
                       'Atualização parcial: alguns dados podem estar incompletos.',
                 ),
@@ -153,37 +155,41 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              _TodaySummaryCard(
-                plan: snapshot.activePlan,
-                meals: todayModel?.mealsForDailyTotals ?? const [],
-                plannedMealsCompleted: todayModel?.plannedMealsCompleted ?? 0,
-              ),
+              if (hasSafeToday)
+                _TodaySummaryCard(
+                  plan: snapshot.activePlan,
+                  meals: todayModel!.mealsForDailyTotals,
+                  plannedMealsCompleted: todayModel.plannedMealsCompleted,
+                )
+              else
+                const _DailyProjectionUnavailable(),
               const SizedBox(height: 14),
               _PlanCard(plan: snapshot.activePlan),
               const SizedBox(height: 14),
-              _MealsSection(
-                plan: snapshot.activePlan,
-                mealsToday: todayModel?.meals ?? const [],
-                serverNow: DateTime.now().toUtc(),
-                timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
-                localServiceDate: todayModel?.localServiceDate,
-                mutationEnabled: mutationHealthy,
-                onRegister: (plan, slot) => _openPlannedMealForm(
-                  context,
-                  plan: plan,
-                  slot: slot,
-                  serviceDate: todayModel!.localServiceDate,
+              if (hasSafeToday)
+                _MealsSection(
+                  plan: snapshot.activePlan,
+                  mealsToday: todayModel!.meals,
+                  serverNow: DateTime.now().toUtc(),
+                  timezone: todayModel.timezone,
+                  localServiceDate: todayModel.localServiceDate,
+                  mutationEnabled: mutationHealthy,
+                  onRegister: (plan, slot) => _openPlannedMealForm(
+                    context,
+                    plan: plan,
+                    slot: slot,
+                    serviceDate: todayModel.localServiceDate,
+                  ),
                 ),
-              ),
               const SizedBox(height: 14),
               _SupplementsSection(
                 plan: snapshot.activePlan,
                 administrations:
-                    todayModel?.canonicalSupplementLogs ??
-                    snapshot.canonicalSupplementLogs,
-                legacyRegimens:
-                    todayModel?.legacySupplementRegimens ??
-                    snapshot.legacySupplementRegimens,
+                    todayModel?.canonicalSupplementLogs ?? const [],
+                administrationsAvailable:
+                    hasSafeToday &&
+                    todayModel!.canonicalSupplementLogsAvailable,
+                legacyRegimens: snapshot.legacySupplementRegimens,
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
                 mutationController: mutationController,
                 dogDisplayName: dogDisplayName,
@@ -192,13 +198,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
               const SizedBox(height: 14),
               _RecentMealsSection(
                 meals: snapshot.mergedMeals.take(8).toList(growable: false),
-                serviceDate:
-                    todayModel?.localServiceDate ??
-                    LocalServiceDate.fromInstant(
-                      DateTime.now().toUtc(),
-                      timezone:
-                          todayModel?.timezone ?? NutritionPlan.defaultTimezone,
-                    ).isoDate,
+                serviceDate: todayModel?.localServiceDate,
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
               ),
             ],
@@ -417,6 +417,43 @@ class _DegradedBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DailyProjectionUnavailable extends StatelessWidget {
+  const _DailyProjectionUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return HealthSummaryCardSurface(
+      child: Semantics(
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Dados de hoje indisponíveis',
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Não foi possível confirmar os registros deste dia. '
+              'Tente atualizar.',
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1207,6 +1244,7 @@ class _SupplementsSection extends StatefulWidget {
   const _SupplementsSection({
     required this.plan,
     required this.administrations,
+    required this.administrationsAvailable,
     required this.legacyRegimens,
     required this.timezone,
     this.mutationController,
@@ -1216,6 +1254,7 @@ class _SupplementsSection extends StatefulWidget {
 
   final NutritionActivePlanRef? plan;
   final List<SupplementLog> administrations;
+  final bool administrationsAvailable;
   final List<LegacySupplementRegimenView> legacyRegimens;
   final String timezone;
   final HealthNutritionMutationController? mutationController;
@@ -1420,7 +1459,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
         ],
         const SizedBox(height: 14),
         Text(
-          'ADMINISTRAÇÕES REGISTRADAS',
+          'ADMINISTRAÇÕES DE HOJE',
           style: GoogleFonts.inter(
             color: AppTheme.textMuted,
             fontSize: 11,
@@ -1429,13 +1468,43 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
           ),
         ),
         const SizedBox(height: 8),
-        if (widget.administrations.isEmpty)
+        if (!widget.administrationsAvailable)
+          HealthSummaryCardSurface(
+            child: Semantics(
+              liveRegion: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Administrações de hoje indisponíveis',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Não foi possível confirmar os registros deste dia. '
+                    'Tente atualizar.',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (widget.administrations.isEmpty)
           HealthSummaryCardSurface(
             child: Text(
               planRegimens.isNotEmpty || widget.legacyRegimens.isNotEmpty
-                  ? 'Nenhuma administração registrada. '
+                  ? 'Nenhuma administração registrada hoje. '
                         'Os suplementos em uso aparecem acima.'
-                  : 'Nenhuma administração registrada.',
+                  : 'Nenhuma administração registrada hoje.',
               style: GoogleFonts.inter(
                 color: AppTheme.textSecondary,
                 fontSize: 12,
@@ -1497,7 +1566,7 @@ class _RecentMealsSection extends StatelessWidget {
     required this.timezone,
   });
   final List<NutritionMealReadItem> meals;
-  final String serviceDate;
+  final String? serviceDate;
   final String timezone;
 
   @override
@@ -1564,7 +1633,7 @@ class _RecentMealsSection extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${HealthNutritionTodayFormatters.recentDateTimeLabel(instant: m.meal.fedAt, serviceDate: serviceDate, timezone: timezone)} · $line'
+                            '${HealthNutritionTodayFormatters.recentDateTimeLabel(instant: m.meal.fedAt, serviceDate: serviceDate ?? '0001-01-01', timezone: timezone)} · $line'
                             '${m.origin != NutritionDataOrigin.canonical ? ' · legado' : ''}',
                             style: GoogleFonts.inter(
                               color: AppTheme.textMuted,

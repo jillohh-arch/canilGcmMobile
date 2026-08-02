@@ -7,6 +7,7 @@ import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
+import 'package:canil_gcm/features/health/domain/supplement_log.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 
 final class _FakeCanonicalPlanReader implements NutritionCanonicalPlanReader {
@@ -35,6 +36,41 @@ final class _FakeCanonicalMealReader implements NutritionCanonicalMealReader {
         ? NutritionSourceBatch.available(meals)
         : const NutritionSourceBatch.empty();
   }
+}
+
+final class _UnavailablePlanReader implements NutritionCanonicalPlanReader {
+  _UnavailablePlanReader(this.batch);
+
+  final NutritionSourceBatch<NutritionPlan> batch;
+
+  @override
+  Future<NutritionSourceBatch<NutritionPlan>> loadPlans(String dogId) async =>
+      batch;
+}
+
+final class _UnavailableMealReader implements NutritionCanonicalMealReader {
+  _UnavailableMealReader(this.batch);
+
+  final NutritionSourceBatch<MealLog> batch;
+
+  @override
+  Future<NutritionSourceBatch<MealLog>> loadMeals(
+    String dogId, {
+    DateTime? from,
+    DateTime? to,
+  }) async => batch;
+}
+
+final class _UnavailableSupplementReader
+    implements NutritionCanonicalSupplementLogReader {
+  _UnavailableSupplementReader(this.batch);
+
+  final NutritionSourceBatch<SupplementLog> batch;
+
+  @override
+  Future<NutritionSourceBatch<SupplementLog>> loadSupplementLogs(
+    String dogId,
+  ) async => batch;
 }
 
 void main() {
@@ -125,6 +161,7 @@ void main() {
 
       // CRITICAL ASSERTION 1: Result status is available, NOT notRecorded
       expect(result.status, HealthSummarySectionStatus.available);
+      expect(result.isDegraded, isFalse);
 
       final data = result.value!;
 
@@ -280,6 +317,110 @@ void main() {
         ]),
         (0, null),
       );
+    },
+  );
+
+  test(
+    'Summary does not fall back to another snapshot after today error',
+    () async {
+      var fallbackCalls = 0;
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _UnavailablePlanReader(
+            const NutritionSourceBatch.error(message: 'plan failed'),
+          ),
+          canonicalMealReader: _UnavailableMealReader(
+            const NutritionSourceBatch.error(message: 'meals failed'),
+          ),
+        ),
+        loadDaySnapshot: (_) async {
+          fallbackCalls++;
+          return const HealthSummaryNutritionDaySnapshot(feedings: []);
+        },
+        clock: () => DateTime.utc(2026, 7, 22, 12),
+      );
+
+      final result = await reader.readToday('dog-bono');
+
+      expect(result.status, HealthSummarySectionStatus.unavailable);
+      expect(result.value, isNull);
+      expect(fallbackCalls, 0);
+    },
+  );
+
+  test(
+    'Summary keeps offline unavailable and valid empty notRecorded',
+    () async {
+      Future<HealthSummarySectionStatus> statusFor({
+        required NutritionSourceBatch<NutritionPlan> plans,
+        required NutritionSourceBatch<MealLog> meals,
+      }) async {
+        final reader = HealthSummaryNutritionReader(
+          coexistenceReadSource: CoexistenceNutritionReadSource(
+            canonicalPlanReader: _UnavailablePlanReader(plans),
+            canonicalMealReader: _UnavailableMealReader(meals),
+          ),
+          clock: () => DateTime.utc(2026, 7, 22, 12),
+        );
+        return (await reader.readToday('dog-bono')).status;
+      }
+
+      expect(
+        await statusFor(
+          plans: const NutritionSourceBatch.offline(),
+          meals: const NutritionSourceBatch.offline(),
+        ),
+        HealthSummarySectionStatus.unavailable,
+      );
+      expect(
+        await statusFor(
+          plans: const NutritionSourceBatch.empty(),
+          meals: const NutritionSourceBatch.empty(),
+        ),
+        HealthSummarySectionStatus.notRecorded,
+      );
+    },
+  );
+
+  test(
+    'Summary preserva degraded e totais seguros quando supplement_logs falha',
+    () async {
+      final now = DateTime.utc(2026, 7, 22, 12);
+      final meal = MealLog(
+        id: 'meal-safe',
+        dogId: 'dog-bono',
+        offeredGrams: 180,
+        consumedGrams: 120,
+        acceptance: MealAcceptanceWire.parse('partial'),
+        period: MealPeriodWire.parseCanonical('morning'),
+        fedAt: now,
+        recordedBy: actor,
+        revision: 1,
+        schemaVersion: 1,
+      );
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(null),
+          canonicalMealReader: _FakeCanonicalMealReader([meal]),
+          canonicalSupplementLogReader: _UnavailableSupplementReader(
+            const NutritionSourceBatch.error(
+              message: 'supplement_logs indisponível',
+            ),
+          ),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday('dog-bono');
+
+      expect(result.status, HealthSummarySectionStatus.available);
+      expect(result.isAvailable, isTrue);
+      expect(result.isDegraded, isTrue);
+      expect(result.message, contains('parcial'));
+      expect(result.valueOrNull, isNotNull);
+      expect(result.value!.offeredAmount, 180);
+      expect(result.value!.consumedAmount, 120);
+      expect(result.isUnavailable, isFalse);
     },
   );
 }

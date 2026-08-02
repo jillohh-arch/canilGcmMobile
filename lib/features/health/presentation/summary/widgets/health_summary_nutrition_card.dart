@@ -93,7 +93,26 @@ class HealthSummaryNutritionCard extends StatelessWidget {
           AppTheme.textSoft,
         );
       case HealthSummarySectionStatus.available:
-        return _available(nutrition.value!);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (nutrition.isDegraded) ...[
+              Semantics(
+                container: true,
+                liveRegion: true,
+                label: nutrition.message,
+                excludeSemantics: true,
+                child: _statusMessage(
+                  nutrition.message ??
+                      'Dados de nutrição parcialmente disponíveis.',
+                  AppTheme.warningAccent,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            _available(nutrition.value!),
+          ],
+        );
     }
   }
 

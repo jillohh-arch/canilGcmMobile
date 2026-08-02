@@ -177,92 +177,101 @@ void main() {
   });
 
   group('HealthSummaryNutritionReader', () {
-    test('zero real com prescrição e sem refeições', () async {
+    test(
+      'snapshot legado com prescrição falha fechado sem produzir hoje',
+      () async {
+        var legacyCalls = 0;
+        final reader = HealthSummaryNutritionReader(
+          loadDaySnapshot: (_) async {
+            legacyCalls++;
+            return HealthSummaryNutritionDaySnapshot(
+              feedings: const [],
+              prescription: NutritionPrescription(
+                amountGramsPerDay: 600,
+                mealsPerDay: 3,
+                vigentFrom: DateTime(2026, 1, 1),
+              ),
+            );
+          },
+        );
+        final section = await reader.readToday('dog-1');
+        expect(section.isUnavailable, isTrue);
+        expect(section.valueOrNull, isNull);
+        expect(legacyCalls, 0);
+      },
+    );
+
+    test('snapshot legado histórico não reconstrói total diário', () async {
+      var legacyCalls = 0;
       final reader = HealthSummaryNutritionReader(
-        loadDaySnapshot: (_) async => HealthSummaryNutritionDaySnapshot(
-          feedings: const [],
-          prescription: NutritionPrescription(
-            amountGramsPerDay: 600,
-            mealsPerDay: 3,
-            vigentFrom: DateTime(2026, 1, 1),
+        loadDaySnapshot: (_) async {
+          legacyCalls++;
+          return HealthSummaryNutritionDaySnapshot(
+            feedings: [
+              Feeding(
+                period: 'manha',
+                amountGrams: 250,
+                prescriptionAtTime: 600,
+                divergencePercent: 0,
+                fedAt: DateTime(2026, 7, 14, 8),
+                fedBy: 'u1',
+              ),
+              Feeding(
+                period: 'almoco',
+                amountGrams: 100,
+                prescriptionAtTime: 600,
+                divergencePercent: 0,
+                fedAt: DateTime(2026, 7, 15, 12),
+                fedBy: 'u1',
+              ),
+            ],
+          );
+        },
+      );
+      final section = await reader.readToday('dog-1');
+      expect(section.isUnavailable, isTrue);
+      expect(section.valueOrNull, isNull);
+      expect(legacyCalls, 0);
+    });
+
+    test(
+      'snapshot legado vazio não confirma notRecorded sem projeção',
+      () async {
+        final reader = HealthSummaryNutritionReader(
+          loadDaySnapshot: (_) async => const HealthSummaryNutritionDaySnapshot(
+            feedings: [],
+            prescription: null,
           ),
-        ),
-      );
-      final section = await reader.readToday('dog-1');
-      expect(section.isAvailable, isTrue);
-      expect(section.value!.consumedAmount, 0);
-      expect(section.value!.plannedAmount, 600);
-      expect(section.value!.mealsRecorded, 0);
-      expect(section.value!.mealsPlanned, 3);
-      expect(section.value!.unitLabel, 'g');
-    });
+        );
+        final section = await reader.readToday('dog-1');
+        expect(section.isUnavailable, isTrue);
+        expect(section.isNotRecorded, isFalse);
+      },
+    );
 
-    test('soma consumido real', () async {
-      final reader = HealthSummaryNutritionReader(
-        loadDaySnapshot: (_) async => HealthSummaryNutritionDaySnapshot(
-          feedings: [
-            Feeding(
-              period: 'manha',
-              amountGrams: 250,
-              prescriptionAtTime: 600,
-              divergencePercent: 0,
-              fedAt: DateTime(2026, 7, 15, 8),
-              fedBy: 'u1',
-            ),
-            Feeding(
-              period: 'almoco',
-              amountGrams: 100,
-              prescriptionAtTime: 600,
-              divergencePercent: 0,
-              fedAt: DateTime(2026, 7, 15, 12),
-              fedBy: 'u1',
-            ),
-          ],
-          prescription: NutritionPrescription(
-            amountGramsPerDay: 600,
-            mealsPerDay: 3,
-            vigentFrom: DateTime(2026, 1, 1),
+    test(
+      'snapshot legado sem plano não publica alimentação como hoje',
+      () async {
+        final reader = HealthSummaryNutritionReader(
+          loadDaySnapshot: (_) async => HealthSummaryNutritionDaySnapshot(
+            feedings: [
+              Feeding(
+                period: 'manha',
+                amountGrams: 200,
+                prescriptionAtTime: 0,
+                divergencePercent: 0,
+                fedAt: DateTime(2026, 7, 15, 8),
+                fedBy: 'u1',
+              ),
+            ],
+            prescription: null,
           ),
-        ),
-      );
-      final section = await reader.readToday('dog-1');
-      expect(section.value!.consumedAmount, 350);
-      expect(section.value!.mealsRecorded, 2);
-    });
-
-    test('notRecorded sem plano e sem refeições', () async {
-      final reader = HealthSummaryNutritionReader(
-        loadDaySnapshot: (_) async => const HealthSummaryNutritionDaySnapshot(
-          feedings: [],
-          prescription: null,
-        ),
-      );
-      expect((await reader.readToday('dog-1')).isNotRecorded, isTrue);
-    });
-
-    test('alimentação sem plano: available sem inventar meta', () async {
-      final reader = HealthSummaryNutritionReader(
-        loadDaySnapshot: (_) async => HealthSummaryNutritionDaySnapshot(
-          feedings: [
-            Feeding(
-              period: 'manha',
-              amountGrams: 200,
-              prescriptionAtTime: 0,
-              divergencePercent: 0,
-              fedAt: DateTime(2026, 7, 15, 8),
-              fedBy: 'u1',
-            ),
-          ],
-          prescription: null,
-        ),
-      );
-      final section = await reader.readToday('dog-1');
-      expect(section.isAvailable, isTrue);
-      expect(section.value!.consumedAmount, 200);
-      expect(section.value!.plannedAmount, isNull);
-      expect(section.value!.mealsPlanned, isNull);
-      expect(section.value!.mealsRecorded, 1);
-    });
+        );
+        final section = await reader.readToday('dog-1');
+        expect(section.isUnavailable, isTrue);
+        expect(section.valueOrNull, isNull);
+      },
+    );
   });
 
   group('HealthSummaryRecentRecordsReader', () {

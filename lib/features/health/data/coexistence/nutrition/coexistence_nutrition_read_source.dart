@@ -133,6 +133,8 @@ final class CoexistenceNutritionReadSource {
     final canonicalMeals = <MealLog>[];
     final legacyEnvelopes = <LegacyMealEnvelope>[];
     final canonicalLogs = <SupplementLog>[];
+    var canonicalSupplementLogAvailability =
+        NutritionSourceAvailability.notConfigured;
     final legacyRegimens = <LegacySupplementRegimenView>[];
     final allDiagnostics = <NutritionMergeDiagnostic>[];
 
@@ -279,10 +281,22 @@ final class CoexistenceNutritionReadSource {
     if (cSupp != null) {
       try {
         final batch = await cSupp.loadSupplementLogs(dogId);
+        canonicalSupplementLogAvailability = batch.availability;
         if (batch.availability == NutritionSourceAvailability.available) {
           canonicalLogs.addAll(batch.items.where((s) => s.dogId == dogId));
         }
+        if (batch.availability == NutritionSourceAvailability.error ||
+            batch.availability == NutritionSourceAvailability.offline) {
+          allDiagnostics.add(
+            NutritionMergeDiagnostic(
+              code: 'supplement_log_source_error',
+              message:
+                  batch.message ?? 'Falha ao ler supplement_logs canônicos',
+            ),
+          );
+        }
       } catch (_) {
+        canonicalSupplementLogAvailability = NutritionSourceAvailability.error;
         // Falha de supplement não mascara meals/plans; fica sem logs.
         allDiagnostics.add(
           const NutritionMergeDiagnostic(
@@ -347,6 +361,7 @@ final class CoexistenceNutritionReadSource {
         legacyEnvelopes.map((e) => e.meal).toList(),
       ),
       canonicalSupplementLogs: List.unmodifiable(canonicalLogs),
+      canonicalSupplementLogAvailability: canonicalSupplementLogAvailability,
       legacySupplementRegimens: List.unmodifiable(legacyRegimens),
       planSources: List.unmodifiable(planStatuses),
       mealSources: List.unmodifiable(mealStatuses),
@@ -429,23 +444,43 @@ final class CoexistenceNutritionReadSource {
     required DateTime serverNow,
   }) async {
     final snapResult = await loadSnapshot(dogId);
-    if (snapResult.isError) {
+    return projectTodayFromSnapshot(
+      dogId: dogId,
+      snapshotResult: snapResult,
+      serverNow: serverNow,
+    );
+  }
+
+  /// Projeção normativa única de dados comunicados como pertencentes a hoje.
+  ///
+  /// Listas do snapshot permanecem históricas até passarem por este filtro.
+  /// Projeta a visão diária a partir de um snapshot já resolvido.
+  ///
+  /// Esta é a única implementação normativa da projeção. Consumidores que
+  /// já carregaram o snapshot devem reutilizá-la para evitar uma segunda
+  /// leitura e manter plano, execuções e diagnósticos atomicamente coerentes.
+  NutritionReadResult<NutritionTodayReadModel> projectTodayFromSnapshot({
+    required String dogId,
+    required NutritionReadResult<NutritionCoexistenceSnapshot> snapshotResult,
+    required DateTime serverNow,
+  }) {
+    if (snapshotResult.isError) {
       return NutritionReadResult.error(
-        message: snapResult.message,
-        code: snapResult.code,
+        message: snapshotResult.message,
+        code: snapshotResult.code,
       );
     }
-    if (snapResult.isOffline) {
+    if (snapshotResult.isOffline) {
       return NutritionReadResult.offline(
-        message: snapResult.message,
-        code: snapResult.code,
+        message: snapshotResult.message,
+        code: snapshotResult.code,
       );
     }
-    if (snapResult.isEmpty) {
-      return NutritionReadResult.empty(message: snapResult.message);
+    if (snapshotResult.isEmpty) {
+      return NutritionReadResult.empty(message: snapshotResult.message);
     }
 
-    final snap = snapResult.value;
+    final snap = snapshotResult.value;
     if (snap == null) {
       return const NutritionReadResult.error(
         code: 'missing_snapshot',
@@ -475,13 +510,15 @@ final class CoexistenceNutritionReadSource {
     // MANTER fonte canônica completa (snap.canonicalSupplementLogs) para
     // Timeline/Histórico futuro. A projeção diária é separada.
     // §5D-Gate5C.4B: `startInclusive <= administeredAt < endExclusive`.
-    final supplementLogsToday = snap.canonicalSupplementLogs.where((log) {
-      final logDate = LocalServiceDate.fromInstant(
-        log.administeredAt,
-        timezone: tzName,
-      );
-      return logDate == localDate;
-    }).toList(growable: false);
+    final supplementLogsToday = snap.canonicalSupplementLogs
+        .where((log) {
+          final logDate = LocalServiceDate.fromInstant(
+            log.administeredAt,
+            timezone: tzName,
+          );
+          return logDate == localDate;
+        })
+        .toList(growable: false);
 
     final today = NutritionTodayReadModel(
       dogId: dogId,
@@ -490,14 +527,15 @@ final class CoexistenceNutritionReadSource {
       activePlan: snap.activePlan,
       meals: mealsToday,
       canonicalSupplementLogs: supplementLogsToday,
+      canonicalSupplementLogsAvailable: !snap.hasSupplementLogSourceFailure,
       legacySupplementRegimens: snap.legacySupplementRegimens,
     );
 
-    if (snapResult.isDegraded) {
+    if (snapshotResult.isDegraded) {
       return NutritionReadResult.degraded(
         today,
-        message: snapResult.message,
-        code: snapResult.code,
+        message: snapshotResult.message,
+        code: snapshotResult.code,
       );
     }
     return NutritionReadResult.data(today);

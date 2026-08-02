@@ -113,54 +113,58 @@ class HealthNutritionReadController extends ChangeNotifier {
     if (!_isCurrent(generation, dogId)) return;
 
     _loading = true;
-    _setSnapshot(
-      const NutritionReadResult.loading(message: 'Carregando nutrição…'),
+    _snapshotResult = const NutritionReadResult.loading(
+      message: 'Carregando nutrição…',
     );
     _todayResult = const NutritionReadResult.loading();
+    _safeNotify();
 
+    NutritionReadResult<NutritionCoexistenceSnapshot> snapshot;
     try {
-      final result = await _source.loadSnapshot(
+      snapshot = await _source.loadSnapshot(
         dogId,
         mealsFrom: mealsFrom,
         mealsTo: mealsTo,
       );
-      if (!_isCurrent(generation, dogId)) return;
-
-      _setSnapshot(result);
-
-      final today = await _source.loadToday(dogId, serverNow: _clock());
-      if (!_isCurrent(generation, dogId)) return;
-      _todayResult = today;
-      _safeNotify();
     } catch (e, st) {
       assert(() {
         debugPrint(
-          '[HealthNutritionReadController] load falhou dog=$dogId: $e\n$st',
+          '[HealthNutritionReadController] snapshot falhou dog=$dogId: $e\n$st',
         );
         return true;
       }());
-      if (!_isCurrent(generation, dogId)) return;
-      _setSnapshot(
-        NutritionReadResult.error(
-          message: e.toString(),
-          code: 'nutrition_read_controller_exception',
-        ),
-      );
-      _todayResult = NutritionReadResult.error(
+      snapshot = NutritionReadResult.error(
         message: e.toString(),
-        code: 'nutrition_read_controller_exception',
+        code: 'nutrition_snapshot_controller_exception',
       );
-    } finally {
-      if (_isCurrent(generation, dogId)) {
-        _loading = false;
-        _safeNotify();
-      }
     }
-  }
+    if (!_isCurrent(generation, dogId)) return;
 
-  void _setSnapshot(NutritionReadResult<NutritionCoexistenceSnapshot> next) {
-    if (_disposed) return;
-    _snapshotResult = next;
+    NutritionReadResult<NutritionTodayReadModel> today;
+    try {
+      today = _source.projectTodayFromSnapshot(
+        dogId: dogId,
+        snapshotResult: snapshot,
+        serverNow: _clock(),
+      );
+    } catch (e, st) {
+      assert(() {
+        debugPrint(
+          '[HealthNutritionReadController] today falhou dog=$dogId: $e\n$st',
+        );
+        return true;
+      }());
+      today = NutritionReadResult.error(
+        message: e.toString(),
+        code: 'nutrition_today_controller_exception',
+      );
+    }
+    if (!_isCurrent(generation, dogId)) return;
+
+    // Publica os dois resultados juntos: ambos derivam do mesmo snapshot.
+    _snapshotResult = snapshot;
+    _todayResult = today;
+    _loading = false;
     _safeNotify();
   }
 

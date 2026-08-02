@@ -12,6 +12,7 @@ import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
+import 'package:canil_gcm/features/health/domain/supplement_log.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
 
@@ -120,6 +121,55 @@ final class _MemMeal implements NutritionCanonicalMealReader {
   }) async => batch;
 }
 
+final class _SequencePlanReader implements NutritionCanonicalPlanReader {
+  _SequencePlanReader(this.batches);
+
+  final List<NutritionSourceBatch<NutritionPlan>> batches;
+  var calls = 0;
+
+  @override
+  Future<NutritionSourceBatch<NutritionPlan>> loadPlans(String dogId) async {
+    final index = calls < batches.length ? calls : batches.length - 1;
+    calls++;
+    return batches[index];
+  }
+}
+
+final class _SequenceSupplementReader
+    implements NutritionCanonicalSupplementLogReader {
+  _SequenceSupplementReader(this.batches);
+
+  final List<NutritionSourceBatch<SupplementLog>> batches;
+  var calls = 0;
+
+  @override
+  Future<NutritionSourceBatch<SupplementLog>> loadSupplementLogs(
+    String dogId,
+  ) async {
+    final index = calls < batches.length ? calls : batches.length - 1;
+    calls++;
+    return batches[index];
+  }
+}
+
+final class _SequenceMealReader implements NutritionCanonicalMealReader {
+  _SequenceMealReader(this.batches);
+
+  final List<NutritionSourceBatch<MealLog>> batches;
+  var calls = 0;
+
+  @override
+  Future<NutritionSourceBatch<MealLog>> loadMeals(
+    String dogId, {
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final index = calls < batches.length ? calls : batches.length - 1;
+    calls++;
+    return batches[index];
+  }
+}
+
 final class _MemLegacyMeal implements NutritionLegacyMealReader {
   _MemLegacyMeal(this.batch);
   NutritionSourceBatch<MealLog> batch;
@@ -208,6 +258,24 @@ MealLog mealLog({
     plannedMealId: plannedMealId,
     planId: plannedMealId == null ? null : 'plan-1',
     mealOccurrenceId: occurrence,
+  );
+}
+
+SupplementLog supplementLog({
+  required String id,
+  required String name,
+  required DateTime administeredAt,
+}) {
+  return SupplementLog(
+    id: id,
+    dogId: 'dog-a',
+    supplementName: name,
+    dose: 1,
+    unit: SupplementDoseUnit.tablet,
+    administeredAt: administeredAt,
+    recordedBy: actor,
+    schemaVersion: 1,
+    revision: 1,
   );
 }
 
@@ -757,9 +825,91 @@ void main() {
       find.textContaining('Não é uma administração pontual'),
       findsOneWidget,
     );
-    expect(find.textContaining('ADMINISTRAÇÕES REGISTRADAS'), findsOneWidget);
+    expect(find.textContaining('ADMINISTRAÇÕES DE HOJE'), findsOneWidget);
     controller.dispose();
   });
+
+  testWidgets(
+    'today error never paints old supplement and refresh replaces unavailable',
+    (tester) async {
+      final now = DateTime.utc(2026, 7, 22, 15);
+      final old = supplementLog(
+        id: 'old',
+        name: 'Histórico antigo',
+        administeredAt: DateTime.utc(2026, 7, 21, 15),
+      );
+      final current = supplementLog(
+        id: 'today',
+        name: 'Administração segura',
+        administeredAt: DateTime.utc(2026, 7, 22, 15),
+      );
+      final plans = _SequencePlanReader([
+        NutritionSourceBatch.available([canonicalPlan()]),
+        NutritionSourceBatch.available([canonicalPlan()]),
+      ]);
+      final supplements = _SequenceSupplementReader([
+        const NutritionSourceBatch.error(message: 'supplement today failed'),
+        NutritionSourceBatch.available([current, old]),
+      ]);
+      final oldMeal = mealLog(
+        id: 'old-meal',
+        fedAt: DateTime.utc(2026, 7, 21, 15),
+      );
+      final meals = _SequenceMealReader([
+        NutritionSourceBatch.available([oldMeal]),
+        NutritionSourceBatch.available([oldMeal]),
+      ]);
+      final controller = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: plans,
+          canonicalMealReader: meals,
+          canonicalSupplementLogReader: supplements,
+        ),
+        clock: () => now,
+      );
+      await controller.selectDog('dog-a');
+      expect(controller.snapshotResult.hasUsableValue, isTrue);
+      expect(controller.todayResult?.isDegraded, isTrue);
+      expect(controller.todayOrNull?.canonicalSupplementLogsAvailable, isFalse);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: controller,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Administrações de hoje indisponíveis'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Administrações de hoje indisponíveis'), findsOneWidget);
+      expect(find.text('Histórico antigo'), findsNothing);
+      expect(find.textContaining('Hoje ·'), findsNothing);
+      expect(
+        find.textContaining('Nenhuma administração registrada hoje'),
+        findsNothing,
+      );
+
+      await controller.refresh();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Administração segura'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(controller.todayResult?.isData, isTrue);
+      expect(find.text('Administração segura'), findsOneWidget);
+      expect(find.text('Histórico antigo'), findsNothing);
+      expect(find.text('Administrações de hoje indisponíveis'), findsNothing);
+      controller.dispose();
+    },
+  );
 }
 
 final class _GatedPlan implements NutritionCanonicalPlanReader {

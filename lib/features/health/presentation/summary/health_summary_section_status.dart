@@ -29,6 +29,7 @@ final class HealthSummarySectionData<T> {
     required this.status,
     this.value,
     this.message,
+    this.isDegraded = false,
   });
 
   const HealthSummarySectionData.loading({String? message})
@@ -37,6 +38,19 @@ final class HealthSummarySectionData<T> {
   /// Requer [value] presente (para `T` não-nulo, o compilador já impede null).
   const HealthSummarySectionData.available(T value)
     : this._(status: HealthSummarySectionStatus.available, value: value);
+
+  /// Valor seguro preservado com diagnóstico de falha parcial.
+  ///
+  /// O status continua [HealthSummarySectionStatus.available] porque o bloco
+  /// possui valor apresentável, mas [isDegraded] impede que ele seja tratado
+  /// como uma leitura completamente saudável.
+  const HealthSummarySectionData.degraded(T value, {required String message})
+    : this._(
+        status: HealthSummarySectionStatus.available,
+        value: value,
+        message: message,
+        isDegraded: true,
+      );
 
   const HealthSummarySectionData.notRecorded({String? message})
     : this._(status: HealthSummarySectionStatus.notRecorded, message: message);
@@ -47,6 +61,7 @@ final class HealthSummarySectionData<T> {
   final HealthSummarySectionStatus status;
   final T? value;
   final String? message;
+  final bool isDegraded;
 
   bool get isAvailable => status == HealthSummarySectionStatus.available;
   bool get isLoading => status == HealthSummarySectionStatus.loading;
@@ -61,8 +76,9 @@ final class HealthSummarySectionData<T> {
       other is HealthSummarySectionData<T> &&
       other.status == status &&
       other.value == value &&
-      other.message == message;
+      other.message == message &&
+      other.isDegraded == isDegraded;
 
   @override
-  int get hashCode => Object.hash(status, value, message);
+  int get hashCode => Object.hash(status, value, message, isDegraded);
 }

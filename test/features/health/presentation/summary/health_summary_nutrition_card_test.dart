@@ -14,14 +14,21 @@ void main() {
 
   Future<void> pumpCard(
     WidgetTester tester,
-    HealthSummaryNutritionTodayView view,
-  ) async {
+    HealthSummarySectionData<HealthSummaryNutritionTodayView> nutrition, {
+    Size size = const Size(800, 600),
+    double textScale = 1,
+  }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: HealthSummaryNutritionCard(
-              nutrition: HealthSummarySectionData.available(view),
+        home: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: HealthSummaryNutritionCard(nutrition: nutrition),
             ),
           ),
         ),
@@ -37,13 +44,15 @@ void main() {
 
     await pumpCard(
       tester,
-      const HealthSummaryNutritionTodayView(
-        offeredAmount: 500,
-        consumedAmount: null,
-        plannedAmount: 500,
-        mealsRecorded: 3,
-        mealsPlanned: 3,
-        unitLabel: 'g',
+      const HealthSummarySectionData.available(
+        HealthSummaryNutritionTodayView(
+          offeredAmount: 500,
+          consumedAmount: null,
+          plannedAmount: 500,
+          mealsRecorded: 3,
+          mealsPlanned: 3,
+          unitLabel: 'g',
+        ),
       ),
     );
 
@@ -74,11 +83,13 @@ void main() {
   ) async {
     await pumpCard(
       tester,
-      const HealthSummaryNutritionTodayView(
-        offeredAmount: 500,
-        consumedAmount: 250,
-        plannedAmount: 500,
-        unitLabel: 'g',
+      const HealthSummarySectionData.available(
+        HealthSummaryNutritionTodayView(
+          offeredAmount: 500,
+          consumedAmount: 250,
+          plannedAmount: 500,
+          unitLabel: 'g',
+        ),
       ),
     );
 
@@ -101,11 +112,13 @@ void main() {
   ) async {
     await pumpCard(
       tester,
-      const HealthSummaryNutritionTodayView(
-        offeredAmount: 700,
-        consumedAmount: 650,
-        plannedAmount: 500,
-        unitLabel: 'g',
+      const HealthSummarySectionData.available(
+        HealthSummaryNutritionTodayView(
+          offeredAmount: 700,
+          consumedAmount: 650,
+          plannedAmount: 500,
+          unitLabel: 'g',
+        ),
       ),
     );
 
@@ -121,11 +134,13 @@ void main() {
   testWidgets('meta inválida não cria percentuais artificiais', (tester) async {
     await pumpCard(
       tester,
-      const HealthSummaryNutritionTodayView(
-        offeredAmount: 500,
-        consumedAmount: 250,
-        plannedAmount: 0,
-        unitLabel: 'g',
+      const HealthSummarySectionData.available(
+        HealthSummaryNutritionTodayView(
+          offeredAmount: 500,
+          consumedAmount: 250,
+          plannedAmount: 0,
+          unitLabel: 'g',
+        ),
       ),
     );
 
@@ -134,4 +149,54 @@ void main() {
     expect(find.text('Consumido: 250 g'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
+
+  testWidgets('available saudável não apresenta diagnóstico parcial', (
+    tester,
+  ) async {
+    await pumpCard(
+      tester,
+      const HealthSummarySectionData.available(
+        HealthSummaryNutritionTodayView(
+          offeredAmount: 200,
+          plannedAmount: 400,
+          unitLabel: 'g',
+        ),
+      ),
+    );
+
+    expect(find.textContaining('parcialmente'), findsNothing);
+  });
+
+  testWidgets(
+    'degraded preserva valor e diagnóstico acessível em 320dp text scale 1.5',
+    (tester) async {
+      const diagnostic =
+          'Atualização parcial: administrações não puderam ser confirmadas.';
+      final semantics = tester.ensureSemantics();
+
+      await pumpCard(
+        tester,
+        const HealthSummarySectionData.degraded(
+          HealthSummaryNutritionTodayView(
+            offeredAmount: 200,
+            consumedAmount: 150,
+            plannedAmount: 400,
+            mealsRecorded: 1,
+            mealsPlanned: 2,
+            unitLabel: 'g',
+          ),
+          message: diagnostic,
+        ),
+        size: const Size(320, 800),
+        textScale: 1.5,
+      );
+
+      expect(find.text(diagnostic), findsOneWidget);
+      expect(find.text('Meta diária: 400 g'), findsOneWidget);
+      expect(find.text('Oferecido: 200 g de 400 g'), findsOneWidget);
+      expect(find.bySemanticsLabel(diagnostic), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
 }

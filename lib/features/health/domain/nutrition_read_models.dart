@@ -92,6 +92,8 @@ final class NutritionCoexistenceSnapshot {
     required this.canonicalMeals,
     required this.legacyMeals,
     required this.canonicalSupplementLogs,
+    this.canonicalSupplementLogAvailability =
+        NutritionSourceAvailability.notConfigured,
     required this.legacySupplementRegimens,
     required this.planSources,
     required this.mealSources,
@@ -108,6 +110,7 @@ final class NutritionCoexistenceSnapshot {
 
   /// Administrações canônicas — **lista separada** do regime legado.
   final List<SupplementLog> canonicalSupplementLogs;
+  final NutritionSourceAvailability canonicalSupplementLogAvailability;
 
   /// Regime legado em uso — **nunca** misturado com SupplementLog.
   final List<LegacySupplementRegimenView> legacySupplementRegimens;
@@ -120,7 +123,13 @@ final class NutritionCoexistenceSnapshot {
 
   bool get hasPlanSourceFailure => planSources.any((s) => s.isFailure);
   bool get hasMealSourceFailure => mealSources.any((s) => s.isFailure);
-  bool get isPartiallyFailed => hasPlanSourceFailure || hasMealSourceFailure;
+  bool get hasSupplementLogSourceFailure =>
+      canonicalSupplementLogAvailability == NutritionSourceAvailability.error ||
+      canonicalSupplementLogAvailability == NutritionSourceAvailability.offline;
+  bool get isPartiallyFailed =>
+      hasPlanSourceFailure ||
+      hasMealSourceFailure ||
+      hasSupplementLogSourceFailure;
 }
 
 /// Visão de "hoje" (foundation — sem UI).
@@ -132,6 +141,7 @@ final class NutritionTodayReadModel {
     this.activePlan,
     this.meals = const [],
     this.canonicalSupplementLogs = const [],
+    this.canonicalSupplementLogsAvailable = true,
     this.legacySupplementRegimens = const [],
   });
 
@@ -141,6 +151,7 @@ final class NutritionTodayReadModel {
   final NutritionActivePlanRef? activePlan;
   final List<NutritionMealReadItem> meals;
   final List<SupplementLog> canonicalSupplementLogs;
+  final bool canonicalSupplementLogsAvailable;
   final List<LegacySupplementRegimenView> legacySupplementRegimens;
 
   int get mealsRecorded => meals.length;

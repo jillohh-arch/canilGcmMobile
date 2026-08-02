@@ -21,9 +21,10 @@ final class HealthSummaryNutritionDaySnapshot {
   final NutritionPrescription? prescription;
 }
 
-/// Leitura de alimentação de hoje via leitor canônico de coexistência ou APIs read-only de [NutritionService].
+/// Leitura de alimentação de hoje via leitor canônico de coexistência.
 ///
-/// Não escreve. Não inventa meta. Diferencia zero real de ausência.
+/// O contrato legado permanece aceito no construtor durante a transição,
+/// mas sem uma projeção normativa ele falha fechado e não publica "hoje".
 class HealthSummaryNutritionReader {
   HealthSummaryNutritionReader({
     NutritionService? nutritionService,
@@ -32,19 +33,10 @@ class HealthSummaryNutritionReader {
     loadDaySnapshot,
     DateTime Function()? clock,
   }) : _coexistenceReadSource = coexistenceReadSource,
-       _clock = clock ?? DateTime.now,
-       _loadDaySnapshot =
-           loadDaySnapshot ??
-           ((dogId) => _loadViaService(
-             nutritionService ?? NutritionService(),
-             dogId,
-             clock ?? DateTime.now,
-           ));
+       _clock = clock ?? DateTime.now;
 
   final CoexistenceNutritionReadSource? _coexistenceReadSource;
   final DateTime Function() _clock;
-  final Future<HealthSummaryNutritionDaySnapshot> Function(String dogId)
-  _loadDaySnapshot;
 
   Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>> readToday(
     String dogId,
@@ -53,7 +45,7 @@ class HealthSummaryNutritionReader {
       if (_coexistenceReadSource != null) {
         return await _readViaCoexistence(dogId);
       }
-      return await _readViaSnapshot(dogId);
+      return await _readViaSnapshot();
     } on FirebaseException catch (e) {
       debugPrint(
         '[HealthSummaryNutritionReader] unavailable [${e.code}]: ${e.message}',
@@ -131,74 +123,45 @@ class HealthSummaryNutritionReader {
       final plannedAmountDouble = plannedGrams?.toDouble();
       final plannedCompleted = today.plannedMealsCompleted;
 
-      return HealthSummarySectionData.available(
-        HealthSummaryNutritionTodayView(
-          consumedAmount: consumedTotal,
-          offeredAmount: offeredTotal,
-          plannedAmount: plannedAmountDouble != null && plannedAmountDouble > 0
-              ? plannedAmountDouble
-              : null,
-          mealsRecorded: plannedCompleted,
-          mealsPlanned: plannedCount,
-          unitLabel: 'g',
-        ),
+      final view = HealthSummaryNutritionTodayView(
+        consumedAmount: consumedTotal,
+        offeredAmount: offeredTotal,
+        plannedAmount: plannedAmountDouble != null && plannedAmountDouble > 0
+            ? plannedAmountDouble
+            : null,
+        mealsRecorded: plannedCompleted,
+        mealsPlanned: plannedCount,
+        unitLabel: 'g',
       );
+      if (result.isDegraded) {
+        return HealthSummarySectionData.degraded(
+          view,
+          message:
+              result.message ?? 'Dados de nutrição parcialmente disponíveis.',
+        );
+      }
+      return HealthSummarySectionData.available(view);
     }
 
-    return _readViaSnapshot(dogId);
-  }
-
-  Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>>
-  _readViaSnapshot(String dogId) async {
-    final snap = await _loadDaySnapshot(dogId);
-    final feedings = snap.feedings;
-    final prescription = snap.prescription;
-
-    final validFeedings = feedings
-        .where((f) => f.amountGrams >= 0)
-        .toList(growable: false);
-
-    if (validFeedings.isEmpty && prescription == null) {
+    if (result.isEmpty) {
       return const HealthSummarySectionData.notRecorded(
         message: HealthSummaryUserCopy.nutritionNotRecorded,
       );
     }
 
-    final consumed = validFeedings.fold<int>(
-      0,
-      (total, feeding) => total + feeding.amountGrams,
-    );
-    final planned = prescription?.amountGramsPerDay;
-    final plannedSafe = (planned != null && planned > 0) ? planned : null;
-    final mealsPlanned = prescription == null
-        ? null
-        : (prescription.mealsPerDay > 0 ? prescription.mealsPerDay : null);
-    final mealsRecorded = validFeedings.length;
-
-    return HealthSummarySectionData.available(
-      HealthSummaryNutritionTodayView(
-        consumedAmount: consumed.toDouble(),
-        plannedAmount: plannedSafe?.toDouble(),
-        mealsRecorded: mealsRecorded,
-        mealsPlanned: mealsPlanned,
-        unitLabel: 'g',
-      ),
+    return const HealthSummarySectionData.unavailable(
+      message: HealthSummaryUserCopy.nutritionUnavailable,
     );
   }
 
-  static Future<HealthSummaryNutritionDaySnapshot> _loadViaService(
-    NutritionService service,
-    String dogId,
-    DateTime Function() clock,
-  ) async {
-    final now = clock();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 1));
-    final feedings = await service.getFeedings(dogId, from: start, to: end);
-    final prescription = await service.getActivePrescription(dogId);
-    return HealthSummaryNutritionDaySnapshot(
-      feedings: feedings,
-      prescription: prescription,
+  Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>>
+  _readViaSnapshot() async {
+    // O snapshot legado não possui contexto normativo suficiente para ser
+    // convertido em "hoje" sem reconstruir filtros/contadores paralelos.
+    // Fail-closed: somente o caminho coexistente com loadToday pode publicar
+    // dados diários.
+    return const HealthSummarySectionData.unavailable(
+      message: HealthSummaryUserCopy.nutritionUnavailable,
     );
   }
 }
