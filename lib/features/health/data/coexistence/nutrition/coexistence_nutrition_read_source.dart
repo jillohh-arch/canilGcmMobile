@@ -524,6 +524,7 @@ final class CoexistenceNutritionReadSource {
       dogId: dogId,
       localServiceDate: localDate.isoDate,
       timezone: tzName,
+      referenceNow: serverNow,
       activePlan: snap.activePlan,
       meals: mealsToday,
       canonicalSupplementLogs: supplementLogsToday,

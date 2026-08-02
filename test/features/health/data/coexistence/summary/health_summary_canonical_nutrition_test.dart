@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
+import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
@@ -73,12 +77,99 @@ final class _UnavailableSupplementReader
   ) async => batch;
 }
 
+final class _SummaryMonotonicClock implements MonotonicElapsedClock {
+  Duration value = Duration.zero;
+
+  @override
+  Duration get elapsed => value;
+}
+
+final class _SummaryTimeGateway implements AuthoritativeTimeGateway {
+  bool fail = false;
+  int calls = 0;
+
+  @override
+  Future<AuthoritativeTimeRemoteResponse> fetchAuthoritativeTime() async {
+    calls++;
+    if (fail) {
+      throw const AuthoritativeTimeFailure(
+        AuthoritativeTimeFailureCode.unavailable,
+        'callable indisponível',
+      );
+    }
+    final now = DateTime.utc(2026, 7, 22, 12);
+    return AuthoritativeTimeRemoteResponse(
+      protocolVersion: 1,
+      requestId: '00000000-0000-4000-8000-000000000001',
+      requestReceivedAtUtc: now,
+      serverSentAtUtc: now,
+      maxAge: const Duration(minutes: 15),
+    );
+  }
+}
+
 void main() {
   final actor = RecordedBy(
     uid: 'user-1',
     name: 'Operador',
     internalRole: 'operator',
   );
+
+  test('Summary applies fresh stale and expired temporal policy', () async {
+    final now = DateTime.utc(2026, 7, 22, 12);
+    final meal = MealLog(
+      id: 'temporal-meal',
+      dogId: 'dog-bono',
+      offeredGrams: 180,
+      consumedGrams: 120,
+      acceptance: MealAcceptanceWire.parse('partial'),
+      period: MealPeriodWire.parseCanonical('morning'),
+      fedAt: now,
+      recordedBy: actor,
+      revision: 1,
+      schemaVersion: 1,
+    );
+    final gateway = _SummaryTimeGateway();
+    final monotonic = _SummaryMonotonicClock();
+    final provider = AuthoritativeTimeProvider(
+      gateway: gateway,
+      monotonicClock: monotonic,
+    );
+    final reader = HealthSummaryNutritionReader(
+      coexistenceReadSource: CoexistenceNutritionReadSource(
+        canonicalPlanReader: _FakeCanonicalPlanReader(null),
+        canonicalMealReader: _FakeCanonicalMealReader([meal]),
+      ),
+      authoritativeTimeProvider: provider,
+    );
+
+    final fresh = await reader.readToday('dog-bono');
+    expect(fresh.isAvailable, isTrue);
+    expect(fresh.isDegraded, isFalse);
+
+    monotonic.value = const Duration(minutes: 6);
+    gateway.fail = true;
+    await provider.synchronize(force: true);
+    final stale = await reader.readToday(
+      'dog-bono',
+      synchronizeTime: false,
+    );
+    expect(stale.isAvailable, isTrue);
+    expect(stale.isDegraded, isTrue);
+    expect(stale.message, contains('Horário aguardando atualização'));
+    expect(stale.valueOrNull?.consumedAmount, 120);
+    expect(gateway.calls, 2);
+
+    monotonic.value = const Duration(minutes: 16);
+    final expired = await reader.readToday(
+      'dog-bono',
+      synchronizeTime: false,
+    );
+    expect(expired.isUnavailable, isTrue);
+    expect(expired.valueOrNull, isNull);
+    expect(expired.message, contains('Horário confiável indisponível'));
+    expect(gateway.calls, 2);
+  });
 
   test(
     'F-02 Canonical Summary Consistency & 125g Semantics: Active canonical plan + 1 planned meal (offered=125, consumed=null) returns available, offeredAmount=125, consumedAmount=null',
@@ -423,4 +514,199 @@ void main() {
       expect(result.isUnavailable, isFalse);
     },
   );
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — CANONICAL CONTEXT MATRIX
+  // ════════════════════════════════════════════════════════════════════════════════
+
+  group('UX-04B3C — Canonical Context Matrix', () {
+    final validDogId = 'dog-canonical-test';
+    final now = DateTime.utc(2026, 7, 22, 12);
+
+    test('no plan: dogId real, nutrition notRecorded, activePlan null', () async {
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(null),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday(validDogId);
+
+      expect(result.status, HealthSummarySectionStatus.notRecorded);
+      expect(result.valueOrNull, isNull);
+      expect(result.isUnavailable, isFalse);
+      expect(result.isAvailable, isFalse);
+    });
+
+    test('legacy plan: dogId real, canonical reader returns null, notRecorded', () async {
+      // Legacy plans are not returned by canonicalPlanReader
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(null),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday(validDogId);
+
+      // No canonical conversion of legacy data — treated as no plan
+      expect(result.status, HealthSummarySectionStatus.notRecorded);
+    });
+
+    test('canonical plan active: dogId real, nutrition available', () async {
+      final plan = NutritionPlan(
+        id: 'plan-canonical-1',
+        dogId: validDogId,
+        foodType: 'Ração Canônica',
+        amountGramsPerDay: 500,
+        mealsPerDay: 2,
+        mealSchedule: [
+          MealScheduleSlot(
+            id: 'slot-m',
+            period: MealPeriodWire.parseCanonical('morning'),
+            scheduledTime: ScheduledTimeOfDay('07:00'),
+            targetGrams: 250,
+          ),
+        ],
+        validFrom: DateTime.utc(2026, 1, 1),
+        timezone: NutritionPlan.defaultTimezone,
+        recordedBy: actor,
+        status: NutritionPlanStatus.active,
+        schemaVersion: 1,
+        revision: 1,
+      );
+
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(plan),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday(validDogId);
+
+      // Plan exists and is active
+      expect(result.isAvailable, isTrue);
+      expect(result.valueOrNull, isNotNull);
+      // Plan has expected characteristics
+      expect(result.status, HealthSummarySectionStatus.available);
+    });
+
+    test('expired plan (superseded status): treated as not effective, notRecorded', () async {
+      final expiredPlan = NutritionPlan(
+        id: 'plan-expired',
+        dogId: validDogId,
+        foodType: 'Ração Vencida',
+        amountGramsPerDay: 500,
+        mealsPerDay: 2,
+        mealSchedule: [
+          MealScheduleSlot(
+            id: 'slot-m',
+            period: MealPeriodWire.parseCanonical('morning'),
+            scheduledTime: ScheduledTimeOfDay('07:00'),
+            targetGrams: 250,
+          ),
+        ],
+        validFrom: DateTime.utc(2025, 1, 1),
+        validUntil: DateTime.utc(2025, 12, 31),
+        timezone: NutritionPlan.defaultTimezone,
+        recordedBy: actor,
+        status: NutritionPlanStatus.superseded,
+        schemaVersion: 1,
+        revision: 1,
+      );
+
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(expiredPlan),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday(validDogId);
+
+      // Superseded/expired plan is not effective for nutrition
+      expect(result.status, HealthSummarySectionStatus.notRecorded);
+    });
+
+    test('cancelled plan: not effective, notRecorded', () async {
+      final cancelledPlan = NutritionPlan(
+        id: 'plan-cancelled',
+        dogId: validDogId,
+        foodType: 'Ração Cancelada',
+        amountGramsPerDay: 500,
+        mealsPerDay: 2,
+        mealSchedule: [
+          MealScheduleSlot(
+            id: 'slot-m',
+            period: MealPeriodWire.parseCanonical('morning'),
+            scheduledTime: ScheduledTimeOfDay('07:00'),
+            targetGrams: 250,
+          ),
+        ],
+        validFrom: DateTime.utc(2026, 1, 1),
+        timezone: NutritionPlan.defaultTimezone,
+        recordedBy: actor,
+        status: NutritionPlanStatus.cancelled,
+        schemaVersion: 1,
+        revision: 1,
+      );
+
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(cancelledPlan),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      final result = await reader.readToday(validDogId);
+
+      // Cancelled plan is not effective
+      expect(result.status, HealthSummarySectionStatus.notRecorded);
+    });
+
+    test('plan for different dogId: no match, notRecorded', () async {
+      final plan = NutritionPlan(
+        id: 'plan-1',
+        dogId: 'dog-other', // Different dogId
+        foodType: 'Ração',
+        amountGramsPerDay: 500,
+        mealsPerDay: 2,
+        mealSchedule: [
+          MealScheduleSlot(
+            id: 'slot-m',
+            period: MealPeriodWire.parseCanonical('morning'),
+            scheduledTime: ScheduledTimeOfDay('07:00'),
+            targetGrams: 250,
+          ),
+        ],
+        validFrom: DateTime.utc(2026, 1, 1),
+        timezone: NutritionPlan.defaultTimezone,
+        recordedBy: actor,
+        status: NutritionPlanStatus.active,
+        schemaVersion: 1,
+        revision: 1,
+      );
+
+      final reader = HealthSummaryNutritionReader(
+        coexistenceReadSource: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _FakeCanonicalPlanReader(plan),
+          canonicalMealReader: _FakeCanonicalMealReader([]),
+        ),
+        clock: () => now,
+      );
+
+      // Request for a dogId that doesn't match the plan's dogId
+      final result = await reader.readToday('dog-nonexistent');
+
+      // The plan belongs to a different dog — not effective for this dog
+      expect(result.status, HealthSummarySectionStatus.notRecorded);
+    });
+  });
 }

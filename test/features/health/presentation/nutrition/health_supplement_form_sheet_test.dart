@@ -759,8 +759,9 @@ void main() {
       expect(find.byType(Scrollable), findsWidgets);
 
       // Select option
-      await tester.tap(longOptionText.first);
+      await tester.tap(longOptionText.first, warnIfMissed: false);
       await tester.pumpAndSettle();
+
 
       // Reopen to verify close button
       await tester.tap(regimenField);

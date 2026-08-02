@@ -44,6 +44,7 @@ void main() {
         dogId: 'dog-001',
         localServiceDate: '2026-07-22',
         timezone: 'America/Sao_Paulo',
+        referenceNow: DateTime.utc(2026, 7, 22, 15),
         activePlan: null,
         meals: const [],
         // Aqui simulamos o resultado do filtro em loadToday()

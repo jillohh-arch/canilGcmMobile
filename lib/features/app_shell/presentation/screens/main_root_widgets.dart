@@ -1,5 +1,26 @@
 part of 'main_root_screen.dart';
 
+@visibleForTesting
+Widget buildMainRootHealthTabForTesting({
+  required AuthoritativeTimeProvider authoritativeTimeProvider,
+  required HealthNutritionPendingIntentSession nutritionPendingSession,
+  required HealthTimelineFlagProvider timelineFlagProvider,
+  required HealthTimelineSourceForResolution timelineSourceForResolution,
+  HealthSummarySource? source,
+  CoexistenceNutritionReadSource? nutritionReadSource,
+  HealthSummaryDogContextView? dogContextOverride,
+}) {
+  return _MainRootHealthTab(
+    authoritativeTimeProvider: authoritativeTimeProvider,
+    nutritionPendingSession: nutritionPendingSession,
+    timelineFlagProvider: timelineFlagProvider,
+    timelineSourceForResolution: timelineSourceForResolution,
+    source: source,
+    nutritionReadSource: nutritionReadSource,
+    dogContextOverride: dogContextOverride,
+  );
+}
+
 class _ActiveOccurrenceBanner extends StatelessWidget {
   final Occurrence occurrence;
   final String dogName;
@@ -31,10 +52,16 @@ class _ActiveOccurrenceBanner extends StatelessWidget {
 
 class _MainRootHealthTab extends StatelessWidget {
   const _MainRootHealthTab({
+    required this.authoritativeTimeProvider,
     required this.nutritionPendingSession,
     required this.timelineFlagProvider,
     required this.timelineSourceForResolution,
+    this.source,
+    this.nutritionReadSource,
+    this.dogContextOverride,
   });
+
+  final AuthoritativeTimeProvider authoritativeTimeProvider;
 
   /// Owner de lifecycle maior que [HealthV1EntryScreen] (MainRoot).
   final HealthNutritionPendingIntentSession nutritionPendingSession;
@@ -44,6 +71,9 @@ class _MainRootHealthTab extends StatelessWidget {
 
   /// Callback de composição da source via factory (H3B3A).
   final HealthTimelineSourceForResolution timelineSourceForResolution;
+  final HealthSummarySource? source;
+  final CoexistenceNutritionReadSource? nutritionReadSource;
+  final HealthSummaryDogContextView? dogContextOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +107,10 @@ class _MainRootHealthTab extends StatelessWidget {
         // vaza para B.
         key: ValueKey<String>('health-v1-$id'),
         dogId: id,
+        authoritativeTimeProvider: authoritativeTimeProvider,
+        source: source,
+        nutritionReadSource: nutritionReadSource,
+        dogContextOverride: dogContextOverride,
         nutritionPendingIntentHolder: nutritionPendingSession.holderFor(id),
         // H3B3A: injeção de dependências de timeline via composition root.
         timelineFlagProvider: timelineFlagProvider,

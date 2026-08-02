@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
@@ -71,6 +72,9 @@ typedef HealthTimelineSourceForResolution =
 class HealthV1EntryScreen extends StatefulWidget {
   final String dogId;
 
+  /// Autoridade temporal compartilhada pelo App Shell.
+  final AuthoritativeTimeProvider? authoritativeTimeProvider;
+
   /// Source de resumo injetável (testes).
   final HealthSummarySource? source;
 
@@ -132,6 +136,7 @@ class HealthV1EntryScreen extends StatefulWidget {
   const HealthV1EntryScreen({
     super.key,
     required this.dogId,
+    this.authoritativeTimeProvider,
     this.source,
     this.timelineSource,
     this.timelineSourceForResolution,
@@ -151,7 +156,8 @@ class HealthV1EntryScreen extends StatefulWidget {
 }
 
 @visibleForTesting
-class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
+class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<HealthShellScreenState> _shellKey =
       GlobalKey<HealthShellScreenState>();
 
@@ -231,10 +237,23 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
   CoexistenceNutritionReadSource get nutritionReadSourceForTest =>
       _nutritionReadSource;
 
+  @visibleForTesting
+  AuthoritativeTimeProvider? get authoritativeTimeProviderForTest =>
+      widget.authoritativeTimeProvider;
+
   @override
   void initState() {
     super.initState();
-    _source = widget.source ?? CoexistenceHealthSummarySource();
+    WidgetsBinding.instance.addObserver(this);
+    final authoritativeTimeProvider = widget.authoritativeTimeProvider;
+    if (authoritativeTimeProvider != null) {
+      unawaited(authoritativeTimeProvider.synchronize());
+    }
+    _source =
+        widget.source ??
+        CoexistenceHealthSummarySource(
+          authoritativeTimeProvider: widget.authoritativeTimeProvider,
+        );
     _controller = HealthSummaryController(source: _source);
     _controller.selectDog(widget.dogId);
 
@@ -264,6 +283,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
         CoexistenceNutritionReadSourceFactory.forFirestore();
     _nutritionReadController = HealthNutritionReadController(
       source: _nutritionReadSource,
+      authoritativeTimeProvider: widget.authoritativeTimeProvider,
     );
     _nutritionMutationGateway =
         widget.nutritionMutationGateway ??
@@ -361,6 +381,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _filterSession?.dispose();
     _timelineController?.dispose();
     _scheduleMutationController.dispose();
@@ -369,6 +390,30 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen> {
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_resynchronizeAfterResume());
+    }
+  }
+
+  Future<void> _resynchronizeAfterResume() async {
+    final provider = widget.authoritativeTimeProvider;
+    if (provider == null) return;
+
+    if (_nutritionReadPrimed) {
+      await _nutritionReadController.refresh();
+    } else {
+      await provider.synchronize(force: true);
+    }
+    if (!mounted) return;
+    final source = _source;
+    if (source is CoexistenceHealthSummarySource) {
+      source.useCurrentTemporalSnapshotOnNextRead();
+    }
+    _controller.refresh();
   }
 
   void _selectSection(HealthShellSection section) {

@@ -4,12 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/permission_service.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
+import 'package:canil_gcm/core/services/authoritative_time/firebase_functions_authoritative_time_gateway.dart';
+import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/app_shell/presentation/main_root_nav_metrics.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
+import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/config/production_health_timeline_flag_provider_factory.dart';
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_composition_factory.dart';
 import 'package:canil_gcm/features/health/data/shadow/health_timeline_shadow_models.dart';
@@ -19,6 +23,8 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_nutritio
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_flags.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_screen.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
@@ -34,7 +40,12 @@ part 'main_root_exit_dialog.dart';
 part 'main_root_widgets.dart';
 
 class MainRootScreen extends StatefulWidget {
-  const MainRootScreen({super.key});
+  const MainRootScreen({
+    super.key,
+    @visibleForTesting this.authoritativeTimeProvider,
+  });
+
+  final AuthoritativeTimeProvider? authoritativeTimeProvider;
 
   @override
   State<MainRootScreen> createState() => _MainRootScreenState();
@@ -45,6 +56,9 @@ class _MainRootScreenState extends State<MainRootScreen> {
   String? _lastOccurrenceWatchDogId;
   DateTime? _lastBackPress;
   late final List<Widget> _screens;
+
+  /// Autoridade temporal única para todo o lifecycle do App Shell.
+  late final AuthoritativeTimeProvider _authoritativeTimeProvider;
 
   /// Sessão de pending intent Nutrição (Gate 3): lifecycle = MainRoot.
   /// Sobrevive a remount de HealthV1EntryScreen (ValueKey/dog) e à aba sem cão.
@@ -70,6 +84,13 @@ class _MainRootScreenState extends State<MainRootScreen> {
   void initState() {
     super.initState();
 
+    _authoritativeTimeProvider =
+        widget.authoritativeTimeProvider ??
+        AuthoritativeTimeProvider(
+          gateway: FirebaseFunctionsAuthoritativeTimeGateway(),
+          monotonicClock: StopwatchMonotonicElapsedClock(),
+        );
+
     // H3B3A: inicialização única das dependências de timeline.
     _healthTimelineFlagProvider =
         ProductionHealthTimelineFlagProviderFactory.forRemoteConfig();
@@ -91,6 +112,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
       ),
       const TrainingHubScreen(),
       _MainRootHealthTab(
+        authoritativeTimeProvider: _authoritativeTimeProvider,
         nutritionPendingSession: _nutritionPendingSession,
         timelineFlagProvider: _healthTimelineFlagProvider,
         timelineSourceForResolution:

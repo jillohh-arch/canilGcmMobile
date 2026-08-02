@@ -83,9 +83,10 @@ abstract final class HealthNutritionTodayFormatters {
     return sum;
   }
 
-  static String dateShort(DateTime utcOrLocal) {
-    final d = utcOrLocal.toLocal();
-    return DateFormat('dd/MM/yyyy').format(d);
+  static String dateShort(DateTime instant, {required String timezone}) {
+    final date = LocalServiceDate.fromInstant(instant, timezone: timezone);
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
   static String timeShort(DateTime instant, {required String timezone}) {

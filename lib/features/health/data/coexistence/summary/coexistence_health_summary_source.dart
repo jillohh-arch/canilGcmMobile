@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
@@ -27,12 +29,14 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
   CoexistenceHealthSummarySource({
     FirebaseFirestore? firestore,
     NutritionService? nutritionService,
+    AuthoritativeTimeProvider? authoritativeTimeProvider,
     CoexistenceNutritionReadSource? coexistenceNutritionReadSource,
     HealthSummaryWeightReader? weightReader,
     HealthSummaryVaccinationReader? vaccinationReader,
     HealthSummaryNutritionReader? nutritionReader,
     HealthSummaryRecentRecordsReader? recentRecordsReader,
-  }) : _weightReader =
+  }) : _authoritativeTimeProvider = authoritativeTimeProvider,
+       _weightReader =
            weightReader ?? HealthSummaryWeightReader(firestore: firestore),
        _vaccinationReader =
            vaccinationReader ??
@@ -41,6 +45,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
            nutritionReader ??
            HealthSummaryNutritionReader(
              nutritionService: nutritionService,
+             authoritativeTimeProvider: authoritativeTimeProvider,
              coexistenceReadSource:
                  coexistenceNutritionReadSource ??
                  CoexistenceNutritionReadSourceFactory.forFirestore(
@@ -51,10 +56,22 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
            recentRecordsReader ??
            HealthSummaryRecentRecordsReader(firestore: firestore);
 
+  final AuthoritativeTimeProvider? _authoritativeTimeProvider;
   final HealthSummaryWeightReader _weightReader;
   final HealthSummaryVaccinationReader _vaccinationReader;
   final HealthSummaryNutritionReader _nutritionReader;
   final HealthSummaryRecentRecordsReader _recentRecordsReader;
+  bool _useCurrentTemporalSnapshotOnNextRead = false;
+
+  @visibleForTesting
+  AuthoritativeTimeProvider? get authoritativeTimeProviderForTest =>
+      _authoritativeTimeProvider;
+
+  /// A próxima leitura reutiliza o resultado de uma sincronização que o
+  /// composition root acabou de aguardar, evitando uma segunda callable.
+  void useCurrentTemporalSnapshotOnNextRead() {
+    _useCurrentTemporalSnapshotOnNextRead = true;
+  }
 
   @override
   Stream<HealthSummaryViewData?> watchSummary(String dogId) {
@@ -72,12 +89,17 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
 
   Future<HealthSummaryViewData?> _loadOnce(String dogId) async {
     try {
+      final synchronizeNutritionTime = !_useCurrentTemporalSnapshotOnNextRead;
+      _useCurrentTemporalSnapshotOnNextRead = false;
       // Paraleliza leitores independentes; falha parcial não cancela os outros
       // porque cada reader captura erros em SectionData.unavailable.
       // Peso atual + tendência: uma única query (readBundle).
       final weightBundleFuture = _weightReader.readBundle(dogId);
       final vaccinationFuture = _vaccinationReader.read(dogId);
-      final nutritionFuture = _nutritionReader.readToday(dogId);
+      final nutritionFuture = _nutritionReader.readToday(
+        dogId,
+        synchronizeTime: synchronizeNutritionTime,
+      );
       final recentFuture = _recentRecordsReader.read(dogId);
 
       final weightBundle = await weightBundleFuture;

@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
+import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
@@ -98,6 +102,40 @@ final class _ControlledPlanReader implements NutritionCanonicalPlanReader {
   }
 }
 
+final class _FakeMonotonicClock implements MonotonicElapsedClock {
+  Duration value = Duration.zero;
+
+  @override
+  Duration get elapsed => value;
+
+  void advance(Duration duration) => value += duration;
+}
+
+final class _TemporalGateway implements AuthoritativeTimeGateway {
+  _TemporalGateway(this.callback);
+
+  Future<AuthoritativeTimeRemoteResponse> Function() callback;
+  int calls = 0;
+
+  @override
+  Future<AuthoritativeTimeRemoteResponse> fetchAuthoritativeTime() {
+    calls++;
+    return callback();
+  }
+}
+
+AuthoritativeTimeRemoteResponse _timeResponse({int sequence = 1}) {
+  final base = DateTime.utc(2026, 7, 22, 15);
+  return AuthoritativeTimeRemoteResponse(
+    protocolVersion: 1,
+    requestId:
+        '00000000-0000-4000-8000-${sequence.toString().padLeft(12, '0')}',
+    requestReceivedAtUtc: base,
+    serverSentAtUtc: base,
+    maxAge: const Duration(minutes: 15),
+  );
+}
+
 NutritionPlan _plan(
   String id,
   String dogId, {
@@ -176,6 +214,123 @@ SupplementLog _supplement(String id) => SupplementLog(
 );
 
 void main() {
+  test('authoritative fresh is atomic and refresh forces a new sync', () async {
+    final monotonic = _FakeMonotonicClock();
+    var sequence = 0;
+    final gateway = _TemporalGateway(
+      () async => _timeResponse(sequence: ++sequence),
+    );
+    final source = CoexistenceNutritionReadSource(
+      canonicalPlanReader: _SequencePlanReader([
+        NutritionSourceBatch.available([_plan('pa', 'dog-a')]),
+      ]),
+    );
+    final controller = HealthNutritionReadController(
+      source: source,
+      authoritativeTimeProvider: AuthoritativeTimeProvider(
+        gateway: gateway,
+        monotonicClock: monotonic,
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.selectDog('dog-a');
+    expect(gateway.calls, 1);
+    expect(controller.temporalState, HealthNutritionTemporalState.fresh);
+    expect(controller.todayOrNull?.referenceNow, DateTime.utc(2026, 7, 22, 15));
+
+    await controller.refresh();
+    expect(gateway.calls, 2);
+    expect(controller.snapshotResult.valueOrNull, isNotNull);
+    expect(controller.todayResult?.isData, isTrue);
+  });
+
+  test(
+    'stale anchor preserves safe today with diagnostic and blocks actions',
+    () async {
+      final monotonic = _FakeMonotonicClock();
+      var fail = false;
+      final gateway = _TemporalGateway(() async {
+        if (fail) {
+          throw const AuthoritativeTimeFailure(
+            AuthoritativeTimeFailureCode.unavailable,
+            'callable indisponível',
+          );
+        }
+        return _timeResponse();
+      });
+      final controller = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _SequencePlanReader([
+            NutritionSourceBatch.available([_plan('pa', 'dog-a')]),
+          ]),
+        ),
+        authoritativeTimeProvider: AuthoritativeTimeProvider(
+          gateway: gateway,
+          monotonicClock: monotonic,
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectDog('dog-a');
+      monotonic.advance(const Duration(minutes: 6));
+      fail = true;
+      await controller.refresh();
+
+      expect(controller.temporalState, HealthNutritionTemporalState.stale);
+      expect(controller.temporalActionsAllowed, isFalse);
+      expect(controller.todayResult?.isDegraded, isTrue);
+      expect(controller.todayOrNull, isNotNull);
+      expect(
+        controller.temporalFailure?.code,
+        AuthoritativeTimeFailureCode.unavailable,
+      );
+    },
+  );
+
+  test(
+    'expired anchor keeps snapshot facts but never recalculates today',
+    () async {
+      final monotonic = _FakeMonotonicClock();
+      var fail = false;
+      final gateway = _TemporalGateway(() async {
+        if (fail) {
+          throw const AuthoritativeTimeFailure(
+            AuthoritativeTimeFailureCode.unavailable,
+            'callable indisponível',
+          );
+        }
+        return _timeResponse();
+      });
+      final controller = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _SequencePlanReader([
+            NutritionSourceBatch.available([_plan('pa', 'dog-a')]),
+          ]),
+        ),
+        authoritativeTimeProvider: AuthoritativeTimeProvider(
+          gateway: gateway,
+          monotonicClock: monotonic,
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectDog('dog-a');
+      monotonic.advance(const Duration(minutes: 16));
+      fail = true;
+      await controller.refresh();
+
+      expect(controller.snapshotResult.valueOrNull, isNotNull);
+      expect(
+        controller.temporalState,
+        HealthNutritionTemporalState.unavailable,
+      );
+      expect(controller.todayResult?.isError, isTrue);
+      expect(controller.todayResult?.code, 'authoritative_time_unavailable');
+      expect(controller.temporalActionsAllowed, isFalse);
+    },
+  );
+
   test('estado keyed por dogId + refresh preserva dog atual', () async {
     final planReader = _ScriptedPlanReader({
       'dog-a': [_plan('pa', 'dog-a')],

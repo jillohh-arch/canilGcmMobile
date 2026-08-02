@@ -157,6 +157,7 @@ void main() {
           timezone: plan.timezone,
         ).isoDate,
         timezone: 'America/Sao_Paulo',
+        referenceNow: now,
         activePlan: NutritionActiveCanonicalPlan(plan),
         meals: readItems,
       );

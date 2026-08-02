@@ -44,7 +44,8 @@ class HealthNutritionTodayScreen extends StatelessWidget {
         final snap = controller.snapshotResult;
         final today = controller.todayResult;
 
-        if (snap.isLoading || controller.isLoading) {
+        if ((snap.isLoading || controller.isLoading) &&
+            snap.valueOrNull == null) {
           return const HealthLoadingView(message: 'Carregando nutrição…');
         }
 
@@ -98,7 +99,17 @@ class HealthNutritionTodayScreen extends StatelessWidget {
 
         final todayModel = today?.valueOrNull;
         final hasSafeToday = today?.hasUsableValue == true;
-        final degraded = snap.isDegraded || today?.isDegraded == true;
+        final temporalState = controller.temporalState;
+        final temporalActionsAllowed = controller.temporalActionsAllowed;
+        final temporalDiagnosticTitle = controller.temporalDiagnosticTitle;
+        final temporalDiagnosticMessage = controller.temporalDiagnosticMessage;
+        final temporalStale =
+            temporalState == HealthNutritionTemporalState.stale;
+        final sourceDegraded =
+            snap.isDegraded ||
+            (today?.isDegraded == true &&
+                today?.code != 'authoritative_time_stale');
+        final degraded = sourceDegraded || temporalStale;
         // Integrity conflict com dados utilizáveis: manter tela + aviso (não empty).
         final integrityConflict =
             snapshot.activePlan is NutritionActivePlanIntegrityConflict ||
@@ -113,7 +124,64 @@ class HealthNutritionTodayScreen extends StatelessWidget {
             !integrityConflict &&
             today?.isData == true &&
             mutationController != null &&
-            _isCanonicalPlanEffectiveNow(snapshot.activePlan);
+            temporalActionsAllowed &&
+            _isCanonicalPlanEffectiveAt(
+              snapshot.activePlan,
+              todayModel?.referenceNow,
+            );
+        final canonicalPlanLinkSafe =
+            snapshot.activePlan is! NutritionActiveCanonicalPlan ||
+            _isCanonicalPlanEffectiveAt(
+              snapshot.activePlan,
+              todayModel?.referenceNow,
+            );
+        final supplementDogId =
+            todayModel?.dogId.trim() ?? snapshot.dogId.trim();
+        final supplementIdentityValid = supplementDogId.isNotEmpty;
+        final supplementActionEnabled =
+            mutationController != null &&
+            temporalActionsAllowed &&
+            hasSafeToday &&
+            today?.isData == true &&
+            !degraded &&
+            !integrityConflict &&
+            canonicalPlanLinkSafe &&
+            supplementIdentityValid;
+        final planTemporalReason = _planTemporalUnavailableReason(
+          snapshot.activePlan,
+          todayModel?.referenceNow,
+        );
+        final supplementUnavailableReason = mutationController == null
+            ? null
+            : !supplementIdentityValid
+            ? 'Identidade do K9 indisponível.'
+            : temporalState == HealthNutritionTemporalState.stale
+            ? 'Horário aguardando atualização. Atualize antes de registrar.'
+            : temporalState == HealthNutritionTemporalState.synchronizing
+            ? 'Horário confiável em atualização. Aguarde para registrar.'
+            : temporalState == HealthNutritionTemporalState.unavailable
+            ? 'Horário confiável indisponível. Registro temporariamente bloqueado.'
+            : planTemporalReason ??
+                  switch ((
+                    mutationController,
+                    supplementIdentityValid,
+                    sourceDegraded,
+                    integrityConflict,
+                    canonicalPlanLinkSafe,
+                    hasSafeToday && today?.isData == true,
+                  )) {
+                    (null, _, _, _, _, _) => null,
+                    (_, false, _, _, _, _) => 'Identidade do K9 indisponível.',
+                    (_, _, true, _, _, _) =>
+                      'Registro indisponível enquanto os dados estão parciais.',
+                    (_, _, _, true, _, _) =>
+                      'Registro indisponível por conflito no plano ativo.',
+                    (_, _, _, _, false, _) =>
+                      'Registro indisponível porque o plano não está vigente.',
+                    (_, _, _, _, _, false) =>
+                      'Registro indisponível sem dados diários seguros.',
+                    _ => null,
+                  };
 
         return RefreshIndicator(
           color: AppTheme.primary,
@@ -129,7 +197,15 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 degradedMessage: today?.message ?? snap.message,
                 localDate: todayModel?.localServiceDate,
               ),
-              if (degraded) ...[
+              if (temporalDiagnosticTitle != null &&
+                  temporalDiagnosticMessage != null) ...[
+                const SizedBox(height: 10),
+                _TemporalDiagnosticBanner(
+                  title: temporalDiagnosticTitle,
+                  message: temporalDiagnosticMessage,
+                ),
+              ],
+              if (sourceDegraded) ...[
                 const SizedBox(height: 10),
                 _DegradedBanner(
                   message:
@@ -170,7 +246,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 _MealsSection(
                   plan: snapshot.activePlan,
                   mealsToday: todayModel!.meals,
-                  serverNow: DateTime.now().toUtc(),
+                  serverNow: todayModel.referenceNow,
                   timezone: todayModel.timezone,
                   localServiceDate: todayModel.localServiceDate,
                   mutationEnabled: mutationHealthy,
@@ -179,6 +255,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                     plan: plan,
                     slot: slot,
                     serviceDate: todayModel.localServiceDate,
+                    authorizedNow: todayModel.referenceNow,
                   ),
                 ),
               const SizedBox(height: 14),
@@ -192,6 +269,11 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 legacyRegimens: snapshot.legacySupplementRegimens,
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
                 mutationController: mutationController,
+                dogId: supplementDogId,
+                actionEnabled: supplementActionEnabled,
+                authorizedNow: todayModel?.referenceNow,
+                unavailableReason: supplementUnavailableReason,
+                canonicalPlanLinkSafe: canonicalPlanLinkSafe,
                 dogDisplayName: dogDisplayName,
                 onRefreshRequested: controller.refresh,
               ),
@@ -208,14 +290,36 @@ class HealthNutritionTodayScreen extends StatelessWidget {
     );
   }
 
-  bool _isCanonicalPlanEffectiveNow(NutritionActivePlanRef? ref) {
+  bool _isCanonicalPlanEffectiveAt(
+    NutritionActivePlanRef? ref,
+    DateTime? referenceNow,
+  ) {
     if (ref is! NutritionActiveCanonicalPlan) return false;
+    if (referenceNow == null) return false;
     try {
-      ref.plan.validateForActivation(DateTime.now().toUtc());
+      ref.plan.validateForActivation(referenceNow);
       return ref.plan.status == NutritionPlanStatus.active;
     } catch (_) {
       return false;
     }
+  }
+
+  String? _planTemporalUnavailableReason(
+    NutritionActivePlanRef? ref,
+    DateTime? referenceNow,
+  ) {
+    if (ref is! NutritionActiveCanonicalPlan || referenceNow == null) {
+      return null;
+    }
+    final plan = ref.plan;
+    if (referenceNow.isBefore(plan.validFrom)) {
+      return 'Registro indisponível: o plano ainda não está vigente.';
+    }
+    final validUntil = plan.validUntil;
+    if (validUntil != null && !referenceNow.isBefore(validUntil)) {
+      return 'Registro indisponível: o plano está expirado.';
+    }
+    return null;
   }
 
   Future<void> _openPlannedMealForm(
@@ -223,6 +327,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
     required NutritionPlan plan,
     required MealScheduleSlot slot,
     required String serviceDate,
+    required DateTime authorizedNow,
   }) async {
     final mutation = mutationController;
     if (mutation == null) return;
@@ -313,6 +418,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
             localServiceDate: serviceDate,
             controller: mutation,
             onRefreshRequested: controller.refresh,
+            clock: () => authorizedNow,
           ),
         );
     if (!context.mounted || outcome == null) return;
@@ -383,40 +489,112 @@ class _Header extends StatelessWidget {
   }
 }
 
+class _TemporalDiagnosticBanner extends StatelessWidget {
+  const _TemporalDiagnosticBanner({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '$title. $message',
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.warning.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.schedule_rounded,
+                size: 18,
+                color: AppTheme.warningAccent,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textPrimary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DegradedBanner extends StatelessWidget {
   const _DegradedBanner({required this.message});
   final String message;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.warning.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            size: 18,
-            color: AppTheme.warningAccent,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: message,
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.warning.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: AppTheme.warningAccent,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -727,6 +905,10 @@ class _PlanCard extends StatelessWidget {
     };
     final notes = HealthNutritionTodayFormatters.planNotes(plan);
     final responsible = HealthNutritionTodayFormatters.responsibleName(plan);
+    final timezone = switch (plan) {
+      NutritionActiveCanonicalPlan(:final plan) => plan.timezone,
+      _ => NutritionPlan.defaultTimezone,
+    };
 
     return HealthSummaryCardSurface(
       child: Column(
@@ -771,11 +953,11 @@ class _PlanCard extends StatelessWidget {
               if (mealsPerDay != null) _meta('$mealsPerDay refeições'),
               if (from != null)
                 _meta(
-                  'Início: ${HealthNutritionTodayFormatters.dateShort(from)}',
+                  'Início: ${HealthNutritionTodayFormatters.dateShort(from, timezone: timezone)}',
                 ),
               if (until != null)
                 _meta(
-                  'Até: ${HealthNutritionTodayFormatters.dateShort(until)}',
+                  'Até: ${HealthNutritionTodayFormatters.dateShort(until, timezone: timezone)}',
                 ),
               if (responsible != null && responsible.isNotEmpty)
                 _meta('Resp.: $responsible'),
@@ -1248,6 +1430,11 @@ class _SupplementsSection extends StatefulWidget {
     required this.legacyRegimens,
     required this.timezone,
     this.mutationController,
+    required this.dogId,
+    required this.actionEnabled,
+    required this.authorizedNow,
+    this.unavailableReason,
+    required this.canonicalPlanLinkSafe,
     required this.dogDisplayName,
     required this.onRefreshRequested,
   });
@@ -1258,6 +1445,11 @@ class _SupplementsSection extends StatefulWidget {
   final List<LegacySupplementRegimenView> legacyRegimens;
   final String timezone;
   final HealthNutritionMutationController? mutationController;
+  final String? dogId;
+  final bool actionEnabled;
+  final DateTime? authorizedNow;
+  final String? unavailableReason;
+  final bool canonicalPlanLinkSafe;
   final String dogDisplayName;
   final Future<void> Function() onRefreshRequested;
 
@@ -1266,7 +1458,10 @@ class _SupplementsSection extends StatefulWidget {
 }
 
 class _SupplementsSectionState extends State<_SupplementsSection> {
+  bool _isOpeningSupplementForm = false;
+
   NutritionActiveCanonicalPlan? get _activeCanonicalPlan {
+    if (!widget.canonicalPlanLinkSafe) return null;
     final p = widget.plan;
     if (p is NutritionActiveCanonicalPlan) return p;
     return null;
@@ -1275,28 +1470,44 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
   Future<void> _openSupplementForm() async {
     final mutation = widget.mutationController;
     if (mutation == null) return;
+    final dogId = widget.dogId?.trim();
+    if (!widget.actionEnabled ||
+        dogId == null ||
+        dogId.isEmpty ||
+        widget.authorizedNow == null ||
+        _isOpeningSupplementForm) {
+      return;
+    }
+
+    setState(() => _isOpeningSupplementForm = true);
 
     final activePlan = _activeCanonicalPlan;
     final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
-    final dogId = activePlan?.plan.dogId ?? '';
 
-    final outcome =
-        await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: AppTheme.surfacePanel,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (_) => HealthSupplementFormSheet(
-            dogId: dogId,
-            dogDisplayName: widget.dogDisplayName,
-            controller: mutation,
-            onRefreshRequested: widget.onRefreshRequested,
-            timezone: tz,
-            activePlan: activePlan,
-          ),
-        );
+    HealthNutritionMutationUiOutcome? outcome;
+    try {
+      outcome = await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppTheme.surfacePanel,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => HealthSupplementFormSheet(
+          dogId: dogId,
+          dogDisplayName: widget.dogDisplayName,
+          controller: mutation,
+          onRefreshRequested: widget.onRefreshRequested,
+          timezone: tz,
+          clock: () => widget.authorizedNow!,
+          activePlan: activePlan,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningSupplementForm = false);
+      }
+    }
 
     if (!mounted) return;
     if (outcome is HealthNutritionMutationUiSuccess) {
@@ -1316,6 +1527,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
     };
 
     final hasMutation = widget.mutationController != null;
+    final actionEnabled = widget.actionEnabled && !_isOpeningSupplementForm;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1334,20 +1546,44 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
               ),
             ),
             if (hasMutation)
-              TextButton.icon(
-                onPressed: _openSupplementForm,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Registrar'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  textStyle: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+              Semantics(
+                button: true,
+                enabled: actionEnabled,
+                label: actionEnabled
+                    ? 'Registrar suplemento'
+                    : 'Registrar suplemento indisponível: '
+                          '${widget.unavailableReason ?? 'contexto inseguro'}',
+                child: ExcludeSemantics(
+                  child: TextButton.icon(
+                    onPressed: actionEnabled ? _openSupplementForm : null,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Registrar'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      foregroundColor: AppTheme.primary,
+                      textStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ),
           ],
         ),
+        if (hasMutation &&
+            !widget.actionEnabled &&
+            widget.unavailableReason != null) ...[
+          Text(
+            widget.unavailableReason!,
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 8),
         if (planRegimens.isEmpty && widget.legacyRegimens.isEmpty)
           HealthSummaryCardSurface(

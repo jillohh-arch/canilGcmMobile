@@ -88,6 +88,7 @@ NutritionTodayReadModel _today(
     dogId: plan.dogId,
     localServiceDate: '2026-07-18',
     timezone: plan.timezone,
+    referenceNow: DateTime.utc(2026, 7, 18, 12),
     activePlan: NutritionActiveCanonicalPlan(plan),
     meals: meals,
   );

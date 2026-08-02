@@ -1,11 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
+import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
@@ -14,6 +21,8 @@ import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:canil_gcm/features/health/domain/supplement_log.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_read_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
 
 final class _ScriptedSource {
@@ -186,13 +195,16 @@ final class _MemLegacyMeal implements NutritionLegacyMealReader {
 final actor = RecordedBy(uid: 'u1', name: 'Silva', internalRole: 'condutor');
 
 NutritionPlan canonicalPlan({
+  String id = 'plan-1',
   String dogId = 'dog-a',
   String foodType = 'Ração Premium',
   double amountGramsPerDay = 600,
   String timezone = NutritionPlan.defaultTimezone,
+  DateTime? validFrom,
+  DateTime? validUntil,
 }) {
   return NutritionPlan(
-    id: 'plan-1',
+    id: id,
     dogId: dogId,
     foodType: foodType,
     amountGramsPerDay: amountGramsPerDay,
@@ -211,7 +223,8 @@ NutritionPlan canonicalPlan({
         targetGrams: 300,
       ),
     ],
-    validFrom: DateTime.utc(2026, 1, 1),
+    validFrom: validFrom ?? DateTime.utc(2026, 1, 1),
+    validUntil: validUntil,
     timezone: timezone,
     recordedBy: actor,
     status: NutritionPlanStatus.active,
@@ -337,7 +350,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
 
     await tester.pumpWidget(
@@ -392,7 +408,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
     addTearDown(controller.dispose);
 
@@ -439,7 +458,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
     addTearDown(controller.dispose);
 
@@ -481,7 +503,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
     addTearDown(controller.dispose);
 
@@ -537,7 +562,10 @@ void main() {
         ),
       ],
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
 
     await tester.pumpWidget(
@@ -595,7 +623,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
 
     await tester.pumpWidget(
@@ -623,7 +654,10 @@ void main() {
     final source = CoexistenceNutritionReadSource(
       canonicalPlanReader: _DogSwitchPlanReader(releaseDogA.future),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
 
     final dogAFuture = controller.selectDog('dog-a');
     await tester.pumpWidget(
@@ -666,7 +700,10 @@ void main() {
         ]),
       ),
     );
-    final controller = HealthNutritionReadController(source: source);
+    final controller = HealthNutritionReadController(
+      source: source,
+      clock: () => DateTime.now().toUtc(),
+    );
     await controller.selectDog('dog-a');
     addTearDown(controller.dispose);
     addTearDown(tester.view.resetPhysicalSize);
@@ -910,6 +947,939 @@ void main() {
       controller.dispose();
     },
   );
+
+  testWidgets(
+    'double tap opens one supplement sheet with selected dog identity',
+    (tester) async {
+      final referenceNow = DateTime.utc(2026, 7, 19, 15);
+      final source = CoexistenceNutritionReadSource(
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'adhoc', fedAt: referenceNow),
+          ]),
+        ),
+      );
+      final readController = HealthNutritionReadController(
+        source: source,
+        clock: () => referenceNow,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+        operationIdFactory: () => 'safe-supplement-op',
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Registrar'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      final semanticsWidget = tester.widget<Semantics>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label == 'Registrar suplemento',
+        ),
+      );
+      expect(semanticsWidget.properties.enabled, isTrue);
+      final registerButton = find.ancestor(
+        of: find.text('Registrar'),
+        matching: find.byType(TextButton),
+      );
+      expect(tester.getSize(registerButton).height, greaterThanOrEqualTo(48));
+
+      final center = tester.getCenter(registerButton);
+      final firstTap = await tester.createGesture(pointer: 1);
+      final secondTap = await tester.createGesture(pointer: 2);
+      await firstTap.down(center);
+      await secondTap.down(center);
+      await firstTap.up();
+      await secondTap.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsOneWidget);
+      final sheet = tester.widget<HealthSupplementFormSheet>(
+        find.byType(HealthSupplementFormSheet),
+      );
+      expect(sheet.dogId, 'dog-a');
+      expect(sheet.activePlan, isNull);
+    },
+  );
+
+  testWidgets('canonical and legacy supplement links remain contract-safe', (
+    tester,
+  ) async {
+    final referenceNow = DateTime.utc(2026, 7, 19, 15);
+
+    Future<void> verifyAllowed({
+      required CoexistenceNutritionReadSource source,
+      required bool expectsCanonicalPlan,
+    }) async {
+      final readController = HealthNutritionReadController(
+        source: source,
+        clock: () => referenceNow,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      await readController.selectDog('dog-a');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Registrar'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+      final sheet = tester.widget<HealthSupplementFormSheet>(
+        find.byType(HealthSupplementFormSheet),
+      );
+      expect(sheet.dogId, 'dog-a');
+      expect(sheet.activePlan != null, expectsCanonicalPlan);
+      Navigator.of(
+        tester.element(find.byType(HealthSupplementFormSheet)),
+      ).pop();
+      await tester.pumpAndSettle();
+      readController.dispose();
+      mutationController.dispose();
+    }
+
+    await verifyAllowed(
+      source: CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([
+            canonicalPlan(
+              validFrom: referenceNow.subtract(const Duration(days: 1)),
+            ),
+          ]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'canonical-adhoc', fedAt: referenceNow),
+          ]),
+        ),
+      ),
+      expectsCanonicalPlan: true,
+    );
+
+    await verifyAllowed(
+      source: CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(const NutritionSourceBatch.empty()),
+        legacyPlanReader: _MemLegacyPlan(
+          NutritionSourceBatch.available([
+            LegacyNutritionPlanView(
+              id: 'legacy-plan',
+              dogId: 'dog-a',
+              foodType: 'Plano legado',
+              amountGramsPerDay: 400,
+              mealsPerDay: 2,
+              vigentFrom: referenceNow.subtract(const Duration(days: 1)),
+              legacySource: 'nutritional_prescriptions',
+            ),
+          ]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'legacy-adhoc', fedAt: referenceNow),
+          ]),
+        ),
+      ),
+      expectsCanonicalPlan: false,
+    );
+  });
+
+  testWidgets('future expired and conflicting plans block supplement sheet', (
+    tester,
+  ) async {
+    final referenceNow = DateTime.utc(2026, 7, 19, 15);
+    final cases = <({List<NutritionPlan> plans, String reason})>[
+      (
+        plans: [
+          canonicalPlan(
+            validFrom: referenceNow.add(const Duration(minutes: 1)),
+          ),
+        ],
+        reason: 'Registro indisponível: o plano ainda não está vigente.',
+      ),
+      (
+        plans: [
+          canonicalPlan(
+            validFrom: referenceNow.subtract(const Duration(days: 2)),
+            validUntil: referenceNow,
+          ),
+        ],
+        reason: 'Registro indisponível: o plano está expirado.',
+      ),
+      (
+        plans: [
+          canonicalPlan(id: 'plan-conflict-a'),
+          canonicalPlan(id: 'plan-conflict-b'),
+        ],
+        reason: 'Registro indisponível por conflito no plano ativo.',
+      ),
+    ];
+
+    for (final testCase in cases) {
+      final readController = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _MemPlan(
+            NutritionSourceBatch.available(testCase.plans),
+          ),
+          canonicalMealReader: _MemMeal(
+            NutritionSourceBatch.available([
+              mealLog(id: 'blocked-adhoc', fedAt: referenceNow),
+            ]),
+          ),
+        ),
+        clock: () => referenceNow,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      await readController.selectDog('dog-a');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Registrar'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text(testCase.reason), findsOneWidget);
+      final button = find.ancestor(
+        of: find.text('Registrar'),
+        matching: find.byType(TextButton),
+      );
+      expect(tester.widget<TextButton>(button).onPressed, isNull);
+      await tester.tap(find.text('Registrar'), warnIfMissed: false);
+      await tester.pump();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+      readController.dispose();
+      mutationController.dispose();
+    }
+  });
+
+  testWidgets('degraded supplement action is disabled with accessible reason', (
+    tester,
+  ) async {
+    final referenceNow = DateTime.utc(2026, 7, 19, 15);
+    final source = CoexistenceNutritionReadSource(
+      canonicalPlanReader: _MemPlan(
+        NutritionSourceBatch.available([canonicalPlan()]),
+      ),
+      canonicalMealReader: _MemMeal(
+        const NutritionSourceBatch.error(
+          code: 'partial_meals',
+          message: 'Falha parcial de refeições',
+        ),
+      ),
+    );
+    final readController = HealthNutritionReadController(
+      source: source,
+      clock: () => referenceNow,
+    );
+    final mutationController = HealthNutritionMutationController(
+      gateway: const FailClosedHealthNutritionMutationGateway(),
+    );
+    addTearDown(readController.dispose);
+    addTearDown(mutationController.dispose);
+    await readController.selectDog('dog-a');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HealthNutritionTodayScreen(
+            controller: readController,
+            mutationController: mutationController,
+            dogDisplayName: 'Bono',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Registrar'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(
+      find.text('Registro indisponível enquanto os dados estão parciais.'),
+      findsOneWidget,
+    );
+    final semanticsWidget = tester.widget<Semantics>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label ==
+                'Registrar suplemento indisponível: '
+                    'Registro indisponível enquanto os dados estão parciais.',
+      ),
+    );
+    expect(semanticsWidget.properties.enabled, isFalse);
+    await tester.tap(find.text('Registrar'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(HealthSupplementFormSheet), findsNothing);
+  });
+
+  testWidgets(
+    'temporal diagnostic remains accessible at 320dp and text scale 1.5',
+    (tester) async {
+      final monotonic = _ScreenMonotonicClock();
+      final gateway = _ScreenTimeGateway();
+      final provider = AuthoritativeTimeProvider(
+        gateway: gateway,
+        monotonicClock: monotonic,
+      );
+      final readController = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalMealReader: _MemMeal(
+            NutritionSourceBatch.available([
+              mealLog(
+                id: 'responsive-temporal-meal',
+                fedAt: DateTime.utc(2026, 7, 19, 15),
+              ),
+            ]),
+          ),
+        ),
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await readController.selectDog('dog-a');
+      monotonic.value = const Duration(minutes: 6);
+      gateway.fail = true;
+      await readController.refresh();
+
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName:
+                  'Bono com nome operacional excepcionalmente extenso',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Horário aguardando atualização'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text('Registrar'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      final semantics = tester.widget<Semantics>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label ==
+                  'Registrar suplemento indisponível: Horário aguardando atualização. Atualize antes de registrar.',
+        ),
+      );
+      expect(semantics.properties.enabled, isFalse);
+      final button = find.ancestor(
+        of: find.text('Registrar'),
+        matching: find.byType(TextButton),
+      );
+      final size = tester.getSize(button);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
+      expect(tester.widget<TextButton>(button).onPressed, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — SUPPLEMENT TEMPORAL EXPIRED
+  // ══════════════════════════════════════════════════════════════════════════
+
+  testWidgets(
+    'temporal expired: factual data visible, supplement action disabled, '
+        'no sheet, no callback, no mutation',
+    (tester) async {
+      // Provider without gateway sync → neverSynchronized → unavailable
+      final provider = AuthoritativeTimeProvider(
+        gateway: _FailingTimeGateway((_) async {
+          throw const AuthoritativeTimeFailure(
+            AuthoritativeTimeFailureCode.unavailable,
+            'temporal service unavailable',
+          );
+        }),
+        monotonicClock: _ScreenMonotonicClock(),
+      );
+
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([mealLog(id: 'ml-1')]),
+        ),
+      );
+
+      final readController = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Controller's temporal state reflects unavailable
+      expect(
+        readController.temporalState,
+        HealthNutritionTemporalState.unavailable,
+      );
+      expect(readController.temporalActionsAllowed, isFalse);
+
+      // Facts visible (factual data from source)
+      expect(find.text('Ração Premium'), findsWidgets);
+
+      // No sheet opens on tap (button should be disabled)
+      await tester.tap(find.text('Registrar'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — SUPPLEMENT TEMPORAL FAILED WITHOUT SNAPSHOT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  testWidgets(
+    'temporal failed without snapshot disables supplement action and opens no sheet',
+    (tester) async {
+      final gateway = _FailingTimeGateway((_) async {
+        throw const AuthoritativeTimeFailure(
+          AuthoritativeTimeFailureCode.unavailable,
+          'serviço temporal indisponível',
+        );
+      });
+      final provider = AuthoritativeTimeProvider(
+        gateway: gateway,
+        monotonicClock: _ScreenMonotonicClock(),
+      );
+
+      final spyMutationGateway = _SpyNutritionMutationGateway();
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan(dogId: 'dog-a')]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([mealLog(id: 'ml-1')]),
+        ),
+      );
+
+      final readController = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: spyMutationGateway,
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Controller temporalState is unavailable & actions disabled
+      expect(
+        readController.temporalState,
+        HealthNutritionTemporalState.unavailable,
+      );
+      expect(readController.temporalActionsAllowed, isFalse);
+
+      // 4. Diagnostic title and message present with explicit reason
+      expect(readController.temporalDiagnosticTitle, contains('Horário confiável indisponível'));
+      expect(readController.temporalDiagnosticMessage, isNotNull);
+
+      // 9. Zero fallback to DateTime.now
+      expect(provider.nowFreshUtc(), isNull);
+      expect(provider.nowReadOnlyUtc(), isNull);
+
+      // 10 & 11. DogId is dog-a, no empty dogId substitute created
+      expect(readController.activeDogId, equals('dog-a'));
+
+      // 3. Semantics enabled=false on button
+      final buttonFinder = find.ancestor(
+        of: find.text('Registrar'),
+        matching: find.byType(TextButton),
+      );
+      final semanticsData = tester.getSemantics(buttonFinder).getSemanticsData();
+      expect(semanticsData.hasFlag(SemanticsFlag.isEnabled), isFalse);
+
+      // 2 & 5. Tap does not open sheet (button callback disabled/inaccessible)
+      await tester.tap(find.text('Registrar'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+
+      // 6, 7, 8. Zero callbacks, zero submits, zero mutation calls
+      expect(spyMutationGateway.callCount, equals(0));
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — STALE WITH FAILURE ON REFRESH
+  // ══════════════════════════════════════════════════════════════════════════
+
+  testWidgets(
+    'stale with refresh failure: query preserved, action continues disabled, '
+        'diagnosis preserved, stale does not become fresh',
+    (tester) async {
+      final gateway = _FailingTimeGateway((_) async {
+        throw const AuthoritativeTimeFailure(
+          AuthoritativeTimeFailureCode.unavailable,
+          'callable indisponível',
+        );
+      });
+      final provider = AuthoritativeTimeProvider(
+        gateway: gateway,
+        monotonicClock: _ScreenMonotonicClock(),
+      );
+
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([mealLog(id: 'ml-1')]),
+        ),
+      );
+
+      final readController = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(gateway.calls, 1);
+
+      // Stale remains after failed refresh
+      await readController.refresh();
+      await tester.pumpAndSettle();
+
+      expect(gateway.calls, 2);
+      expect(
+        readController.temporalState,
+        HealthNutritionTemporalState.unavailable,
+      );
+
+      // Supplement still disabled
+      expect(readController.temporalActionsAllowed, isFalse);
+
+      // No sheet
+      await tester.tap(find.text('Registrar'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — LIVE REGION SEMANTICS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  testWidgets(
+    'liveRegion: controller has temporal diagnostic when provider fresh',
+    (tester) async {
+      final provider = AuthoritativeTimeProvider(
+        gateway: _ScreenTimeGateway(),
+        monotonicClock: _ScreenMonotonicClock(),
+      );
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([mealLog(id: 'ml-1')]),
+        ),
+      );
+      final readController = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // With fresh provider, diagnostic title is null (no problem)
+      expect(readController.temporalDiagnosticTitle, isNull);
+      expect(readController.temporalState, HealthNutritionTemporalState.fresh);
+    },
+  );
+
+  testWidgets(
+    'UX-04B3C Section 10 — liveRegion real: Semantics node has liveRegion==true on diagnostic text',
+    (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
+      try {
+        final monotonic = _ScreenMonotonicClock();
+        final gateway = _ScreenTimeGateway();
+        final provider = AuthoritativeTimeProvider(
+          gateway: gateway,
+          monotonicClock: monotonic,
+        );
+        final source = CoexistenceNutritionReadSource(
+          canonicalMealReader: _MemMeal(
+            NutritionSourceBatch.available([
+              mealLog(
+                id: 'live-region-meal',
+                fedAt: DateTime.utc(2026, 7, 19, 15),
+              ),
+            ]),
+          ),
+        );
+        final readController = HealthNutritionReadController(
+          source: source,
+          authoritativeTimeProvider: provider,
+        );
+        final mutationController = HealthNutritionMutationController(
+          gateway: const FailClosedHealthNutritionMutationGateway(),
+        );
+        addTearDown(readController.dispose);
+        addTearDown(mutationController.dispose);
+
+        await readController.selectDog('dog-a');
+        monotonic.value = const Duration(minutes: 6);
+        gateway.fail = true;
+        await readController.refresh();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: HealthNutritionTodayScreen(
+                controller: readController,
+                mutationController: mutationController,
+                dogDisplayName: 'Bono',
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Find the diagnostic text and verify liveRegion property on its Semantics node
+        final diagnosticFinder = find.text('Horário aguardando atualização');
+        expect(diagnosticFinder, findsOneWidget);
+
+        final semanticsData = tester.getSemantics(diagnosticFinder).getSemanticsData();
+        expect(semanticsData.hasFlag(SemanticsFlag.isLiveRegion), isTrue);
+        expect(
+          semanticsData.label,
+          contains('Horário aguardando atualização'),
+        );
+
+        // Verify button disabled state is independent of liveRegion
+        await tester.scrollUntilVisible(
+          find.text('Registrar'),
+          400,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final buttonSemantics = tester.getSemantics(
+          find.ancestor(
+            of: find.text('Registrar'),
+            matching: find.byType(TextButton),
+          ),
+        ).getSemanticsData();
+        expect(buttonSemantics.hasFlag(SemanticsFlag.isEnabled), isFalse);
+      } finally {
+        semanticsHandle.dispose();
+      }
+    },
+  );
+
+
+
+  testWidgets(
+    'button disabled: controller temporalActionsAllowed is false when unavailable',
+    (tester) async {
+      // Controller without provider → unavailable → button disabled
+      final readController = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _MemPlan(
+            NutritionSourceBatch.available([canonicalPlan()]),
+          ),
+          canonicalMealReader: _MemMeal(
+            NutritionSourceBatch.available([mealLog(id: 'ml-1')]),
+          ),
+        ),
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Controller state reflects disabled action
+      expect(readController.temporalActionsAllowed, isFalse);
+      expect(readController.temporalState, HealthNutritionTemporalState.unavailable);
+
+      // No sheet on tap
+      await tester.tap(find.text('Registrar'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UX-04B3C — REOPENING / SEQUENTIAL SHEET ON SAME STATE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  testWidgets(
+    'UX-04B3C Section 9 — sheet reopening on same State: open, close, finally releases lock, open second time legitimately',
+    (tester) async {
+      final referenceNow = DateTime.utc(2026, 7, 19, 15);
+      final provider = AuthoritativeTimeProvider(
+        gateway: _ScreenTimeGateway(),
+        monotonicClock: _ScreenMonotonicClock(),
+      );
+      final source = CoexistenceNutritionReadSource(
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'adhoc', fedAt: referenceNow),
+          ]),
+        ),
+      );
+      final readController = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+      final mutationController = HealthNutritionMutationController(
+        gateway: const FailClosedHealthNutritionMutationGateway(),
+        operationIdFactory: () => 'safe-supplement-op',
+      );
+      addTearDown(readController.dispose);
+      addTearDown(mutationController.dispose);
+      await readController.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: readController,
+              mutationController: mutationController,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Registrar'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      // 1. Open sheet first time
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsOneWidget);
+
+      // 2. Close sheet
+      final sheetElement = tester.element(find.byType(HealthSupplementFormSheet));
+      Navigator.of(sheetElement).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+
+      // 3. Reopen sheet on the SAME screen and SAME State
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+
+      // 4. Prove second legitimate opening
+      expect(find.byType(HealthSupplementFormSheet), findsOneWidget);
+      final sheet2 = tester.widget<HealthSupplementFormSheet>(
+        find.byType(HealthSupplementFormSheet),
+      );
+      expect(sheet2.dogId, 'dog-a');
+
+      // Close again
+      Navigator.of(tester.element(find.byType(HealthSupplementFormSheet))).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthSupplementFormSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'invalid selected dog identity is rejected before any sheet context',
+    () {
+      final controller = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(),
+      );
+      addTearDown(controller.dispose);
+      expect(() => controller.selectDog('   '), throwsArgumentError);
+      expect(controller.activeDogId, isNull);
+      expect(controller.todayOrNull, isNull);
+    },
+  );
+
+}
+
+final class _FailingTimeGateway implements AuthoritativeTimeGateway {
+  _FailingTimeGateway(this._thunk);
+  final Future<AuthoritativeTimeRemoteResponse> Function(int) _thunk;
+  int calls = 0;
+
+  @override
+  Future<AuthoritativeTimeRemoteResponse> fetchAuthoritativeTime() async {
+    calls++;
+    return _thunk(calls);
+  }
+}
+
+final class _ScreenMonotonicClock implements MonotonicElapsedClock {
+  Duration value = Duration.zero;
+
+  @override
+  Duration get elapsed => value;
+}
+
+final class _ScreenTimeGateway implements AuthoritativeTimeGateway {
+  bool fail = false;
+
+  @override
+  Future<AuthoritativeTimeRemoteResponse> fetchAuthoritativeTime() async {
+    if (fail) {
+      throw const AuthoritativeTimeFailure(
+        AuthoritativeTimeFailureCode.unavailable,
+        'callable indisponível',
+      );
+    }
+    final now = DateTime.utc(2026, 7, 19, 15);
+    return AuthoritativeTimeRemoteResponse(
+      protocolVersion: 1,
+      requestId: '00000000-0000-4000-8000-000000000001',
+      requestReceivedAtUtc: now,
+      serverSentAtUtc: now,
+      maxAge: const Duration(minutes: 15),
+    );
+  }
 }
 
 final class _GatedPlan implements NutritionCanonicalPlanReader {
@@ -948,5 +1918,33 @@ final class _DogSwitchPlanReader implements NutritionCanonicalPlanReader {
     return NutritionSourceBatch.available([
       canonicalPlan(dogId: dogId, foodType: 'Plano B'),
     ]);
+  }
+}
+
+final class _SpyNutritionMutationGateway implements HealthNutritionMutationGateway {
+  int callCount = 0;
+
+  @override
+  Future<HealthNutritionMutationResult> createAdhocMealLog(
+    dynamic command,
+  ) async {
+    callCount++;
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<HealthNutritionMutationResult> createPlannedMealLog(
+    dynamic command,
+  ) async {
+    callCount++;
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<HealthNutritionMutationResult> createSupplementLog(
+    dynamic command,
+  ) async {
+    callCount++;
+    throw UnimplementedError();
   }
 }

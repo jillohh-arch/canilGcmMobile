@@ -387,6 +387,7 @@ void main() {
 
       expect(result.isData, isTrue);
       expect(result.value!.localServiceDate, '2026-07-19');
+      expect(result.value!.referenceNow, DateTime.utc(2026, 7, 19, 16));
       expect(result.value!.meals.map((m) => m.meal.id), ['local-today']);
     });
 

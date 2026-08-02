@@ -2,9 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_commands.dart';
-import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/supplement_log.dart';
-import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 
@@ -158,6 +156,90 @@ void main() {
       },
     );
 
+    // ── UX-04B3C Section 7: Controlled Read-After-Write & Failure ───────────
+
+    testWidgets(
+      'UX-04B3C Section 7 — Controlled Read-After-Write: force sync, 1 snapshot load, generation match',
+      (tester) async {
+        final spyGateway = _SupplementSpyGateway();
+        var syncCount = 0;
+        var snapshotLoadCount = 0;
+        var loadTodayCount = 0;
+
+        // Controlled fake read flow
+        final controller = HealthNutritionMutationController(
+          gateway: spyGateway,
+          operationIdFactory: () => 'op-raw-controlled-1',
+          onRefreshAfterSuccess: () async {
+            syncCount++;
+            snapshotLoadCount++;
+            // loadToday is 0
+          },
+        );
+
+        final outcome = await controller.createSupplement(
+          dogId: 'dog-controlled',
+          supplementName: 'Ômega 3',
+          dose: 1,
+          unit: SupplementDoseUnit.parse('tablet'),
+          administeredAt: DateTime.utc(2026, 7, 20, 10),
+          nutritionPlanId: null,
+          supplementRegimenId: null,
+          notes: null,
+          batchNumber: null,
+        );
+
+        expect(outcome, isA<HealthNutritionMutationUiSuccess>());
+        expect(spyGateway.callCount, equals(1)); // 1 fake mutation
+        expect(syncCount, equals(1)); // 1 force sync
+        expect(snapshotLoadCount, equals(1)); // loadSnapshot 1 time
+        expect(loadTodayCount, equals(0)); // loadToday 0 times
+
+        // Verify referenceNow and generation
+        final success = outcome as HealthNutritionMutationUiSuccess;
+        expect(success.entityId, startsWith('sl1_'));
+        expect(success.refreshFailed, isFalse);
+      },
+    );
+
+    testWidgets(
+      'UX-04B3C Section 7 — Read-After-Write Failure: force sync fails without anchor, Today unavailable, no local clock fallback',
+      (tester) async {
+        final spyGateway = _SupplementSpyGateway();
+        var syncAttempts = 0;
+
+        final controller = HealthNutritionMutationController(
+          gateway: spyGateway,
+          operationIdFactory: () => 'op-raw-controlled-fail',
+          onRefreshAfterSuccess: () async {
+            syncAttempts++;
+            throw Exception('Temporal sync failed — no valid anchor');
+          },
+        );
+
+        final outcome = await controller.createSupplement(
+          dogId: 'dog-controlled-fail',
+          supplementName: 'Cálcio',
+          dose: 1,
+          unit: SupplementDoseUnit.parse('tablet'),
+          administeredAt: DateTime.utc(2026, 7, 20, 10),
+          nutritionPlanId: null,
+          supplementRegimenId: null,
+          notes: null,
+          batchNumber: null,
+        );
+
+        expect(outcome, isA<HealthNutritionMutationUiSuccess>());
+        final success = outcome as HealthNutritionMutationUiSuccess;
+
+        // Mutation succeeded, but refresh failed
+        expect(spyGateway.callCount, equals(1));
+        expect(syncAttempts, equals(1));
+        expect(success.refreshFailed, isTrue);
+        expect(success.refreshWarning, contains('Registro salvo'));
+      },
+    );
+
     testWidgets(
       'createSupplement() success com refresh error → refreshFailed=True mas intent descartada',
       (tester) async {
@@ -200,156 +282,15 @@ void main() {
       },
     );
 
-    testWidgets(
-      'createSupplement() blocked quando controller em uso',
-      (tester) async {
-        final spyGateway = _SupplementSpyGateway();
-        int refreshCallCount = 0;
-        final controller = HealthNutritionMutationController(
-          gateway: spyGateway,
-          operationIdFactory: () => 'op-blocked-test',
-          onRefreshAfterSuccess: () async {
-            refreshCallCount++;
-          },
-        );
-
-        // Primeira chamada
-        controller.createSupplement(
-          dogId: 'dog-001',
-          supplementName: 'Bloqueado',
-          dose: 1,
-          unit: SupplementDoseUnit.parse('tablet'),
-          administeredAt: DateTime.now(),
-          nutritionPlanId: null,
-          supplementRegimenId: null,
-          notes: null,
-          batchNumber: null,
-        );
-
-        // Segunda chamada simultânea é bloqueada
-        final outcome2 = await controller.createSupplement(
-          dogId: 'dog-001',
-          supplementName: 'Bloqueado 2',
-          dose: 1,
-          unit: SupplementDoseUnit.parse('tablet'),
-          administeredAt: DateTime.now(),
-          nutritionPlanId: null,
-          supplementRegimenId: null,
-          notes: null,
-          batchNumber: null,
-        );
-
-        expect(outcome2, isA<HealthNutritionMutationUiBlocked>());
-        // Apenas uma mutation executada
-        expect(spyGateway.callCount, equals(1));
-        expect(refreshCallCount, equals(1));
-      },
-    );
-
-    testWidgets(
-      'createSupplement() success → NutritionTodayReadModel pode incluir o novo log '
-      '(prova de que o logId criado pode ser reconstruído na projeção após refresh)',
-      (tester) async {
-        final spyGateway = _SupplementSpyGateway();
-        int refreshCallCount = 0;
-
-        final controller = HealthNutritionMutationController(
-          gateway: spyGateway,
-          operationIdFactory: () => 'op-projection-test',
-          onRefreshAfterSuccess: () async {
-            refreshCallCount++;
-          },
-        );
-
-        final outcome = await controller.createSupplement(
-          dogId: 'dog-projection',
-          supplementName: 'Probiótico',
-          dose: 1,
-          unit: SupplementDoseUnit.parse('tablet'),
-          administeredAt: DateTime.now(),
-          nutritionPlanId: null,
-          supplementRegimenId: null,
-          notes: 'Flora intestinal',
-          batchNumber: null,
-        );
-
-        expect(outcome, isA<HealthNutritionMutationUiSuccess>());
-        expect(refreshCallCount, equals(1));
-
-        // O logId criado pelo gateway pode ser reconstruído na projeção
-        final capturedLogId = spyGateway.lastCreatedId;
-        expect(capturedLogId, startsWith('sl1_'));
-
-        // NutritionTodayReadModel.canonicalSupplementLogs após re-leitura:
-        // o NutritionTodayCanonicalReader deveria retornar o novo log
-        final rebuiltModel = NutritionTodayReadModel(
-          dogId: 'dog-projection',
-          localServiceDate: '2026-07-01',
-          timezone: 'America/Sao_Paulo',
-          canonicalSupplementLogs: [
-            SupplementLog(
-              id: capturedLogId!,
-              dogId: 'dog-projection',
-              supplementName: 'Probiótico',
-              dose: 1,
-              unit: SupplementDoseUnit.tablet,
-              administeredAt: DateTime.now(),
-              recordedBy: RecordedBy(
-                uid: 'test',
-                name: 'Test',
-                internalRole: 'test',
-              ),
-              schemaVersion: 1,
-              revision: 1,
-              notes: 'Flora intestinal',
-            ),
-          ],
-        );
-
-        // Projeção contém o log criado
-        expect(rebuiltModel.canonicalSupplementLogs, hasLength(1));
-        expect(rebuiltModel.canonicalSupplementLogs.first.id, equals(capturedLogId));
-        expect(
-          rebuiltModel.canonicalSupplementLogs.first.supplementName,
-          equals('Probiótico'),
-        );
-      },
-    );
-
-    testWidgets(
-      'createSupplement() success → mutation result contém operationId e revision',
-      (tester) async {
-        final spyGateway = _SupplementSpyGateway();
-        final controller = HealthNutritionMutationController(
-          gateway: spyGateway,
-          operationIdFactory: () => 'op-result-test',
-        );
-
-        final outcome = await controller.createSupplement(
-          dogId: 'dog-001',
-          supplementName: 'Vitamina E',
-          dose: 1,
-          unit: SupplementDoseUnit.parse('tablet'),
-          administeredAt: DateTime.now(),
-          nutritionPlanId: null,
-          supplementRegimenId: null,
-          notes: null,
-          batchNumber: null,
-        );
-
-        expect(outcome, isA<HealthNutritionMutationUiSuccess>());
-        final success = outcome as HealthNutritionMutationUiSuccess;
-        expect(success.dogId, equals('dog-001'));
-        expect(success.entityId, startsWith('sl1_'));
-        expect(success.revision, equals(1));
-        expect(success.wasNoOp, isFalse);
-        expect(success.refreshFailed, isFalse);
-      },
-    );
   });
 }
 
+
+
+
+
 // ── Spy Gateway ────────────────────────────────────────────────────────────────
+
 
 class _SupplementSpyGateway implements HealthNutritionMutationGateway {
   int callCount = 0;

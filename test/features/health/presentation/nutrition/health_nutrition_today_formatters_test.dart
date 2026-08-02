@@ -129,20 +129,134 @@ void main() {
         scheduledTime: ScheduledTimeOfDay('23:50'),
         targetGrams: 200,
       );
-      final now = DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-        10,
-        0,
-      );
       final st = NutritionTodaySlotUi.statusFor(
         slot: slot,
         meal: null,
-        serverNow: now.toUtc(),
+        serverNow: DateTime.utc(2026, 7, 14, 13),
         timezone: NutritionPlan.defaultTimezone,
       );
       expect(st, NutritionTodaySlotUiStatus.pending);
+    });
+
+    test('exactly at planned time remains pending', () {
+      final slot = MealScheduleSlot(
+        id: 's1',
+        period: MealPeriodWire.parseCanonical('morning'),
+        scheduledTime: ScheduledTimeOfDay('07:00'),
+        targetGrams: 200,
+      );
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot,
+          meal: null,
+          serverNow: DateTime.utc(2026, 7, 14, 10),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.pending,
+      );
+    });
+
+    test('fixed serverNow deterministically decides late', () {
+      final slot = MealScheduleSlot(
+        id: 's1',
+        period: MealPeriodWire.parseCanonical('morning'),
+        scheduledTime: ScheduledTimeOfDay('07:00'),
+        targetGrams: 200,
+      );
+      NutritionTodaySlotUiStatus status(DateTime serverNow) =>
+          NutritionTodaySlotUi.statusFor(
+            slot: slot,
+            meal: null,
+            serverNow: serverNow,
+            timezone: NutritionPlan.defaultTimezone,
+          );
+
+      expect(
+        status(DateTime.utc(2026, 7, 14, 9, 59)),
+        NutritionTodaySlotUiStatus.pending,
+      );
+      expect(
+        status(DateTime.utc(2026, 7, 14, 10, 1)),
+        NutritionTodaySlotUiStatus.late,
+      );
+      expect(
+        status(DateTime.utc(2026, 7, 14, 10, 1)),
+        NutritionTodaySlotUiStatus.late,
+      );
+    });
+
+    test('completed takes precedence after planned time', () {
+      final slot = MealScheduleSlot(
+        id: 's1',
+        period: MealPeriodWire.parseCanonical('morning'),
+        scheduledTime: ScheduledTimeOfDay('07:00'),
+        targetGrams: 200,
+      );
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot,
+          meal: item(meal(id: 'm1')),
+          serverNow: DateTime.utc(2026, 7, 14, 20),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.completed,
+      );
+    });
+
+    test('plan timezone and normative midnight share one clock', () {
+      final slot = MealScheduleSlot(
+        id: 's1',
+        period: MealPeriodWire.parseCanonical('night'),
+        scheduledTime: ScheduledTimeOfDay('23:55'),
+        targetGrams: 200,
+      );
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot,
+          meal: null,
+          serverNow: DateTime.utc(2026, 7, 15, 2, 54),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.pending,
+      );
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot,
+          meal: null,
+          serverNow: DateTime.utc(2026, 7, 15, 3, 1),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.pending,
+      );
+    });
+  });
+
+  group('plan validity formatting', () {
+    test('instant uses explicit plan timezone near UTC midnight', () {
+      expect(
+        HealthNutritionTodayFormatters.dateShort(
+          DateTime.utc(2026, 7, 19, 0, 30),
+          timezone: 'America/Sao_Paulo',
+        ),
+        '18/07/2026',
+      );
+    });
+
+    test('default timezone formats start and end deterministically', () {
+      expect(
+        HealthNutritionTodayFormatters.dateShort(
+          DateTime.utc(2026, 1, 1, 3),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        '01/01/2026',
+      );
+      expect(
+        HealthNutritionTodayFormatters.dateShort(
+          DateTime.utc(2026, 12, 31, 2, 59),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        '30/12/2026',
+      );
     });
   });
 

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
@@ -29,21 +31,28 @@ class HealthSummaryNutritionReader {
   HealthSummaryNutritionReader({
     NutritionService? nutritionService,
     CoexistenceNutritionReadSource? coexistenceReadSource,
+    AuthoritativeTimeProvider? authoritativeTimeProvider,
     Future<HealthSummaryNutritionDaySnapshot> Function(String dogId)?
     loadDaySnapshot,
-    DateTime Function()? clock,
+    @visibleForTesting DateTime Function()? clock,
   }) : _coexistenceReadSource = coexistenceReadSource,
-       _clock = clock ?? DateTime.now;
+       _authoritativeTimeProvider = authoritativeTimeProvider,
+       _testClock = clock;
 
   final CoexistenceNutritionReadSource? _coexistenceReadSource;
-  final DateTime Function() _clock;
+  final AuthoritativeTimeProvider? _authoritativeTimeProvider;
+  final DateTime Function()? _testClock;
 
   Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>> readToday(
-    String dogId,
-  ) async {
+    String dogId, {
+    bool synchronizeTime = true,
+  }) async {
     try {
       if (_coexistenceReadSource != null) {
-        return await _readViaCoexistence(dogId);
+        return await _readViaCoexistence(
+          dogId,
+          synchronizeTime: synchronizeTime,
+        );
       }
       return await _readViaSnapshot();
     } on FirebaseException catch (e) {
@@ -64,10 +73,19 @@ class HealthSummaryNutritionReader {
   }
 
   Future<HealthSummarySectionData<HealthSummaryNutritionTodayView>>
-  _readViaCoexistence(String dogId) async {
+  _readViaCoexistence(String dogId, {required bool synchronizeTime}) async {
+    final temporal = await _resolveTemporalReference(
+      synchronizeTime: synchronizeTime,
+    );
+    if (temporal == null) {
+      return const HealthSummarySectionData.unavailable(
+        message:
+            'Horário confiável indisponível. Os demais dados do resumo continuam disponíveis.',
+      );
+    }
     final result = await _coexistenceReadSource!.loadToday(
       dogId,
-      serverNow: _clock().toUtc(),
+      serverNow: temporal.now,
     );
 
     if ((result.isData || result.isDegraded) && result.value != null) {
@@ -133,6 +151,19 @@ class HealthSummaryNutritionReader {
         mealsPlanned: plannedCount,
         unitLabel: 'g',
       );
+      if (temporal.isStale) {
+        return HealthSummarySectionData.degraded(
+          view,
+          message:
+              'Horário aguardando atualização. Os dados permanecem disponíveis para consulta.',
+        );
+      }
+      if (temporal.failure != null) {
+        return HealthSummarySectionData.degraded(
+          view,
+          message: 'Falha ao atualizar o horário: ${temporal.failure!.message}',
+        );
+      }
       if (result.isDegraded) {
         return HealthSummarySectionData.degraded(
           view,
@@ -163,5 +194,36 @@ class HealthSummaryNutritionReader {
     return const HealthSummarySectionData.unavailable(
       message: HealthSummaryUserCopy.nutritionUnavailable,
     );
+  }
+
+  Future<({DateTime now, bool isStale, AuthoritativeTimeFailure? failure})?>
+  _resolveTemporalReference({required bool synchronizeTime}) async {
+    final provider = _authoritativeTimeProvider;
+    if (provider == null) {
+      final clock = _testClock;
+      if (clock == null) return null;
+      return (now: clock().toUtc(), isStale: false, failure: null);
+    }
+
+    final syncResult = synchronizeTime ? await provider.synchronize() : null;
+    final failure = syncResult is AuthoritativeTimeSyncFailure
+        ? syncResult.failure
+        : provider.lastFailure;
+    return switch (provider.status) {
+      AuthoritativeTimeStatus.fresh => (
+        now: provider.nowFreshUtc()!,
+        isStale: false,
+        failure: failure,
+      ),
+      AuthoritativeTimeStatus.stale => (
+        now: provider.nowReadOnlyUtc()!,
+        isStale: true,
+        failure: failure,
+      ),
+      AuthoritativeTimeStatus.neverSynchronized ||
+      AuthoritativeTimeStatus.synchronizing ||
+      AuthoritativeTimeStatus.expired ||
+      AuthoritativeTimeStatus.failed => null,
+    };
   }
 }

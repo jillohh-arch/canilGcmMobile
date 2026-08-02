@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
+import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
@@ -17,15 +19,20 @@ import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 ///   nunca sobrescreve dog B.
 /// - Após [dispose], Futures antigas não chamam [notifyListeners].
 /// - Não mistura mutation state (isso é [HealthNutritionMutationController]).
+enum HealthNutritionTemporalState { synchronizing, fresh, stale, unavailable }
+
 class HealthNutritionReadController extends ChangeNotifier {
   HealthNutritionReadController({
     required CoexistenceNutritionReadSource source,
-    DateTime Function()? clock,
+    AuthoritativeTimeProvider? authoritativeTimeProvider,
+    @visibleForTesting DateTime Function()? clock,
   }) : _source = source,
-       _clock = clock ?? (() => DateTime.now().toUtc());
+       _authoritativeTimeProvider = authoritativeTimeProvider,
+       _testClock = clock;
 
   final CoexistenceNutritionReadSource _source;
-  final DateTime Function() _clock;
+  final AuthoritativeTimeProvider? _authoritativeTimeProvider;
+  final DateTime Function()? _testClock;
 
   NutritionReadResult<NutritionCoexistenceSnapshot> _snapshotResult =
       const NutritionReadResult.loading();
@@ -37,6 +44,9 @@ class HealthNutritionReadController extends ChangeNotifier {
   int _generation = 0;
   bool _disposed = false;
   bool _loading = false;
+  HealthNutritionTemporalState _temporalState =
+      HealthNutritionTemporalState.synchronizing;
+  AuthoritativeTimeFailure? _temporalFailure;
 
   NutritionReadResult<NutritionCoexistenceSnapshot> get snapshotResult =>
       _snapshotResult;
@@ -52,6 +62,36 @@ class HealthNutritionReadController extends ChangeNotifier {
       _snapshotResult.valueOrNull;
 
   NutritionTodayReadModel? get todayOrNull => _todayResult?.valueOrNull;
+
+  HealthNutritionTemporalState get temporalState => _temporalState;
+
+  AuthoritativeTimeFailure? get temporalFailure => _temporalFailure;
+
+  bool get temporalActionsAllowed =>
+      _temporalState == HealthNutritionTemporalState.fresh;
+
+  String? get temporalDiagnosticTitle => switch (_temporalState) {
+    HealthNutritionTemporalState.synchronizing =>
+      'Atualizando horário confiável',
+    HealthNutritionTemporalState.stale => 'Horário aguardando atualização',
+    HealthNutritionTemporalState.unavailable =>
+      'Horário confiável indisponível',
+    HealthNutritionTemporalState.fresh when _temporalFailure != null =>
+      'Falha ao atualizar o horário',
+    HealthNutritionTemporalState.fresh => null,
+  };
+
+  String? get temporalDiagnosticMessage => switch (_temporalState) {
+    HealthNutritionTemporalState.synchronizing =>
+      'Ações dependentes de horário permanecem bloqueadas até o fim da sincronização.',
+    HealthNutritionTemporalState.stale =>
+      'Os dados permanecem disponíveis para consulta. Atualize a sincronização antes de registrar novas ações.',
+    HealthNutritionTemporalState.unavailable =>
+      'Os dados podem ser consultados, mas ações dependentes de horário estão temporariamente bloqueadas.',
+    HealthNutritionTemporalState.fresh when _temporalFailure != null =>
+      _temporalFailure!.message,
+    HealthNutritionTemporalState.fresh => null,
+  };
 
   /// Seleciona o K9 e carrega o snapshot de coexistência.
   ///
@@ -72,6 +112,7 @@ class HealthNutritionReadController extends ChangeNotifier {
       dogId: normalized,
       mealsFrom: mealsFrom,
       mealsTo: mealsTo,
+      forceTimeSync: false,
     );
   }
 
@@ -90,6 +131,7 @@ class HealthNutritionReadController extends ChangeNotifier {
       dogId: id,
       mealsFrom: _mealsFrom,
       mealsTo: _mealsTo,
+      forceTimeSync: true,
     );
   }
 
@@ -109,15 +151,49 @@ class HealthNutritionReadController extends ChangeNotifier {
     required String dogId,
     DateTime? mealsFrom,
     DateTime? mealsTo,
+    required bool forceTimeSync,
   }) async {
     if (!_isCurrent(generation, dogId)) return;
 
     _loading = true;
-    _snapshotResult = const NutritionReadResult.loading(
-      message: 'Carregando nutrição…',
-    );
-    _todayResult = const NutritionReadResult.loading();
+    _temporalState = HealthNutritionTemporalState.synchronizing;
+    _temporalFailure = null;
+    if (_snapshotResult.valueOrNull == null) {
+      _snapshotResult = const NutritionReadResult.loading(
+        message: 'Carregando nutrição…',
+      );
+      _todayResult = const NutritionReadResult.loading();
+    }
     _safeNotify();
+
+    DateTime? referenceNow;
+    final provider = _authoritativeTimeProvider;
+    final testClock = _testClock;
+    if (provider != null) {
+      final syncResult = await provider.synchronize(force: forceTimeSync);
+      if (!_isCurrent(generation, dogId)) return;
+      if (syncResult is AuthoritativeTimeSyncFailure) {
+        _temporalFailure = syncResult.failure;
+      }
+      switch (provider.status) {
+        case AuthoritativeTimeStatus.fresh:
+          _temporalState = HealthNutritionTemporalState.fresh;
+          referenceNow = provider.nowFreshUtc();
+        case AuthoritativeTimeStatus.stale:
+          _temporalState = HealthNutritionTemporalState.stale;
+          referenceNow = provider.nowReadOnlyUtc();
+        case AuthoritativeTimeStatus.neverSynchronized:
+        case AuthoritativeTimeStatus.synchronizing:
+        case AuthoritativeTimeStatus.expired:
+        case AuthoritativeTimeStatus.failed:
+          _temporalState = HealthNutritionTemporalState.unavailable;
+      }
+    } else if (testClock != null) {
+      _temporalState = HealthNutritionTemporalState.fresh;
+      referenceNow = testClock().toUtc();
+    } else {
+      _temporalState = HealthNutritionTemporalState.unavailable;
+    }
 
     NutritionReadResult<NutritionCoexistenceSnapshot> snapshot;
     try {
@@ -142,11 +218,27 @@ class HealthNutritionReadController extends ChangeNotifier {
 
     NutritionReadResult<NutritionTodayReadModel> today;
     try {
-      today = _source.projectTodayFromSnapshot(
-        dogId: dogId,
-        snapshotResult: snapshot,
-        serverNow: _clock(),
-      );
+      if (referenceNow == null) {
+        today = const NutritionReadResult.error(
+          message: 'Horário confiável indisponível.',
+          code: 'authoritative_time_unavailable',
+        );
+      } else {
+        today = _source.projectTodayFromSnapshot(
+          dogId: dogId,
+          snapshotResult: snapshot,
+          serverNow: referenceNow,
+        );
+        if (_temporalState == HealthNutritionTemporalState.stale &&
+            today.valueOrNull != null) {
+          today = NutritionReadResult.degraded(
+            today.valueOrNull!,
+            message:
+                'Horário aguardando atualização. Os dados permanecem disponíveis para consulta.',
+            code: 'authoritative_time_stale',
+          );
+        }
+      }
     } catch (e, st) {
       assert(() {
         debugPrint(
@@ -202,4 +294,8 @@ class HealthNutritionReadController extends ChangeNotifier {
 
   @visibleForTesting
   int get generationForTest => _generation;
+
+  @visibleForTesting
+  AuthoritativeTimeProvider? get authoritativeTimeProviderForTest =>
+      _authoritativeTimeProvider;
 }

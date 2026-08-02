@@ -168,6 +168,7 @@ _pump(
       canonicalPlanReader: planReader,
       canonicalMealReader: mealReader,
     ),
+    clock: () => DateTime.now().toUtc(),
   );
   await read.selectDog('dog-a');
   final gateway = _Gateway();

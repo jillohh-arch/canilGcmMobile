@@ -138,6 +138,7 @@ final class NutritionTodayReadModel {
     required this.dogId,
     required this.localServiceDate,
     required this.timezone,
+    required this.referenceNow,
     this.activePlan,
     this.meals = const [],
     this.canonicalSupplementLogs = const [],
@@ -148,6 +149,9 @@ final class NutritionTodayReadModel {
   final String dogId;
   final String localServiceDate;
   final String timezone;
+
+  /// Instante normativo usado para gerar esta projeção diária.
+  final DateTime referenceNow;
   final NutritionActivePlanRef? activePlan;
   final List<NutritionMealReadItem> meals;
   final List<SupplementLog> canonicalSupplementLogs;
