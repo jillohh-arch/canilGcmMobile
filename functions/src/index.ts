@@ -38,6 +38,7 @@ import {
 import {readActivationGuard} from "./health_timeline_activation_guard";
 import {runHealthTimelineRecordShadowTelemetry} from "./health_timeline_shadow_telemetry_callable";
 import {FirestoreHealthTimelineShadowTelemetryAggregateWriter} from "./health_timeline_shadow_telemetry_firestore_adapter";
+import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 
 admin.initializeApp();
 
@@ -45,6 +46,17 @@ const db = admin.firestore();
 const region = "southamerica-east1";
 
 type JsonMap = Record<string, unknown>;
+
+/**
+ * Horário autoritativo genérico do sistema.
+ * Auth obrigatória; read-only; App Check não enforced nesta primeira versão.
+ */
+export const systemAuthoritativeTimeNow = onCall({region}, async (request) => {
+  return runSystemAuthoritativeTimeNow(request, {
+    nowMs: () => Date.now(),
+    requestId: () => crypto.randomUUID(),
+  });
+});
 
 const ACTION_REQUIRED_NOTIFICATION_TYPES = new Set([
   "vehicle_crew_invitation",
