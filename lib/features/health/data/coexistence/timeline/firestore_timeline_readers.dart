@@ -356,6 +356,42 @@ abstract final class FirestoreTimelineReaders {
     );
   }
 
+  static HealthTimelineSourceReader mealLogs({
+    FirebaseFirestore? firestore,
+  }) {
+    return FirestoreOrderedTimelineReader(
+      sourceKey: HealthTimelineMappers.sourceMealLogs,
+      dateField: 'fed_at',
+      firestore: firestore,
+      tryMap:
+          ({required dogId, required docId, required data, required filters}) =>
+              HealthTimelineMappers.mapCanonicalMealLog(
+                dogId: dogId,
+                docId: docId,
+                data: data,
+                filters: filters,
+              ),
+    );
+  }
+
+  static HealthTimelineSourceReader supplementLogs({
+    FirebaseFirestore? firestore,
+  }) {
+    return FirestoreOrderedTimelineReader(
+      sourceKey: HealthTimelineMappers.sourceSupplementLogs,
+      dateField: 'administered_at',
+      firestore: firestore,
+      tryMap:
+          ({required dogId, required docId, required data, required filters}) =>
+              HealthTimelineMappers.mapCanonicalSupplementLog(
+                dogId: dogId,
+                docId: docId,
+                data: data,
+                filters: filters,
+              ),
+    );
+  }
+
   /// Vacinas raiz — **sem** orderBy servidor (índice composto ausente).
   static HealthTimelineSourceReader legacyVacinas({
     FirebaseFirestore? firestore,

@@ -34,8 +34,16 @@ abstract final class HealthTimelineMappers {
   static const sourceFeedingEvents = 'feeding_events';
   static const sourceFeedings = 'feedings';
   static const sourceVacinas = 'vacinas';
+  static const sourceMealLogs = 'meal_logs';
+  static const sourceSupplementLogs = 'supplement_logs';
 
   static String globalId(String sourceKey, String docId) => '$sourceKey:$docId';
+
+  static String _formatGramValue(num grams) {
+    return grams == grams.roundToDouble()
+        ? '${grams.toInt()} g'
+        : '${grams.toStringAsFixed(1).replaceAll('.', ',')} g';
+  }
 
   /// Mensagem pública para leitura inconclusiva (sem PHI / reason bruto).
   static const inconclusivePublicMessage =
@@ -359,6 +367,222 @@ abstract final class HealthTimelineMappers {
         legacyId: docId,
       ),
     );
+    if (!matchesFilters(entry, filters)) {
+      return const TimelineIgnored('query_filter');
+    }
+    return TimelineMapped(entry);
+  }
+
+  static TimelineMappingResult mapCanonicalMealLog({
+    required String dogId,
+    required String docId,
+    required Map<String, dynamic> data,
+    required HealthTimelineQuery filters,
+  }) {
+    if (HealthSummarySoftDelete.isSoftDeleted(data)) {
+      return const TimelineIgnored('soft_deleted');
+    }
+
+    if (filters.types.isNotEmpty &&
+        !filters.types.contains(HealthTimelineType.meal)) {
+      return const TimelineIgnored('type_filter');
+    }
+
+    final dateRaw = data['fed_at'];
+    final occurredAt = HealthSummaryDateParse.tryParse(dateRaw);
+    if (occurredAt == null) {
+      return TimelineInvalid(_dateReason(dateRaw));
+    }
+
+    final rawConsumed = data['consumed_grams'];
+    final rawOffered = data['offered_grams'] ?? data['legacy_amount_grams'] ?? data['amount_grams'];
+
+    String subtitle;
+    if (rawConsumed != null) {
+      if (rawConsumed is num && rawConsumed.isFinite) {
+        subtitle = '${_formatGramValue(rawConsumed)} consumidos';
+      } else {
+        return const TimelineInvalid(TimelineMappingInvalidReason.invalidRequiredStructure);
+      }
+    } else if (rawOffered != null) {
+      if (rawOffered is num && rawOffered.isFinite) {
+        subtitle = '${_formatGramValue(rawOffered)} oferecidos · consumo não informado';
+      } else {
+        return const TimelineInvalid(TimelineMappingInvalidReason.invalidRequiredStructure);
+      }
+    } else {
+      subtitle = 'Consumo não informado';
+    }
+
+    final title = 'Alimentação registrada';
+
+    ProfessionalIdentitySummary? professional;
+    final profRaw = data['professional'];
+    if (profRaw is Map) {
+      final pName = profRaw['name']?.toString().trim();
+      if (pName != null && pName.isNotEmpty) {
+        final clinic = profRaw['clinic']?.toString().trim();
+        professional = ProfessionalIdentitySummary(
+          name: pName,
+          specialty: (clinic == null || clinic.isEmpty) ? null : clinic,
+        );
+      }
+    }
+
+    final hasAttachment =
+        (data['attachment_refs'] is List &&
+            (data['attachment_refs'] as List).isNotEmpty);
+
+    final legacyId = data['legacy_id']?.toString().trim();
+    final legacySource = data['legacy_source']?.toString().trim();
+    final String entryId;
+    if (legacyId != null && legacyId.isNotEmpty) {
+      if (legacySource == 'feedings' || legacySource == 'feeding_events') {
+        entryId = 'feeding:$legacyId';
+      } else if (legacySource == 'vacinas') {
+        entryId = 'vacinas:$legacyId';
+      } else if (legacySource != null && legacySource.isNotEmpty) {
+        entryId = '$legacySource:$legacyId';
+      } else {
+        entryId = globalId(sourceMealLogs, docId);
+      }
+    } else {
+      entryId = globalId(sourceMealLogs, docId);
+    }
+
+    final entry = HealthTimelineEntryView(
+      id: entryId,
+      dogId: dogId,
+      type: HealthTimelineTypeView.known(HealthTimelineType.meal),
+      occurredAt: occurredAt,
+      recordedAt:
+          HealthSummaryDateParse.tryParse(data['created_at']) ??
+          HealthSummaryDateParse.tryParse(data['createdAt']) ??
+          occurredAt,
+      title: title,
+      subtitle: subtitle,
+      status: HealthTimelineEntryStatus.finalised,
+      caseId: data['case_id']?.toString() ?? data['caseId']?.toString(),
+      professional: professional,
+      hasAttachments: hasAttachment,
+      attachmentCount: hasAttachment
+          ? (data['attachment_refs'] as List).length
+          : null,
+      detailReference: HealthTimelineDetailReference(
+        sourceType: sourceMealLogs,
+        sourceId: docId,
+        caseId: data['case_id']?.toString() ?? data['caseId']?.toString(),
+      ),
+      traceability: HealthTimelineTraceability(
+        sourceCollection: 'dogs/{dogId}/meal_logs',
+        sourceId: docId,
+        legacySource: legacySource,
+        legacyId: legacyId,
+      ),
+    );
+
+    if (!matchesFilters(entry, filters)) {
+      return const TimelineIgnored('query_filter');
+    }
+    return TimelineMapped(entry);
+  }
+
+  static TimelineMappingResult mapCanonicalSupplementLog({
+    required String dogId,
+    required String docId,
+    required Map<String, dynamic> data,
+    required HealthTimelineQuery filters,
+  }) {
+    if (HealthSummarySoftDelete.isSoftDeleted(data)) {
+      return const TimelineIgnored('soft_deleted');
+    }
+
+    if (filters.types.isNotEmpty &&
+        !filters.types.contains(HealthTimelineType.supplement)) {
+      return const TimelineIgnored('type_filter');
+    }
+
+    final dateRaw = data['administered_at'];
+    final occurredAt = HealthSummaryDateParse.tryParse(dateRaw);
+    if (occurredAt == null) {
+      return TimelineInvalid(_dateReason(dateRaw));
+    }
+
+    final name = data['supplement_name']?.toString().trim() ?? 'Suplemento';
+    final dose = data['dose'];
+    final unit = data['unit']?.toString().trim();
+
+    String? subtitle;
+    if (dose != null) {
+      final unitStr = unit != null ? ' $unit' : '';
+      subtitle = '$dose$unitStr';
+    }
+
+    ProfessionalIdentitySummary? professional;
+    final profRaw = data['professional'];
+    if (profRaw is Map) {
+      final pName = profRaw['name']?.toString().trim();
+      if (pName != null && pName.isNotEmpty) {
+        final clinic = profRaw['clinic']?.toString().trim();
+        professional = ProfessionalIdentitySummary(
+          name: pName,
+          specialty: (clinic == null || clinic.isEmpty) ? null : clinic,
+        );
+      }
+    }
+
+    final hasAttachment =
+        (data['attachment_refs'] is List &&
+            (data['attachment_refs'] as List).isNotEmpty);
+
+    final legacyId = data['legacy_id']?.toString().trim();
+    final legacySource = data['legacy_source']?.toString().trim();
+    final String entryId;
+    if (legacyId != null && legacyId.isNotEmpty) {
+      if (legacySource == 'vacinas') {
+        entryId = 'vacinas:$legacyId';
+      } else if (legacySource == 'feedings' || legacySource == 'feeding_events') {
+        entryId = 'feeding:$legacyId';
+      } else if (legacySource != null && legacySource.isNotEmpty) {
+        entryId = '$legacySource:$legacyId';
+      } else {
+        entryId = globalId(sourceSupplementLogs, docId);
+      }
+    } else {
+      entryId = globalId(sourceSupplementLogs, docId);
+    }
+
+    final entry = HealthTimelineEntryView(
+      id: entryId,
+      dogId: dogId,
+      type: HealthTimelineTypeView.known(HealthTimelineType.supplement),
+      occurredAt: occurredAt,
+      recordedAt:
+          HealthSummaryDateParse.tryParse(data['created_at']) ??
+          HealthSummaryDateParse.tryParse(data['createdAt']) ??
+          occurredAt,
+      title: name,
+      subtitle: subtitle,
+      status: HealthTimelineEntryStatus.finalised,
+      caseId: data['case_id']?.toString() ?? data['caseId']?.toString(),
+      professional: professional,
+      hasAttachments: hasAttachment,
+      attachmentCount: hasAttachment
+          ? (data['attachment_refs'] as List).length
+          : null,
+      detailReference: HealthTimelineDetailReference(
+        sourceType: sourceSupplementLogs,
+        sourceId: docId,
+        caseId: data['case_id']?.toString() ?? data['caseId']?.toString(),
+      ),
+      traceability: HealthTimelineTraceability(
+        sourceCollection: 'dogs/{dogId}/supplement_logs',
+        sourceId: docId,
+        legacySource: legacySource,
+        legacyId: legacyId,
+      ),
+    );
+
     if (!matchesFilters(entry, filters)) {
       return const TimelineIgnored('query_filter');
     }

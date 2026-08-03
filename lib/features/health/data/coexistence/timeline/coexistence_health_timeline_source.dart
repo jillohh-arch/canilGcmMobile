@@ -75,6 +75,8 @@ class CoexistenceHealthTimelineSource implements HealthTimelineSource {
     final base = <HealthTimelineSourceReader>[
       FirestoreTimelineReaders.healthEvents(firestore: fs),
       FirestoreTimelineReaders.weightRecords(firestore: fs),
+      FirestoreTimelineReaders.mealLogs(firestore: fs),
+      FirestoreTimelineReaders.supplementLogs(firestore: fs),
       FirestoreTimelineReaders.feedingEvents(firestore: fs),
       FirestoreTimelineReaders.feedings(firestore: fs),
     ];
@@ -122,7 +124,10 @@ class CoexistenceHealthTimelineSource implements HealthTimelineSource {
               return types.contains(HealthTimelineType.weight);
             case HealthTimelineMappers.sourceFeedingEvents:
             case HealthTimelineMappers.sourceFeedings:
+            case HealthTimelineMappers.sourceMealLogs:
               return types.contains(HealthTimelineType.meal);
+            case HealthTimelineMappers.sourceSupplementLogs:
+              return types.contains(HealthTimelineType.supplement);
             case HealthTimelineMappers.sourceVacinas:
               return types.contains(HealthTimelineType.vaccination);
             case HealthTimelineMappers.sourceHealthEvents:
