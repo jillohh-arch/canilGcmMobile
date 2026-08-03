@@ -5,7 +5,7 @@ import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:intl/intl.dart';
 
-/// Copy e formatação de apresentação — Nutrição Hoje (Gate 5B).
+/// Copy e formatação de apresentação — Nutrição Hoje (Gate 5B / UX-04C).
 /// Sem write. Sem inventar slots/legados.
 abstract final class HealthNutritionTodayFormatters {
   HealthNutritionTodayFormatters._();
@@ -81,6 +81,93 @@ abstract final class HealthNutritionTodayFormatters {
       if (o.isFinite && o > 0) sum += o;
     }
     return sum;
+  }
+
+  /// Agregação de ofertas.
+  static ({double? sum, bool hasAnyMeal, bool hasRegisteredOffer})
+  offeredAggregation(Iterable<NutritionMealReadItem> meals) {
+    var sum = 0.0;
+    var count = 0;
+    var anyOffer = false;
+    for (final item in meals) {
+      count++;
+      final o = item.meal.offeredGrams;
+      if (o.isFinite && o >= 0) {
+        anyOffer = true;
+        sum += o;
+      }
+    }
+    return (
+      sum: anyOffer ? sum : null,
+      hasAnyMeal: count > 0,
+      hasRegisteredOffer: anyOffer,
+    );
+  }
+
+  /// Percentual textual determinístico de progresso em relação à meta.
+  static String percentageText({
+    required num? planned,
+    required double? consumedMeasured,
+    required bool hasUnknownConsumed,
+  }) {
+    if (planned == null || !planned.isFinite || planned <= 0) {
+      return 'Progresso indisponível (meta não informada)';
+    }
+    if (consumedMeasured == null) {
+      if (hasUnknownConsumed) {
+        return 'Progresso indisponível (medição não realizada)';
+      }
+      return 'Progresso indisponível (nenhum consumo registrado)';
+    }
+    final ratio = consumedMeasured / planned;
+    final percent = (ratio * 100).round();
+    if (percent >= 100) {
+      if (percent == 100) return 'Meta diária atingida (100%)';
+      return '$percent% da meta diária consumida (acima da meta)';
+    }
+    return '$percent% da meta diária consumida';
+  }
+
+  /// Texto do campo Restante determinístico.
+  static String remainingText({
+    required num? planned,
+    required double? consumedMeasured,
+    required bool hasUnknownConsumed,
+    required bool hasRegisteredConsumption,
+  }) {
+    if (planned == null || !planned.isFinite || planned <= 0) {
+      return '—';
+    }
+    if (consumedMeasured == null) {
+      if (hasUnknownConsumed) {
+        return 'Até ${grams(planned)}';
+      }
+      return 'Não calculado';
+    }
+    final rem = (planned - consumedMeasured).clamp(0.0, double.infinity);
+    if (hasUnknownConsumed) {
+      return 'Até ${grams(rem)}';
+    }
+    return grams(rem);
+  }
+
+  /// Badge operacional para o resumo de hoje (máximo um badge principal).
+  static String? statusBadgeText({
+    required num? planned,
+    required double? consumedMeasured,
+    required bool hasUnknownConsumed,
+    required bool hasAnyMeal,
+  }) {
+    final validPlan = planned != null && planned.isFinite && planned > 0;
+    if (hasUnknownConsumed) return 'Medição incompleta';
+    if (validPlan && consumedMeasured != null) {
+      final ratio = consumedMeasured / planned;
+      if (ratio > 1.0) return 'Acima da meta';
+      if (ratio >= 0.999) return 'Meta atingida';
+      if (consumedMeasured > 0) return 'Dentro do plano';
+    }
+    if (!hasAnyMeal) return 'Sem registro';
+    return null;
   }
 
   static String dateShort(DateTime instant, {required String timezone}) {
@@ -182,8 +269,6 @@ abstract final class NutritionTodaySlotUi {
     required String timezone,
   }) {
     if (meal != null) return NutritionTodaySlotUiStatus.completed;
-    // Late: comparação civil simples HH:mm vs agora no TZ do plano.
-    // Sem inventar occurrence; só apresentação.
     final parts = slot.scheduledTime.value.split(':');
     if (parts.length < 2) return NutritionTodaySlotUiStatus.pending;
     final h = int.tryParse(parts[0]);

@@ -370,7 +370,7 @@ void main() {
 
     expect(find.textContaining('Ração Premium'), findsOneWidget);
     expect(find.textContaining('MANHÃ'), findsWidgets);
-    expect(find.textContaining('Plano ativo'), findsOneWidget);
+    expect(find.textContaining('PLANO ALIMENTAR ATIVO'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('Hoje ·'),
       400,
@@ -427,16 +427,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Oferecido: 500 g de 500 g'), findsOneWidget);
-    expect(find.text('Consumido conhecido: 250 g de 500 g'), findsOneWidget);
-    expect(find.text('Há refeições sem quantidade consumida'), findsOneWidget);
+    expect(find.text('250 g mensurados'), findsWidgets);
+    expect(find.text('Meta diária: 500 g'), findsWidgets);
+    expect(find.text('Até 250 g'), findsOneWidget);
+    expect(
+      find.text('Cálculo baseado apenas nas quantidades medidas'),
+      findsOneWidget,
+    );
     final bars = tester
         .widgetList<LinearProgressIndicator>(
           find.byType(LinearProgressIndicator),
         )
         .toList();
-    expect(bars[0].value, 1);
-    expect(bars[1].value, 0.5);
+    expect(bars[0].value, 0.5);
   });
 
   testWidgets('aceitação full sem consumo explica ausência de medição', (
@@ -477,13 +480,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Quantidade consumida não medida'),
+      find.text('Quantidade consumida não medida').first,
       300,
       scrollable: find.byType(Scrollable).first,
     );
 
     expect(find.text('Aceitou tudo'), findsOneWidget);
-    expect(find.text('Quantidade consumida não medida'), findsOneWidget);
+    expect(find.text('Quantidade consumida não medida'), findsWidgets);
     expect(find.text('Não informado'), findsOneWidget);
   });
 
@@ -730,7 +733,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'surface $size');
-      expect(find.textContaining('Plano ativo'), findsOneWidget);
+      expect(find.text('CONSUMO DE HOJE'), findsOneWidget);
     }
   });
 

@@ -655,7 +655,7 @@ class _TodaySummaryCard extends StatelessWidget {
       NutritionActiveLegacyPlan(:final view) => view.amountGramsPerDay,
       _ => null,
     };
-    final offered = HealthNutritionTodayFormatters.offeredSum(meals);
+    final offered = HealthNutritionTodayFormatters.offeredAggregation(meals);
     final consumed = HealthNutritionTodayFormatters.consumedAggregation(meals);
     final mealsPlanned = switch (plan) {
       NutritionActiveCanonicalPlan(:final plan) => plan.mealsPerDay,
@@ -665,84 +665,286 @@ class _TodaySummaryCard extends StatelessWidget {
     final completed = plannedMealsCompleted;
 
     final validPlan = planned != null && planned.isFinite && planned > 0;
+    final validConsumedMeasured =
+        consumed.knownSum != null && consumed.knownSum!.isFinite;
+
+    final progressRatio = validPlan && validConsumedMeasured
+        ? (consumed.knownSum! / planned).toDouble()
+        : null;
+
+    final progressClamped = progressRatio?.clamp(0.0, 1.0).toDouble();
+
+    final hasRegisteredConsumption =
+        consumed.knownSum != null || consumed.hasUnknownConsumed;
+
+    final primaryText = switch ((
+      validPlan,
+      consumed.knownSum,
+      consumed.hasUnknownConsumed,
+    )) {
+      (true, final double sum, false) =>
+        '${HealthNutritionTodayFormatters.grams(sum)} de ${HealthNutritionTodayFormatters.grams(planned)}',
+      (true, final double sum, true) =>
+        '${HealthNutritionTodayFormatters.grams(sum)} mensurados',
+      (true, null, true) => 'Quantidade consumida não medida',
+      (true, null, false) => 'Consumo não registrado',
+      (false, final double sum, true) =>
+        '${HealthNutritionTodayFormatters.grams(sum)} mensurados',
+      (false, final double sum, false) =>
+        HealthNutritionTodayFormatters.grams(sum),
+      (false, null, true) => 'Quantidade consumida não medida',
+      (false, null, false) => 'Consumo não registrado',
+    };
+
+    final secondaryText = switch ((
+      validPlan,
+      consumed.knownSum,
+      consumed.hasUnknownConsumed,
+    )) {
+      (true, final double sum, false) =>
+        HealthNutritionTodayFormatters.percentageText(
+          planned: planned,
+          consumedMeasured: sum,
+          hasUnknownConsumed: false,
+        ),
+      (true, _, _) =>
+        'Meta diária: ${HealthNutritionTodayFormatters.grams(planned)}',
+      (false, _, _) => 'Meta diária não informada',
+    };
+
+    final offeredText = offered.hasRegisteredOffer
+        ? HealthNutritionTodayFormatters.grams(offered.sum)
+        : 'Não registrado';
+
+    final consumedText = consumed.knownSum != null
+        ? '${HealthNutritionTodayFormatters.grams(consumed.knownSum)}${consumed.hasUnknownConsumed ? ' mensurados' : ''}'
+        : (consumed.hasUnknownConsumed ? 'Não medido' : 'Não registrado');
+
+    final remainingText = HealthNutritionTodayFormatters.remainingText(
+      planned: planned,
+      consumedMeasured: consumed.knownSum,
+      hasUnknownConsumed: consumed.hasUnknownConsumed,
+      hasRegisteredConsumption: hasRegisteredConsumption,
+    );
+
+    final statusBadge = HealthNutritionTodayFormatters.statusBadgeText(
+      planned: planned,
+      consumedMeasured: consumed.knownSum,
+      hasUnknownConsumed: consumed.hasUnknownConsumed,
+      hasAnyMeal: consumed.hasAnyMeal,
+    );
+
+    final String semanticsPrimary;
+    if (primaryText.contains(' de ')) {
+      semanticsPrimary = '$primaryText.';
+    } else if (validPlan) {
+      semanticsPrimary =
+          '$primaryText. Meta diária de ${HealthNutritionTodayFormatters.grams(planned).replaceAll('g', 'gramas')}.';
+    } else {
+      semanticsPrimary = '$primaryText.';
+    }
+
+    final String semanticsOffered;
+    if (offered.hasRegisteredOffer) {
+      semanticsOffered =
+          '${HealthNutritionTodayFormatters.grams(offered.sum).replaceAll('g', 'gramas')} oferecidos.';
+    } else {
+      semanticsOffered = 'Quantidade oferecida não registrada.';
+    }
+
+    final String semanticsConsumed;
+    if (consumed.knownSum != null) {
+      semanticsConsumed =
+          '${HealthNutritionTodayFormatters.grams(consumed.knownSum).replaceAll('g', 'gramas')} consumidos${consumed.hasUnknownConsumed ? ' mensurados' : ''}.';
+    } else if (consumed.hasUnknownConsumed) {
+      semanticsConsumed = 'Consumo não medido.';
+    } else {
+      semanticsConsumed = 'Quantidade consumida não registrada.';
+    }
+
+    final String semanticsRemaining;
+    if (remainingText == 'Não calculado') {
+      semanticsRemaining = 'Restante não calculado.';
+    } else if (remainingText.startsWith('Até ')) {
+      final val = remainingText.substring(4).replaceAll('g', 'gramas');
+      semanticsRemaining = 'Restante de até $val pela medição disponível.';
+    } else {
+      semanticsRemaining =
+          'Restante: ${remainingText.replaceAll('g', 'gramas')}.';
+    }
+
+    final semanticsLabel = [
+      if (statusBadge != null) 'Status: $statusBadge.',
+      semanticsPrimary,
+      semanticsOffered,
+      semanticsConsumed,
+      semanticsRemaining,
+      if (consumed.hasUnknownConsumed)
+        'Há refeição com quantidade consumida não medida.',
+      mealsPlanned == null
+          ? '$completed refeições executadas.'
+          : '$completed de $mealsPlanned refeições executadas.',
+    ].join(' ');
 
     return HealthSummaryCardSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            runSpacing: 6,
-            spacing: 8,
-            children: [
-              Text(
-                'CONSUMO DE HOJE',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+      child: Semantics(
+        label: semanticsLabel,
+        excludeSemantics: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 6,
+              spacing: 8,
+              children: [
+                Text(
+                  'CONSUMO DE HOJE',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (statusBadge != null)
+                      _chip(statusBadge, _badgeColor(statusBadge)),
+                    if (plan is NutritionActiveLegacyPlan)
+                      _chip('Plano anterior', AppTheme.attention),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              primaryText,
+              style: GoogleFonts.inter(
+                color: AppTheme.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              secondaryText,
+              style: GoogleFonts.inter(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (progressClamped != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: progressClamped,
+                  minHeight: 8,
+                  backgroundColor: AppTheme.outlineVariant,
+                  color: AppTheme.success,
                 ),
               ),
-              if (plan is NutritionActiveLegacyPlan)
-                _chip('Plano anterior', AppTheme.attention),
-              if (plan is NutritionActiveCanonicalPlan)
-                _chip('Plano ativo', AppTheme.success),
             ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            validPlan
-                ? 'Meta diária: ${HealthNutritionTodayFormatters.grams(planned)}'
-                : 'Meta diária não informada',
-            style: GoogleFonts.inter(
-              color: AppTheme.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _metricColumn(
+                  label: 'OFERECIDO',
+                  value: offeredText,
+                  valueColor: offered.hasRegisteredOffer
+                      ? AppTheme.attention
+                      : AppTheme.textMuted,
+                ),
+                _metricColumn(
+                  label: 'CONSUMIDO',
+                  value: consumedText,
+                  valueColor: consumed.knownSum != null
+                      ? AppTheme.success
+                      : AppTheme.textMuted,
+                ),
+                _metricColumn(
+                  label: 'RESTANTE',
+                  value: remainingText,
+                  valueColor: AppTheme.textPrimary,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 14),
-          _DailyProgressMetric(
-            label: 'Oferecido',
-            amount: offered,
-            planned: validPlan ? planned : null,
-            color: AppTheme.attention,
-          ),
-          const SizedBox(height: 12),
-          _DailyProgressMetric(
-            label: consumed.hasUnknownConsumed && consumed.knownSum != null
-                ? 'Consumido conhecido'
-                : 'Consumido',
-            amount: consumed.knownSum,
-            planned: validPlan ? planned : null,
-            color: AppTheme.success,
-            unknownText: 'Consumido: não informado',
-          ),
-          if (consumed.hasUnknownConsumed && consumed.knownSum != null) ...[
-            const SizedBox(height: 6),
+            if (consumed.hasUnknownConsumed) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Cálculo baseado apenas nas quantidades medidas',
+                style: GoogleFonts.inter(
+                  color: AppTheme.warningAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
             Text(
-              'Há refeições sem quantidade consumida',
+              mealsPlanned == null
+                  ? '$completed refeições executadas'
+                  : '$completed de $mealsPlanned refeições executadas',
               style: GoogleFonts.inter(
-                color: AppTheme.warningAccent,
-                fontSize: 12,
+                color: AppTheme.textSecondary,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
-          const SizedBox(height: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _metricColumn({
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            mealsPlanned == null
-                ? '$completed refeições executadas'
-                : '$completed de $mealsPlanned refeições executadas',
+            label,
             style: GoogleFonts.inter(
-              color: AppTheme.textSecondary,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+              color: AppTheme.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              color: valueColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Color _badgeColor(String badge) {
+    if (badge == 'Meta atingida' || badge == 'Acima da meta') {
+      return AppTheme.success;
+    }
+    if (badge == 'Dentro do plano') {
+      return AppTheme.primary;
+    }
+    if (badge == 'Medição incompleta') {
+      return AppTheme.warningAccent;
+    }
+    return AppTheme.attention;
   }
 
   Widget _chip(String text, Color color) {
@@ -760,73 +962,6 @@ class _TodaySummaryCard extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),
-      ),
-    );
-  }
-}
-
-class _DailyProgressMetric extends StatelessWidget {
-  const _DailyProgressMetric({
-    required this.label,
-    required this.amount,
-    required this.planned,
-    required this.color,
-    this.unknownText,
-  });
-
-  final String label;
-  final double? amount;
-  final num? planned;
-  final Color color;
-  final String? unknownText;
-
-  @override
-  Widget build(BuildContext context) {
-    final validAmount = amount != null && amount!.isFinite;
-    final validPlan = planned != null && planned!.isFinite && planned! > 0;
-    final progress = validAmount && validPlan
-        ? (amount! / planned!).clamp(0.0, 1.0).toDouble()
-        : null;
-    final text = !validAmount
-        ? (unknownText ?? '$label: não informado')
-        : validPlan
-        ? '$label: ${HealthNutritionTodayFormatters.grams(amount)} de '
-              '${HealthNutritionTodayFormatters.grams(planned)}'
-        : '$label: ${HealthNutritionTodayFormatters.grams(amount)}';
-    final semanticsLabel = !validAmount
-        ? '$label, quantidade não informada.'
-        : validPlan
-        ? '$label, ${amount!.round()} gramas de uma meta de '
-              '${planned!.round()} gramas, ${(progress! * 100).round()} por cento.'
-        : '$label, ${amount!.round()} gramas. Meta diária não informada.';
-
-    return Semantics(
-      label: semanticsLabel,
-      excludeSemantics: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            text,
-            style: GoogleFonts.inter(
-              color: validAmount ? AppTheme.textPrimary : AppTheme.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 7,
-                backgroundColor: AppTheme.outlineVariant,
-                color: color,
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

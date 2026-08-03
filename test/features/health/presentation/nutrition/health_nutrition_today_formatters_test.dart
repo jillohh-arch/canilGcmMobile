@@ -1,5 +1,3 @@
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
@@ -7,72 +5,201 @@ import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final actor = RecordedBy(uid: 'u1', name: 'A', internalRole: 'admin');
-  final t = DateTime.utc(2026, 7, 14, 12);
 
-  MealLog meal({
+  NutritionMealReadItem mealItem({
     required String id,
-    double offered = 100,
+    double offered = 300,
     double? consumed,
-    String acceptance = 'unknown',
   }) {
-    return MealLog(
-      id: id,
-      dogId: 'dog-a',
-      period: MealPeriodWire.parseCanonical('morning'),
-      offeredGrams: offered,
-      acceptance: MealAcceptanceWire.parse(acceptance),
-      fedAt: t,
-      recordedBy: actor,
-      schemaVersion: 1,
-      revision: 1,
-      consumedGrams: consumed,
-    );
-  }
-
-  NutritionMealReadItem item(MealLog m, {NutritionDataOrigin? origin}) {
+    final finalOffered = (consumed != null && consumed > offered)
+        ? consumed
+        : offered;
     return NutritionMealReadItem(
-      meal: m,
-      origin: origin ?? NutritionDataOrigin.canonical,
-      mergeKey: 'k:${m.id}',
+      meal: MealLog(
+        id: id,
+        dogId: 'dog-1',
+        period: MealPeriodWire.parseCanonical('morning'),
+        offeredGrams: finalOffered,
+        consumedGrams: consumed,
+        acceptance: MealAcceptanceWire.parse(
+          consumed == null
+              ? 'full'
+              : (consumed == finalOffered
+                    ? 'full'
+                    : (consumed == 0 ? 'refused' : 'partial')),
+        ),
+        fedAt: DateTime.utc(2026, 7, 22, 12),
+        recordedBy: actor,
+        schemaVersion: 1,
+        revision: 1,
+      ),
+      origin: NutritionDataOrigin.canonical,
+      mergeKey: id,
     );
   }
 
-  group('consumed null != 0', () {
+  group('HealthNutritionTodayFormatters — Consumed Aggregation', () {
     test('sem refeições → knownSum null', () {
-      final a = HealthNutritionTodayFormatters.consumedAggregation(const []);
-      expect(a.knownSum, isNull);
-      expect(a.hasAnyMeal, isFalse);
+      final res = HealthNutritionTodayFormatters.consumedAggregation([]);
+      expect(res.knownSum, isNull);
+      expect(res.hasUnknownConsumed, isFalse);
+      expect(res.hasAnyMeal, isFalse);
     });
 
     test('todas com consumed null → knownSum null (não zero)', () {
-      final a = HealthNutritionTodayFormatters.consumedAggregation([
-        item(meal(id: '1', consumed: null)),
-        item(meal(id: '2', consumed: null)),
+      final res = HealthNutritionTodayFormatters.consumedAggregation([
+        mealItem(id: '1', consumed: null),
+        mealItem(id: '2', consumed: null),
       ]);
-      expect(a.knownSum, isNull);
-      expect(a.hasUnknownConsumed, isTrue);
-      expect(a.hasAnyMeal, isTrue);
+      expect(res.knownSum, isNull);
+      expect(res.hasUnknownConsumed, isTrue);
+      expect(res.hasAnyMeal, isTrue);
     });
 
     test('mistura: soma só conhecidos e marca unknown', () {
-      final a = HealthNutritionTodayFormatters.consumedAggregation([
-        item(meal(id: '1', consumed: 100)),
-        item(meal(id: '2', consumed: null)),
+      final res = HealthNutritionTodayFormatters.consumedAggregation([
+        mealItem(id: '1', consumed: 100),
+        mealItem(id: '2', consumed: null),
       ]);
-      expect(a.knownSum, 100);
-      expect(a.hasUnknownConsumed, isTrue);
+      expect(res.knownSum, 100);
+      expect(res.hasUnknownConsumed, isTrue);
+      expect(res.hasAnyMeal, isTrue);
     });
 
     test('todos conhecidos → soma', () {
-      final a = HealthNutritionTodayFormatters.consumedAggregation([
-        item(meal(id: '1', consumed: 100)),
-        item(meal(id: '2', consumed: 50)),
+      final res = HealthNutritionTodayFormatters.consumedAggregation([
+        mealItem(id: '1', offered: 200, consumed: 100),
+        mealItem(id: '2', offered: 200, consumed: 50),
       ]);
-      expect(a.knownSum, 150);
-      expect(a.hasUnknownConsumed, isFalse);
+      expect(res.knownSum, 150);
+      expect(res.hasUnknownConsumed, isFalse);
+      expect(res.hasAnyMeal, isTrue);
+    });
+  });
+
+  group('HealthNutritionTodayFormatters — UX-04C summary card formatters', () {
+    test(
+      'offeredAggregation diferencia ausência de oferta de zero verdadeiro',
+      () {
+        final noMeals = HealthNutritionTodayFormatters.offeredAggregation([]);
+        expect(noMeals.hasRegisteredOffer, isFalse);
+        expect(noMeals.sum, isNull);
+
+        final registeredOffer =
+            HealthNutritionTodayFormatters.offeredAggregation([
+              mealItem(id: 'm1', offered: 100, consumed: 0),
+            ]);
+        expect(registeredOffer.hasRegisteredOffer, isTrue);
+        expect(registeredOffer.sum, 100);
+      },
+    );
+
+    test('percentageText determinístico', () {
+      expect(
+        HealthNutritionTodayFormatters.percentageText(
+          planned: 500,
+          consumedMeasured: 350,
+          hasUnknownConsumed: false,
+        ),
+        '70% da meta diária consumida',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.percentageText(
+          planned: 500,
+          consumedMeasured: null,
+          hasUnknownConsumed: false,
+        ),
+        'Progresso indisponível (nenhum consumo registrado)',
+      );
+    });
+
+    test('remainingText determinístico (UX-04C Human Review)', () {
+      expect(
+        HealthNutritionTodayFormatters.remainingText(
+          planned: 500,
+          consumedMeasured: null,
+          hasUnknownConsumed: false,
+          hasRegisteredConsumption: false,
+        ),
+        'Não calculado',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.remainingText(
+          planned: 500,
+          consumedMeasured: null,
+          hasUnknownConsumed: true,
+          hasRegisteredConsumption: true,
+        ),
+        'Até 500 g',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.remainingText(
+          planned: 500,
+          consumedMeasured: 250,
+          hasUnknownConsumed: true,
+          hasRegisteredConsumption: true,
+        ),
+        'Até 250 g',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.remainingText(
+          planned: 500,
+          consumedMeasured: 350,
+          hasUnknownConsumed: false,
+          hasRegisteredConsumption: true,
+        ),
+        '150 g',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.remainingText(
+          planned: 500,
+          consumedMeasured: 550,
+          hasUnknownConsumed: false,
+          hasRegisteredConsumption: true,
+        ),
+        '0 g',
+      );
+    });
+
+    test('statusBadgeText determinístico sem Plano ativo', () {
+      expect(
+        HealthNutritionTodayFormatters.statusBadgeText(
+          planned: 500,
+          consumedMeasured: 350,
+          hasUnknownConsumed: false,
+          hasAnyMeal: true,
+        ),
+        'Dentro do plano',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.statusBadgeText(
+          planned: 500,
+          consumedMeasured: null,
+          hasUnknownConsumed: false,
+          hasAnyMeal: false,
+        ),
+        'Sem registro',
+      );
+
+      expect(
+        HealthNutritionTodayFormatters.statusBadgeText(
+          planned: 500,
+          consumedMeasured: null,
+          hasUnknownConsumed: true,
+          hasAnyMeal: true,
+        ),
+        'Medição incompleta',
+      );
     });
   });
 
@@ -106,48 +233,43 @@ void main() {
   });
 
   group('slot status derivado', () {
-    test('completed quando há meal', () {
-      final slot = MealScheduleSlot(
+    MealScheduleSlot slot({String period = 'morning', String time = '07:00'}) {
+      return MealScheduleSlot(
         id: 's1',
-        period: MealPeriodWire.parseCanonical('morning'),
-        scheduledTime: ScheduledTimeOfDay('07:00'),
+        period: MealPeriodWire.parseCanonical(period),
+        scheduledTime: ScheduledTimeOfDay(time),
         targetGrams: 200,
       );
-      final st = NutritionTodaySlotUi.statusFor(
-        slot: slot,
-        meal: item(meal(id: 'm1')),
-        serverNow: DateTime.utc(2026, 7, 14, 20),
-        timezone: NutritionPlan.defaultTimezone,
+    }
+
+    test('completed quando há meal', () {
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot(),
+          meal: mealItem(id: 'm1'),
+          serverNow: DateTime.utc(2026, 7, 14, 20),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.completed,
       );
-      expect(st, NutritionTodaySlotUiStatus.completed);
     });
 
     test('pending sem meal e horário futuro', () {
-      final slot = MealScheduleSlot(
-        id: 's1',
-        period: MealPeriodWire.parseCanonical('night'),
-        scheduledTime: ScheduledTimeOfDay('23:50'),
-        targetGrams: 200,
+      expect(
+        NutritionTodaySlotUi.statusFor(
+          slot: slot(period: 'night', time: '23:50'),
+          meal: null,
+          serverNow: DateTime.utc(2026, 7, 14, 13),
+          timezone: NutritionPlan.defaultTimezone,
+        ),
+        NutritionTodaySlotUiStatus.pending,
       );
-      final st = NutritionTodaySlotUi.statusFor(
-        slot: slot,
-        meal: null,
-        serverNow: DateTime.utc(2026, 7, 14, 13),
-        timezone: NutritionPlan.defaultTimezone,
-      );
-      expect(st, NutritionTodaySlotUiStatus.pending);
     });
 
     test('exactly at planned time remains pending', () {
-      final slot = MealScheduleSlot(
-        id: 's1',
-        period: MealPeriodWire.parseCanonical('morning'),
-        scheduledTime: ScheduledTimeOfDay('07:00'),
-        targetGrams: 200,
-      );
       expect(
         NutritionTodaySlotUi.statusFor(
-          slot: slot,
+          slot: slot(),
           meal: null,
           serverNow: DateTime.utc(2026, 7, 14, 10),
           timezone: NutritionPlan.defaultTimezone,
@@ -157,15 +279,9 @@ void main() {
     });
 
     test('fixed serverNow deterministically decides late', () {
-      final slot = MealScheduleSlot(
-        id: 's1',
-        period: MealPeriodWire.parseCanonical('morning'),
-        scheduledTime: ScheduledTimeOfDay('07:00'),
-        targetGrams: 200,
-      );
       NutritionTodaySlotUiStatus status(DateTime serverNow) =>
           NutritionTodaySlotUi.statusFor(
-            slot: slot,
+            slot: slot(),
             meal: null,
             serverNow: serverNow,
             timezone: NutritionPlan.defaultTimezone,
@@ -186,16 +302,10 @@ void main() {
     });
 
     test('completed takes precedence after planned time', () {
-      final slot = MealScheduleSlot(
-        id: 's1',
-        period: MealPeriodWire.parseCanonical('morning'),
-        scheduledTime: ScheduledTimeOfDay('07:00'),
-        targetGrams: 200,
-      );
       expect(
         NutritionTodaySlotUi.statusFor(
-          slot: slot,
-          meal: item(meal(id: 'm1')),
+          slot: slot(),
+          meal: mealItem(id: 'm1'),
           serverNow: DateTime.utc(2026, 7, 14, 20),
           timezone: NutritionPlan.defaultTimezone,
         ),
@@ -204,15 +314,10 @@ void main() {
     });
 
     test('plan timezone and normative midnight share one clock', () {
-      final slot = MealScheduleSlot(
-        id: 's1',
-        period: MealPeriodWire.parseCanonical('night'),
-        scheduledTime: ScheduledTimeOfDay('23:55'),
-        targetGrams: 200,
-      );
+      final nightSlot = slot(period: 'night', time: '23:55');
       expect(
         NutritionTodaySlotUi.statusFor(
-          slot: slot,
+          slot: nightSlot,
           meal: null,
           serverNow: DateTime.utc(2026, 7, 15, 2, 54),
           timezone: NutritionPlan.defaultTimezone,
@@ -221,7 +326,7 @@ void main() {
       );
       expect(
         NutritionTodaySlotUi.statusFor(
-          slot: slot,
+          slot: nightSlot,
           meal: null,
           serverNow: DateTime.utc(2026, 7, 15, 3, 1),
           timezone: NutritionPlan.defaultTimezone,
