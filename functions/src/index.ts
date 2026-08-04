@@ -26,6 +26,10 @@ import {
 } from "./health_nutrition_callables";
 import type {NutritionActor} from "./health_nutrition_engine";
 import {
+  buildHealthWeightCreateRecordHandler,
+  createAdminWeightEngineDeps,
+} from "./health_weight_callables";
+import {
   healthTimelineProjectMealLogCreatedWrapper,
   healthTimelineProjectSupplementLogCreatedWrapper,
 } from "./health_timeline_triggers";
@@ -384,7 +388,14 @@ type AccessModule =
   | "training"
   | "vehicles";
 
-type AccessAction = "view" | "create" | "edit" | "archive" | "approve" | "manage_nutrition_plan";
+type AccessAction =
+  | "view"
+  | "create"
+  | "edit"
+  | "archive"
+  | "approve"
+  | "manage_nutrition_plan"
+  | "record_routine";
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -8011,6 +8022,42 @@ export const healthNutritionUpdateActivePlan = onCall({region}, async (request) 
 export const healthNutritionCancelPlan = onCall({region}, async (request) => {
   return runHealthNutritionCancelPlan(request, healthNutritionDeps);
 });
+
+const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler({
+  db,
+  requireHealthRecordRoutine: async (auth) => {
+    const caller = await requireAccessPermission(
+      auth,
+      "health",
+      "record_routine",
+    );
+    const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
+    return {
+      uid: caller.uid,
+      name: caller.name,
+      ra: caller.ra,
+      internalRole: isAdmin ? "admin" : "condutor",
+    };
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    const accessCaller = requireAuth(auth);
+    if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
+      throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
+    }
+    await requireDogRecordAccess(
+      auth,
+      accessCaller,
+      dogId,
+      dog,
+    );
+  },
+  createEngineDeps: () => createAdminWeightEngineDeps(db),
+});
+
+/** Create a canonical WeightRecord with durable receipt idempotency (health.record_routine). */
+export const healthWeightCreateRecord = onCall({region}, async (request) =>
+  runHealthWeightCreateRecord(request));
+
 
 // =============================================================================
 // Health Timeline — Triggers + Scheduler (Gate 5C.5C.5)
