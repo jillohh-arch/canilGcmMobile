@@ -38,6 +38,8 @@ void main() {
 
       // Título
       expect(find.text('REGISTRAR SUPLEMENTO'), findsOneWidget);
+      expect(find.text('Administração avulsa'), findsOneWidget);
+      expect(find.text('Sem vínculo com regime ativo'), findsOneWidget);
 
       // Campos obrigatórios (HudSelectField usa labels uppercase)
       expect(find.text('Nome do suplemento'), findsOneWidget);
@@ -171,6 +173,8 @@ void main() {
     await tester.tap(find.text('Do plano').first);
     await tester.pumpAndSettle();
     expect(find.text('Do plano'), findsWidgets);
+    expect(find.text('Suplemento prescrito'), findsOneWidget);
+    expect(find.text('Vinculado ao plano alimentar'), findsOneWidget);
   });
 
   testWidgets('mode selector present with adequate size', (tester) async {

@@ -690,8 +690,9 @@ class _TodaySummaryCard extends StatelessWidget {
       (true, null, false) => 'Consumo não registrado',
       (false, final double sum, true) =>
         '${HealthNutritionTodayFormatters.grams(sum)} mensurados',
-      (false, final double sum, false) =>
-        HealthNutritionTodayFormatters.grams(sum),
+      (false, final double sum, false) => HealthNutritionTodayFormatters.grams(
+        sum,
+      ),
       (false, null, true) => 'Quantidade consumida não medida',
       (false, null, false) => 'Consumo não registrado',
     };
@@ -1668,18 +1669,15 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Text(
-                'SUPLEMENTOS EM USO',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.55,
-                ),
+            const Expanded(
+              child: _SupplementSectionHeading(
+                title: 'SUPLEMENTOS EM USO',
+                subtitle: 'Regimes prescritos atualmente',
               ),
             ),
+            const SizedBox(width: 8),
             if (hasMutation)
               Semantics(
                 button: true,
@@ -1696,6 +1694,7 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
                     style: TextButton.styleFrom(
                       minimumSize: const Size(48, 48),
                       foregroundColor: AppTheme.primary,
+                      disabledForegroundColor: AppTheme.textMuted,
                       textStyle: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -1709,12 +1708,33 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
         if (hasMutation &&
             !widget.actionEnabled &&
             widget.unavailableReason != null) ...[
-          Text(
-            widget.unavailableReason!,
-            style: GoogleFonts.inter(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-              height: 1.35,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.surfacePanel,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.outline),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.schedule_rounded,
+                  color: AppTheme.textMuted,
+                  size: 16,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    widget.unavailableReason!,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -1722,121 +1742,54 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
         const SizedBox(height: 8),
         if (planRegimens.isEmpty && widget.legacyRegimens.isEmpty)
           HealthSummaryCardSurface(
-            child: Text(
-              'Nenhum suplemento em uso registrado.',
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nenhum suplemento em uso registrado.',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (hasMutation) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Registre uma administração avulsa ou consulte o plano alimentar.',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 11,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ],
             ),
           )
         else ...[
           ...planRegimens.map(
             (r) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: HealthSummaryCardSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      r.name,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${r.dose} ${r.unit.displayLabel} · ${r.frequency}',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if ((r.instructions ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        r.instructions!,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              child: _ActiveSupplementCard(regimen: r),
             ),
           ),
           ...widget.legacyRegimens.map(
             (r) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: HealthSummaryCardSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            r.name,
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          'Em uso (legado)',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.attention,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      [
-                        if (r.doseText.isNotEmpty) r.doseText,
-                        if ((r.unitText ?? '').isNotEmpty) r.unitText,
-                        if ((r.frequencyText ?? '').isNotEmpty) r.frequencyText,
-                      ].whereType<String>().join(' · '),
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Não é uma administração pontual.',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _LegacySupplementCard(regimen: r),
             ),
           ),
         ],
         const SizedBox(height: 14),
-        Text(
-          'ADMINISTRAÇÕES DE HOJE',
-          style: GoogleFonts.inter(
-            color: AppTheme.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.55,
-          ),
+        _SupplementSectionHeading(
+          title: 'ADMINISTRAÇÕES DE HOJE',
+          subtitle: 'Fatos registrados no dia',
+          trailing:
+              widget.administrationsAvailable &&
+                  widget.administrations.isNotEmpty
+              ? '${widget.administrations.length} ${widget.administrations.length == 1 ? 'registro' : 'registros'}'
+              : null,
         ),
         const SizedBox(height: 8),
         if (!widget.administrationsAvailable)
@@ -1865,6 +1818,17 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
                       height: 1.35,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    onPressed: widget.onRefreshRequested,
+                    icon: const Icon(Icons.refresh_rounded, size: 17),
+                    label: const Text('Atualizar'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      foregroundColor: AppTheme.primary,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1888,46 +1852,363 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
           ...widget.administrations.map(
             (a) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: HealthSummaryCardSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      a.supplementName,
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${a.dose} ${a.unit.displayLabel} · '
-                      '${HealthNutritionTodayFormatters.timeShort(a.administeredAt, timezone: widget.timezone)}',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if ((a.notes ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        a.notes!,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              child: _SupplementAdministrationCard(
+                administration: a,
+                timezone: widget.timezone,
               ),
             ),
           ),
       ],
     );
   }
+}
+
+class _SupplementSectionHeading extends StatelessWidget {
+  const _SupplementSectionHeading({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.55,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          _SupplementMetadataBadge(label: trailing!, color: AppTheme.textMuted),
+        ],
+      ],
+    );
+  }
+}
+
+class _ActiveSupplementCard extends StatelessWidget {
+  const _ActiveSupplementCard({required this.regimen});
+
+  final NutritionPlanSupplementRegimen regimen;
+
+  @override
+  Widget build(BuildContext context) {
+    return HealthSummaryCardSurface(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SupplementIcon(
+            icon: Icons.medication_rounded,
+            color: AppTheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  regimen.name,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${_formatSupplementDose(regimen.dose)} ${regimen.unit.displayLabel}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  regimen.frequency,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+                if ((regimen.instructions ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    regimen.instructions!,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 7),
+                const _SupplementMetadataBadge(
+                  label: 'Plano ativo',
+                  color: AppTheme.primary,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegacySupplementCard extends StatelessWidget {
+  const _LegacySupplementCard({required this.regimen});
+
+  final LegacySupplementRegimenView regimen;
+
+  @override
+  Widget build(BuildContext context) {
+    final details = [
+      if (regimen.doseText.isNotEmpty) regimen.doseText,
+      if ((regimen.unitText ?? '').isNotEmpty) regimen.unitText!,
+      if ((regimen.frequencyText ?? '').isNotEmpty) regimen.frequencyText!,
+    ].join(' · ');
+
+    return HealthSummaryCardSurface(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SupplementIcon(
+            icon: Icons.medication_outlined,
+            color: AppTheme.textMuted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  regimen.name,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    height: 1.25,
+                  ),
+                ),
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    details,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 7),
+                const _SupplementMetadataBadge(
+                  label: 'Registro legado',
+                  color: AppTheme.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupplementAdministrationCard extends StatelessWidget {
+  const _SupplementAdministrationCard({
+    required this.administration,
+    required this.timezone,
+  });
+
+  final SupplementLog administration;
+  final String timezone;
+
+  @override
+  Widget build(BuildContext context) {
+    final time = HealthNutritionTodayFormatters.timeShort(
+      administration.administeredAt,
+      timezone: timezone,
+    );
+    final origin = _supplementAdministrationOrigin(administration);
+
+    return HealthSummaryCardSurface(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SupplementIcon(
+            icon: Icons.check_rounded,
+            color: AppTheme.success,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        administration.supplementName,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      time,
+                      maxLines: 1,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.success,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${_formatSupplementDose(administration.dose)} ${administration.unit.displayLabel}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (origin != null) ...[
+                  const SizedBox(height: 7),
+                  _SupplementMetadataBadge(
+                    label: origin,
+                    color: origin == 'Prescrito'
+                        ? AppTheme.primary
+                        : AppTheme.textMuted,
+                  ),
+                ],
+                if ((administration.notes ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    administration.notes!,
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupplementIcon extends StatelessWidget {
+  const _SupplementIcon({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, color: color, size: 18),
+    );
+  }
+}
+
+class _SupplementMetadataBadge extends StatelessWidget {
+  const _SupplementMetadataBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+String? _supplementAdministrationOrigin(SupplementLog administration) {
+  final planId = administration.nutritionPlanId?.trim();
+  final regimenId = administration.supplementRegimenId?.trim();
+  if (planId?.isNotEmpty == true && regimenId?.isNotEmpty == true) {
+    return 'Prescrito';
+  }
+  if ((planId == null || planId.isEmpty) &&
+      (regimenId == null || regimenId.isEmpty)) {
+    return 'Avulso';
+  }
+  return null;
+}
+
+String _formatSupplementDose(num dose) {
+  final value = dose.toDouble();
+  return value == value.truncateToDouble()
+      ? value.toInt().toString()
+      : value.toString();
 }
 
 class _RecentMealsSection extends StatelessWidget {

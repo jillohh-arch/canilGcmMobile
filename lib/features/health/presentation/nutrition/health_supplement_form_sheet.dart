@@ -389,41 +389,41 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.dogDisplayName,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+          Text(
+            widget.dogDisplayName,
+            style: GoogleFonts.inter(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _isPrescribed
+                    ? AppTheme.primary.withValues(alpha: 0.16)
+                    : AppTheme.textMuted.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
+              child: Text(
+                _isPrescribed ? 'Suplemento prescrito' : 'Administração avulsa',
+                style: GoogleFonts.inter(
                   color: _isPrescribed
-                      ? AppTheme.success.withValues(alpha: 0.2)
-                      : AppTheme.attention.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _isPrescribed ? 'Do plano' : 'Avulso',
-                  style: GoogleFonts.inter(
-                    color: _isPrescribed ? AppTheme.success : AppTheme.attention,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      ? AppTheme.primary
+                      : AppTheme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             _isPrescribed
-                ? 'Administração vinculada ao plano nutricional'
-                : 'Administração independente de plano nutricional',
+                ? 'Vinculado ao plano alimentar'
+                : 'Sem vínculo com regime ativo',
             style: GoogleFonts.inter(
               color: AppTheme.textSecondary,
               fontSize: 12,

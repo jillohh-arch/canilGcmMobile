@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
@@ -17,6 +16,7 @@ import 'package:canil_gcm/features/health/domain/legacy_nutrition_views.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
 import 'package:canil_gcm/features/health/domain/meal_schedule_slot.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
+import 'package:canil_gcm/features/health/domain/nutrition_plan_regimen.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_read_state.dart';
 import 'package:canil_gcm/features/health/domain/supplement_log.dart';
@@ -24,6 +24,7 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_nutritio
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
+import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
 
 final class _ScriptedSource {
   _ScriptedSource(this.resultsByDog);
@@ -202,6 +203,7 @@ NutritionPlan canonicalPlan({
   String timezone = NutritionPlan.defaultTimezone,
   DateTime? validFrom,
   DateTime? validUntil,
+  List<NutritionPlanSupplementRegimen> supplements = const [],
 }) {
   return NutritionPlan(
     id: id,
@@ -230,6 +232,7 @@ NutritionPlan canonicalPlan({
     status: NutritionPlanStatus.active,
     schemaVersion: 1,
     revision: 1,
+    supplements: supplements,
   );
 }
 
@@ -278,17 +281,25 @@ SupplementLog supplementLog({
   required String id,
   required String name,
   required DateTime administeredAt,
+  num dose = 1,
+  SupplementDoseUnit unit = SupplementDoseUnit.tablet,
+  String? notes,
+  String? nutritionPlanId,
+  String? supplementRegimenId,
 }) {
   return SupplementLog(
     id: id,
     dogId: 'dog-a',
     supplementName: name,
-    dose: 1,
-    unit: SupplementDoseUnit.tablet,
+    dose: dose,
+    unit: unit,
     administeredAt: administeredAt,
     recordedBy: actor,
     schemaVersion: 1,
     revision: 1,
+    notes: notes,
+    nutritionPlanId: nutritionPlanId,
+    supplementRegimenId: supplementRegimenId,
   );
 }
 
@@ -860,13 +871,184 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('Condroprotetor'), findsOneWidget);
-    expect(find.textContaining('Em uso (legado)'), findsOneWidget);
-    expect(
-      find.textContaining('Não é uma administração pontual'),
-      findsOneWidget,
-    );
+    expect(find.text('Registro legado'), findsOneWidget);
     expect(find.textContaining('ADMINISTRAÇÕES DE HOJE'), findsOneWidget);
     controller.dispose();
+  });
+
+  testWidgets(
+    'supplement authority hierarchy separates active and legacy regimens from today facts',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final referenceNow = DateTime.utc(2026, 7, 22, 15);
+      final regimen = NutritionPlanSupplementRegimen(
+        id: 'reg-active',
+        name: 'Condroprotetor veterinário de suporte articular',
+        dose: 1.5,
+        unit: SupplementDoseUnit.tablet,
+        frequency: 'Uma vez ao dia conforme orientação veterinária',
+        instructions: 'Administrar junto ao alimento.',
+      );
+      final controller = HealthNutritionReadController(
+        source: CoexistenceNutritionReadSource(
+          canonicalPlanReader: _MemPlan(
+            NutritionSourceBatch.available([
+              canonicalPlan(supplements: [regimen]),
+            ]),
+          ),
+          legacySupplementRegimenReader: _MemLegacyRegimen(
+            NutritionSourceBatch.available([
+              const LegacySupplementRegimenView(
+                id: 'legacy-regimen',
+                dogId: 'dog-a',
+                name: 'Óleo de peixe legado',
+                doseText: '2',
+                unitText: 'cápsulas',
+                frequencyText: 'Conforme prescrição anterior',
+                legacySource: 'nutrition_supplements',
+              ),
+            ]),
+          ),
+          canonicalSupplementLogReader: _SequenceSupplementReader([
+            NutritionSourceBatch.available([
+              supplementLog(
+                id: 'prescribed-log',
+                name: 'Condroprotetor veterinário de suporte articular',
+                administeredAt: DateTime.utc(2026, 7, 22, 11, 30),
+                dose: 1.5,
+                nutritionPlanId: 'plan-1',
+                supplementRegimenId: 'reg-active',
+                notes: 'Aceitou sem intercorrências durante a administração.',
+              ),
+              supplementLog(
+                id: 'adhoc-log',
+                name: 'Probiótico avulso',
+                administeredAt: DateTime.utc(2026, 7, 22, 14),
+                unit: SupplementDoseUnit.g,
+              ),
+            ]),
+          ]),
+        ),
+        clock: () => referenceNow,
+      );
+      addTearDown(controller.dispose);
+      await controller.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: controller,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollable = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+        find.text('SUPLEMENTOS EM USO'),
+        400,
+        scrollable: scrollable,
+      );
+      expect(find.text('Regimes prescritos atualmente'), findsOneWidget);
+      expect(find.text('Plano ativo'), findsOneWidget);
+      expect(find.text('Registro legado'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('Probiótico avulso'),
+        400,
+        scrollable: scrollable,
+      );
+      expect(find.text('ADMINISTRAÇÕES DE HOJE'), findsOneWidget);
+      expect(find.text('Fatos registrados no dia'), findsOneWidget);
+      expect(find.text('2 registros'), findsOneWidget);
+      expect(find.text('Prescrito'), findsOneWidget);
+      expect(find.text('Avulso'), findsOneWidget);
+      expect(find.text('08:30'), findsOneWidget);
+      expect(find.text('11:00'), findsOneWidget);
+      expect(find.text('1,5 comprimido'), findsNothing);
+      expect(find.text('1.5 comprimido'), findsWidgets);
+      expect(
+        find.text('Aceitou sem intercorrências durante a administração.'),
+        findsOneWidget,
+      );
+      for (final card in [
+        find.ancestor(
+          of: find.text('Óleo de peixe legado'),
+          matching: find.byType(HealthSummaryCardSurface),
+        ),
+        find.ancestor(
+          of: find.text('Probiótico avulso'),
+          matching: find.byType(HealthSummaryCardSurface),
+        ),
+      ]) {
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.textContaining('Pendente', skipOffstage: false),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.textContaining('Atrasado', skipOffstage: false),
+          ),
+          findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('supplement and administration empty states remain distinct', (
+    tester,
+  ) async {
+    final referenceNow = DateTime.utc(2026, 7, 22, 15);
+    final controller = HealthNutritionReadController(
+      source: CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalSupplementLogReader: _SequenceSupplementReader([
+          const NutritionSourceBatch.empty(),
+        ]),
+      ),
+      clock: () => referenceNow,
+    );
+    addTearDown(controller.dispose);
+    await controller.selectDog('dog-a');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HealthNutritionTodayScreen(
+            controller: controller,
+            dogDisplayName: 'Bono',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Nenhuma administração registrada hoje.'),
+      400,
+      scrollable: scrollable,
+    );
+
+    expect(find.text('Nenhum suplemento em uso registrado.'), findsOneWidget);
+    expect(find.text('Nenhuma administração registrada hoje.'), findsOneWidget);
+    expect(find.text('Administrações de hoje indisponíveis'), findsNothing);
+    expect(find.textContaining('registros'), findsNothing);
   });
 
   testWidgets(
@@ -929,6 +1111,9 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('Administrações de hoje indisponíveis'), findsOneWidget);
+      final updateButton = find.widgetWithText(TextButton, 'Atualizar');
+      expect(updateButton, findsOneWidget);
+      expect(tester.getSize(updateButton).height, greaterThanOrEqualTo(48));
       expect(find.text('Histórico antigo'), findsNothing);
       expect(find.textContaining('Hoje ·'), findsNothing);
       expect(
@@ -1350,7 +1535,7 @@ void main() {
 
   testWidgets(
     'temporal expired: factual data visible, supplement action disabled, '
-        'no sheet, no callback, no mutation',
+    'no sheet, no callback, no mutation',
     (tester) async {
       // Provider without gateway sync → neverSynchronized → unavailable
       final provider = AuthoritativeTimeProvider(
@@ -1473,7 +1658,10 @@ void main() {
       expect(readController.temporalActionsAllowed, isFalse);
 
       // 4. Diagnostic title and message present with explicit reason
-      expect(readController.temporalDiagnosticTitle, contains('Horário confiável indisponível'));
+      expect(
+        readController.temporalDiagnosticTitle,
+        contains('Horário confiável indisponível'),
+      );
       expect(readController.temporalDiagnosticMessage, isNotNull);
 
       // 9. Zero fallback to DateTime.now
@@ -1488,7 +1676,9 @@ void main() {
         of: find.text('Registrar'),
         matching: find.byType(TextButton),
       );
-      final semanticsData = tester.getSemantics(buttonFinder).getSemanticsData();
+      final semanticsData = tester
+          .getSemantics(buttonFinder)
+          .getSemanticsData();
       expect(semanticsData.hasFlag(SemanticsFlag.isEnabled), isFalse);
 
       // 2 & 5. Tap does not open sheet (button callback disabled/inaccessible)
@@ -1507,7 +1697,7 @@ void main() {
 
   testWidgets(
     'stale with refresh failure: query preserved, action continues disabled, '
-        'diagnosis preserved, stale does not become fresh',
+    'diagnosis preserved, stale does not become fresh',
     (tester) async {
       final gateway = _FailingTimeGateway((_) async {
         throw const AuthoritativeTimeFailure(
@@ -1676,12 +1866,11 @@ void main() {
         final diagnosticFinder = find.text('Horário aguardando atualização');
         expect(diagnosticFinder, findsOneWidget);
 
-        final semanticsData = tester.getSemantics(diagnosticFinder).getSemanticsData();
+        final semanticsData = tester
+            .getSemantics(diagnosticFinder)
+            .getSemanticsData();
         expect(semanticsData.hasFlag(SemanticsFlag.isLiveRegion), isTrue);
-        expect(
-          semanticsData.label,
-          contains('Horário aguardando atualização'),
-        );
+        expect(semanticsData.label, contains('Horário aguardando atualização'));
 
         // Verify button disabled state is independent of liveRegion
         await tester.scrollUntilVisible(
@@ -1689,20 +1878,20 @@ void main() {
           400,
           scrollable: find.byType(Scrollable).first,
         );
-        final buttonSemantics = tester.getSemantics(
-          find.ancestor(
-            of: find.text('Registrar'),
-            matching: find.byType(TextButton),
-          ),
-        ).getSemanticsData();
+        final buttonSemantics = tester
+            .getSemantics(
+              find.ancestor(
+                of: find.text('Registrar'),
+                matching: find.byType(TextButton),
+              ),
+            )
+            .getSemanticsData();
         expect(buttonSemantics.hasFlag(SemanticsFlag.isEnabled), isFalse);
       } finally {
         semanticsHandle.dispose();
       }
     },
   );
-
-
 
   testWidgets(
     'button disabled: controller temporalActionsAllowed is false when unavailable',
@@ -1740,7 +1929,10 @@ void main() {
 
       // Controller state reflects disabled action
       expect(readController.temporalActionsAllowed, isFalse);
-      expect(readController.temporalState, HealthNutritionTemporalState.unavailable);
+      expect(
+        readController.temporalState,
+        HealthNutritionTemporalState.unavailable,
+      );
 
       // No sheet on tap
       await tester.tap(find.text('Registrar'), warnIfMissed: false);
@@ -1805,7 +1997,9 @@ void main() {
       expect(find.byType(HealthSupplementFormSheet), findsOneWidget);
 
       // 2. Close sheet
-      final sheetElement = tester.element(find.byType(HealthSupplementFormSheet));
+      final sheetElement = tester.element(
+        find.byType(HealthSupplementFormSheet),
+      );
       Navigator.of(sheetElement).pop();
       await tester.pumpAndSettle();
       expect(find.byType(HealthSupplementFormSheet), findsNothing);
@@ -1822,7 +2016,9 @@ void main() {
       expect(sheet2.dogId, 'dog-a');
 
       // Close again
-      Navigator.of(tester.element(find.byType(HealthSupplementFormSheet))).pop();
+      Navigator.of(
+        tester.element(find.byType(HealthSupplementFormSheet)),
+      ).pop();
       await tester.pumpAndSettle();
       expect(find.byType(HealthSupplementFormSheet), findsNothing);
       expect(tester.takeException(), isNull);
@@ -1841,7 +2037,6 @@ void main() {
       expect(controller.todayOrNull, isNull);
     },
   );
-
 }
 
 final class _FailingTimeGateway implements AuthoritativeTimeGateway {
@@ -1924,7 +2119,8 @@ final class _DogSwitchPlanReader implements NutritionCanonicalPlanReader {
   }
 }
 
-final class _SpyNutritionMutationGateway implements HealthNutritionMutationGateway {
+final class _SpyNutritionMutationGateway
+    implements HealthNutritionMutationGateway {
   int callCount = 0;
 
   @override
