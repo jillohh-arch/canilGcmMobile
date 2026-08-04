@@ -567,6 +567,69 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets(
+      'modal em 360px respeita safe area superior sem duplicar inset',
+      (tester) async {
+        const systemTop = 32.0;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        tester.view.padding = const FakeViewPadding(top: systemTop);
+        tester.view.viewPadding = const FakeViewPadding(top: systemTop);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => HealthSupplementFormSheet(
+                      dogId: 'dog-001',
+                      dogDisplayName: 'Bono',
+                      controller: _TestController(),
+                      onRefreshRequested: () async {},
+                      timezone: 'America/Sao_Paulo',
+                      activePlan: _mockActivePlan(),
+                      defaultRegimen: _mockRegimen(),
+                    ),
+                  ),
+                  child: const Text('Abrir formulário'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Abrir formulário'));
+        await tester.pumpAndSettle();
+
+        final titleRect = tester.getRect(find.text('REGISTRAR SUPLEMENTO'));
+        final dogRect = tester.getRect(find.text('Bono'));
+        final closeFinder = find.widgetWithIcon(
+          IconButton,
+          Icons.close_rounded,
+        );
+        final closeRect = tester.getRect(closeFinder);
+
+        expect(titleRect.top, greaterThanOrEqualTo(systemTop));
+        expect(dogRect.top, greaterThanOrEqualTo(systemTop));
+        expect(closeRect.top, greaterThanOrEqualTo(systemTop));
+        expect(titleRect.top, lessThan(systemTop + 72));
+        expect(closeRect.bottom, lessThanOrEqualTo(800));
+
+        await tester.tap(closeFinder);
+        await tester.pumpAndSettle();
+
+        expect(find.text('REGISTRAR SUPLEMENTO'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     // ── D. Suplemento com teclado aberto (viewInsets.bottom) ───────────
     // viewInsets simula teclado virtual. SafeArea compensa com padding
     // adicional — o formulário permanece funcional.
@@ -574,10 +637,18 @@ void main() {
     testWidgets('do plano com teclado aberto em 320px: scroll, submit e SafeArea funcional', (
       tester,
     ) async {
+      const systemTop = 32.0;
+      const keyboardHeight = 200.0;
       tester.view.physicalSize = const Size(320, 800);
       tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(top: systemTop);
+      tester.view.viewPadding = const FakeViewPadding(top: systemTop);
+      tester.view.viewInsets = const FakeViewPadding(bottom: keyboardHeight);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      addTearDown(tester.view.resetViewInsets);
 
       final supplementGate = Completer<HealthNutritionMutationResult>();
       final loadingGateway = _LoadingGateway(supplementGate.future);
@@ -586,23 +657,18 @@ void main() {
         operationIdFactory: () => 'op-sup-kbd',
       );
 
-      // Simulate keyboard open (viewInsets.bottom ≈ 200)
       await tester.pumpWidget(
         MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(
-              viewInsets: EdgeInsets.only(bottom: 200),
-            ),
-            child: Scaffold(
-              body: HealthSupplementFormSheet(
-                dogId: 'dog-001',
-                dogDisplayName: 'Bono',
-                controller: loadingController,
-                onRefreshRequested: () async {},
-                timezone: 'America/Sao_Paulo',
-                activePlan: _mockActivePlan(),
-                defaultRegimen: _mockRegimen(),
-              ),
+          home: Scaffold(
+            resizeToAvoidBottomInset: false,
+            body: HealthSupplementFormSheet(
+              dogId: 'dog-001',
+              dogDisplayName: 'Bono',
+              controller: loadingController,
+              onRefreshRequested: () async {},
+              timezone: 'America/Sao_Paulo',
+              activePlan: _mockActivePlan(),
+              defaultRegimen: _mockRegimen(),
             ),
           ),
         ),
@@ -610,8 +676,23 @@ void main() {
       await tester.pumpAndSettle();
       addTearDown(loadingController.dispose);
 
-      // 1. SafeArea wrapping is present
+      // 1. Cabeçalho e identificação começam abaixo da área do sistema.
       expect(find.byType(SafeArea), findsWidgets);
+      expect(
+        tester.getRect(find.text('REGISTRAR SUPLEMENTO')).top,
+        greaterThanOrEqualTo(systemTop),
+      );
+      expect(
+        tester.getRect(find.text('Bono')).top,
+        greaterThanOrEqualTo(systemTop),
+      );
+      expect(
+        tester
+            .getRect(find.widgetWithIcon(IconButton, Icons.close_rounded))
+            .top,
+        greaterThanOrEqualTo(systemTop),
+      );
+      expect(find.byType(Scrollable), findsWidgets);
 
       // 2. Scroll until submit button is visible
       final submitFinder = find.widgetWithText(
@@ -620,6 +701,10 @@ void main() {
       );
       await tester.ensureVisible(submitFinder);
       await tester.pumpAndSettle();
+      expect(
+        tester.getRect(submitFinder).bottom,
+        lessThanOrEqualTo(800 - keyboardHeight),
+      );
 
       // 3. Confirm button is in viewport and tap it
       await tester.tap(submitFinder);
