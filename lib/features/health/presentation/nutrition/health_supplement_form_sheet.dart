@@ -140,8 +140,10 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 10 + systemTop, 20, 16 + keyboard),
+        padding: EdgeInsets.only(top: systemTop),
         child: SingleChildScrollView(
+          clipBehavior: Clip.hardEdge,
+          padding: EdgeInsets.fromLTRB(20, 10, 20, 16 + keyboard),
           child: Form(
             key: _formKey,
             child: Column(

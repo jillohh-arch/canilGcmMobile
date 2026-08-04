@@ -634,7 +634,7 @@ void main() {
     // viewInsets simula teclado virtual. SafeArea compensa com padding
     // adicional — o formulário permanece funcional.
 
-    testWidgets('do plano com teclado aberto em 320px: scroll, submit e SafeArea funcional', (
+    testWidgets('avulso com teclado aberto em 320px: viewport protegido e CTA alcançável', (
       tester,
     ) async {
       const systemTop = 32.0;
@@ -676,6 +676,18 @@ void main() {
       await tester.pumpAndSettle();
       addTearDown(loadingController.dispose);
 
+      await tester.tap(find.text('Avulso').first);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nome do suplemento'),
+        'Vitamina C',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Dose'),
+        '1',
+      );
+      await tester.pumpAndSettle();
+
       // 1. Cabeçalho e identificação começam abaixo da área do sistema.
       expect(find.byType(SafeArea), findsWidgets);
       expect(
@@ -697,10 +709,25 @@ void main() {
       // 2. Scroll until submit button is visible
       final submitFinder = find.widgetWithText(
         FilledButton,
-        'REGISTRAR ADMINISTRAÇÃO DO PLANO',
+        'REGISTRAR SUPLEMENTO AVULSO',
       );
       await tester.ensureVisible(submitFinder);
       await tester.pumpAndSettle();
+      final scrollFinder = find.byType(SingleChildScrollView);
+      final scrollRect = tester.getRect(scrollFinder);
+      expect(scrollRect.top, systemTop);
+      expect(
+        tester.widget<SingleChildScrollView>(scrollFinder).clipBehavior,
+        Clip.hardEdge,
+      );
+      expect(
+        tester.getRect(find.text('Sem vínculo com regime ativo')).bottom,
+        lessThanOrEqualTo(scrollRect.top),
+      );
+      expect(
+        find.text('Sem vínculo com regime ativo').hitTestable(),
+        findsNothing,
+      );
       expect(
         tester.getRect(submitFinder).bottom,
         lessThanOrEqualTo(800 - keyboardHeight),
@@ -712,12 +739,23 @@ void main() {
 
       // 4. Confirm submit started with contextual loading
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Registrando administração do plano…'), findsOneWidget);
+      expect(find.text('Registrando suplemento…'), findsOneWidget);
 
       // 5. Confirm single call to gateway
       expect(loadingGateway.supplementCallCount, 1);
 
       // 6. Confirm no exceptions or overflows
+      expect(tester.takeException(), isNull);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.drag(scrollFinder, const Offset(0, 1200));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final titleTop = tester.getRect(find.text('REGISTRAR SUPLEMENTO')).top;
+      expect(titleTop, greaterThanOrEqualTo(systemTop));
+      expect(titleTop, lessThan(systemTop + 72));
       expect(tester.takeException(), isNull);
 
       supplementGate.complete(CreateSupplementLogSuccess(
