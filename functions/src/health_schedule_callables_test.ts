@@ -226,11 +226,13 @@ async function main(): Promise<void> {
   await test("create sucesso + retry same key/payload = no-op + 1 audit", async () => {
     const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
     const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    // O handler usa o relógio real; uma hora de margem evita fixture vencido e flakiness.
+    const scheduledFor = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const payload = {
       dogId: "dog-1",
       scheduleType: "vaccination",
       title: "V10",
-      scheduledFor: "2026-08-01T12:00:00.000Z",
+      scheduledFor,
       timezone: "America/Sao_Paulo",
       idempotencyKey: "create-key-1",
     };
@@ -258,13 +260,15 @@ async function main(): Promise<void> {
     const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
     const deps = depsFor({db, allowCreate: true, dogAccess: true});
     const auth = {uid: actor.uid, token: {}};
+    // Ambas as chamadas precisam compartilhar o mesmo instante futuro no fingerprint.
+    const scheduledFor = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await runHealthScheduleCreateManual(
       mockRequest(
         {
           dogId: "dog-1",
           scheduleType: "vaccination",
           title: "V10",
-          scheduledFor: "2026-08-01T12:00:00.000Z",
+          scheduledFor,
           timezone: "America/Sao_Paulo",
           idempotencyKey: "create-key-2",
         },
@@ -280,7 +284,7 @@ async function main(): Promise<void> {
               dogId: "dog-1",
               scheduleType: "vaccination",
               title: "OUTRO",
-              scheduledFor: "2026-08-01T12:00:00.000Z",
+              scheduledFor,
               timezone: "America/Sao_Paulo",
               idempotencyKey: "create-key-2",
             },
