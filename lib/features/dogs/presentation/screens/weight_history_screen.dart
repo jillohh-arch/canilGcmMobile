@@ -2,25 +2,29 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
-import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
 import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/core/services/pdf_generator/weight_history_pdf.dart';
+import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
 
 /// Tela 2.11 — Histórico de Peso Completo.
 /// Gráfico ampliado, estatísticas, lista cronológica, registro de pesagem.
 class WeightHistoryScreen extends StatefulWidget {
   final Dog dog;
+  final WeightHistoryService? historyService;
 
-  const WeightHistoryScreen({super.key, required this.dog});
+  const WeightHistoryScreen({
+    super.key,
+    required this.dog,
+    this.historyService,
+  });
 
   @override
   State<WeightHistoryScreen> createState() => _WeightHistoryScreenState();
@@ -28,17 +32,40 @@ class WeightHistoryScreen extends StatefulWidget {
 
 class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   String _periodFilter = '6m'; // '30d' | '6m' | '1ano' | 'tudo'
+  late final WeightHistoryService _historyService;
+
+  @override
+  void initState() {
+    super.initState();
+    _historyService = widget.historyService ?? WeightHistoryService();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final healthVM = Provider.of<HealthViewModel>(context);
-    final allEntries = _extractWeightHistory(healthVM.healthLogs);
-    final filtered = _filterByPeriod(allEntries);
+    return StreamBuilder<List<WeightRecord>>(
+      stream: _historyService.watchHistory(widget.dog.id),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildReadState(
+            message: 'Não foi possível carregar o histórico de peso.',
+            retry: () => setState(() {}),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: AppTheme.background,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _buildHistory(snapshot.data!);
+      },
+    );
+  }
 
-    final idealMin = widget.dog.idealWeightMin ?? 26.0;
-    final idealMax = widget.dog.idealWeightMax ?? 30.0;
-    final historyContextLabel =
-        '${allEntries.length} pesagens registradas · faixa ideal ${idealMin.toStringAsFixed(0)}-${idealMax.toStringAsFixed(0)}kg';
+  Widget _buildHistory(List<WeightRecord> records) {
+    final allEntries = _extractWeightHistory(records);
+    final filtered = _filterByPeriod(allEntries);
+    final historyContextLabel = '${allEntries.length} pesagens registradas';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -73,7 +100,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildExportBar(context, healthVM.healthLogs),
+                            _buildExportBar(context, records),
                             const SizedBox(height: 16),
                             _buildPeriodChips(),
                             const SizedBox(height: 16),
@@ -99,6 +126,25 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadState({
+    required String message,
+    required VoidCallback retry,
+  }) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, style: const TextStyle(color: AppTheme.textPrimary)),
+            const SizedBox(height: 12),
+            TextButton(onPressed: retry, child: const Text('TENTAR NOVAMENTE')),
+          ],
         ),
       ),
     );
@@ -188,11 +234,24 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   // ─── Export Bar ────────────────────────────────────────────────────
 
-  Widget _buildExportBar(BuildContext context, List<HealthLogModel> logs) {
+  Widget _buildExportBar(BuildContext context, List<WeightRecord> records) {
     return GestureDetector(
       onTap: () async {
         HapticFeedback.mediumImpact();
         try {
+          final logs = records
+              .map(
+                (record) => HealthLogModel(
+                  dogId: widget.dog.id,
+                  date: record.measuredAt,
+                  type: 'other',
+                  subtype: 'Pesagem',
+                  weight: record.weightKg,
+                  healthObservations: record.notes ?? '',
+                  createdBy: record.recordedBy.name,
+                ),
+              )
+              .toList(growable: false);
           final pdfBytes = await WeightHistoryPdf.generate(widget.dog, logs);
           await Printing.layoutPdf(
             onLayout: (format) async => pdfBytes,
@@ -301,20 +360,22 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   // ─── Card peso atual ───────────────────────────────────────────────
 
   Widget _buildCurrentWeightCard(List<_WeightEntry> history) {
-    final currentWeight = widget.dog.weight ?? 28.0;
-    final trend = _weightTrend(history);
-
-    // Get conductor name for last record
-    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    final weightLogs = healthVM.healthLogs
-        .where((l) => l.dogId == widget.dog.id && l.weight != null)
-        .toList();
-    final author = weightLogs.isNotEmpty
-        ? (weightLogs.first.createdBy ?? 'você')
-        : 'você';
-    final dateStr = weightLogs.isNotEmpty
-        ? DateFormat('dd/MM/yyyy').format(weightLogs.first.date)
-        : DateFormat('dd/MM/yyyy').format(DateTime.now());
+    if (history.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surfacePanel,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'Nenhuma pesagem canônica registrada.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+      );
+    }
+    final latest = history.last;
+    final dateStr = DateFormat('dd/MM/yyyy').format(latest.date);
 
     return Container(
       width: double.infinity,
@@ -331,7 +392,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: currentWeight.toStringAsFixed(1),
+                  text: latest.weight.toStringAsFixed(1),
                   style: GoogleFonts.outfit(
                     color: AppTheme.textPrimary,
                     fontSize: 40,
@@ -365,16 +426,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$trend · faixa ideal',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.success,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Medido em $dateStr · $author',
+                  'Medido em $dateStr · ${latest.record.recordedBy.name}',
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,
@@ -454,8 +506,8 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               size: const Size(double.infinity, 140),
               painter: _WeightFullChartPainter(
                 data: entries,
-                idealWeightMin: widget.dog.idealWeightMin ?? 26.0,
-                idealWeightMax: widget.dog.idealWeightMax ?? 30.0,
+                idealWeightMin: widget.dog.idealWeightMin,
+                idealWeightMax: widget.dog.idealWeightMax,
               ),
             ),
           ),
@@ -588,43 +640,17 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   Widget _buildWeightItem(_WeightEntry entry, List<_WeightEntry> allReversed) {
     final index = allReversed.indexOf(entry);
-    final prevWeight = index + 1 < allReversed.length
-        ? allReversed[index + 1].weight
+    final previous = index + 1 < allReversed.length
+        ? allReversed[index + 1]
         : null;
-    final prevDate = index + 1 < allReversed.length
-        ? allReversed[index + 1].date
-        : null;
-    final diff = prevWeight != null ? entry.weight - prevWeight : null;
-    final days = prevDate != null ? entry.date.difference(prevDate).inDays : 0;
-
-    // Get log observations/metadata for the weight row
-    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    final log = healthVM.healthLogs.firstWhere(
-      (l) =>
-          l.dogId == widget.dog.id &&
-          l.weight == entry.weight &&
-          l.date.day == entry.date.day &&
-          l.date.month == entry.date.month,
-      orElse: () => HealthLogModel(
-        dogId: widget.dog.id,
-        date: entry.date,
-        type: 'other',
-        healthObservations: '',
-        createdBy: 'você',
-      ),
-    );
-
-    final author = log.createdBy ?? 'você';
-    final hasPhoto = log.attachmentUrl != null || log.mediaAttachments != null;
-
-    // Variation label
-    String variationLabel = '→ Estável';
-    Color variationColor = AppTheme.textTertiary;
-    if (diff != null && diff.abs() >= 0.05) {
-      variationLabel =
-          '${diff > 0 ? '↑ +' : '↓ '}${diff.toStringAsFixed(1)}kg em ${days}d';
-      variationColor = diff > 0 ? AppTheme.warning : AppTheme.success;
-    }
+    final diff = previous == null ? null : entry.weight - previous.weight;
+    final days = previous == null
+        ? 0
+        : entry.date.difference(previous.date).inDays;
+    final variationLabel = diff == null
+        ? 'Primeiro registro'
+        : '${diff >= 0 ? '+' : ''}${diff.toStringAsFixed(1)}kg em ${days}d';
+    final contextLabel = entry.record.contextLabel;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -636,7 +662,6 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       ),
       child: Row(
         children: [
-          // Date
           Text(
             DateFormat('dd/MM').format(entry.date),
             style: GoogleFonts.inter(
@@ -646,7 +671,6 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             ),
           ),
           const SizedBox(width: 24),
-          // Weight
           RichText(
             text: TextSpan(
               children: [
@@ -669,7 +693,6 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             ),
           ),
           const SizedBox(width: 24),
-          // Variation & Author details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,14 +700,14 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 Text(
                   variationLabel,
                   style: GoogleFonts.inter(
-                    color: variationColor,
+                    color: AppTheme.textTertiary,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$author · canil',
+                  [entry.record.recordedBy.name, ?contextLabel].join(' · '),
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,
@@ -693,7 +716,6 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
               ],
             ),
           ),
-          if (hasPhoto) const Text('📷', style: TextStyle(fontSize: 14)),
         ],
       ),
     );
@@ -757,43 +779,22 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     );
   }
 
-  void _showWeighForm(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _WeighFormSheet(
-        dog: widget.dog,
-        healthVM: Provider.of<HealthViewModel>(context, listen: false),
-      ),
-    );
+  Future<void> _showWeighForm(BuildContext context) async {
+    await showHealthWeightFormSheet(context: context, dog: widget.dog);
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────
+  // ─── Helpers ────────────────────────────────────────────────────
 
-  List<_WeightEntry> _extractWeightHistory(List<HealthLogModel> logs) {
-    final entries = <_WeightEntry>[];
-
-    for (final log in logs) {
-      if (log.dogId == widget.dog.id && log.weight != null) {
-        entries.add(_WeightEntry(date: log.date, weight: log.weight!));
-      }
-    }
-
-    if (widget.dog.weight != null) {
-      final hasToday = entries.any(
-        (e) =>
-            e.date.year == DateTime.now().year &&
-            e.date.month == DateTime.now().month &&
-            e.date.day == DateTime.now().day,
-      );
-      if (!hasToday) {
-        entries.add(
-          _WeightEntry(date: DateTime.now(), weight: widget.dog.weight!),
-        );
-      }
-    }
-
+  List<_WeightEntry> _extractWeightHistory(List<WeightRecord> records) {
+    final entries = records
+        .map(
+          (record) => _WeightEntry(
+            date: record.measuredAt,
+            weight: record.weightKg,
+            record: record,
+          ),
+        )
+        .toList();
     entries.sort((a, b) => a.date.compareTo(b.date));
     return entries;
   }
@@ -811,378 +812,25 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
     return entries.where((e) => e.date.isAfter(cutoff)).toList();
   }
-
-  String _weightTrend(List<_WeightEntry> history) {
-    if (history.length < 2) return '→ Estável';
-    final first = history.first.weight;
-    final last = history.last.weight;
-    final diff = last - first;
-    if (diff.abs() < 0.5) return '→ Estável';
-    if (diff > 0) return '↑ +${diff.toStringAsFixed(1)} kg';
-    return '↓ ${diff.toStringAsFixed(1)} kg';
-  }
 }
 
 class _WeightEntry {
   final DateTime date;
   final double weight;
+  final WeightRecord record;
 
-  const _WeightEntry({required this.date, required this.weight});
-}
-
-/// A stateful bottom sheet for weighing registration
-class _WeighFormSheet extends StatefulWidget {
-  final Dog dog;
-  final HealthViewModel healthVM;
-
-  const _WeighFormSheet({required this.dog, required this.healthVM});
-
-  @override
-  State<_WeighFormSheet> createState() => _WeighFormSheetState();
-}
-
-class _WeighFormSheetState extends State<_WeighFormSheet> {
-  late double _weight;
-  String _selectedLocation = 'Canil';
-  bool _hasPhoto = false;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _weight = widget.dog.weight ?? 28.0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surfacePanelStrong,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'REGISTRAR PESAGEM',
-                style: GoogleFonts.outfit(
-                  color: AppTheme.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Icon(
-                  Icons.close,
-                  color: AppTheme.textPrimary.withAlpha(153),
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Big selector with +/- buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Minus button
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    if (_weight > 1.0) _weight -= 0.1;
-                  });
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textPrimary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: AppTheme.textPrimary.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '-',
-                      style: TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 32),
-              // Value display
-              Column(
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _weight.toStringAsFixed(1),
-                          style: GoogleFonts.outfit(
-                            color: AppTheme.textPrimary,
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' kg',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textTertiary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'PESO DETECTADO',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 32),
-              // Plus button
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    _weight += 0.1;
-                  });
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textPrimary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: AppTheme.textPrimary.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '+',
-                      style: TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-
-          // Location Checklist
-          Text(
-            'LOCAL DA PESAGEM',
-            style: GoogleFonts.inter(
-              color: AppTheme.textTertiary,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _locationChip('Canil'),
-              const SizedBox(width: 8),
-              _locationChip('Veterinário'),
-              const SizedBox(width: 8),
-              _locationChip('Campo'),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Photo Trigger
-          Text(
-            'COMPROVAÇÃO (OPCIONAL)',
-            style: GoogleFonts.inter(
-              color: AppTheme.textTertiary,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              setState(() {
-                _hasPhoto = !_hasPhoto;
-              });
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: _hasPhoto
-                    ? AppTheme.surfacePanelAlt
-                    : AppTheme.transparent,
-                border: Border.all(
-                  color: _hasPhoto
-                      ? AppTheme.success.withValues(alpha: 0.3)
-                      : AppTheme.textPrimary.withValues(alpha: 0.1),
-                  style: _hasPhoto ? BorderStyle.solid : BorderStyle.solid,
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _hasPhoto
-                        ? '✓ Foto da Balança Anexada'
-                        : '📷 Anexar foto da balança',
-                    style: GoogleFonts.inter(
-                      color: _hasPhoto
-                          ? AppTheme.success
-                          : AppTheme.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 28),
-
-          // Save Button
-          GestureDetector(
-            onTap: _isSaving
-                ? null
-                : () async {
-                    HapticFeedback.mediumImpact();
-                    final navigator = Navigator.of(context);
-                    setState(() => _isSaving = true);
-                    final log = HealthLogModel(
-                      dogId: widget.dog.id,
-                      date: DateTime.now(),
-                      type: 'other',
-                      subtype: 'Pesagem',
-                      weight: _weight,
-                      healthObservations:
-                          'Pesagem efetuada em $_selectedLocation.',
-                      attachmentUrl: _hasPhoto
-                          ? 'scale_photo_comprovante_balanca.jpg'
-                          : null,
-                    );
-
-                    try {
-                      await widget.healthVM.addHealthLog(log);
-                      await WeightHistoryService().addRecord(
-                        widget.dog.id,
-                        WeightRecord(
-                          weightKg: _weight,
-                          measuredAt: log.date,
-                          measuredBy: log.createdBy ?? 'app_mobile',
-                          context: _selectedLocation,
-                          photoUrl: log.attachmentUrl,
-                          notes: log.healthObservations,
-                        ),
-                      );
-                      if (!mounted) return;
-                      navigator.pop();
-                      AppFeedback.success(
-                        context,
-                        'Pesagem registrada: ${_weight.toStringAsFixed(1)} kg.',
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        setState(() => _isSaving = false);
-                        AppFeedback.error(context, e);
-                      }
-                    }
-                  },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  _isSaving ? 'SALVANDO...' : 'SALVAR REGISTRO',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.background,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _locationChip(String value) {
-    final selected = _selectedLocation == value;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedLocation = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.primary.withValues(alpha: 0.12)
-              : AppTheme.textPrimary.withValues(alpha: 0.04),
-          border: Border.all(
-            color: selected
-                ? AppTheme.primary.withValues(alpha: 0.4)
-                : AppTheme.textPrimary.withValues(alpha: 0.1),
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          value,
-          style: GoogleFonts.inter(
-            color: selected ? AppTheme.primary : AppTheme.textSecondary,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
+  const _WeightEntry({
+    required this.date,
+    required this.weight,
+    required this.record,
+  });
 }
 
 /// Painter para gráfico de peso ampliado.
 class _WeightFullChartPainter extends CustomPainter {
   final List<_WeightEntry> data;
-  final double idealWeightMin;
-  final double idealWeightMax;
+  final double? idealWeightMin;
+  final double? idealWeightMax;
 
   _WeightFullChartPainter({
     required this.data,
@@ -1198,55 +846,27 @@ class _WeightFullChartPainter extends CustomPainter {
     double minWeight = weights.reduce((a, b) => a < b ? a : b);
     double maxWeight = weights.reduce((a, b) => a > b ? a : b);
 
-    if (idealWeightMin < minWeight) {
-      minWeight = idealWeightMin;
+    if (idealWeightMin != null && idealWeightMin! < minWeight) {
+      minWeight = idealWeightMin!;
     }
-    if (idealWeightMax > maxWeight) {
-      maxWeight = idealWeightMax;
+    if (idealWeightMax != null && idealWeightMax! > maxWeight) {
+      maxWeight = idealWeightMax!;
     }
 
     final minVal = minWeight - 0.5;
     final maxVal = maxWeight + 0.5;
     final range = maxVal - minVal > 0 ? maxVal - minVal : 1.0;
 
-    // Draw ideal weight shaded range band
-    final yMin =
-        size.height - ((idealWeightMin - minVal) / range) * size.height;
-    final yMax =
-        size.height - ((idealWeightMax - minVal) / range) * size.height;
-
-    final rectPaint = Paint()
-      ..color = AppTheme.success
-          .withAlpha(24) // Semi-transparent green
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
-
-    final boundaryPaint = Paint()
-      ..color = AppTheme.success.withAlpha(53)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawLine(Offset(0, yMax), Offset(size.width, yMax), boundaryPaint);
-    canvas.drawLine(Offset(0, yMin), Offset(size.width, yMin), boundaryPaint);
-
-    // Draw IDEAL text label
-    final textSpan = TextSpan(
-      text:
-          'IDEAL ${idealWeightMin.toStringAsFixed(0)}-${idealWeightMax.toStringAsFixed(0)}kg',
-      style: GoogleFonts.inter(
-        color: AppTheme.success,
-        fontSize: 8,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 0.5,
-      ),
-    );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: ui.TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(canvas, Offset(8, yMax + 4));
+    if (idealWeightMin != null && idealWeightMax != null) {
+      _drawIdealRange(
+        canvas,
+        size,
+        minVal,
+        range,
+        idealWeightMin!,
+        idealWeightMax!,
+      );
+    }
 
     final linePaint = Paint()
       ..color = AppTheme.primary
@@ -1301,6 +921,51 @@ class _WeightFullChartPainter extends CustomPainter {
       canvas.drawCircle(points.last, 5, bgPaint);
       canvas.drawCircle(points.last, 4, dotPaint);
     }
+  }
+
+  void _drawIdealRange(
+    Canvas canvas,
+    Size size,
+    double minVal,
+    double range,
+    double idealMin,
+    double idealMax,
+  ) {
+    final yMin = size.height - ((idealMin - minVal) / range) * size.height;
+    final yMax = size.height - ((idealMax - minVal) / range) * size.height;
+
+    final rectPaint = Paint()
+      ..color = AppTheme.success
+          .withAlpha(24) // Semi-transparent green
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRect(Rect.fromLTRB(0, yMax, size.width, yMin), rectPaint);
+
+    final boundaryPaint = Paint()
+      ..color = AppTheme.success.withAlpha(53)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(Offset(0, yMax), Offset(size.width, yMax), boundaryPaint);
+    canvas.drawLine(Offset(0, yMin), Offset(size.width, yMin), boundaryPaint);
+
+    // Draw IDEAL text label
+    final textSpan = TextSpan(
+      text:
+          'IDEAL ${idealMin.toStringAsFixed(0)}-${idealMax.toStringAsFixed(0)}kg',
+      style: GoogleFonts.inter(
+        color: AppTheme.success,
+        fontSize: 8,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 0.5,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: ui.TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(8, yMax + 4));
   }
 
   @override

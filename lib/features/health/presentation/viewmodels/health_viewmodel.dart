@@ -157,19 +157,6 @@ class HealthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Registra uma pesagem rápida.
-  Future<void> addWeightRecord(String dogId, double weight) async {
-    final log = HealthLogModel(
-      dogId: dogId,
-      date: DateTime.now(),
-      type: 'other',
-      subtype: 'Pesagem',
-      weight: weight,
-      healthObservations: 'Pesagem registrada: ${weight.toStringAsFixed(1)} kg',
-    );
-    await addHealthLog(log);
-  }
-
   Future<void> _syncDogHealthSnapshot(HealthLogModel log) {
     final isBathLog = log.logType == 'Banho';
     final isVaccineLog = log.logType == 'Vacina';
@@ -178,7 +165,6 @@ class HealthViewModel extends ChangeNotifier {
       log.dogId,
       lastVaccineDate: isVaccineLog ? log.date : null,
       lastBathDate: isBathLog ? log.date : null,
-      weight: log.weight,
     );
   }
 

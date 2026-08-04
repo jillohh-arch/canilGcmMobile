@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,6 +24,7 @@ import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_heal
 import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
@@ -196,31 +196,12 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
     Dog dog, {
     BuildContext? hostContext,
   }) async {
-    final latest = (await _dataFuture)?.latestWeight ?? dog.weight ?? 25.0;
-    if (!mounted) return false;
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showHealthWeightFormSheet(
       context: hostContext ?? context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.transparent,
-      builder: (_) => _WeightRegistrationSheet(
-        initialWeight: latest,
-        onSave: (weight, notes) async {
-          final user = FirebaseAuth.instance.currentUser;
-          await _weightHistoryService.addRecord(
-            dog.id,
-            WeightRecord(
-              weightKg: weight,
-              measuredAt: DateTime.now(),
-              measuredBy: user?.uid ?? user?.email ?? 'unknown',
-              context: 'canil',
-              notes: notes,
-            ),
-          );
-        },
-      ),
+      dog: dog,
+      onRefreshAfterSuccess: () async => _refresh(),
     );
     if (!mounted) return saved == true;
-    if (saved == true) _refresh();
     return saved == true;
   }
 
@@ -458,11 +439,7 @@ class _HealthProntuarioBody extends StatelessWidget {
                                   : '${data.weightLogs.length} registros',
                             ),
                             const SizedBox(height: 10),
-                            _WeightEvolutionCard(
-                              dog: dog,
-                              records: data.weightRecords,
-                              legacyLogs: data.weightLogs,
-                            ),
+                            _WeightEvolutionCard(records: data.weightRecords),
                             const SizedBox(height: 18),
                             _SectionLabel(
                               title: 'CARTEIRA DE VACINAÇÃO',
@@ -1084,11 +1061,7 @@ class _HealthResumoTab extends StatelessWidget {
               : '${data.weightRecords.length} registros',
         ),
         const SizedBox(height: 10),
-        _WeightEvolutionCard(
-          dog: dog,
-          records: data.weightRecords,
-          legacyLogs: data.weightLogs,
-        ),
+        _WeightEvolutionCard(records: data.weightRecords),
         const SizedBox(height: 18),
         _SectionLabel(
           title: 'ÚLTIMOS EVENTOS',
@@ -1154,19 +1127,15 @@ class _HealthWeightTab extends StatelessWidget {
               : '${data.weightRecords.length} registros',
         ),
         const SizedBox(height: 10),
-        _WeightEvolutionCard(
-          dog: dog,
-          records: data.weightRecords,
-          legacyLogs: data.weightLogs,
-        ),
+        _WeightEvolutionCard(records: data.weightRecords),
         const SizedBox(height: 12),
-        _WeightMetricsRow(dog: dog, data: data),
+        _WeightMetricsRow(data: data),
         const SizedBox(height: 18),
         _SectionLabel(title: 'REGISTROS DE PESAGEM'),
         const SizedBox(height: 10),
         _WeightRecordsList(records: data.weightRecords),
         const SizedBox(height: 12),
-        _WeightTrendInsight(dog: dog, records: data.weightRecords),
+        _WeightTrendInsight(records: data.weightRecords),
       ],
     );
   }
@@ -2222,10 +2191,9 @@ class _UpcomingVaccineCard extends StatelessWidget {
 }
 
 class _WeightMetricsRow extends StatelessWidget {
-  final Dog dog;
   final _HealthProntuarioData data;
 
-  const _WeightMetricsRow({required this.dog, required this.data});
+  const _WeightMetricsRow({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -2235,11 +2203,6 @@ class _WeightMetricsRow extends StatelessWidget {
     final latestDate = latest == null
         ? 'Sem registro'
         : _formatDate(latest.measuredAt);
-    final target = dog.idealWeightMin != null && dog.idealWeightMax != null
-        ? '${((dog.idealWeightMin! + dog.idealWeightMax!) / 2).toStringAsFixed(1)} kg'
-        : 'Não definida';
-    final condition = _weightConditionLabel(dog, data.latestWeight);
-
     return Row(
       children: [
         Expanded(
@@ -2253,19 +2216,21 @@ class _WeightMetricsRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _MetricMiniCard(
-            icon: Icons.track_changes_rounded,
-            label: 'Meta operacional',
-            value: target,
+            icon: Icons.monitor_weight_rounded,
+            label: 'Último peso',
+            value: latest == null
+                ? 'Sem registro'
+                : '${latest.weightKg.toStringAsFixed(1)} kg',
             color: AppTheme.info,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricMiniCard(
-            icon: Icons.health_and_safety_rounded,
-            label: 'Condição corporal',
-            value: condition,
-            color: condition == 'Ideal' ? AppTheme.success : AppTheme.warning,
+            icon: Icons.list_alt_rounded,
+            label: 'Registros',
+            value: ordered.length.toString(),
+            color: AppTheme.primary,
           ),
         ),
       ],
@@ -2325,27 +2290,19 @@ class _MetricMiniCard extends StatelessWidget {
 }
 
 class _WeightTrendInsight extends StatelessWidget {
-  final Dog dog;
   final List<WeightRecord> records;
 
-  const _WeightTrendInsight({required this.dog, required this.records});
+  const _WeightTrendInsight({required this.records});
 
   @override
   Widget build(BuildContext context) {
     final ordered = [...records]
       ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
     final latest = ordered.isEmpty ? null : ordered.first.weightKg;
-    final condition = _weightConditionLabel(dog, latest);
     final message = latest == null
-        ? 'Registre pesagens para acompanhar a tendência operacional.'
-        : condition == 'Ideal'
-        ? 'O peso está dentro da faixa ideal cadastrada, com acompanhamento ativo.'
-        : 'Peso fora da faixa ideal cadastrada. Acompanhe a próxima pesagem.';
-    final color = latest == null
-        ? AppTheme.textMuted
-        : condition == 'Ideal'
-        ? AppTheme.success
-        : AppTheme.warning;
+        ? 'Nenhuma pesagem canônica registrada.'
+        : '${records.length} registro(s) canônico(s); último peso: ${latest.toStringAsFixed(1)} kg.';
+    const color = AppTheme.info;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2363,7 +2320,7 @@ class _WeightTrendInsight extends StatelessWidget {
               color: color.withAlpha(22),
               borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(Icons.trending_up_rounded, color: color, size: 22),
+            child: Icon(Icons.monitor_weight_rounded, color: color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2371,9 +2328,7 @@ class _WeightTrendInsight extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  condition == 'Ideal'
-                      ? 'Tendência estável'
-                      : 'Acompanhar tendência',
+                  'Histórico de pesagens',
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 13,
@@ -2879,15 +2834,9 @@ class _SpecialtyRail extends StatelessWidget {
 }
 
 class _WeightEvolutionCard extends StatelessWidget {
-  final Dog dog;
   final List<WeightRecord> records;
-  final List<HealthLogModel> legacyLogs;
 
-  const _WeightEvolutionCard({
-    required this.dog,
-    required this.records,
-    this.legacyLogs = const [],
-  });
+  const _WeightEvolutionCard({required this.records});
 
   @override
   Widget build(BuildContext context) {
@@ -2896,19 +2845,7 @@ class _WeightEvolutionCard extends StatelessWidget {
             .map((record) => _WeightPoint(record.measuredAt, record.weightKg))
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-    if (values.isEmpty) {
-      values.addAll(
-        legacyLogs
-            .where((log) => log.weight != null)
-            .map((log) => _WeightPoint(log.date, log.weight!)),
-      );
-      values.sort((a, b) => a.date.compareTo(b.date));
-    }
-    if (values.isEmpty && dog.weight != null) {
-      values.add(_WeightPoint(DateTime.now(), dog.weight!));
-    }
     final current = values.isNotEmpty ? values.last.value : null;
-    final trend = _weightTrend(values);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2925,21 +2862,6 @@ class _WeightEvolutionCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.success.withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  trend,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.success,
-                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -3439,204 +3361,6 @@ class _EventRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _WeightRegistrationSheet extends StatefulWidget {
-  final double initialWeight;
-  final Future<void> Function(double weight, String? notes) onSave;
-
-  const _WeightRegistrationSheet({
-    required this.initialWeight,
-    required this.onSave,
-  });
-
-  @override
-  State<_WeightRegistrationSheet> createState() =>
-      _WeightRegistrationSheetState();
-}
-
-class _WeightRegistrationSheetState extends State<_WeightRegistrationSheet> {
-  final _notesController = TextEditingController();
-  late double _weight;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _weight = widget.initialWeight.clamp(5.0, 60.0).toDouble();
-  }
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      final notes = _notesController.text.trim();
-      await widget.onSave(_weight, notes.isEmpty ? null : notes);
-      if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      AppFeedback.error(
-        context,
-        e,
-        fallback: 'Não foi possível registrar a pesagem.',
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        decoration: const BoxDecoration(
-          color: AppTheme.surfaceSheet,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          border: Border(top: BorderSide(color: AppTheme.primaryDivider)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Registrar pesagem',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  '${_weight.toStringAsFixed(1)} kg',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.primary,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Slider(
-                value: _weight,
-                min: 5,
-                max: 60,
-                divisions: 550,
-                activeColor: AppTheme.primary,
-                inactiveColor: AppTheme.primary.withAlpha(40),
-                label: '${_weight.toStringAsFixed(1)} kg',
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(() => _weight = value),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '5 kg',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
-                    '60 kg',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _notesController,
-                minLines: 2,
-                maxLines: 3,
-                enabled: !_saving,
-                style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Observação opcional',
-                  labelStyle: GoogleFonts.inter(color: AppTheme.textSecondary),
-                  filled: true,
-                  fillColor: AppTheme.surfacePanel,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.surfaceWhiteBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.primary),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: AppTheme.background,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.background,
-                          ),
-                        )
-                      : const Icon(Icons.monitor_weight_rounded, size: 18),
-                  label: Text(
-                    _saving ? 'SALVANDO...' : 'SALVAR PESAGEM',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -4310,14 +4034,14 @@ class _SummaryEventData {
   }
 
   factory _SummaryEventData.fromWeightRecord(WeightRecord record) {
-    final context = record.context.trim().isEmpty ? 'canil' : record.context;
+    final context = record.contextLabel;
     final measuredBy = record.measuredBy.trim();
     return _SummaryEventData(
       date: record.measuredAt,
       title: 'Pesagem',
       subtitle: [
         '${record.weightKg.toStringAsFixed(1)} kg',
-        context,
+        ?context,
         if (measuredBy.isNotEmpty) measuredBy,
       ].join(' · '),
       icon: Icons.monitor_weight_rounded,
@@ -4494,37 +4218,6 @@ _MedicalStatusData _statusForAntiparasitic(List<HealthLogModel> logs) {
 }
 
 // ignore: unused_element
-_MedicalStatusData _statusForWeight(Dog dog, double? latestWeight) {
-  final weight = latestWeight ?? dog.weight;
-  if (weight == null) {
-    return const _MedicalStatusData(
-      label: 'PESO',
-      value: 'Sem registro',
-      subtitle: 'Registre uma pesagem',
-      icon: Icons.monitor_weight_rounded,
-      level: _StatusLevel.neutral,
-    );
-  }
-
-  final inRange =
-      dog.idealWeightMin != null &&
-      dog.idealWeightMax != null &&
-      weight >= dog.idealWeightMin! &&
-      weight <= dog.idealWeightMax!;
-  final hasRange = dog.idealWeightMin != null && dog.idealWeightMax != null;
-
-  return _MedicalStatusData(
-    label: 'PESO',
-    value: '${weight.toStringAsFixed(1)} kg',
-    subtitle: hasRange
-        ? 'Faixa ideal: ${dog.idealWeightMin!.toStringAsFixed(1)}-${dog.idealWeightMax!.toStringAsFixed(1)} kg'
-        : 'Última pesagem registrada',
-    icon: Icons.monitor_weight_rounded,
-    level: !hasRange || inRange ? _StatusLevel.ok : _StatusLevel.warn,
-  );
-}
-
-// ignore: unused_element
 _MedicalStatusData _statusForExams(List<HealthLogModel> logs) {
   final exams = logs.where((log) => log.type == 'exam').toList();
   if (exams.isEmpty) {
@@ -4614,31 +4307,6 @@ String _supplementSubtitle(NutritionSupplement supplement) {
       ? 'em uso'
       : 'até ${_formatDate(supplement.endedAt!)}';
   return '${supplement.dose} · desde ${_formatDate(supplement.startedAt)} · $end';
-}
-
-// ignore: unused_element
-double? _latestWeight(List<HealthLogModel> logs) {
-  final weighted = logs.where((log) => log.weight != null).toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-  return weighted.isEmpty ? null : weighted.first.weight;
-}
-
-String _weightTrend(List<_WeightPoint> values) {
-  if (values.length < 2) return '→ sem curva';
-  final diff = values.last.value - values.first.value;
-  if (diff.abs() < 0.4) return '→ estável';
-  if (diff > 0) return '↑ +${diff.toStringAsFixed(1)} kg';
-  return '↓ ${diff.toStringAsFixed(1)} kg';
-}
-
-String _weightConditionLabel(Dog dog, double? weight) {
-  if (weight == null) return 'Sem dado';
-  final min = dog.idealWeightMin;
-  final max = dog.idealWeightMax;
-  if (min == null || max == null) return 'Monitorado';
-  if (weight < min) return 'Abaixo';
-  if (weight > max) return 'Acima';
-  return 'Ideal';
 }
 
 Color _colorForLevel(_StatusLevel level) {

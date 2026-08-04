@@ -120,14 +120,9 @@ abstract final class HealthTimelineMappers {
 
   /// Espelho dual-write de pesagem mobile (3E-D3).
   ///
-  /// **Prova de escrita** (`weight_history_screen.dart`):
-  /// ```dart
-  /// await healthVM.addHealthLog(HealthLogModel(
-  ///   type: 'other', subtype: 'Pesagem', weight: ...,
-  ///   healthObservations: 'Pesagem efetuada em ...',
-  /// ));
-  /// await WeightHistoryService().addRecord(...); // weight_records
-  /// ```
+  /// Registros legados de pesagem em `health_events` são apenas reconhecidos
+  /// para evitar duplicidade durante a coexistência. A escrita Mobile canônica
+  /// ocorre exclusivamente pelo callable de `weight_records`.
   ///
   /// IDs distintos (sem `source_id` / docId compartilhado) — identidade
   /// lógica vem do **contrato de escrita dual comprovado**, não de
@@ -395,20 +390,28 @@ abstract final class HealthTimelineMappers {
     }
 
     final rawConsumed = data['consumed_grams'];
-    final rawOffered = data['offered_grams'] ?? data['legacy_amount_grams'] ?? data['amount_grams'];
+    final rawOffered =
+        data['offered_grams'] ??
+        data['legacy_amount_grams'] ??
+        data['amount_grams'];
 
     String subtitle;
     if (rawConsumed != null) {
       if (rawConsumed is num && rawConsumed.isFinite) {
         subtitle = '${_formatGramValue(rawConsumed)} consumidos';
       } else {
-        return const TimelineInvalid(TimelineMappingInvalidReason.invalidRequiredStructure);
+        return const TimelineInvalid(
+          TimelineMappingInvalidReason.invalidRequiredStructure,
+        );
       }
     } else if (rawOffered != null) {
       if (rawOffered is num && rawOffered.isFinite) {
-        subtitle = '${_formatGramValue(rawOffered)} oferecidos · consumo não informado';
+        subtitle =
+            '${_formatGramValue(rawOffered)} oferecidos · consumo não informado';
       } else {
-        return const TimelineInvalid(TimelineMappingInvalidReason.invalidRequiredStructure);
+        return const TimelineInvalid(
+          TimelineMappingInvalidReason.invalidRequiredStructure,
+        );
       }
     } else {
       subtitle = 'Consumo não informado';
@@ -431,7 +434,7 @@ abstract final class HealthTimelineMappers {
 
     final hasAttachment =
         (data['attachment_refs'] is List &&
-            (data['attachment_refs'] as List).isNotEmpty);
+        (data['attachment_refs'] as List).isNotEmpty);
 
     final legacyId = data['legacy_id']?.toString().trim();
     final legacySource = data['legacy_source']?.toString().trim();
@@ -533,7 +536,7 @@ abstract final class HealthTimelineMappers {
 
     final hasAttachment =
         (data['attachment_refs'] is List &&
-            (data['attachment_refs'] as List).isNotEmpty);
+        (data['attachment_refs'] as List).isNotEmpty);
 
     final legacyId = data['legacy_id']?.toString().trim();
     final legacySource = data['legacy_source']?.toString().trim();
@@ -541,7 +544,8 @@ abstract final class HealthTimelineMappers {
     if (legacyId != null && legacyId.isNotEmpty) {
       if (legacySource == 'vacinas') {
         entryId = 'vacinas:$legacyId';
-      } else if (legacySource == 'feedings' || legacySource == 'feeding_events') {
+      } else if (legacySource == 'feedings' ||
+          legacySource == 'feeding_events') {
         entryId = 'feeding:$legacyId';
       } else if (legacySource != null && legacySource.isNotEmpty) {
         entryId = '$legacySource:$legacyId';

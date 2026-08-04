@@ -37,7 +37,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
   final _subtypeController =
       TextEditingController(); // e.g. vaccine name, medicine name
   final _observationsController = TextEditingController();
-  final _weightController = TextEditingController();
   final _vetNameController = TextEditingController();
   final _crmvController = TextEditingController();
   final _clinicController = TextEditingController();
@@ -73,7 +72,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
   void dispose() {
     _subtypeController.dispose();
     _observationsController.dispose();
-    _weightController.dispose();
     _vetNameController.dispose();
     _crmvController.dispose();
     _clinicController.dispose();
@@ -268,11 +266,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
         subtype: _subtypeController.text.trim().isNotEmpty
             ? _subtypeController.text.trim()
             : null,
-        weight: _weightController.text.trim().isNotEmpty
-            ? double.tryParse(
-                _weightController.text.trim().replaceAll(',', '.'),
-              )
-            : null,
         healthObservations: finalObservations,
         nextDueDate: _nextDueDate,
         professionalCrmv: _crmvController.text.trim().isNotEmpty
@@ -359,8 +352,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
                     _buildDateField(),
                     const SizedBox(height: 16),
                     _buildSubtypeField(),
-                    const SizedBox(height: 16),
-                    _buildWeightField(),
                     const SizedBox(height: 16),
                     _buildCostField(),
                     const SizedBox(height: 24),
@@ -566,18 +557,6 @@ class _HealthEventFormScreenState extends State<HealthEventFormScreen> {
       decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       validator: (value) =>
           (value == null || value.trim().isEmpty) ? 'Campo obrigatório' : null,
-    );
-  }
-
-  Widget _buildWeightField() {
-    return TextFormField(
-      controller: _weightController,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        labelText: 'Peso do Cão (Opcional)',
-        prefixIcon: Icon(Icons.monitor_weight_rounded),
-        suffixText: 'kg',
-      ),
     );
   }
 
