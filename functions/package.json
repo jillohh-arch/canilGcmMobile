@@ -10,6 +10,8 @@
     "test:health-schedule": "npm run build && node lib/health_schedule_logic_test.js && node lib/health_schedule_callables_test.js",
     "test:health-weight": "npm run build && node lib/health_weight_engine_test.js",
     "test:health-weight-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_weight_emulator_e2e_test.js\"",
+    "test:access-homologation": "npm run build && node lib/admin_access_homologation_snapshot_test.js",
+    "test:access-homologation-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only auth,firestore \"node lib/admin_access_homologation_snapshot_emulator_test.js\"",
     "test:health-nutrition": "npm run build && node lib/health_nutrition_logic_test.js && node lib/health_nutrition_engine_test.js && node lib/health_nutrition_plan_engine_test.js && node lib/health_nutrition_permission_test.js && node lib/health_nutrition_callables_test.js && node lib/health_nutrition_firestore_adapter_test.js",
     "test:health-nutrition-emulator": "npm run build && node lib/health_nutrition_emulator_e2e_test.js",
     "test:health-nutrition-plan-emulator": "npm run build && npx firebase-tools emulators:exec --project canil-gcm --config ../firebase.json --only firestore \"node lib/health_nutrition_plan_emulator_test.js\"",

@@ -43,6 +43,11 @@ import {readActivationGuard} from "./health_timeline_activation_guard";
 import {runHealthTimelineRecordShadowTelemetry} from "./health_timeline_shadow_telemetry_callable";
 import {FirestoreHealthTimelineShadowTelemetryAggregateWriter} from "./health_timeline_shadow_telemetry_firestore_adapter";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
+import {
+  buildAdminGetAccessHomologationSnapshotHandler,
+  createAdminAccessHomologationSnapshotDeps,
+  evaluateDogAccess,
+} from "./admin_access_homologation_snapshot";
 
 admin.initializeApp();
 
@@ -592,9 +597,11 @@ async function requireDogRecordAccess(
   dogId: string,
   dog: JsonMap,
 ) {
-  if ((await accessScopeForCaller(auth, caller)) === "global") return;
-  if (dogHandlerRa(dog) === caller.ra) return;
-  if (await callerHasActiveDog(caller, dogId)) return;
+  const scope = await accessScopeForCaller(auth, caller);
+  const directLink = dogHandlerRa(dog) === caller.ra;
+  const activeShift = scope === "global" || directLink ? false : await callerHasActiveDog(caller, dogId);
+  const evaluation = evaluateDogAccess({activeShift, directLink, dogExists: true, scope});
+  if (evaluation.allowed) return;
 
   throw new HttpsError(
     "permission-denied",
@@ -1758,6 +1765,33 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   );
   return {ra, profileId, profileName};
 });
+
+const runAdminGetAccessHomologationSnapshot =
+  buildAdminGetAccessHomologationSnapshotHandler(
+    createAdminAccessHomologationSnapshotDeps({
+      auth: admin.auth(),
+      authorize: async (auth) => {
+        const typedAuth = auth as {uid: string; token: admin.auth.DecodedIdToken} | undefined;
+        const caller = requireAuth(typedAuth);
+        if (typedAuth && isAdminToken(typedAuth.token)) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        const user = await db.collection("users").doc(caller.ra).get();
+        if (user.exists && isAdminUserRecord(user.data() ?? {})) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        throw new HttpsError("permission-denied", "Autoridade administrativa obrigatoria.");
+      },
+      db,
+      logInfo: (event) => logger.info("admin_access_homologation_snapshot_read", event),
+      logWarning: (event) => logger.warn("admin_access_homologation_snapshot_read_failed", event),
+      projectId: "canil-gcm",
+    }),
+  );
+
+/** Read-only, admin-only authorization snapshot for controlled homologation. */
+export const adminGetAccessHomologationSnapshot = onCall({region}, async (request) =>
+  runAdminGetAccessHomologationSnapshot(request));
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "access", "approve");
