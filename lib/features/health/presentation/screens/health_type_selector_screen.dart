@@ -40,6 +40,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
 
 class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
   String? _selectedType;
+  bool _isContinuing = false;
 
   List<_HealthActionCategory> get _mainCategories => [
     const _HealthActionCategory(
@@ -52,8 +53,8 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     ),
     const _HealthActionCategory(
       id: 'weight',
-      label: 'Peso',
-      subtitle: 'Registrar nova pesagem',
+      label: 'Pesagem',
+      subtitle: 'Registrar peso corporal',
       icon: Icons.monitor_weight_rounded,
       color: AppTheme.primary,
       group: _HealthActionGroup.frequent,
@@ -149,6 +150,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
   }
 
   Future<void> _continueSelected() async {
+    if (_isContinuing) return;
     _HealthActionCategory? selected;
     for (final category in _categories) {
       if (category.id == _selectedType) {
@@ -159,6 +161,16 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     if (selected == null) return;
     final selectedId = selected.id;
 
+    setState(() => _isContinuing = true);
+
+    try {
+      await _openSelectedCategory(selectedId);
+    } finally {
+      if (mounted) setState(() => _isContinuing = false);
+    }
+  }
+
+  Future<void> _openSelectedCategory(String selectedId) async {
     if (selectedId == 'weight') {
       final saved = await widget.onRegisterWeight?.call(context) ?? false;
       if (!mounted) return;
@@ -353,7 +365,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                           ),
                           elevation: _selectedType != null ? 4 : 0,
                         ),
-                        onPressed: _selectedType == null
+                        onPressed: _selectedType == null || _isContinuing
                             ? null
                             : _continueSelected,
                         child: Text(

@@ -51,6 +51,7 @@ import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_screen.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_source.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/widgets/health_timeline_status_views.dart';
+import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
 import 'package:canil_gcm/features/nutrition/presentation/screens/nutrition_full_screen.dart';
 
@@ -474,6 +475,11 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
     final dogContext =
         widget.dogContextOverride ??
         _resolveDogContext(dogVM ?? DogViewModel());
+    final dog = _resolveDogForNavigation(
+      dogId: widget.dogId,
+      dogVM: dogVM,
+      preferredContext: dogContext,
+    ).dog;
 
     final saved = await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
@@ -481,6 +487,16 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
           dogId: widget.dogId,
           dogName: dogContext.name,
           dogBreed: dogContext.breed,
+          onRegisterWeight: (hubContext) async {
+            final saved = await showHealthWeightFormSheet(
+              context: hubContext,
+              dog: dog,
+              onRefreshAfterSuccess: () async {
+                _controller.selectDog(widget.dogId);
+              },
+            );
+            return saved == true;
+          },
           onRegisterNutrition: (hubContext) async {
             // Mostrar seleção entre Alimentação Avulsa e Suplemento.
             final choice =
