@@ -248,7 +248,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                   subtype: 'Pesagem',
                   weight: record.weightKg,
                   healthObservations: record.notes ?? '',
-                  createdBy: record.recordedBy.name,
+                  createdBy: record.recordedBy?.name,
                 ),
               )
               .toList(growable: false);
@@ -426,7 +426,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Medido em $dateStr · ${latest.record.recordedBy.name}',
+                  [
+                    'Medido em $dateStr',
+                    ?latest.record.recordedBy?.name,
+                  ].join(' · '),
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,
@@ -707,7 +710,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  [entry.record.recordedBy.name, ?contextLabel].join(' · '),
+                  [?entry.record.recordedBy?.name, ?contextLabel].join(' · '),
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,

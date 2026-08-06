@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_soft_delete.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/timeline_mapping_result.dart';
+import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
 import 'package:canil_gcm/features/health/presentation/timeline/health_timeline_entry_view.dart';
@@ -250,6 +251,16 @@ abstract final class HealthTimelineMappers {
     return TimelineMapped(entry);
   }
 
+  /// Mapeia `weight_records` via parser central (ADR-008 §11.4).
+  ///
+  /// - `valid` → evento (a timeline não carrega autoria; shapes legados sem
+  ///   `recorder` também viram evento);
+  /// - `invalidated` → [TimelineIgnored] (excluído da timeline ordinária, sem
+  ///   bloquear a completude);
+  /// - `malformed`/`unsupported` → [TimelineInvalid] (documento ativo
+  ///   estruturalmente inutilizável → leitura inconclusiva, nunca evento);
+  /// - metadata interna (`legacyActorReference`) nunca é usada como texto;
+  /// - `created_at` permanece apenas como fallback derivado de `recordedAt`.
   static TimelineMappingResult mapWeightRecord({
     required String dogId,
     required String docId,
@@ -261,27 +272,32 @@ abstract final class HealthTimelineMappers {
       return const TimelineIgnored('soft_deleted');
     }
 
-    // Fonte é sempre weight — filtro de tipo antes da data.
+    // Fonte é sempre weight — filtro de tipo antes do parse.
     if (filters.types.isNotEmpty &&
         !filters.types.contains(HealthTimelineType.weight)) {
       return const TimelineIgnored('type_filter');
     }
 
-    final dateRaw = data['measured_at'];
-    final occurredAt = HealthSummaryDateParse.tryParse(dateRaw);
-    if (occurredAt == null) {
-      return TimelineInvalid(_dateReason(dateRaw));
+    final result = WeightAssessmentReadAdapter.read(
+      documentId: docId,
+      dogId: dogId,
+      data: data,
+    );
+    switch (result.kind) {
+      case WeightReadKind.invalidated:
+        return const TimelineIgnored('invalidated');
+      case WeightReadKind.malformed:
+      case WeightReadKind.unsupported:
+        return const TimelineInvalid(
+          TimelineMappingInvalidReason.invalidRequiredStructure,
+        );
+      case WeightReadKind.valid:
+        break;
     }
 
-    final kg = (data['weight_kg'] is num)
-        ? (data['weight_kg'] as num).toDouble()
-        : null;
-    if (kg == null || !kg.isFinite || kg <= 0) {
-      return const TimelineInvalid(
-        TimelineMappingInvalidReason.invalidRequiredStructure,
-      );
-    }
-
+    final assessment = result.assessment!;
+    final occurredAt = assessment.measuredAt;
+    final kg = assessment.weightKg;
     final label = kg == kg.roundToDouble()
         ? '${kg.toInt()} kg'
         : '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';

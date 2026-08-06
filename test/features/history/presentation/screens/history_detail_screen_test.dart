@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_detail_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
@@ -122,5 +123,180 @@ void main() {
     expect(find.text('NÃO INFORMADO'), findsOneWidget);
     expect(find.text('0g'), findsNothing);
     expect(find.text('EM CONFORMIDADE'), findsNothing);
+  });
+
+  group('autoria ausente em pesagem legada (RecordDetail.fromEntry)', () {
+    HistoryEntry weightEntry({required String author}) => HistoryEntry(
+      id: 'weight_1',
+      type: HistoryEntryType.health,
+      title: 'Pesagem operacional registrada',
+      subtitle: 'Peso atual: 32.0 kg',
+      time: DateTime(2026, 8, 4, 10),
+      author: author,
+      authorId: author,
+      tag: 'PESO',
+      icon: Icons.monitor_weight_rounded,
+      color: Colors.purple,
+      details: const {'_healthKind': 'weight', 'Peso': '32.0 kg'},
+    );
+
+    test('peso sem autoria não fabrica Ragonha nem GCM Ragonha', () {
+      final detail = RecordDetail.fromEntry(weightEntry(author: ''));
+
+      expect(detail.author, isEmpty);
+      expect(detail.handlerName, isEmpty);
+      expect(detail.author, isNot(contains('Ragonha')));
+      expect(detail.handlerName, isNot(contains('Ragonha')));
+      // O evento de criação não afirma autoria factual.
+      final created = detail.auditEvents.first;
+      expect(created.user, isEmpty);
+      expect(created.action, 'Registro criado');
+    });
+
+    test('peso COM autoria continua normalizando o nome (sem regressão)', () {
+      final detail = RecordDetail.fromEntry(weightEntry(author: 'Ana'));
+
+      expect(detail.author, 'GCM Ana');
+      expect(detail.handlerName, 'Ana');
+    });
+
+    test('outros tipos health sem autor mantêm fallback existente', () {
+      final vaccine = HistoryEntry(
+        id: 'vac_1',
+        type: HistoryEntryType.health,
+        title: 'Vacinação',
+        subtitle: '',
+        time: DateTime(2026, 8, 4, 10),
+        author: '',
+        tag: 'SAÚDE',
+        icon: Icons.vaccines,
+        color: Colors.teal,
+        details: const {'_healthKind': 'vaccine'},
+      );
+
+      final detail = RecordDetail.fromEntry(vaccine);
+
+      // Comportamento legado preservado para tipos que não são pesagem.
+      expect(detail.author, 'GCM Ragonha');
+      expect(detail.handlerName, 'Ragonha');
+    });
+  });
+
+  testWidgets('detalhe de pesagem sem autoria omite identidade e vet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final detail = RecordDetail.fromEntry(
+      HistoryEntry(
+        id: 'weight_1',
+        type: HistoryEntryType.health,
+        title: 'Pesagem operacional registrada',
+        subtitle: 'Peso atual: 32.0 kg',
+        time: DateTime(2026, 8, 4, 10),
+        author: '',
+        authorId: '',
+        tag: 'PESO',
+        icon: Icons.monitor_weight_rounded,
+        color: Colors.purple,
+        details: const {'_healthKind': 'weight', 'Peso': '32.0 kg'},
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(child: HistorySaudeBody(detail: detail)),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Ragonha'), findsNothing);
+    expect(find.textContaining('GCM Ragonha'), findsNothing);
+    expect(find.textContaining('desconhecido'), findsNothing);
+    expect(find.textContaining('RA-'), findsNothing);
+    // Bloco de responsável técnico não é renderizado sem vet factual.
+    expect(find.text('RESPONSÁVEL TÉCNICO'), findsNothing);
+  });
+
+  group('scaffold completo do detalhe (RegistroDetalhePage)', () {
+    // Fluxo real: HistoryEntry → RecordDetail.fromEntry → RegistroDetalhePage,
+    // incluindo o card de identificação (onde o antigo 'GCM Ragonha' surgia).
+    HistoryEntry weightEntry({required String author}) => HistoryEntry(
+      id: 'weight_1',
+      type: HistoryEntryType.health,
+      title: 'Pesagem operacional registrada',
+      subtitle: 'Peso atual: 32.0 kg',
+      time: DateTime(2026, 8, 4, 10),
+      author: author,
+      authorId: author,
+      tag: 'PESO',
+      icon: Icons.monitor_weight_rounded,
+      color: Colors.purple,
+      originalModel: WeightRecord(
+        id: 'weight_1',
+        weightKg: 32.0,
+        measuredAt: DateTime.utc(2026, 8, 4, 10),
+        recordedBy: null,
+      ),
+      details: const {
+        '_healthKind': 'weight',
+        'Cão': 'Aracnid',
+        'Peso': '32.0 kg',
+      },
+    );
+
+    // Viewport largo evita overflow horizontal do card no ambiente de teste;
+    // o card de identificação usa RichText, portanto os finders precisam de
+    // findRichText: true para realmente atravessar seus TextSpans.
+    Future<void> pump(WidgetTester tester, HistoryEntry entry) async {
+      tester.view.physicalSize = const Size(1400, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(home: RegistroDetalhePage(entry: entry)),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('pesagem sem autoria: card renderiza sem autor fabricado', (
+      tester,
+    ) async {
+      await pump(tester, weightEntry(author: ''));
+
+      // Detalhe renderiza e dado factual do K9 permanece visível no card.
+      expect(find.byType(RegistroDetalhePage), findsOneWidget);
+      expect(find.textContaining('Aracnid', findRichText: true), findsWidgets);
+
+      // Nenhuma autoria fabricada em toda a árvore do scaffold (inclui o
+      // card de identificação em RichText, onde o antigo 'GCM Ragonha' surgia).
+      expect(find.textContaining('Ragonha', findRichText: true), findsNothing);
+      expect(
+        find.textContaining('desconhecido', findRichText: true),
+        findsNothing,
+      );
+      expect(find.textContaining('RA-', findRichText: true), findsNothing);
+      expect(
+        find.textContaining('Criado por', findRichText: true),
+        findsNothing,
+      );
+      // Responsável técnico ausente sem vet factual.
+      expect(find.text('RESPONSÁVEL TÉCNICO'), findsNothing);
+    });
+
+    testWidgets('pesagem com autoria: card preserva o nome (sem regressão)', (
+      tester,
+    ) async {
+      await pump(tester, weightEntry(author: 'Ana'));
+
+      expect(find.byType(RegistroDetalhePage), findsOneWidget);
+      // Normalização preservada: 'Ana' → 'GCM Ana' no card de identificação.
+      expect(find.textContaining('Ana', findRichText: true), findsWidgets);
+      expect(find.textContaining('Ragonha', findRichText: true), findsNothing);
+    });
   });
 }

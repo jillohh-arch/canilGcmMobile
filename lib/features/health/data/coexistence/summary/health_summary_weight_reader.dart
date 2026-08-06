@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
+import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
@@ -138,6 +138,16 @@ class HealthSummaryWeightReader {
     return list;
   }
 
+  /// Leitura DESC adotando o parser central.
+  ///
+  /// Política de peso atual (ADR-008 §11.1), aplicada na ordem retornada:
+  /// - `valid` → candidato (o summary não carrega autoria, então shapes
+  ///   legados sem `recorder` também contam);
+  /// - `invalidated` → ignorado como candidato (não bloqueia);
+  /// - `malformed`/`unsupported` **antes** do primeiro candidato válido →
+  ///   erro controlado (inconclusivo), sem promover registro anterior;
+  /// - `malformed`/`unsupported` **depois** de um candidato válido → ignorado
+  ///   (não invalida o candidato mais recente).
   static Future<List<HealthSummaryWeightSample>> _loadFromFirestore(
     FirebaseFirestore firestore,
     String dogId,
@@ -151,13 +161,32 @@ class HealthSummaryWeightReader {
         .get();
 
     final samples = <HealthSummaryWeightSample>[];
+    var seenValid = false;
     for (final doc in snap.docs) {
-      final data = doc.data();
-      final kgRaw = data['weight_kg'];
-      final kg = kgRaw is num ? kgRaw.toDouble() : null;
-      final at = HealthSummaryDateParse.tryParse(data['measured_at']);
-      if (kg == null || at == null) continue;
-      samples.add(HealthSummaryWeightSample(weightKg: kg, measuredAt: at));
+      final result = WeightAssessmentReadAdapter.read(
+        documentId: doc.id,
+        dogId: dogId,
+        data: doc.data(),
+      );
+      switch (result.kind) {
+        case WeightReadKind.valid:
+          final assessment = result.assessment!;
+          seenValid = true;
+          samples.add(
+            HealthSummaryWeightSample(
+              weightKg: assessment.weightKg,
+              measuredAt: assessment.measuredAt,
+            ),
+          );
+        case WeightReadKind.invalidated:
+          continue;
+        case WeightReadKind.malformed:
+        case WeightReadKind.unsupported:
+          if (!seenValid) {
+            throw StateError('weight_summary_inconclusive_${result.kind.name}');
+          }
+          continue;
+      }
     }
     return samples;
   }

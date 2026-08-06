@@ -43,7 +43,7 @@ void main() {
 
     expect(records.map((record) => record.id), ['newer', 'older']);
     expect(records.first.weightKg, 24.8);
-    expect(records.last.recordedBy.name, 'Ana');
+    expect(records.last.recordedBy?.name, 'Ana');
     expect(records.last.contextLabel, 'Rotina');
     expect(records, hasLength(2));
   });

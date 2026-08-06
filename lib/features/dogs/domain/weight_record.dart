@@ -50,7 +50,11 @@ final class WeightRecord {
   final String id;
   final double weightKg;
   final DateTime measuredAt;
-  final WeightRecordedBy recordedBy;
+
+  /// Autoria canônica. Ausente (`null`) em pesagens legadas reconhecidas que
+  /// não possuem `recorder`: a leitura é permitida, mas a autoria não é
+  /// inventada nem derivada de `legacyActorReference` / RA.
+  final WeightRecordedBy? recordedBy;
   final int schemaVersion;
   final String context;
   final String? notes;
@@ -64,7 +68,8 @@ final class WeightRecord {
   };
 
   /// Compatibilidade somente de apresentação para consumidores existentes.
-  String get measuredBy => recordedBy.name;
+  /// String vazia quando não há autoria factual (legado sem `recorder`).
+  String get measuredBy => recordedBy?.name ?? '';
 
   /// O contrato canônico de Pesagem desta fase não possui foto.
   String? get photoUrl => null;

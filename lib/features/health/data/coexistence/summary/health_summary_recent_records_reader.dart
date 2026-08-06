@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_soft_delete.dart';
+import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
@@ -174,6 +175,16 @@ class HealthSummaryRecentRecordsReader {
     );
   }
 
+  /// Pesagens recentes via parser central (ADR-008 §11.3).
+  ///
+  /// - inclui apenas `valid` (o card não carrega autoria, então shapes legados
+  ///   sem `recorder` também entram);
+  /// - `invalidated` excluído;
+  /// - `malformed`/`unsupported` nunca viram card;
+  /// - bloqueio **antes** do primeiro `valid` → falha (sem promover registro
+  ///   mais antigo como "mais recente"); o bloco fica `unavailable` pelo
+  ///   mecanismo de erro já existente. Bloqueio **depois** de um `valid` é
+  ///   ignorado.
   static Future<List<HealthSummaryRecentRawItem>> _weights(
     FirebaseFirestore firestore,
     String dogId,
@@ -186,25 +197,39 @@ class HealthSummaryRecentRecordsReader {
         .limit(5)
         .get();
     final items = <HealthSummaryRecentRawItem>[];
+    var seenValid = false;
     for (final doc in snap.docs) {
-      final data = doc.data();
-      final at = HealthSummaryDateParse.tryParse(data['measured_at']);
-      final kg = (data['weight_kg'] is num)
-          ? (data['weight_kg'] as num).toDouble()
-          : null;
-      if (at == null || kg == null || !kg.isFinite || kg <= 0) continue;
-      final label = kg == kg.roundToDouble()
-          ? '${kg.toInt()} kg'
-          : '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';
-      items.add(
-        HealthSummaryRecentRawItem(
-          id: 'wt-${doc.id}',
-          type: 'weight',
-          title: 'Pesagem',
-          subtitle: label,
-          occurredAt: at,
-        ),
+      final result = WeightAssessmentReadAdapter.read(
+        documentId: doc.id,
+        dogId: dogId,
+        data: doc.data(),
       );
+      switch (result.kind) {
+        case WeightReadKind.invalidated:
+          continue;
+        case WeightReadKind.malformed:
+        case WeightReadKind.unsupported:
+          if (!seenValid) {
+            throw StateError('weight_recent_inconclusive_${result.kind.name}');
+          }
+          continue;
+        case WeightReadKind.valid:
+          seenValid = true;
+          final assessment = result.assessment!;
+          final kg = assessment.weightKg;
+          final label = kg == kg.roundToDouble()
+              ? '${kg.toInt()} kg'
+              : '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';
+          items.add(
+            HealthSummaryRecentRawItem(
+              id: 'wt-${doc.id}',
+              type: 'weight',
+              title: 'Pesagem',
+              subtitle: label,
+              occurredAt: assessment.measuredAt,
+            ),
+          );
+      }
     }
     return items;
   }

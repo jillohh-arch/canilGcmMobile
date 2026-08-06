@@ -2,6 +2,8 @@ import 'dart:collection';
 
 import 'health_v1_enums.dart';
 
+export 'weight_assessment.dart' show WeightAssessment;
+
 final class HealthDomainException implements Exception {
   const HealthDomainException(this.code, this.message);
 
@@ -417,55 +419,6 @@ final class ClinicalEvent {
         ? this.cancelledBy
         : cancelledBy as RecordedBy?,
   );
-}
-
-final class WeightAssessment {
-  WeightAssessment({
-    required String id,
-    required String dogId,
-    required this.weight,
-    required this.measuredAt,
-    required this.recordedBy,
-    required this.schemaVersion,
-  }) : id = _required(id, 'id'),
-       dogId = _required(dogId, 'dog_id') {
-    if (schemaVersion <= 0) {
-      throw const HealthDomainException(
-        'invalid_schema_version',
-        'schema_version deve ser positivo',
-      );
-    }
-  }
-
-  final String id;
-  final String dogId;
-  final WeightKg weight;
-  final DateTime measuredAt;
-  final RecordedBy recordedBy;
-  final int schemaVersion;
-
-  void validateMeasuredAt({required DateTime referenceTime}) {
-    if (measuredAt.isAfter(referenceTime)) {
-      throw const HealthDomainException(
-        'future_measured_at',
-        'measured_at não pode estar no futuro',
-      );
-    }
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      other is WeightAssessment &&
-      other.id == id &&
-      other.dogId == dogId &&
-      other.weight == weight &&
-      other.measuredAt == measuredAt &&
-      other.recordedBy == recordedBy &&
-      other.schemaVersion == schemaVersion;
-
-  @override
-  int get hashCode =>
-      Object.hash(id, dogId, weight, measuredAt, recordedBy, schemaVersion);
 }
 
 final class MealLog {

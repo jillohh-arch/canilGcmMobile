@@ -51,6 +51,65 @@ enum MealPeriod { morning, afternoon, evening, night, extra }
 /// Aceitação da refeição (MealLog) — Domain Model §2.8 / D9 / D42.
 enum MealAcceptance { full, partial, refused, unknown }
 
+enum WeightRecordType { quick, official, legacySimple }
+
+enum WeightAssessmentStatus { valid, invalidated }
+
+enum WeightInformationSource {
+  measuredByRecorder,
+  reportedByOtherOperator,
+  externalDocumentOrService,
+}
+
+enum WeightLocation { kennel, veterinaryClinic, pharmacy, other }
+
+enum WeightMeasurementCondition {
+  fasting,
+  afterFeeding,
+  afterActivityOrTraining,
+  noSpecificCondition,
+  other,
+}
+
+enum WeightEquipmentState {
+  none,
+  collar,
+  harnessOrOperationalEquipment,
+  notInformed,
+}
+
+enum WeightReadingQuality { stable, approximate, notRecorded }
+
+enum WeightBcsSource {
+  operatorAssessment,
+  veterinaryGuidance,
+  reportedByOtherOperator,
+}
+
+enum WeightCorrectionReason { dataEntryError, newScaleReading, other }
+
+enum WeightInvalidationReason {
+  wrongDog,
+  defectiveScale,
+  duplicate,
+  irrecoverableError,
+  other,
+}
+
+enum WeightAssessmentOperationType {
+  createQuick,
+  createOfficial,
+  completeAsOfficial,
+  correct,
+  invalidate,
+  addAttachment,
+  removeAttachment,
+}
+
+enum WeightConfigurationOperationType { setReferenceRange, setWeightGoal }
+
+enum WeightFollowUpOperationType { createFollowUp }
+
 enum ParsedHealthEnumState { known, unknown, absent }
 
 /// Preserva valores desconhecidos sem confundi-los com ausência.
@@ -256,4 +315,191 @@ extension MealAcceptanceWire on MealAcceptance {
   /// Parse unknown-safe — nunca promove valor desconhecido a um known incorreto.
   static ParsedHealthEnum<MealAcceptance> parse(Object? value) =>
       _parseEnum(value, MealAcceptance.values, (item) => item.wireName);
+}
+
+extension WeightRecordTypeWire on WeightRecordType {
+  String get wireName => switch (this) {
+    WeightRecordType.quick => 'quick',
+    WeightRecordType.official => 'official',
+    WeightRecordType.legacySimple => 'legacy_simple',
+  };
+
+  String get targetWireName => switch (this) {
+    WeightRecordType.quick => 'quick',
+    WeightRecordType.official => 'official',
+    WeightRecordType.legacySimple => throw StateError(
+      'legacy_simple é derivado de leitura e não serializável como target',
+    ),
+  };
+
+  static ParsedHealthEnum<WeightRecordType> parse(Object? value) =>
+      _parseEnum(value, WeightRecordType.values, (item) => item.wireName);
+}
+
+extension WeightAssessmentStatusWire on WeightAssessmentStatus {
+  String get wireName => switch (this) {
+    WeightAssessmentStatus.valid => 'valid',
+    WeightAssessmentStatus.invalidated => 'invalidated',
+  };
+
+  static ParsedHealthEnum<WeightAssessmentStatus> parse(Object? value) =>
+      _parseEnum(value, WeightAssessmentStatus.values, (item) => item.wireName);
+}
+
+extension WeightInformationSourceWire on WeightInformationSource {
+  String get wireName => switch (this) {
+    WeightInformationSource.measuredByRecorder => 'measured_by_recorder',
+    WeightInformationSource.reportedByOtherOperator =>
+      'reported_by_other_operator',
+    WeightInformationSource.externalDocumentOrService =>
+      'external_document_or_service',
+  };
+
+  static ParsedHealthEnum<WeightInformationSource> parse(Object? value) =>
+      _parseEnum(
+        value,
+        WeightInformationSource.values,
+        (item) => item.wireName,
+      );
+}
+
+extension WeightLocationWire on WeightLocation {
+  String get wireName => switch (this) {
+    WeightLocation.kennel => 'kennel',
+    WeightLocation.veterinaryClinic => 'veterinary_clinic',
+    WeightLocation.pharmacy => 'pharmacy',
+    WeightLocation.other => 'other',
+  };
+
+  static ParsedHealthEnum<WeightLocation> parse(Object? value) =>
+      _parseEnum(value, WeightLocation.values, (item) => item.wireName);
+}
+
+extension WeightMeasurementConditionWire on WeightMeasurementCondition {
+  String get wireName => switch (this) {
+    WeightMeasurementCondition.fasting => 'fasting',
+    WeightMeasurementCondition.afterFeeding => 'after_feeding',
+    WeightMeasurementCondition.afterActivityOrTraining =>
+      'after_activity_or_training',
+    WeightMeasurementCondition.noSpecificCondition => 'no_specific_condition',
+    WeightMeasurementCondition.other => 'other',
+  };
+
+  static ParsedHealthEnum<WeightMeasurementCondition> parse(Object? value) =>
+      _parseEnum(
+        value,
+        WeightMeasurementCondition.values,
+        (item) => item.wireName,
+      );
+}
+
+extension WeightEquipmentStateWire on WeightEquipmentState {
+  String get wireName => switch (this) {
+    WeightEquipmentState.none => 'none',
+    WeightEquipmentState.collar => 'collar',
+    WeightEquipmentState.harnessOrOperationalEquipment =>
+      'harness_or_operational_equipment',
+    WeightEquipmentState.notInformed => 'not_informed',
+  };
+
+  static ParsedHealthEnum<WeightEquipmentState> parse(Object? value) =>
+      _parseEnum(value, WeightEquipmentState.values, (item) => item.wireName);
+}
+
+extension WeightReadingQualityWire on WeightReadingQuality {
+  String get wireName => switch (this) {
+    WeightReadingQuality.stable => 'stable',
+    WeightReadingQuality.approximate => 'approximate',
+    WeightReadingQuality.notRecorded => 'not_recorded',
+  };
+
+  static ParsedHealthEnum<WeightReadingQuality> parse(Object? value) =>
+      _parseEnum(value, WeightReadingQuality.values, (item) => item.wireName);
+}
+
+extension WeightBcsSourceWire on WeightBcsSource {
+  String get wireName => switch (this) {
+    WeightBcsSource.operatorAssessment => 'operator_assessment',
+    WeightBcsSource.veterinaryGuidance => 'veterinary_guidance',
+    WeightBcsSource.reportedByOtherOperator => 'reported_by_other_operator',
+  };
+
+  static ParsedHealthEnum<WeightBcsSource> parse(Object? value) =>
+      _parseEnum(value, WeightBcsSource.values, (item) => item.wireName);
+}
+
+extension WeightCorrectionReasonWire on WeightCorrectionReason {
+  String get wireName => switch (this) {
+    WeightCorrectionReason.dataEntryError => 'data_entry_error',
+    WeightCorrectionReason.newScaleReading => 'new_scale_reading',
+    WeightCorrectionReason.other => 'other',
+  };
+
+  static ParsedHealthEnum<WeightCorrectionReason> parse(Object? value) =>
+      _parseEnum(value, WeightCorrectionReason.values, (item) => item.wireName);
+}
+
+extension WeightInvalidationReasonWire on WeightInvalidationReason {
+  String get wireName => switch (this) {
+    WeightInvalidationReason.wrongDog => 'wrong_dog',
+    WeightInvalidationReason.defectiveScale => 'defective_scale',
+    WeightInvalidationReason.duplicate => 'duplicate',
+    WeightInvalidationReason.irrecoverableError => 'irrecoverable_error',
+    WeightInvalidationReason.other => 'other',
+  };
+
+  static ParsedHealthEnum<WeightInvalidationReason> parse(Object? value) =>
+      _parseEnum(
+        value,
+        WeightInvalidationReason.values,
+        (item) => item.wireName,
+      );
+}
+
+extension WeightAssessmentOperationTypeWire on WeightAssessmentOperationType {
+  String get wireName => switch (this) {
+    WeightAssessmentOperationType.createQuick => 'create_quick',
+    WeightAssessmentOperationType.createOfficial => 'create_official',
+    WeightAssessmentOperationType.completeAsOfficial => 'complete_as_official',
+    WeightAssessmentOperationType.correct => 'correct',
+    WeightAssessmentOperationType.invalidate => 'invalidate',
+    WeightAssessmentOperationType.addAttachment => 'add_attachment',
+    WeightAssessmentOperationType.removeAttachment => 'remove_attachment',
+  };
+
+  static ParsedHealthEnum<WeightAssessmentOperationType> parse(Object? value) =>
+      _parseEnum(
+        value,
+        WeightAssessmentOperationType.values,
+        (item) => item.wireName,
+      );
+}
+
+extension WeightConfigurationOperationTypeWire
+    on WeightConfigurationOperationType {
+  String get wireName => switch (this) {
+    WeightConfigurationOperationType.setReferenceRange => 'set_reference_range',
+    WeightConfigurationOperationType.setWeightGoal => 'set_weight_goal',
+  };
+
+  static ParsedHealthEnum<WeightConfigurationOperationType> parse(
+    Object? value,
+  ) => _parseEnum(
+    value,
+    WeightConfigurationOperationType.values,
+    (item) => item.wireName,
+  );
+}
+
+extension WeightFollowUpOperationTypeWire on WeightFollowUpOperationType {
+  String get wireName => switch (this) {
+    WeightFollowUpOperationType.createFollowUp => 'create_follow_up',
+  };
+
+  static ParsedHealthEnum<WeightFollowUpOperationType> parse(Object? value) =>
+      _parseEnum(
+        value,
+        WeightFollowUpOperationType.values,
+        (item) => item.wireName,
+      );
 }

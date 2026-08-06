@@ -242,7 +242,16 @@ void main() {
         HealthTimelineMappers.mapWeightRecord(
           dogId: 'd1',
           docId: 'w1',
-          data: {'measured_at': DateTime(2026, 3, 1), 'weight_kg': 29.8},
+          data: {
+            'measured_at': DateTime(2026, 3, 1),
+            'weight_kg': 29.8,
+            'schema_version': 1,
+            'recorded_by': const {
+              'uid': 'user-1',
+              'name': 'Ana',
+              'internal_role': 'condutor',
+            },
+          },
           filters: HealthTimelineQuery(dogId: 'd1'),
         ),
       );
@@ -335,6 +344,12 @@ void main() {
             data: {
               'measured_at': DateTime(2026, 5, 10, 10),
               'weight_kg': 30.0,
+              'schema_version': 1,
+              'recorded_by': const {
+                'uid': 'user-1',
+                'name': 'Ana',
+                'internal_role': 'condutor',
+              },
             },
             filters: q,
           ),
@@ -477,7 +492,16 @@ void main() {
         HealthTimelineMappers.mapWeightRecord(
           dogId: 'd1',
           docId: 'abc',
-          data: {'measured_at': DateTime(2026, 1, 1), 'weight_kg': 20},
+          data: {
+            'measured_at': DateTime(2026, 1, 1),
+            'weight_kg': 20,
+            'schema_version': 1,
+            'recorded_by': const {
+              'uid': 'user-1',
+              'name': 'Ana',
+              'internal_role': 'condutor',
+            },
+          },
           filters: q,
         ),
       );

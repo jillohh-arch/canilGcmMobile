@@ -526,14 +526,18 @@ class HistoryDetailScaffold extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const TextSpan(text: ' · GCM '),
-                      TextSpan(
-                        text: detail.handlerName,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontWeight: FontWeight.bold,
+                      // Autoria ausente (ex.: pesagem legada sem recorder):
+                      // omite o segmento de condutor sem deixar 'GCM' órfão.
+                      if (detail.handlerName.trim().isNotEmpty) ...[
+                        const TextSpan(text: ' · GCM '),
+                        TextSpan(
+                          text: detail.handlerName,
+                          style: const TextStyle(
+                            color: _textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      ],
                       const TextSpan(text: ' · Canil K9 Limeira'),
                     ],
                   ),
@@ -2847,43 +2851,53 @@ class HistorySaudeBody extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Veterinário responsável
-        const _SectionLabel('RESPONSÁVEL TÉCNICO'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _textPrimary.withAlpha(5),
-            border: Border.all(color: _textPrimary.withAlpha(12)),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.assignment_ind_outlined, color: _cyan, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      vetName,
-                      style: GoogleFonts.inter(
-                        color: _textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      crmv,
-                      style: GoogleFonts.inter(color: _textMuted, fontSize: 11),
-                    ),
-                  ],
+        // Veterinário responsável — omitido quando não há responsável técnico
+        // factual (ex.: pesagem legada sem autoria não fabrica um nome).
+        if (vetName.trim().isNotEmpty) ...[
+          const _SectionLabel('RESPONSÁVEL TÉCNICO'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _textPrimary.withAlpha(5),
+              border: Border.all(color: _textPrimary.withAlpha(12)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.assignment_ind_outlined,
+                  color: _cyan,
+                  size: 18,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vetName,
+                        style: GoogleFonts.inter(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        crmv,
+                        style: GoogleFonts.inter(
+                          color: _textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
 
         // Documentos anexos
         const _SectionLabel('DOCUMENTOS ANEXOS'),

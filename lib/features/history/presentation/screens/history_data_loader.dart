@@ -175,7 +175,11 @@ extension _HistoryDataLoader on _HistoryScreenState {
       title: 'Pesagem operacional registrada',
       subtitle: 'Peso atual: ${record.weightKg.toStringAsFixed(1)} kg',
       time: record.measuredAt,
-      author: _resolveAuthorName(record.measuredBy),
+      // Pesagem legada reconhecida sem autoria canônica: mantém a autoria
+      // ausente (sem inventar nome nem derivar de RA/legacyActorReference).
+      author: record.measuredBy.isEmpty
+          ? ''
+          : _resolveAuthorName(record.measuredBy),
       authorId: record.measuredBy,
       tag: 'PESO',
       icon: Icons.monitor_weight_rounded,

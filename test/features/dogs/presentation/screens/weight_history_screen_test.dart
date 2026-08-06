@@ -80,6 +80,30 @@ void main() {
     expect(find.textContaining('Clínica'), findsOneWidget);
   });
 
+  testWidgets(
+    'renders recorder-less legacy record without author suffix or RA leak',
+    (tester) async {
+      final legacy = WeightRecord(
+        id: 'legacy-1',
+        weightKg: 24.5,
+        measuredAt: DateTime.utc(2026, 8, 4),
+        // Autoria canônica ausente (legado reconhecido).
+        recordedBy: null,
+      );
+      await pumpScreen(tester, Stream.value([legacy]));
+
+      // A pesagem permanece visível.
+      expect(find.textContaining('24.5'), findsWidgets);
+      // Sem autor inventado, sem rótulo substituto, sem RA / referência legada.
+      expect(find.textContaining('Ana'), findsNothing);
+      expect(find.textContaining('RA-'), findsNothing);
+      expect(find.textContaining('Ragonha'), findsNothing);
+      expect(find.textContaining('desconhecido'), findsNothing);
+      // Sufixo de autoria ' · ' não deve acompanhar a data quando ausente.
+      expect(find.textContaining('Medido em'), findsWidgets);
+    },
+  );
+
   testWidgets('renders controlled read error state', (tester) async {
     await pumpScreen(
       tester,
