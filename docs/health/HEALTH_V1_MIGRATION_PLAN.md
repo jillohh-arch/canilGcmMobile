@@ -395,3 +395,27 @@
 - Código limpo sem referências a formato legado do agregado.
 - Dados legados preservados no Firestore (documentação histórica).
 - Quando todos os agregados concluírem: migração oficialmente concluída.
+
+---
+
+## Plano específico de Pesagem (WEIGHT-00C)
+
+Status: **APPROVED TARGET — MIGRATION NOT STARTED**.
+
+1. Introduzir bridge de schema nos readers.
+2. Interpretar ausência dos novos campos como `record_type=legacy_simple`,
+   `status=valid` e `revision=1` somente no read model.
+3. Não inferir Quick, Official, source, location, condition, quality ou equipment.
+4. Preservar IDs, peso, `measured_at`, autoria disponível, receipts, timeline e
+   summary, incluindo Apolo 32.0 kg e 33.3 kg.
+5. Não converter BCS legado 1–9 para a escala canônica 1–5.
+6. Permitir lazy migration somente por operação backend legítima, auditada e após
+   aprovação da fase correspondente.
+7. Executar backfill apenas após inventário, dry-run, reconciliação e autorização
+   humana explícita.
+8. Retirar `adminCreateK9WeightRecord`, novos writes em `weight_history`,
+   `appendK9WeightRecord`, writes client-side e denormalização Web best-effort.
+9. Endurecer Rules somente em fase própria, com prova Emulator e rollback.
+
+Nenhuma etapa pode apagar ou reidentificar um registro. A retirada dos writers
+paralelos é gate bloqueante antes de liberar o lifecycle ampliado.

@@ -409,3 +409,35 @@ Futuras expansões:
 - Framework comum de formulários.
 - Prontidão integrada.
 - Arquitetura preparada para expansão futura.
+
+---
+
+# Integração canônica de Pesagem (WEIGHT-00C)
+
+Status: **APPROVED TARGET — NOT YET DEPLOYED**. A fonte normativa é
+`health/HEALTH_WEIGHT_CANONICAL_SPEC.md`; lifecycle em
+`health/adr/ADR-008-WEIGHT-ASSESSMENT-LIFECYCLE.md`.
+
+O estado implantado continua limitado ao create simples Mobile → callable
+`healthWeightCreateRecord` → transação/receipt/audit → `weight_records` e campos
+de compatibilidade no K9. Mobile e Web leem diretamente
+`dogs/{dogId}/weight_records`; resumo, gráfico, prontuário e histórico atuais são
+compostos por esses readers. O documento do K9 mantém temporariamente `weight`,
+`_last_weight_kg` e `_last_weight_at`. A projeção-alvo de Pesagem em
+`health_summary/current` e uma `health_timeline` materializada como fonte do peso
+ainda não estão implantadas. Readers diretos e denormalizações são apenas
+compatibilidade temporária.
+
+No target, toda mutação percorre uma command boundary backend-only. Um serviço de
+projeção recalcula summary, timeline, gráficos, rotina, faixa e delta a partir de
+`weight_records`. Attachments usam `HealthDocument` e fila independente. O
+offline futuro usa command queue local com operationId e somente confirma após
+receipt; nunca usa write direto.
+
+Web pode visualizar imagens, legendas e metadados permitidos; consultar histórico,
+detalhes, auditoria, gráficos e filtros; e administrar faixa/meta quando
+autorizada. Web não pode adicionar, remover ou substituir imagens, executar
+mutation operacional de attachment nem registrar Pesagem como fluxo operacional
+padrão. Mutations de attachment permanecem Mobile-initiated por command backend
+autorizado. Ferramentas administrativas extraordinárias futuras não fazem parte
+deste target. O writer Web legado deve ser retirado antes do rollout ampliado.

@@ -617,3 +617,28 @@ O campo `professional` nos eventos identifica o profissional externo responsáve
 - Admin SDK IGNORA Firestore Rules — portanto operações administrativas de Functions (escrita em projeções, backfill, reconciliação) NÃO são validadas por Rules, e sim por testes separados de Functions.
 - Testes de Rules verificam que clientes autenticados recebem `PERMISSION_DENIED` ao tentar write em projeções.
 - Testes de Functions (separados dos testes de Rules) verificam que escritas administrativas funcionam corretamente sob Admin SDK.
+
+---
+
+## 7. Matriz de testes de Pesagem (WEIGHT-00C)
+
+Status: cobertura **APPROVED TARGET**, ainda não implementada integralmente.
+
+| Categoria | Cobertura mínima |
+|---|---|
+| Unit/domain | tipos e lifecycle; décimos de kg; 1,0–100,0; BCS 1–5; variação 5/10%; cronologia; faixa/meta |
+| Parsing/backend | precisão extra; futuro; Quick-now; Official retroativa; catálogos; contract shape |
+| Command unit | dez comandos; fingerprint; replay; conflict; revision; retries e error taxonomy |
+| Widget | escolha sem default; Quick/Official; confirmações; warning diário; filtros; acessibilidade |
+| Integration Mobile | gateway, receipt, refresh, drafts, fila offline, reabertura e troca de usuário |
+| Emulator | atomicidade; dois registros no dia; completion; correction; invalidation; reprojeção; zero legado/e-mail |
+| Firestore Rules | clients sem write canônico; leitura por dog access; revisions/configuração protegidas |
+| Storage Rules | apenas imagens; tamanho/path; dog access; create-only; tombstone e retenção |
+| Web | readers, cronologia, filtros, gestor, anexos e auditoria; ausência de writer operacional padrão |
+| Golden | Quick, Official, alertas, offline, histórico, detalhes e BCS |
+| Physical Pixel | duplo toque, perda/retorno de rede, fotos parciais, timezone e acessibilidade |
+| Pós-produção read-only | Apolo 32/33.3, receipts, audit, projeções, duplicidade e ausência de legado |
+
+Cada fase WEIGHT-01–11 deve selecionar o subconjunto pertinente e provar rollback
+sem hard delete. Suites que possam acessar produção não fazem parte da validação
+local automática.

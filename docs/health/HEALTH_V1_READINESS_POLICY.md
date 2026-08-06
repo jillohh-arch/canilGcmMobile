@@ -324,3 +324,29 @@ Quando a conectividade retorna após operação offline:
 | Quando remover? | Quando IPO estiver implementado ou quando UX confirmar que não agrega | — |
 
 Durante a transição, ambos podem coexistir na UI. O badge principal é o estado Health v1.0. O score legado pode aparecer como "Score operacional" em seção secundária, com nota de que não reflete restrições clínicas.
+
+---
+
+## 18. Pesagem: rotina, atenção e restrição (WEIGHT-00C)
+
+Status: **APPROVED TARGET — NOT YET DEPLOYED**.
+
+```text
+weighing_routine_status (7/14 dias)
+  != operational_attention (threshold configurável de 90 dias)
+  != operational_restriction (autoridade canônica)
+```
+
+- 0–7 dias: `current`.
+- 8–14 dias: `recommended`.
+- Acima de 14 dias: `overdue`.
+
+O status 7/14 gera alerta de rotina, badge Mobile e destaque Web. Não gera
+restrição ou inaptidão. O threshold configurável de 90 dias permanece separado e
+pode alimentar `operational_attention` durante a coexistência. Ele também não
+gera inaptidão. Somente `operational_restrictions` explícitas podem limitar ou
+bloquear operação.
+
+Peso fora da faixa, variação elevada, BCS inadequado, leitura aproximada e atraso
+de pesagem nunca criam automaticamente uma restrição. Ver
+`HEALTH_WEIGHT_CANONICAL_SPEC.md` e ADR-008.

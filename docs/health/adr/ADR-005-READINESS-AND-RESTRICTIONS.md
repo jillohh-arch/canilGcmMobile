@@ -373,3 +373,14 @@ O IPO futuro poderá consumir TANTO o estado clínico QUANTO indicadores de trei
 | Usuário que encerra | **Interno** | `RecordedBy { uid, name, internal_role }` + capability | Registra no sistema o encerramento autorizado pelo profissional externo |
 
 Não existe custom claim `role: vet`. O profissional é uma entidade externa ao sistema de autenticação. Suas credenciais profissionais são dados registrados no documento (`ProfessionalIdentity`), não claims de autenticação.
+
+---
+
+## Integração de Pesagem (WEIGHT-00C)
+
+O target separa três conceitos: rotina 7/14, `operational_attention` configurável
+de 90 dias e `operational_restriction`. Atraso acima de 14 dias gera alertas de
+rotina, mas não inaptidão. O threshold de 90 dias pode continuar alimentando
+atenção durante a coexistência. Peso fora da faixa, variação, BCS, leitura
+aproximada e atraso nunca criam restrição automaticamente. Esta decisão target
+ainda não está implantada integralmente. Ver ADR-008.

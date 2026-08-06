@@ -314,3 +314,12 @@ As seguintes decisões humanas já foram tomadas e são refletidas neste documen
      attachment_refs, source_document, operational_impact
    - Conteúdo clínico permanece legível e íntegro
 ```
+
+---
+
+## Cross-reference: WeightAssessment (WEIGHT-00C)
+
+Pesagem é agregado de rotina e não se torna `ClinicalEvent` por padrão. Seu
+modelo target de estado atual + revisions imutáveis é definido no ADR-008 e não
+altera a imutabilidade clínica deste ADR. Vínculo clínico de uma Pesagem Oficial
+é opcional e não cria evento automaticamente.

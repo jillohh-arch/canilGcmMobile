@@ -274,29 +274,78 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 
 ### 2.7 weight_records/{id}
 
+#### CURRENTLY DEPLOYED
+
+O create simples por `healthWeightCreateRecord` persiste a Pesagem canônica em
+`dogs/{dogId}/weight_records/{entityId}` com peso, `measured_at`, autoria
+server-side e os metadados de operação/auditoria do contrato implantado. Há
+operationId, receipt, fingerprint, idempotência, transação, audit log e projeções
+atuais no documento do K9. Não há ainda tipo Quick/Official, lifecycle expandido,
+revisions, anexos ou fila offline persistente. O Mobile é o writer operacional
+homologado via Backend; a Web não é writer operacional canônica.
+
+#### APPROVED TARGET — NOT YET DEPLOYED
+
+Os campos abaixo exigem implementação, Rules, migração e rollout futuros
+(ADR-008). Eles não descrevem o shape atualmente gravado pelo create simples.
+
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
-| weight_kg | number | ✅ | > 0 |
+| record_type | string (enum) | ✅ target | `quick` ou `official`; `legacy_simple` existe somente no bridge de leitura |
+| origin_record_type | string (enum) | ✅ target | `quick` ou `official`; imutável |
+| status | string (enum) | ✅ target | `valid` ou `invalidated` |
+| weight_kg | number | ✅ | 1,0–100,0; exatamente uma casa decimal |
 | measured_at | timestamp | ✅ | |
+| recorded_at | timestamp | ✅ target | Server |
 | recorded_by | RecordedBy | ✅ | |
+| revision | number | ✅ target | Monotônica; create = 1 |
+| information_source | string (enum) | Oficial | Ver especificação canônica |
+| location | string (enum) | Oficial | `other` exige descrição |
+| measurement_condition | string (enum) | Oficial | `other` exige descrição |
+| equipment_state | string (enum) | ❌ | Opcional |
+| reading_quality | string (enum) | ❌ | Opcional |
 | context | string (enum) | ❌ | routine, clinical, pre_op, post_op |
-| bcs | number | ❌ | 1-9 body condition score |
+| bcs | number | ❌ | Target 1–5; somente Oficial |
+| bcs_source | string (enum) | Quando BCS presente | Obrigatório com BCS |
 | notes | string | ❌ | |
 | attachment_refs | array of health_document_id | ❌ | Referências a HealthDocument (substitui photo_url) |
-| case_id | string | ❌ | |
-| ideal_weight_min | number | ❌ | |
-| ideal_weight_max | number | ❌ | |
-| deleted_at | timestamp | ❌ | Soft delete |
-| deleted_by | RecordedBy | ❌ | |
-| delete_reason | string | ❌ | |
+| clinical_links | array | ❌ | Vínculos opcionais; não cria ClinicalEvent automaticamente |
+| completion/correction/invalidation metadata | map/campos estruturados | ❌ | Server-managed conforme lifecycle |
 | migration_batch_id | string | ❌ | |
 | legacy_source | string | ❌ | |
 | legacy_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Mobile.
+**Escritor target:** somente Backend por comandos idempotentes.
 **Leitor:** Mobile, Web.
-**Índices:** `measured_at DESC`; `deleted_at ASC, measured_at DESC`.
+**Índices target:** `status ASC, measured_at DESC, recorded_at DESC` e índices de
+filtro documentados na especificação.
+
+Subcoleção target:
+
+```text
+dogs/{dogId}/weight_records/{entityId}/revisions/{revisionId}
+```
+
+Cada revision é create-only e contém before/after, operation type, justification,
+actor, server timestamp, revision number, operationId e receipt reference.
+
+### 2.7.1 weight_configuration/current — APPROVED TARGET
+
+```text
+dogs/{dogId}/weight_configuration/current
+dogs/{dogId}/weight_configuration/current/revisions/{revisionId}
+```
+
+O singleton guarda faixa e meta com lifecycles independentes, revision e autoria.
+Sua subcoleção preserva snapshots imutáveis. Estes paths ainda não estão
+implantados.
+
+### 2.7.2 Bridge de migração
+
+Registros sem campos target são interpretados somente em leitura como
+`record_type=legacy_simple`, `status=valid`, `revision=1`. Não se inferem tipo
+Quick/Official nem dados factuais ausentes. BCS legado 1–9 não é convertido.
 
 ---
 

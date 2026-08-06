@@ -81,7 +81,7 @@ o que exige e quem pode exercê-la como **executor candidato** (não mapeamento 
 
 | Capability | Descrição | Executor candidato | Canal | Evidência requerida | Auditoria |
 |-----------|-----------|--------------------|-------|--------------------|-----------|
-| `health.record_routine` | Registrar peso, refeição, suplemento | condutor, admin | Mobile | — | recorded_by obrigatório |
+| `health.record_routine` | Registrar peso, refeição, suplemento | **Pesagem:** `operador_k9` (decisão aprovada em §12); demais usos mantêm seu mapping provisório próprio | Mobile | — | recorded_by obrigatório |
 
 ### 4.3 Registros preventivos
 
@@ -166,7 +166,7 @@ Esses nomes, se aparecerem em tabelas históricas, são **não operacionais**.
 | ExamProcess | health.request_exam | health.read | transições via capability (a definir; transições server-orchestrated) | capability administrativa [provisório] |
 | TreatmentProtocol | health.create_treatment (Web, com evidence profissional) [provisório] | health.read | health.complete_treatment ou health.cancel_record [provisório] | health.cancel_record |
 | DoseAdministration | health.administer_dose | health.read | — (imutável) | — |
-| WeightAssessment | health.record_routine | health.read | autor (com audit) [provisório] | health.cancel_record [provisório] |
+| WeightAssessment | Backend-only `CreateQuickWeight` / `CreateOfficialWeight` / `CompleteWeightAsOfficial`; `operador_k9` + capability da operação | health.read + dog access | Sem UPDATE CRUD genérico; `CorrectWeight` exige `health.correct_routine`; complemento que muda peso exige também essa capability | Sem DELETE/soft delete genérico; `InvalidateWeight` exige `health.invalidate_routine` |
 | NutritionPlan | health.manage_nutrition_plan via **backend** (Web) [provisório; capability **não** enforced no runtime atual] | health.read [doc] / dog access [ops] | backend only; Mobile **ZERO** write | lifecycle cancelled [provisório] |
 | MealLog | health.record_routine via **callable** [provisório; não enforced] | health.read [doc] | soft cancel / correction auditada [provisório] | soft cancel — sem hard delete |
 | SupplementLog | health.record_routine via **callable** [provisório; não enforced] | health.read [doc] | soft cancel [provisório] | soft cancel — sem hard delete |
@@ -416,3 +416,35 @@ O mapeamento capability → perfil real será definido na implementação. Possi
 3. **Condutor pode criar protocolo?** Proposta: não. Protocolo é prescrição — capability dedicada transcreve via Web com evidence profissional obrigatória.
 4. **Granularidade do source_document:** obrigatório vs. recomendado depende da criticidade. Restrições e tratamentos = obrigatório. Consultas e preventivos = recomendado.
 5. **PII profissional:** Firestore não oferece leitura por campo dentro do documento (Rules operam no nível do documento). Para o v1, usuários internos com `health.read` podem ler `ProfessionalIdentity` quando presente no registro. Projeções devem carregar o mínimo necessário. Restrição por perfil a campos específicos (ex: ocultar `crmv` ou `clinic`) **não** está no escopo do v1 — exigiria mover esses campos para uma subcoleção privada. Não há "veterinários autenticados" como readers.
+
+---
+
+## 12. Capabilities de Pesagem aprovadas (WEIGHT-00C)
+
+| Capability | Finalidade | Profile-alvo | Estado atual | Estado-alvo | Risco | Auditoria |
+|---|---|---|---|---|---|---|
+| `health.record_routine` | Create Quick/Official, completar e adicionar anexo | `operador_k9` | **Ativa somente para create simples** | Reutilizada no lifecycle aprovado | Médio | operationId, receipt, actor, server time |
+| `health.correct_routine` | Corrigir e remover anexo auditadamente | `operador_k9` | **NOT YET DEPLOYED** | Capability separada | Alto | before/after, reason, revision |
+| `health.invalidate_routine` | Invalidar Pesagem | `operador_k9` | **NOT YET DEPLOYED** | Capability separada | Crítico | estado, reason, revision, reprojeção |
+| `health.manage_weight_reference` | Faixa e meta versionadas | `operador_k9` | **NOT YET DEPLOYED** | Capability separada | Alto | config before/after, revision |
+
+Todas exigem K9 existente e ativo, acesso ao K9 e autorização server-side. A
+aprovação de destino ao profile não equivale a ativação; profiles/claims não são
+alterados pela documentação. Follow-up usa o contrato existente de `health.create`
+e somente após confirmação humana.
+
+Para `WeightAssessment`, esta seção substitui as propostas genéricas anteriores
+de executor `condutor`, update pelo autor, `health.cancel_record` e soft delete.
+Não existe UPDATE CRUD, DELETE ou soft delete genérico: create/completion,
+correction, invalidation e gestão de faixa/meta são commands backend-only com o
+profile `operador_k9` e a capability indicada acima. `health.cancel_record` não
+invalida Pesagem. Somente `health.record_routine` está implantada, limitada ao
+create simples; as capabilities adicionais permanecem **APPROVED TARGET — NOT
+YET DEPLOYED**.
+
+Qualquer Operador K9 com a capability apropriada MAY operar sobre qualquer K9
+existente e ativo ao qual tenha acesso. Não precisa ser o condutor vinculado,
+estar com o K9 no turno nem ser o autor original. Alteração de `weight_kg` em
+`CompleteWeightAsOfficial` exige simultaneamente `health.record_routine` e
+`health.correct_routine`; sem a segunda capability, somente a complementação com
+peso idêntico pode prosseguir.

@@ -384,3 +384,17 @@ A regra é única e absoluta: o primeiro caso verdadeiro vence. Não há caso em
 `health_schedule` é **agregado canônico** (não projeção): ele contém informação que não existe em nenhum outro lugar (ex: agendamento manual de pesagem). Seus estados temporais de exibição são derivados pelo cliente no momento da leitura — nenhuma Function periódica reescreve o documento.
 
 `health_timeline` e `health_summary` são **projeções reconstruíveis** a qualquer momento a partir das fontes canônicas.
+
+### Integração de Pesagem — APPROVED TARGET / NOT YET DEPLOYED
+
+`weight_records` permanece a fonte canônica. Peso atual é o registro válido
+ordenado por `measured_at DESC`, `recorded_at DESC`, entityId DESC, sem preferência
+Quick/Official. Create produz uma entrada determinística; complemento e correção
+atualizam a mesma entrada; invalidação preserva a entrada marcada e a oculta no
+default; operação exclusiva de attachment não cria nova linha.
+
+`health_summary/current` projeta record ID/type, peso/data atuais, delta, faixa,
+rotina 7/14 e BCS Official corrente. Uma retroativa não substitui uma medição
+posterior. Correção e invalidação recomputam vizinhos e todas as projeções
+afetadas. Campos de peso no documento K9 são compatibilidade temporária, não
+autoridade. Ver ADR-008 e `../HEALTH_WEIGHT_CANONICAL_SPEC.md`.

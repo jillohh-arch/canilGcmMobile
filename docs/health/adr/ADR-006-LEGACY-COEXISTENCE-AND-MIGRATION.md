@@ -466,3 +466,19 @@ Mobile plan: **read-only**.
 | `health_logs` (raiz) | Avaliar (possivelmente sem dados) | Inventário na Fase 0 |
 | `alertas` (raiz) | Substituído por `health_schedule` + notificações | Não migrar; aposentar |
 | `_last_*` no K9 | Substituído por `health_summary/current` | Manter como cache legado; não é mais fonte |
+
+---
+
+## Integração de Pesagem (WEIGHT-00C)
+
+`weight_records` permanece canônico. O target proíbe novos writes em
+`weight_history`. Registros sem campos do novo lifecycle usam bridge somente em
+leitura: `legacy_simple`, `valid`, revision 1 no read model, sem inferir fatos
+ausentes. BCS legado 1–9 não é convertido automaticamente.
+
+`adminCreateK9WeightRecord`, `appendK9WeightRecord`, writes client-side e
+denormalização Web best-effort são dívida bloqueante, não writers aceitos. Sua
+retirada será controlada, com bridge antes de Rules endurecidas, lazy migration
+somente auditada e backfill apenas após dry-run e aprovação. IDs, receipts,
+histórico e os registros conhecidos do Apolo 32.0/33.3 kg devem ser preservados.
+Ver ADR-008 e `../HEALTH_WEIGHT_CANONICAL_SPEC.md`.

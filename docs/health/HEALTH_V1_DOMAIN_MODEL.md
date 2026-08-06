@@ -216,19 +216,46 @@ schedule: {
 
 ### 2.6 WeightAssessment
 
+> **Integração WEIGHT-00C (2026-08-06):** a definição abaixo representa o
+> **APPROVED TARGET**, ainda não implantado integralmente. O runtime atual possui
+> apenas create simples. A especificação normativa é
+> `HEALTH_WEIGHT_CANONICAL_SPEC.md` e a decisão de lifecycle é ADR-008.
+
 | Aspecto | Definição |
 |---------|-----------|
-| **Responsabilidade** | Registro canônico de pesagem com escore corporal e contexto |
+| **Responsabilidade** | Agregado operacional canônico de Pesagem Rápida, Oficial e lifecycle auditado; não é ClinicalEvent por padrão |
 | **Identificador** | `{dogId}/weight_records/{id}` — UUID |
-| **Invariantes** | (1) `weight_kg` > 0. (2) `measured_at` não pode ser futuro. (3) Pode existir sem caso clínico. |
-| **Estados** | Nenhum estado além de soft delete |
-| **Campos obrigatórios** | `weight_kg`, `measured_at`, `recorded_by`, `schema_version` |
-| **Campos opcionais** | `bcs` (body condition score 1-9), `context` (enum: routine, clinical, pre_op, post_op), `notes`, `attachment_refs`, `case_id`, `ideal_weight_min`, `ideal_weight_max`, `legacy_source`, `legacy_id` |
-| **Valores derivados** | `delta_from_previous`, `within_ideal_range` |
+| **Invariantes** | (1) `weight_kg` entre 1,0 e 100,0 com uma casa decimal. (2) `measured_at` não pode ser futuro. (3) Pode existir sem caso clínico. (4) entityId e `origin_record_type` são estáveis. (5) peso atual usa a maior cronologia válida por `measured_at`, `recorded_at`, entityId. |
+| **Tipos** | `quick`, `official`; bridge de leitura `legacy_simple` para registros anteriores sem tipo |
+| **Estados** | `valid`, `invalidated`; invalidação lógica, sem hard delete |
+| **Campos obrigatórios target** | `record_type`, `origin_record_type`, `status`, `weight_kg`, `measured_at`, `recorded_at`, `recorded_by`, `revision`, `schema_version` |
+| **Campos opcionais target** | `information_source`, `location`, `measurement_condition`, `equipment_state`, `reading_quality`, `context`, `notes`, `scale_identifier`, `bcs` 1–5, `bcs_source`, `attachment_refs`, `clinical_links`, marcadores de complemento/correção/invalidação |
+| **Configuração** | Faixa e meta vivem em `weight_configuration/current` com revisions; não são duplicadas em cada pesagem como autoridade |
+| **Valores derivados** | `delta_kg`, `delta_percent`, classificação de variação, `within_reference_range`, `weighing_routine_status` |
 | **Dados sensíveis** | Nenhum |
 | **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` |
-| **Auditoria** | Append-only |
-| **Soft delete** | `deleted_at`, `deleted_by`, `delete_reason` |
+| **Auditoria** | Estado atual na raiz + revisions imutáveis com before/after, operação, justificativa, ator, server time, operationId e receipt |
+| **Remoção** | Sem hard delete; `status=invalidated` exclui o registro de cálculos e permite reprojeção |
+| **Autorização target** | `operador_k9`, K9 existente/ativo e dog access; commands backend-only; sem exigência de condutor vinculado, turno ou autoria original |
+
+**BCS legado:** documentos antigos que contenham escala 1–9 permanecem legados e
+não são convertidos nem alimentam o gráfico canônico 1–5 automaticamente.
+
+**CURRENTLY DEPLOYED:** create simples via backend, sem tipo, status/revision no
+documento, BCS, complemento, correção, invalidação, anexos ou offline persistente.
+
+**Comandos do APPROVED TARGET — NOT YET DEPLOYED:** `CreateQuickWeight`,
+`CreateOfficialWeight`, `CompleteWeightAsOfficial`, `CorrectWeight`,
+`InvalidateWeight`, `AddWeightAttachment`, `RemoveWeightAttachment`,
+`SetWeightReferenceRange`, `SetWeightGoal` e `CreateWeightFollowUp`. Seus
+contratos normativos, capabilities e efeitos estão definidos em
+`HEALTH_WEIGHT_CANONICAL_SPEC.md` §30 e decididos pelo ADR-008.
+
+Não existe UPDATE CRUD ou soft delete genérico de `WeightAssessment`.
+`CorrectWeight` e `InvalidateWeight` são transições backend-only específicas e
+auditadas. `health.cancel_record` não invalida Pesagem. `recorded_by` permanece o
+autor original durante todo o lifecycle; complementação, correção, invalidação e
+attachment registram seus próprios operation actors.
 
 ---
 
@@ -514,7 +541,7 @@ Ver §2.14 acima.
 | ExamProcess | Etapas tipadas | condutor [prov.] | pode ter | ✅ | ✅ | ✅ | ✅ | ✅ (cada etapa) | ✅ (pendentes) | ✅ (resultado pode gerar restrição) |
 | TreatmentProtocol | Web transcreve | admin [prov.] | obrigatório | ❌ | ✅ | ✅ | ✅ | ✅ (início/fim) | ✅ (doses) | ✅ (restrição se aplicável) |
 | DoseAdministration | Mobile executa | condutor [prov.] | não | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ (próxima) | ❌ |
-| WeightAssessment | Mobile registra | condutor [prov.] | não | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ (próxima pesagem) | ✅ (dados de completude) |
+| WeightAssessment | Mobile inicia command backend-only | `operador_k9` com capability e dog access (aprovado para Pesagem; independe de vínculo/turno) | não | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ (próxima pesagem) | ✅ (dados de completude) |
 | NutritionPlan | Web define | admin [prov.] | pode ter | ❌ | ✅ | ✅ | ✅ | ✅ (ativação) | ❌ | ✅ (dados de completude) |
 | MealLog | Mobile executa | condutor [prov.] | não | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | SupplementLog | Mobile executa | condutor [prov.] | não | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
