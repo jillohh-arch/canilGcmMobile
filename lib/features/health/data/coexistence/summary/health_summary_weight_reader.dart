@@ -2,19 +2,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
+import 'package:canil_gcm/features/health/domain/weight_collection_policy.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_section_status.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_user_copy.dart';
 
-/// Amostra mínima de peso para mapeamento (sem model legado na fronteira).
-final class HealthSummaryWeightSample {
-  const HealthSummaryWeightSample({
-    required this.weightKg,
-    required this.measuredAt,
+/// Documento bruto de `weight_records` na fronteira do reader (WEIGHT-01E-C1).
+///
+/// A fronteira carrega o documento inteiro — e não um par
+/// peso/data já filtrado — para que a classificação continue sendo feita pelo
+/// parser/adapter central e para que `entityId`, `recorded_at` e o estado
+/// documental (`valid`/`invalidated`/`malformed`/`unsupported`) cheguem
+/// íntegros à policy coletiva. Um seam mais estreito não conseguiria
+/// representar bloqueadores nem desempate canônico.
+final class HealthSummaryWeightDocument {
+  const HealthSummaryWeightDocument({
+    required this.entityId,
+    required this.data,
   });
 
-  final double weightKg;
-  final DateTime measuredAt;
+  final String entityId;
+  final Map<String, dynamic> data;
 }
 
 /// Leitura read-only de peso a partir de `dogs/{dogId}/weight_records`.
@@ -25,16 +33,17 @@ final class HealthSummaryWeightSample {
 class HealthSummaryWeightReader {
   HealthSummaryWeightReader({
     FirebaseFirestore? firestore,
-    Future<List<HealthSummaryWeightSample>> Function(String dogId)? loadSamples,
-  }) : _loadSamples =
-           loadSamples ??
+    Future<List<HealthSummaryWeightDocument>> Function(String dogId)?
+    loadDocuments,
+  }) : _loadDocuments =
+           loadDocuments ??
            ((dogId) => _loadFromFirestore(
              firestore ?? FirebaseFirestore.instance,
              dogId,
            ));
 
-  final Future<List<HealthSummaryWeightSample>> Function(String dogId)
-  _loadSamples;
+  final Future<List<HealthSummaryWeightDocument>> Function(String dogId)
+  _loadDocuments;
 
   static const int trendLimit = 30;
 
@@ -61,9 +70,26 @@ class HealthSummaryWeightReader {
   >
   readBundle(String dogId) async {
     try {
-      final samples = await _loadSamples(dogId);
-      final valid = _validSorted(samples);
-      if (valid.isEmpty) {
+      final documents = await _loadDocuments(dogId);
+      final analysis = analyzeWeightCollection(_classify(dogId, documents));
+
+      // Bloqueador global (`malformed`/`unsupported`/`entityId` duplicado):
+      // o peso atual é desconhecido e nenhum registro anterior é promovido.
+      if (analysis.isInconclusive) {
+        return (
+          current:
+              const HealthSummarySectionData<
+                HealthSummaryWeightView
+              >.unavailable(message: HealthSummaryUserCopy.weightUnavailable),
+          trend:
+              const HealthSummarySectionData<
+                HealthSummaryWeightTrendView
+              >.unavailable(message: HealthSummaryUserCopy.weightUnavailable),
+        );
+      }
+
+      final current = analysis.current;
+      if (current == null) {
         return (
           current:
               const HealthSummarySectionData<
@@ -75,25 +101,38 @@ class HealthSummaryWeightReader {
               >.notRecorded(message: HealthSummaryUserCopy.weightNotRecorded),
         );
       }
-      final latest = valid.last;
-      final points = valid
+
+      // Tendência derivada EM MEMÓRIA da mesma leitura (WEIGHT-01E-C1.2):
+      // `validRecords` vem em ordem canônica DESC, então os `trendLimit` mais
+      // recentes são o prefixo; o `reversed` final entrega a série em ordem
+      // cronológica ascendente, como o consumer espera.
+      //
+      // O recorte acontece DEPOIS da análise: a policy já observou a coleção
+      // completa, então um bloqueador fora desta janela continua visível.
+      final mostRecentValid = analysis.validRecords.length > trendLimit
+          ? analysis.validRecords.take(trendLimit)
+          : analysis.validRecords;
+      final ascending = mostRecentValid
+          .toList(growable: false)
+          .reversed
           .map(
-            (s) => HealthSummaryWeightPoint(
-              at: s.measuredAt,
-              weightKg: s.weightKg,
+            (assessment) => HealthSummaryWeightPoint(
+              at: assessment.measuredAt,
+              weightKg: assessment.weightKg,
             ),
           )
           .toList(growable: false);
+
       return (
         current: HealthSummarySectionData.available(
           HealthSummaryWeightView(
-            weightKg: latest.weightKg,
-            measuredAt: latest.measuredAt,
+            weightKg: current.weightKg,
+            measuredAt: current.measuredAt,
           ),
         ),
         // Meta/BCS não inventados — exigem fonte estruturada própria.
         trend: HealthSummarySectionData.available(
-          HealthSummaryWeightTrendView(points: points),
+          HealthSummaryWeightTrendView(points: ascending),
         ),
       );
     } on FirebaseException catch (e) {
@@ -127,28 +166,49 @@ class HealthSummaryWeightReader {
     }
   }
 
-  /// Ordena ascendente e descarta pesos não finitos / não positivos.
-  static List<HealthSummaryWeightSample> _validSorted(
-    List<HealthSummaryWeightSample> raw,
+  /// Classifica os documentos pelo adapter central, preservando `entityId`.
+  ///
+  /// A classificação é a única autoridade sobre estado documental; esta camada
+  /// não reclassifica, não descarta e não decide nada por posição.
+  static List<WeightCandidate> _classify(
+    String dogId,
+    List<HealthSummaryWeightDocument> documents,
   ) {
-    final list = raw
-        .where((s) => s.weightKg.isFinite && s.weightKg > 0)
-        .toList(growable: true);
-    list.sort((a, b) => a.measuredAt.compareTo(b.measuredAt));
-    return list;
+    final candidates = <WeightCandidate>[];
+    for (final document in documents) {
+      final result = WeightAssessmentReadAdapter.read(
+        documentId: document.entityId,
+        dogId: dogId,
+        data: document.data,
+      );
+      candidates.add(
+        WeightCandidate(
+          entityId: document.entityId,
+          kind: switch (result.kind) {
+            WeightReadKind.valid => WeightCandidateKind.valid,
+            WeightReadKind.invalidated => WeightCandidateKind.invalidated,
+            WeightReadKind.malformed => WeightCandidateKind.malformed,
+            WeightReadKind.unsupported => WeightCandidateKind.unsupported,
+          },
+          assessment: result.assessment,
+        ),
+      );
+    }
+    return candidates;
   }
 
-  /// Leitura DESC adotando o parser central.
+  /// Carrega a coleção COMPLETA do cão em uma única leitura (WEIGHT-01E-C1.2).
   ///
-  /// Política de peso atual (ADR-008 §11.1), aplicada na ordem retornada:
-  /// - `valid` → candidato (o summary não carrega autoria, então shapes
-  ///   legados sem `recorder` também contam);
-  /// - `invalidated` → ignorado como candidato (não bloqueia);
-  /// - `malformed`/`unsupported` **antes** do primeiro candidato válido →
-  ///   erro controlado (inconclusivo), sem promover registro anterior;
-  /// - `malformed`/`unsupported` **depois** de um candidato válido → ignorado
-  ///   (não invalida o candidato mais recente).
-  static Future<List<HealthSummaryWeightSample>> _loadFromFirestore(
+  /// Sem `limit` e sem `orderBy`: a policy exige visibilidade global para
+  /// detectar `malformed`/`unsupported`/`entityId` duplicado em QUALQUER
+  /// posição, e um `limit` aqui esconderia bloqueadores fora da janela
+  /// (finding do WEIGHT-01E-C1.1). A ordenação é responsabilidade de
+  /// [compareWeightRecency]; [trendLimit] é aplicado somente em memória, após
+  /// a análise canônica.
+  ///
+  /// Consequência conhecida: custo de leitura O(histórico do cão) por chamada.
+  /// Reduzir isso exige um read model canônico, não reintroduzir `limit`.
+  static Future<List<HealthSummaryWeightDocument>> _loadFromFirestore(
     FirebaseFirestore firestore,
     String dogId,
   ) async {
@@ -156,38 +216,13 @@ class HealthSummaryWeightReader {
         .collection('dogs')
         .doc(dogId)
         .collection('weight_records')
-        .orderBy('measured_at', descending: true)
-        .limit(trendLimit)
         .get();
 
-    final samples = <HealthSummaryWeightSample>[];
-    var seenValid = false;
-    for (final doc in snap.docs) {
-      final result = WeightAssessmentReadAdapter.read(
-        documentId: doc.id,
-        dogId: dogId,
-        data: doc.data(),
-      );
-      switch (result.kind) {
-        case WeightReadKind.valid:
-          final assessment = result.assessment!;
-          seenValid = true;
-          samples.add(
-            HealthSummaryWeightSample(
-              weightKg: assessment.weightKg,
-              measuredAt: assessment.measuredAt,
-            ),
-          );
-        case WeightReadKind.invalidated:
-          continue;
-        case WeightReadKind.malformed:
-        case WeightReadKind.unsupported:
-          if (!seenValid) {
-            throw StateError('weight_summary_inconclusive_${result.kind.name}');
-          }
-          continue;
-      }
-    }
-    return samples;
+    return snap.docs
+        .map(
+          (doc) =>
+              HealthSummaryWeightDocument(entityId: doc.id, data: doc.data()),
+        )
+        .toList(growable: false);
   }
 }

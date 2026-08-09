@@ -13,7 +13,10 @@ void main() {
 
   CollectionReference<Map<String, dynamic>> col(
     FakeFirebaseFirestore firestore,
-  ) => firestore.collection('dogs').doc('dog-apolo').collection('weight_records');
+  ) => firestore
+      .collection('dogs')
+      .doc('dog-apolo')
+      .collection('weight_records');
 
   Map<String, dynamic> v1(num weight, DateTime measuredAt) => {
     'dog_id': 'dog-apolo',
@@ -65,34 +68,44 @@ void main() {
     expect(section.value!.weightKg, 33.3);
   });
 
-  test('invalidated mais recente é ignorado; próximo valid vira atual', () async {
-    final firestore = FakeFirebaseFirestore();
-    await col(firestore).add(v1(33.3, apoloSecond));
-    await col(firestore).add(invalidatedV2(40.0, later));
+  test(
+    'invalidated mais recente é ignorado; próximo valid vira atual',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      await col(firestore).add(v1(33.3, apoloSecond));
+      await col(firestore).add(invalidatedV2(40.0, later));
 
-    final section = await current(firestore);
-    expect(section.status, HealthSummarySectionStatus.available);
-    expect(section.value!.weightKg, 33.3);
-  });
+      final section = await current(firestore);
+      expect(section.status, HealthSummarySectionStatus.available);
+      expect(section.value!.weightKg, 33.3);
+    },
+  );
 
-  test('malformed antes do primeiro valid → inconclusivo (unavailable)', () async {
-    final firestore = FakeFirebaseFirestore();
-    await col(firestore).add(v1(33.3, apoloSecond));
-    await col(firestore).add(malformed(later));
+  test(
+    'malformed antes do primeiro valid → inconclusivo (unavailable)',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      await col(firestore).add(v1(33.3, apoloSecond));
+      await col(firestore).add(malformed(later));
 
-    final section = await current(firestore);
-    expect(section.status, HealthSummarySectionStatus.unavailable);
-  });
+      final section = await current(firestore);
+      expect(section.status, HealthSummarySectionStatus.unavailable);
+    },
+  );
 
-  test('malformed depois do candidato válido não substitui o candidato', () async {
+  // WEIGHT-01E-C1: o bloqueio passou a ser GLOBAL (paridade com a policy Web).
+  // Antes, um malformed posicionado depois do primeiro candidato válido era
+  // ignorado; agora a posição física não decide, e o candidato anterior não é
+  // promovido silenciosamente.
+  test('malformed depois do candidato válido também bloqueia', () async {
     final firestore = FakeFirebaseFirestore();
     // DESC: valid (later) vem antes; malformed (apoloFirst) vem depois.
     await col(firestore).add(v1(33.3, later));
     await col(firestore).add(malformed(apoloFirst));
 
     final section = await current(firestore);
-    expect(section.status, HealthSummarySectionStatus.available);
-    expect(section.value!.weightKg, 33.3);
+    expect(section.status, HealthSummarySectionStatus.unavailable);
+    expect(section.valueOrNull, isNull);
   });
 
   test('sem registros → notRecorded', () async {

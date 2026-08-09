@@ -16,6 +16,28 @@ import 'package:canil_gcm/features/health/presentation/summary/health_summary_st
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 
+/// Documento v1 fiel ao writer canônico, para o seam documental do
+/// `HealthSummaryWeightReader` (WEIGHT-01E-C1).
+/// `dog_id` embutido é omitido: o dogId do path é a autoridade, e um valor
+/// embutido divergente tornaria o documento malformed.
+HealthSummaryWeightDocument weightDocV1({
+  required String entityId,
+  required num weightKg,
+  required DateTime measuredAt,
+}) => HealthSummaryWeightDocument(
+  entityId: entityId,
+  data: {
+    'weight_kg': weightKg,
+    'schema_version': 1,
+    'measured_at': Timestamp.fromDate(measuredAt),
+    'recorded_by': const {
+      'uid': 'uid-fixture',
+      'name': 'Operador Fixture',
+      'internal_role': 'condutor',
+    },
+  },
+);
+
 void main() {
   group('HealthSummaryDogContextMapper', () {
     test('mapeia campos cadastrais sem I/O', () {
@@ -83,22 +105,16 @@ void main() {
   });
 
   group('HealthSummaryWeightReader', () {
-    test('available com peso válido; ignora 0 e NaN', () async {
+    test('available com peso válido', () async {
       final reader = HealthSummaryWeightReader(
-        loadSamples: (_) async => [
-          HealthSummaryWeightSample(
-            weightKg: 0,
-            measuredAt: DateTime(2026, 1, 1),
-          ),
-          HealthSummaryWeightSample(
-            weightKg: double.nan,
-            measuredAt: DateTime(2026, 2, 1),
-          ),
-          HealthSummaryWeightSample(
+        loadDocuments: (_) async => [
+          weightDocV1(
+            entityId: 'a',
             weightKg: 28.5,
             measuredAt: DateTime(2026, 6, 1),
           ),
-          HealthSummaryWeightSample(
+          weightDocV1(
+            entityId: 'b',
             weightKg: 29.8,
             measuredAt: DateTime(2026, 7, 1),
           ),
@@ -116,15 +132,38 @@ void main() {
       expect(trend.value!.bodyConditionScore, isNull);
     });
 
+    // Antes, 0/NaN eram descartados silenciosamente na fronteira de amostras.
+    // Com fidelidade documental o parser central classifica como malformed, e
+    // a policy bloqueia globalmente em vez de promover o válido anterior.
+    test('peso 0/NaN é malformed → unavailable, sem promover válido', () async {
+      for (final invalid in <num>[0, double.nan]) {
+        final reader = HealthSummaryWeightReader(
+          loadDocuments: (_) async => [
+            weightDocV1(
+              entityId: 'bad',
+              weightKg: invalid,
+              measuredAt: DateTime(2026, 1, 1),
+            ),
+            weightDocV1(
+              entityId: 'good',
+              weightKg: 29.8,
+              measuredAt: DateTime(2026, 7, 1),
+            ),
+          ],
+        );
+        expect((await reader.readCurrent('dog-1')).isUnavailable, isTrue);
+      }
+    });
+
     test('notRecorded quando vazio', () async {
-      final reader = HealthSummaryWeightReader(loadSamples: (_) async => []);
+      final reader = HealthSummaryWeightReader(loadDocuments: (_) async => []);
       expect((await reader.readCurrent('x')).isNotRecorded, isTrue);
       expect((await reader.readTrend('x')).isNotRecorded, isTrue);
     });
 
     test('unavailable em falha', () async {
       final reader = HealthSummaryWeightReader(
-        loadSamples: (_) async => throw StateError('boom'),
+        loadDocuments: (_) async => throw StateError('boom'),
       );
       final section = await reader.readCurrent('x');
       expect(section.isUnavailable, isTrue);
@@ -333,14 +372,14 @@ void main() {
 
   group('CoexistenceHealthSummarySource', () {
     CoexistenceHealthSummarySource buildSource({
-      List<HealthSummaryWeightSample> weights = const [],
+      List<HealthSummaryWeightDocument> weights = const [],
       List<HealthSummaryVaccinationFact> vaccines = const [],
       HealthSummaryNutritionDaySnapshot? nutrition,
       List<HealthSummaryRecentRawItem> recent = const [],
     }) {
       return CoexistenceHealthSummarySource(
         weightReader: HealthSummaryWeightReader(
-          loadSamples: (_) async => weights,
+          loadDocuments: (_) async => weights,
         ),
         vaccinationReader: HealthSummaryVaccinationReader(
           loadFacts: (_) async => vaccines,
@@ -362,7 +401,8 @@ void main() {
     test('emite ViewData com dogId correto e blocos parciais', () async {
       final source = buildSource(
         weights: [
-          HealthSummaryWeightSample(
+          weightDocV1(
+            entityId: 'w1',
             weightKg: 30,
             measuredAt: DateTime(2026, 7, 1),
           ),
@@ -392,8 +432,9 @@ void main() {
     test('falha parcial: peso ok, vacina falha → não derruba resumo', () async {
       final source = CoexistenceHealthSummarySource(
         weightReader: HealthSummaryWeightReader(
-          loadSamples: (_) async => [
-            HealthSummaryWeightSample(
+          loadDocuments: (_) async => [
+            weightDocV1(
+              entityId: 'w1',
               weightKg: 29,
               measuredAt: DateTime(2026, 6, 1),
             ),
@@ -432,7 +473,8 @@ void main() {
       () async {
         final source = buildSource(
           weights: [
-            HealthSummaryWeightSample(
+            weightDocV1(
+              entityId: 'w1',
               weightKg: 28,
               measuredAt: DateTime(2026, 5, 1),
             ),
@@ -466,7 +508,7 @@ void main() {
       () async {
         final source = CoexistenceHealthSummarySource(
           weightReader: HealthSummaryWeightReader(
-            loadSamples: (_) async => throw StateError('peso offline'),
+            loadDocuments: (_) async => throw StateError('peso offline'),
           ),
           vaccinationReader: HealthSummaryVaccinationReader(
             loadFacts: (_) async => throw StateError('vac offline'),
@@ -492,7 +534,7 @@ void main() {
         // Readers mapeiam FirebaseException code unavailable → networkUnavailable.
         final source = CoexistenceHealthSummarySource(
           weightReader: HealthSummaryWeightReader(
-            loadSamples: (_) async {
+            loadDocuments: (_) async {
               throw FirebaseException(
                 plugin: 'cloud_firestore',
                 code: 'unavailable',
@@ -544,7 +586,7 @@ void main() {
       () async {
         final source = CoexistenceHealthSummarySource(
           weightReader: HealthSummaryWeightReader(
-            loadSamples: (_) async => throw StateError('peso offline'),
+            loadDocuments: (_) async => throw StateError('peso offline'),
           ),
           vaccinationReader: HealthSummaryVaccinationReader(
             loadFacts: (_) async => throw StateError('vac offline'),

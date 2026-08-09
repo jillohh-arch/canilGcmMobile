@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
+import 'package:canil_gcm/features/health/domain/weight_collection_policy.dart';
 
 /// Falha controlada de leitura de histórico quando um documento em
 /// `weight_records` é ilegível (malformed) ou de schema não suportado
@@ -65,9 +66,65 @@ class WeightHistoryService {
     return _parseSnapshot(dogId, await query.get());
   }
 
+  /// Peso atual canônico (WEIGHT-01E-C1).
+  ///
+  /// Aplica [analyzeWeightCollection] sobre a coleção completa, e não
+  /// `orderBy(...).limit(1)`: com `limit(1)` um `malformed`/`unsupported` em
+  /// outra posição ficaria invisível, um `invalidated` mais recente impediria
+  /// o fallback para o válido anterior e o desempate não seria controlado.
+  ///
+  /// - bloqueador global (`malformed`/`unsupported`/`entityId` duplicado) →
+  ///   [WeightHistoryReadException], sem promover registro anterior;
+  /// - `invalidated` mais recente → válido anterior pode ser o atual;
+  /// - vazio ou somente `invalidated` → `null`.
   Future<WeightRecord?> getLatest(String dogId) async {
-    final records = await getHistory(dogId, limit: 1);
-    return records.isEmpty ? null : records.first;
+    final snapshot = await _collection(dogId).get();
+
+    final candidates = <WeightCandidate>[];
+    final facades = <String, WeightRecord>{};
+    for (final doc in snapshot.docs) {
+      final result = WeightAssessmentReadAdapter.read(
+        documentId: doc.id,
+        dogId: dogId,
+        data: doc.data(),
+      );
+      final record = result.record;
+      if (record != null) facades[doc.id] = record;
+      candidates.add(
+        WeightCandidate(
+          entityId: doc.id,
+          kind: switch (result.kind) {
+            WeightReadKind.valid => WeightCandidateKind.valid,
+            WeightReadKind.invalidated => WeightCandidateKind.invalidated,
+            WeightReadKind.malformed => WeightCandidateKind.malformed,
+            WeightReadKind.unsupported => WeightCandidateKind.unsupported,
+          },
+          assessment: result.assessment,
+        ),
+      );
+    }
+
+    final analysis = analyzeWeightCollection(candidates);
+    switch (analysis.kind) {
+      case WeightCurrentKind.inconclusive:
+        throw WeightHistoryReadException(_blockerReason(analysis.blockers));
+      case WeightCurrentKind.none:
+        return null;
+      case WeightCurrentKind.current:
+        // `entityId` é único aqui: duplicidade já teria sido bloqueada acima.
+        return facades[analysis.current!.entityId];
+    }
+  }
+
+  /// Código estável do bloqueio, preservando os motivos históricos.
+  static String _blockerReason(List<WeightCurrentBlocker> blockers) {
+    if (blockers.contains(WeightCurrentBlocker.malformed)) {
+      return 'malformed_weight_record';
+    }
+    if (blockers.contains(WeightCurrentBlocker.unsupported)) {
+      return 'unsupported_weight_schema';
+    }
+    return 'duplicate_weight_entity_id';
   }
 
   Future<Map<String, double>> getStats(
