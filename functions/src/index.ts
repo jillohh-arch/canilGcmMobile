@@ -1882,14 +1882,6 @@ function k9Text(data: JsonMap, ...keys: string[]): string {
   return "";
 }
 
-function k9Number(data: JsonMap, ...keys: string[]): number | null {
-  for (const key of keys) {
-    const value = optionalNumberValue(data[key]);
-    if (value !== null) return value;
-  }
-  return null;
-}
-
 function parseK9BirthDate(profile: JsonMap): string {
   const birthDate = requiredString(profile, "birthDate");
   const parsed = new Date(`${birthDate}T12:00:00`);
@@ -1986,49 +1978,22 @@ async function protectedK9Modalities(dogId: string): Promise<string[]> {
   return Array.from(protectedSet);
 }
 
-function firestoreRecordDate(data: JsonMap): number {
-  for (const key of ["measured_at", "measuredAt", "created_at", "createdAt"]) {
-    const value = data[key];
-    if (value instanceof admin.firestore.Timestamp) {
-      return value.toMillis();
-    }
-    if (typeof value === "string" || typeof value === "number") {
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
-    }
-  }
-  return 0;
-}
-
-async function latestK9Weight(dogId: string, fallback: unknown): Promise<number | null> {
-  const snapshot = await db.collection("dogs").doc(dogId).collection("weight_records").get();
-  const latest = [...snapshot.docs].sort(
-    (a, b) => firestoreRecordDate(b.data() ?? {}) - firestoreRecordDate(a.data() ?? {}),
-  )[0];
-  if (latest) {
-    return k9Number(latest.data() ?? {}, "weight_kg", "weightKg", "weight", "peso");
-  }
-  return optionalNumberValue(fallback);
-}
-
-function appendK9WeightRecord(
-  batch: admin.firestore.WriteBatch,
-  dogId: string,
-  weight: number,
-  caller: CallerIdentity,
-): void {
-  const recordRef = db.collection("dogs").doc(dogId).collection("weight_records").doc();
-  batch.set(recordRef, {
-    dogId,
-    dog_id: dogId,
-    weight_kg: weight,
-    measured_at: admin.firestore.FieldValue.serverTimestamp(),
-    performed_by: caller.ra,
-    created_at: admin.firestore.FieldValue.serverTimestamp(),
-    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    audit_trail: [auditEntry("created", caller)],
-  });
-}
+// WEIGHT-01E-C2C-B: `latestK9Weight` e `appendK9WeightRecord` removidos.
+//
+// `appendK9WeightRecord` era o false writer: fabricava um documento em
+// `weight_records` a partir de um save cadastral, com `measured_at` do save.
+//
+// `latestK9Weight` existia apenas para alimentar a condição desse writer e era
+// uma quarta definição concorrente de "peso atual" — sort local por data mais
+// cadeia de aliases (`weight_kg`/`weightKg`/`weight`/`peso`), sem parser e sem
+// a policy coletiva canônica. Removê-la elimina, junto com a fabricação, uma
+// autoridade paralela de current.
+//
+// `k9Number` e `firestoreRecordDate` saíram na mesma cadeia causal: existiam
+// somente para `latestK9Weight` e ficaram órfãos (TS6133) com sua remoção.
+//
+// Peso atual canônico vem de `weight_records` via parser/adapter e policy
+// compartilhada; escrita clínica, somente por `healthWeightCreateRecord`.
 
 async function reconcileK9Specialties(
   batch: admin.firestore.WriteBatch,
@@ -2173,11 +2138,6 @@ export const adminUpsertK9 = onCall({region}, async (request) => {
     );
   }
 
-  const previousData = existingSnap.data() ?? {};
-  const currentWeight = mode === "create" ?
-    null :
-    await latestK9Weight(dogId, previousData.weight);
-  const nextWeight = optionalNumberValue(profile.weight);
   const batch = db.batch();
   const now = admin.firestore.FieldValue.serverTimestamp();
   const dogPatch: JsonMap = {
@@ -2198,9 +2158,19 @@ export const adminUpsertK9 = onCall({region}, async (request) => {
     batch.set(dogRef, dogPatch, {merge: true});
   }
 
-  if (nextWeight !== null && (mode === "create" || currentWeight === null || nextWeight !== currentWeight)) {
-    appendK9WeightRecord(batch, dogId, nextWeight, caller);
-  }
+  // WEIGHT-01E-C2C-B: cadastro de K9 NÃO cria pesagem.
+  //
+  // Este fluxo criava um documento em `dogs/{dogId}/weight_records` sempre que
+  // o peso do formulário diferia do atual, com `measured_at` =
+  // serverTimestamp() — o instante do save, não o da medição. Um save
+  // cadastral produzia evidência clínica sem ninguém ter pesado o cão, e esse
+  // registro entrava na policy canônica como pesagem legítima, podendo virar o
+  // peso atual no Mobile e no Web.
+  //
+  // Peso clínico só nasce pelos comandos Health autorizados
+  // (`healthWeightCreateRecord`). O campo cadastral `weight` continua sendo
+  // persistido em `dogPatch` para compatibilidade legada, mas não gera
+  // registro e não é evidência de pesagem.
 
   await reconcileK9Specialties(batch, dogId, selected, caller);
   batch.set(db.collection("auditLogs").doc(), {
