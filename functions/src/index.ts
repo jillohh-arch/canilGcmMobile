@@ -2341,75 +2341,29 @@ export const adminCreateHealthEvent = onCall({region}, async (request) => {
   return {dogId, id: eventRef.id, type};
 });
 
-export const adminCreateK9WeightRecord = onCall({region}, async (request) => {
-  const caller = await requireAnyAccessPermission(
-    request.auth,
-    "health",
-    ["create", "edit"],
-  );
-  const data = request.data as JsonMap;
-  const dogId = requiredString(data, "dogId");
-  const payload = (data.payload ?? {}) as JsonMap;
-  assertDocumentId(dogId, "Identificador do K9");
-  const weightKg = optionalNumberValue(payload.weightKg);
-  if (weightKg === null || weightKg <= 0 || weightKg > 100) {
-    throw new HttpsError("invalid-argument", "Peso do K9 invalido.");
-  }
-  const measuredAt = requiredTimestamp(payload.measuredAt, "Data da pesagem");
-  const dogRef = db.collection("dogs").doc(dogId);
-  const dogSnapshot = await dogRef.get();
-  if (!dogSnapshot.exists) {
-    throw new HttpsError("not-found", "K9 nao encontrado.");
-  }
-  const dog = dogSnapshot.data() ?? {};
-  await requireDogRecordAccess(request.auth, caller, dogId, dog);
-  const dogName = k9Text(dog, "name", "nome") || dogId;
-  const recordRef = dogRef.collection("weight_records").doc();
-  const legacyRef = dogRef.collection("weight_history").doc(recordRef.id);
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  const record: JsonMap = {
-    dogId,
-    dog_id: dogId,
-    weight_kg: weightKg,
-    measured_at: measuredAt,
-    measured_by: caller.ra,
-    performed_by: caller.ra,
-    context: optionalString(payload, "context") ?? "canil",
-    created_at: now,
-    updated_at: now,
-    audit_trail: [auditEntry("created", caller)],
-  };
-  const notes = optionalString(payload, "notes");
-  if (notes) record.notes = notes;
-
-  const batch = db.batch();
-  batch.set(recordRef, record);
-  batch.set(legacyRef, record);
-  batch.set(dogRef, {
-    weight: weightKg,
-    _last_weight_kg: weightKg,
-    _last_weight_at: measuredAt,
-    updatedAt: now,
-    updated_at: now,
-    audit_trail: admin.firestore.FieldValue.arrayUnion(
-      auditEntry("weight_updated", caller),
-    ),
-  }, {merge: true});
-  batch.set(db.collection("auditLogs").doc(), {
-    action: "k9_weight_recorded",
-    entity_type: "weight",
-    entity_id: recordRef.id,
-    entity_path: `dogs/${dogId}/weight_records/${recordRef.id}`,
-    summary: `Pesagem registrada para ${dogName}: ${weightKg} kg`,
-    actor: caller,
-    metadata: {dog_id: dogId, weight_kg: weightKg},
-    source: "functions",
-    performed_at: now,
-    createdAt: now,
-  });
-  await batch.commit();
-  return {dogId, id: recordRef.id, weightKg};
-});
+// WEIGHT-01E-C2C-C: `adminCreateK9WeightRecord` aposentada.
+//
+// Era o writer operacional legado do Web. Registrava pesagem legítima, mas
+// fora do contrato canônico:
+//
+// - sem receipt/idempotência — um retry do cliente duplicava o registro;
+// - sem validação de cronologia (aceitava `measured_at` futuro);
+// - dual-write em `dogs/{dogId}/weight_history`, espelho legado;
+// - escrevia `weight`/`_last_weight_kg`/`_last_weight_at` sem guarda;
+// - `batch` em vez de transação, com leitura do cão fora do escopo atômico.
+//
+// Enquanto estivesse publicada, seguia sendo uma porta autenticada para gravar
+// peso fora do writer canônico. Registro operacional agora existe apenas por
+// `healthWeightCreateRecord` (app K9 Ops).
+//
+// DEPLOY ORDER: WEB BEFORE FUNCTIONS.
+// O Web que consumia esta callable já não a chama, mas um bundle antigo ainda
+// aberto pode invocá-la: publique o Web primeiro e confirme a nova versão
+// servida antes de levar esta remoção a produção. Abas antigas receberão
+// `not-found` e precisarão de refresh — transição aceitável.
+//
+// `weight_history` fica sem writer ativo; os dados históricos permanecem
+// intactos. Nenhuma migração ou destruição foi executada.
 
 export const adminCreateK9HealthDocument = onCall({region}, async (request) => {
   const caller = await requireAnyAccessPermission(
