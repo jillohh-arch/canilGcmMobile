@@ -334,7 +334,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       ),
                     ),
                     Text(
-                      '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
+                      // Sem peso factual, informa ausência: não fabrica valor.
+                      widget.dog.weight == null
+                          ? '—'
+                          : '${widget.dog.weight!.toStringAsFixed(1)} kg',
                       style: GoogleFonts.inter(
                         color: AppTheme.textPrimary,
                         fontSize: 10,
@@ -489,8 +492,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             _buildMedCard(
               icon: '⚖',
               label: 'PESO',
-              value: '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
-              sub: 'Estável · últimos 3 meses',
+              // Projeção legada (`dogs.weight`): sem valor factual não fabrica
+              // número, e não afirma tendência sem série canônica (C2B).
+              value: widget.dog.weight == null
+                  ? 'Sem registro'
+                  : '${widget.dog.weight!.toStringAsFixed(1)} kg',
+              sub: 'Ver histórico de pesagens',
               status: weightOk ? _CardStatus.ok : _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -1031,7 +1038,8 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date)); // Oldest first for chart
 
-    final currentWeight = widget.dog.weight ?? 28.0;
+    // Projeção legada; sem valor factual não fabrica número (C2B).
+    final currentWeight = widget.dog.weight;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1078,40 +1086,25 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: currentWeight.toStringAsFixed(1),
+                          text: currentWeight == null
+                              ? 'Sem registro'
+                              : currentWeight.toStringAsFixed(1),
                           style: GoogleFonts.inter(
                             color: AppTheme.textPrimary,
-                            fontSize: 22,
+                            fontSize: currentWeight == null ? 15 : 22,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        TextSpan(
-                          text: ' kg',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textTertiary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        if (currentWeight != null)
+                          TextSpan(
+                            text: ' kg',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textTertiary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
                       ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.success.withAlpha(31),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '→ Estável',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.success,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
                   ),
                 ],
@@ -1899,10 +1892,13 @@ class _MiniWeightChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Se não tiver dados suficientes, desenha uma linha simulada estável como no mockup
-    final List<double> values = logs.isNotEmpty
-        ? logs.map((l) => l.weight ?? 28.0).toList()
-        : const [27.0, 27.5, 28.0, 28.1, 28.0, 27.9, 28.0];
+    // WEIGHT-01E-C2B: sem série factual não desenha nada. A linha simulada
+    // anterior apresentava dado demonstrativo como evolução clínica real.
+    final List<double> values = logs
+        .map((l) => l.weight)
+        .whereType<double>()
+        .toList(growable: false);
+    if (values.length < 2) return;
 
     final double minVal = values.reduce((a, b) => a < b ? a : b) - 0.5;
     final double maxVal = values.reduce((a, b) => a > b ? a : b) + 0.5;

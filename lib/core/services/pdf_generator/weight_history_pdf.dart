@@ -34,21 +34,26 @@ class WeightHistoryPdf {
     final docId = _buildDocId(dog);
     final count = weightLogs.length;
 
-    // Calculate statistics
+    // Estatísticas derivadas SOMENTE de pesagens factuais (WEIGHT-01E-C2B).
+    //
+    // Antes, sem registros, `current` caía em `dog.weight ?? 0.0` e propagava
+    // para mínimo/médio/máximo — produzindo estatística clínica inexistente
+    // (inclusive 0,0 kg) em documento exportado. `dogs.weight` é projeção
+    // legada, não evidência de pesagem.
     final weights = weightLogs.map((l) => l.weight!).toList();
-    final current = weights.isNotEmpty ? weights.first : (dog.weight ?? 0.0);
-    final min = weights.isNotEmpty
+    final double? current = weights.isNotEmpty ? weights.first : null;
+    final double? min = weights.isNotEmpty
         ? weights.reduce((a, b) => a < b ? a : b)
-        : current;
-    final max = weights.isNotEmpty
+        : null;
+    final double? max = weights.isNotEmpty
         ? weights.reduce((a, b) => a > b ? a : b)
-        : current;
-    final avg = weights.isNotEmpty
+        : null;
+    final double? avg = weights.isNotEmpty
         ? weights.reduce((a, b) => a + b) / weights.length
-        : current;
+        : null;
 
     // Determine weight trend
-    String trendText = 'Estável';
+    String trendText = weights.isEmpty ? 'Sem pesagens registradas' : 'Estável';
     if (weights.length >= 2) {
       final oldest = weights.last;
       final newest = weights.first;
@@ -65,7 +70,10 @@ class WeightHistoryPdf {
     // Determine range status
     String rangeStatus = 'Faixa Ideal Não Configurada';
     PdfColor rangeColor = _textTertiary;
-    if (dog.idealWeightMin != null && dog.idealWeightMax != null) {
+    // Sem peso factual não há como avaliar faixa: não classifica.
+    if (current == null) {
+      rangeStatus = 'Sem Pesagem Registrada';
+    } else if (dog.idealWeightMin != null && dog.idealWeightMax != null) {
       if (current >= dog.idealWeightMin! && current <= dog.idealWeightMax!) {
         rangeStatus = 'DENTRO DA FAIXA IDEAL';
         rangeColor = PdfInstitutionalColors.greenInstitutional;
@@ -193,16 +201,16 @@ class WeightHistoryPdf {
               children: [
                 _buildStatBox(
                   'PESO ATUAL',
-                  '${current.toStringAsFixed(1)} kg',
+                  _statLabel(current),
                   fonts,
                   isPrimary: true,
                 ),
                 pw.SizedBox(width: 8),
-                _buildStatBox('MÍNIMO', '${min.toStringAsFixed(1)} kg', fonts),
+                _buildStatBox('MÍNIMO', _statLabel(min), fonts),
                 pw.SizedBox(width: 8),
-                _buildStatBox('MÉDIO', '${avg.toStringAsFixed(1)} kg', fonts),
+                _buildStatBox('MÉDIO', _statLabel(avg), fonts),
                 pw.SizedBox(width: 8),
-                _buildStatBox('MÁXIMO', '${max.toStringAsFixed(1)} kg', fonts),
+                _buildStatBox('MÁXIMO', _statLabel(max), fonts),
               ],
             ),
 
@@ -379,17 +387,25 @@ class WeightHistoryPdf {
     );
   }
 
+  /// Rótulo de estatística: ausência explícita em vez de número fabricado.
+  static String _statLabel(double? value) =>
+      value == null ? '—' : '${value.toStringAsFixed(1)} kg';
+
   /// Constrói a avaliação de desempenho clínico.
   static pw.Widget _buildClinicalAnalysis(
     Dog dog,
-    double currentWeight,
+    double? currentWeight,
     String trend,
     String rangeStatus,
     PdfColor color,
     PdfFonts fonts,
   ) {
     String message = '';
-    if (rangeStatus == 'DENTRO DA FAIXA IDEAL') {
+    if (currentWeight == null) {
+      message =
+          'Não há pesagens registradas para este cão. Sem evidência de pesagem '
+          'não é possível avaliar peso atual, tendência ou faixa ideal.';
+    } else if (rangeStatus == 'DENTRO DA FAIXA IDEAL') {
       message =
           'O cão encontra-se no peso recomendado para as atividades institucionais e de alta intensidade do canil. Recomenda-se manter a rotina nutricional e de treinos atual.';
     } else if (rangeStatus == 'ABAIXO DO PESO IDEAL') {

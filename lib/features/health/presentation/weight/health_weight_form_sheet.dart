@@ -57,9 +57,16 @@ class _HealthWeightFormSheetState extends State<HealthWeightFormSheet> {
   @override
   void initState() {
     super.initState();
-    _weightController = TextEditingController(
-      text: widget.dog.weight?.toStringAsFixed(1).replaceAll('.', ',') ?? '',
-    );
+    // Campo inicia VAZIO (WEIGHT-01E-C2B).
+    //
+    // Antes era pré-preenchido com `dog.weight` — projeção legada. Como o
+    // submit só valida faixa, abrir a sheet e confirmar sem medir gravava o
+    // cache stale como nova pesagem factual com `measuredAt` autoritativo,
+    // que o writer devolvia para a própria projeção: um ciclo que dava
+    // aparência de evidência fresca a um valor antigo.
+    //
+    // Uma nova pesagem exige valor informado explicitamente nesta interação.
+    _weightController = TextEditingController();
     _ownsController = widget.controller == null;
     _controller =
         widget.controller ??

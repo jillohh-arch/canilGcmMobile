@@ -183,6 +183,46 @@ void main() {
     },
   );
 
+  // WEIGHT-01E-C2B: `dog.weight` é projeção legada. Pré-preencher o campo
+  // permitia abrir a sheet e confirmar sem medir, gravando cache stale como
+  // pesagem factual — e o writer devolvia o valor para a própria projeção.
+  testWidgets('create form does not prefill with the legacy dog.weight', (
+    tester,
+  ) async {
+    final dogWithProjection = Dog(
+      id: 'dog-1',
+      name: 'Kira',
+      breed: 'Pastor Belga Malinois',
+      dateOfBirth: DateTime.utc(2020),
+      weight: 28.4,
+    );
+    await openSheet(tester, selectedDog: dogWithProjection);
+
+    final input = tester.widget<TextField>(
+      find.byKey(const Key('health-weight-input')),
+    );
+    expect(input.controller!.text, isEmpty);
+    expect(find.text('28,4'), findsNothing);
+    expect(find.text('28.4'), findsNothing);
+  });
+
+  testWidgets('submit is blocked without explicit input in this interaction', (
+    tester,
+  ) async {
+    final dogWithProjection = Dog(
+      id: 'dog-1',
+      name: 'Kira',
+      breed: 'Pastor Belga Malinois',
+      dateOfBirth: DateTime.utc(2020),
+      weight: 28.4,
+    );
+    await openSheet(tester, selectedDog: dogWithProjection);
+    await submit(tester);
+
+    // Nada é enviado: o valor herdado não vira nova evidência.
+    expect(gateway.calls, isEmpty);
+  });
+
   testWidgets('opens with approved header and only real selected K9 data', (
     tester,
   ) async {

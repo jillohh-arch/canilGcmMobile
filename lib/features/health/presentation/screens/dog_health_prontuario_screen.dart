@@ -25,6 +25,8 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_me
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_facts.dart';
+import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_read_state.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
@@ -49,6 +51,9 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   final HealthService _healthService = HealthService();
   final DogProfileService _profileService = DogProfileService();
   final WeightHistoryService _weightHistoryService = WeightHistoryService();
+  late final ProntuarioWeightResolver _resolver = ProntuarioWeightResolver(
+    _weightHistoryService,
+  );
 
   Stream<Dog?>? _dogStream;
   Future<_HealthProntuarioData>? _dataFuture;
@@ -79,13 +84,37 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
     final results = await Future.wait([
       _healthService.getHealthLogsForDog(dogId),
       _profileService.getDocuments(dogId),
-      _weightHistoryService.getHistory(dogId, limit: 20),
+      _loadWeight(dogId),
     ]);
     return _HealthProntuarioData(
       logs: results[0] as List<HealthLogModel>,
       documents: results[1] as List<DogDocument>,
-      weightRecords: results[2] as List<WeightRecord>,
+      weight: results[2] as _ProntuarioWeight,
     );
+  }
+
+  /// Peso canônico delegado ao resolver testável (WEIGHT-01E-C2B.1A).
+  ///
+  /// A resolução de estado vive em [ProntuarioWeightResolver], que consome
+  /// [WeightHistoryService.getLatest] (coleção completa + policy compartilhada)
+  /// e não conhece `dogs.weight`. A tela apenas apresenta o resultado — não
+  /// existe segundo caminho local de seleção de peso atual.
+  ///
+  /// A série histórica é carregada à parte e é irrelevante para o atual: em
+  /// estado bloqueado ou indisponível ela fica vazia e nada é promovido.
+  Future<_ProntuarioWeight> _loadWeight(String dogId) async {
+    final readState = await _resolver.resolve(dogId);
+    if (!readState.isCurrent) {
+      return _ProntuarioWeight(readState: readState);
+    }
+    List<WeightRecord> records = const [];
+    try {
+      records = await _weightHistoryService.getHistory(dogId);
+    } catch (e) {
+      // Série indisponível não invalida o atual já resolvido canonicamente.
+      debugPrint('[Prontuario] série de peso indisponível: $e');
+    }
+    return _ProntuarioWeight(readState: readState, records: records);
   }
 
   void _refresh() {
@@ -157,7 +186,8 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   }
 
   Future<void> _openHealthActionHub(Dog dog) async {
-    final latestWeight = (await _dataFuture)?.latestWeight ?? dog.weight;
+    // Somente peso canônico: `dog.weight` é projeção legada, não evidência.
+    final latestWeight = (await _dataFuture)?.latestWeight;
     if (!mounted) return;
     final saved = await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
@@ -417,7 +447,7 @@ class _HealthProntuarioBody extends StatelessWidget {
                           const SizedBox(height: 12),
                           _DogIdentityCard(
                             dog: dog,
-                            latestWeight: data.latestWeight ?? dog.weight,
+                            latestWeight: data.latestWeight,
                           ),
                           const SizedBox(height: 18),
                           _SectionLabel(title: 'STATUS MÉDICO'),
@@ -571,7 +601,7 @@ class _DogIdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayWeight = latestWeight ?? dog.weight;
+    final displayWeight = latestWeight;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -845,6 +875,22 @@ class _QuickStatusRow extends StatelessWidget {
 
   const _QuickStatusRow({required this.dog, required this.data});
 
+  /// Rótulo honesto do peso: distingue ausência, inconclusivo e indisponível.
+  ///
+  /// Nunca exibe `dog.weight`: uma projeção legada não é evidência clínica.
+  static String _weightStatusLabel(_HealthProntuarioData data) {
+    switch (data.weightState) {
+      case ProntuarioWeightState.current:
+        return '${data.latestWeight!.toStringAsFixed(1)} kg';
+      case ProntuarioWeightState.none:
+        return 'Sem registro';
+      case ProntuarioWeightState.inconclusive:
+        return 'Não conclusivo';
+      case ProntuarioWeightState.unavailable:
+        return 'Indisponível';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vaccines = _statusForVaccines(data.logs);
@@ -856,9 +902,7 @@ class _QuickStatusRow extends StatelessWidget {
           child: _QuickStatusCard(
             icon: Icons.monitor_weight_rounded,
             label: 'Peso',
-            value: data.latestWeight == null
-                ? 'Sem registro'
-                : '${data.latestWeight!.toStringAsFixed(1)} kg',
+            value: _weightStatusLabel(data),
             color: AppTheme.primary,
           ),
         ),
@@ -1135,7 +1179,7 @@ class _HealthWeightTab extends StatelessWidget {
         const SizedBox(height: 10),
         _WeightRecordsList(records: data.weightRecords),
         const SizedBox(height: 12),
-        _WeightTrendInsight(records: data.weightRecords),
+        _WeightTrendInsight(facts: data.weightFacts),
       ],
     );
   }
@@ -2197,9 +2241,11 @@ class _WeightMetricsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ordered = [...data.weightRecords]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-    final latest = ordered.isEmpty ? null : ordered.first;
+    // Autoridade única (WEIGHT-01E-C2B.3): peso e data vêm do MESMO registro
+    // canônico. Antes, um sort local por `measuredAt` elegia o "último" e
+    // podia divergir do atual em empate de data.
+    final facts = data.weightFacts;
+    final latest = facts.current;
     final latestDate = latest == null
         ? 'Sem registro'
         : _formatDate(latest.measuredAt);
@@ -2229,7 +2275,7 @@ class _WeightMetricsRow extends StatelessWidget {
           child: _MetricMiniCard(
             icon: Icons.list_alt_rounded,
             label: 'Registros',
-            value: ordered.length.toString(),
+            value: facts.recordCount.toString(),
             color: AppTheme.primary,
           ),
         ),
@@ -2290,18 +2336,22 @@ class _MetricMiniCard extends StatelessWidget {
 }
 
 class _WeightTrendInsight extends StatelessWidget {
-  final List<WeightRecord> records;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightTrendInsight({required this.records});
+  const _WeightTrendInsight({required this.facts});
 
   @override
   Widget build(BuildContext context) {
-    final ordered = [...records]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-    final latest = ordered.isEmpty ? null : ordered.first.weightKg;
+    // O endpoint atual da tendência é o registro canônico — não o primeiro de
+    // um sort local. O histórico entra apenas como termo anterior do delta.
+    final latest = facts.currentWeightKg;
+    final delta = facts.deltaKg;
     final message = latest == null
         ? 'Nenhuma pesagem canônica registrada.'
-        : '${records.length} registro(s) canônico(s); último peso: ${latest.toStringAsFixed(1)} kg.';
+        : '${facts.recordCount} registro(s) canônico(s); '
+              'último peso: ${latest.toStringAsFixed(1)} kg'
+              '${delta == null ? '' : ' (${delta >= 0 ? '+' : ''}'
+                        '${delta.toStringAsFixed(1)} kg vs anterior)'}.';
     const color = AppTheme.info;
 
     return Container(
@@ -3768,19 +3818,57 @@ class _SheetDropdown extends StatelessWidget {
   }
 }
 
+/// Peso do prontuário: estado canônico resolvido + série histórica.
+///
+/// Transporta o [ProntuarioWeightReadState] íntegro — e não um par
+/// estado/registro reconstruído — para que a distinção entre `none`,
+/// `inconclusive` e `unavailable` não se perca no caminho até a UI.
+class _ProntuarioWeight {
+  const _ProntuarioWeight({required this.readState, this.records = const []});
+
+  final ProntuarioWeightReadState readState;
+
+  ProntuarioWeightState get state => readState.state;
+
+  /// Peso atual canônico; `null` fora de [ProntuarioWeightState.current].
+  WeightRecord? get current => readState.current;
+
+  /// Histórico válido para série/lista; vazio quando inconclusivo ou indisponível.
+  final List<WeightRecord> records;
+}
+
 class _HealthProntuarioData {
   final List<HealthLogModel> logs;
   final List<DogDocument> documents;
-  final List<WeightRecord> weightRecords;
+  final _ProntuarioWeight weight;
 
   const _HealthProntuarioData({
     required this.logs,
     required this.documents,
-    required this.weightRecords,
+    required this.weight,
   });
 
-  factory _HealthProntuarioData.empty() =>
-      const _HealthProntuarioData(logs: [], documents: [], weightRecords: []);
+  factory _HealthProntuarioData.empty() => const _HealthProntuarioData(
+    logs: [],
+    documents: [],
+    // Sem dado carregado ainda: indisponível, nunca "sem registro".
+    weight: _ProntuarioWeight(
+      readState: ProntuarioWeightReadState.unavailable(),
+    ),
+  );
+
+  List<WeightRecord> get weightRecords => weight.records;
+
+  /// Fatos de peso apresentáveis: atual canônico + anterior histórico.
+  ///
+  /// Autoridade única do atual; o histórico nunca o redefine.
+  ProntuarioWeightFacts get weightFacts => ProntuarioWeightFacts.from(
+    readState: weight.readState,
+    history: weight.records,
+  );
+
+  /// Estado da leitura de peso, para representação honesta na UI.
+  ProntuarioWeightState get weightState => weight.state;
 
   List<HealthLogModel> get vaccines =>
       logs.where((log) => log.type == 'vaccination').toList();
@@ -3794,18 +3882,12 @@ class _HealthProntuarioData {
   List<HealthLogModel> get weightLogs =>
       logs.where((log) => log.weight != null).toList();
 
-  double? get latestWeight {
-    if (weightRecords.isNotEmpty) {
-      final sorted = [...weightRecords]
-        ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-      return sorted.first.weightKg;
-    }
-    if (weightLogs.isNotEmpty) {
-      final sorted = [...weightLogs]..sort((a, b) => b.date.compareTo(a.date));
-      return sorted.first.weight;
-    }
-    return null;
-  }
+  /// Peso atual canônico, ou `null` quando não há evidência factual.
+  ///
+  /// Não seleciona localmente e não recorre a fontes não canônicas: a decisão
+  /// vem da policy compartilhada. `health_logs` (via [weightLogs]) permanece
+  /// disponível para contagem/histórico legado, mas NÃO é fonte de peso atual.
+  double? get latestWeight => weight.current?.weightKg;
 
   int get openAlertsCount {
     return logs.where((log) {
