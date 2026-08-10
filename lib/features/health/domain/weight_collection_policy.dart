@@ -113,31 +113,54 @@ int compareWeightEntityIdCodeUnits(String a, String b) {
   return a.length - b.length;
 }
 
-/// Ordenação canônica de recência entre registros válidos.
+/// Núcleo da ordenação canônica de recência, expresso sobre os três campos que
+/// a decidem — sem depender do tipo que os transporta.
 ///
 /// 1. `measuredAt` DESC;
 /// 2. `recordedAt` DESC — factual vence `null`; ambos `null` empata;
 /// 3. `entityId` DESC por unidade de código UTF-16.
 ///
-/// Negativo quando [a] é mais recente que [b]. Não usa locale, collation,
+/// Negativo quando `a` é mais recente que `b`. Não usa locale, collation,
 /// ordem de origem nem ordenação implícita do Firestore.
-int compareWeightRecency(WeightAssessment a, WeightAssessment b) {
-  final measuredComparison = b.measuredAt.compareTo(a.measuredAt);
+///
+/// Existe para que o aggregate [WeightAssessment] e a façade `WeightRecord`
+/// compartilhem UMA implementação: um segundo comparador poderia divergir e
+/// fazer duas superfícies discordarem sobre qual pesagem é a atual.
+int compareWeightCanonicalOrder({
+  required DateTime aMeasuredAt,
+  required DateTime? aRecordedAt,
+  required String aEntityId,
+  required DateTime bMeasuredAt,
+  required DateTime? bRecordedAt,
+  required String bEntityId,
+}) {
+  final measuredComparison = bMeasuredAt.compareTo(aMeasuredAt);
   if (measuredComparison != 0) return measuredComparison;
 
-  final aRecorded = a.recordedAt;
-  final bRecorded = b.recordedAt;
-  if (aRecorded != null && bRecorded == null) return -1;
-  if (aRecorded == null && bRecorded != null) return 1;
-  if (aRecorded != null && bRecorded != null) {
-    final recordedComparison = bRecorded.compareTo(aRecorded);
+  if (aRecordedAt != null && bRecordedAt == null) return -1;
+  if (aRecordedAt == null && bRecordedAt != null) return 1;
+  if (aRecordedAt != null && bRecordedAt != null) {
+    final recordedComparison = bRecordedAt.compareTo(aRecordedAt);
     if (recordedComparison != 0) return recordedComparison;
   }
 
-  final idComparison = compareWeightEntityIdCodeUnits(a.entityId, b.entityId);
+  final idComparison = compareWeightEntityIdCodeUnits(aEntityId, bEntityId);
   if (idComparison != 0) return idComparison > 0 ? -1 : 1;
   return 0;
 }
+
+/// Ordenação canônica de recência entre registros válidos.
+///
+/// Delega a [compareWeightCanonicalOrder]; ver lá o contrato de desempate.
+int compareWeightRecency(WeightAssessment a, WeightAssessment b) =>
+    compareWeightCanonicalOrder(
+      aMeasuredAt: a.measuredAt,
+      aRecordedAt: a.recordedAt,
+      aEntityId: a.entityId,
+      bMeasuredAt: b.measuredAt,
+      bRecordedAt: b.recordedAt,
+      bEntityId: b.entityId,
+    );
 
 /// Aplica a regra canônica de peso atual sobre a coleção completa.
 ///

@@ -128,6 +128,30 @@ void main() {
       expect(result.record, isNotNull);
     });
 
+    // PRE-V2-WEIGHT-RECORDEDAT-FACADE-CORRECTIONS: esta é a ÚNICA rota de
+    // runtime que carrega `recordedAt` para a façade, e antes desta correção
+    // nenhum teste detectava sua remoção. Deve falhar se a propagação em
+    // `_toRecord` for apagada.
+    test('recordedAt do aggregate é propagado para a façade', () {
+      final result = read(quickV2());
+
+      expect(result.assessment!.recordedAt, recordedAt);
+      // O que importa: a façade carrega o MESMO instante do aggregate.
+      expect(result.record!.recordedAt, recordedAt);
+      expect(result.record!.recordedAt, result.assessment!.recordedAt);
+      // Não colapsa com `measuredAt`: o desempate depende de serem distintos.
+      expect(result.record!.recordedAt, isNot(result.record!.measuredAt));
+    });
+
+    test('v1 sem recorded_at → façade com recordedAt null', () {
+      final result = read(deployedV1());
+
+      expect(result.kind, WeightReadKind.valid);
+      expect(result.assessment!.recordedAt, isNull);
+      // Ausência é factual, não substituída por `measuredAt`/`created_at`.
+      expect(result.record!.recordedAt, isNull);
+    });
+
     test('invalidated → invalidated, sem façade, não promovido', () {
       final result = read(quickV2(status: 'invalidated'));
       expect(result.kind, WeightReadKind.invalidated);

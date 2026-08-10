@@ -138,6 +138,9 @@ abstract final class WeightAssessmentReadAdapter {
       schemaVersion: assessment.schemaVersion,
       context: assessment.context ?? '',
       notes: assessment.notes,
+      // Propagado do aggregate para que a façade possa aplicar o desempate
+      // canônico completo. `null` em v1/legado, onde o campo não existe.
+      recordedAt: assessment.recordedAt,
     );
   }
 }

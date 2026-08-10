@@ -13,14 +13,19 @@ import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_
 void main() {
   final sameInstant = DateTime.utc(2026, 8, 6, 10);
 
-  WeightRecord record(String id, double weightKg, {DateTime? measuredAt}) =>
-      WeightRecord(
-        id: id,
-        weightKg: weightKg,
-        measuredAt: measuredAt ?? sameInstant,
-        recordedBy: null,
-        schemaVersion: 1,
-      );
+  WeightRecord record(
+    String id,
+    double weightKg, {
+    DateTime? measuredAt,
+    DateTime? recordedAt,
+  }) => WeightRecord(
+    id: id,
+    weightKg: weightKg,
+    measuredAt: measuredAt ?? sameInstant,
+    recordedBy: null,
+    schemaVersion: 1,
+    recordedAt: recordedAt,
+  );
 
   ProntuarioWeightFacts factsFor({
     required WeightRecord? current,
@@ -74,6 +79,86 @@ void main() {
       expect(facts.currentWeightKg, 32.0);
       expect(facts.current!.id, 'A');
       expect(facts.previous!.id, 'B');
+    });
+  });
+
+  // PRE-V2-WEIGHT-RECORDEDAT-FACADE: antes deste gate a façade não expunha
+  // `recordedAt`, então o desempate desta superfície pulava direto de
+  // `measuredAt` para `entityId`. Estes testes provam que o campo participa
+  // do resultado e que v1 (sem `recorded_at`) não regride.
+  group('desempate por recordedAt na façade', () {
+    // Todas as permutações da entrada. O resultado do desempate não pode
+    // depender da ordem em que o snapshot devolveu os documentos, e a
+    // asimetria de `null` é justamente o ramo mais sensível a isso.
+    List<List<WeightRecord>> permutations(List<WeightRecord> records) {
+      if (records.length <= 1) return [records];
+      final result = <List<WeightRecord>>[];
+      for (var i = 0; i < records.length; i++) {
+        final rest = [...records]..removeAt(i);
+        for (final tail in permutations(rest)) {
+          result.add([records[i], ...tail]);
+        }
+      }
+      return result;
+    }
+
+    /// Prova que [expectedPreviousId] vence em TODAS as ordens de entrada.
+    void expectPreviousInEveryOrder({
+      required WeightRecord current,
+      required List<WeightRecord> history,
+      required String expectedPreviousId,
+    }) {
+      final orders = permutations(history);
+      // Guarda contra um helper que silenciosamente pare de permutar.
+      expect(orders, hasLength(6));
+      for (final order in orders) {
+        final facts = factsFor(current: current, history: order);
+        expect(
+          facts.previous!.id,
+          expectedPreviousId,
+          reason: 'ordem ${order.map((r) => r.id).join(",")}',
+        );
+      }
+    }
+
+    final current = record('B', 33.3, recordedAt: DateTime.utc(2026, 8, 6, 12));
+
+    test('mesmo measuredAt: maior recordedAt vence, apesar do entityId', () {
+      // C tem o entityId MAIOR mas o recordedAt mais antigo. Se `recordedAt`
+      // fosse ignorado, C seria escolhido como anterior — o defeito v2.
+      expectPreviousInEveryOrder(
+        current: current,
+        history: [
+          record('C', 32.0, recordedAt: DateTime.utc(2026, 8, 6, 10, 30)),
+          record('A', 31.0, recordedAt: DateTime.utc(2026, 8, 6, 11, 45)),
+          current,
+        ],
+        expectedPreviousId: 'A',
+      );
+    });
+
+    test('recordedAt factual vence ausência no mesmo measuredAt', () {
+      // O legado tem entityId maior; o factual deve vencer mesmo assim.
+      expectPreviousInEveryOrder(
+        current: current,
+        history: [
+          record('C', 32.0),
+          record('A', 31.0, recordedAt: DateTime.utc(2026, 8, 6, 11)),
+          current,
+        ],
+        expectedPreviousId: 'A',
+      );
+    });
+
+    test('v1: ambos recordedAt null → desempate segue por entityId', () {
+      // Compatibilidade: sem `recorded_at`, o comportamento é o anterior.
+      final v1Current = record('B', 33.3);
+      expectPreviousInEveryOrder(
+        current: v1Current,
+        // entityId DESC entre os candidatos: C > A.
+        history: [record('A', 32.0), record('C', 31.0), v1Current],
+        expectedPreviousId: 'C',
+      );
     });
   });
 

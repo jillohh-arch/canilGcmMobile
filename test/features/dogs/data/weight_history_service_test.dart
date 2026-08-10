@@ -115,4 +115,27 @@ void main() {
     expect(record.context, isEmpty);
     expect(record.notes, isNull);
   });
+
+  // PRE-V2-WEIGHT-RECORDEDAT-FACADE-CORRECTIONS: esta rota NÃO parseia
+  // `recorded_at`. Um documento `schema_version: 1` + `recorded_at` é
+  // `hybridV1V2`/malformed para o parser canônico, então testar esse shape
+  // aqui como V1 válido codificaria o oposto do contrato. A propagação real
+  // do campo é coberta em
+  // test/features/health/data/weight/weight_assessment_read_adapter_test.dart.
+  test('v1 canônico não expõe recordedAt por esta rota', () {
+    final record = WeightRecord.fromJson({
+      'id': 'weight-1',
+      'weight_kg': 20,
+      'schema_version': 1,
+      'measured_at': Timestamp.fromDate(DateTime.utc(2026, 8, 6, 10)),
+      'recorded_by': {
+        'uid': 'user-1',
+        'name': 'Ana',
+        'internal_role': 'condutor',
+      },
+    });
+
+    expect(record.recordedAt, isNull);
+    expect(record.measuredAt.toUtc(), DateTime.utc(2026, 8, 6, 10));
+  });
 }

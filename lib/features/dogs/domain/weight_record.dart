@@ -45,11 +45,20 @@ final class WeightRecord {
     this.schemaVersion = 1,
     this.context = '',
     this.notes,
+    this.recordedAt,
   });
 
   final String id;
   final double weightKg;
   final DateTime measuredAt;
+
+  /// Instante em que a pesagem foi REGISTRADA, distinto de [measuredAt] (o
+  /// instante medido). Participa do desempate canônico quando duas pesagens
+  /// compartilham `measuredAt`.
+  ///
+  /// `null` em registros v1/legados que não persistem `recorded_at`; ausência é
+  /// factual e não é substituída por `measuredAt` nem por `created_at`.
+  final DateTime? recordedAt;
 
   /// Autoria canônica. Ausente (`null`) em pesagens legadas reconhecidas que
   /// não possuem `recorder`: a leitura é permitida, mas a autoria não é
@@ -102,6 +111,13 @@ final class WeightRecord {
       schemaVersion: schemaVersion,
       context: context ?? '',
       notes: _optionalString(json['notes']),
+      // `recordedAt` NÃO é lido aqui de propósito: esta rota exige
+      // `schema_version == 1`, e o parser canônico classifica
+      // `schema_version: 1` + `recorded_at` como `hybridV1V2` → malformed
+      // (`recorded_at` pertence a `_targetFields`). Parsear o campo aqui
+      // ensinaria a façade a aceitar como V1 válido um documento que a
+      // autoridade rejeita. O campo é preenchido pela rota de runtime real:
+      // `WeightAssessmentReadAdapter._toRecord`.
     );
   }
 

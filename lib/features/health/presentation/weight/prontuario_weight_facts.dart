@@ -85,15 +85,23 @@ class ProntuarioWeightFacts {
   }
 }
 
-/// Adapta [compareWeightRecency] à façade [WeightRecord].
+/// Aplica a ordenação canônica à façade [WeightRecord].
 ///
-/// A façade não expõe `recordedAt`; o desempate disponível aqui é
-/// `measuredAt` DESC seguido de `entityId` DESC por unidade de código UTF-16,
-/// reusando o comparador canônico de ids da policy compartilhada.
-int _byCanonicalRecency(WeightRecord a, WeightRecord b) {
-  final byMeasured = b.measuredAt.compareTo(a.measuredAt);
-  if (byMeasured != 0) return byMeasured;
-  final byId = compareWeightEntityIdCodeUnits(a.id, b.id);
-  if (byId != 0) return byId > 0 ? -1 : 1;
-  return 0;
-}
+/// Desde que a façade expõe `recordedAt`, o desempate aqui é o MESMO de
+/// [compareWeightRecency]: `measuredAt` DESC → `recordedAt` DESC → `entityId`
+/// DESC. Ambos delegam a [compareWeightCanonicalOrder], então esta superfície
+/// não pode divergir do aggregate sobre qual pesagem é a mais recente.
+///
+/// Escopo desta ordenação: `current` já chega canônico via
+/// [ProntuarioWeightReadState], então este comparador decide apenas
+/// [ProntuarioWeightFacts.previous] — e por consequência `deltaKg`/tendência.
+/// Ele NÃO redefine qual pesagem é a atual.
+int _byCanonicalRecency(WeightRecord a, WeightRecord b) =>
+    compareWeightCanonicalOrder(
+      aMeasuredAt: a.measuredAt,
+      aRecordedAt: a.recordedAt,
+      aEntityId: a.id,
+      bMeasuredAt: b.measuredAt,
+      bRecordedAt: b.recordedAt,
+      bEntityId: b.id,
+    );
