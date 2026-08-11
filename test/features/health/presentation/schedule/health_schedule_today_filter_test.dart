@@ -46,6 +46,10 @@ void main() {
       );
       expect(v.temporalStatus, HealthScheduleTemporalStatus.pending);
       expect(HealthScheduleUiFilter.today.matches(v, now: now), isTrue);
+      expect(filterScheduleItems([v], HealthScheduleUiFilter.today, now: now), [
+        v,
+      ]);
+      expect(countScheduleItemsToday([v], now: now), 1);
     });
 
     test('overdue do mesmo dia aparece', () {

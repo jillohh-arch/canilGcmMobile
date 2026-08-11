@@ -109,7 +109,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     ),
     const _HealthActionCategory(
       id: 'symptom',
-      label: 'Sintoma observado',
+      label: 'Sintoma',
       subtitle: 'Adicionar reação ou sintoma',
       icon: Icons.warning_rounded,
       color: AppTheme.error,

@@ -25,6 +25,7 @@ abstract final class HealthSummaryUserCopy {
   static const readinessNotRecorded = 'Prontidão ainda não registrada.';
   static const weightNotRecorded = 'Nenhuma pesagem registrada.';
   static const vaccinationNotRecorded = 'Nenhuma vacinação registrada.';
+  static const treatmentsNotRecorded = 'Nenhuma medicação registrada.';
   static const nutritionNotRecorded =
       'Nenhum plano ou refeição registrada para hoje.';
   static const recentNotRecorded = 'Nenhum registro recente.';

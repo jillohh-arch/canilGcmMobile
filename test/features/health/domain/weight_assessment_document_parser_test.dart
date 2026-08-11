@@ -134,6 +134,54 @@ void main() {
   });
 
   group('adapters legados reconhecidos', () {
+    test('legacy Mobile preserva peso factual com measured_by isolado', () {
+      final result = parse({
+        'weight_kg': 28.8,
+        'measured_at': apoloFirst,
+        'measured_by': 'masked-actor',
+        'context': 'canil',
+      });
+      expect(result.kind, WeightAssessmentParseResultKind.success);
+      expect(result.assessment!.weightKg, 28.8);
+      expect(result.assessment!.recorder, isNull);
+      expect(
+        result.assessment!.compatibility.sourceShape,
+        WeightDocumentSourceShape.recognizedLegacyMobile,
+      );
+      expect(
+        result.diagnostics.map((item) => item.code),
+        contains(WeightDocumentDiagnosticCode.missingCanonicalRecorder),
+      );
+    });
+
+    test('measured_by não-String não é promovido a legacy Mobile', () {
+      final result = parse({
+        'weight_kg': 28.0,
+        'measured_at': apoloFirst,
+        'measured_by': 42,
+      });
+      expect(result.kind, WeightAssessmentParseResultKind.malformed);
+      expect(
+        result.diagnostics.single.code,
+        WeightDocumentDiagnosticCode.unknownLegacyShape,
+      );
+    });
+
+    test('measured_by vazio ou whitespace não é legacy Mobile', () {
+      for (final actor in const ['', '   ']) {
+        final result = parse({
+          'weight_kg': 28.0,
+          'measured_at': apoloFirst,
+          'measured_by': actor,
+        });
+        expect(result.kind, WeightAssessmentParseResultKind.malformed);
+        expect(
+          result.diagnostics.single.code,
+          WeightDocumentDiagnosticCode.unknownLegacyShape,
+        );
+      }
+    });
+
     test('legacy Web permite autoria ausente com diagnostic', () {
       final result = parse({
         'dogId': 'dog-apolo',

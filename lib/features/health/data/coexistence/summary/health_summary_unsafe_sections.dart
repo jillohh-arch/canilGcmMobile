@@ -16,11 +16,6 @@ abstract final class HealthSummaryUnsafeSections {
         message: HealthSummaryUserCopy.readinessUnavailable,
       );
 
-  static const treatments =
-      HealthSummarySectionData<HealthSummaryTreatmentsView>.unavailable(
-        message: HealthSummaryUserCopy.treatmentsUnavailable,
-      );
-
   static const attention =
       HealthSummarySectionData<HealthSummaryAttentionView>.unavailable(
         message: HealthSummaryUserCopy.attentionUnavailable,

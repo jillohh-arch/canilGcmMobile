@@ -466,7 +466,10 @@ class _ScheduleBody extends StatelessWidget {
                   },
           ),
         ),
-      HealthScheduleKpiRow(groups: kpiGroups),
+      HealthScheduleKpiRow(
+        groups: kpiGroups,
+        todayCount: countScheduleItemsToday(snapshot.items, now: clock),
+      ),
       const SizedBox(height: 16),
       ..._buildSections(groups),
       if (filtered.isEmpty)

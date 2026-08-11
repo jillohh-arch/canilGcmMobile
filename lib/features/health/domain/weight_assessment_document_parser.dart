@@ -263,13 +263,21 @@ abstract final class WeightAssessmentDocumentParser {
     required String dogId,
     required Map<String, Object?> data,
   }) {
+    // Shape emitted by the original mobile WeightRecord.toJson(): factual
+    // weight/date plus a non-empty `measured_by` string, without schema or
+    // `performed_by`. A non-string or blank `measured_by` never came from that
+    // writer, so it must not be promoted to the recognized Mobile shape.
+    final rawMeasuredBy = data['measured_by'];
+    final hasLegacyMobileActor =
+        rawMeasuredBy is String && rawMeasuredBy.trim().isNotEmpty;
+    final isMobile = hasLegacyMobileActor && data['performed_by'] == null;
     final isWeb = data['measured_by'] != null && data['performed_by'] != null;
     final isDogUpdate =
         data['performed_by'] != null &&
         data['measured_by'] == null &&
         data['context'] == null &&
         data['notes'] == null;
-    if (!isWeb && !isDogUpdate) {
+    if (!isMobile && !isWeb && !isDogUpdate) {
       return WeightAssessmentParseResult.malformed(const [
         WeightDocumentDiagnostic(
           code: WeightDocumentDiagnosticCode.unknownLegacyShape,
@@ -332,7 +340,9 @@ abstract final class WeightAssessmentDocumentParser {
       context: _optionalString(data['context']),
       notes: _optionalString(data['notes']),
       compatibility: WeightCompatibilityMetadata(
-        sourceShape: isWeb
+        sourceShape: isMobile
+            ? WeightDocumentSourceShape.recognizedLegacyMobile
+            : isWeb
             ? WeightDocumentSourceShape.recognizedLegacyWeb
             : WeightDocumentSourceShape.recognizedLegacyDogUpdate,
         persistedSchemaVersion: null,

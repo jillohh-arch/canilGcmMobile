@@ -11,8 +11,13 @@ import 'package:canil_gcm/features/health/presentation/summary/widgets/health_su
 /// Em largura < 420: grid 2×2. Acima: uma linha (fidelidade ao mockup mobile).
 class HealthScheduleKpiRow extends StatelessWidget {
   final HealthScheduleGroups groups;
+  final int? todayCount;
 
-  const HealthScheduleKpiRow({super.key, required this.groups});
+  const HealthScheduleKpiRow({
+    super.key,
+    required this.groups,
+    this.todayCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +34,11 @@ class HealthScheduleKpiRow extends StatelessWidget {
       _KpiTile(
         label: HealthScheduleUserCopy.kpiToday,
         hint: HealthScheduleUserCopy.kpiTodayHint,
-        count: groups.today.length,
+        count: todayCount ?? groups.today.length,
         color: AppTheme.primary,
         icon: Icons.today_rounded,
         semanticsLabel:
-            '${HealthScheduleUserCopy.kpiToday}: ${groups.today.length}',
+            '${HealthScheduleUserCopy.kpiToday}: ${todayCount ?? groups.today.length}',
       ),
       _KpiTile(
         label: HealthScheduleUserCopy.kpiUpcoming,

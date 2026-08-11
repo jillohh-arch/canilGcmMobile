@@ -6,6 +6,7 @@ import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_recent_records_reader.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_medication_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_unsafe_sections.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_vaccination_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_weight_reader.dart';
@@ -35,6 +36,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
     HealthSummaryVaccinationReader? vaccinationReader,
     HealthSummaryNutritionReader? nutritionReader,
     HealthSummaryRecentRecordsReader? recentRecordsReader,
+    HealthSummaryMedicationReader? medicationReader,
   }) : _authoritativeTimeProvider = authoritativeTimeProvider,
        _weightReader =
            weightReader ?? HealthSummaryWeightReader(firestore: firestore),
@@ -54,13 +56,17 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
            ),
        _recentRecordsReader =
            recentRecordsReader ??
-           HealthSummaryRecentRecordsReader(firestore: firestore);
+           HealthSummaryRecentRecordsReader(firestore: firestore),
+       _medicationReader =
+           medicationReader ??
+           HealthSummaryMedicationReader(firestore: firestore);
 
   final AuthoritativeTimeProvider? _authoritativeTimeProvider;
   final HealthSummaryWeightReader _weightReader;
   final HealthSummaryVaccinationReader _vaccinationReader;
   final HealthSummaryNutritionReader _nutritionReader;
   final HealthSummaryRecentRecordsReader _recentRecordsReader;
+  final HealthSummaryMedicationReader _medicationReader;
   bool _useCurrentTemporalSnapshotOnNextRead = false;
 
   @visibleForTesting
@@ -101,6 +107,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
         synchronizeTime: synchronizeNutritionTime,
       );
       final recentFuture = _recentRecordsReader.read(dogId);
+      final medicationFuture = _medicationReader.read(dogId);
 
       final weightBundle = await weightBundleFuture;
       final weight = weightBundle.current;
@@ -108,19 +115,22 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
       final vaccination = await vaccinationFuture;
       final nutrition = await nutritionFuture;
       final recent = await recentFuture;
+      final medication = await medicationFuture;
 
       // Falha estrutural: todos os blocos *mapeáveis* falharam.
       // Não apresentar dashboard "válido" com 0 fatos e 8 cards unavailable.
-      // (readiness/treatments/attention já são unavailable por decisão UNSAFE.)
+      // (readiness/attention seguem unavailable por decisão UNSAFE.)
       if (_allMappableUnavailable(
         weight: weight,
         vaccination: vaccination,
+        medication: medication,
         nutrition: nutrition,
         recent: recent,
       )) {
         final offline = _looksOffline([
           weight.message,
           vaccination.message,
+          medication.message,
           nutrition.message,
           recent.message,
         ]);
@@ -135,7 +145,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
         readiness: HealthSummaryUnsafeSections.readiness,
         weight: weight,
         vaccination: vaccination,
-        treatments: HealthSummaryUnsafeSections.treatments,
+        treatments: medication,
         attention: HealthSummaryUnsafeSections.attention,
         nutritionToday: nutrition,
         weightTrend: trend,
@@ -166,15 +176,17 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
     }
   }
 
-  /// weight / vaccination / nutrition / recent — blocos que a 2D tenta ler.
+  /// Blocos que a fonte de coexistência consegue mapear factualmente.
   static bool _allMappableUnavailable({
     required HealthSummarySectionData weight,
     required HealthSummarySectionData vaccination,
+    required HealthSummarySectionData medication,
     required HealthSummarySectionData nutrition,
     required HealthSummarySectionData recent,
   }) {
     return weight.isUnavailable &&
         vaccination.isUnavailable &&
+        medication.isUnavailable &&
         nutrition.isUnavailable &&
         recent.isUnavailable;
   }

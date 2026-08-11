@@ -104,7 +104,8 @@ void main() {
       expect(find.text('Exame'), findsOneWidget);
       expect(find.text('Consulta'), findsOneWidget);
       expect(find.text('Medicação'), findsOneWidget);
-      expect(find.text('Sintoma observado'), findsOneWidget);
+      expect(find.text('Sintoma'), findsOneWidget);
+      expect(find.text('Adicionar reação ou sintoma'), findsOneWidget);
       expect(find.text('Cirurgia'), findsOneWidget);
       expect(find.text('Outro'), findsOneWidget);
 

@@ -3,6 +3,7 @@ import 'health_v1_models.dart' show HealthDomainException, RecordedBy, WeightKg;
 
 enum WeightDocumentSourceShape {
   deployedV1,
+  recognizedLegacyMobile,
   recognizedLegacyWeb,
   recognizedLegacyDogUpdate,
   targetV2,

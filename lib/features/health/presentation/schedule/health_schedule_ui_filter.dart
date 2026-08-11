@@ -100,3 +100,12 @@ List<HealthScheduleItemView> filterScheduleItems(
       if (filter.matches(item, now: now)) item,
   ];
 }
+
+/// Contador factual de itens operacionais agendados no dia civil local.
+/// Compartilha exatamente o predicate usado pelo filtro "Hoje".
+int countScheduleItemsToday(
+  Iterable<HealthScheduleItemView> items, {
+  required DateTime now,
+}) => items
+    .where((item) => HealthScheduleUiFilter.today.matches(item, now: now))
+    .length;

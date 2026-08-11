@@ -100,12 +100,37 @@ void main() {
     'performed_by': 'RA-1234',
   };
 
+  Map<String, dynamic> legacyMobile(num weight, DateTime measuredAt) => {
+    'dog_id': 'dog-apolo',
+    'weight_kg': weight,
+    'measured_at': Timestamp.fromDate(measuredAt),
+    'measured_by': 'RA-1234',
+    'context': 'canil',
+  };
+
   Map<String, dynamic> legacyDogUpdate(num weight, DateTime measuredAt) => {
     'dog_id': 'dog-apolo',
     'weight_kg': weight,
     'measured_at': Timestamp.fromDate(measuredAt),
     'performed_by': 'RA-5678',
   };
+
+  test(
+    'legacy Mobile e pesagem canônica nova mantêm histórico conclusivo',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final col = weightRecords(firestore, 'dog-apolo');
+      await col.doc('legacyMobile').set(legacyMobile(27.9, apoloFirst));
+      await col.doc('current').set(canonicalV1(28.8, apoloSecond));
+
+      final service = WeightHistoryService(firestore: firestore);
+      final records = await service.getHistory('dog-apolo');
+      final latest = await service.getLatest('dog-apolo');
+
+      expect(records.map((record) => record.weightKg), [28.8, 27.9]);
+      expect(latest?.weightKg, 28.8);
+    },
+  );
 
   test(
     'recognized legacy Web sem recorder permanece no histórico, sem autoria',

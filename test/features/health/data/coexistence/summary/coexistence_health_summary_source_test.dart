@@ -5,6 +5,7 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/coexistence_health_summary_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_date_parse.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_medication_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_recent_records_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_unsafe_sections.dart';
@@ -346,28 +347,23 @@ void main() {
   });
 
   group('HealthSummaryUnsafeSections', () {
-    test(
-      'prontidão/tratamentos/atenções são unavailable (não notEvaluated inventado)',
-      () {
-        expect(HealthSummaryUnsafeSections.readiness.isUnavailable, isTrue);
-        expect(HealthSummaryUnsafeSections.treatments.isUnavailable, isTrue);
-        expect(HealthSummaryUnsafeSections.attention.isUnavailable, isTrue);
-        expect(HealthSummaryUnsafeSections.readiness.valueOrNull, isNull);
-        // Copy operacional — sem jargão de arquitetura.
-        for (final msg in [
-          HealthSummaryUnsafeSections.readiness.message,
-          HealthSummaryUnsafeSections.treatments.message,
-          HealthSummaryUnsafeSections.attention.message,
-        ]) {
-          final lower = (msg ?? '').toLowerCase();
-          expect(lower.contains('coexist'), isFalse);
-          expect(lower.contains('legado'), isFalse);
-          expect(lower.contains('health v1'), isFalse);
-          expect(lower.contains('adapter'), isFalse);
-          expect(lower.contains('reader'), isFalse);
-        }
-      },
-    );
+    test('prontidão/atenções são unavailable (não notEvaluated inventado)', () {
+      expect(HealthSummaryUnsafeSections.readiness.isUnavailable, isTrue);
+      expect(HealthSummaryUnsafeSections.attention.isUnavailable, isTrue);
+      expect(HealthSummaryUnsafeSections.readiness.valueOrNull, isNull);
+      // Copy operacional — sem jargão de arquitetura.
+      for (final msg in [
+        HealthSummaryUnsafeSections.readiness.message,
+        HealthSummaryUnsafeSections.attention.message,
+      ]) {
+        final lower = (msg ?? '').toLowerCase();
+        expect(lower.contains('coexist'), isFalse);
+        expect(lower.contains('legado'), isFalse);
+        expect(lower.contains('health v1'), isFalse);
+        expect(lower.contains('adapter'), isFalse);
+        expect(lower.contains('reader'), isFalse);
+      }
+    });
   });
 
   group('CoexistenceHealthSummarySource', () {
@@ -394,6 +390,9 @@ void main() {
         ),
         recentRecordsReader: HealthSummaryRecentRecordsReader(
           loadItems: (_) async => recent,
+        ),
+        medicationReader: HealthSummaryMedicationReader(
+          loadFacts: (_) async => const [],
         ),
       );
     }
@@ -423,7 +422,7 @@ void main() {
       expect(payload.vaccination.isAvailable, isTrue);
       expect(payload.vaccination.value!.summaryLabel, isNull);
       expect(payload.readiness.isUnavailable, isTrue);
-      expect(payload.treatments.isUnavailable, isTrue);
+      expect(payload.treatments.isNotRecorded, isTrue);
       expect(payload.attention.isUnavailable, isTrue);
       expect(payload.metadata.isFromCache, isFalse);
       expect(payload.metadata.isStale, isFalse);
