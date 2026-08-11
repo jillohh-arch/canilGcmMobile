@@ -1927,6 +1927,22 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      // Health v1 — Restrições operacionais canônicas, mantidas pelo backend.
+      // Leitura cliente somente no escopo autorizado do K9.
+      match /operational_restrictions/{restrictionId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Health v1 — Projeção server-side singleton para prontidão atual.
+      // Não expõe histórico nem aceita writes diretos de clientes.
+      match /health_summary/{summaryId} {
+        allow read: if summaryId == 'current'
+          && signedIn()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
       // Health v1 — Nutrição canônica (5D Gate 4): read-only no cliente.
       // Mesmo predicado da Agenda: signedIn + canAccessDogRecord(dogId).
       // Writes canônicos exclusivamente via callables Admin SDK
