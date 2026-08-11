@@ -469,7 +469,10 @@ class _HealthProntuarioBody extends StatelessWidget {
                                   : '${data.weightLogs.length} registros',
                             ),
                             const SizedBox(height: 10),
-                            _WeightEvolutionCard(records: data.weightRecords),
+                            _WeightEvolutionCard(
+                              records: data.weightRecords,
+                              facts: data.weightFacts,
+                            ),
                             const SizedBox(height: 18),
                             _SectionLabel(
                               title: 'CARTEIRA DE VACINAÇÃO',
@@ -1105,7 +1108,10 @@ class _HealthResumoTab extends StatelessWidget {
               : '${data.weightRecords.length} registros',
         ),
         const SizedBox(height: 10),
-        _WeightEvolutionCard(records: data.weightRecords),
+        _WeightEvolutionCard(
+          records: data.weightRecords,
+          facts: data.weightFacts,
+        ),
         const SizedBox(height: 18),
         _SectionLabel(
           title: 'ÚLTIMOS EVENTOS',
@@ -1171,13 +1177,19 @@ class _HealthWeightTab extends StatelessWidget {
               : '${data.weightRecords.length} registros',
         ),
         const SizedBox(height: 10),
-        _WeightEvolutionCard(records: data.weightRecords),
+        _WeightEvolutionCard(
+          records: data.weightRecords,
+          facts: data.weightFacts,
+        ),
         const SizedBox(height: 12),
         _WeightMetricsRow(data: data),
         const SizedBox(height: 18),
         _SectionLabel(title: 'REGISTROS DE PESAGEM'),
         const SizedBox(height: 10),
-        _WeightRecordsList(records: data.weightRecords),
+        _WeightRecordsList(
+          records: data.weightRecords,
+          facts: data.weightFacts,
+        ),
         const SizedBox(height: 12),
         _WeightTrendInsight(facts: data.weightFacts),
       ],
@@ -2671,10 +2683,19 @@ class _SummaryEventRow extends StatelessWidget {
   }
 }
 
+/// Lista de pesagens com variação por linha.
+///
+/// WEIGHT-01E-R: a ordem vem de [compareWeightRecordRecency] — a MESMA
+/// ordenação canônica usada por [ProntuarioWeightFacts] — e não de um
+/// `measuredAt`-only local. O defeito anterior tinha duas consequências:
+/// `List.sort` é instável, então em empate de `measuredAt` a ordem das linhas
+/// (e portanto o `previous` de cada linha) era arbitrária; e o topo da lista
+/// não era necessariamente o atual canônico.
 class _WeightRecordsList extends StatelessWidget {
   final List<WeightRecord> records;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightRecordsList({required this.records});
+  const _WeightRecordsList({required this.records, required this.facts});
 
   @override
   Widget build(BuildContext context) {
@@ -2685,8 +2706,7 @@ class _WeightRecordsList extends StatelessWidget {
       );
     }
 
-    final visible = [...records]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    final visible = [...records]..sort(compareWeightRecordRecency);
     final limited = visible.take(6).toList();
     return Container(
       decoration: _panelDecoration(),
@@ -2695,7 +2715,11 @@ class _WeightRecordsList extends StatelessWidget {
           for (var i = 0; i < limited.length; i++)
             _WeightRecordRow(
               record: limited[i],
-              previous: i + 1 < visible.length ? visible[i + 1] : null,
+              // A linha do atual usa o `previous` da decisão canônica; as
+              // demais comparam com o vizinho na mesma ordem canônica.
+              previous: limited[i].id == facts.current?.id
+                  ? facts.previous
+                  : (i + 1 < visible.length ? visible[i + 1] : null),
               isLast: i == limited.length - 1,
             ),
         ],
@@ -2883,10 +2907,18 @@ class _SpecialtyRail extends StatelessWidget {
   }
 }
 
+/// Card de evolução: série cronológica + peso atual CANÔNICO.
+///
+/// WEIGHT-01E-R: o número exibido vem de [ProntuarioWeightFacts.currentWeightKg]
+/// — a decisão da WeightCollectionPolicy — e não do último ponto da série. A
+/// ordenação ASC abaixo existe apenas para desenhar a curva; usar `values.last`
+/// como peso atual fazia este card divergir de `_WeightMetricsRow` na MESMA
+/// tela quando dois registros empatavam em `measuredAt`.
 class _WeightEvolutionCard extends StatelessWidget {
   final List<WeightRecord> records;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightEvolutionCard({required this.records});
+  const _WeightEvolutionCard({required this.records, required this.facts});
 
   @override
   Widget build(BuildContext context) {
@@ -2895,7 +2927,7 @@ class _WeightEvolutionCard extends StatelessWidget {
             .map((record) => _WeightPoint(record.measuredAt, record.weightKg))
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-    final current = values.isNotEmpty ? values.last.value : null;
+    final current = facts.currentWeightKg;
 
     return Container(
       padding: const EdgeInsets.all(14),

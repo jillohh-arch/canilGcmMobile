@@ -101,23 +101,23 @@ class HealthSummaryWeightTrendCard extends StatelessWidget {
       if (!kg.isFinite) return null;
       return HealthSummaryFormatters.weightKg(kg);
     }
-    if (weightTrend.isAvailable) {
-      final ordered = _orderedFinitePoints(weightTrend.value!.points);
-      if (ordered.isEmpty) return null;
-      return HealthSummaryFormatters.weightKg(ordered.last.weightKg);
-    }
+    // WEIGHT-01E-R: sem `currentWeight` canônico NÃO há peso atual a exibir.
+    //
+    // Antes, a série era promovida (`points.last`) como se fosse o atual. A
+    // série é ordenada apenas por `at` e seus pontos não carregam `entityId`
+    // nem `recordedAt`, então esse caminho não podia representar o desempate
+    // canônico — e, pior, transformava ausência de autoridade
+    // (`none`/`inconclusive`/`unavailable`) em um número aparentemente factual.
+    // O peso atual pertence exclusivamente à decisão da WeightCollectionPolicy,
+    // recebida aqui via [currentWeight].
     return null;
   }
 
   String? _subtitle() {
-    DateTime? at;
-    if (currentWeight != null && currentWeight!.isAvailable) {
-      at = currentWeight!.value!.measuredAt;
-    } else if (weightTrend.isAvailable) {
-      final ordered = _orderedFinitePoints(weightTrend.value!.points);
-      if (ordered.isNotEmpty) at = ordered.last.at;
-    }
-    if (at == null) return null;
+    // Mesma regra do peso: a data da última pesagem acompanha o registro
+    // canônico, nunca o último ponto da série.
+    if (currentWeight == null || !currentWeight!.isAvailable) return null;
+    final at = currentWeight!.value!.measuredAt;
     return HealthSummaryFormatters.lastWeighingLabel(at);
   }
 
@@ -390,10 +390,7 @@ class HealthSummaryWeightChartPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppTheme.info.withValues(alpha: 0.22),
-            AppTheme.transparent,
-          ],
+          colors: [AppTheme.info.withValues(alpha: 0.22), AppTheme.transparent],
         ).createShader(Offset.zero & size),
     );
     canvas.drawPath(path, linePaint);

@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/dogs/data/weight_history_service.dart';
 import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/core/services/pdf_generator/weight_history_pdf.dart';
 import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_read_state.dart';
 
 /// Tela 2.11 — Histórico de Peso Completo.
 /// Gráfico ampliado, estatísticas, lista cronológica, registro de pesagem.
@@ -26,6 +27,11 @@ class WeightHistoryScreen extends StatefulWidget {
     this.historyService,
   });
 
+  /// Identifica o headline do peso atual canônico para verificação: a lista e o
+  /// gráfico da mesma tela também exibem números de peso, e uma busca sem
+  /// escopo não distinguiria o atual autoritativo de uma linha de histórico.
+  static const currentWeightCardKey = Key('weight-history-current-card');
+
   @override
   State<WeightHistoryScreen> createState() => _WeightHistoryScreenState();
 }
@@ -34,10 +40,31 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   String _periodFilter = '6m'; // '30d' | '6m' | '1ano' | 'tudo'
   late final WeightHistoryService _historyService;
 
+  /// Estado canônico do peso atual (WEIGHT-01E-R).
+  ///
+  /// O stream de histórico NÃO é autoridade de peso atual: `watchHistory` usa
+  /// `orderBy(measured_at).limit()`, não executa `analyzeWeightCollection` e
+  /// portanto não detecta `entityId` duplicado nem enxerga documentos fora da
+  /// janela. O headline "PESO ATUAL" vem daqui — coleção completa, bloqueadores
+  /// globais e desempate canônico — enquanto o stream continua alimentando
+  /// lista e gráfico.
+  late Future<ProntuarioWeightReadState> _currentWeight;
+
   @override
   void initState() {
     super.initState();
     _historyService = widget.historyService ?? WeightHistoryService();
+    _currentWeight = ProntuarioWeightResolver(
+      _historyService,
+    ).resolve(widget.dog.id);
+  }
+
+  void _reloadCurrentWeight() {
+    setState(() {
+      _currentWeight = ProntuarioWeightResolver(
+        _historyService,
+      ).resolve(widget.dog.id);
+    });
   }
 
   @override
@@ -48,7 +75,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
         if (snapshot.hasError) {
           return _buildReadState(
             message: 'Não foi possível carregar o histórico de peso.',
-            retry: () => setState(() {}),
+            retry: _reloadCurrentWeight,
           );
         }
         if (!snapshot.hasData) {
@@ -100,11 +127,11 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildExportBar(context, records),
+                            _buildExportBar(context),
                             const SizedBox(height: 16),
                             _buildPeriodChips(),
                             const SizedBox(height: 16),
-                            _buildCurrentWeightCard(allEntries),
+                            _buildCurrentWeightCard(),
                             const SizedBox(height: 16),
                             _buildChart(filtered),
                             const SizedBox(height: 16),
@@ -234,12 +261,18 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   // ─── Export Bar ────────────────────────────────────────────────────
 
-  Widget _buildExportBar(BuildContext context, List<WeightRecord> records) {
+  Widget _buildExportBar(BuildContext context) {
     return GestureDetector(
       onTap: () async {
         HapticFeedback.mediumImpact();
         try {
-          final logs = records
+          // Uma exportação nasce de UMA leitura full e UMA análise canônica.
+          // Tabela, contagem, current e oldest pertencem à mesma fotografia;
+          // o stream limitado e o Future do headline não participam do PDF.
+          final export = await _historyService.readExportSnapshot(
+            widget.dog.id,
+          );
+          final logs = export.readableRecords
               .map(
                 (record) => HealthLogModel(
                   dogId: widget.dog.id,
@@ -252,7 +285,11 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 ),
               )
               .toList(growable: false);
-          final pdfBytes = await WeightHistoryPdf.generate(widget.dog, logs);
+          final pdfBytes = await WeightHistoryPdf.generate(
+            widget.dog,
+            logs,
+            authority: _pdfAuthority(export),
+          );
           await Printing.layoutPdf(
             onLayout: (format) async => pdfBytes,
             name: 'Historico_Peso_${widget.dog.name}.pdf',
@@ -359,25 +396,63 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
   // ─── Card peso atual ───────────────────────────────────────────────
 
-  Widget _buildCurrentWeightCard(List<_WeightEntry> history) {
-    if (history.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surfacePanel,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text(
-          'Nenhuma pesagem canônica registrada.',
-          style: TextStyle(color: AppTheme.textSecondary),
-        ),
-      );
-    }
-    final latest = history.last;
-    final dateStr = DateFormat('dd/MM/yyyy').format(latest.date);
+  /// Headline "PESO ATUAL" — SOMENTE peso canônico.
+  ///
+  /// WEIGHT-01E-R: antes usava `history.last` sobre uma lista ordenada apenas
+  /// por `measuredAt` ASC. Como `List.sort` é instável, em empate de
+  /// `measuredAt` o vencedor era arbitrário; e a lista vem de um stream com
+  /// `limit`, sem análise coletiva. Agora a decisão vem do resolver canônico e
+  /// cada estado não-`current` é apresentado honestamente, sem promover
+  /// registro do histórico.
+  Widget _buildCurrentWeightCard() {
+    return FutureBuilder<ProntuarioWeightReadState>(
+      future: _currentWeight,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _buildCurrentWeightPlaceholder(
+            snapshot.hasError
+                ? 'Peso atual indisponível.'
+                : 'Carregando peso atual…',
+          );
+        }
+        final readState = snapshot.data!;
+        final record = readState.current;
+        if (record == null) {
+          return _buildCurrentWeightPlaceholder(switch (readState.state) {
+            ProntuarioWeightState.none =>
+              'Nenhuma pesagem canônica registrada.',
+            ProntuarioWeightState.inconclusive =>
+              'Peso atual não conclusivo: há registro ilegível no histórico.',
+            ProntuarioWeightState.unavailable => 'Peso atual indisponível.',
+            ProntuarioWeightState.current => 'Peso atual indisponível.',
+          });
+        }
+        return _buildCurrentWeightPanel(record);
+      },
+    );
+  }
+
+  Widget _buildCurrentWeightPlaceholder(String message) {
+    return Container(
+      key: WeightHistoryScreen.currentWeightCardKey,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfacePanel,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        message,
+        style: const TextStyle(color: AppTheme.textSecondary),
+      ),
+    );
+  }
+
+  Widget _buildCurrentWeightPanel(WeightRecord record) {
+    final dateStr = DateFormat('dd/MM/yyyy').format(record.measuredAt);
 
     return Container(
+      key: WeightHistoryScreen.currentWeightCardKey,
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -392,7 +467,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: latest.weight.toStringAsFixed(1),
+                  text: record.weightKg.toStringAsFixed(1),
                   style: GoogleFonts.outfit(
                     color: AppTheme.textPrimary,
                     fontSize: 40,
@@ -426,10 +501,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  [
-                    'Medido em $dateStr',
-                    ?latest.record.recordedBy?.name,
-                  ].join(' · '),
+                  ['Medido em $dateStr', ?record.recordedBy?.name].join(' · '),
                   style: GoogleFonts.inter(
                     color: AppTheme.textTertiary,
                     fontSize: 10,
@@ -782,8 +854,35 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     );
   }
 
+  /// Traduz o estado canônico para o contrato de exportação.
+  ///
+  /// Current e oldest já chegam do snapshot analisado antes do seam
+  /// `HealthLogModel`, que não carrega `recordedAt`/`entityId`. Em qualquer
+  /// estado não-current nenhum endpoint é fornecido.
+  WeightPdfAuthority _pdfAuthority(WeightExportSnapshot snapshot) {
+    switch (snapshot.state) {
+      case WeightExportSnapshotState.none:
+        return const WeightPdfAuthority.none();
+      case WeightExportSnapshotState.inconclusive:
+        return const WeightPdfAuthority.inconclusive();
+      case WeightExportSnapshotState.unavailable:
+        return const WeightPdfAuthority.unavailable();
+      case WeightExportSnapshotState.current:
+        final current = snapshot.current!;
+        return WeightPdfAuthority(
+          state: WeightPdfAuthorityState.current,
+          currentKg: current.weightKg,
+          oldestKg: snapshot.oldest?.weightKg,
+        );
+    }
+  }
+
   Future<void> _showWeighForm(BuildContext context) async {
     await showHealthWeightFormSheet(context: context, dog: widget.dog);
+    // O histórico chega por stream, mas o peso atual canônico é resolvido uma
+    // vez: sem reresolver, o headline continuaria exibindo a pesagem anterior
+    // depois de registrar uma nova.
+    if (mounted) _reloadCurrentWeight();
   }
 
   // ─── Helpers ────────────────────────────────────────────────────

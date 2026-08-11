@@ -47,7 +47,7 @@ class ProntuarioWeightFacts {
         history
             .where((record) => record.id != current.id)
             .toList(growable: false)
-          ..sort(_byCanonicalRecency);
+          ..sort(compareWeightRecordRecency);
 
     return ProntuarioWeightFacts._(
       current: current,
@@ -92,11 +92,13 @@ class ProntuarioWeightFacts {
 /// DESC. Ambos delegam a [compareWeightCanonicalOrder], então esta superfície
 /// não pode divergir do aggregate sobre qual pesagem é a mais recente.
 ///
-/// Escopo desta ordenação: `current` já chega canônico via
-/// [ProntuarioWeightReadState], então este comparador decide apenas
-/// [ProntuarioWeightFacts.previous] — e por consequência `deltaKg`/tendência.
-/// Ele NÃO redefine qual pesagem é a atual.
-int _byCanonicalRecency(WeightRecord a, WeightRecord b) =>
+/// Escopo desta ordenação: `current` NUNCA é decidido aqui — chega canônico via
+/// [ProntuarioWeightReadState]. Este comparador ordena apenas registros já
+/// validados, para escolher [ProntuarioWeightFacts.previous] e a ordem de
+/// exibição de linhas de histórico. Público (WEIGHT-01E-R) para que as
+/// superfícies do prontuário reusem ESTA ordenação em vez de reimplementar
+/// `measuredAt`-only localmente.
+int compareWeightRecordRecency(WeightRecord a, WeightRecord b) =>
     compareWeightCanonicalOrder(
       aMeasuredAt: a.measuredAt,
       aRecordedAt: a.recordedAt,

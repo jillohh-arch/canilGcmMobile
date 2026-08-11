@@ -2,7 +2,36 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:canil_gcm/features/dogs/domain/weight_record.dart';
 import 'package:canil_gcm/features/health/data/weight/weight_assessment_read_adapter.dart';
+import 'package:canil_gcm/features/health/domain/weight_assessment.dart';
 import 'package:canil_gcm/features/health/domain/weight_collection_policy.dart';
+
+typedef WeightDocumentData = ({String documentId, Map<String, dynamic> data});
+
+enum WeightExportSnapshotState { current, none, inconclusive, unavailable }
+
+/// Coherent view of one full read of `weight_records` for PDF export.
+final class WeightExportSnapshot {
+  const WeightExportSnapshot._({
+    required this.state,
+    required this.current,
+    required this.oldest,
+    required this.readableRecords,
+    required this.blockers,
+  });
+
+  const WeightExportSnapshot.unavailable()
+    : state = WeightExportSnapshotState.unavailable,
+      current = null,
+      oldest = null,
+      readableRecords = const [],
+      blockers = const [];
+
+  final WeightExportSnapshotState state;
+  final WeightRecord? current;
+  final WeightRecord? oldest;
+  final List<WeightRecord> readableRecords;
+  final List<WeightCurrentBlocker> blockers;
+}
 
 /// Falha controlada de leitura de histórico quando um documento em
 /// `weight_records` é ilegível (malformed) ou de schema não suportado
@@ -66,6 +95,88 @@ class WeightHistoryService {
     return _parseSnapshot(dogId, await query.get());
   }
 
+  /// Snapshot exclusivo da exportação: uma consulta full, sem janela.
+  ///
+  /// Blockers documentais tornam a autoridade inconclusiva, mas preservam os
+  /// demais registros legíveis. Falha da consulta resulta em `unavailable`.
+  Future<WeightExportSnapshot> readExportSnapshot(String dogId) async {
+    late final QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await _collection(dogId).get();
+    } on Object {
+      return const WeightExportSnapshot.unavailable();
+    }
+    return analyzeExportDocuments(
+      dogId: dogId,
+      documents: snapshot.docs.map(
+        (doc) => (documentId: doc.id, data: doc.data()),
+      ),
+    );
+  }
+
+  /// Seam puro compartilhado pelo export e pelo reader de peso atual.
+  ///
+  /// Cada documento passa uma vez pelo adapter/parser central e a coleção passa
+  /// uma vez por [analyzeWeightCollection].
+  static WeightExportSnapshot analyzeExportDocuments({
+    required String dogId,
+    required Iterable<WeightDocumentData> documents,
+  }) {
+    final candidates = <WeightCandidate>[];
+    final facadeByAssessment = <WeightAssessment, WeightRecord>{};
+
+    for (final document in documents) {
+      final result = WeightAssessmentReadAdapter.read(
+        documentId: document.documentId,
+        dogId: dogId,
+        data: document.data,
+      );
+      final assessment = result.assessment;
+      final record = result.record;
+      if (assessment != null && record != null) {
+        facadeByAssessment[assessment] = record;
+      }
+      candidates.add(
+        WeightCandidate(
+          entityId: document.documentId,
+          kind: switch (result.kind) {
+            WeightReadKind.valid => WeightCandidateKind.valid,
+            WeightReadKind.invalidated => WeightCandidateKind.invalidated,
+            WeightReadKind.malformed => WeightCandidateKind.malformed,
+            WeightReadKind.unsupported => WeightCandidateKind.unsupported,
+          },
+          assessment: assessment,
+        ),
+      );
+    }
+
+    final analysis = analyzeWeightCollection(candidates);
+    final readableRecords = analysis.validRecords
+        .map((assessment) => facadeByAssessment[assessment]!)
+        .toList(growable: false);
+    final state = switch (analysis.kind) {
+      WeightCurrentKind.current => WeightExportSnapshotState.current,
+      WeightCurrentKind.none => WeightExportSnapshotState.none,
+      WeightCurrentKind.inconclusive => WeightExportSnapshotState.inconclusive,
+    };
+    final current = analysis.current == null
+        ? null
+        : facadeByAssessment[analysis.current!];
+    final oldest =
+        state == WeightExportSnapshotState.current &&
+            analysis.validRecords.length > 1
+        ? facadeByAssessment[analysis.validRecords.last]
+        : null;
+
+    return WeightExportSnapshot._(
+      state: state,
+      current: current,
+      oldest: oldest,
+      readableRecords: List.unmodifiable(readableRecords),
+      blockers: analysis.blockers,
+    );
+  }
+
   /// Peso atual canônico (WEIGHT-01E-C1).
   ///
   /// Aplica [analyzeWeightCollection] sobre a coleção completa, e não
@@ -79,40 +190,21 @@ class WeightHistoryService {
   /// - vazio ou somente `invalidated` → `null`.
   Future<WeightRecord?> getLatest(String dogId) async {
     final snapshot = await _collection(dogId).get();
-
-    final candidates = <WeightCandidate>[];
-    final facades = <String, WeightRecord>{};
-    for (final doc in snapshot.docs) {
-      final result = WeightAssessmentReadAdapter.read(
-        documentId: doc.id,
-        dogId: dogId,
-        data: doc.data(),
-      );
-      final record = result.record;
-      if (record != null) facades[doc.id] = record;
-      candidates.add(
-        WeightCandidate(
-          entityId: doc.id,
-          kind: switch (result.kind) {
-            WeightReadKind.valid => WeightCandidateKind.valid,
-            WeightReadKind.invalidated => WeightCandidateKind.invalidated,
-            WeightReadKind.malformed => WeightCandidateKind.malformed,
-            WeightReadKind.unsupported => WeightCandidateKind.unsupported,
-          },
-          assessment: result.assessment,
-        ),
-      );
-    }
-
-    final analysis = analyzeWeightCollection(candidates);
-    switch (analysis.kind) {
-      case WeightCurrentKind.inconclusive:
-        throw WeightHistoryReadException(_blockerReason(analysis.blockers));
-      case WeightCurrentKind.none:
+    final analyzed = analyzeExportDocuments(
+      dogId: dogId,
+      documents: snapshot.docs.map(
+        (doc) => (documentId: doc.id, data: doc.data()),
+      ),
+    );
+    switch (analyzed.state) {
+      case WeightExportSnapshotState.inconclusive:
+        throw WeightHistoryReadException(_blockerReason(analyzed.blockers));
+      case WeightExportSnapshotState.none:
         return null;
-      case WeightCurrentKind.current:
-        // `entityId` é único aqui: duplicidade já teria sido bloqueada acima.
-        return facades[analysis.current!.entityId];
+      case WeightExportSnapshotState.current:
+        return analyzed.current;
+      case WeightExportSnapshotState.unavailable:
+        throw StateError('getLatest analysis cannot be unavailable');
     }
   }
 

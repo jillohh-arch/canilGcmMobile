@@ -8,6 +8,203 @@ import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'pdf_colors.dart';
 import 'pdf_common_widgets.dart';
 
+/// Estado canônico da autoridade de peso, transportado para o documento.
+///
+/// WEIGHT-01E-R-PDF: antes o documento recebia `double?`, o que colapsava três
+/// estados distintos em `null` e permitia afirmar "Não há pesagens registradas"
+/// sobre um cão com 12 pesagens válidas e um documento ilegível. Os quatro
+/// estados espelham `ProntuarioWeightState`; o enum é redeclarado aqui para não
+/// criar dependência de `features/health/presentation` a partir de `core`.
+enum WeightPdfAuthorityState {
+  /// Há peso atual factual decidido pela WeightCollectionPolicy.
+  current,
+
+  /// Coleção analisada com sucesso e nenhum registro elegível.
+  none,
+
+  /// Bloqueador global (`malformed`/`unsupported`/`entityId` duplicado): o
+  /// peso atual é desconhecido e NENHUM registro pode ser promovido.
+  inconclusive,
+
+  /// Falha de leitura/resolução. NÃO é ausência de registro.
+  unavailable,
+}
+
+/// Decisão canônica recebida pelo documento — ele nunca a recalcula.
+final class WeightPdfAuthority {
+  const WeightPdfAuthority({
+    required this.state,
+    this.currentKg,
+    this.oldestKg,
+  });
+
+  const WeightPdfAuthority.none()
+    : state = WeightPdfAuthorityState.none,
+      currentKg = null,
+      oldestKg = null;
+
+  const WeightPdfAuthority.inconclusive()
+    : state = WeightPdfAuthorityState.inconclusive,
+      currentKg = null,
+      oldestKg = null;
+
+  const WeightPdfAuthority.unavailable()
+    : state = WeightPdfAuthorityState.unavailable,
+      currentKg = null,
+      oldestKg = null;
+
+  final WeightPdfAuthorityState state;
+
+  /// Peso atual canônico; só existe em [WeightPdfAuthorityState.current].
+  final double? currentKg;
+
+  /// Extremo histórico mais antigo elegível, escolhido pela ordenação canônica
+  /// (`measuredAt` → `recordedAt` → `entityId`) ANTES da conversão para
+  /// `HealthLogModel`, que descarta `recordedAt`/`entityId`. `null` quando não
+  /// há segundo registro com que comparar.
+  ///
+  /// Não é o "peso anterior": a tendência deste documento compara o atual com o
+  /// extremo antigo da série, não com o registro imediatamente anterior.
+  final double? oldestKg;
+
+  bool get isCurrent => state == WeightPdfAuthorityState.current;
+}
+
+/// Semântica textual do documento, derivada de forma pura e testável.
+///
+/// Existe para que os estados canônicos sejam verificáveis sem inspecionar
+/// bytes de PDF: toda a decisão de copy vive aqui.
+final class WeightPdfSummary {
+  const WeightPdfSummary({
+    required this.currentLabel,
+    required this.trendText,
+    required this.rangeStatus,
+    required this.analysisMessage,
+    required this.totalDisplayedRecords,
+    required this.isConclusive,
+  });
+
+  /// Deriva a semântica a partir da autoridade canônica e dos registros legíveis.
+  ///
+  /// [displayedWeights] são as pesagens efetivamente exibidas na tabela. Elas
+  /// alimentam mínimo/médio/máximo e a contagem, mas NUNCA decidem peso atual
+  /// nem endpoint de tendência.
+  factory WeightPdfSummary.from({
+    required WeightPdfAuthority authority,
+    required List<double> displayedWeights,
+    double? idealWeightMin,
+    double? idealWeightMax,
+  }) {
+    final count = displayedWeights.length;
+    final current = authority.isCurrent ? authority.currentKg : null;
+
+    // Estado não conclusivo NÃO promove registro algum, mesmo havendo válidos.
+    if (current == null) {
+      final String message;
+      final String range;
+      switch (authority.state) {
+        case WeightPdfAuthorityState.none:
+          message =
+              'Não há pesagens registradas para este cão. Sem evidência de '
+              'pesagem não é possível avaliar peso atual, tendência ou faixa '
+              'ideal.';
+          range = 'Sem Pesagem Registrada';
+        case WeightPdfAuthorityState.inconclusive:
+          // O histórico legível permanece visível; o que não é permitido é
+          // afirmar ausência de pesagens ou eleger um dos registros.
+          message =
+              'Análise atual não conclusiva: existe registro de pesagem '
+              'inconsistente nesta coleção. $count registro(s) legível(is) '
+              'permanecem listados para fins históricos, mas peso atual, '
+              'tendência e faixa ideal não podem ser afirmados.';
+          range = 'Análise Não Conclusiva';
+        case WeightPdfAuthorityState.unavailable:
+          message =
+              'Não foi possível consultar as pesagens deste cão. Ausência de '
+              'leitura não equivale a ausência de registro.';
+          range = 'Peso Atual Indisponível';
+        case WeightPdfAuthorityState.current:
+          // Inalcançável: `current` nulo com estado `current` seria contrato
+          // violado; tratado como indisponível em vez de fabricar valor.
+          message =
+              'Não foi possível determinar o peso atual canônico deste cão.';
+          range = 'Peso Atual Indisponível';
+      }
+      return WeightPdfSummary(
+        currentLabel: '—',
+        trendText: switch (authority.state) {
+          WeightPdfAuthorityState.none => 'Sem pesagens registradas',
+          WeightPdfAuthorityState.unavailable => 'Tendência indisponível',
+          _ => 'Tendência não conclusiva',
+        },
+        rangeStatus: range,
+        analysisMessage: message,
+        totalDisplayedRecords: count,
+        isConclusive: false,
+      );
+    }
+
+    // Tendência: atual canônico contra o extremo antigo canônico.
+    final oldest = authority.oldestKg;
+    var trend = 'Estável';
+    if (oldest != null) {
+      final diff = current - oldest;
+      if (diff.abs() < 0.5) {
+        trend = 'Estável (Variação insignificante)';
+      } else if (diff > 0) {
+        trend = 'Ganho de Peso (+${diff.toStringAsFixed(1)} kg)';
+      } else {
+        trend = 'Perda de Peso (${diff.toStringAsFixed(1)} kg)';
+      }
+    }
+
+    var range = 'Faixa Ideal Não Configurada';
+    var message =
+        'Faixa ideal não configurada para este cão. Sem referência não é '
+        'possível classificar o peso atual.';
+    if (idealWeightMin != null && idealWeightMax != null) {
+      if (current >= idealWeightMin && current <= idealWeightMax) {
+        range = 'DENTRO DA FAIXA IDEAL';
+        message =
+            'O cão encontra-se no peso recomendado para as atividades '
+            'institucionais e de alta intensidade do canil. Recomenda-se manter '
+            'a rotina nutricional e de treinos atual.';
+      } else if (current < idealWeightMin) {
+        range = 'ABAIXO DO PESO IDEAL';
+        message =
+            'Atenção: O cão está abaixo do peso ideal recomendado. Isso pode '
+            'impactar sua performance de guarda, proteção e resistência física. '
+            'Sugere-se avaliação de ração/suplementação.';
+      } else {
+        range = 'ACIMA DO PESO IDEAL';
+        message =
+            'Atenção: O cão está acima do peso ideal recomendado. O excesso de '
+            'peso pode reduzir agilidade, resistência e vida útil operacional. '
+            'Sugere-se ajuste nutricional e reavaliação de carga de treino.';
+      }
+    }
+
+    return WeightPdfSummary(
+      currentLabel: '${current.toStringAsFixed(1)} kg',
+      trendText: trend,
+      rangeStatus: range,
+      analysisMessage: message,
+      totalDisplayedRecords: count,
+      isConclusive: true,
+    );
+  }
+
+  final String currentLabel;
+  final String trendText;
+  final String rangeStatus;
+  final String analysisMessage;
+  final int totalDisplayedRecords;
+
+  /// `false` em `none`/`inconclusive`/`unavailable`: nenhuma afirmação clínica
+  /// de peso atual, tendência ou faixa é autoritativa.
+  final bool isConclusive;
+}
+
 /// Gerador do PDF do Histórico de Peso do Cão.
 class WeightHistoryPdf {
   static final _blue = PdfInstitutionalColors.blue;
@@ -18,7 +215,20 @@ class WeightHistoryPdf {
   static final _cardBorder = PdfInstitutionalColors.cardBorder;
 
   /// Gera os bytes do PDF de histórico de peso.
-  static Future<Uint8List> generate(Dog dog, List<HealthLogModel> logs) async {
+  ///
+  /// [authority] transporta a decisão da `WeightCollectionPolicy` — os quatro
+  /// estados canônicos, o peso atual e o extremo antigo da tendência. O
+  /// documento NUNCA recalcula essa decisão: `HealthLogModel` carrega apenas
+  /// `date` + `weight`, então `recordedAt`/`entityId` já foram descartados aqui
+  /// e o desempate canônico é inexpressável neste ponto.
+  ///
+  /// [logs] alimentam somente tabela e estatísticas descritivas
+  /// (mínimo/médio/máximo) e devem vir da coleção COMPLETA, não de uma janela.
+  static Future<Uint8List> generate(
+    Dog dog,
+    List<HealthLogModel> logs, {
+    required WeightPdfAuthority authority,
+  }) async {
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Historico de Peso - ${dog.name}',
@@ -32,7 +242,6 @@ class WeightHistoryPdf {
           ..sort((a, b) => b.date.compareTo(a.date)); // Newest first
 
     final docId = _buildDocId(dog);
-    final count = weightLogs.length;
 
     // Estatísticas derivadas SOMENTE de pesagens factuais (WEIGHT-01E-C2B).
     //
@@ -40,8 +249,18 @@ class WeightHistoryPdf {
     // para mínimo/médio/máximo — produzindo estatística clínica inexistente
     // (inclusive 0,0 kg) em documento exportado. `dogs.weight` é projeção
     // legada, não evidência de pesagem.
+    //
+    // Estas são estatísticas DESCRITIVAS do conjunto exibido: `reduce` sobre
+    // min/max/avg não elege peso atual nem endpoint de tendência.
     final weights = weightLogs.map((l) => l.weight!).toList();
-    final double? current = weights.isNotEmpty ? weights.first : null;
+    final summary = WeightPdfSummary.from(
+      authority: authority,
+      displayedWeights: weights,
+      idealWeightMin: dog.idealWeightMin,
+      idealWeightMax: dog.idealWeightMax,
+    );
+    final count = summary.totalDisplayedRecords;
+    final double? current = authority.isCurrent ? authority.currentKg : null;
     final double? min = weights.isNotEmpty
         ? weights.reduce((a, b) => a < b ? a : b)
         : null;
@@ -52,39 +271,14 @@ class WeightHistoryPdf {
         ? weights.reduce((a, b) => a + b) / weights.length
         : null;
 
-    // Determine weight trend
-    String trendText = weights.isEmpty ? 'Sem pesagens registradas' : 'Estável';
-    if (weights.length >= 2) {
-      final oldest = weights.last;
-      final newest = weights.first;
-      final diff = newest - oldest;
-      if (diff.abs() < 0.5) {
-        trendText = 'Estável (Variação insignificante)';
-      } else if (diff > 0) {
-        trendText = 'Ganho de Peso (+${diff.toStringAsFixed(1)} kg)';
-      } else {
-        trendText = 'Perda de Peso (${diff.toStringAsFixed(1)} kg)';
-      }
-    }
-
-    // Determine range status
-    String rangeStatus = 'Faixa Ideal Não Configurada';
-    PdfColor rangeColor = _textTertiary;
-    // Sem peso factual não há como avaliar faixa: não classifica.
-    if (current == null) {
-      rangeStatus = 'Sem Pesagem Registrada';
-    } else if (dog.idealWeightMin != null && dog.idealWeightMax != null) {
-      if (current >= dog.idealWeightMin! && current <= dog.idealWeightMax!) {
-        rangeStatus = 'DENTRO DA FAIXA IDEAL';
-        rangeColor = PdfInstitutionalColors.greenInstitutional;
-      } else if (current < dog.idealWeightMin!) {
-        rangeStatus = 'ABAIXO DO PESO IDEAL';
-        rangeColor = PdfInstitutionalColors.amberWarning;
-      } else {
-        rangeStatus = 'ACIMA DO PESO IDEAL';
-        rangeColor = PdfInstitutionalColors.redAlert;
-      }
-    }
+    final trendText = summary.trendText;
+    final rangeStatus = summary.rangeStatus;
+    final PdfColor rangeColor = switch (rangeStatus) {
+      'DENTRO DA FAIXA IDEAL' => PdfInstitutionalColors.greenInstitutional,
+      'ABAIXO DO PESO IDEAL' => PdfInstitutionalColors.amberWarning,
+      'ACIMA DO PESO IDEAL' => PdfInstitutionalColors.redAlert,
+      _ => _textTertiary,
+    };
 
     pdf.addPage(
       pw.MultiPage(
@@ -223,14 +417,7 @@ class WeightHistoryPdf {
               color: _blue,
             ),
             pw.SizedBox(height: 8),
-            _buildClinicalAnalysis(
-              dog,
-              current,
-              trendText,
-              rangeStatus,
-              rangeColor,
-              fonts,
-            ),
+            _buildClinicalAnalysis(summary, trendText, rangeColor, fonts),
 
             pw.SizedBox(height: 20),
 
@@ -392,32 +579,18 @@ class WeightHistoryPdf {
       value == null ? '—' : '${value.toStringAsFixed(1)} kg';
 
   /// Constrói a avaliação de desempenho clínico.
+  ///
+  /// A copy vem inteiramente de [WeightPdfSummary], que distingue os quatro
+  /// estados canônicos. Antes, este bloco derivava a mensagem de um
+  /// `currentWeight == null` e afirmava "Não há pesagens registradas" também em
+  /// `inconclusive`/`unavailable` — falso quando existem registros legíveis.
   static pw.Widget _buildClinicalAnalysis(
-    Dog dog,
-    double? currentWeight,
+    WeightPdfSummary summary,
     String trend,
-    String rangeStatus,
     PdfColor color,
     PdfFonts fonts,
   ) {
-    String message = '';
-    if (currentWeight == null) {
-      message =
-          'Não há pesagens registradas para este cão. Sem evidência de pesagem '
-          'não é possível avaliar peso atual, tendência ou faixa ideal.';
-    } else if (rangeStatus == 'DENTRO DA FAIXA IDEAL') {
-      message =
-          'O cão encontra-se no peso recomendado para as atividades institucionais e de alta intensidade do canil. Recomenda-se manter a rotina nutricional e de treinos atual.';
-    } else if (rangeStatus == 'ABAIXO DO PESO IDEAL') {
-      message =
-          'Atenção: O cão está abaixo do peso ideal recomendado. Isso pode impactar sua performance de guarda, proteção e resistência física. Sugere-se avaliação de ração/suplementação.';
-    } else if (rangeStatus == 'ACIMA DO PESO IDEAL') {
-      message =
-          'Alerta: O cão está acima da faixa ideal de peso recomendada. O sobrepeso aumenta o estresse articular em saltos e corridas. Recomenda-se ajustar a porção diária de ração.';
-    } else {
-      message =
-          'Não há uma faixa de peso ideal cadastrada para este cão no sistema. Defina os limites idealMin e idealMax para viabilizar o acompanhamento clínico automático.';
-    }
+    final message = summary.analysisMessage;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),

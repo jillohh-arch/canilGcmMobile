@@ -334,10 +334,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       ),
                     ),
                     Text(
-                      // Sem peso factual, informa ausência: não fabrica valor.
-                      widget.dog.weight == null
-                          ? '—'
-                          : '${widget.dog.weight!.toStringAsFixed(1)} kg',
+                      // WEIGHT-01E-R: `dogs.weight` é projeção legada e não é
+                      // exibida como peso clínico. Sem a decisão canônica
+                      // disponível nesta página, informa ausência.
+                      '—',
                       style: GoogleFonts.inter(
                         color: AppTheme.textPrimary,
                         fontSize: 10,
@@ -432,8 +432,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     final antipulgasOk = antipulgasDays <= 90;
     final antipulgasDaysRemaining = (90 - antipulgasDays).clamp(0, 90);
 
-    // 3. Peso
-    final weightOk = widget.dog.weight != null;
+    // 3. Peso — WEIGHT-01E-R: não há flag de peso aqui. A presença de
+    // `dogs.weight` (projeção legada) não é evidência de pesagem e não pode
+    // produzir status clínico "ok"; esta página não resolve `weight_records`.
 
     // 4. Exames
     final examesLogs =
@@ -492,13 +493,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             _buildMedCard(
               icon: '⚖',
               label: 'PESO',
-              // Projeção legada (`dogs.weight`): sem valor factual não fabrica
-              // número, e não afirma tendência sem série canônica (C2B).
-              value: widget.dog.weight == null
-                  ? 'Sem registro'
-                  : '${widget.dog.weight!.toStringAsFixed(1)} kg',
+              // WEIGHT-01E-R: `dogs.weight` é projeção legada, não peso clínico.
+              // Este card não resolve `weight_records`, então não afirma valor
+              // nem status "ok": encaminha para a tela com a decisão canônica.
+              value: '—',
               sub: 'Ver histórico de pesagens',
-              status: weightOk ? _CardStatus.ok : _CardStatus.warn,
+              status: _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => WeightHistoryScreen(dog: widget.dog),
@@ -1038,8 +1038,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date)); // Oldest first for chart
 
-    // Projeção legada; sem valor factual não fabrica número (C2B).
-    final currentWeight = widget.dog.weight;
+    // WEIGHT-01E-R: `dogs.weight` é projeção legada e NÃO é autoridade de peso
+    // clínico atual. Esta página não lê `weight_records`, portanto não possui a
+    // decisão da WeightCollectionPolicy e não pode afirmar um peso atual — nem
+    // mesmo "o último conhecido". O valor canônico vive na tela de histórico
+    // (link 'Ver tudo →' abaixo), que resolve a coleção completa.
+    const double? currentWeight = null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
