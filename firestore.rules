@@ -1959,6 +1959,30 @@ service cloud.firestore {
         allow read: if signedIn() && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+
+      // Readiness v1 — projeção server-side de Prontidão (health_summary/current).
+      //
+      // NATUREZA: projeção de DISPLAY, reconstruível a partir das fontes canônicas.
+      // Não é agregado canônico e NUNCA é autoridade de autorização: ações críticas
+      // continuam validando operational_restrictions no backend.
+      //
+      // Escrita: exclusivamente pelo projector via Admin SDK (bypassa Rules).
+      // Cliente jamais escreve — nem o próprio readiness_status que ele lê.
+      match /health_summary/{summaryId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Restrições operacionais canônicas — decisão profissional de saúde.
+      //
+      // Leitura cliente com acesso ao K9 (alimenta a exibição de Prontidão).
+      // Escrita negada nesta vertical: enquanto não existir um mutation owner
+      // canônico explícito, criar/alterar/encerrar restrição permanece decisão
+      // de backend. Não abrir writer direto de cliente apenas para satisfazer Rules.
+      match /operational_restrictions/{restrictionId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /occurrences/{occurrenceId} {

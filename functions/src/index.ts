@@ -42,6 +42,16 @@ import {
 import {readActivationGuard} from "./health_timeline_activation_guard";
 import {runHealthTimelineRecordShadowTelemetry} from "./health_timeline_shadow_telemetry_callable";
 import {FirestoreHealthTimelineShadowTelemetryAggregateWriter} from "./health_timeline_shadow_telemetry_firestore_adapter";
+import {
+  buildHealthReadinessRefreshHandler,
+  type HealthReadinessCallableDeps,
+} from "./health_readiness_callable";
+import {
+  healthReadinessProjectWeightRecord,
+  healthReadinessProjectHealthEvent,
+  healthReadinessProjectNutritionPlan,
+  healthReadinessProjectRestriction,
+} from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 
 admin.initializeApp();
@@ -8057,6 +8067,83 @@ const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler({
 /** Create a canonical WeightRecord with durable receipt idempotency (health.record_routine). */
 export const healthWeightCreateRecord = onCall({region}, async (request) =>
   runHealthWeightCreateRecord(request));
+
+
+// =============================================================================
+// Health Readiness — Triggers + Callable (Gate 4)
+// =============================================================================
+
+/**
+ * Deps reais do refresh de Prontidão.
+ *
+ * A autorização dog-level vive DENTRO de `requireHealthReadAccess` — o seam
+ * injetável — e não inline no wrapper. Isso é deliberado: o Admin SDK ignora as
+ * Rules, então o callable precisa reproduzir `canAccessDogRecord(dogId)` por
+ * conta própria, e essa checagem tem de ser exercitável por teste chamando o
+ * handler real. Enquanto ela ficava fora do handler, nenhum teste do handler
+ * conseguia provar que um K9 alheio é negado.
+ *
+ * `requireDogRecordAccess` é reutilizada, não reimplementada: mesmas três vias
+ * de acesso das Rules (escopo global / handler do K9 / turno ativo).
+ */
+function buildReadinessCallableDeps(
+  auth: CallableRequest["auth"],
+): HealthReadinessCallableDeps {
+  return {
+    requireAuth: async (callableAuth) => {
+      const caller = requireAuth(callableAuth);
+      return {uid: caller.uid};
+    },
+    requireHealthReadAccess: async (_uid: string, dogId: string) => {
+      const caller = requireAuth(auth);
+      const dogSnap = await db.collection("dogs").doc(dogId).get();
+      if (!dogSnap.exists) {
+        throw new HttpsError("not-found", "Cao nao encontrado.");
+      }
+      await requireDogRecordAccess(auth, caller, dogId, dogSnap.data() ?? {});
+    },
+  };
+}
+
+export const healthReadinessRefresh = onCall({region}, async (request) => {
+  // Ordem explícita: auth → dogId válido → autorização por K9 → handler.
+  //
+  // `dogId` é validado ANTES de qualquer coisa para que a checagem de acesso
+  // nunca dependa de um caminho condicional. Um payload sem dogId utilizável é
+  // rejeitado aqui e não alcança o handler.
+  requireAuth(request.auth);
+
+  const data = request.data as Record<string, unknown> | undefined;
+  const rawDogId = data?.dogId;
+  if (
+    typeof rawDogId !== "string" ||
+    rawDogId.trim().length === 0 ||
+    rawDogId.length > 128 ||
+    rawDogId.includes("/") ||
+    rawDogId === "." ||
+    rawDogId === ".."
+  ) {
+    throw new HttpsError("invalid-argument", "dogId invalido.");
+  }
+
+  const handler = buildHealthReadinessRefreshHandler(
+    buildReadinessCallableDeps(request.auth),
+    db,
+  );
+  return handler(request);
+});
+
+/** Readiness trigger — fires on any weight_records write. */
+export {healthReadinessProjectWeightRecord};
+
+/** Readiness trigger — fires on any health_events write. */
+export {healthReadinessProjectHealthEvent};
+
+/** Readiness trigger — fires on any nutrition_plans write. */
+export {healthReadinessProjectNutritionPlan};
+
+/** Readiness trigger — fires on any operational_restrictions write. */
+export {healthReadinessProjectRestriction};
 
 
 // =============================================================================

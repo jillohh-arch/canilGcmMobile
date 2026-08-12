@@ -4,6 +4,26 @@ import 'operational_restriction.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReadinessPolicy — política pura de prontidão operacional.
+//
+// ⚠️ LEGADO NÃO AUTORITATIVO — NÃO USAR EM RUNTIME.
+//
+// Esta policy NÃO possui caller de runtime e NÃO deve ganhar um. Prontidão é
+// uma projeção server-side: o Mobile apenas LÊ
+// `dogs/{dogId}/health_summary/current` e nunca calcula prontidão localmente.
+//
+// A autoridade única de avaliação é `functions/src/health_readiness_policy.ts`.
+//
+// Divergência conhecida e deliberada: o gating de completude aqui usa
+// `hasRecentExam` (exemplo de `data_completeness` do ADR-005, contrato mais
+// antigo). A decisão humana ratificada em READINESS-V1 define as quatro
+// lacunas significativas como peso (90d), vacinação vigente, CONSULTA (180d) e
+// plano alimentar ativo — sem threshold de exame, e sem exame substituindo
+// consulta. Onde este arquivo contradizer o evaluator server-side, o
+// evaluator server-side prevalece.
+//
+// Mantido apenas como especificação histórica da matriz de precedência
+// (Readiness Policy §3/§4), que permanece correta e é espelhada no servidor.
+//
 // Fontes: HEALTH_V1_READINESS_POLICY.md §3 e §4; ADR-005 matriz de precedência.
 // Recebe fatos booleanos/canônicos já resolvidos pelo caller.
 // Sem relógio, sem acesso remoto, sem dependência de health_projections.dart,
@@ -73,6 +93,15 @@ final class ReadinessDecision {
 }
 
 /// Política determinística de prontidão (Readiness Policy §3 e §4).
+///
+/// ⚠️ Não autoritativa. Ver nota no topo do arquivo.
+@Deprecated(
+  'Prontidão é projeção server-side. O Mobile deve LER '
+  'dogs/{dogId}/health_summary/current, nunca calcular localmente. '
+  'Autoridade: functions/src/health_readiness_policy.ts. '
+  'Além disso, o gating de completude aqui (hasRecentExam) contraria a '
+  'decisão ratificada em READINESS-V1 (peso/vacinação/consulta/plano).',
+)
 final class ReadinessPolicy {
   const ReadinessPolicy();
 

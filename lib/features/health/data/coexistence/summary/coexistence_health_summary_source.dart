@@ -5,9 +5,9 @@ import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_pr
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_nutrition_reader.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_readiness_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_recent_records_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_medication_reader.dart';
-import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_unsafe_sections.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_vaccination_reader.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_weight_reader.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_block_models.dart';
@@ -37,7 +37,11 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
     HealthSummaryNutritionReader? nutritionReader,
     HealthSummaryRecentRecordsReader? recentRecordsReader,
     HealthSummaryMedicationReader? medicationReader,
+    HealthSummaryReadinessReader? readinessReader,
   }) : _authoritativeTimeProvider = authoritativeTimeProvider,
+       _readinessReader =
+           readinessReader ??
+           HealthSummaryReadinessReader(firestore: firestore),
        _weightReader =
            weightReader ?? HealthSummaryWeightReader(firestore: firestore),
        _vaccinationReader =
@@ -62,6 +66,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
            HealthSummaryMedicationReader(firestore: firestore);
 
   final AuthoritativeTimeProvider? _authoritativeTimeProvider;
+  final HealthSummaryReadinessReader _readinessReader;
   final HealthSummaryWeightReader _weightReader;
   final HealthSummaryVaccinationReader _vaccinationReader;
   final HealthSummaryNutritionReader _nutritionReader;
@@ -100,6 +105,9 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
       // Paraleliza leitores independentes; falha parcial não cancela os outros
       // porque cada reader captura erros em SectionData.unavailable.
       // Peso atual + tendência: uma única query (readBundle).
+      // Prontidão + Atenções vêm do MESMO snapshot server-side, em paralelo
+      // com os demais leitores. Falha aqui não cancela os outros blocos.
+      final readinessFuture = _readinessReader.read(dogId);
       final weightBundleFuture = _weightReader.readBundle(dogId);
       final vaccinationFuture = _vaccinationReader.read(dogId);
       final nutritionFuture = _nutritionReader.readToday(
@@ -109,6 +117,7 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
       final recentFuture = _recentRecordsReader.read(dogId);
       final medicationFuture = _medicationReader.read(dogId);
 
+      final readinessSections = await readinessFuture;
       final weightBundle = await weightBundleFuture;
       final weight = weightBundle.current;
       final trend = weightBundle.trend;
@@ -119,7 +128,11 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
 
       // Falha estrutural: todos os blocos *mapeáveis* falharam.
       // Não apresentar dashboard "válido" com 0 fatos e 8 cards unavailable.
-      // (readiness/attention seguem unavailable por decisão UNSAFE.)
+      //
+      // Prontidão/Atenções seguem FORA deste conjunto (comportamento preservado
+      // do 2D): elas vêm de uma projeção server-side independente, com seu
+      // próprio estado técnico. Quando as cinco fontes legadas falham juntas, o
+      // diagnóstico é de canal/permissão e a tela de erro continua correta.
       if (_allMappableUnavailable(
         weight: weight,
         vaccination: vaccination,
@@ -142,11 +155,12 @@ class CoexistenceHealthSummarySource implements HealthSummarySource {
 
       return HealthSummaryViewData(
         dogId: dogId,
-        readiness: HealthSummaryUnsafeSections.readiness,
+        // READINESS-V1 Gate 6: projeção server-side real, não mais placeholder.
+        readiness: readinessSections.readiness,
         weight: weight,
         vaccination: vaccination,
         treatments: medication,
-        attention: HealthSummaryUnsafeSections.attention,
+        attention: readinessSections.attention,
         nutritionToday: nutrition,
         weightTrend: trend,
         recentRecords: recent,

@@ -15,7 +15,9 @@
     "test:health-nutrition-plan-emulator": "npm run build && npx firebase-tools emulators:exec --project canil-gcm --config ../firebase.json --only firestore \"node lib/health_nutrition_plan_emulator_test.js\"",
     "test:health-nutrition-emulator:exec": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_nutrition_emulator_e2e_test.js\" && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_nutrition_firestore_adapter_test.js\"",
     "test:health-nutrition-callable-transport": "npm run build && firebase emulators:exec --project canil-gcm --config ../firebase.json --only auth,firestore,functions \"node ../tools/rules_tests/health_nutrition_callables_emulator_tests.mjs\"",
-    "test": "npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition",
+    "test:health-readiness": "npm run build && node lib/health_readiness_policy_test.js && node lib/health_readiness_evidence_logic_test.js && node lib/health_readiness_projector_test.js && node lib/health_readiness_callable_test.js && node lib/health_readiness_trigger_test.js",
+    "test:health-readiness-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_readiness_emulator_test.js\"",
+    "test": "npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition && npm run test:health-readiness",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions"
   },

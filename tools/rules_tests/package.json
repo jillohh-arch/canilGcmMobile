@@ -9,6 +9,7 @@
     "test:health-nutrition-readers": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore \"node health_nutrition_canonical_readers_emulator_tests.mjs\"",
     "test:health-nutrition-callable-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node health_nutrition_callables_emulator_tests.mjs\"",
     "test:health-timeline": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_timeline_rules_tests.mjs\"",
+    "test:health-readiness": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_readiness_rules_tests.mjs\"",
     "test:direct": "node rules_tests.mjs"
   },
   "devDependencies": {
