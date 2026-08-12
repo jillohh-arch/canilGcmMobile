@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {initializeApp as initializeAdminApp, getApps, deleteApp} from "firebase-admin/app";
 import {getAuth as getAdminAuth} from "firebase-admin/auth";
-import {getFirestore as getAdminFirestore} from "firebase-admin/firestore";
+import {getFirestore as getAdminFirestore, FieldValue} from "firebase-admin/firestore";
 import {initializeApp, deleteApp as deleteClientApp} from "firebase/app";
 import {
   connectAuthEmulator,
@@ -108,6 +108,24 @@ function assertHttpsCode(err, expectedSubstring) {
     hay.includes(String(expectedSubstring).toLowerCase()),
     `esperado conter "${expectedSubstring}", obtido code=${code} details=${detailsCode} msg=${message}`,
   );
+}
+
+/**
+ * SEC-02A.1 — exige que a callable seja NEGADA, e pelo motivo certo.
+ *
+ * Asserir apenas "lançou" deixaria o teste passar por validação de payload ou
+ * erro interno, mascarando exatamente a falha de autorização que ele existe
+ * para provar.
+ */
+async function assertCallableDenied(name, payload) {
+  let threw = false;
+  try {
+    await callable(name)(payload);
+  } catch (e) {
+    threw = true;
+    assertHttpsCode(e, "permission-denied");
+  }
+  assert.ok(threw, `${name} deveria ter sido negada, mas foi permitida`);
 }
 
 function assertAppCode(err, appCode) {
@@ -260,10 +278,19 @@ async function seedBase() {
     auth_uid: OP_B.uid,
   });
 
-  await ensureUser(OP);
-  await ensureUser(OP_B);
-  await ensureUser(NO_PERM);
-  await ensureUser(ADMIN, {admin: true, role: "admin"});
+  // SEC-02A: claims realistas. Em produção `humanClaims` SEMPRE emite `ra` e
+  // `access_scope`; a fixture antes criava usuários sem claim alguma e as Rules
+  // supriam com default 'global'. Sem isso, a leitura cliente passava a valer
+  // por fail-open, não por autoridade real.
+  await ensureUser(OP, {ra: OP.ra, access_scope: "own_records"});
+  await ensureUser(OP_B, {ra: OP_B.ra, access_scope: "own_records"});
+  await ensureUser(NO_PERM, {ra: NO_PERM.ra, access_scope: "own_records"});
+  await ensureUser(ADMIN, {
+    admin: true,
+    role: "admin",
+    ra: ADMIN.ra,
+    access_scope: "global",
+  });
 }
 
 async function countCollection(pathPrefix, field, value) {
@@ -830,6 +857,135 @@ await test("callable ainda muta via Admin SDK após client deny", async () => {
   assert.equal(c.data.wasNoOp, false);
   const item = await getSchedule(DOG_A, c.data.scheduleId);
   assert.ok(item);
+});
+
+// -----------------------------------------------------------------------------
+// SEC-02A.1 — contrato estrito de estado de autorização
+//
+// Decisão humana: vínculo válido com o K9 NÃO compensa configuração de
+// autorização ausente/inválida/malformada. Em todos os casos abaixo o chamador
+// É o condutor registrado de DOG_A (conductor_ra: OP.ra na fixture) e ainda
+// assim deve ser NEGADO, porque a camada declarativa está quebrada.
+//
+// A versão anterior deste hotfix permitia que esses casos passassem por prova
+// de vínculo. Estes testes existem para impedir que essa política volte.
+// -----------------------------------------------------------------------------
+
+/** Restaura o estado canônico de autorização de OP entre os casos. */
+async function restoreOpAuthState() {
+  await adminDb.collection("users").doc(OP.ra).set({
+    ra: OP.ra,
+    access_profile_id: "operador_k9",
+    access_scope: "own_records",
+    auth_uid: OP.uid,
+  }, {merge: true});
+  // Recria o perfil INTEGRALMENTE (um dos casos o apaga), incluindo o mapa de
+  // permissions — sem ele o gate de capability nega antes do de escopo, e o
+  // caso ALLOW falharia pelo motivo errado.
+  await adminDb.collection("access_profiles").doc("operador_k9").set({
+    status: "active",
+    scope: "own_records",
+    permissions: {
+      health: {view: true, create: true, edit: true},
+    },
+  });
+}
+
+await test("SEC-02A.1 espelho users/{ra} ausente → DENY mesmo sendo condutor", async () => {
+  await adminDb.collection("users").doc(OP.ra).delete();
+  await signIn(OP);
+  try {
+    await assertCallableDenied(
+      "healthScheduleCreateManual",
+      createPayload({idempotencyKey: "sec02a1-no-mirror", title: "No mirror"}),
+    );
+  } finally {
+    await restoreOpAuthState();
+  }
+});
+
+await test("SEC-02A.1 usuário soft-deleted → DENY mesmo sendo condutor", async () => {
+  await adminDb.collection("users").doc(OP.ra).set(
+    {deleted_at: new Date()}, {merge: true},
+  );
+  await signIn(OP);
+  try {
+    await assertCallableDenied(
+      "healthScheduleCreateManual",
+      createPayload({idempotencyKey: "sec02a1-soft-deleted", title: "Deleted"}),
+    );
+  } finally {
+    await adminDb.collection("users").doc(OP.ra).update({
+      deleted_at: FieldValue.delete(),
+    });
+    await restoreOpAuthState();
+  }
+});
+
+await test("SEC-02A.1 access_profile ausente → DENY mesmo sendo condutor", async () => {
+  await adminDb.collection("access_profiles").doc("operador_k9").delete();
+  await signIn(OP);
+  try {
+    await assertCallableDenied(
+      "healthScheduleCreateManual",
+      createPayload({idempotencyKey: "sec02a1-no-profile", title: "No profile"}),
+    );
+  } finally {
+    await restoreOpAuthState();
+  }
+});
+
+await test("SEC-02A.1 perfil inativo → DENY mesmo sendo condutor", async () => {
+  await adminDb.collection("access_profiles").doc("operador_k9").set(
+    {status: "inactive"}, {merge: true},
+  );
+  await signIn(OP);
+  try {
+    await assertCallableDenied(
+      "healthScheduleCreateManual",
+      createPayload({idempotencyKey: "sec02a1-inactive", title: "Inactive"}),
+    );
+  } finally {
+    await restoreOpAuthState();
+  }
+});
+
+await test("SEC-02A.1 scope ausente/malformado → DENY mesmo sendo condutor", async () => {
+  for (const [i, scope] of [undefined, "ownRecords", "", "unit"].entries()) {
+    await adminDb.collection("access_profiles").doc("operador_k9").set(
+      scope === undefined
+        ? {status: "active", scope: FieldValue.delete()}
+        : {status: "active", scope},
+      {merge: true},
+    );
+    // espelho e claim também sem valor válido, senão restringiriam legitimamente
+    await adminDb.collection("users").doc(OP.ra).set({
+      access_scope: FieldValue.delete(),
+      accessScope: FieldValue.delete(),
+    }, {merge: true});
+    await signIn(OP);
+    try {
+      await assertCallableDenied(
+        "healthScheduleCreateManual",
+        createPayload({
+          idempotencyKey: `sec02a1-bad-scope-${i}`,
+          title: "Bad scope",
+        }),
+      );
+    } finally {
+      await restoreOpAuthState();
+    }
+  }
+});
+
+await test("SEC-02A.1 estado válido own_records + próprio K9 → ALLOW (não regrediu)", async () => {
+  await restoreOpAuthState();
+  await signIn(OP);
+  const c = await callable("healthScheduleCreateManual")(
+    createPayload({idempotencyKey: "sec02a1-valid-allow", title: "Valid"}),
+  );
+  assert.equal(c.data.wasNoOp, false);
+  assert.ok(await getSchedule(DOG_A, c.data.scheduleId));
 });
 
 // -----------------------------------------------------------------------------

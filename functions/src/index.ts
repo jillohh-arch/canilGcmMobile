@@ -10,6 +10,12 @@ import {
   onRequest,
 } from "firebase-functions/v2/https";
 import {
+  decideAccessScope,
+  parseAccessScope,
+  type AccessScope,
+  type AccessScopeResolution,
+} from "./access_scope";
+import {
   runHealthScheduleCancel,
   runHealthScheduleComplete,
   runHealthScheduleCreateManual,
@@ -217,7 +223,9 @@ function accessClaimsForProfile(
   ra: string,
   profileId: string | null,
   roleKeys: string[],
-  accessScope: "global" | "own_records" = "global",
+  // SEC-02A: obrigatório. O default "global" era uma armadilha — um chamador
+  // futuro que omitisse o argumento cunharia uma claim global silenciosamente.
+  accessScope: AccessScope,
 ): JsonMap {
   const profileKey = normalizedKey(profileId);
   const profileRoles = new Set([
@@ -310,7 +318,8 @@ function humanClaims(
   accessLevel: string,
   accessProfileId: string | null,
   isK9Instructor: boolean,
-  accessScope: "global" | "own_records" = "global",
+  // SEC-02A: obrigatório — ver nota em accessClaimsForProfile.
+  accessScope: AccessScope,
 ): JsonMap {
   const roleKeys = normalizedRoleKeys(
     [accessLevel, accessProfileId],
@@ -521,25 +530,57 @@ async function requireAnyAccessPermission(
   );
 }
 
-async function accessScopeForCaller(
+/**
+ * Valida escopo em caminho de ESCRITA. Rejeita com erro estruturado em vez de
+ * coagir para `"global"`: nenhum writer pode ampliar permissão por omissão ou
+ * erro de digitação.
+ */
+export function requireAccessScope(value: unknown): AccessScope {
+  const scope = parseAccessScope(value);
+  if (scope === null) {
+    throw new HttpsError(
+      "invalid-argument",
+      "scope deve ser exatamente \"global\" ou \"own_records\".",
+      {code: "invalid-access-scope"},
+    );
+  }
+  return scope;
+}
+
+/**
+ * SEC-02A — resolução de escopo FALHA FECHADA.
+ *
+ * Faz as leituras de servidor e delega a DECISÃO para `decideAccessScope`
+ * (módulo puro, testável sem emulador). Ver `access_scope.ts` para o contrato.
+ */
+async function resolveAccessScope(
   auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   caller: CallerIdentity,
-): Promise<"global" | "own_records"> {
-  if (auth && isAdminToken(auth.token)) return "global";
+): Promise<AccessScopeResolution> {
+  if (!auth) return {kind: "denied", reason: "missing-auth"};
+  if (isAdminToken(auth.token)) return {kind: "global"};
+  if (!caller.ra.trim()) return {kind: "denied", reason: "unresolved-ra"};
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
-  const user = userSnap.data() ?? {};
-  const profileId = accessProfileIdFrom(auth?.token, user);
-  const profileSnap = await db.collection("access_profiles").doc(profileId).get();
-  const profileScope = stringValue(profileSnap.data()?.scope);
-  if (profileScope === "own_records") return "own_records";
-  if (profileScope === "global") return "global";
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
+  if (userDoc === undefined) {
+    return {kind: "denied", reason: "missing-user-mirror"};
+  }
 
-  const mirroredScope =
-    stringValue(user.access_scope) ??
-    stringValue(user.accessScope) ??
-    stringValue(auth?.token.access_scope);
-  return mirroredScope === "own_records" ? "own_records" : "global";
+  const profileId = accessProfileIdFrom(auth.token, userDoc);
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+
+  return decideAccessScope({
+    authPresent: true,
+    isAdminToken: false,
+    ra: caller.ra,
+    userDoc,
+    profileDoc: profileSnap.exists ? profileSnap.data() ?? {} : undefined,
+    tokenAccessScope: auth.token.access_scope,
+  });
 }
 
 function dogHandlerRa(dog: JsonMap): string | null {
@@ -563,19 +604,56 @@ async function callerHasActiveDog(caller: CallerIdentity, dogId: string) {
   return stringValue(shift.status) === "active" && activeDogId === dogId;
 }
 
+/**
+ * SEC-02A.1 — acesso a registro de K9 FALHA FECHADO, contrato estrito.
+ *
+ * Ordem contratual, não negociável:
+ *
+ *   1. autenticado
+ *   2. bypass administrativo explícito (server-controlled), se canônico
+ *   3. estado de autorização VÁLIDO — espelho do usuário existe, usuário não
+ *      soft-deleted, perfil de acesso existe e está ativo, scope é enum válido
+ *   4. decisão de escopo
+ *   5. vínculo com o K9, quando aplicável
+ *
+ * Vínculo com o K9 é avaliado SOMENTE depois que o estado de autorização é
+ * válido. Um vínculo válido NÃO compensa configuração de autorização ausente,
+ * inválida ou malformada: se a camada declarativa está quebrada, nega.
+ *
+ * Decisão humana SEC-02A.1: a versão anterior deste gate permitia que escopo
+ * não resolvível caísse para prova de vínculo ("não sei o escopo, mas ele é o
+ * condutor → permito"). Isso eliminava a escalada para global, mas era uma
+ * política diferente da aprovada. Health e dados operacionais exigem o modelo
+ * rígido.
+ */
 async function requireDogRecordAccess(
   auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   caller: CallerIdentity,
   dogId: string,
   dog: JsonMap,
 ) {
-  if ((await accessScopeForCaller(auth, caller)) === "global") return;
+  const scope = await resolveAccessScope(auth, caller);
+
+  // Estado de autorização inválido/ausente/malformado: nega, sem consultar
+  // vínculo. Não existe fallback de compatibilidade por vínculo.
+  if (scope.kind === "denied") {
+    throw new HttpsError(
+      "permission-denied",
+      "Nao foi possivel estabelecer autorizacao valida para este acesso.",
+      {code: "authorization-state-invalid", reason: scope.reason},
+    );
+  }
+
+  if (scope.kind === "global") return;
+
+  // scope === own_records: aqui, e só aqui, o vínculo com o K9 decide.
   if (dogHandlerRa(dog) === caller.ra) return;
   if (await callerHasActiveDog(caller, dogId)) return;
 
   throw new HttpsError(
     "permission-denied",
     "Seu perfil permite registrar dados apenas para o K9 vinculado ou em turno ativo.",
+    {code: "dog-scope-denied", scope: scope.kind},
   );
 }
 
@@ -618,7 +696,11 @@ function accessProfilePayload(
     name: requiredString(source, "name"),
     permissions: sanitizeAccessPermissions(source.permissions),
     role_keys: stringList(source.role_keys),
-    scope: stringValue(source.scope) === "own_records" ? "own_records" : "global",
+    // SEC-02A: escopo é validado explicitamente. Antes, qualquer valor
+    // diferente de "own_records" — inclusive ausente, "" ou "ownRecords" —
+    // era reescrito silenciosamente como "global", transformando erro de
+    // digitação numa ampliação de permissão persistida.
+    scope: requireAccessScope(source.scope),
     seed_version: optionalNumberValue(source.seed_version) ?? 0,
     slug: optionalString(source, "slug") ?? profileId,
     status,
@@ -1621,8 +1703,19 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   }
   const profileName = stringValue(profile.name) ?? profileId;
   const seedVersion = optionalNumberValue(profile.seed_version) ?? null;
-  const accessScope =
-    stringValue(profile.scope) === "own_records" ? "own_records" : "global";
+  // SEC-02A: perfil com escopo ausente/malformado NÃO pode virar claim global.
+  // Recusa explícita — é operação administrativa, e cunhar uma claim ampla a
+  // partir de dado inválido é exatamente a escalada que este gate fecha.
+  const storedScope = parseAccessScope(profile.scope);
+  if (storedScope === null) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Perfil de acesso possui scope ausente ou invalido; corrija o perfil " +
+        "antes de atribui-lo.",
+      {code: "invalid-access-scope"},
+    );
+  }
+  const accessScope = storedScope;
   const roleKeys = normalizedRoleKeys(profile.role_keys, [profileId]);
   const roleSet = new Set(roleKeys);
   const isAdminProfile = roleSet.has("admin") ||
@@ -2518,10 +2611,34 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   const accessProfileSnapshot = accessProfileId
     ? await db.collection("access_profiles").doc(accessProfileId).get()
     : null;
-  const accessScope =
-    stringValue(accessProfileSnapshot?.data()?.scope) === "own_records"
-      ? "own_records"
-      : "global";
+  // SEC-02A: escopo do usuário provisionado nunca é ampliado por omissão.
+  //
+  // Antes: `accessProfileId` ausente deixava o snapshot null e o escopo caía em
+  // "global"; perfil com scope malformado idem. O valor era gravado no espelho
+  // `users/{ra}` E na custom claim, tornando a ampliação permanente.
+  //
+  // Agora: perfil declarado precisa existir com scope válido (recusa explícita
+  // se não); sem perfil declarado, assume-se o escopo MENOS privilegiado.
+  const accessScope: AccessScope = (() => {
+    if (!accessProfileId) return "own_records";
+    if (!accessProfileSnapshot?.exists) {
+      throw new HttpsError(
+        "not-found",
+        "Perfil de acesso informado nao existe.",
+        {code: "missing-access-profile"},
+      );
+    }
+    const parsed = parseAccessScope(accessProfileSnapshot.data()?.scope);
+    if (parsed === null) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Perfil de acesso possui scope ausente ou invalido; corrija o perfil " +
+          "antes de vincula-lo a um usuario.",
+        {code: "invalid-access-scope"},
+      );
+    }
+    return parsed;
+  })();
   const isAdminProfile = profileRoleSet.has("admin") ||
     profileRoleSet.has("administrador") ||
     profileRoleSet.has("admin_master");
@@ -2567,6 +2684,10 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     );
   }
   let authUser: admin.auth.UserRecord | null = null;
+  // SEC-02A: distingue conta CRIADA por esta chamada de conta preexistente.
+  // Compensação só pode agir sobre a que nós criamos — nunca apagar nem
+  // desabilitar uma conta que já existia por causa de falha de update.
+  let createdNewAuthUser = false;
 
   if (existingUid) {
     try {
@@ -2600,30 +2721,29 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
         "A senha provisoria deve ter ao menos 8 caracteres.",
       );
     }
+    // SEC-02A: conta nova nasce SEMPRE desabilitada, independente de `active`.
+    // Firebase Auth e Firestore são serviços distintos — não existe transação
+    // atômica entre eles. Em vez de fingir que existe, a conta só se torna
+    // utilizável depois que o espelho de autorização estiver válido (ver
+    // habilitação no final desta função).
     authUser = await admin.auth().createUser({
-      disabled: !active,
+      disabled: true,
       displayName: callsign,
       email,
       password: temporaryPassword,
       photoURL: optionalString(profile, "photoUrl") ?? undefined,
     });
+    createdNewAuthUser = true;
   } else {
+    // Conta existente: desabilitar é a direção SEGURA e pode ser aplicada de
+    // imediato. Habilitar é a direção perigosa e fica para o final, após o
+    // espelho de autorização estar gravado.
     authUser = await admin.auth().updateUser(authUser.uid, {
-      disabled: !active,
+      ...(active ? {} : {disabled: true}),
       displayName: callsign,
       photoURL: optionalString(profile, "photoUrl") ?? undefined,
     });
   }
-
-  const claims = humanClaims(
-    authUser.customClaims ?? {},
-    ra,
-    accessLevel,
-    accessProfileId,
-    isK9Instructor,
-    accessScope,
-  );
-  await admin.auth().setCustomUserClaims(authUser.uid, claims);
 
   const payload: JsonMap = {
     ra,
@@ -2692,7 +2812,60 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     );
   }
 
-  await userRef.set(payload, {merge: true});
+  // SEC-02A — ordem de provisionamento FALHA FECHADA.
+  //
+  // Auth e Firestore não compartilham transação, então a ordem é escolhida para
+  // que qualquer falha parcial deixe a conta MENOS utilizável, nunca mais:
+  //
+  //   1. espelho de autorização em users/{ra}   (nada utilizável ainda)
+  //   2. custom claims                          (derivadas de escopo validado)
+  //   3. habilitar a conta                      (último — só aqui vira usável)
+  //
+  // Falha em 1 ou 2 com conta recém-criada: compensa desabilitando/removendo.
+  // A conta jamais fica habilitada sem espelho de autorização válido.
+  try {
+    await userRef.set(payload, {merge: true});
+
+    const claims = humanClaims(
+      authUser.customClaims ?? {},
+      ra,
+      accessLevel,
+      accessProfileId,
+      isK9Instructor,
+      accessScope,
+    );
+    await admin.auth().setCustomUserClaims(authUser.uid, claims);
+  } catch (error) {
+    if (createdNewAuthUser) {
+      // Compensação idempotente. Desabilitar primeiro: mesmo que a remoção
+      // falhe, a conta não fica utilizável.
+      try {
+        await admin.auth().updateUser(authUser.uid, {disabled: true});
+      } catch (compensationError) {
+        console.error(
+          "[adminUpsertHuman] falha ao desabilitar conta órfã",
+          {ra, uid: authUser.uid, error: String(compensationError)},
+        );
+      }
+      try {
+        await admin.auth().deleteUser(authUser.uid);
+      } catch (compensationError) {
+        console.error(
+          "[adminUpsertHuman] conta órfã permanece desabilitada; remover " +
+            "manualmente",
+          {ra, uid: authUser.uid, error: String(compensationError)},
+        );
+      }
+    }
+    throw error;
+  }
+
+  // Habilitação por último, e somente quando solicitado. Retry desta callable é
+  // idempotente: reexecuta o espelho e as claims antes de habilitar de novo.
+  if (active) {
+    authUser = await admin.auth().updateUser(authUser.uid, {disabled: false});
+  }
+
   return {
     ra,
     uid: authUser.uid,

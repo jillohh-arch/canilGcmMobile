@@ -95,10 +95,87 @@ service cloud.firestore {
         );
     }
 
+    // =====================================================================
+    // SEC-02A.2 — ESTADO DE AUTORIZAÇÃO E ESCOPO, FALHA FECHADA
+    //
+    // Histórico do defeito:
+    //   SEC-02A  — `token.get('access_scope', 'global')` tratava claim ausente
+    //              como global, e os guards eram
+    //              `!hasOwnRecordsScope() || <vínculo>`: claim ausente tornava a
+    //              negação verdadeira e liberava QUALQUER K9.
+    //   SEC-02A.2 — a claim deixou de ser AUTORIDADE. O documento de perfil
+    //              (access_profiles/{id}.scope) é a autoridade vigente, como já
+    //              é no backend. Uma claim antiga não amplia acesso enquanto o
+    //              token não é renovado; só pode RESTRINGIR.
+    //
+    // Ordem contratual para chamador NÃO-admin:
+    //   RA válida -> users/{ra} existe -> não soft-deleted ->
+    //   access_profile_id válido -> perfil existe -> status permite ->
+    //   scope é enum válido -> claim/espelho podem só restringir ->
+    //   vínculo com o K9 quando o escopo efetivo é own_records
+    //
+    // AUSENTE / DESCONHECIDO / MALFORMADO => DENY.
+    // =====================================================================
+
+    // Estado de autorização resolvido UMA ÚNICA VEZ.
+    //
+    // Rules não memoizam chamadas de função: helpers encadeados re-derivam a
+    // cadeia inteira a cada referência e estouram o limite de 1000 expressões
+    // por avaliação. Por isso todo o estado é calculado aqui, com `let`, e
+    // devolvido como mapa; cada guard chama esta função uma vez.
+    //
+    // Sentinelas evitam segmento de path vazio quando a claim/campo falta:
+    // exists() falha e o acesso é negado, sem herdar perfil por omissão
+    // (o default 'operador_k9' foi justamente o vetor corrigido no backend).
+    function authState() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.token.get('ra', '__sec02_no_ra__'));
+      let userOk = hasRaClaim() && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
+      let profileId = user.get('access_profile_id', user.get('accessProfileId', '__sec02_no_profile__'));
+      let profilePath = /databases/$(database)/documents/access_profiles/$(profileId is string && profileId.size() > 0 ? profileId : '__sec02_no_profile__');
+      let profileOk = userOk && exists(profilePath);
+      let profile = profileOk ? get(profilePath).data : {};
+      // Enum persistido é 'active' | 'inactive'. AUSENTE é tolerado como ativo
+      // para não divergir de activeProfileGrants nem do backend.
+      let statusOk = profile.get('status', 'active') == 'active';
+      let scope = profile.get('scope', '');
+      // Qualquer camada que declare own_records RESTRINGE. Ampliar é
+      // impossível: só o perfil concede global.
+      let restricted = user.get('access_scope', user.get('accessScope', '')) == 'own_records'
+        || request.auth.token.get('access_scope', '') == 'own_records';
+      return {
+        'valid': userOk
+          && user.get('deleted_at', null) == null
+          && profileOk
+          && statusOk
+          && (scope == 'global' || scope == 'own_records'),
+        'global': scope == 'global' && !restricted,
+      };
+    }
+
+    function hasValidAuthorizationState() {
+      return signedIn() && authState().get('valid', false);
+    }
+
+    // Escopo amplo vigente: perfil ATUAL diz global e nada restringe. Uma claim
+    // 'global' obsoleta não satisfaz esta função — o perfil é a autoridade.
+    function hasExplicitGlobalScope() {
+      let st = authState();
+      return signedIn()
+        && (
+          isAdmin()
+          || (st.get('valid', false) && st.get('global', false))
+        );
+    }
+
+    // Escopo restrito vigente. NÃO usar sua negação como guard de acesso
+    // amplo — negação não prova autorização.
     function hasOwnRecordsScope() {
+      let st = authState();
       return signedIn()
         && !isAdmin()
-        && request.auth.token.get('access_scope', 'global') == 'own_records';
+        && st.get('valid', false)
+        && !st.get('global', false);
     }
 
     function dogAssignedToAuth(data) {
@@ -125,14 +202,27 @@ service cloud.firestore {
         );
     }
 
+    // SEC-02A.2: vínculo com o K9 só vale sob estado de autorização íntegro.
+    // Admin conserva o bypass explícito canônico.
+    //
+    // `authState()` é chamado UMA vez e o resultado reaproveitado via `let` —
+    // encadear helpers aqui re-deriva a cadeia e estoura o limite de 1000
+    // expressões por avaliação.
     function canAccessDogRecord(dogId) {
       let dogPath = /databases/$(database)/documents/dogs/$(dogId);
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          exists(dogPath)
-          && dogAssignedToAuth(get(dogPath).data)
-        )
-        || activeShiftDogMatches(dogId);
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || (
+              exists(dogPath)
+              && dogAssignedToAuth(get(dogPath).data)
+            )
+            || activeShiftDogMatches(dogId)
+          )
+        );
     }
 
     function recordDogId(data) {
@@ -147,28 +237,49 @@ service cloud.firestore {
 
     function canAccessDogData(data) {
       let dogId = recordDogId(data);
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          dogId is string
-          && dogId.size() > 0
-          && canAccessDogRecord(dogId)
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || (
+              dogId is string
+              && dogId.size() > 0
+              && canAccessDogRecord(dogId)
+            )
+          )
         );
     }
 
     function canReadTrainingData(data) {
       let handlerId = trainingHandlerId(data);
-      return !hasOwnRecordsScope()
-        || emailMatchesRa(handlerId)
-        || canAccessDogData(data);
+      let st = authState();
+      return isAdmin()
+        || (
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || emailMatchesRa(handlerId)
+            || canAccessDogData(data)
+          )
+        );
     }
 
     function canReadAuditRecord(data) {
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          data.get('actor', {}) is map
+          st.get('valid', false)
           && (
-            data.get('actor', {}).get('uid', '') == request.auth.uid
-            || emailMatchesRa(data.get('actor', {}).get('ra', ''))
+            st.get('global', false)
+            || (
+              data.get('actor', {}) is map
+              && (
+                data.get('actor', {}).get('uid', '') == request.auth.uid
+                || emailMatchesRa(data.get('actor', {}).get('ra', ''))
+              )
+            )
           )
         );
     }
