@@ -773,4 +773,216 @@ void main() {
       expect(calls, hasLength(1));
     });
   });
+
+  // ==========================================================================
+  // UR — RECUPERAÇÃO DE `unavailable`
+  //
+  // Um bloqueio técnico corrigido no servidor não pode congelar o app em
+  // INDISPONÍVEL até que alguém grave um registro clínico. Snapshot
+  // `unavailable` velho pede reprojeção; recém-gerado não martela a Function.
+  //
+  // Tempo de referência: `projection_attempted_at` (em `unavailable` não existe
+  // `readiness_updated_at`). NUNCA `last_evaluated_at`, que é tempo clínico.
+  // ==========================================================================
+  group('UR — recuperação de snapshot unavailable', () {
+    /// Snapshot `unavailable` com `projection_attempted_at` = [attemptedAt].
+    ///
+    /// `last_evaluated_at` fica deliberadamente ANTIGO em todos os casos: se a
+    /// idade fosse medida por tempo clínico, UR-01/UR-02 refresacariam e
+    /// falhariam.
+    Map<String, Object?> unavailableDoc({
+      required DateTime attemptedAt,
+      List<Object?> blockers = const ['weight_source_inconclusive'],
+    }) {
+      return {
+        'projection_status': 'unavailable',
+        'projection_attempted_at': Timestamp.fromDate(attemptedAt),
+        'updated_at': Timestamp.fromDate(attemptedAt),
+        'last_evaluated_at': Timestamp.fromDate(
+          attemptedAt.subtract(const Duration(days: 30)),
+        ),
+        'technical_blockers': blockers,
+        'schema_version': 1,
+      };
+    }
+
+    test('UR-01 unavailable com 4min59s → não refresh', () async {
+      final db = await seeded(
+        unavailableDoc(
+          attemptedAt: now.subtract(const Duration(minutes: 4, seconds: 59)),
+        ),
+      );
+      final sections = await reader(
+        db,
+        refresh: gateway(ok: false),
+      ).read(dogId);
+
+      expect(calls, isEmpty);
+      expect(sections.readiness.isUnavailable, isTrue);
+      expect(sections.attention.isUnavailable, isTrue);
+    });
+
+    test('UR-02 unavailable com exatamente 5min → não refresh', () async {
+      final db = await seeded(
+        unavailableDoc(attemptedAt: now.subtract(const Duration(minutes: 5))),
+      );
+      final sections = await reader(
+        db,
+        refresh: gateway(ok: false),
+      ).read(dogId);
+
+      // Fronteira congelada: `<=` janela é fresco.
+      expect(calls, isEmpty);
+      expect(sections.readiness.isUnavailable, isTrue);
+    });
+
+    test('UR-03 unavailable com 5min + 1ms → exatamente 1 refresh', () async {
+      final db = await seeded(
+        unavailableDoc(
+          attemptedAt: now.subtract(
+            const Duration(minutes: 5, milliseconds: 1),
+          ),
+        ),
+      );
+      final sections = await reader(
+        db,
+        refresh: gateway(ok: false),
+      ).read(dogId);
+
+      expect(calls, hasLength(1));
+      expect(calls.single.name, ReadinessCallableNames.refresh);
+      expect(calls.single.payload, {'dogId': dogId});
+      // Callable falhou: segue indisponível, sem cálculo local.
+      expect(sections.readiness.isUnavailable, isTrue);
+      expect(sections.readiness.valueOrNull, isNull);
+    });
+
+    test('UR-04 unavailable velho → callable ok → re-read READY', () async {
+      final db = await seeded(
+        unavailableDoc(attemptedAt: now.subtract(const Duration(hours: 6))),
+      );
+      final sections = await reader(
+        db,
+        refresh: gateway(
+          ok: true,
+          seedInto: db,
+          writeOnRefresh: readyDoc(updatedAt: now),
+        ),
+      ).read(dogId);
+
+      expect(calls, hasLength(1));
+      expect(sections.readiness.isAvailable, isTrue);
+      expect(sections.readiness.value!.status, ReadinessStatus.operational);
+      expect(sections.attention.isAvailable, isTrue);
+    });
+
+    test(
+      'UR-05 unavailable velho → callable ok → segue unavailable → sem 2ª chamada',
+      () async {
+        final db = await seeded(
+          unavailableDoc(attemptedAt: now.subtract(const Duration(hours: 6))),
+        );
+        // Backend tentou de novo e falhou de novo: novo attempted_at, mesmo
+        // status técnico.
+        final sections = await reader(
+          db,
+          refresh: gateway(
+            ok: true,
+            seedInto: db,
+            writeOnRefresh: unavailableDoc(attemptedAt: now),
+          ),
+        ).read(dogId);
+
+        // Uma tentativa por leitura: nada de read→refresh→read→refresh.
+        expect(calls, hasLength(1));
+        expect(sections.readiness.isUnavailable, isTrue);
+        expect(sections.readiness.valueOrNull, isNull);
+      },
+    );
+
+    test('UR-06 unavailable velho → callable falha → indisponível', () async {
+      final db = await seeded(
+        unavailableDoc(attemptedAt: now.subtract(const Duration(days: 2))),
+      );
+      final sections = await reader(
+        db,
+        refresh: gateway(ok: false),
+      ).read(dogId);
+
+      expect(calls, hasLength(1));
+      expect(sections.readiness.isUnavailable, isTrue);
+      expect(sections.attention.isUnavailable, isTrue);
+    });
+
+    test('UR-07 3 leituras concorrentes do mesmo velho → 1 callable', () async {
+      final db = await seeded(
+        unavailableDoc(attemptedAt: now.subtract(const Duration(hours: 6))),
+      );
+      final r = reader(db, refresh: gateway(ok: false));
+
+      await Future.wait([r.read(dogId), r.read(dogId), r.read(dogId)]);
+
+      expect(calls, hasLength(1));
+      expect(r.hasInFlightRefresh(dogId), isFalse);
+    });
+
+    test(
+      'UR-08 not_evaluated READY fresco segue clínico, não técnico',
+      () async {
+        final db = await seeded(
+          readyDoc(
+            status: 'not_evaluated',
+            label: 'Não avaliado',
+            updatedAt: now,
+          ),
+        );
+        final sections = await reader(
+          db,
+          refresh: gateway(ok: false),
+        ).read(dogId);
+
+        // "Nunca foi avaliado" é estado CLÍNICO disponível, não
+        // indisponibilidade.
+        expect(sections.readiness.isAvailable, isTrue);
+        expect(sections.readiness.value!.status, ReadinessStatus.notEvaluated);
+        expect(sections.readiness.isUnavailable, isFalse);
+        expect(calls, isEmpty);
+      },
+    );
+
+    test(
+      'UR-09 cenário Bono: blocker legacy antigo → refresh → Prontidão real',
+      () async {
+        // Estado exato deixado em produção antes da correção do adapter legacy
+        // de Weight no backend.
+        final db = await seeded(
+          unavailableDoc(
+            attemptedAt: now.subtract(const Duration(hours: 14)),
+            blockers: const ['weight_source_inconclusive'],
+          ),
+        );
+        final r = reader(
+          db,
+          refresh: gateway(
+            ok: true,
+            seedInto: db,
+            // Backend já corrigido: agora reconhece o peso legacy e projeta.
+            writeOnRefresh: readyDoc(updatedAt: now),
+          ),
+        );
+
+        final sections = await r.read(dogId);
+
+        expect(calls, hasLength(1));
+        expect(calls.single.name, ReadinessCallableNames.refresh);
+        expect(sections.readiness.isAvailable, isTrue);
+        expect(sections.readiness.value!.status, ReadinessStatus.operational);
+        expect(
+          sections.readiness.value!.reason,
+          'Sem restrições ativas e dados de saúde em dia.',
+        );
+        expect(sections.attention.isAvailable, isTrue);
+      },
+    );
+  });
 }

@@ -30,11 +30,17 @@ typedef ReadinessSections = ({
 ///
 /// Toda decisão clínica pertence a `functions/src/health_readiness_policy.ts`.
 ///
-/// ## Frescor
+/// ## Frescor e recuperação
 ///
-/// Snapshot `ready` com mais de [freshnessWindow] pede reprojeção ao backend.
-/// A idade usa tempo de PROJEÇÃO (`readiness_updated_at`), nunca
-/// `last_evaluated_at`, que é tempo clínico e mediria a coisa errada.
+/// Snapshot com mais de [freshnessWindow] pede reprojeção ao backend — tanto
+/// `ready` (frescor) quanto `unavailable` (recuperação de bloqueio técnico já
+/// resolvido no servidor). A idade usa tempo de PROJEÇÃO
+/// (`readiness_updated_at` quando `ready`, `projection_attempted_at` quando
+/// `unavailable`), nunca `last_evaluated_at`, que é tempo clínico e mediria a
+/// coisa errada.
+///
+/// A reprojeção é tentada UMA vez por leitura. Se a re-leitura seguir
+/// `unavailable`, a UI mostra indisponível — não há laço de retentativa.
 class HealthSummaryReadinessReader {
   HealthSummaryReadinessReader({
     FirebaseFirestore? firestore,
@@ -107,8 +113,14 @@ class HealthSummaryReadinessReader {
 
       var snapshot = (result as ReadinessParseSuccess).snapshot;
 
-      // Snapshot pronto mas velho: pede reprojeção e reaproveita o resultado.
-      if (snapshot.isReady && _isStale(snapshot)) {
+      // Snapshot velho pede reprojeção, seja `ready` (frescor) ou `unavailable`
+      // (recuperação). Sem isto um bloqueio técnico já corrigido no servidor
+      // ficaria congelado até que alguém gravasse um registro clínico — o app
+      // exibiria INDISPONÍVEL indefinidamente por causa de uma falha passada.
+      //
+      // UMA tentativa por leitura: se a re-leitura seguir `unavailable`, a UI
+      // mostra indisponível e para. Nunca read→refresh→read→refresh em laço.
+      if (_isStale(snapshot)) {
         final refreshed = await _requestRefresh(normalized);
         if (refreshed) {
           final reread = await _fetch(normalized);
