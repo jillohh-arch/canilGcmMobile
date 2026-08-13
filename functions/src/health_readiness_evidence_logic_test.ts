@@ -406,6 +406,180 @@ async function main(): Promise<void> {
     assert.strictEqual(candidate.kind, "malformed");
   });
 
+  // ── Recognized legacy shapes (NO schema_version key) ─────────────────────
+  //
+  // Frozen from the first production homologation: this exact shape made the
+  // Mobile card render 28.8 kg while readiness published
+  // `weight_source_inconclusive` / `projection_status: unavailable`.
+  await test("WEIGHT-LEGACY Bono production shape is recognized legacy Mobile", () => {
+    const bono = doc("4tR5lSuUNqBaqwK85POO", {
+      weight_kg: 28.8,
+      measured_at: ts(daysAgo(1)),
+      measured_by: "Condutor Responsavel",
+      created_at: ts(daysAgo(1)),
+      updated_at: ts(daysAgo(1)),
+      context: "rotina",
+      notes: "",
+      audit_trail: [{performed_by: "u1"}],
+    });
+
+    const candidate = classifyWeightDoc(bono, "4DDeRe7CCjTte6nbUbrC");
+    assert.strictEqual(candidate.kind, "valid");
+    // Legacy persists no factual recording instant, and created_at is never
+    // promoted to authority — only kept as ordering fallback metadata.
+    assert.strictEqual(candidate.recordedAt, null);
+    assert.notStrictEqual(candidate.orderingFallbackAt, null);
+
+    // And the collection must become conclusive with weight evidence present.
+    const analysis = analyzeWeightCollection([bono], "4DDeRe7CCjTte6nbUbrC");
+    assert.strictEqual(analysis.kind, "current");
+    assert.deepStrictEqual(analysis.blockers, []);
+
+    const evidence = resolveWeightEvidence(docs(bono), "4DDeRe7CCjTte6nbUbrC");
+    assert.strictEqual(evidence.kind, "present");
+  });
+
+  await test("WEIGHT-LEGACY web shape (measured_by + performed_by) is valid", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-web", {
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(2)),
+        measured_by: "Veterinario",
+        performed_by: "u-web",
+      }),
+    );
+    assert.strictEqual(candidate.kind, "valid");
+  });
+
+  await test("WEIGHT-LEGACY dog-update shape (performed_by only) is valid", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-dog", {
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(3)),
+        performed_by: "u-dog",
+      }),
+    );
+    assert.strictEqual(candidate.kind, "valid");
+  });
+
+  await test("WEIGHT-LEGACY dog-update with narrative fields is NOT recognized", () => {
+    // `context`/`notes` never came from the dog-update writer, so this is an
+    // unknown shape rather than a tolerated one.
+    for (const narrative of [{context: "rotina"}, {notes: "obs"}]) {
+      const candidate = classifyWeightDoc(
+        doc("w-amb", {
+          weight_kg: 28.8,
+          measured_at: ts(daysAgo(3)),
+          performed_by: "u-dog",
+          ...narrative,
+        }),
+      );
+      assert.strictEqual(candidate.kind, "malformed");
+    }
+  });
+
+  await test("WEIGHT-LEGACY blank/non-string measured_by is NOT recognized", () => {
+    for (const bad of ["", "   ", 42, {}]) {
+      const candidate = classifyWeightDoc(
+        doc("w-blank", {
+          weight_kg: 28.8,
+          measured_at: ts(daysAgo(1)),
+          measured_by: bad,
+        }),
+      );
+      assert.strictEqual(
+        candidate.kind,
+        "malformed",
+        `measured_by=${JSON.stringify(bad)}`,
+      );
+    }
+  });
+
+  await test("WEIGHT-LEGACY legacy carrying recorded_by is NOT recognized", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-mixed", {
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(1)),
+        measured_by: "Condutor",
+        recorded_by: {uid: "u1", name: "C", internal_role: "condutor"},
+      }),
+    );
+    assert.strictEqual(candidate.kind, "malformed");
+  });
+
+  await test("WEIGHT-LEGACY legacy carrying target-v2 field is hybrid malformed", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-hybrid", {
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(1)),
+        measured_by: "Condutor",
+        bcs: 5,
+      }),
+    );
+    assert.strictEqual(candidate.kind, "malformed");
+  });
+
+  await test("WEIGHT-LEGACY broken schema_version stays malformed", () => {
+    // Present-but-invalid schema_version must NOT fall through to legacy.
+    for (const bad of [0, -1, 1.5, "1", null]) {
+      const candidate = classifyWeightDoc(
+        doc("w-schema", {
+          schema_version: bad,
+          weight_kg: 28.8,
+          measured_at: ts(daysAgo(1)),
+          measured_by: "Condutor",
+        }),
+      );
+      assert.strictEqual(
+        candidate.kind,
+        "malformed",
+        `schema_version=${JSON.stringify(bad)}`,
+      );
+    }
+  });
+
+  await test("WEIGHT-LEGACY cross-dog legacy document is rejected", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-other", {
+        dog_id: "outro-cao",
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(1)),
+        measured_by: "Condutor",
+      }),
+      "dog-1",
+    );
+    assert.strictEqual(candidate.kind, "malformed");
+  });
+
+  await test("WEIGHT-LEGACY invalidated legacy record still does not block", () => {
+    const candidate = classifyWeightDoc(
+      doc("w-inv-legacy", {
+        weight_kg: 28.8,
+        measured_at: ts(daysAgo(1)),
+        measured_by: "Condutor",
+        deleted_at: ts(daysAgo(1)),
+      }),
+    );
+    assert.strictEqual(candidate.kind, "invalidated");
+  });
+
+  await test("WEIGHT-LEGACY ordering: v1 beats legacy on same measured_at", () => {
+    // Neither persists a factual recorded_at, so entityId DESC decides — and
+    // created_at must not sneak in as a tiebreaker.
+    const legacy = doc("w-aaa", {
+      weight_kg: 30,
+      measured_at: ts(daysAgo(1)),
+      measured_by: "Condutor",
+      created_at: ts(NOW),
+    });
+    const deployed = weightDoc("w-zzz", {measured_at: ts(daysAgo(1))});
+
+    const forward = analyzeWeightCollection([legacy, deployed]);
+    const reverse = analyzeWeightCollection([deployed, legacy]);
+    assert.strictEqual(forward.current?.entityId, "w-zzz");
+    assert.strictEqual(reverse.current?.entityId, "w-zzz");
+  });
+
   await test("WEIGHT non-positive weight is malformed", () => {
     for (const bad of [0, -1, Number.NaN]) {
       const candidate = classifyWeightDoc(

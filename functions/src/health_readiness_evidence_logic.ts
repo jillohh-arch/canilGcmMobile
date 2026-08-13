@@ -255,6 +255,89 @@ function malformedWeight(entityId: string): WeightCandidate {
   };
 }
 
+/** Absent or explicitly null, matching Dart's `== null` on a Map lookup. */
+function isNullish(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
+/**
+ * Embedded dog identity must not contradict the path — guards cross-dog
+ * contamination. Mirrors `_embeddedDogIdIssue`
+ * (weight_assessment_document_parser.dart:126), which runs BEFORE shape
+ * dispatch and therefore applies to legacy documents too.
+ */
+function embeddedDogIdConflicts(
+  data: Readonly<Record<string, unknown>>,
+  dogId: string,
+): boolean {
+  const embedded =
+    readNonEmptyString(data["dog_id"]) ?? readNonEmptyString(data["dogId"]);
+  return embedded !== null && embedded !== dogId;
+}
+
+/**
+ * Classifies a weight document that carries NO `schema_version` key at all.
+ *
+ * PARITY FIX (READINESS-V1): the homologated Mobile authority recognizes three
+ * legitimate pre-schema writer shapes in `_parseRecognizedLegacy`
+ * (weight_assessment_document_parser.dart:261). The first production
+ * homologation proved the omission concretely: Bono's real records carry
+ * `weight_kg` + `measured_at` + `measured_by` and no `schema_version`, so the
+ * Mobile card rendered 28.8 kg while readiness escalated the whole collection
+ * to `inconclusive` and published `projection_status: unavailable`.
+ *
+ * Recognizing a shape is NOT the same as trusting any document with a weight:
+ * an unknown actor combination, a partially-migrated hybrid, or a missing
+ * factual `measured_at` still yields `malformed` and still blocks.
+ *
+ * `recordedAt` stays null — these shapes persist no factual recording instant,
+ * and `created_at` is preserved only as `orderingFallbackAt`, never promoted.
+ */
+function classifyRecognizedLegacyWeightDoc(doc: RawDoc): WeightCandidate {
+  const data = doc.data;
+
+  // Legacy shape carrying target-v2 fields is a partially-migrated hybrid.
+  if (hasAnyTargetV2Field(data)) return malformedWeight(doc.id);
+
+  // A genuine legacy writer never emitted the canonical provenance envelope.
+  if (!isNullish(data["recorded_by"])) return malformedWeight(doc.id);
+
+  const measuredBy = data["measured_by"];
+  const performedBy = data["performed_by"];
+  const hasMeasuredBy = !isNullish(measuredBy);
+  const hasPerformedBy = !isNullish(performedBy);
+
+  // legacy Mobile — original WeightRecord.toJson(): non-empty string
+  // `measured_by`, no top-level `performed_by`. A blank or non-string
+  // `measured_by` never came from that writer.
+  const isMobile = readNonEmptyString(measuredBy) !== null && !hasPerformedBy;
+  // legacy Web — both actor references present.
+  const isWeb = hasMeasuredBy && hasPerformedBy;
+  // legacy dog-update — only `performed_by`, and no narrative fields.
+  const isDogUpdate =
+    hasPerformedBy &&
+    !hasMeasuredBy &&
+    isNullish(data["context"]) &&
+    isNullish(data["notes"]);
+
+  if (!isMobile && !isWeb && !isDogUpdate) return malformedWeight(doc.id);
+
+  const rawWeight = data["weight_kg"];
+  const weightOk =
+    typeof rawWeight === "number" && Number.isFinite(rawWeight) && rawWeight > 0;
+  const measuredAt = readInstant(data["measured_at"]);
+  if (!weightOk || measuredAt === null) return malformedWeight(doc.id);
+
+  return {
+    entityId: doc.id,
+    kind: "valid",
+    measuredAt,
+    // Legacy shapes persist no factual recording instant.
+    recordedAt: null,
+    orderingFallbackAt: readInstant(data["created_at"]),
+  };
+}
+
 /**
  * Classifies one raw weight document, mirroring the homologated Mobile parser.
  *
@@ -265,10 +348,14 @@ function malformedWeight(entityId: string): WeightCandidate {
  *     `recordedAt` is null by definition; `created_at` is kept only as
  *     `orderingFallbackAt`.
  *   - target v2: `schema_version == 2` with a FACTUAL `recorded_at`.
+ *   - recognized legacy (NO `schema_version` key): the three pre-schema writer
+ *     shapes the Mobile authority accepts — see
+ *     `classifyRecognizedLegacyWeightDoc`.
  *
- * Anything else — including a legacy write with valid weight but no canonical
- * provenance envelope, or a hybrid v1/v2 shape — is malformed/unsupported and
- * escalates the collection to inconclusive rather than being guessed at.
+ * Anything else — including a `schema_version == 1` write without the canonical
+ * provenance envelope, an unknown legacy actor combination, or a hybrid v1/v2
+ * shape — is malformed/unsupported and escalates the collection to inconclusive
+ * rather than being guessed at.
  */
 export function classifyWeightDoc(doc: RawDoc, dogId?: string): WeightCandidate {
   const data = doc.data;
@@ -291,6 +378,18 @@ export function classifyWeightDoc(doc: RawDoc, dogId?: string): WeightCandidate 
       recordedAt: null,
       orderingFallbackAt: null,
     };
+  }
+
+  // Embedded identity is checked BEFORE shape dispatch, mirroring the Dart
+  // parser, so a cross-dog document can never reach the legacy adapter.
+  if (dogId !== undefined && embeddedDogIdConflicts(data, dogId)) {
+    return malformedWeight(doc.id);
+  }
+
+  // No `schema_version` KEY at all → recognized legacy writer shapes.
+  // A present-but-broken `schema_version` stays malformed below.
+  if (!("schema_version" in data)) {
+    return classifyRecognizedLegacyWeightDoc(doc);
   }
 
   const rawSchema = data["schema_version"];
@@ -320,15 +419,7 @@ export function classifyWeightDoc(doc: RawDoc, dogId?: string): WeightCandidate 
     return malformedWeight(doc.id);
   }
 
-  // Embedded dog identity must not contradict the path — guards cross-dog
-  // contamination.
-  if (dogId !== undefined) {
-    const embedded =
-      readNonEmptyString(data["dog_id"]) ?? readNonEmptyString(data["dogId"]);
-    if (embedded !== null && embedded !== dogId) {
-      return malformedWeight(doc.id);
-    }
-  }
+  // Embedded dog identity was already validated before shape dispatch.
 
   const orderingFallbackAt = readInstant(data["created_at"]);
 
