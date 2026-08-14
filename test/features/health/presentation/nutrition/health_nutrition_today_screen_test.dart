@@ -24,7 +24,10 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_nutritio
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_screen.dart';
+import 'package:canil_gcm/features/health/presentation/screens/health_shell_screen.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
+import 'package:canil_gcm/features/health/presentation/widgets/health_section_navigation.dart';
+import 'package:canil_gcm/features/health/presentation/widgets/health_shell_section.dart';
 
 final class _ScriptedSource {
   _ScriptedSource(this.resultsByDog);
@@ -489,16 +492,15 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Quantidade consumida não medida').first,
+      find.text('Aceitou tudo • consumo não medido').first,
       300,
       scrollable: find.byType(Scrollable).first,
     );
 
-    expect(find.text('Aceitou tudo'), findsOneWidget);
-    expect(find.text('Quantidade consumida não medida'), findsWidgets);
-    expect(find.text('Não informado'), findsOneWidget);
+    expect(find.text('300 g oferecidos'), findsOneWidget);
+    expect(find.text('Aceitou tudo • consumo não medido'), findsOneWidget);
+    expect(find.text('Medição incompleta'), findsWidgets);
   });
 
   testWidgets('refeição avulsa preserva horário no timezone normativo', (
@@ -2035,6 +2037,150 @@ void main() {
       expect(() => controller.selectDog('   '), throwsArgumentError);
       expect(controller.activeDogId, isNull);
       expect(controller.todayOrNull, isNull);
+    },
+  );
+
+  // ==========================================================================
+  // PASS 03D — Ajuste 1: alinhamento horizontal com o card das tabs.
+  //
+  // O shell (`HealthShellScreen`) já aplica `contentPadding.left/right` à área
+  // de seção. A Nutrição aplicava OUTRO 16 no seu `ListView`, somando 32 por
+  // lado e ficando 16 mais estreita que as tabs. Estes testes provam que o
+  // eixo horizontal agora é único e vem do shell.
+  // ==========================================================================
+  testWidgets(
+    'PASS 03D: ListView da Nutrição não aplica padding horizontal próprio',
+    (tester) async {
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'm1', plannedMealId: 's-m'),
+          ]),
+        ),
+      );
+      final controller = HealthNutritionReadController(
+        source: source,
+        clock: () => DateTime.now().toUtc(),
+      );
+      addTearDown(controller.dispose);
+      await controller.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HealthNutritionTodayScreen(
+              controller: controller,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final listView = tester.widget<ListView>(find.byType(ListView).first);
+      final padding = listView.padding as EdgeInsets;
+      // Quem manda no eixo horizontal é o shell, não a seção.
+      expect(padding.left, 0);
+      expect(padding.right, 0);
+      // O eixo vertical permanece como antes.
+      expect(padding.top, 8);
+    },
+  );
+
+  testWidgets(
+    'PASS 03D: card principal alinha com as tabs dentro do shell real',
+    (tester) async {
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'm1', plannedMealId: 's-m'),
+          ]),
+        ),
+      );
+      final controller = HealthNutritionReadController(
+        source: source,
+        clock: () => DateTime.now().toUtc(),
+      );
+      addTearDown(controller.dispose);
+      await controller.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthShellScreen(
+            initialSection: HealthShellSection.nutricao,
+            resumo: (_) => const SizedBox.shrink(),
+            historico: (_) => const SizedBox.shrink(),
+            agenda: (_) => const SizedBox.shrink(),
+            nutricao: (_) => HealthNutritionTodayScreen(
+              controller: controller,
+              dogDisplayName: 'Bono',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tabsRect = tester.getRect(find.byType(HealthSectionNavigation));
+      final cardRect = tester.getRect(find.byType(HealthSummaryCardSurface).first);
+
+      // Mesmo eixo visual esquerdo/direito — é isso que a pass pediu.
+      expect(cardRect.left, closeTo(tabsRect.left, 0.5));
+      expect(cardRect.right, closeTo(tabsRect.right, 0.5));
+      expect(cardRect.width, closeTo(tabsRect.width, 1.0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'PASS 03D: alinhamento se mantém em 320px sem overflow',
+    (tester) async {
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _MemPlan(
+          NutritionSourceBatch.available([canonicalPlan()]),
+        ),
+        canonicalMealReader: _MemMeal(
+          NutritionSourceBatch.available([
+            mealLog(id: 'm1', plannedMealId: 's-m'),
+          ]),
+        ),
+      );
+      final controller = HealthNutritionReadController(
+        source: source,
+        clock: () => DateTime.now().toUtc(),
+      );
+      addTearDown(controller.dispose);
+      await controller.selectDog('dog-a');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(320, 800)),
+            child: HealthShellScreen(
+              initialSection: HealthShellSection.nutricao,
+              resumo: (_) => const SizedBox.shrink(),
+              historico: (_) => const SizedBox.shrink(),
+              agenda: (_) => const SizedBox.shrink(),
+              nutricao: (_) => HealthNutritionTodayScreen(
+                controller: controller,
+                dogDisplayName: 'Bono',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tabsRect = tester.getRect(find.byType(HealthSectionNavigation));
+      final cardRect = tester.getRect(find.byType(HealthSummaryCardSurface).first);
+      expect(cardRect.left, closeTo(tabsRect.left, 0.5));
+      expect(cardRect.right, closeTo(tabsRect.right, 0.5));
+      expect(tester.takeException(), isNull);
     },
   );
 }

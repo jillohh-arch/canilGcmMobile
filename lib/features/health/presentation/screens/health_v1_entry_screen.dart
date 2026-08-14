@@ -531,6 +531,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                     builder: (_) => HealthAdhocMealFormSheet(
                       dogId: widget.dogId,
                       dogDisplayName: dogContext.name,
+                      dogPhotoUrl: dogContext.photoUrl,
                       controller: _nutritionMutationController,
                       onRefreshRequested: () async {
                         _primeNutritionIfNeeded();
@@ -706,6 +707,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                   builder: (_) => HealthAdhocMealFormSheet(
                     dogId: dog.id,
                     dogDisplayName: dog.name,
+                    dogPhotoUrl: dog.profileImageUrl,
                     controller: _nutritionMutationController,
                     onRefreshRequested: () async {
                       _primeNutritionIfNeeded();
@@ -796,6 +798,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
           controller: _nutritionReadController,
           mutationController: _nutritionMutationController,
           dogDisplayName: dogContext.name,
+          dogPhotoUrl: dogContext.photoUrl,
           bottomPadding: _timelineBottomPadding(context),
         ),
       ),

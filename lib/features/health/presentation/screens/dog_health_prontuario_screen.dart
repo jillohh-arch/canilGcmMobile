@@ -256,6 +256,7 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
           builder: (_) => HealthAdhocMealFormSheet(
             dogId: dog.id,
             dogDisplayName: dog.name,
+            dogPhotoUrl: dog.profileImageUrl,
             controller: controller,
             onRefreshRequested: () async {
               final nutritionVM = Provider.of<NutritionViewModel>(

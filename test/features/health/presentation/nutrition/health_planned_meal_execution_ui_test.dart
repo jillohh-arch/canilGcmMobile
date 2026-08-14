@@ -295,6 +295,13 @@ void main() {
   ) async {
     final host = await _pump(tester);
     await _openFirstForm(tester);
+    // PASS 02B: formulário fresco inicia com full + consumed = offered.
+    // Para testar que "null" (não medido) é preservado no payload,
+    // o usuário precisa explicitamente selecionar "Não medido".
+    await tester.tap(find.text('Não informado'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Não medido'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO'),
       250,
@@ -303,6 +310,8 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO'));
     await tester.pumpAndSettle();
     final command = host.gateway.commands.single;
+    // null = "não medido" preservado no payload — a regra de domínio que o teste
+    // verificava continua sendo respeitada, só que agora requer interação explícita.
     expect(command.consumedGrams, isNull);
     expect(command.planId, 'plan-1');
     expect(command.plannedMealId, 'slot-am');
@@ -312,16 +321,46 @@ void main() {
   testWidgets('refused forces zero and partial bounds validate', (
     tester,
   ) async {
-    await _pump(tester);
+    final host = await _pump(tester);
     await _openFirstForm(tester);
-    await tester.tap(find.text('Não informado'));
+    // PASS 02B: formulário inicia em full + all (consumed = offered).
+    // Campo de consumed NÃO está visível no estado inicial.
+    // Verificamos ausência antes de qualquer interação.
+    expect(find.byKey(const Key('consumed-field')), findsNothing);
+    // Scroll até o chip "Parcial".
+    final partialChip = find.byKey(const Key('planned-meal-consumed-Parcial'));
+    await tester.ensureVisible(partialChip);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Recusou').last);
+    await tester.tap(partialChip);
     await tester.pumpAndSettle();
-    final consumed = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Quantidade consumida (g) — opcional'),
+    // Confirma que o ChoiceChip ficou selected.
+    final chipAfterTap = tester.widget<ChoiceChip>(partialChip);
+    expect(chipAfterTap.selected, isTrue,
+        reason: 'Parcial deve estar selecionado após tap');
+    // Campo de consumed deve aparecer (mode=partial, refused=false).
+    final consumedFieldFinder = find.byKey(const Key('consumed-field'));
+    expect(consumedFieldFinder, findsOneWidget,
+        reason: 'Parcial revela o campo de consumed');
+    // Tocamos "Recusou" — `_onAcceptanceChanged` força consumed = 0 e esconde.
+    final refusedChip = find.byKey(const Key('planned-meal-acceptance-refused'));
+    await tester.ensureVisible(refusedChip);
+    await tester.pumpAndSettle();
+    await tester.tap(refusedChip);
+    await tester.pumpAndSettle();
+    // Campo escondido após a seleção.
+    expect(consumedFieldFinder, findsNothing,
+        reason: 'Recusou força modo all, que esconde o campo de consumed');
+    // Validação do valor real: Submit e verifica que o gateway recebeu consumed=0.
+    final submit = find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO');
+    await tester.scrollUntilVisible(
+      submit,
+      250,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(consumed.controller!.text, '0');
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(host.gateway.commands.single.consumedGrams, 0);
+    expect(host.gateway.commands.single.operationId, 'op-1');
   });
 
   testWidgets('double tap produces one gateway invocation', (tester) async {
@@ -351,31 +390,38 @@ void main() {
       HealthNutritionMutationUnavailable(),
     );
     await _openFirstForm(tester);
-    final offered = find.widgetWithText(TextFormField, 'Quantidade oferecida (g)');
-    await tester.enterText(offered, '275');
-    final submit = find.widgetWithText(FilledButton, 'REGISTRAR REFEIÇÃO');
-    await tester.scrollUntilVisible(
-      submit,
-      250,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(submit);
+    // Altera offered de 300 para 275 (sem usar widgetWithText para evitar ambiguidade).
+    final offeredField = find.byType(TextFormField).first;
+    await tester.enterText(offeredField, '275');
+    await tester.pump();
+    // Desfoca o campo para garantir que o valor está no controller.
+    await tester.tapAt(tester.getRect(offeredField).center);
     await tester.pumpAndSettle();
-    expect(find.textContaining('Não foi possível confirmar'), findsOneWidget);
+    // Toca no botão REGISTRAR (FilledButton.last).
+    final submitBtn = find.byType(FilledButton);
+    await tester.ensureVisible(submitBtn.last);
+    await tester.pumpAndSettle();
+    await tester.tap(submitBtn.last);
+    await tester.pumpAndSettle();
+    // PASS 02B: Unavailable é retry silencioso — formulário continua aberto.
+    expect(find.byType(HealthPlannedMealFormSheet), findsOneWidget);
+    expect(host.gateway.commands, hasLength(1),
+        reason: 'Um comando deve ter sido enviado mesmo com Unavailable');
     final firstOp = host.gateway.commands.single.operationId;
+    // Fecha e reabre: a intenção está no holder, o formulário restaura o offered='275'.
     Navigator.of(tester.element(find.byType(HealthPlannedMealFormSheet))).pop();
     await tester.pumpAndSettle();
     expect(find.byType(HealthPlannedMealFormSheet), findsNothing);
     await _openFirstForm(tester);
     expect(find.text('275'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      submit,
-      250,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(submit);
+    final submitBtn2 = find.byType(FilledButton);
+    await tester.ensureVisible(submitBtn2.last);
     await tester.pumpAndSettle();
+    await tester.tap(submitBtn2.last);
+    await tester.pumpAndSettle();
+    expect(find.byType(HealthPlannedMealFormSheet), findsOneWidget);
     expect(host.gateway.commands, hasLength(2));
+    // operationId estável: mesma intenção usa a mesma key no holder.
     expect(host.gateway.commands.last.operationId, firstOp);
   });
 
@@ -500,6 +546,113 @@ void main() {
       mealOccurrenceId: 'mo-320',
     ));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('PASS 03B: novo modal planejado abre com Aceitou tudo, Tudo e consumed == offered', (
+    tester,
+  ) async {
+    final plan = _plan();
+    final completer = Completer<HealthNutritionMutationResult>();
+    final gateway = _LoadingGateway(completer.future);
+    final controller = HealthNutritionMutationController(
+      gateway: gateway,
+      operationIdFactory: () => 'op-1',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HealthPlannedMealFormSheet(
+              slot: plan.mealSchedule.first,
+              plan: plan,
+              dogDisplayName: 'Bono',
+              localServiceDate: '2026-07-21',
+              controller: controller,
+              onRefreshRequested: () async {},
+              clock: () => DateTime.utc(2026, 7, 21, 12, 0),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Primeira frame útil:
+    final fullChip = tester.widget<ChoiceChip>(
+      find.byKey(const Key('planned-meal-acceptance-full')),
+    );
+    expect(fullChip.selected, isTrue);
+
+    final allChip = tester.widget<ChoiceChip>(
+      find.byKey(const Key('planned-meal-consumed-Tudo')),
+    );
+    expect(allChip.selected, isTrue);
+
+    final offeredFinder = find.widgetWithText(
+      TextFormField,
+      'Quantidade oferecida (g)',
+    );
+    final offeredField = tester.widget<TextFormField>(offeredFinder);
+    expect(offeredField.controller?.text, '300');
+  });
+
+  testWidgets('PASS 03B: Tudo -> Parcial com consumed == offered limpa o campo', (
+    tester,
+  ) async {
+    final plan = _plan();
+    final completer = Completer<HealthNutritionMutationResult>();
+    final gateway = _LoadingGateway(completer.future);
+    final controller = HealthNutritionMutationController(
+      gateway: gateway,
+      operationIdFactory: () => 'op-1',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HealthPlannedMealFormSheet(
+              slot: plan.mealSchedule.first,
+              plan: plan,
+              dogDisplayName: 'Bono',
+              localServiceDate: '2026-07-21',
+              controller: controller,
+              onRefreshRequested: () async {},
+              clock: () => DateTime.utc(2026, 7, 21, 12, 0),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Toque em Parcial
+    await tester.tap(find.byKey(const Key('planned-meal-consumed-Parcial')));
+    await tester.pumpAndSettle();
+
+    final consumedFinder = find.byKey(const ValueKey('consumed-field'));
+    expect(consumedFinder, findsOneWidget);
+    final consumedField = tester.widget<TextFormField>(consumedFinder);
+    expect(consumedField.controller?.text, isEmpty);
+
+    // Preenche 180
+    await tester.enterText(consumedFinder, '180');
+    await tester.pumpAndSettle();
+
+    // Alterna para Tudo e depois volta para Parcial
+    await tester.tap(find.byKey(const Key('planned-meal-consumed-Tudo')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('planned-meal-consumed-Parcial')));
+    await tester.pumpAndSettle();
+
+    // Como 300 != 180 antes de voltar para Parcial, o valor 300 foi redefinido em Tudo,
+    // então ao voltar de Tudo para Parcial o campo é limpo novamente
+    final consumedFieldAfter = tester.widget<TextFormField>(consumedFinder);
+    expect(consumedFieldAfter.controller?.text, isEmpty);
   });
 }
 

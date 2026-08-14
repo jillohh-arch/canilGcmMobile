@@ -11,6 +11,8 @@ import 'package:canil_gcm/features/health/domain/nutrition_read_models.dart';
 import 'package:canil_gcm/features/health/domain/supplement_log.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_context_badge.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_dog_avatar.dart';
 
 /// Sheet operacional Health v1 para criação de SupplementLog.
 ///
@@ -27,6 +29,7 @@ class HealthSupplementFormSheet extends StatefulWidget {
     super.key,
     required this.dogId,
     required this.dogDisplayName,
+    this.dogPhotoUrl,
     required this.controller,
     required this.onRefreshRequested,
     this.timezone,
@@ -37,6 +40,9 @@ class HealthSupplementFormSheet extends StatefulWidget {
 
   final String dogId;
   final String dogDisplayName;
+
+  /// PASS 03C: URL de foto já disponível no contexto do app. Ausente → patinha.
+  final String? dogPhotoUrl;
   final HealthNutritionMutationController controller;
   final Future<void> Function() onRefreshRequested;
   final String? timezone;
@@ -163,20 +169,43 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.medication_rounded,
-                      color: AppTheme.primary,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.medication_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'REGISTRAR SUPLEMENTO',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'REGISTRAR SUPLEMENTO',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Registro de suplemento alimentar',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     IconButton(
@@ -208,6 +237,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 _textField(
                   controller: _nameController,
                   label: 'Nome do suplemento',
+                  prefixIcon: Icons.medication_rounded,
                   enabled: !_isPrescribed,
                   validator: (raw) {
                     if ((raw?.trim().length ?? 0) == 0) {
@@ -222,6 +252,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 _numberField(
                   controller: _doseController,
                   label: 'Dose',
+                  prefixIcon: Icons.scale_rounded,
                   enabled: !_isPrescribed,
                   validator: (raw) {
                     final value = _parseNumber(raw);
@@ -251,15 +282,12 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                   onTap: _submitting ? null : _pickTime,
                   borderRadius: BorderRadius.circular(10),
                   child: InputDecorator(
-                    decoration: _inputDecoration('Horário da administração'),
+                    decoration: _inputDecoration(
+                      'Horário da administração',
+                      prefixIcon: Icons.schedule_rounded,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.schedule_rounded,
-                          color: AppTheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
                         Text(
                           _adminTime.format(context),
                           style: GoogleFonts.inter(
@@ -289,6 +317,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                 _textField(
                   controller: _batchController,
                   label: 'Número do lote — opcional',
+                  prefixIcon: Icons.tag_rounded,
                   enabled: !_submitting && !_savedButRefreshFailed,
                 ),
                 const SizedBox(height: 14),
@@ -300,7 +329,10 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
                   maxLines: 3,
                   maxLength: 500,
                   style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Observações — opcional'),
+                  decoration: _inputDecoration(
+                    'Observações — opcional',
+                    prefixIcon: Icons.chat_bubble_outline_rounded,
+                  ),
                 ),
 
                 if (_message != null) ...[
@@ -383,66 +415,81 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
   Widget _contextCard() {
     final regimen = _selectedRegimen;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.primaryOverlay,
+        color: AppTheme.surfacePanel,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primaryDivider),
+        border: Border.all(color: AppTheme.outline),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            widget.dogDisplayName,
-            style: GoogleFonts.inter(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
+          HealthNutritionDogAvatar(
+            key: const ValueKey('supplement-dog-avatar'),
+            dogDisplayName: widget.dogDisplayName,
+            photoUrl: widget.dogPhotoUrl,
           ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _isPrescribed
-                    ? AppTheme.primary.withValues(alpha: 0.16)
-                    : AppTheme.textMuted.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                _isPrescribed ? 'Suplemento prescrito' : 'Administração avulsa',
-                style: GoogleFonts.inter(
-                  color: _isPrescribed
-                      ? AppTheme.primary
-                      : AppTheme.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // PASS 03D: nome à esquerda, badge de classificação à direita,
+                // na MESMA linha — mesmo princípio dos sheets de refeição.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.dogDisplayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: HealthNutritionContextBadge(
+                        key: const ValueKey('supplement-context-badge'),
+                        label: _isPrescribed
+                            ? 'Suplemento prescrito'
+                            : 'Administração avulsa',
+                        accent: _isPrescribed
+                            ? AppTheme.primary
+                            : AppTheme.textSecondary,
+                        backgroundAlpha: _isPrescribed ? 0.16 : 0.12,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  _isPrescribed
+                      ? 'Vinculado ao plano alimentar'
+                      : 'Sem vínculo com regime ativo',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (regimen != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Regime: ${regimen.name} · ${regimen.dose} ${regimen.unit.displayLabel}',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            _isPrescribed
-                ? 'Vinculado ao plano alimentar'
-                : 'Sem vínculo com regime ativo',
-            style: GoogleFonts.inter(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-          if (regimen != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Regime: ${regimen.name} · ${regimen.dose} ${regimen.unit.displayLabel}',
-              style: GoogleFonts.inter(
-                color: AppTheme.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -495,6 +542,7 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
   Widget _textField({
     required TextEditingController controller,
     required String label,
+    IconData? prefixIcon,
     bool enabled = true,
     String? Function(String?)? validator,
   }) =>
@@ -502,13 +550,14 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
         controller: controller,
         enabled: enabled && !_submitting && !_savedButRefreshFailed,
         style: GoogleFonts.inter(color: AppTheme.textPrimary),
-        decoration: _inputDecoration(label),
+        decoration: _inputDecoration(label, prefixIcon: prefixIcon),
         validator: validator,
       );
 
   Widget _numberField({
     required TextEditingController controller,
     required String label,
+    IconData? prefixIcon,
     bool enabled = true,
     String? Function(String?)? validator,
   }) =>
@@ -521,13 +570,14 @@ class _HealthSupplementFormSheetState extends State<HealthSupplementFormSheet> {
           FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]'))
         ],
         style: GoogleFonts.inter(color: AppTheme.textPrimary),
-        decoration: _inputDecoration(label),
+        decoration: _inputDecoration(label, prefixIcon: prefixIcon),
         validator: validator,
       );
 
-  InputDecoration _inputDecoration(String label) => InputDecoration(
+  InputDecoration _inputDecoration(String label, {IconData? prefixIcon}) => InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.inter(color: AppTheme.textSecondary),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppTheme.primary, size: 20) : null,
         filled: true,
         fillColor: AppTheme.surfacePanel,
         enabledBorder: OutlineInputBorder(

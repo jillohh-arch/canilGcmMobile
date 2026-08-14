@@ -18,6 +18,9 @@ import 'package:canil_gcm/features/health/presentation/nutrition/health_nutritio
 import 'package:canil_gcm/features/health/presentation/nutrition/health_planned_meal_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_supplement_form_sheet.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_history_timeline.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_period_grid.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_period_visuals.dart';
 import 'package:canil_gcm/features/health/presentation/shared/states/health_state_views.dart';
 import 'package:canil_gcm/features/health/presentation/summary/widgets/health_summary_card_surface.dart';
 
@@ -26,6 +29,10 @@ class HealthNutritionTodayScreen extends StatelessWidget {
   final HealthNutritionReadController controller;
   final HealthNutritionMutationController? mutationController;
   final String dogDisplayName;
+
+  /// PASS 03C: repassa ao sheet planejado a foto já resolvida pelo chamador.
+  /// Passthrough puro — esta tela não a renderiza nem a busca.
+  final String? dogPhotoUrl;
   final double bottomPadding;
 
   const HealthNutritionTodayScreen({
@@ -33,6 +40,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
     required this.controller,
     this.mutationController,
     required this.dogDisplayName,
+    this.dogPhotoUrl,
     this.bottomPadding = 24,
   });
 
@@ -189,14 +197,17 @@ class HealthNutritionTodayScreen extends StatelessWidget {
           onRefresh: controller.refresh,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding + 16),
+            // PASS 03D: alinhamento horizontal com o card das tabs.
+            // O `HealthShellScreen` já aplica `contentPadding.left/right` (16)
+            // à área de seção, então o 16 que existia aqui era um SEGUNDO
+            // inset, deixando o card 32px de cada lado — 16 mais estreito que
+            // as tabs. Zero horizontal aqui é como Resumo, Agenda e Timeline
+            // já se comportam: quem manda no eixo horizontal é o shell.
+            padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding + 16),
             children: [
-              _Header(
-                dogName: dogDisplayName,
-                degraded: degraded,
-                degradedMessage: today?.message ?? snap.message,
-                localDate: todayModel?.localServiceDate,
-              ),
+              // PASS 02: o `_Header` grande saiu daqui. O contexto (K9 + data de
+              // serviço) agora vive como linha discreta DENTRO do card
+              // principal, abaixo.
               if (temporalDiagnosticTitle != null &&
                   temporalDiagnosticMessage != null) ...[
                 const SizedBox(height: 10),
@@ -231,33 +242,73 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              if (hasSafeToday)
-                _TodaySummaryCard(
-                  plan: snapshot.activePlan,
-                  meals: todayModel!.mealsForDailyTotals,
-                  plannedMealsCompleted: todayModel.plannedMealsCompleted,
-                )
-              else
-                const _DailyProjectionUnavailable(),
-              const SizedBox(height: 14),
-              _PlanCard(plan: snapshot.activePlan),
-              const SizedBox(height: 14),
-              if (hasSafeToday)
-                _MealsSection(
-                  plan: snapshot.activePlan,
-                  mealsToday: todayModel!.meals,
-                  serverNow: todayModel.referenceNow,
-                  timezone: todayModel.timezone,
-                  localServiceDate: todayModel.localServiceDate,
-                  mutationEnabled: mutationHealthy,
-                  onRegister: (plan, slot) => _openPlannedMealForm(
-                    context,
-                    plan: plan,
-                    slot: slot,
-                    serviceDate: todayModel.localServiceDate,
-                    authorizedNow: todayModel.referenceNow,
-                  ),
+              // ── CARD PRINCIPAL ÚNICO (PASS 02) ──────────────────────────
+              // Antes eram três surfaces independentes empilhadas (consumo,
+              // plano, grid), o que fazia a tela parecer uma sequência de
+              // módulos soltos. Agora é UM card: contexto -> produto -> meta ->
+              // consumo de hoje -> grid 2×2. Os conteúdos internos são os
+              // mesmos widgets, apenas sem surface própria (`nested: true`).
+              HealthSummaryCardSurface(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Header(
+                      dogName: dogDisplayName,
+                      degraded: degraded,
+                      degradedMessage: today?.message ?? snap.message,
+                      localDate: todayModel?.localServiceDate,
+                    ),
+                    const SizedBox(height: 10),
+                    _PlanCard(plan: snapshot.activePlan, nested: true),
+                    const SizedBox(height: 12),
+                    if (hasSafeToday)
+                      _TodaySummaryCard(
+                        plan: snapshot.activePlan,
+                        meals: todayModel!.mealsForDailyTotals,
+                        plannedMealsCompleted: todayModel.plannedMealsCompleted,
+                        nested: true,
+                      )
+                    else
+                      const _DailyProjectionUnavailable(nested: true),
+                    if (hasSafeToday) ...[
+                      const SizedBox(height: 12),
+                      _MealsSection(
+                        plan: snapshot.activePlan,
+                        mealsToday: todayModel!.meals,
+                        serverNow: todayModel.referenceNow,
+                        timezone: todayModel.timezone,
+                        localServiceDate: todayModel.localServiceDate,
+                        mutationEnabled: mutationHealthy,
+                        onRegister: (plan, slot) => _openPlannedMealForm(
+                          context,
+                          plan: plan,
+                          slot: slot,
+                          serviceDate: todayModel.localServiceDate,
+                          authorizedNow: todayModel.referenceNow,
+                        ),
+                        supplementQuadrant: _buildSupplementQuadrant(
+                          context,
+                          plan: snapshot.activePlan,
+                          administrationCount:
+                              todayModel.canonicalSupplementLogsAvailable
+                              ? todayModel.canonicalSupplementLogs.length
+                              : null,
+                          legacyRegimenCount:
+                              snapshot.legacySupplementRegimens.length,
+                          mutationController: mutationController,
+                          dogId: supplementDogId,
+                          actionEnabled: supplementActionEnabled,
+                          authorizedNow: todayModel.referenceNow,
+                          canonicalPlanLinkSafe: canonicalPlanLinkSafe,
+                          dogDisplayName: dogDisplayName,
+                          onRefreshRequested: controller.refresh,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
               const SizedBox(height: 14),
               _SupplementsSection(
                 plan: snapshot.activePlan,
@@ -282,11 +333,96 @@ class HealthNutritionTodayScreen extends StatelessWidget {
                 meals: snapshot.mergedMeals.take(8).toList(growable: false),
                 serviceDate: todayModel?.localServiceDate,
                 timezone: todayModel?.timezone ?? NutritionPlan.defaultTimezone,
+                // Mesma fonte da seção "ADMINISTRAÇÕES DE HOJE" — só é passada
+                // quando a leitura é confiável, para não exibir lista parcial
+                // como se fosse completa.
+                supplementAdministrations:
+                    hasSafeToday && todayModel!.canonicalSupplementLogsAvailable
+                    ? todayModel.canonicalSupplementLogs
+                    : const [],
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// Monta o quarto quadrante (Suplemento).
+  ///
+  /// HONESTIDADE DE STATUS: este quadrante NÃO exibe Pendente/Concluída. O
+  /// contrato de suplemento proíbe explicitamente inferir que uma administração
+  /// completou uma frequência prescrita (ver `HealthSupplementFormSheet`), então
+  /// um badge de status aqui seria semântica inventada. Mostramos contagens
+  /// factuais: regimes previstos e administrações registradas hoje.
+  ///
+  /// `administrationCount == null` significa indisponível (não zero) — a
+  /// distinção que o read model já carrega em
+  /// `canonicalSupplementLogsAvailable`.
+  HealthNutritionQuadrantData _buildSupplementQuadrant(
+    BuildContext context, {
+    required NutritionActivePlanRef? plan,
+    required int? administrationCount,
+    required int legacyRegimenCount,
+    required HealthNutritionMutationController? mutationController,
+    required String dogId,
+    required bool actionEnabled,
+    required DateTime? authorizedNow,
+    required bool canonicalPlanLinkSafe,
+    required String dogDisplayName,
+    required Future<void> Function() onRefreshRequested,
+  }) {
+    final canonicalPlan = canonicalPlanLinkSafe &&
+            plan is NutritionActiveCanonicalPlan
+        ? plan
+        : null;
+    final regimenCount =
+        (canonicalPlan?.plan.supplements.length ?? 0) + legacyRegimenCount;
+
+    final lines = <String>[];
+    if (regimenCount > 0) {
+      lines.add(
+        regimenCount == 1
+            ? '1 regime previsto'
+            : '$regimenCount regimes previstos',
+      );
+    }
+    if (administrationCount == null) {
+      // Copy deliberadamente distinta da seção de suplementos abaixo, que diz
+      // "Administrações de hoje indisponíveis". Repetir a MESMA string aqui
+      // duplicaria a mensagem na tela (e há teste que exige exatamente uma).
+      // Indisponível continua sendo indisponível — nunca zero.
+      lines.add('Administrações de hoje sem leitura');
+    } else {
+      lines.add(
+        administrationCount == 1
+            ? '1 administração hoje'
+            : '$administrationCount administrações hoje',
+      );
+    }
+
+    final canRegister =
+        mutationController != null &&
+        actionEnabled &&
+        dogId.isNotEmpty &&
+        authorizedNow != null;
+
+    return HealthNutritionQuadrantData(
+      group: HealthNutritionPeriodGroup.supplement,
+      slots: const [],
+      ctaLabel: 'Registrar suplemento',
+      summaryLine: lines.join(' · '),
+      onAction: canRegister
+          ? () => openHealthSupplementFormSheet(
+              context: context,
+              dogId: dogId,
+              dogDisplayName: dogDisplayName,
+              mutation: mutationController,
+              onRefreshRequested: onRefreshRequested,
+              authorizedNow: authorizedNow,
+              activePlan: canonicalPlan,
+            )
+          : null,
     );
   }
 
@@ -413,6 +549,7 @@ class HealthNutritionTodayScreen extends StatelessWidget {
           backgroundColor: AppTheme.background,
           builder: (_) => HealthPlannedMealFormSheet(
             dogDisplayName: dogDisplayName,
+            dogPhotoUrl: dogPhotoUrl,
             plan: plan,
             slot: slot,
             localServiceDate: serviceDate,
@@ -451,39 +588,35 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // PASS 02: a apresentação grande de "NUTRIÇÃO" saiu — a tab ativa já
+    // estabelece o contexto e o bloco custava altura sem hierarquia. Sobra uma
+    // linha discreta DENTRO do card principal, com o K9 e a data de serviço,
+    // que são contexto funcional (a data prova qual dia a tela projeta).
+    // `Wrap` em vez de `Row`: a 320dp com textScale alto os dois rótulos não
+    // cabem na mesma linha, e um `Row` com Text sem constraint estoura.
+    return Wrap(
+      spacing: 8,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
-          'NUTRIÇÃO',
+          'NUTRIÇÃO · $dogName',
           style: GoogleFonts.inter(
-            color: AppTheme.textPrimary,
+            color: AppTheme.textMuted,
             fontWeight: FontWeight.w800,
-            fontSize: 20,
-            letterSpacing: 0.4,
+            fontSize: 11,
+            letterSpacing: 0.6,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Plano alimentar, consumo diário e acompanhamento · $dogName',
-          style: GoogleFonts.inter(
-            color: AppTheme.textSecondary,
-            fontWeight: FontWeight.w500,
-            fontSize: 13,
-            height: 1.35,
-          ),
-        ),
-        if (localDate != null) ...[
-          const SizedBox(height: 6),
+        if (localDate != null)
           Text(
             'Serviço: $localDate',
             style: GoogleFonts.inter(
               color: AppTheme.textMuted,
               fontWeight: FontWeight.w600,
-              fontSize: 11,
+              fontSize: 10.5,
             ),
           ),
-        ],
       ],
     );
   }
@@ -601,12 +734,15 @@ class _DegradedBanner extends StatelessWidget {
 }
 
 class _DailyProjectionUnavailable extends StatelessWidget {
-  const _DailyProjectionUnavailable();
+  const _DailyProjectionUnavailable({this.nested = false});
+
+  /// Quando `true`, renderiza sem surface própria — o card principal já é a
+  /// surface. Evita "card dentro de card".
+  final bool nested;
 
   @override
   Widget build(BuildContext context) {
-    return HealthSummaryCardSurface(
-      child: Semantics(
+    final body = Semantics(
         liveRegion: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,8 +768,9 @@ class _DailyProjectionUnavailable extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
+
+    return nested ? body : HealthSummaryCardSurface(child: body);
   }
 }
 
@@ -642,11 +779,19 @@ class _TodaySummaryCard extends StatelessWidget {
     required this.plan,
     required this.meals,
     required this.plannedMealsCompleted,
+    this.nested = false,
   });
 
   final NutritionActivePlanRef? plan;
   final List<NutritionMealReadItem> meals;
   final int plannedMealsCompleted;
+
+  /// Quando `true`, é uma FAIXA dentro do card principal, não uma surface.
+  ///
+  /// Todos os fatos continuam presentes (OFERECIDO/CONSUMIDO/RESTANTE, barra de
+  /// progresso, avisos de medição parcial) e o `Semantics` que os testes usam
+  /// como âncora é preservado — muda só a densidade e o container.
+  final bool nested;
 
   @override
   Widget build(BuildContext context) {
@@ -787,8 +932,7 @@ class _TodaySummaryCard extends StatelessWidget {
           : '$completed de $mealsPlanned refeições executadas.',
     ].join(' ');
 
-    return HealthSummaryCardSurface(
-      child: Semantics(
+    final body = Semantics(
         label: semanticsLabel,
         excludeSemantics: true,
         child: Column(
@@ -821,37 +965,42 @@ class _TodaySummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              primaryText,
-              style: GoogleFonts.inter(
-                color: AppTheme.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              secondaryText,
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  primaryText,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: nested ? 14 : 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  secondaryText,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
             if (progressClamped != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(99),
                 child: LinearProgressIndicator(
                   value: progressClamped,
-                  minHeight: 8,
+                  minHeight: 5,
                   backgroundColor: AppTheme.outlineVariant,
                   color: AppTheme.success,
                 ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Row(
               children: [
                 _metricColumn(
@@ -875,32 +1024,38 @@ class _TodaySummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (consumed.hasUnknownConsumed) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Cálculo baseado apenas nas quantidades medidas',
-                style: GoogleFonts.inter(
-                  color: AppTheme.warningAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  mealsPlanned == null
+                      ? '$completed refeições executadas'
+                      : '$completed de $mealsPlanned refeições executadas',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Text(
-              mealsPlanned == null
-                  ? '$completed refeições executadas'
-                  : '$completed de $mealsPlanned refeições executadas',
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondary,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
+                if (consumed.hasUnknownConsumed)
+                  Text(
+                    'Cálculo baseado apenas nas quantidades medidas',
+                    style: GoogleFonts.inter(
+                      color: AppTheme.warningAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
-      ),
-    );
+      );
+
+    return nested ? body : HealthSummaryCardSurface(child: body);
   }
 
   Widget _metricColumn({
@@ -945,19 +1100,19 @@ class _TodaySummaryCard extends StatelessWidget {
     if (badge == 'Medição incompleta') {
       return AppTheme.warningAccent;
     }
-    return AppTheme.attention;
+    return AppTheme.textMuted;
   }
 
-  Widget _chip(String text, Color color) {
+  Widget _chip(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
-        text,
+        label,
         style: GoogleFonts.inter(
           color: color,
           fontSize: 10,
@@ -968,15 +1123,62 @@ class _TodaySummaryCard extends StatelessWidget {
   }
 }
 
+/// Miniatura do produto do plano.
+///
+/// [imageUrl] é o ponto de entrada para quando a integração com o estoque Web
+/// existir. Enquanto o read model não tiver o campo, o parâmetro fica `null` e o
+/// fallback é o que aparece — nenhuma imagem fictícia é usada.
+class _ProductThumb extends StatelessWidget {
+  const _ProductThumb({required this.isLegacy, this.imageUrl});
+
+  final bool isLegacy;
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isLegacy ? AppTheme.attention : AppTheme.primary;
+    final url = imageUrl?.trim();
+
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceNutrition,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: url == null || url.isEmpty
+          ? Icon(Icons.restaurant_rounded, size: 22, color: accent)
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              // Falha de rede não vira card quebrado: cai no mesmo fallback.
+              errorBuilder: (_, _, _) =>
+                  Icon(Icons.restaurant_rounded, size: 22, color: accent),
+            ),
+    );
+  }
+}
+
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan});
+  const _PlanCard({required this.plan, this.nested = false});
   final NutritionActivePlanRef? plan;
+
+  /// Quando `true`, é o topo do card principal — sem surface própria.
+  final bool nested;
+
+  /// Aplica a surface só quando o widget é autônomo.
+  Widget _wrap(Widget child, {Color? borderColor}) {
+    if (nested) return child;
+    return HealthSummaryCardSurface(borderColor: borderColor, child: child);
+  }
 
   @override
   Widget build(BuildContext context) {
     if (plan == null) {
-      return HealthSummaryCardSurface(
-        child: Text(
+      return _wrap(
+        Text(
           'Nenhum plano alimentar ativo encontrado.',
           style: GoogleFonts.inter(
             color: AppTheme.textSecondary,
@@ -989,9 +1191,9 @@ class _PlanCard extends StatelessWidget {
 
     if (plan is NutritionActivePlanIntegrityConflict) {
       final c = plan! as NutritionActivePlanIntegrityConflict;
-      return HealthSummaryCardSurface(
+      return _wrap(
         borderColor: AppTheme.error.withValues(alpha: 0.45),
-        child: Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -1046,35 +1248,42 @@ class _PlanCard extends StatelessWidget {
       _ => NutritionPlan.defaultTimezone,
     };
 
-    return HealthSummaryCardSurface(
-      child: Column(
+    return _wrap(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             HealthNutritionTodayFormatters.planSourceLabel(plan).toUpperCase(),
             style: GoogleFonts.inter(
-              color: AppTheme.textMuted,
+              color: AppTheme.primary,
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+              letterSpacing: 0.6,
             ),
           ),
           const SizedBox(height: 8),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.restaurant_rounded,
-                size: 22,
-                color: isLegacy ? AppTheme.attention : AppTheme.primary,
-              ),
-              const SizedBox(width: 10),
+              // Slot da imagem do produto.
+              //
+              // O read model atual NÃO possui campo de imagem (o plano só
+              // carrega `foodType`, uma String). Então hoje isto renderiza
+              // SEMPRE o fallback. O slot existe para aceitar a imagem quando o
+              // dado passar a existir, sem inventar productId nem buscar
+              // estoque agora.
+              // `imageUrl: null` explícito: é aqui que a URL do produto entra
+              // quando o read model passar a carregá-la.
+              _ProductThumb(isLegacy: isLegacy, imageUrl: null),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   food,
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 17,
+                    height: 1.2,
                   ),
                 ),
               ),
@@ -1148,6 +1357,7 @@ class _MealsSection extends StatelessWidget {
     required this.localServiceDate,
     required this.mutationEnabled,
     required this.onRegister,
+    this.supplementQuadrant,
   });
 
   final NutritionActivePlanRef? plan;
@@ -1158,6 +1368,152 @@ class _MealsSection extends StatelessWidget {
   final bool mutationEnabled;
   final void Function(NutritionPlan plan, MealScheduleSlot slot) onRegister;
 
+  /// Quarto quadrante. Vem pronto de fora porque suplemento NÃO é MealPeriod —
+  /// tem modelo, coleção e gating próprios. Ele ocupa o quadrante por decisão
+  /// visual, sem virar período no domínio.
+  final HealthNutritionQuadrantData? supplementQuadrant;
+
+  /// Monta o grid 2×2 a partir dos slots derivados do plano canônico.
+  ///
+  /// PRESERVADO INTEGRALMENTE: a derivação (`NutritionSlotDayDerivation.derive`
+  /// vs. fallback pending quando não há data de serviço), o status derivado
+  /// (`NutritionTodaySlotUi.statusFor`) e as quatro condições de gating do CTA.
+  /// A mudança é só de composição visual: slots passam a ser agrupados por
+  /// faixa do dia em vez de listados verticalmente.
+  Widget _buildPeriodGrid(NutritionPlan canonical) {
+    final slotViews = localServiceDate == null
+        ? canonical.mealSchedule
+              .map(
+                (slot) => NutritionSlotDayView(
+                  slot: slot,
+                  status: NutritionSlotDayStatus.pending,
+                ),
+              )
+              .toList(growable: false)
+        : NutritionSlotDayDerivation.derive(
+            plan: canonical,
+            mealsForDay: mealsToday,
+            localServiceDate: LocalServiceDate.fromIso(localServiceDate!),
+          ).toList(growable: false);
+
+    final grouped = <HealthNutritionPeriodGroup, List<HealthNutritionSlotEntry>>{
+      HealthNutritionPeriodGroup.morning: [],
+      HealthNutritionPeriodGroup.afternoon: [],
+      HealthNutritionPeriodGroup.night: [],
+      HealthNutritionPeriodGroup.extra: [],
+    };
+
+    for (final slotView in slotViews) {
+      final uiStatus = NutritionTodaySlotUi.statusFor(
+        slot: slotView.slot,
+        meal: slotView.meal,
+        serverNow: serverNow,
+        timezone: timezone,
+      );
+      final statusColor = slotView.hasOccurrenceConflict
+          ? AppTheme.error
+          : switch (uiStatus) {
+              NutritionTodaySlotUiStatus.completed => AppTheme.success,
+              NutritionTodaySlotUiStatus.late => AppTheme.warning,
+              NutritionTodaySlotUiStatus.pending => AppTheme.warningAccent,
+            };
+      final group = HealthNutritionPeriodVisuals.groupFor(slotView.slot.period);
+
+      // Fatos da refeição executada em formato compacto operacional.
+      final meal = slotView.meal;
+      final facts = <HealthNutritionFactLine>[];
+      String? conflictMessage;
+      String? measurementNote;
+      if (meal != null) {
+        final hasMeasured = meal.meal.consumedGrams != null;
+        final acceptanceStr = HealthNutritionTodayFormatters.acceptanceLabel(
+          meal.meal.acceptance,
+        );
+
+        if (hasMeasured) {
+          facts.add(
+            HealthNutritionFactLine(
+              label: '',
+              value: '${HealthNutritionTodayFormatters.grams(meal.meal.consumedGrams)} consumidos',
+              valueColor: AppTheme.textPrimary,
+            ),
+          );
+          facts.add(
+            HealthNutritionFactLine(
+              label: '',
+              value: acceptanceStr,
+              valueColor: AppTheme.success,
+            ),
+          );
+        } else {
+          facts.add(
+            HealthNutritionFactLine(
+              label: '',
+              value: '${HealthNutritionTodayFormatters.grams(meal.meal.offeredGrams)} oferecidos',
+              valueColor: AppTheme.textPrimary,
+            ),
+          );
+          facts.add(
+            HealthNutritionFactLine(
+              label: '',
+              value: '$acceptanceStr • consumo não medido',
+              valueColor: AppTheme.textMuted,
+            ),
+          );
+        }
+      }
+
+      if (slotView.hasOccurrenceConflict) {
+        conflictMessage =
+            'Execução duplicada detectada. '
+            'Ação temporariamente indisponível.';
+      }
+
+      grouped[group]!.add(
+        HealthNutritionSlotEntry(
+          timeLabel: slotView.slot.scheduledTime.value,
+          statusLabel: slotView.hasOccurrenceConflict
+              ? 'Dados inconsistentes'
+              : NutritionTodaySlotUi.label(uiStatus),
+          statusColor: statusColor,
+          targetGrams: slotView.slot.targetGrams,
+          executedFacts: facts,
+          conflictMessage: conflictMessage,
+          measurementNote: measurementNote,
+          onRegister:
+              mutationEnabled &&
+                  localServiceDate != null &&
+                  !slotView.hasOccurrenceConflict &&
+                  uiStatus != NutritionTodaySlotUiStatus.completed
+              ? () => onRegister(canonical, slotView.slot)
+              : null,
+        ),
+      );
+    }
+
+    HealthNutritionQuadrantData quadrant(HealthNutritionPeriodGroup group) {
+      final slots = grouped[group]!;
+      return HealthNutritionQuadrantData(
+        group: group,
+        slots: slots,
+        summaryLine: slots.length > 1
+            ? '${slots.length} refeições nesta faixa'
+            : null,
+        emptyLabel: 'Sem refeição prevista',
+      );
+    }
+
+    return HealthNutritionPeriodGrid(
+      quadrants: [
+        quadrant(HealthNutritionPeriodGroup.morning),
+        quadrant(HealthNutritionPeriodGroup.afternoon),
+        quadrant(HealthNutritionPeriodGroup.night),
+        ?supplementQuadrant,
+      ],
+      extraSlots: grouped[HealthNutritionPeriodGroup.extra]!,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canonical = plan is NutritionActiveCanonicalPlan
@@ -1167,59 +1523,11 @@ class _MealsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'REFEIÇÕES DE HOJE',
-          style: GoogleFonts.inter(
-            color: AppTheme.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.55,
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Sem heading próprio: o grid vive no contexto do plano (como no
+        // mockup), então repetir "REFEIÇÕES DE HOJE" aqui só gastaria altura.
+        // A faixa de cada quadrante já identifica o que é cada célula.
         if (canonical != null) ...[
-          ...(localServiceDate == null
-                  ? canonical.mealSchedule.map(
-                      (slot) => NutritionSlotDayView(
-                        slot: slot,
-                        status: NutritionSlotDayStatus.pending,
-                      ),
-                    )
-                  : NutritionSlotDayDerivation.derive(
-                      plan: canonical,
-                      mealsForDay: mealsToday,
-                      localServiceDate: LocalServiceDate.fromIso(
-                        localServiceDate!,
-                      ),
-                    ))
-              .map((slotView) {
-                final uiStatus = NutritionTodaySlotUi.statusFor(
-                  slot: slotView.slot,
-                  meal: slotView.meal,
-                  serverNow: serverNow,
-                  timezone: timezone,
-                );
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _MealSlotCard(
-                    periodLabel: HealthNutritionTodayFormatters.periodLabel(
-                      slotView.slot.period,
-                    ),
-                    timeLabel: slotView.slot.scheduledTime.value,
-                    targetGrams: slotView.slot.targetGrams,
-                    meal: slotView.meal,
-                    status: uiStatus,
-                    integrityConflict: slotView.hasOccurrenceConflict,
-                    onRegister:
-                        mutationEnabled &&
-                            localServiceDate != null &&
-                            !slotView.hasOccurrenceConflict &&
-                            uiStatus != NutritionTodaySlotUiStatus.completed
-                        ? () => onRegister(canonical, slotView.slot)
-                        : null,
-                  ),
-                );
-              }),
+          _buildPeriodGrid(canonical),
           // Meals do dia sem slot (ad hoc canônico / não planejado)
           ...mealsToday
               .where((m) => m.meal.plannedMealId == null)
@@ -1256,189 +1564,6 @@ class _MealsSection extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _MealSlotCard extends StatelessWidget {
-  const _MealSlotCard({
-    required this.periodLabel,
-    required this.timeLabel,
-    required this.targetGrams,
-    required this.status,
-    this.meal,
-    this.integrityConflict = false,
-    this.onRegister,
-  });
-
-  final String periodLabel;
-  final String timeLabel;
-  final double targetGrams;
-  final NutritionTodaySlotUiStatus status;
-  final NutritionMealReadItem? meal;
-  final bool integrityConflict;
-  final VoidCallback? onRegister;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = integrityConflict
-        ? AppTheme.error
-        : switch (status) {
-            NutritionTodaySlotUiStatus.completed => AppTheme.success,
-            NutritionTodaySlotUiStatus.late => AppTheme.warning,
-            NutritionTodaySlotUiStatus.pending => AppTheme.warningAccent,
-          };
-
-    return HealthSummaryCardSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  periodLabel.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  integrityConflict
-                      ? 'Dados inconsistentes'
-                      : NutritionTodaySlotUi.label(status),
-                  style: GoogleFonts.inter(
-                    color: statusColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$timeLabel · ${targetGrams.round()} g previstos',
-            style: GoogleFonts.inter(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (integrityConflict) ...[
-            const SizedBox(height: 10),
-            Semantics(
-              container: true,
-              liveRegion: true,
-              label:
-                  'Execução duplicada detectada. '
-                  'Ação temporariamente indisponível.',
-              excludeSemantics: true,
-              child: Text(
-                'Execução duplicada detectada. '
-                'Ação temporariamente indisponível.',
-                style: GoogleFonts.inter(
-                  color: AppTheme.error,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-              ),
-            ),
-          ],
-          if (meal != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _kv(
-                  'Oferecido',
-                  HealthNutritionTodayFormatters.grams(meal!.meal.offeredGrams),
-                ),
-                _kv(
-                  'Consumido',
-                  meal!.meal.consumedGrams == null
-                      ? 'Não informado'
-                      : HealthNutritionTodayFormatters.grams(
-                          meal!.meal.consumedGrams,
-                        ),
-                  valueColor: meal!.meal.consumedGrams == null
-                      ? AppTheme.textMuted
-                      : AppTheme.success,
-                ),
-                _kv(
-                  'Aceitação',
-                  HealthNutritionTodayFormatters.acceptanceLabel(
-                    meal!.meal.acceptance,
-                  ),
-                ),
-              ],
-            ),
-            if (meal!.meal.acceptance.value == MealAcceptance.full &&
-                meal!.meal.consumedGrams == null) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Quantidade consumida não medida',
-                style: GoogleFonts.inter(
-                  color: AppTheme.textMuted,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ] else if (onRegister != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onRegister,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Registrar refeição'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: AppTheme.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _kv(String k, String v, {Color? valueColor}) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            k,
-            style: GoogleFonts.inter(
-              color: AppTheme.textMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(
-            v,
-            style: GoogleFonts.inter(
-              color: valueColor ?? AppTheme.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1593,6 +1718,56 @@ class _SupplementsSection extends StatefulWidget {
   State<_SupplementsSection> createState() => _SupplementsSectionState();
 }
 
+/// Abre o sheet de registro de suplemento.
+///
+/// Extraído de `_SupplementsSectionState._openSupplementForm` SEM alteração de
+/// comportamento: mesma configuração de sheet, mesmo `HealthSupplementFormSheet`,
+/// mesmo clock autoritativo e mesma mensagem de sucesso. Existe para que o CTA
+/// do quadrante e o CTA do cabeçalho compartilhem UMA implementação, em vez de
+/// duplicar o fluxo de mutação.
+///
+/// O gating (`actionEnabled`, dogId, `authorizedNow`) permanece no chamador.
+Future<void> openHealthSupplementFormSheet({
+  required BuildContext context,
+  required String dogId,
+  required String dogDisplayName,
+  String? dogPhotoUrl,
+  required HealthNutritionMutationController mutation,
+  required Future<void> Function() onRefreshRequested,
+  required DateTime authorizedNow,
+  required NutritionActiveCanonicalPlan? activePlan,
+}) async {
+  final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
+
+  final outcome = await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppTheme.surfacePanel,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => HealthSupplementFormSheet(
+      dogId: dogId,
+      dogDisplayName: dogDisplayName,
+      dogPhotoUrl: dogPhotoUrl,
+      controller: mutation,
+      onRefreshRequested: onRefreshRequested,
+      timezone: tz,
+      clock: () => authorizedNow,
+      activePlan: activePlan,
+    ),
+  );
+
+  if (!context.mounted) return;
+  if (outcome is HealthNutritionMutationUiSuccess) {
+    AppFeedback.success(
+      context,
+      'Suplemento registrado com sucesso.',
+      title: 'Suplemento',
+    );
+  }
+}
+
 class _SupplementsSectionState extends State<_SupplementsSection> {
   bool _isOpeningSupplementForm = false;
 
@@ -1616,42 +1791,20 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
     }
 
     setState(() => _isOpeningSupplementForm = true);
-
-    final activePlan = _activeCanonicalPlan;
-    final tz = activePlan?.plan.timezone ?? NutritionPlan.defaultTimezone;
-
-    HealthNutritionMutationUiOutcome? outcome;
     try {
-      outcome = await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+      await openHealthSupplementFormSheet(
         context: context,
-        isScrollControlled: true,
-        backgroundColor: AppTheme.surfacePanel,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (_) => HealthSupplementFormSheet(
-          dogId: dogId,
-          dogDisplayName: widget.dogDisplayName,
-          controller: mutation,
-          onRefreshRequested: widget.onRefreshRequested,
-          timezone: tz,
-          clock: () => widget.authorizedNow!,
-          activePlan: activePlan,
-        ),
+        dogId: dogId,
+        dogDisplayName: widget.dogDisplayName,
+        mutation: mutation,
+        onRefreshRequested: widget.onRefreshRequested,
+        authorizedNow: widget.authorizedNow!,
+        activePlan: _activeCanonicalPlan,
       );
     } finally {
       if (mounted) {
         setState(() => _isOpeningSupplementForm = false);
       }
-    }
-
-    if (!mounted) return;
-    if (outcome is HealthNutritionMutationUiSuccess) {
-      AppFeedback.success(
-        context,
-        'Suplemento registrado com sucesso.',
-        title: 'Suplemento',
-      );
     }
   }
 
@@ -1740,31 +1893,17 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
           const SizedBox(height: 8),
         ],
         const SizedBox(height: 8),
+        // PASS 02: ausência não ganha mais uma grande surface própria — o
+        // quadrante Suplemento já iniciou essa informação acima. Vira uma linha
+        // discreta. A copy é a MESMA (há teste ancorado nela) e a dica de ação
+        // some porque o CTA do quadrante já a oferece.
         if (planRegimens.isEmpty && widget.legacyRegimens.isEmpty)
-          HealthSummaryCardSurface(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Nenhum suplemento em uso registrado.',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (hasMutation) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Registre uma administração avulsa ou consulte o plano alimentar.',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ],
+          Text(
+            'Nenhum suplemento em uso registrado.',
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           )
         else ...[
@@ -1833,19 +1972,21 @@ class _SupplementsSectionState extends State<_SupplementsSection> {
               ),
             ),
           )
+        // PASS 02: "nenhuma administração hoje" vira linha discreta. O estado
+        // INDISPONÍVEL acima conserva surface + botão Atualizar de propósito —
+        // ali há ação a tomar, e há teste de Semantics e alvo de 48px nele.
+        // Ausência de dado não merece o mesmo peso visual que falha de leitura.
         else if (widget.administrations.isEmpty)
-          HealthSummaryCardSurface(
-            child: Text(
-              planRegimens.isNotEmpty || widget.legacyRegimens.isNotEmpty
-                  ? 'Nenhuma administração registrada hoje. '
-                        'Os suplementos em uso aparecem acima.'
-                  : 'Nenhuma administração registrada hoje.',
-              style: GoogleFonts.inter(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
+          Text(
+            planRegimens.isNotEmpty || widget.legacyRegimens.isNotEmpty
+                ? 'Nenhuma administração registrada hoje. '
+                      'Os suplementos em uso aparecem acima.'
+                : 'Nenhuma administração registrada hoje.',
+            style: GoogleFonts.inter(
+              color: AppTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
             ),
           )
         else
@@ -2216,13 +2357,79 @@ class _RecentMealsSection extends StatelessWidget {
     required this.meals,
     required this.serviceDate,
     required this.timezone,
+    this.supplementAdministrations = const [],
   });
   final List<NutritionMealReadItem> meals;
   final String? serviceDate;
   final String timezone;
 
+  /// Administrações de suplemento do dia, já presentes no read state.
+  ///
+  /// PASS 02: entram na MESMA timeline das refeições, em verde, ordenadas
+  /// temporalmente. Não há projeção nova, nem leitura nova, nem persistência
+  /// alterada — é composição de apresentação com dado que a tela já recebia
+  /// (`todayModel.canonicalSupplementLogs`, o mesmo que alimenta a seção
+  /// "ADMINISTRAÇÕES DE HOJE").
+  final List<SupplementLog> supplementAdministrations;
+
+  /// Constrói as entradas ordenadas por instante, refeições + suplementos.
+  List<HealthNutritionHistoryEntry> _buildEntries() {
+    // (instante, entrada) para ordenar as duas naturezas juntas.
+    final rows = <(DateTime, HealthNutritionHistoryEntry)>[];
+
+    for (final m in meals) {
+      final consumed = m.meal.consumedGrams;
+      final line = consumed == null
+          ? '${HealthNutritionTodayFormatters.grams(m.meal.offeredGrams)} oferecidos · consumo não informado'
+          : '${HealthNutritionTodayFormatters.grams(consumed)} consumidos';
+      rows.add((
+        m.meal.fedAt,
+        HealthNutritionHistoryEntry(
+          group: HealthNutritionPeriodVisuals.groupFor(m.meal.period),
+          title: HealthNutritionPeriodVisuals.labelFor(m.meal.period),
+          whenLabel: HealthNutritionTodayFormatters.recentDateTimeLabel(
+            instant: m.meal.fedAt,
+            serviceDate: serviceDate ?? '0001-01-01',
+            timezone: timezone,
+          ),
+          detailLine: line,
+          isLegacy: m.origin != NutritionDataOrigin.canonical,
+        ),
+      ));
+    }
+
+    for (final a in supplementAdministrations) {
+      rows.add((
+        a.administeredAt,
+        HealthNutritionHistoryEntry(
+          group: HealthNutritionPeriodGroup.supplement,
+          title: HealthNutritionPeriodVisuals.resolve(
+            HealthNutritionPeriodGroup.supplement,
+          ).label,
+          whenLabel: HealthNutritionTodayFormatters.recentDateTimeLabel(
+            instant: a.administeredAt,
+            serviceDate: serviceDate ?? '0001-01-01',
+            timezone: timezone,
+          ),
+          // Nome + dose: os mesmos fatos do card da seção de administrações.
+          detailLine:
+              '${a.supplementName} · '
+              '${_formatSupplementDose(a.dose)} ${a.unit.displayLabel}',
+          // Suplemento canônico: a seção legada é de regimes, não de logs.
+          isLegacy: false,
+        ),
+      ));
+    }
+
+    // Mais recente primeiro, como a lista de refeições já se comportava.
+    rows.sort((a, b) => b.$1.compareTo(a.$1));
+    return rows.map((r) => r.$2).toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final entries = _buildEntries();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2236,7 +2443,7 @@ class _RecentMealsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        if (meals.isEmpty)
+        if (entries.isEmpty)
           HealthSummaryCardSurface(
             child: Text(
               'Sem refeições recentes.',
@@ -2248,59 +2455,12 @@ class _RecentMealsSection extends StatelessWidget {
             ),
           )
         else
-          ...meals.map((m) {
-            final consumed = m.meal.consumedGrams;
-            final line = consumed == null
-                ? '${HealthNutritionTodayFormatters.grams(m.meal.offeredGrams)} oferecidos · consumo não informado'
-                : '${HealthNutritionTodayFormatters.grams(consumed)} consumidos';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: HealthSummaryCardSurface(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.restaurant_rounded,
-                      size: 18,
-                      color: m.origin == NutritionDataOrigin.canonical
-                          ? AppTheme.primary
-                          : AppTheme.attention,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            HealthNutritionTodayFormatters.periodLabel(
-                              m.meal.period,
-                            ),
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                          Text(
-                            '${HealthNutritionTodayFormatters.recentDateTimeLabel(instant: m.meal.fedAt, serviceDate: serviceDate ?? '0001-01-01', timezone: timezone)} · $line'
-                            '${m.origin != NutritionDataOrigin.canonical ? ' · legado' : ''}',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.textMuted,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
+          // Timeline local APROVADA na revisão física — anatomia, rail,
+          // espaçamento, tipografia e cores preservados integralmente.
+          // A única evolução desta pass: administrações de suplemento entram no
+          // mesmo padrão, em verde. Cor = período/tipo; proveniência legada
+          // continua sendo badge.
+          HealthNutritionHistoryTimeline(entries: entries),
       ],
     );
   }

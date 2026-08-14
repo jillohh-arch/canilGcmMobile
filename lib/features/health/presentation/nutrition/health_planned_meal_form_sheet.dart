@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:canil_gcm/core/theme/app_theme.dart';
-import 'package:canil_gcm/core/widgets/hud_controls.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_errors.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/meal_occurrence.dart';
@@ -12,12 +11,36 @@ import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
 import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_today_formatters.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_context_badge.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/widgets/health_nutrition_dog_avatar.dart';
+
+/// PASS 02B: modo de preenchimento da quantidade consumida.
+/// Controla o chip ativo e a visibilidade do campo numérico.
+/// Não é uma variável "espelhada" do controller — deriva dele para manter
+/// consistência com o valor efetivamente enviado no payload.
+enum _ConsumedMode { all, partial, unmeasured }
+
+/// Deriva o modo inicial a partir do valor real do controller + oferecido.
+_ConsumedMode _deriveConsumedMode(String consumed, String offered) {
+  final c = _numberStatic(consumed);
+  final o = _numberStatic(offered);
+  if (consumed.trim().isEmpty) return _ConsumedMode.unmeasured;
+  if (c != null && o != null && c == o) return _ConsumedMode.all;
+  return _ConsumedMode.partial;
+}
+
+double? _numberStatic(String? raw) {
+  final normalized = raw?.trim().replaceAll(',', '.');
+  if (normalized == null || normalized.isEmpty) return null;
+  return double.tryParse(normalized);
+}
 
 /// Sheet operacional Health v1 para criação exclusiva de MealLog planned.
 class HealthPlannedMealFormSheet extends StatefulWidget {
   const HealthPlannedMealFormSheet({
     super.key,
     required this.dogDisplayName,
+    this.dogPhotoUrl,
     required this.plan,
     required this.slot,
     required this.localServiceDate,
@@ -27,6 +50,9 @@ class HealthPlannedMealFormSheet extends StatefulWidget {
   });
 
   final String dogDisplayName;
+
+  /// PASS 03C: URL de foto já disponível no contexto do app. Ausente → patinha.
+  final String? dogPhotoUrl;
   final NutritionPlan plan;
   final MealScheduleSlot slot;
   final String localServiceDate;
@@ -45,11 +71,32 @@ class _HealthPlannedMealFormSheetState
   late final TextEditingController _offered;
   late final TextEditingController _consumed;
   late final TextEditingController _observations;
-  MealAcceptance _acceptance = MealAcceptance.unknown;
+  MealAcceptance _acceptance = MealAcceptance.full;
   late TimeOfDay _fedTime;
   bool _submitting = false;
   bool _savedButRefreshFailed = false;
   String? _message;
+
+  /// PASS 02B: modo de quantidade consumida. Controla qual chip está ativo
+  /// e a visibilidade do campo numérico.
+  ///
+  /// - `all`: "Tudo" selecionado — campo escondido, consumo = oferecido.
+  /// - `partial`: "Parcial" — campo visível para digitação.
+  /// - `unmeasured`: "Não medido" — campo escondido, consumo vazio.
+  ///
+  /// Inicializado em `initState`:
+  /// - Fresh (sem draft): `_consumedMode = all`, `_consumed` = oferecido.
+  ///   Caso normal: o formulário abre com "Tudo" selecionado e quantidade
+  ///   preenchida, pronto para registrar sem interação.
+  /// - Draft restaurado: deriva do valor real do controller.
+  ///
+  /// A validação de `consumed > offered` é condicional: só aplica quando o
+  /// campo está visível (modo `partial`). Isso evita erro quando o usuário
+  /// muda `offered` sem tocar nos chips de consumed.
+  ///
+  /// Quando `refused` é selecionado na aceitação, `_onAcceptanceChanged`
+  /// força `all` + consumo 0, que é o estado correto para "recusou".
+  _ConsumedMode _consumedMode = _ConsumedMode.all;
 
   DateTime get _now => (widget.clock?.call() ?? DateTime.now()).toUtc();
 
@@ -65,16 +112,30 @@ class _HealthPlannedMealFormSheetState
     _offered = TextEditingController(
       text: _gramsText(same ? pending.offeredGrams : widget.slot.targetGrams),
     );
-    _consumed = TextEditingController(
-      text: same && pending.consumedGrams != null
-          ? _gramsText(pending.consumedGrams!)
-          : '',
-    );
+    _offered.addListener(_onOfferedChanged);
+    // PASS 02B: novo formulário inicia com consumed = oferecido.
+    // Caso normal = usuário registra "aceitou tudo" sem digitar nada.
+    if (same && pending.consumedGrams != null) {
+      _consumed = TextEditingController(
+        text: _gramsText(pending.consumedGrams!),
+      );
+      // Deriva o modo inicial a partir do draft restaurado.
+      _consumedMode = _deriveConsumedMode(
+        _consumed.text,
+        _offered.text,
+      );
+    } else {
+      // PASS 02B: fresh — preenche com oferecido para o caso normal.
+      _consumed = TextEditingController(
+        text: _gramsText(widget.slot.targetGrams),
+      );
+      _consumedMode = _ConsumedMode.all;
+    }
     _observations = TextEditingController(
       text: same ? pending.observations ?? '' : '',
     );
     if (same) {
-      _acceptance = pending.acceptance.value ?? MealAcceptance.unknown;
+      _acceptance = pending.acceptance.value ?? MealAcceptance.full;
       final local = LocalServiceDate.instantInTimezone(
         pending.fedAt,
         timezone: widget.plan.timezone,
@@ -89,8 +150,15 @@ class _HealthPlannedMealFormSheetState
     }
   }
 
+  void _onOfferedChanged() {
+    if (_consumedMode == _ConsumedMode.all && _acceptance != MealAcceptance.refused) {
+      _consumed.text = _offered.text;
+    }
+  }
+
   @override
   void dispose() {
+    _offered.removeListener(_onOfferedChanged);
     _offered.dispose();
     _consumed.dispose();
     _observations.dispose();
@@ -124,20 +192,43 @@ class _HealthPlannedMealFormSheetState
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.restaurant_rounded,
-                      color: AppTheme.primary,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.restaurant_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'REGISTRAR REFEIÇÃO',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'REGISTRAR REFEIÇÃO',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Refeição prevista no plano alimentar',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     IconButton(
@@ -156,6 +247,7 @@ class _HealthPlannedMealFormSheetState
                 _numberField(
                   controller: _offered,
                   label: 'Quantidade oferecida (g)',
+                  prefixIcon: Icons.scale_rounded,
                   validator: (raw) {
                     final value = _number(raw);
                     return value == null || value <= 0
@@ -164,37 +256,19 @@ class _HealthPlannedMealFormSheetState
                   },
                 ),
                 const SizedBox(height: 14),
-                HudSelectField<MealAcceptance>(
-                  label: 'Aceitação',
-                  icon: Icons.restaurant_rounded,
-                  value: _acceptance,
-                  items: MealAcceptance.values,
-                  labelBuilder: (a) => _acceptanceLabel(a),
-                  accent: AppTheme.primary,
-                  placeholder: 'Selecione',
-                  onChanged: _onAcceptanceChanged,
-                ),
+                _acceptanceChips(),
                 const SizedBox(height: 14),
-                _numberField(
-                  controller: _consumed,
-                  label: 'Quantidade consumida (g) — opcional',
-                  enabled: _acceptance != MealAcceptance.refused,
-                  validator: _validateConsumed,
-                ),
+                // PASS 02B: `_consumedChips` já contém o campo numérico quando
+                // "Parcial" está ativo — não precisa existir aqui separadamente.
+                _consumedChips(),
                 const SizedBox(height: 14),
                 InkWell(
                   onTap: _submitting ? null : _pickTime,
                   borderRadius: BorderRadius.circular(10),
                   child: InputDecorator(
-                    decoration: _inputDecoration('Oferecido às'),
+                    decoration: _inputDecoration('Oferecido às', prefixIcon: Icons.schedule_rounded),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.schedule_rounded,
-                          color: AppTheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
                         Text(
                           _fedTime.format(context),
                           style: GoogleFonts.inter(
@@ -225,7 +299,10 @@ class _HealthPlannedMealFormSheetState
                   maxLines: 3,
                   maxLength: 500,
                   style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                  decoration: _inputDecoration('Observações — opcional'),
+                  decoration: _inputDecoration(
+                    'Observações — opcional',
+                    prefixIcon: Icons.chat_bubble_outline_rounded,
+                  ),
                 ),
                 if (_message != null) ...[
                   const SizedBox(height: 12),
@@ -291,51 +368,92 @@ class _HealthPlannedMealFormSheetState
   }
 
   Widget _contextCard() => Container(
-    padding: const EdgeInsets.all(14),
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppTheme.primaryOverlay,
+      color: AppTheme.surfacePanel,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppTheme.primaryDivider),
+      border: Border.all(color: AppTheme.outline),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Row(
       children: [
-        Text(
-          widget.dogDisplayName,
-          style: GoogleFonts.inter(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w800,
-          ),
+        HealthNutritionDogAvatar(
+          key: const ValueKey('planned-meal-dog-avatar'),
+          dogDisplayName: widget.dogDisplayName,
+          photoUrl: widget.dogPhotoUrl,
         ),
-        const SizedBox(height: 6),
-        Text(
-          '${HealthNutritionTodayFormatters.periodLabel(widget.slot.period)} · '
-          '${widget.slot.scheduledTime.value} · '
-          '${_gramsText(widget.slot.targetGrams)} g planejados',
-          style: GoogleFonts.inter(color: AppTheme.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // PASS 03D: nome à esquerda, badge de classificação à direita, na
+              // MESMA linha. `Flexible` + ellipsis nos dois lados garante que
+              // nome longo e badge nunca colidam nem estourem em 320px.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Text(
+                      widget.dogDisplayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Flexible(
+                    child: HealthNutritionContextBadge(
+                      key: ValueKey('planned-meal-context-badge'),
+                      label: 'Planejada',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${HealthNutritionTodayFormatters.periodLabel(widget.slot.period)} · '
+                '${widget.slot.scheduledTime.value} · '
+                '${_gramsText(widget.slot.targetGrams)} g planejados',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     ),
   );
 
   Widget _numberField({
+    Key? key,
     required TextEditingController controller,
     required String label,
     required String? Function(String?) validator,
+    IconData? prefixIcon,
     bool enabled = true,
-  }) => TextFormField(
-    controller: controller,
+  }) =>
+      TextFormField(
+        key: key,
+        controller: controller,
     enabled: enabled && !_submitting && !_savedButRefreshFailed,
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]'))],
     style: GoogleFonts.inter(color: AppTheme.textPrimary),
-    decoration: _inputDecoration(label),
+    decoration: _inputDecoration(label, prefixIcon: prefixIcon),
     validator: validator,
   );
 
-  InputDecoration _inputDecoration(String label) => InputDecoration(
+  InputDecoration _inputDecoration(String label, {IconData? prefixIcon}) => InputDecoration(
     labelText: label,
     labelStyle: GoogleFonts.inter(color: AppTheme.textSecondary),
+    prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppTheme.primary, size: 20) : null,
     filled: true,
     fillColor: AppTheme.surfacePanel,
     enabledBorder: OutlineInputBorder(
@@ -368,7 +486,17 @@ class _HealthPlannedMealFormSheetState
     ),
   );
 
+  double? get _calculatedConsumedGrams {
+    if (_acceptance == MealAcceptance.refused) return 0;
+    return switch (_consumedMode) {
+      _ConsumedMode.all => _number(_offered.text),
+      _ConsumedMode.unmeasured => null,
+      _ConsumedMode.partial => _number(_consumed.text),
+    };
+  }
+
   String? _validateConsumed(String? raw) {
+    if (_consumedMode != _ConsumedMode.partial) return null;
     final offered = _number(_offered.text);
     final consumed = _number(raw);
     if (raw != null && raw.trim().isNotEmpty && consumed == null) {
@@ -424,7 +552,7 @@ class _HealthPlannedMealFormSheetState
       offeredGrams: _number(_offered.text)!,
       acceptance: MealAcceptanceWire.parse(_acceptance.wireName),
       fedAt: fedAt,
-      consumedGrams: _number(_consumed.text),
+      consumedGrams: _calculatedConsumedGrams,
       observations: _observations.text.trim().isEmpty
           ? null
           : _observations.text.trim(),
@@ -504,6 +632,42 @@ class _HealthPlannedMealFormSheetState
     return double.tryParse(normalized);
   }
 
+
+  /// PASS 03C: label do chip com o indicador de seleção como SUFIXO.
+  ///
+  /// Regra visual da pass: o ícone semântico vive no slot `avatar` (à esquerda)
+  /// e o check vive depois da label (à direita). Nunca no mesmo slot, nunca em
+  /// `Stack`. Só o chip selecionado renderiza o check.
+  Widget _chipLabel(
+    String text, {
+    required bool selected,
+    required Color accent,
+  }) {
+    if (!selected) return Text(text);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: Text(text)),
+        const SizedBox(width: 6),
+        Icon(Icons.check_rounded, size: 15, color: accent),
+      ],
+    );
+  }
+
+  IconData _acceptanceIcon(MealAcceptance a) => switch (a) {
+    MealAcceptance.full => Icons.sentiment_satisfied_alt_rounded,
+    MealAcceptance.partial => Icons.sentiment_neutral_rounded,
+    MealAcceptance.refused => Icons.sentiment_dissatisfied_rounded,
+    MealAcceptance.unknown => Icons.help_outline_rounded,
+  };
+
+  Color _acceptanceColor(MealAcceptance a) => switch (a) {
+    MealAcceptance.full => AppTheme.success,
+    MealAcceptance.partial => AppTheme.warningAccent,
+    MealAcceptance.refused => AppTheme.error,
+    MealAcceptance.unknown => AppTheme.textMuted,
+  };
+
   String _acceptanceLabel(MealAcceptance a) => switch (a) {
     MealAcceptance.full => 'Aceitou tudo',
     MealAcceptance.partial => 'Aceitação parcial',
@@ -511,14 +675,207 @@ class _HealthPlannedMealFormSheetState
     MealAcceptance.unknown => 'Não informado',
   };
 
+  Widget _acceptanceChips() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ACEITAÇÃO',
+          style: GoogleFonts.inter(
+            color: AppTheme.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in MealAcceptance.values)
+              ChoiceChip(
+                key: Key('planned-meal-acceptance-${option.wireName}'),
+                // PASS 03C: o checkmark padrão do ChoiceChip é desenhado no
+                // MESMO slot do `avatar`, sobrepondo o ícone semântico. Ele é
+                // desligado aqui e reposicionado como sufixo depois da label.
+                showCheckmark: false,
+                avatar: Icon(
+                  _acceptanceIcon(option),
+                  size: 18,
+                  color: _acceptance == option
+                      ? _acceptanceColor(option)
+                      : AppTheme.textMuted,
+                ),
+                label: _chipLabel(
+                  _acceptanceLabel(option),
+                  selected: _acceptance == option,
+                  accent: _acceptanceColor(option),
+                ),
+                selected: _acceptance == option,
+                onSelected: _submitting
+                    ? null
+                    : (_) => _onAcceptanceChanged(option),
+                selectedColor: _acceptanceColor(option).withValues(alpha: 0.16),
+                backgroundColor: AppTheme.surfacePanel,
+                side: BorderSide(
+                  color: _acceptance == option
+                      ? _acceptanceColor(option)
+                      : AppTheme.outline,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                labelStyle: GoogleFonts.inter(
+                  color: _acceptance == option
+                      ? AppTheme.textPrimary
+                      : AppTheme.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _consumedChips() {
+    final refused = _acceptance == MealAcceptance.refused;
+
+    Widget chip(
+      String label,
+      IconData icon,
+      Color accent,
+      bool selected,
+      VoidCallback onTap,
+    ) {
+      return ChoiceChip(
+        key: Key('planned-meal-consumed-$label'),
+        // PASS 03C: ver nota em `_acceptanceChips` — checkmark vai para sufixo.
+        showCheckmark: false,
+        avatar: Icon(
+          icon,
+          size: 18,
+          // PASS 03D: cor semântica só no estado selecionado; não selecionado
+          // permanece discreto como antes.
+          color: selected ? accent : AppTheme.textMuted,
+        ),
+        label: _chipLabel(label, selected: selected, accent: accent),
+        selected: selected,
+        onSelected: _submitting || refused ? null : (_) => onTap(),
+        selectedColor: accent.withValues(alpha: 0.16),
+        backgroundColor: AppTheme.surfacePanel,
+        side: BorderSide(
+          color: selected ? accent : AppTheme.outline,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        labelStyle: GoogleFonts.inter(
+          color: selected ? accent : AppTheme.textSecondary,
+          fontWeight: FontWeight.w700,
+          fontSize: 12.5,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'QUANTIDADE CONSUMIDA',
+          style: GoogleFonts.inter(
+            color: AppTheme.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            chip(
+              'Tudo',
+              Icons.restaurant_rounded,
+              // PASS 03D: mesma família de Aceitação — verde = completo.
+              AppTheme.success,
+              _consumedMode == _ConsumedMode.all,
+              () {
+                setState(() {
+                  _consumedMode = _ConsumedMode.all;
+                  if (_offered.text.isNotEmpty) {
+                    _consumed.text = _offered.text;
+                  }
+                });
+              },
+            ),
+            chip(
+              'Parcial',
+              // PASS 03C: `pie_chart_outline` lia como gráfico/estatística.
+              // `rice_bowl` = tigela/porção, alinhado a "comeu parte do que
+              // foi oferecido" e distinto do rosto neutro de Aceitação parcial.
+              Icons.rice_bowl_rounded,
+              // PASS 03D: âmbar = parcial, igual a "Aceitação parcial".
+              AppTheme.warningAccent,
+              _consumedMode == _ConsumedMode.partial,
+              () {
+                setState(() {
+                  final prevMode = _consumedMode;
+                  _consumedMode = _ConsumedMode.partial;
+                  final off = _number(_offered.text);
+                  final con = _number(_consumed.text);
+                  if (prevMode == _ConsumedMode.all || (off != null && con != null && off == con)) {
+                    _consumed.clear();
+                  }
+                });
+              },
+            ),
+            chip(
+              'Não medido',
+              Icons.remove_circle_outline_rounded,
+              // PASS 03D: NEUTRO, nunca vermelho. Ausência de mensuração não é
+              // recusa, erro nem problema clínico.
+              AppTheme.textMuted,
+              _consumedMode == _ConsumedMode.unmeasured,
+              () {
+                setState(() {
+                  _consumedMode = _ConsumedMode.unmeasured;
+                  _consumed.clear();
+                });
+              },
+            ),
+          ],
+        ),
+        // PASS 02B: campo numérico visível só quando "Parcial".
+        if (_consumedMode == _ConsumedMode.partial && !refused) ...[
+          const SizedBox(height: 10),
+          _numberField(
+            key: const ValueKey('consumed-field'),
+            controller: _consumed,
+            label: 'Quantidade consumida (g) — opcional',
+            prefixIcon: Icons.scale_rounded,
+            enabled: !refused,
+            validator: _validateConsumed,
+          ),
+        ],
+      ],
+    );
+  }
+
   void _onAcceptanceChanged(MealAcceptance? value) {
     if (value == null || _submitting) return;
     setState(() {
       _acceptance = value;
       if (value == MealAcceptance.refused) {
+        // PASS 02B: `refused` força consumo 0 e modo "Tudo".
         _consumed.text = '0';
+        _consumedMode = _ConsumedMode.all;
       } else if (value == MealAcceptance.unknown) {
         _consumed.clear();
+        _consumedMode = _ConsumedMode.unmeasured;
       }
     });
   }

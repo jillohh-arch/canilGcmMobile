@@ -14,8 +14,8 @@ abstract final class HealthNutritionTodayFormatters {
     if (period.isKnown && period.value != null) {
       return switch (period.value!) {
         MealPeriod.morning => 'Manhã',
-        MealPeriod.afternoon => 'Almoço',
-        MealPeriod.evening => 'Tarde',
+        MealPeriod.afternoon => 'Tarde',
+        MealPeriod.evening => 'Noite',
         MealPeriod.night => 'Noite',
         MealPeriod.extra => 'Extra',
       };
