@@ -202,6 +202,10 @@ class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
               isOwnDog: dog.conductorRa == widget.currentRa,
               onTap: () async {
                 HapticFeedback.mediumImpact();
+                // HEALTH-V1-OP-AUTH: este aviso é DISPLAY legado (vacina,
+                // antipulgas, status do cadastro) sobre campos de `dogs/{id}`.
+                // Ele não autoriza nem libera nada: a decisão clínica vem do
+                // backend, que valida `operational_restrictions` logo abaixo.
                 if (fitness.status != DogFitnessStatus.apt) {
                   final confirm = await _showFitnessConfirmation(
                     context,
@@ -214,6 +218,48 @@ class _AvailableDogsLoaderState extends State<_AvailableDogsLoader> {
                 Navigator.of(context).pop();
                 await widget.shiftVM.switchDog(dog.id);
                 if (!context.mounted) return;
+
+                final failure = widget.shiftVM.authorizationFailure;
+                if (failure != null) {
+                  if (failure.isClinicalBlock) {
+                    // Bloqueio clínico: sem opção de prosseguir.
+                    await ShiftAuthorizationPrompts.showBlocked(
+                      context,
+                      dogName: dog.name,
+                      failure: failure,
+                    );
+                  } else if (failure.kind ==
+                      ShiftAuthorizationFailureKind.acknowledgementRequired) {
+                    final acknowledged =
+                        await ShiftAuthorizationPrompts.confirmPartial(
+                          context,
+                          dogName: dog.name,
+                          failure: failure,
+                        );
+                    if (acknowledged) {
+                      await widget.shiftVM.acknowledgePartialRestrictions();
+                      if (!context.mounted) return;
+                      final retryFailure =
+                          widget.shiftVM.authorizationFailure;
+                      if (retryFailure != null) {
+                        ShiftAuthorizationPrompts.showFailureMessage(
+                          context,
+                          dogName: dog.name,
+                          failure: retryFailure,
+                        );
+                      }
+                    }
+                  } else {
+                    ShiftAuthorizationPrompts.showFailureMessage(
+                      context,
+                      dogName: dog.name,
+                      failure: failure,
+                    );
+                  }
+                  widget.shiftVM.clearAuthorizationFeedback();
+                  return;
+                }
+
                 final error = widget.shiftVM.error;
                 if (error != null && error.trim().isNotEmpty) {
                   AppFeedback.error(context, error);

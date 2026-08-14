@@ -53,6 +53,11 @@ import {
   healthReadinessProjectRestriction,
 } from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
+import {
+  buildShiftAuthorizedCommandHandler,
+  createAdminShiftEngineDeps,
+} from "./shift_authorization_callables";
+import type {ShiftActor} from "./shift_authorization_engine";
 
 admin.initializeApp();
 
@@ -8144,6 +8149,89 @@ export {healthReadinessProjectNutritionPlan};
 
 /** Readiness trigger — fires on any operational_restrictions write. */
 export {healthReadinessProjectRestriction};
+
+
+// =============================================================================
+// HEALTH-V1-OP-AUTH — Enforcement operacional de restrições (Gate B)
+// =============================================================================
+
+/**
+ * Deps reais do mutation owner de associação operacional de K9.
+ *
+ * AUTORIZAÇÃO DO CALLER: preserva o modelo factual vigente. Turno NÃO é gated
+ * por capability de perfil — não existe módulo `shifts` em `AccessModule`, e as
+ * Rules autorizam hoje apenas via `emailMatchesRa(ra)`, isto é, "o operador age
+ * sobre o próprio RA". Reproduzimos exatamente isso: identidade sempre derivada
+ * do token, nunca do payload, então um cliente não abre turno no RA de outro.
+ * Introduzir aqui uma capability inexistente negaria a operação a todos os
+ * condutores reais.
+ *
+ * ACESSO AO K9: `requireDogRecordAccess` é reutilizada, não reimplementada. Vale
+ * notar uma assimetria real: uma de suas três vias é "ter turno ativo com o
+ * cão", que no `start_shift` ainda não existe. Logo, quem inicia turno passa
+ * pelas outras duas vias (escopo global ou ser o condutor vinculado ao K9) —
+ * exatamente como as Rules já se comportam hoje para este caso.
+ */
+function buildShiftAuthorizationDeps() {
+  return {
+    db,
+    requireShiftActor: async (
+      auth: CallableRequest["auth"],
+    ): Promise<ShiftActor> => {
+      const caller = requireAuth(auth);
+      if (!caller.ra) {
+        throw new HttpsError(
+          "permission-denied",
+          "RA do operador não pôde ser resolvido.",
+        );
+      }
+      return {
+        uid: caller.uid,
+        ra: caller.ra,
+        email: caller.email,
+        name: caller.name,
+      };
+    },
+    requireDogAccess: async (
+      auth: CallableRequest["auth"],
+      actor: ShiftActor,
+      dogId: string,
+    ): Promise<void> => {
+      const dogSnap = await db.collection("dogs").doc(dogId).get();
+      if (!dogSnap.exists) {
+        throw new HttpsError("not-found", "Cao nao encontrado.");
+      }
+      await requireDogRecordAccess(
+        auth,
+        {
+          uid: actor.uid,
+          email: actor.email,
+          ra: actor.ra,
+          name: actor.name,
+        },
+        dogId,
+        dogSnap.data() ?? {},
+      );
+    },
+    createEngineDeps: () => createAdminShiftEngineDeps(db),
+  };
+}
+
+/**
+ * Executa uma ação operacional crítica com K9 sob guard canônico de restrições.
+ *
+ * Ações: `start_shift`, `switch_dog`, `assume_vehicle` — todas as que podem
+ * INTRODUZIR ou SUBSTITUIR o K9 operacional. A autoridade é
+ * `dogs/{dogId}/operational_restrictions` com `status == active`, consultada
+ * dentro da mesma transação que aplica a mutação. `health_summary/current` NÃO
+ * participa da decisão (ADR-005 §13).
+ */
+export const shiftExecuteAuthorizedCommand = onCall({region}, async (request) => {
+  const handler = buildShiftAuthorizedCommandHandler(
+    buildShiftAuthorizationDeps(),
+  );
+  return handler(request);
+});
 
 
 // =============================================================================
