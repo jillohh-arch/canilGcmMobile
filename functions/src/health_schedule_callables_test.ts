@@ -40,6 +40,18 @@ const adminActor: ScheduleCaller = {
   name: "Admin",
 };
 
+/**
+ * `scheduled_for` determinístico sempre no futuro relativo ao "agora" da
+ * execução. Datas literais apodrecem: a validação de create recusa passado,
+ * então um fixture fixo transforma a suíte em bomba-relógio (era exatamente o
+ * caso de "2026-08-01T12:00:00.000Z", que passou a falhar em 2026-08-01).
+ * A validação de produção permanece intacta — apenas o teste deixa de assumir
+ * uma data de calendário.
+ */
+const FUTURE_SCHEDULED_FOR_ISO = new Date(
+  Date.now() + 30 * 24 * 60 * 60 * 1000,
+).toISOString();
+
 function createFakeDb(initial: Record<string, JsonMap> = {}) {
   const store = new Map<string, JsonMap>();
   for (const [k, v] of Object.entries(initial)) {
@@ -230,7 +242,7 @@ async function main(): Promise<void> {
       dogId: "dog-1",
       scheduleType: "vaccination",
       title: "V10",
-      scheduledFor: "2026-08-01T12:00:00.000Z",
+      scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
       timezone: "America/Sao_Paulo",
       idempotencyKey: "create-key-1",
     };
@@ -264,7 +276,7 @@ async function main(): Promise<void> {
           dogId: "dog-1",
           scheduleType: "vaccination",
           title: "V10",
-          scheduledFor: "2026-08-01T12:00:00.000Z",
+          scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
           timezone: "America/Sao_Paulo",
           idempotencyKey: "create-key-2",
         },
@@ -280,7 +292,7 @@ async function main(): Promise<void> {
               dogId: "dog-1",
               scheduleType: "vaccination",
               title: "OUTRO",
-              scheduledFor: "2026-08-01T12:00:00.000Z",
+              scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
               timezone: "America/Sao_Paulo",
               idempotencyKey: "create-key-2",
             },
@@ -865,7 +877,7 @@ async function main(): Promise<void> {
               dogId: "dog-1",
               scheduleType: "vaccination",
               title: "V10",
-              scheduledFor: "2026-08-01T12:00:00.000Z",
+              scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
               timezone: "America/Sao_Paulo",
               idempotencyKey: "k2",
               recorded_by: {uid: "hacker"},
@@ -971,6 +983,201 @@ async function main(): Promise<void> {
   const material = createIdempotencyMaterial("u", "d", "k");
   const hash = crypto.createHash("sha256").update(material).digest("hex");
   assert.ok(deterministicManualScheduleId(hash).startsWith("m_"));
+
+  // ── dog_id autoridade (HW-4A.2C) ──────────────────────────────────────────
+  //
+  // dogId do payload é a autoridade; dog_id redundante é ignorado quando
+  // consistente, rejeitado quando conflitante. dog_id nunca pode sobrescrever
+  // a autoridade estrutural. Impossível mover um schedule entre cães.
+
+  await test("create: dogId fornecido + dog_id consistente → ignora dog_id", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    const auth = {uid: actor.uid, token: {}};
+    const r = await runHealthScheduleCreateManual(
+      mockRequest(
+        {
+          dogId: "dog-1",
+          dog_id: "dog-1", // redundante mas consistente → aceito
+          scheduleType: "vaccination",
+          title: "V10",
+          scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
+          timezone: "America/Sao_Paulo",
+          idempotencyKey: "dog-id-consistent",
+        },
+        auth,
+      ),
+      deps,
+    );
+    assert.strictEqual(r.wasNoOp, false);
+    assert.strictEqual(r.dogId, "dog-1");
+    const stored = db._store.get("dogs/dog-1/health_schedule/" + r.scheduleId);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id gravado = dogId");
+  });
+
+  await test("create: dogId + dog_id conflitante → rejeita", async () => {
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      "dogs/dog-other": {name: "Outro"},
+    });
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCreateManual(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other", // sobrescrita → rejeita
+              scheduleType: "vaccination",
+              title: "V10",
+              scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
+              timezone: "America/Sao_Paulo",
+              idempotencyKey: "dog-id-conflict",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        e.message?.includes("dog_id não pode sobrescrever"),
+    );
+  });
+
+  await test("create: dog_id fornecido sem dogId → rejeita", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCreateManual(
+          mockRequest(
+            {
+              dog_id: "dog-1", // cliente tentando usar dog_id como fornecedor
+              scheduleType: "vaccination",
+              title: "V10",
+              scheduledFor: FUTURE_SCHEDULED_FOR_ISO,
+              timezone: "America/Sao_Paulo",
+              idempotencyKey: "dog-id-missing-dogId",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string}) => e.code === "invalid-argument",
+    );
+  });
+
+  await test("update: dogId + dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-update-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      "dogs/dog-other": {name: "Outro"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1", // existente no documento
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleUpdateOpen(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other", // sobrescrita → rejeita
+              scheduleId,
+              expectedRevision: 1,
+              operationId: "update-conflict",
+              patch: {title: "Nova V"},
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        e.message?.includes("dog_id não pode sobrescrever"),
+    );
+  });
+
+  await test("complete: dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-complete-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1",
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleComplete(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other",
+              scheduleId,
+              operationId: "complete-conflict",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        e.message?.includes("dog_id não pode sobrescrever"),
+    );
+  });
+
+  await test("cancel: dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-cancel-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1",
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCancel(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other",
+              scheduleId,
+              operationId: "cancel-conflict",
+              cancelReason: "motivo",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        e.message?.includes("dog_id não pode sobrescrever"),
+    );
+  });
 
   console.log("\nhealth_schedule_callables_test: all passed");
 }

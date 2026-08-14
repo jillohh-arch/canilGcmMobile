@@ -1,0 +1,284 @@
+{
+  "$comment": "K9 Ops — HW-4A.2 cross-platform temporal parity fixture. Same input MUST produce the same temporal state on Mobile (Dart) and Web (TS). Pure data: no runtime coupling between repos. Durations in the approved config: upcoming 7d all types; post-due 24h all types except dose (dose has no generic fallback).",
+  "version": 1,
+  "cases": [
+    {
+      "name": "terminal completed is never reclassified by time",
+      "now": "2027-01-01T00:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "completed"
+      },
+      "expected": "completed"
+    },
+    {
+      "name": "terminal cancelled is never reclassified by time",
+      "now": "2027-01-01T00:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "cancelled"
+      },
+      "expected": "cancelled"
+    },
+    {
+      "name": "scheduled before the upcoming window opens",
+      "now": "2026-08-04T14:59:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "scheduled"
+    },
+    {
+      "name": "upcoming exactly at windowStart (inclusive start)",
+      "now": "2026-08-04T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "upcoming"
+    },
+    {
+      "name": "upcoming inside window on a different civil day",
+      "now": "2026-08-08T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "upcoming"
+    },
+    {
+      "name": "today earlier on the same civil day in item timezone",
+      "now": "2026-08-11T13:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "today"
+    },
+    {
+      "name": "pending at the exact scheduled_for instant",
+      "now": "2026-08-11T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "pending"
+    },
+    {
+      "name": "pending later the same civil day, after scheduled_for",
+      "now": "2026-08-11T19:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "pending"
+    },
+    {
+      "name": "pending at the exact effectiveDue instant (scheduled + 24h)",
+      "now": "2026-08-12T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "pending"
+    },
+    {
+      "name": "overdue one millisecond after effectiveDue",
+      "now": "2026-08-12T15:00:00.001Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "overdue"
+    },
+    {
+      "name": "explicit due_until overrides the 24h default and stays pending",
+      "now": "2026-08-14T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": "2026-08-20T15:00:00.000Z",
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "pending"
+    },
+    {
+      "name": "dose with protocol-derived due_until stays pending inside window",
+      "now": "2026-08-11T15:29:00.000Z",
+      "item": {
+        "scheduleType": "dose",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": "2026-08-11T15:30:00.000Z",
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "pending"
+    },
+    {
+      "name": "dose with protocol-derived due_until is overdue past it",
+      "now": "2026-08-11T15:31:00.000Z",
+      "item": {
+        "scheduleType": "dose",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": "2026-08-11T15:30:00.000Z",
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "overdue"
+    },
+    {
+      "name": "civil day uses item timezone, not UTC (previous local day)",
+      "now": "2026-08-12T01:00:00.000Z",
+      "item": {
+        "scheduleType": "weighing",
+        "scheduledFor": "2026-08-12T12:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "upcoming"
+    },
+    {
+      "name": "civil day uses item timezone, same local day",
+      "now": "2026-08-12T09:00:00.000Z",
+      "item": {
+        "scheduleType": "weighing",
+        "scheduledFor": "2026-08-12T12:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "today"
+    },
+    {
+      "name": "local 23:59 is still the previous civil day",
+      "now": "2026-08-12T02:59:00.000Z",
+      "item": {
+        "scheduleType": "bath",
+        "scheduledFor": "2026-08-12T13:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "upcoming"
+    },
+    {
+      "name": "local 00:00 rolls into the scheduled civil day",
+      "now": "2026-08-12T03:00:00.000Z",
+      "item": {
+        "scheduleType": "bath",
+        "scheduledFor": "2026-08-12T13:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "today"
+    },
+    {
+      "name": "DST spring-forward: same local day after the jump",
+      "now": "2026-03-08T12:00:00.000Z",
+      "item": {
+        "scheduleType": "consultation",
+        "scheduledFor": "2026-03-09T00:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/New_York",
+        "lifecycleStatus": "open"
+      },
+      "expected": "today"
+    },
+    {
+      "name": "DST spring-forward: previous local day before the jump",
+      "now": "2026-03-08T01:00:00.000Z",
+      "item": {
+        "scheduleType": "consultation",
+        "scheduledFor": "2026-03-09T00:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/New_York",
+        "lifecycleStatus": "open"
+      },
+      "expected": "upcoming"
+    },
+    {
+      "name": "deworming overdue past the 24h default",
+      "now": "2026-08-13T16:00:00.000Z",
+      "item": {
+        "scheduleType": "deworming",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expected": "overdue"
+    }
+  ],
+  "invalidCases": [
+    {
+      "name": "dose without due_until has no generic tolerance",
+      "now": "2026-08-11T15:00:00.000Z",
+      "item": {
+        "scheduleType": "dose",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expectedReason": "missing_dose_tolerance"
+    },
+    {
+      "name": "due_until before scheduled_for is rejected",
+      "now": "2026-08-11T15:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": "2026-08-10T15:00:00.000Z",
+        "timezone": "America/Sao_Paulo",
+        "lifecycleStatus": "open"
+      },
+      "expectedReason": "due_until_before_scheduled_for"
+    },
+    {
+      "name": "unrecognized timezone never falls back to UTC",
+      "now": "2026-08-11T13:00:00.000Z",
+      "item": {
+        "scheduleType": "vaccination",
+        "scheduledFor": "2026-08-11T15:00:00.000Z",
+        "dueUntil": null,
+        "timezone": "Mars/Olympus",
+        "lifecycleStatus": "open"
+      },
+      "expectedReason": "invalid_timezone"
+    }
+  ]
+}

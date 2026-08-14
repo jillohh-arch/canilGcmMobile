@@ -3,6 +3,7 @@ import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_transitions_v2.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_presentation_policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// NÃO chama initializeTimeZones() no setUpAll.
@@ -441,6 +442,154 @@ void main() {
           throwsA(isA<HealthDomainException>()),
           reason: type.wireName,
         );
+      }
+    });
+
+    group('tolerância ausente (contrato dose aprovado HW-4A.2B)', () {
+      /// dose configurada como aprovado: janela upcoming presente,
+      /// tolerância pós-vencimento AUSENTE.
+      final doseConfig = MapHealthScheduleTemporalConfig({
+        for (final t in ScheduleType.values)
+          t: HealthScheduleTypeTemporalConfig(
+            toleranceAfterScheduled: t == ScheduleType.dose
+                ? null
+                : const Duration(hours: 24),
+            upcomingWindow: const Duration(days: 7),
+          ),
+      });
+
+      test('dose sem due_until falha fechada, sem tolerância inventada', () {
+        final policy = policyWith(doseConfig);
+        final item = build(scheduleType: ScheduleType.dose);
+
+        expect(
+          () => policy.effectiveDueUntil(item),
+          throwsA(
+            isA<HealthDomainException>().having(
+              (e) => e.code,
+              'code',
+              'incomplete_schedule_temporal_config',
+            ),
+          ),
+        );
+        expect(
+          () => policy.evaluate(item, now: now),
+          throwsA(
+            isA<HealthDomainException>().having(
+              (e) => e.code,
+              'code',
+              'incomplete_schedule_temporal_config',
+            ),
+          ),
+        );
+      });
+
+      test('dose com due_until explícito é autoritativo e válido', () {
+        final policy = policyWith(doseConfig);
+        final scheduled = now.subtract(const Duration(hours: 3));
+        final due = now.add(const Duration(hours: 1));
+        final item = build(
+          scheduleType: ScheduleType.dose,
+          scheduledFor: scheduled,
+          dueUntil: due,
+        );
+
+        expect(policy.effectiveDueUntil(item), due);
+        expect(
+          policy.evaluate(item, now: now),
+          HealthScheduleTemporalStatus.pending,
+        );
+        expect(
+          policy.evaluate(item, now: due.add(const Duration(minutes: 1))),
+          HealthScheduleTemporalStatus.overdue,
+        );
+      });
+
+      test('dose mantém janela upcoming de 7 dias', () {
+        final policy = policyWith(doseConfig);
+        final scheduled = now.add(const Duration(days: 3));
+        final item = build(
+          scheduleType: ScheduleType.dose,
+          scheduledFor: scheduled,
+          // due_until obrigatório para dose ser avaliável.
+          dueUntil: scheduled.add(const Duration(hours: 1)),
+        );
+
+        expect(
+          policy.evaluate(item, now: now),
+          HealthScheduleTemporalStatus.upcoming,
+        );
+      });
+
+      test('tipos não-dose seguem com fallback de 24h', () {
+        final policy = policyWith(doseConfig);
+        final scheduled = now.subtract(const Duration(hours: 3));
+        final exam = build(
+          scheduleType: ScheduleType.exam,
+          scheduledFor: scheduled,
+        );
+
+        expect(
+          policy.effectiveDueUntil(exam),
+          scheduled.add(const Duration(hours: 24)),
+        );
+        expect(
+          policy.evaluate(exam, now: now),
+          HealthScheduleTemporalStatus.pending,
+        );
+      });
+
+      test('estado terminal vence tolerância ausente', () {
+        final policy = policyWith(doseConfig);
+        // completed/cancelled precedem qualquer derivação temporal, então
+        // uma dose sem due_until NÃO deve explodir quando já é terminal.
+        final completed = build(
+          status: ScheduleLifecycleStatus.completed,
+          scheduleType: ScheduleType.dose,
+          completedAt: now,
+        );
+        final cancelled = build(
+          status: ScheduleLifecycleStatus.cancelled,
+          scheduleType: ScheduleType.dose,
+          cancelledAt: now,
+          cancelReason: 'erro de agendamento',
+        );
+
+        expect(
+          policy.evaluate(completed, now: now),
+          HealthScheduleTemporalStatus.completed,
+        );
+        expect(
+          policy.evaluate(cancelled, now: now),
+          HealthScheduleTemporalStatus.cancelled,
+        );
+      });
+    });
+
+    test('política aprovada de produção: dose sem tolerância genérica', () {
+      final snapshot = healthSchedulePresentationPolicySnapshot();
+      expect(
+        snapshot[ScheduleType.dose]!.toleranceAfterScheduled,
+        isNull,
+        reason: 'dose não pode ter fallback genérico (decisão humana)',
+      );
+      expect(
+        snapshot[ScheduleType.dose]!.upcomingWindow,
+        const Duration(days: 7),
+      );
+      for (final type in ScheduleType.values) {
+        expect(
+          snapshot[type]!.upcomingWindow,
+          const Duration(days: 7),
+          reason: type.wireName,
+        );
+        if (type != ScheduleType.dose) {
+          expect(
+            snapshot[type]!.toleranceAfterScheduled,
+            const Duration(hours: 24),
+            reason: type.wireName,
+          );
+        }
       }
     });
 

@@ -297,9 +297,10 @@ final class HealthScheduleTypeTemporalConfig {
     required this.toleranceAfterScheduled,
     required this.upcomingWindow,
   }) {
-    if (toleranceAfterScheduled.isNegative) {
+    final tolerance = toleranceAfterScheduled;
+    if (tolerance != null && tolerance.isNegative) {
       throw ArgumentError.value(
-        toleranceAfterScheduled,
+        tolerance,
         'toleranceAfterScheduled',
         'não pode ser negativo',
       );
@@ -314,7 +315,15 @@ final class HealthScheduleTypeTemporalConfig {
   }
 
   /// Acrescentada a `scheduled_for` quando `due_until` está ausente.
-  final Duration toleranceAfterScheduled;
+  ///
+  /// `null` significa **ausência de fallback genérico**: o tipo só possui
+  /// vencimento efetivo quando `due_until` está explicitamente persistido no
+  /// item. É o contrato aprovado de [ScheduleType.dose] (HW-4A.2B, decisão
+  /// humana 1/2) — nunca substituir por uma tolerância inventada.
+  ///
+  /// Distinto de `Duration.zero`, que significa "vence exatamente em
+  /// `scheduled_for`".
+  final Duration? toleranceAfterScheduled;
 
   /// Janela "upcoming" antes de `scheduled_for` (configurável por tipo).
   final Duration upcomingWindow;
