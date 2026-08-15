@@ -39,6 +39,11 @@ import {
   createAdminHealthDocumentStorageAdapter,
 } from "./health_document_storage_adapter";
 import {
+  RestrictionCaller,
+  runHealthRestrictionIssue,
+  type HealthRestrictionCallableDeps,
+} from "./health_restriction_callables";
+import {
   healthTimelineProjectMealLogCreatedWrapper,
   healthTimelineProjectSupplementLogCreatedWrapper,
 } from "./health_timeline_triggers";
@@ -419,7 +424,12 @@ type AccessAction =
   | "archive"
   | "approve"
   | "manage_nutrition_plan"
-  | "record_routine";
+  | "record_routine"
+  // Autoridade de emissão de restrição operacional (B1). Deliberadamente
+  // distinta de `create`/`edit`: registrar um documento não é declarar que um
+  // K9 não pode trabalhar. `release_restriction` chega no B2, junto com a
+  // decisão pendente sobre a autoridade de `cancelled`.
+  | "issue_restriction";
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -8011,6 +8021,59 @@ export const healthDocumentPrepareUpload = onCall({region}, async (request) => {
  */
 export const healthDocumentFinalizeUpload = onCall({region}, async (request) => {
   return runHealthDocumentFinalizeUpload(request, healthDocumentDeps);
+});
+
+function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * Writer canônico de OperationalRestriction — ISSUE (B1).
+ *
+ * `health.issue_restriction` é autoridade própria: nenhuma outra ação Health
+ * autoriza declarar impacto operacional. Nenhum access profile real recebe
+ * esse grant automaticamente — a concessão é decisão de cutover.
+ */
+const healthRestrictionDeps: HealthRestrictionCallableDeps = {
+  db,
+  requireIssueRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireAccessPermission(auth, "health", "issue_restriction"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Emite restrição operacional canônica (health.issue_restriction + dog access).
+ * Admin SDK write; a projeção de readiness reage pelo trigger existente.
+ */
+export const healthRestrictionIssue = onCall({region}, async (request) => {
+  return runHealthRestrictionIssue(request, healthRestrictionDeps);
 });
 
 /** Create manual schedule item (health.create + dog access). Admin SDK write. */
