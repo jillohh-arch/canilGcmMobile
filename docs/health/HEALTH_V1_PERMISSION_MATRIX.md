@@ -149,7 +149,8 @@ Esses nomes, se aparecerem em tabelas históricas, são **não operacionais**.
 - Mutações da Agenda (`health.create` / `health.edit` nos callables) operam apenas sobre `health_schedule` — não modificam prontidão, não encerram restrições, não alteram casos.
 - `health.reopen_case` é permitido apenas em `ClinicalCase` com `clinical_status == "discharged"`. Estado de destino permitido: `open`, `under_investigation`, `under_treatment` ou `monitoring` (nunca direto a `cancelled`).
 - `health.cancel_case` adiciona `cancel_reason` e mantém o histórico completo.
-- `health.release_restriction` registra encerramento de restrição. Quando representa decisão clínica externa, exige `ProfessionalIdentity` + `end_source_document` + `end_reason` obrigatórios. O Schema armazena `end_professional` e `end_source_document` para esses casos.
+- `health.release_restriction` registra encerramento de restrição. **Reconciliado em ADR-005 E6:** `status == ended` **é** liberação clínica por definição, portanto `end_professional` + `end_source_document` + `end_reason` são obrigatórios **sempre** — não "quando representa decisão clínica externa". Não existe `ended` administrativo. Invalidação administrativa (duplicado, erro material, evidência incorreta) usa `cancelled`, que não é liberação clínica e cuja autoridade permanece pendente (ver ADR-005 E11 item 1).
+- `health.issue_restriction` e `health.release_restriction` são autoridades **distintas** e não devem ser fundidas em uma capability genérica, nem substituídas por `health.create`/`health.edit`. A coluna "Canal" indica **iniciadores possíveis** de uma operação cuja autoridade é do backend (channel-agnostic); nenhum cliente escreve `operational_restrictions` diretamente. Ver ADR-005 E1/E2.
 - O mapeamento capability → perfil real (`condutor`/`admin`) **permanece provisório até a Fase 1B** (questão O1). As tabelas acima listam **executores candidatos** — não atribuições aprovadas.
 
 ---

@@ -384,3 +384,180 @@ rotina, mas não inaptidão. O threshold de 90 dias pode continuar alimentando
 atenção durante a coexistência. Peso fora da faixa, variação, BCS, leitura
 aproximada e atraso nunca criam restrição automaticamente. Esta decisão target
 ainda não está implantada integralmente. Ver ADR-008.
+
+---
+
+## Emenda — HEALTH-V1-RESTRICTION-WRITER Gate A.2 (2026-08-14)
+
+Esta emenda reconcilia as decisões necessárias para implementar o writer produtivo
+de `OperationalRestriction`. Ela **não** altera as decisões aprovadas em 2026-07-13;
+resolve ambiguidades que o Gate A (auditoria read-only sobre
+`5ebc2e4a9af7b586b1d693ca64fd35294b91922f`) expôs.
+
+### E1. Canal não é autoridade
+
+§10 (Impacto em Mobile) e §11 (Impacto em Web) descrevem ambos a emissão e o
+encerramento por usuário interno autorizado. Isso **nunca** significou exclusividade
+de canal.
+
+A autoridade de mutação pertence ao **backend**, que é channel-agnostic. Mobile e Web
+são iniciadores possíveis da mesma operação autorizada. Nenhum cliente escreve
+`operational_restrictions` diretamente: Firestore Rules permanecem deny-all para
+writes de cliente, e essa negação é parte do contrato, não uma limitação temporária.
+
+Para o Health Mobile v1, Mobile é o primeiro canal de UI implementado. Web reutilizará
+as mesmas callables sem alteração de contrato.
+
+### E2. Vocabulário de autoridade
+
+Emissão e liberação são autoridades **distintas**, com grants independentes:
+
+- `health.issue_restriction`
+- `health.release_restriction`
+
+Não reutilizar `health.create`, `health.edit`, `health.manage_nutrition_plan` ou
+`health.record_routine` — sob pena de "registrar vacina" passar a implicar "declarar
+K9 inapto". Não criar capability genérica `health.manage_restriction`: emitir e
+liberar têm impacto operacional oposto e precisam poder divergir.
+
+Autorização é access-profile/capability driven. Não existe autoridade derivada de
+`role == gestor | condutor | instrutor` hard-coded.
+
+Admin não é profissional clínico. Onde houver bypass administrativo, o admin continua
+sendo apenas o usuário interno que registra a decisão externa — nunca substitui
+`ProfessionalIdentity` nem dispensa `source_document`.
+
+### E3. Evidência documental é pré-requisito, não formalidade
+
+`source_document` permanece **obrigatório** na emissão. Não é relaxável.
+
+A coleção legada `documentos` (raiz) **não** é evidência canônica e não será promovida
+automaticamente: faltam `storage_path`, `mime_type` e `recorded_by` canônicos, e não
+existe regra de derivação segura (conclusão já registrada em
+`lib/features/health/legacy/legacy_document_adapter.dart`).
+
+Consequência de sequenciamento: uma **fatia mínima canônica de `HealthDocument`**
+precede o writer de restrição. Escopo dessa fatia: criar documento canônico com id
+estável, `storage_path`, `mime_type`, `recorded_by` server-authoritative, vínculo ao
+K9, tipo/descrição, audit e idempotência — suficiente para produzir um
+`HealthDocumentRef` válido. Biblioteca documental, busca, compartilhamento e demais UX
+permanecem fora de escopo.
+
+Isso inverte, deliberadamente, a ordem temática do roadmap (Documentos aparece depois
+de Prontidão). A inversão é uma dependência de contrato, não uma reordenação de
+prioridade de produto.
+
+### E4. ProfessionalIdentity não se infere do legado
+
+Os campos legados `vetName`, `professionalCrmv` e `professionalClinic` (escalares
+soltos em `health_events`) **não** são promovidos a `ProfessionalIdentity` por
+derivação silenciosa.
+
+Shape canônico inalterado: `name`, `registration_type`, `registration_number`,
+`clinic`, `specialty?`.
+
+Em particular, `registration_type` deve existir **explicitamente no payload**. A UI
+pode apresentar `CRMV` como valor inicial visível para o caso veterinário, mas o valor
+não pode ser assumido apenas porque o campo legado se chamava "CRMV".
+
+Não há registry de profissionais no v1. `ProfessionalIdentity` permanece snapshot
+embutido da decisão clínica externa.
+
+### E5. Restrição é agregado próprio, com fluxo próprio
+
+A emissão **não** depende de Consulta, Exame ou Cirurgia estarem canônicos. Em
+particular, workflows de Cirurgia estão diferidos para v2+
+(`HEALTH_V1_FOUNDATION_REVIEW.md` §6), portanto não podem ser foundation do writer v1.
+
+A primeira superfície Mobile é um fluxo próprio de Restrição Operacional. Esse fluxo
+deve **aceitar opcionalmente** contexto clínico (consulta, exame, cirurgia, outro
+registro canônico) preenchendo `source_document`, `professional` e referências, sem
+**depender** desses fluxos para existir.
+
+### E6. `ended` é liberação clínica; `cancelled` é invalidação administrativa
+
+Esta é a reconciliação semântica central desta emenda. Não existe "encerramento
+administrativo" de restrição.
+
+**`active → ended`** representa liberação/encerramento **clínico real** e exige, sempre:
+
+| Campo | Origem |
+|-------|--------|
+| `end_reason` | não vazio |
+| `actual_end` | server-side |
+| `ended_by` | server-authoritative (`RecordedBy`) |
+| `end_professional` | `ProfessionalIdentity` do profissional externo que liberou |
+| `end_source_document` | `HealthDocumentRef` da evidência de liberação |
+
+A mesma separação profissional-externo / usuário-interno que vale na emissão vale na
+liberação: o usuário interno registra, o profissional externo decide, o documento
+comprova. Isso **substitui** as formulações anteriores que condicionavam
+`end_professional` e `end_source_document` a "quando representa decisão clínica
+externa" — em `ended`, sempre representa.
+
+**`active → cancelled`** não é liberação clínica. Serve para registro duplicado, erro
+material de lançamento, registro inválido ou evidência associada incorretamente.
+Preserva documento e dados originais, é terminal, exige motivo explícito, actor e
+timestamp. Não há hard delete e `cancelled` nunca retorna a `active`.
+
+Consequência para prontidão: `cancelled` remove o efeito da restrição sem afirmar
+liberação clínica. Um `cancelled` indevido é um risco operacional, não um atalho de UX.
+
+### E7. Política de correção — append-oriented
+
+Após a emissão, os campos de substância clínica são **imutáveis**: `level`, `category`,
+`description`, `activities_restricted`, `professional`, `source_document`, `issued_at`,
+`expected_end` e a evidência clínica material.
+
+- Erro de lançamento: `active → cancelled` e, se necessário, nova restrição correta.
+- Nova decisão/reavaliação clínica: encerrar a anterior conforme E6 e emitir nova
+  restrição quando houver nova limitação.
+
+Não existe update livre estilo CRUD sobre restrição ativa.
+
+### E8. Compatibilidade de leitor não define o agregado
+
+Os consumidores atuais (`resolveRestrictionsEvidence`, usado tanto pelo readiness
+projector quanto pelo guard de turno) leem apenas `status`, `level`, `description`,
+`since`/`issued_at`, `activities_restricted`, `expected_end` e `category`.
+
+Esse conjunto é **compatibilidade de consumidor, não definição do agregado**. O writer
+deve produzir um documento simultaneamente válido para o Domain Model (provenance e
+evidência inclusas), para OP-AUTH, para o projector, e auditável. Não reduzir o
+agregado ao shape mínimo do parser.
+
+### E9. Invariante de documento totalmente parseável
+
+O leitor canônico é fail-closed e a query é **sem filtro**: um único documento
+malformado torna toda a fonte de restrições daquele K9 `unavailable`, o que **nega**
+ações operacionais críticas. Um timestamp ainda não materializado em formato aceito
+conta como malformado.
+
+Portanto nenhum documento pode se tornar observável pelo leitor em estado
+parcialmente escrito. Escrita parcial é apagão operacional do K9, não leitura
+degradada. A implementação disso é decidida no Gate correspondente; a exigência é
+contrato.
+
+### E10. `partial` e taxonomia de atividades
+
+`level == partial` continua exigindo `activities_restricted` não vazio.
+
+`activities_restricted` permanece free-form no v1. O taxonomy gap é conhecido e
+registrado; não será resolvido nesta vertical. O writer garante apenas a invariante
+estrutural.
+
+### E11. Pendências registradas (não resolvidas nesta emenda)
+
+1. **Autoridade de `cancelled` — CONFLITO ABERTO.** E2 define autoridades para emitir e
+   liberar. `cancelled` não é liberação clínica (E6), portanto `health.release_restriction`
+   não é obviamente a autoridade correta, e `health.issue_restriction` tampouco.
+   `HEALTH_V1_PERMISSION_MATRIX.md` §5 registra "capability administrativa [provisório]"
+   para essa coluna. Decisão pendente antes do Gate que implementar cancel.
+2. **Defeito em `OperationalRestrictionTransitions.transition`**
+   (`lib/features/health/domain/health_v1_transitions_v2.dart`): valida
+   `cancelledAt`/`cancelledBy`/`cancelReason`, campos que o agregado não possui, e
+   descarta `endProfessional`/`endSourceDocument` ao construir o objeto encerrado —
+   perdendo exatamente a evidência que E6 torna obrigatória. Correção pertence ao Gate
+   de implementação. O shape correto é o desta emenda.
+3. **Mapeamento capability → perfil real** permanece provisório, como já registrado na
+   Permission Matrix (questão O1).

@@ -513,9 +513,12 @@ Path: `dogs/{dogId}/supplement_logs/{logId}`
 | expected_end | timestamp | ❌ | |
 | actual_end | timestamp | ❌ | |
 | ended_by | RecordedBy | ❌ | Usuário interno que encerra |
-| end_professional | ProfessionalIdentity | ❌ | Profissional externo que autorizou encerramento (obrigatório quando encerramento representa decisão clínica externa) |
-| end_source_document | HealthDocumentRef | ❌ | Laudo/atestado de liberação (obrigatório quando encerramento representa decisão clínica externa) |
-| end_reason | string | ❌ | Obrigatório quando status=ended |
+| end_professional | ProfessionalIdentity | ⚠️ | Profissional externo que autorizou encerramento — **obrigatório quando `status == ended`** (ADR-005 E6) |
+| end_source_document | HealthDocumentRef | ⚠️ | Laudo/atestado de liberação — **obrigatório quando `status == ended`** (ADR-005 E6) |
+| end_reason | string | ⚠️ | Obrigatório quando `status == ended` |
+| cancelled_at | timestamp | ⚠️ | Obrigatório quando `status == cancelled` |
+| cancelled_by | RecordedBy | ⚠️ | Obrigatório quando `status == cancelled` — server-authoritative |
+| cancel_reason | string | ⚠️ | Obrigatório quando `status == cancelled` |
 | evidence | map | ❌ | Ver Evidence |
 | status | string (enum) | ✅ | active, ended, cancelled |
 | case_id | string | ❌ | |
@@ -526,9 +529,22 @@ Path: `dogs/{dogId}/supplement_logs/{logId}`
 | delete_reason | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Mobile/Web (admin ou condutor com evidence profissional).
+**Escritor:** exclusivamente **backend** (callable/Admin SDK), channel-agnostic. Mobile e
+Web são iniciadores da operação autorizada, nunca escritores. Firestore Rules permanecem
+deny-all para writes de cliente. Ver ADR-005 E1/E2.
 **Leitor:** Mobile, Web, Function (para snapshot).
 **Índices:** `status ASC, level ASC, issued_at DESC`.
+
+**Lifecycle e obrigatoriedade condicional (ADR-005 E6/E7):** `ended` é liberação clínica
+e exige `actual_end` + `ended_by` + `end_reason` + `end_professional` +
+`end_source_document`. `cancelled` é invalidação administrativa (duplicado, erro material,
+evidência incorreta) e exige `cancelled_at` + `cancelled_by` + `cancel_reason`; **não** é
+liberação clínica e não usa os campos `end_*`. Ambos são terminais. Campos de substância
+clínica são imutáveis após emissão — correção é `cancelled` + nova restrição.
+
+> **Nota de coexistência:** `cancelled_at`, `cancelled_by` e `cancel_reason` são campos
+> canônicos derivados desta emenda e **ainda não existem** no agregado Dart
+> (`OperationalRestriction`) nem em qualquer writer. Ver ADR-005 E11 item 2.
 
 ---
 

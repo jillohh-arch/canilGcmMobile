@@ -397,11 +397,12 @@ nutrition_supplements (legado)  = estado “em uso” → adapter / curadoria de
 |---------|-----------|
 | **Responsabilidade** | Restrição clínica ativa que afeta a prontidão operacional do K9 |
 | **Identificador** | `{dogId}/operational_restrictions/{id}` — UUID |
-| **Invariantes** | (1) Requer evidence profissional para emissão. (2) Restrição `absolute` + `active` = K9 `temporarily_unfit`. (3) Encerramento requer justificativa. (4) Não pode ser deletada, apenas encerrada. |
+| **Invariantes** | (1) Requer evidence profissional para emissão. (2) Restrição `absolute` + `active` = K9 `temporarily_unfit`. (3) Encerramento requer justificativa. (4) Não pode ser deletada, apenas encerrada. (5) `level == partial` exige `activities_restricted` não vazio. (6) Substância clínica é imutável após emissão — correção é `cancelled` + nova restrição (ADR-005 E7). |
 | **Estados** | `active`, `ended`, `cancelled` |
-| **Transições** | `active→ended` (com justificativa), `active→cancelled` (erro administrativo) |
-| **Campos obrigatórios** | `level` (enum: absolute, partial, attention), `category` (enum), `description`, `issued_at`, `recorded_by`, `professional`, `source_document`, `status`, `schema_version` |
-| **Campos opcionais** | `activities_restricted`, `expected_end`, `actual_end`, `ended_by`, `end_professional`, `end_source_document`, `end_reason`, `evidence`, `case_id`, `event_id`, `exam_id` |
+| **Transições** | `active→ended` (liberação clínica documentada), `active→cancelled` (invalidação administrativa: duplicado, erro material, evidência incorreta). Ambos terminais. Ver ADR-005 E6 |
+| **Campos obrigatórios** | `level` (enum: absolute, partial, attention), `category` (enum), `description`, `issued_at`, `recorded_by`, `professional`, `source_document`, `status`, `schema_version`; `activities_restricted` quando `level == partial` |
+| **Campos condicionais** | Quando `status == ended`: `actual_end`, `ended_by`, `end_reason`, `end_professional`, `end_source_document`. Quando `status == cancelled`: `cancelled_at`, `cancelled_by`, `cancel_reason` |
+| **Campos opcionais** | `activities_restricted` (quando `level != partial`), `expected_end`, `evidence`, `case_id`, `event_id`, `exam_id` |
 | **Valores derivados** | `is_overdue` (expected_end passado e ainda active) |
 | **Dados sensíveis** | Justificativa clínica + professional identity — acesso por capability |
 | **Autoria** | `recorded_by: RecordedBy { uid, name, internal_role }` (usuário interno autorizado que transcreveu a decisão do profissional externo) |
