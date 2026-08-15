@@ -499,27 +499,95 @@ separação canal/autoridade aplicada a `operational_restrictions`).
 **Leitor:** Mobile, Web.
 **Índices:** `deleted_at ASC, uploaded_at DESC`; `document_type ASC, uploaded_at DESC`.
 
-**Storage path canônico (B0-A.2):**
+**Storage paths (B0-A.2, corrigido em B0-B.R):**
 
 ```text
-health_documents/{dogId}/{documentId}
+STAGING    health_document_uploads/{dogId}/{documentId}   ← upload do cliente
+CANÔNICO   health_documents/{dogId}/{documentId}          ← selado pelo backend
 ```
 
-Sem extensão: `documentId` é identidade suficiente, `mime_type` vem do metadata do objeto,
-`title` pertence ao agregado e o filename original não é autoridade. O path é totalmente
-determinístico a partir de `dogId` + `documentId`, e há exatamente um objeto por
+Sem extensão em nenhum dos dois: `documentId` é identidade suficiente, `mime_type` vem do
+metadata do objeto, `title` pertence ao agregado e o filename original não é autoridade. Ambos
+são determinísticos a partir de `dogId` + `documentId`, e há exatamente um objeto canônico por
 `HealthDocument`.
 
 Não confundir com o path **Firestore** do agregado, que é
 `dogs/{dogId}/health_documents/{documentId}`.
 
-**Storage Rules (contrato para implementação):** namespace `health_documents/{dogId}/{documentId}`
-com `read` e `create` exigindo acesso ao K9, `create` também exigindo contentType permitido e
-tamanho ≤ 20 MB; `update` e `delete` negados. O catch-all permanece deny-all.
+**Por que existem dois namespaces (correção de contrato B0-B.R).** O B0-A.2 previa upload do
+cliente direto no path canônico, assumindo que `allow create` + `allow update: if false`
+tornaria os bytes imutáveis. **Essa premissa é falsa:** nas Storage Rules, `create` cobre a
+gravação do conteúdo do arquivo, então permitir `create` no path também permite substituir os
+bytes de um objeto já existente. Comprovado no emulador — e o comportamento é idêntico em
+`health_attachments` e `documentos`, logo é semântica do produto, não de um namespace novo.
+
+Consequência inaceitável para evidência clínica: um `HealthDocument` finalizado continuaria
+apontando para o mesmo `storage_path`, mas os bytes por trás dele poderiam ser trocados depois
+por qualquer cliente com acesso ao K9. Como esse documento fundamenta
+`OperationalRestriction.source_document`, a cadeia termina em "o K9 trabalha ou não" — o
+sistema precisa **garantir** integridade, não apenas deixar rastro de que houve alteração.
+
+**Storage Rules (contrato para implementação):**
+
+| Namespace | read | create | update | delete |
+|---|---|---|---|---|
+| `health_document_uploads/{dogId}/{documentId}` | acesso ao K9 | acesso ao K9 + contentType permitido + ≤ 20 MB | ❌ | ❌ |
+| `health_documents/{dogId}/{documentId}` | acesso ao K9 | **❌** | ❌ | ❌ |
+
+O catch-all permanece deny-all. Sobrescrever o **staging** antes do FINALIZE é inócuo: não é
+evidência, e o selo se prende à `generation` exata validada.
+
+**Selo backend (staging → canônico).** O FINALIZE valida o objeto de staging, captura sua
+`generation` e copia para o path canônico com duas preconditions do Cloud Storage:
+
+- **fonte** presa à `generation` observada — se os bytes mudarem entre validação e cópia, falha;
+- **destino** com `ifGenerationMatch: 0` — create-only real, que as Rules não expressam.
+
+`mime_type`, `file_size_bytes` e os checksums do audit descrevem o objeto **canônico** selado.
 
 Upload bem-sucedido **não** prova existência do K9 — `canAccessDogRecord` em `storage.rules`
 não verifica `exists(dogPath)`. O finalize backend valida independentemente: existência e
-acesso ao K9, path exato reservado, existência do objeto, metadata, size e contentType.
+acesso ao K9, path derivado no servidor, existência do objeto, metadata, size, contentType,
+`generation` e checksum.
+
+**Selo de intenção (B0-B.R2).** Junto com os bytes, a cópia grava metadata **server-owned** no
+objeto canônico:
+
+```text
+k9_health_seal_version      "1"
+k9_health_seal_fingerprint  SHA256(seal-kind/version | dogId | operationId | finalizeFingerprint)
+k9_health_document_id       {documentId}
+```
+
+Isso resolve uma janela específica: quando o selo tem sucesso mas a transação Firestore não
+commita, **não existe receipt** — logo nada durável no Firestore prova qual intenção produziu
+aqueles bytes. Sem o selo, um segundo FINALIZE com o mesmo `operationId` e payload **diferente**
+poderia herdar bytes selados pela intenção anterior, furando a promessa
+"mesmo `operationId` + payload diferente → conflito" justamente após uma falha parcial.
+
+O fingerprint de selagem é metadata do **protocolo de mutação**, não do domínio clínico: não
+entra no `HealthDocument` nem no `HealthDocumentRef`.
+
+**Estado de recuperação legítimo.** Storage e Firestore não compartilham transação, então
+"bytes canônicos selados + `HealthDocument` ausente" é possível sem corrupção. A autoridade da
+recuperação é o **selo**, não o staging — após um selo bem-sucedido o staging pode ter sido
+sobrescrito por um retry ou já apagado pela limpeza best-effort, e exigi-lo tornaria um
+documento legitimamente selado irrecuperável.
+
+Fail-closed em: selo ausente (objeto de origem desconhecida), `seal_version` inesperada,
+fingerprint ausente ou de outra intenção. Nunca reescreve a metadata para forçar
+correspondência. Bytes canônicos sem `HealthDocument` **não são** evidência clínica.
+
+**Camadas do protocolo — cada uma responde uma pergunta diferente:**
+
+| Mecanismo | Pergunta |
+|---|---|
+| precondition de fonte (`generation`) | estes são exatamente os bytes que validei? |
+| precondition de destino (`ifGenerationMatch: 0`) | ninguém substituiu um objeto canônico? |
+| seal fingerprint | estes bytes foram selados para **esta** intenção? |
+| receipt | esta mutação já foi commitada? |
+| `HealthDocument` | este artefato tem autoridade clínica? |
+| `HealthDocumentRef` | qual é a identidade citável? |
 
 ---
 

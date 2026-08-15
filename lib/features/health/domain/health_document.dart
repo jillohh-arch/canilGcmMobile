@@ -36,7 +36,9 @@ final class HealthDocument {
         'schema_version deve ser positivo',
       );
     }
-    if (title.isEmpty) {
+    // Valida o campo normalizado, não o parâmetro: um título só de espaços
+    // passaria pelo teste do parâmetro e persistiria como string vazia.
+    if (this.title.isEmpty) {
       throw const HealthDomainException(
         'missing_document_title',
         'title é obrigatório',

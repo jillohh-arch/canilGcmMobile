@@ -30,6 +30,15 @@ import {
   createAdminWeightEngineDeps,
 } from "./health_weight_callables";
 import {
+  DocumentCaller,
+  runHealthDocumentFinalizeUpload,
+  runHealthDocumentPrepareUpload,
+  type HealthDocumentCallableDeps,
+} from "./health_document_callables";
+import {
+  createAdminHealthDocumentStorageAdapter,
+} from "./health_document_storage_adapter";
+import {
   healthTimelineProjectMealLogCreatedWrapper,
   healthTimelineProjectSupplementLogCreatedWrapper,
 } from "./health_timeline_triggers";
@@ -7943,6 +7952,66 @@ const healthScheduleDeps = {
     {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
   ),
 };
+
+function toDocumentCaller(caller: CallerIdentity): DocumentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * HealthDocument canônico (B0 — fatia mínima de evidência clínica).
+ *
+ * `health.create` é a autoridade real existente e é deliberadamente estreita:
+ * criar documento NÃO concede autoridade para declarar o K9 inapto, que
+ * continua dependendo de `health.issue_restriction`.
+ */
+const healthDocumentDeps: HealthDocumentCallableDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toDocumentCaller(await requireAccessPermission(auth, "health", "create")),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: DocumentCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: DocumentCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+  storage: createAdminHealthDocumentStorageAdapter(),
+};
+
+/**
+ * Reserva determinística de identidade + Storage path. ZERO writes.
+ * Não é autoridade: apenas FINALIZE cria o agregado canônico.
+ */
+export const healthDocumentPrepareUpload = onCall({region}, async (request) => {
+  return runHealthDocumentPrepareUpload(request, healthDocumentDeps);
+});
+
+/**
+ * Cria o HealthDocument canônico após verificar o objeto no Storage.
+ * Recomputa documentId/storagePath — path do cliente nunca é autoridade.
+ */
+export const healthDocumentFinalizeUpload = onCall({region}, async (request) => {
+  return runHealthDocumentFinalizeUpload(request, healthDocumentDeps);
+});
 
 /** Create manual schedule item (health.create + dog access). Admin SDK write. */
 export const healthScheduleCreateManual = onCall({region}, async (request) => {

@@ -49,17 +49,11 @@ void main() {
     });
 
     test('mimeType vazio é rejeitado', () {
-      expect(
-        () => build(mimeType: ''),
-        throwsA(isA<HealthDomainException>()),
-      );
+      expect(() => build(mimeType: ''), throwsA(isA<HealthDomainException>()));
     });
 
     test('title vazio é rejeitado', () {
-      expect(
-        () => build(title: ''),
-        throwsA(isA<HealthDomainException>()),
-      );
+      expect(() => build(title: ''), throwsA(isA<HealthDomainException>()));
     });
 
     test('expiry anterior a issueDate é rejeitado', () {
@@ -98,7 +92,10 @@ void main() {
 
     test('isExpiredAt retorna true somente após expiryDate', () {
       final doc = build(expiryDate: expiry);
-      expect(doc.isExpiredAt(expiry.subtract(const Duration(days: 1))), isFalse);
+      expect(
+        doc.isExpiredAt(expiry.subtract(const Duration(days: 1))),
+        isFalse,
+      );
       expect(doc.isExpiredAt(expiry), isFalse);
       expect(doc.isExpiredAt(expiry.add(const Duration(days: 1))), isTrue);
     });
@@ -114,6 +111,79 @@ void main() {
       // ausência de setters na API pública.
       expect(doc.caseId, isNull);
       expect(doc.issuer, isNull);
+    });
+
+    test('title apenas com espaços é rejeitado (B0-B)', () {
+      // O construtor validava o parâmetro, não o campo trimado, então um
+      // título só de espaços passava e persistia como string vazia.
+      expect(
+        () => build(title: '   '),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'missing_document_title',
+          ),
+        ),
+      );
+      expect(
+        () => build(title: '\t\n '),
+        throwsA(isA<HealthDomainException>()),
+      );
+      expect(build(title: '  Laudo  ').title, 'Laudo');
+    });
+  });
+
+  group('HealthDocumentType.parse (B0-B)', () {
+    test('round-trip dos nove tipos canônicos', () {
+      expect(HealthDocumentType.values, hasLength(9));
+      for (final type in HealthDocumentType.values) {
+        final parsed = HealthDocumentType.parse(type.wireName);
+        expect(parsed.state, ParsedHealthEnumState.known, reason: type.name);
+        expect(parsed.value, type);
+        expect(parsed.raw, type.wireName);
+      }
+    });
+
+    test('valores legados não são mapeados', () {
+      for (final legacy in ['laudo', 'certificado', 'documento', 'exame']) {
+        final parsed = HealthDocumentType.parse(legacy);
+        expect(
+          parsed.state,
+          ParsedHealthEnumState.unknown,
+          reason: 'legado $legacy não deve mapear',
+        );
+        expect(parsed.value, isNull);
+        expect(parsed.raw, legacy);
+      }
+    });
+
+    test('desconhecido não cai em other', () {
+      final parsed = HealthDocumentType.parse('restriction_evidence');
+      expect(parsed.state, ParsedHealthEnumState.unknown);
+      expect(parsed.value, isNot(HealthDocumentType.other));
+      expect(parsed.value, isNull);
+
+      final vetRelease = HealthDocumentType.parse('vet_release');
+      expect(vetRelease.state, ParsedHealthEnumState.unknown);
+    });
+
+    test('other só a partir do literal other', () {
+      final parsed = HealthDocumentType.parse('other');
+      expect(parsed.state, ParsedHealthEnumState.known);
+      expect(parsed.value, HealthDocumentType.other);
+    });
+
+    test('ausente é distinguível de desconhecido', () {
+      expect(
+        HealthDocumentType.parse(null).state,
+        ParsedHealthEnumState.absent,
+      );
+      expect(HealthDocumentType.parse('').state, ParsedHealthEnumState.absent);
+      expect(
+        HealthDocumentType.parse('  ').state,
+        ParsedHealthEnumState.absent,
+      );
     });
   });
 }

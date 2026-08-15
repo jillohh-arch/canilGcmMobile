@@ -271,6 +271,44 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // STAGING de HealthDocument — destino ÚNICO de upload do cliente.
+    //
+    // Estes bytes NÃO são evidência clínica. Existem porque `allow create` do
+    // Storage não impede substituir o conteúdo de um objeto existente
+    // (comprovado no emulador; idêntico em `health_attachments` e
+    // `documentos`). Logo, bytes graváveis pelo cliente não podem ser a
+    // evidência canônica.
+    //
+    // Sobrescrever aqui antes do FINALIZE não corrompe nada: o selo do backend
+    // se prende à `generation` exata que foi validada, então trocar os bytes
+    // depois da validação faz a operação FALHAR em vez de selar outra coisa.
+    //
+    // Acesso ao K9 aqui NÃO prova que o K9 existe (não há exists() em Storage
+    // Rules); o backend valida existência e acesso independentemente.
+    match /health_document_uploads/{dogId}/{documentId} {
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create: if canAccessDogRecord(dogId)
+        && canWriteHealthAttachment(20);
+      allow update, delete: if false;
+    }
+
+    // HealthDocument CANÔNICO — evidência clínica selada.
+    //
+    // Escrito EXCLUSIVAMENTE pelo backend, copiando do staging com
+    // preconditions do Cloud Storage: fonte presa à generation validada e
+    // destino `ifGenerationMatch: 0` (create-only real, que as Rules não
+    // conseguem expressar). O Admin SDK ignora estas Rules; o cliente não
+    // tem nenhuma operação de escrita aqui.
+    //
+    // `create: false` é deliberado e é o coração do B0-B.R: se o cliente
+    // pudesse criar, poderia também substituir os bytes de um documento já
+    // finalizado, e o `storage_path` de uma OperationalRestriction deixaria de
+    // apontar para a evidência que foi de fato aprovada.
+    match /health_documents/{dogId}/{documentId} {
+      allow read: if signedIn() && canAccessDogRecord(dogId);
+      allow create, update, delete: if false;
+    }
+
     match /occurrences/{occurrenceId}/{fileName} {
       allow read: if signedIn();
       allow create: if canWritePdf(20);

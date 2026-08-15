@@ -385,7 +385,7 @@ nutrition_supplements (legado)  = estado “em uso” → adapter / curadoria de
 **Enum `document_type`:** `prescription`, `report`, `certificate`, `exam_image`, `exam_pdf`, `photo`, `vaccination_card`, `surgical_report`, `other`
 
 **`storage_path` vs `storage_url`:**
-- `storage_path` é a identidade canônica; o layout canônico é `health_documents/{dogId}/{documentId}` (sem extensão)
+- `storage_path` é a identidade canônica; o layout canônico é `health_documents/{dogId}/{documentId}` (sem extensão), **selado pelo backend** — o cliente sobe para `health_document_uploads/{dogId}/{documentId}` e nunca escreve no canônico (ver Schema §2.11, correção B0-B.R)
 - `storage_url` é derivado via Storage API; pode ser cache para performance mas nunca é fonte
 - Alterações de bucket/CDN não invalidam o documento — apenas o derivado URL
 

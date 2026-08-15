@@ -10,6 +10,7 @@
     "test:health-nutrition-callable-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node health_nutrition_callables_emulator_tests.mjs\"",
     "test:health-timeline": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_timeline_rules_tests.mjs\"",
     "test:health-readiness": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_readiness_rules_tests.mjs\"",
+    "test:health-document": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node health_document_rules_tests.mjs\"",
     "test:shift-dog-provenance": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node shift_dog_provenance_rules_tests.mjs\"",
     "test:shift-authorization-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node shift_authorization_callables_emulator_tests.mjs\"",
     "test:direct": "node rules_tests.mjs"

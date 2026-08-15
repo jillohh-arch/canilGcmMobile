@@ -2047,6 +2047,20 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      // Documentos de saúde canônicos — evidência clínica citável.
+      //
+      // `storage_path` é a identidade canônica do arquivo; a URL é derivada e
+      // nunca fonte. O agregado é escrito exclusivamente pelo backend
+      // (callable/Admin SDK) após verificar o objeto no Storage: um documento
+      // cujo arquivo não exista não é evidência de nada.
+      //
+      // Cliente lê com acesso ao K9 e nunca escreve — nem para "corrigir"
+      // metadados, porque metadados de upload são imutáveis.
+      match /health_documents/{documentId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
       // Restrições operacionais canônicas — decisão profissional de saúde.
       //
       // Leitura cliente com acesso ao K9 (alimenta a exibição de Prontidão).

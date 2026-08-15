@@ -228,6 +228,20 @@ enum HealthDocumentType {
     HealthDocumentType.surgicalReport => 'surgical_report',
     HealthDocumentType.other => 'other',
   };
+
+  /// Parse estrito dos nove tipos canônicos.
+  ///
+  /// Desconhecido vira [ParsedHealthEnumState.unknown] preservando o raw —
+  /// nunca cai em `other`, que esconderia dado malformado. O vocabulário
+  /// legado (`laudo`, `certificado`, `documento`, `exame`) NÃO é mapeado
+  /// (decisão B0-A.2): mapear exigiria uma regra de derivação que o domínio
+  /// não possui.
+  static ParsedHealthEnum<HealthDocumentType> parse(Object? value) =>
+      parseHealthEnum(
+        value,
+        HealthDocumentType.values,
+        (item) => item.wireName,
+      );
 }
 
 /// Tipo de um exame (Domain Model §6).
