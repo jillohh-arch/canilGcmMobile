@@ -385,9 +385,35 @@ nutrition_supplements (legado)  = estado “em uso” → adapter / curadoria de
 **Enum `document_type`:** `prescription`, `report`, `certificate`, `exam_image`, `exam_pdf`, `photo`, `vaccination_card`, `surgical_report`, `other`
 
 **`storage_path` vs `storage_url`:**
-- `storage_path` é a identidade canônica (ex: `dogs/dog_001/health/doc_xyz.pdf`)
+- `storage_path` é a identidade canônica; o layout canônico é `health_documents/{dogId}/{documentId}` (sem extensão)
 - `storage_url` é derivado via Storage API; pode ser cache para performance mas nunca é fonte
 - Alterações de bucket/CDN não invalidam o documento — apenas o derivado URL
+
+**Autoridade de mutação (B0-A.2):** Mobile e Web são **iniciadores**; o agregado é escrito
+exclusivamente pelo backend (Function / Admin SDK) e writes de cliente são negados.
+`recorded_by` é server-authoritative. Mesma separação canal/autoridade de ADR-005 E1/E2.
+
+**Agregado vs metadados de mutação (B0-A.2):** os campos obrigatórios acima são o contrato
+clínico completo. Idempotência (`operationId`, fingerprint) pertence ao **receipt** e ao
+**audit**, não ao agregado. `revision` não é introduzido em um agregado create-only e imutável
+sem decisão explícita — `HealthDocument` não tem estado além de soft delete e não possui
+política de amendment/versionamento definida.
+
+**Papel de evidência não é `document_type`:** `document_type` descreve a natureza do arquivo
+(atestado → `certificate`, laudo/relatório → `report`, resultado de exame em PDF → `exam_pdf`,
+relatório cirúrgico → `surgical_report`). O fato de um documento ser evidência de uma restrição
+é expresso pelo relacionamento `OperationalRestriction.source_document` /
+`end_source_document`, nunca por um tipo especial como `restriction_evidence` ou `vet_release`.
+Os vocabulários legados (`laudo`, `certificado`, `documento`, `exame`) **não** são mapeados
+automaticamente para o enum canônico.
+
+**Objeto órfão no Storage (B0-A.2):** um objeto presente no Storage **sem** o documento
+canônico correspondente em `dogs/{dogId}/health_documents/{documentId}` é apenas *orphan
+storage residue*. Não é `HealthDocument`, não é evidência clínica, não é `source_document`
+válido e não carrega autoridade para nenhuma decisão Health. Retry transitório reutiliza o
+mesmo `operationId`/`documentId`/`storage_path`, então apenas falha definitiva de arquivo deixa
+órfão. Cleanup é dívida operacional observável, não fallback de autoridade — nenhum scheduler,
+trigger ou delete de cliente é criado para isso no v1.
 
 ---
 

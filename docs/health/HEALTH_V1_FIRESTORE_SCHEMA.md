@@ -490,11 +490,36 @@ Path: `dogs/{dogId}/supplement_logs/{logId}`
 | legacy_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**`storage_path`:** identidade canonica (ex: `dogs/dog_001/health/doc_xyz.pdf`).
+**`storage_path`:** identidade canonica no Cloud Storage.
 **`storage_url`:** derivado/cache via Storage API. Alteracoes de bucket/CDN nao invalidam o doc.
-**Escritor:** Mobile, Web.
+**Iniciadores:** Mobile, Web (emitem comando; nunca escrevem o agregado).
+**Mutation owner:** Backend Function / Admin SDK. Client Firestore writes: **denied**.
+`recorded_by` é server-authoritative — jamais aceito do payload. Ver ADR-005 E1/E2 (mesma
+separação canal/autoridade aplicada a `operational_restrictions`).
 **Leitor:** Mobile, Web.
 **Índices:** `deleted_at ASC, uploaded_at DESC`; `document_type ASC, uploaded_at DESC`.
+
+**Storage path canônico (B0-A.2):**
+
+```text
+health_documents/{dogId}/{documentId}
+```
+
+Sem extensão: `documentId` é identidade suficiente, `mime_type` vem do metadata do objeto,
+`title` pertence ao agregado e o filename original não é autoridade. O path é totalmente
+determinístico a partir de `dogId` + `documentId`, e há exatamente um objeto por
+`HealthDocument`.
+
+Não confundir com o path **Firestore** do agregado, que é
+`dogs/{dogId}/health_documents/{documentId}`.
+
+**Storage Rules (contrato para implementação):** namespace `health_documents/{dogId}/{documentId}`
+com `read` e `create` exigindo acesso ao K9, `create` também exigindo contentType permitido e
+tamanho ≤ 20 MB; `update` e `delete` negados. O catch-all permanece deny-all.
+
+Upload bem-sucedido **não** prova existência do K9 — `canAccessDogRecord` em `storage.rules`
+não verifica `exists(dogPath)`. O finalize backend valida independentemente: existência e
+acesso ao K9, path exato reservado, existência do objeto, metadata, size e contentType.
 
 ---
 
