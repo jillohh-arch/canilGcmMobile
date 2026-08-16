@@ -553,6 +553,8 @@ estrutural.
    não é obviamente a autoridade correta, e `health.issue_restriction` tampouco.
    `HEALTH_V1_PERMISSION_MATRIX.md` §5 registra "capability administrativa [provisório]"
    para essa coluna. Decisão pendente antes do Gate que implementar cancel.
+   → **RESOLVIDO em E12** (Gate B2-A): a autoridade é `health.cancel_restriction`,
+   capability própria e distinta.
 2. **Defeito em `OperationalRestrictionTransitions.transition`**
    (`lib/features/health/domain/health_v1_transitions_v2.dart`): valida
    `cancelledAt`/`cancelledBy`/`cancelReason`, campos que o agregado não possui, e
@@ -561,3 +563,60 @@ estrutural.
    de implementação. O shape correto é o desta emenda.
 3. **Mapeamento capability → perfil real** permanece provisório, como já registrado na
    Permission Matrix (questão O1).
+
+### E12. Autoridade das transições terminais (Gate B2-A)
+
+Resolve o CONFLITO ABERTO de E11 item 1. São **três** poderes distintos, com três
+capabilities distintas:
+
+| Transição | Autoridade | Afirmação feita pelo usuário |
+|-----------|-----------|------------------------------|
+| — → `active` | `health.issue_restriction` | cria impacto operacional |
+| `active` → `ended` | `health.release_restriction` | o motivo clínico da restrição terminou |
+| `active` → `cancelled` | `health.cancel_restriction` | este registro não é autoridade operacional válida |
+
+`health.cancel_restriction` é capability **própria**. Não reutilizar
+`health.release_restriction`, `health.issue_restriction`, `health.create`,
+`health.edit`, `health.approve` nem `health.cancel_record`.
+
+**Por que capability própria.** Para `readiness` e OP-AUTH o *efeito* de `ended` e
+`cancelled` é o mesmo — a restrição deixa de bloquear. Mas a afirmação é
+completamente diferente. Fundir cancel em `health.release_restriction` faria alguém
+com poder de corrigir cadastro praticar, pelo sistema, uma liberação clínica. Usar
+`health.issue_restriction` seria pior ainda: poder criar uma restrição não deve
+implicar poder apagar o efeito dela.
+
+**Risco que justifica o nome próprio.** `cancelled` não afirma melhora clínica, mas
+remove o efeito operacional: uma autorização indevida de cancel **recoloca um K9 em
+operação**. Não é CRUD administrativo comum, e a capability precisa dizer isso em voz
+alta — "esta pessoa tem autoridade para invalidar uma restrição operacional ativa".
+
+**Campos obrigatórios por transição** (consolida E6):
+
+| `active` → `ended` | `active` → `cancelled` |
+|---|---|
+| `end_reason` — não vazio | `cancel_reason` — não vazio |
+| `actual_end` — server | `cancelled_at` — server |
+| `ended_by` — server (`RecordedBy`) | `cancelled_by` — server (`RecordedBy`) |
+| `end_professional` — obrigatório | **não** exige professional |
+| `end_source_document` — obrigatório | **não** exige HealthDocument |
+
+`cancelled` não exige `ProfessionalIdentity` nem `HealthDocumentRef` **por decisão**:
+exigi-los transformaria invalidação administrativa numa pseudo-liberação clínica.
+Simetricamente, não existe `ended` administrativo (E6).
+
+`end_source_document` é evidência **da liberação** — espera-se um novo HealthDocument
+canônico. Não assumir `end_source_document == source_document` original; reutilizar o
+documento que originou a restrição só seria legítimo se ele próprio contivesse a
+liberação, o que não é o fluxo v1.
+
+**Escopo de `cancelled`.** Invalidação factual do registro: criado por engano,
+duplicidade, K9 incorreto, evidência vinculada errada, transcrição materialmente
+incorreta, ou outro erro de registro. **Não** é cancel: condição melhorou, tratamento
+acabou, prazo venceu, profissional liberou, K9 está apto — esses casos são `ended`
+quando houver liberação clínica documentada. Nenhuma taxonomia de motivo é criada:
+`cancel_reason` é texto obrigatório, auditável e imutável.
+
+**Concessão a perfis reais permanece fora do código** (E11 item 3 / questão O1).
+Vocabulário de capability implementado ≠ grant concedido. As três decisões — quem
+emite, quem libera, quem cancela — são independentes e pertencem ao cutover.
