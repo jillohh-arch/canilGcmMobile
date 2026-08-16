@@ -535,8 +535,19 @@ export function fingerprintIssueIntent(intent: RestrictionIssueIntent): string {
 
 export type ReceiptMatch = "replay" | "idempotency-conflict" | "missing";
 
-/** Receipt malformado ≠ ausente: fail-closed, nunca "missing". */
-export function assertReceiptShape(data: JsonMap): void {
+/**
+ * Receipt malformado ≠ ausente: fail-closed, nunca "missing".
+ *
+ * `kind` e `operationType` são parâmetros porque ISSUE, END e CANCEL têm
+ * receipts distintos e NÃO podem ser interpretados um pelo outro. Um receipt
+ * de END lido por CANCEL (mesmo `operationId`) é violação de integridade, não
+ * replay — ver `RESTRICTION_*_KIND`.
+ */
+export function assertReceiptShapeOf(
+  data: JsonMap,
+  kind: string,
+  operationType: string,
+): void {
   const required = [
     "kind",
     "operation_id",
@@ -554,18 +565,45 @@ export function assertReceiptShape(data: JsonMap): void {
       );
     }
   }
-  if (stringValue(data.kind) !== RESTRICTION_ISSUE_KIND) {
+  if (stringValue(data.kind) !== kind) {
     throw logicError(
       "integrity",
-      `Receipt de kind/version incompatível com ${RESTRICTION_ISSUE_KIND}.`,
+      `Receipt de kind/version incompatível com ${kind}.`,
     );
   }
-  if (stringValue(data.operation_type) !== RESTRICTION_ISSUE_OPERATION) {
+  if (stringValue(data.operation_type) !== operationType) {
     throw logicError("integrity", "Receipt de operation_type incompatível.");
   }
 }
 
+/** Receipt do ISSUE (B1). */
+export function assertReceiptShape(data: JsonMap): void {
+  assertReceiptShapeOf(data, RESTRICTION_ISSUE_KIND, RESTRICTION_ISSUE_OPERATION);
+}
+
 /** Replay só quando actor + operation_type + fingerprint batem TODOS. */
+export function matchReceiptOf(params: {
+  readonly receiptExists: boolean;
+  readonly storedActorUid?: string;
+  readonly storedOperationType?: string;
+  readonly storedFingerprint?: string;
+  readonly actorUid: string;
+  readonly fingerprint: string;
+  readonly operationType: string;
+}): ReceiptMatch {
+  if (!params.receiptExists) return "missing";
+  if (params.storedActorUid !== params.actorUid) {
+    return "idempotency-conflict";
+  }
+  if (params.storedOperationType !== params.operationType) {
+    return "idempotency-conflict";
+  }
+  if (params.storedFingerprint !== params.fingerprint) {
+    return "idempotency-conflict";
+  }
+  return "replay";
+}
+
 export function matchIssueReceipt(params: {
   readonly receiptExists: boolean;
   readonly storedActorUid?: string;
@@ -574,17 +612,7 @@ export function matchIssueReceipt(params: {
   readonly actorUid: string;
   readonly fingerprint: string;
 }): ReceiptMatch {
-  if (!params.receiptExists) return "missing";
-  if (params.storedActorUid !== params.actorUid) {
-    return "idempotency-conflict";
-  }
-  if (params.storedOperationType !== RESTRICTION_ISSUE_OPERATION) {
-    return "idempotency-conflict";
-  }
-  if (params.storedFingerprint !== params.fingerprint) {
-    return "idempotency-conflict";
-  }
-  return "replay";
+  return matchReceiptOf({...params, operationType: RESTRICTION_ISSUE_OPERATION});
 }
 
 export type IssueDecision =
@@ -643,4 +671,243 @@ export function recordedByPayload(
 export interface IssueReceiptResult {
   readonly dogId: string;
   readonly restrictionId: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lifecycle terminal — END / CANCEL (B2)
+//
+// Dois comandos de domínio SEPARADOS. Ambos terminam alterando `status`, mas as
+// autoridades, as provas exigidas e as afirmações feitas pelo usuário são
+// diferentes (ADR-005 E12), então não existe writer genérico de status.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Discriminadores versionados — load-bearing: END e CANCEL nunca se replayam. */
+export const RESTRICTION_END_KIND = "health_operational_restriction_end_v1";
+export const RESTRICTION_CANCEL_KIND =
+  "health_operational_restriction_cancel_v1";
+
+export const RESTRICTION_END_OPERATION = "release_restriction";
+export const RESTRICTION_CANCEL_OPERATION = "cancel_restriction";
+
+export const MAX_REASON_LEN = 2000;
+
+/** Estados terminais: nunca reabrem (ADR-005 E12). */
+export const RESTRICTION_STATUS_ACTIVE = "active";
+export const RESTRICTION_STATUS_ENDED = "ended";
+export const RESTRICTION_STATUS_CANCELLED = "cancelled";
+
+/** Razão é parte material da transição: obrigatória, não derivada. */
+export function assertReason(raw: unknown, label: string): string {
+  const value = stringValue(raw);
+  if (!value) throw logicError("validation", `${label} é obrigatório.`);
+  if (value.length > MAX_REASON_LEN) {
+    throw logicError("validation", `${label} excede o tamanho máximo.`);
+  }
+  return value;
+}
+
+export function canonicalRestrictionOperationPath(
+  dogId: string,
+  restrictionId: string,
+  operationId: string,
+): string {
+  return `${canonicalRestrictionPath(dogId, restrictionId)}/operations/${operationId}`;
+}
+
+export interface RestrictionEndIntent {
+  readonly dogId: string;
+  readonly restrictionId: string;
+  readonly endReason: string;
+  readonly endProfessional: ProfessionalIdentity;
+  readonly endSourceDocument: HealthDocumentRefValue;
+}
+
+/**
+ * Fingerprint da intenção de END.
+ *
+ * Inclui só o payload material do cliente. Fora: `actual_end`, `ended_by` e
+ * qualquer timestamp gerado pela operação — todos server-owned, e incluí-los
+ * tornaria cada retry um fingerprint novo.
+ */
+export function fingerprintEndIntent(intent: RestrictionEndIntent): string {
+  return stableStringify({
+    kind: RESTRICTION_END_KIND,
+    dogId: intent.dogId,
+    restrictionId: intent.restrictionId,
+    endReason: intent.endReason,
+    endProfessional: {
+      name: intent.endProfessional.name,
+      registration_type: intent.endProfessional.registration_type,
+      registration_number: intent.endProfessional.registration_number,
+      clinic: intent.endProfessional.clinic,
+      specialty: intent.endProfessional.specialty,
+    },
+    endSourceDocument: {
+      health_document_id: intent.endSourceDocument.health_document_id,
+      description: intent.endSourceDocument.description,
+    },
+  });
+}
+
+export interface RestrictionCancelIntent {
+  readonly dogId: string;
+  readonly restrictionId: string;
+  readonly cancelReason: string;
+}
+
+/** Fingerprint da intenção de CANCEL — sem professional, sem documento. */
+export function fingerprintCancelIntent(
+  intent: RestrictionCancelIntent,
+): string {
+  return stableStringify({
+    kind: RESTRICTION_CANCEL_KIND,
+    dogId: intent.dogId,
+    restrictionId: intent.restrictionId,
+    cancelReason: intent.cancelReason,
+  });
+}
+
+export function assertEndReceiptShape(data: JsonMap): void {
+  assertReceiptShapeOf(data, RESTRICTION_END_KIND, RESTRICTION_END_OPERATION);
+}
+
+export function assertCancelReceiptShape(data: JsonMap): void {
+  assertReceiptShapeOf(
+    data,
+    RESTRICTION_CANCEL_KIND,
+    RESTRICTION_CANCEL_OPERATION,
+  );
+}
+
+export function matchEndReceipt(params: {
+  readonly receiptExists: boolean;
+  readonly storedActorUid?: string;
+  readonly storedOperationType?: string;
+  readonly storedFingerprint?: string;
+  readonly actorUid: string;
+  readonly fingerprint: string;
+}): ReceiptMatch {
+  return matchReceiptOf({...params, operationType: RESTRICTION_END_OPERATION});
+}
+
+export function matchCancelReceipt(params: {
+  readonly receiptExists: boolean;
+  readonly storedActorUid?: string;
+  readonly storedOperationType?: string;
+  readonly storedFingerprint?: string;
+  readonly actorUid: string;
+  readonly fingerprint: string;
+}): ReceiptMatch {
+  return matchReceiptOf({
+    ...params,
+    operationType: RESTRICTION_CANCEL_OPERATION,
+  });
+}
+
+export type TerminalDecision =
+  | {readonly kind: "transition"}
+  | {readonly kind: "replay"}
+  | {
+      readonly kind: "error";
+      readonly code: AppErrorCode;
+      readonly message: string;
+    };
+
+/**
+ * Decisão canônica das transições terminais.
+ *
+ * Ordem load-bearing: o RECEIPT é a autoridade de replay idempotente e é
+ * consultado ANTES do status. Sem isso, um retry legítimo da MESMA operação
+ * veria a restrição já terminal e receberia conflito espúrio.
+ *
+ * Só depois o status decide: apenas `active` transiciona. Restrição já terminal
+ * por OUTRA operação é `conflict` — terminal nunca reabre (ADR-005 E12), e a
+ * segunda transição concorrente perde aqui.
+ */
+export function decideTerminalTransition(params: {
+  readonly receiptMatch: ReceiptMatch;
+  readonly restrictionExists: boolean;
+  readonly currentStatus: string | undefined;
+}): TerminalDecision {
+  if (params.receiptMatch === "replay") return {kind: "replay"};
+  if (params.receiptMatch === "idempotency-conflict") {
+    return {
+      kind: "error",
+      code: "idempotency-conflict",
+      message:
+        "Mesma idempotencyKey com intenção diferente da operação original.",
+    };
+  }
+  if (!params.restrictionExists) {
+    return {
+      kind: "error",
+      code: "not-found",
+      message: "Restrição operacional não encontrada.",
+    };
+  }
+  const status = stringValue(params.currentStatus);
+  if (!status) {
+    return {
+      kind: "error",
+      code: "integrity",
+      message: "Restrição sem status legível: recusando transição.",
+    };
+  }
+  if (status === RESTRICTION_STATUS_ACTIVE) return {kind: "transition"};
+  if (
+    status === RESTRICTION_STATUS_ENDED ||
+    status === RESTRICTION_STATUS_CANCELLED
+  ) {
+    return {
+      kind: "error",
+      code: "conflict",
+      message:
+        `Restrição já está em estado terminal (${status}): ` +
+        "estados terminais não reabrem.",
+    };
+  }
+  return {
+    kind: "error",
+    code: "integrity",
+    message: `Status não suportado para transição: ${status}.`,
+  };
+}
+
+/**
+ * Exclusividade de metadata terminal — invariante load-bearing.
+ *
+ * Um agregado nunca pode carregar os dois conjuntos: `ended` com metadata de
+ * cancel, ou `cancelled` com metadata de end, seria um terminal híbrido sem
+ * significado clínico. A restrição `active` produzida pelo B1 naturalmente não
+ * tem nenhum dos dois, então esta checagem só falha diante de corrupção.
+ */
+export const END_METADATA_FIELDS = [
+  "actual_end",
+  "ended_by",
+  "end_reason",
+  "end_professional",
+  "end_source_document",
+] as const;
+
+export const CANCEL_METADATA_FIELDS = [
+  "cancelled_at",
+  "cancelled_by",
+  "cancel_reason",
+] as const;
+
+export function assertNoTerminalMetadata(
+  current: JsonMap,
+  fields: readonly string[],
+  label: string,
+): void {
+  for (const field of fields) {
+    const value = current[field];
+    if (value !== undefined && value !== null) {
+      throw logicError(
+        "integrity",
+        `Restrição ativa já carrega metadata de ${label} (${field}): ` +
+          "recusando produzir agregado terminal híbrido.",
+      );
+    }
+  }
 }

@@ -48,6 +48,23 @@ import {
   parseSourceDocumentRef,
   recordedByPayload,
   stringValue,
+  CANCEL_METADATA_FIELDS,
+  END_METADATA_FIELDS,
+  RESTRICTION_CANCEL_KIND,
+  RESTRICTION_CANCEL_OPERATION,
+  RESTRICTION_END_KIND,
+  RESTRICTION_END_OPERATION,
+  RESTRICTION_STATUS_CANCELLED,
+  RESTRICTION_STATUS_ENDED,
+  assertCancelReceiptShape,
+  assertEndReceiptShape,
+  assertNoTerminalMetadata,
+  assertReason,
+  decideTerminalTransition,
+  fingerprintCancelIntent,
+  fingerprintEndIntent,
+  matchCancelReceipt,
+  matchEndReceipt,
 } from "./health_restriction_logic";
 
 type JsonMap = Record<string, unknown>;
@@ -144,16 +161,35 @@ function sha256Hex(material: string): string {
   return crypto.createHash("sha256").update(material, "utf8").digest("hex");
 }
 
-/** Audit determinístico: um audit lógico por emissão, sem duplicar em replay. */
+/**
+ * Audit determinístico: um audit lógico por operação, sem duplicar em replay.
+ *
+ * `operationType` participa do hash, então ISSUE, END e CANCEL sobre a mesma
+ * restrição com o mesmo `operationId` produzem audits distintos.
+ */
+function auditDocIdFor(
+  dogId: string,
+  restrictionId: string,
+  operationType: string,
+  operationId: string,
+): string {
+  const h = sha256Hex(
+    `${dogId}|${restrictionId}|${operationType}|${operationId}`,
+  );
+  return `or_audit_${h.slice(0, 40)}`;
+}
+
 function auditDocId(
   dogId: string,
   restrictionId: string,
   operationId: string,
 ): string {
-  const h = sha256Hex(
-    `${dogId}|${restrictionId}|${RESTRICTION_ISSUE_OPERATION}|${operationId}`,
+  return auditDocIdFor(
+    dogId,
+    restrictionId,
+    RESTRICTION_ISSUE_OPERATION,
+    operationId,
   );
-  return `or_audit_${h.slice(0, 40)}`;
 }
 
 function restrictionRef(
@@ -191,21 +227,39 @@ function healthDocumentRef(
     .doc(healthDocumentId);
 }
 
+function receiptPayloadFor(params: {
+  kind: string;
+  operationType: string;
+  operationId: string;
+  actorUid: string;
+  fingerprint: string;
+  result: JsonMap;
+}): JsonMap {
+  return {
+    kind: params.kind,
+    operation_id: params.operationId,
+    operation_type: params.operationType,
+    actor_uid: params.actorUid,
+    fingerprint: params.fingerprint,
+    result: {...params.result},
+    processed_at: FieldValue.serverTimestamp(),
+  };
+}
+
 function receiptPayload(params: {
   operationId: string;
   actorUid: string;
   fingerprint: string;
   result: IssueReceiptResult;
 }): JsonMap {
-  return {
+  return receiptPayloadFor({
     kind: RESTRICTION_ISSUE_KIND,
-    operation_id: params.operationId,
-    operation_type: RESTRICTION_ISSUE_OPERATION,
-    actor_uid: params.actorUid,
+    operationType: RESTRICTION_ISSUE_OPERATION,
+    operationId: params.operationId,
+    actorUid: params.actorUid,
     fingerprint: params.fingerprint,
     result: {...params.result},
-    processed_at: FieldValue.serverTimestamp(),
-  };
+  });
 }
 
 /**
@@ -216,19 +270,21 @@ function receiptPayload(params: {
  * agregado, cujo acesso é controlado. O audit registra a operação e sua
  * proveniência, não o conteúdo clínico.
  */
-function auditLogPayload(
+function auditLogPayloadFor(
   caller: RestrictionCaller,
+  action: string,
   dogId: string,
   restrictionId: string,
+  summary: string,
   metadata: JsonMap,
 ): JsonMap {
   const now = FieldValue.serverTimestamp();
   return {
-    action: "health_operational_restriction_issued",
+    action,
     entity_type: "operational_restrictions",
     entity_id: restrictionId,
     entity_path: canonicalRestrictionPath(dogId, restrictionId),
-    summary: `Restrição operacional emitida para K9 ${dogId}`,
+    summary,
     actor: {
       uid: caller.uid,
       email: caller.email,
@@ -248,6 +304,22 @@ function auditLogPayload(
  * Fail-closed explícito: um payload que tente definir `status`, autoria ou
  * qualquer campo de encerramento é rejeitado, nunca ignorado em silêncio.
  */
+function auditLogPayload(
+  caller: RestrictionCaller,
+  dogId: string,
+  restrictionId: string,
+  metadata: JsonMap,
+): JsonMap {
+  return auditLogPayloadFor(
+    caller,
+    "health_operational_restriction_issued",
+    dogId,
+    restrictionId,
+    `Restrição operacional emitida para K9 ${dogId}`,
+    metadata,
+  );
+}
+
 function rejectInjection(data: JsonMap): void {
   const forbidden = [
     "id",
@@ -540,6 +612,495 @@ export async function runHealthRestrictionIssue(
       );
 
       return issueResponse(dogId, restrictionId, false);
+    });
+  } catch (err) {
+    mapLogicError(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lifecycle terminal — END / CANCEL (B2)
+//
+// Dois comandos SEPARADOS, deliberadamente. Ambos terminam mudando `status`,
+// mas as autoridades, as provas exigidas e a afirmação feita pelo usuário são
+// diferentes (ADR-005 E12). Um `changeStatus` genérico teria que reintroduzir
+// essa distinção via parâmetro — exatamente onde ficaria fácil de errar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HealthRestrictionLifecycleDeps {
+  db: FirebaseFirestore.Firestore;
+  /** `health.release_restriction` — liberação clínica documentada. */
+  requireReleaseRestriction: (
+    auth: CallableRequest["auth"],
+  ) => Promise<RestrictionCaller>;
+  /** `health.cancel_restriction` — invalidação do registro. */
+  requireCancelRestriction: (
+    auth: CallableRequest["auth"],
+  ) => Promise<RestrictionCaller>;
+  requireDogAccess: (
+    auth: CallableRequest["auth"],
+    caller: RestrictionCaller,
+    dogId: string,
+    dog: JsonMap,
+  ) => Promise<void>;
+  isAdministrativeAuthority: (
+    auth: CallableRequest["auth"],
+    caller: RestrictionCaller,
+  ) => Promise<boolean>;
+  /** Referência única de tempo server-side para a operação. */
+  now?: () => Date;
+}
+
+/**
+ * Campos materiais da restrição emitida — lifecycle NUNCA os reescreve.
+ *
+ * Correção material continua sendo CANCEL + nova ISSUE (ADR-005 E7): permitir
+ * que END/CANCEL editassem `level`, `description` ou a evidência original
+ * transformaria uma transição de lifecycle num update disfarçado.
+ */
+const MATERIAL_FIELDS_DENYLIST = [
+  "level",
+  "category",
+  "description",
+  "activitiesRestricted",
+  "activities_restricted",
+  "expectedEnd",
+  "expected_end",
+  "professional",
+  "sourceDocument",
+  "source_document",
+  "issuedAt",
+  "issued_at",
+  "since",
+  "recordedBy",
+  "recorded_by",
+  "schemaVersion",
+  "schema_version",
+  "revision",
+  "expectedRevision",
+  "expected_revision",
+  "status",
+  "id",
+  "restrictionId2",
+  "actor",
+  "source",
+  "deletedAt",
+  "deleted_at",
+];
+
+const END_OWNED_FIELDS = ["actualEnd", "actual_end", "endedBy", "ended_by"];
+
+const CANCEL_OWNED_FIELDS = [
+  "cancelledAt",
+  "cancelled_at",
+  "cancelledBy",
+  "cancelled_by",
+];
+
+function rejectLifecycleInjection(
+  data: JsonMap,
+  extraForbidden: readonly string[],
+): void {
+  for (const key of [...MATERIAL_FIELDS_DENYLIST, ...extraForbidden]) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      appError(
+        "invalid-argument",
+        "validation",
+        `Campo não permitido no payload: ${key}.`,
+      );
+    }
+  }
+}
+
+function terminalResponse(
+  dogId: string,
+  restrictionId: string,
+  status: string,
+  wasNoOp: boolean,
+): JsonMap {
+  return {
+    dog_id: dogId,
+    restriction_id: restrictionId,
+    status,
+    was_no_op: wasNoOp,
+    // espelho camelCase (paridade Agenda / clientes mistos)
+    dogId,
+    restrictionId,
+    wasNoOp,
+  };
+}
+
+/**
+ * Encerra uma restrição por LIBERAÇÃO CLÍNICA documentada.
+ *
+ * Exige `health.release_restriction`, a `ProfessionalIdentity` do profissional
+ * externo que liberou e um `HealthDocumentRef` canônico da evidência de
+ * liberação. Não existe END administrativo (ADR-005 E6).
+ *
+ * Como o ISSUE, não consulta Storage: o B0 encapsulou isso, e um HealthDocument
+ * canônico existente É a evidência citável.
+ */
+export async function runHealthRestrictionEnd(
+  request: CallableRequest,
+  deps: HealthRestrictionLifecycleDeps,
+): Promise<JsonMap> {
+  try {
+    const caller = await deps.requireReleaseRestriction(request.auth);
+    const data = (request.data ?? {}) as JsonMap;
+    rejectLifecycleInjection(data, [
+      ...END_OWNED_FIELDS,
+      ...CANCEL_OWNED_FIELDS,
+      "cancelReason",
+      "cancel_reason",
+      "cancelProfessional",
+      "cancel_professional",
+      "cancelSourceDocument",
+      "cancel_source_document",
+    ]);
+
+    const dogId = assertDocumentId(data.dogId ?? data.dog_id, "dogId");
+    const restrictionId = assertDocumentId(
+      data.restrictionId ?? data.restriction_id,
+      "restrictionId",
+    );
+    const operationId = normalizeOperationId(
+      data.idempotencyKey ?? data.operationId ?? data.operation_id,
+    );
+    const endReason = assertReason(
+      data.endReason ?? data.end_reason,
+      "end_reason",
+    );
+    const endProfessional = parseProfessionalIdentity(
+      data.endProfessional ?? data.end_professional,
+    );
+    const endSourceDocument = parseSourceDocumentRef(
+      data.endSourceDocument ?? data.end_source_document,
+    );
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintEndIntent({
+      dogId,
+      restrictionId,
+      endReason,
+      endProfessional,
+      endSourceDocument,
+    });
+
+    const docRef = restrictionRef(deps.db, dogId, restrictionId);
+    const opRef = operationRef(deps.db, dogId, restrictionId, operationId);
+    const evidenceRef = healthDocumentRef(
+      deps.db,
+      dogId,
+      endSourceDocument.health_document_id,
+    );
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        auditDocIdFor(
+          dogId,
+          restrictionId,
+          RESTRICTION_END_OPERATION,
+          operationId,
+        ),
+      );
+
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const actualEnd = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      // Todos os reads antes de qualquer write.
+      const [existing, opSnap, evidenceSnap] = await Promise.all([
+        tx.get(docRef),
+        tx.get(opRef),
+        tx.get(evidenceRef),
+      ]);
+
+      let receiptMatch: ReturnType<typeof matchEndReceipt> = "missing";
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        // Um receipt de CANCEL com o mesmo operationId falha aqui como
+        // integridade: kinds distintos são load-bearing, nunca replay cruzado.
+        assertEndReceiptShape(stored);
+        receiptMatch = matchEndReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          actorUid: caller.uid,
+          fingerprint,
+        });
+      }
+
+      const current = (existing.data() ?? {}) as JsonMap;
+      const decision = decideTerminalTransition({
+        receiptMatch,
+        restrictionExists: existing.exists,
+        currentStatus: stringValue(current.status),
+      });
+
+      if (decision.kind === "error") {
+        if (decision.code === "not-found") {
+          appError("not-found", "not-found", decision.message);
+        }
+        throwDecisionError(decision.code, decision.message);
+      }
+      if (decision.kind === "replay") {
+        return terminalResponse(
+          dogId,
+          restrictionId,
+          RESTRICTION_STATUS_ENDED,
+          true,
+        );
+      }
+
+      // Nunca produzir agregado terminal híbrido.
+      assertNoTerminalMetadata(current, CANCEL_METADATA_FIELDS, "cancelamento");
+
+      // Evidência da LIBERAÇÃO: canônica, do mesmo K9, sem Storage.
+      if (!evidenceSnap.exists) {
+        appError(
+          "failed-precondition",
+          "integrity",
+          "HealthDocument citado em end_source_document não existe em " +
+            `${canonicalHealthDocumentPath(
+              dogId,
+              endSourceDocument.health_document_id,
+            )}: encerramento exige evidência documental canônica.`,
+        );
+      }
+      const evidence = (evidenceSnap.data() ?? {}) as JsonMap;
+      if (evidence.deleted_at !== undefined && evidence.deleted_at !== null) {
+        appError(
+          "failed-precondition",
+          "integrity",
+          "HealthDocument citado em end_source_document está excluído.",
+        );
+      }
+
+      // Altera SOMENTE status + metadata terminal. Os campos materiais da
+      // emissão permanecem exatamente como foram registrados.
+      const patch: JsonMap = {
+        status: RESTRICTION_STATUS_ENDED,
+        end_reason: endReason,
+        actual_end: actualEnd,
+        ended_by: recordedByPayload(caller, isAdmin),
+        end_professional: {
+          name: endProfessional.name,
+          registration_type: endProfessional.registration_type,
+          registration_number: endProfessional.registration_number,
+          clinic: endProfessional.clinic,
+          specialty: endProfessional.specialty,
+        },
+        end_source_document: {
+          health_document_id: endSourceDocument.health_document_id,
+          description: endSourceDocument.description,
+        },
+      };
+
+      tx.update(docRef, patch);
+      tx.set(
+        opRef,
+        receiptPayloadFor({
+          kind: RESTRICTION_END_KIND,
+          operationType: RESTRICTION_END_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {dogId, restrictionId, status: RESTRICTION_STATUS_ENDED},
+        }),
+      );
+      tx.set(
+        auditRef,
+        auditLogPayloadFor(
+          caller,
+          "health_operational_restriction_ended",
+          dogId,
+          restrictionId,
+          `Restrição operacional encerrada por liberação clínica — K9 ${dogId}`,
+          {
+            restriction_id: restrictionId,
+            operation_id: operationId,
+            end_reason: endReason,
+            source_document_id: endSourceDocument.health_document_id,
+            authority: "operational_restrictions",
+          },
+        ),
+      );
+
+      return terminalResponse(
+        dogId,
+        restrictionId,
+        RESTRICTION_STATUS_ENDED,
+        false,
+      );
+    });
+  } catch (err) {
+    mapLogicError(err);
+  }
+}
+
+/**
+ * Invalida o REGISTRO de uma restrição.
+ *
+ * Exige `health.cancel_restriction`. NÃO exige `ProfessionalIdentity` nem
+ * `HealthDocumentRef` — exigi-los transformaria invalidação administrativa numa
+ * pseudo-liberação clínica (ADR-005 E12).
+ *
+ * CANCEL não afirma melhora clínica, mas remove o efeito operacional da
+ * restrição: é por isso que tem capability própria e não é CRUD comum.
+ */
+export async function runHealthRestrictionCancel(
+  request: CallableRequest,
+  deps: HealthRestrictionLifecycleDeps,
+): Promise<JsonMap> {
+  try {
+    const caller = await deps.requireCancelRestriction(request.auth);
+    const data = (request.data ?? {}) as JsonMap;
+    rejectLifecycleInjection(data, [
+      ...CANCEL_OWNED_FIELDS,
+      ...END_OWNED_FIELDS,
+      "endReason",
+      "end_reason",
+      "endProfessional",
+      "end_professional",
+      "endSourceDocument",
+      "end_source_document",
+      // CANCEL não carrega prova clínica: enviar professional/documento é erro
+      // de contrato, não campo opcional a ser ignorado em silêncio.
+      "cancelProfessional",
+      "cancel_professional",
+      "cancelSourceDocument",
+      "cancel_source_document",
+    ]);
+
+    const dogId = assertDocumentId(data.dogId ?? data.dog_id, "dogId");
+    const restrictionId = assertDocumentId(
+      data.restrictionId ?? data.restriction_id,
+      "restrictionId",
+    );
+    const operationId = normalizeOperationId(
+      data.idempotencyKey ?? data.operationId ?? data.operation_id,
+    );
+    const cancelReason = assertReason(
+      data.cancelReason ?? data.cancel_reason,
+      "cancel_reason",
+    );
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintCancelIntent({
+      dogId,
+      restrictionId,
+      cancelReason,
+    });
+
+    const docRef = restrictionRef(deps.db, dogId, restrictionId);
+    const opRef = operationRef(deps.db, dogId, restrictionId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        auditDocIdFor(
+          dogId,
+          restrictionId,
+          RESTRICTION_CANCEL_OPERATION,
+          operationId,
+        ),
+      );
+
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const cancelledAt = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [existing, opSnap] = await Promise.all([
+        tx.get(docRef),
+        tx.get(opRef),
+      ]);
+
+      let receiptMatch: ReturnType<typeof matchCancelReceipt> = "missing";
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertCancelReceiptShape(stored);
+        receiptMatch = matchCancelReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          actorUid: caller.uid,
+          fingerprint,
+        });
+      }
+
+      const current = (existing.data() ?? {}) as JsonMap;
+      const decision = decideTerminalTransition({
+        receiptMatch,
+        restrictionExists: existing.exists,
+        currentStatus: stringValue(current.status),
+      });
+
+      if (decision.kind === "error") {
+        if (decision.code === "not-found") {
+          appError("not-found", "not-found", decision.message);
+        }
+        throwDecisionError(decision.code, decision.message);
+      }
+      if (decision.kind === "replay") {
+        return terminalResponse(
+          dogId,
+          restrictionId,
+          RESTRICTION_STATUS_CANCELLED,
+          true,
+        );
+      }
+
+      assertNoTerminalMetadata(current, END_METADATA_FIELDS, "encerramento");
+
+      const patch: JsonMap = {
+        status: RESTRICTION_STATUS_CANCELLED,
+        cancel_reason: cancelReason,
+        cancelled_at: cancelledAt,
+        cancelled_by: recordedByPayload(caller, isAdmin),
+      };
+
+      tx.update(docRef, patch);
+      tx.set(
+        opRef,
+        receiptPayloadFor({
+          kind: RESTRICTION_CANCEL_KIND,
+          operationType: RESTRICTION_CANCEL_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {dogId, restrictionId, status: RESTRICTION_STATUS_CANCELLED},
+        }),
+      );
+      tx.set(
+        auditRef,
+        auditLogPayloadFor(
+          caller,
+          "health_operational_restriction_cancelled",
+          dogId,
+          restrictionId,
+          `Registro de restrição operacional invalidado — K9 ${dogId}`,
+          {
+            restriction_id: restrictionId,
+            operation_id: operationId,
+            cancel_reason: cancelReason,
+            authority: "operational_restrictions",
+          },
+        ),
+      );
+
+      return terminalResponse(
+        dogId,
+        restrictionId,
+        RESTRICTION_STATUS_CANCELLED,
+        false,
+      );
     });
   } catch (err) {
     mapLogicError(err);

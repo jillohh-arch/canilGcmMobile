@@ -40,8 +40,11 @@ import {
 } from "./health_document_storage_adapter";
 import {
   RestrictionCaller,
+  runHealthRestrictionCancel,
+  runHealthRestrictionEnd,
   runHealthRestrictionIssue,
   type HealthRestrictionCallableDeps,
+  type HealthRestrictionLifecycleDeps,
 } from "./health_restriction_callables";
 import {
   healthTimelineProjectMealLogCreatedWrapper,
@@ -427,9 +430,15 @@ type AccessAction =
   | "record_routine"
   // Autoridade de emissão de restrição operacional (B1). Deliberadamente
   // distinta de `create`/`edit`: registrar um documento não é declarar que um
-  // K9 não pode trabalhar. `release_restriction` chega no B2, junto com a
-  // decisão pendente sobre a autoridade de `cancelled`.
-  | "issue_restriction";
+  // K9 não pode trabalhar.
+  | "issue_restriction"
+  // Transições terminais (B2). Três poderes distintos, três capabilities
+  // distintas (ADR-005 E12): emitir cria impacto operacional, liberar declara
+  // que o motivo clínico terminou, cancelar invalida o próprio registro.
+  // `cancel_restriction` tem nome próprio porque um cancel indevido recoloca
+  // um K9 em operação sem afirmar melhora clínica.
+  | "release_restriction"
+  | "cancel_restriction";
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -8074,6 +8083,62 @@ const healthRestrictionDeps: HealthRestrictionCallableDeps = {
  */
 export const healthRestrictionIssue = onCall({region}, async (request) => {
   return runHealthRestrictionIssue(request, healthRestrictionDeps);
+});
+
+/**
+ * Writers de lifecycle terminal — END / CANCEL (B2).
+ *
+ * Autoridades separadas e não intercambiáveis. Nenhum access profile real
+ * recebe esses grants automaticamente: a concessão é decisão de cutover.
+ */
+const healthRestrictionLifecycleDeps: HealthRestrictionLifecycleDeps = {
+  db,
+  requireReleaseRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireAccessPermission(auth, "health", "release_restriction"),
+  ),
+  requireCancelRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireAccessPermission(auth, "health", "cancel_restriction"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Encerra restrição por liberação clínica documentada
+ * (health.release_restriction + dog access). Admin SDK write.
+ */
+export const healthRestrictionEnd = onCall({region}, async (request) => {
+  return runHealthRestrictionEnd(request, healthRestrictionLifecycleDeps);
+});
+
+/**
+ * Invalida o registro de uma restrição (health.cancel_restriction + dog
+ * access). Não afirma liberação clínica. Admin SDK write.
+ */
+export const healthRestrictionCancel = onCall({region}, async (request) => {
+  return runHealthRestrictionCancel(request, healthRestrictionLifecycleDeps);
 });
 
 /** Create manual schedule item (health.create + dog access). Admin SDK write. */

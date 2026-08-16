@@ -8,10 +8,25 @@ import * as crypto from "crypto";
 import {
   PROFESSIONAL_REGISTRATION_TYPES,
   RESTRICTION_CATEGORIES,
+  CANCEL_METADATA_FIELDS,
+  END_METADATA_FIELDS,
+  RESTRICTION_CANCEL_KIND,
+  RESTRICTION_CANCEL_OPERATION,
+  RESTRICTION_END_KIND,
+  RESTRICTION_END_OPERATION,
   RESTRICTION_ISSUE_KIND,
   RESTRICTION_LEVELS,
   RestrictionIssueIntent,
+  assertCancelReceiptShape,
   assertDescription,
+  assertEndReceiptShape,
+  assertNoTerminalMetadata,
+  assertReason,
+  decideTerminalTransition,
+  fingerprintCancelIntent,
+  fingerprintEndIntent,
+  matchCancelReceipt,
+  matchEndReceipt,
   assertPartialInvariant,
   assertReceiptShape,
   canonicalHealthDocumentPath,
@@ -490,6 +505,345 @@ function testOperationIdAndRecordedBy() {
   assert.ok(!("clinic" in payload), "sem clínica");
 }
 
+
+// ── Lifecycle terminal: END / CANCEL (B2) ────────────────────────────────────
+
+function testReason() {
+  assert.strictEqual(assertReason("  Liberado  ", "end_reason"), "Liberado");
+  expectLogicError(() => assertReason("", "end_reason"), "validation", "vazio");
+  expectLogicError(
+    () => assertReason("   ", "end_reason"),
+    "validation",
+    "whitespace-only",
+  );
+  expectLogicError(
+    () => assertReason("\t\n ", "cancel_reason"),
+    "validation",
+    "tab/newline",
+  );
+  expectLogicError(
+    () => assertReason(undefined, "cancel_reason"),
+    "validation",
+    "ausente",
+  );
+}
+
+function testKindsAreDistinct() {
+  // Load-bearing: END e CANCEL nunca podem replayar o receipt um do outro.
+  assert.notStrictEqual(
+    RESTRICTION_END_KIND,
+    RESTRICTION_CANCEL_KIND,
+    "kinds distintos",
+  );
+  assert.notStrictEqual(RESTRICTION_END_KIND, RESTRICTION_ISSUE_KIND);
+  assert.notStrictEqual(RESTRICTION_CANCEL_KIND, RESTRICTION_ISSUE_KIND);
+  assert.notStrictEqual(
+    RESTRICTION_END_OPERATION,
+    RESTRICTION_CANCEL_OPERATION,
+  );
+  assert.strictEqual(RESTRICTION_END_OPERATION, "release_restriction");
+  assert.strictEqual(RESTRICTION_CANCEL_OPERATION, "cancel_restriction");
+}
+
+const endIntent = {
+  dogId: "dog-1",
+  restrictionId: "or_abc",
+  endReason: "Liberado por reavaliação clínica",
+  endProfessional: parseProfessionalIdentity(validProfessional),
+  endSourceDocument: parseSourceDocumentRef({health_document_id: "hd_release"}),
+};
+
+function testEndFingerprint() {
+  const a = fingerprintEndIntent(endIntent);
+  assert.strictEqual(a, fingerprintEndIntent({...endIntent}), "estável");
+  assert.ok(a.includes(RESTRICTION_END_KIND), "kind versionado");
+
+  assert.notStrictEqual(
+    a,
+    fingerprintEndIntent({...endIntent, endReason: "Outro motivo"}),
+    "endReason muda fingerprint",
+  );
+  assert.notStrictEqual(
+    a,
+    fingerprintEndIntent({
+      ...endIntent,
+      endSourceDocument: parseSourceDocumentRef({
+        health_document_id: "hd_outro",
+      }),
+    }),
+    "documento de liberação muda fingerprint",
+  );
+  assert.notStrictEqual(
+    a,
+    fingerprintEndIntent({
+      ...endIntent,
+      endProfessional: parseProfessionalIdentity({
+        ...validProfessional,
+        registration_number: "SP-99999",
+      }),
+    }),
+    "profissional muda fingerprint",
+  );
+  assert.notStrictEqual(
+    a,
+    fingerprintEndIntent({...endIntent, restrictionId: "or_outro"}),
+    "restrictionId muda fingerprint",
+  );
+
+  // Server-owned fora do fingerprint: incluí-los tornaria cada retry único.
+  for (const forbidden of ["actual_end", "ended_by", "processed_at"]) {
+    assert.ok(!a.includes(forbidden), `${forbidden} fora do fingerprint`);
+  }
+}
+
+function testCancelFingerprint() {
+  const base = {
+    dogId: "dog-1",
+    restrictionId: "or_abc",
+    cancelReason: "Registro duplicado",
+  };
+  const a = fingerprintCancelIntent(base);
+  assert.strictEqual(a, fingerprintCancelIntent({...base}), "estável");
+  assert.ok(a.includes(RESTRICTION_CANCEL_KIND), "kind versionado");
+  assert.notStrictEqual(
+    a,
+    fingerprintCancelIntent({...base, cancelReason: "K9 incorreto"}),
+    "razão muda fingerprint",
+  );
+  assert.notStrictEqual(
+    a,
+    fingerprintCancelIntent({...base, restrictionId: "or_outro"}),
+    "restrictionId muda fingerprint",
+  );
+
+  // CANCEL não carrega prova clínica nem timestamp.
+  for (const forbidden of [
+    "professional",
+    "source_document",
+    "cancelled_at",
+    "cancelled_by",
+  ]) {
+    assert.ok(!a.includes(forbidden), `${forbidden} fora do fingerprint`);
+  }
+
+  // END e CANCEL da mesma restrição produzem fingerprints diferentes.
+  assert.notStrictEqual(
+    a,
+    fingerprintEndIntent(endIntent),
+    "END e CANCEL nunca colidem",
+  );
+}
+
+function testTerminalReceiptShapes() {
+  const endReceipt: JsonMap = {
+    kind: RESTRICTION_END_KIND,
+    operation_id: "op-1",
+    operation_type: RESTRICTION_END_OPERATION,
+    actor_uid: "uid-1",
+    fingerprint: "fp",
+    result: {dogId: "dog-1", restrictionId: "or_x"},
+  };
+  assertEndReceiptShape(endReceipt);
+
+  const cancelReceipt: JsonMap = {
+    kind: RESTRICTION_CANCEL_KIND,
+    operation_id: "op-1",
+    operation_type: RESTRICTION_CANCEL_OPERATION,
+    actor_uid: "uid-1",
+    fingerprint: "fp",
+    result: {dogId: "dog-1", restrictionId: "or_x"},
+  };
+  assertCancelReceiptShape(cancelReceipt);
+
+  // Colisão cruzada: cada comando rejeita o receipt do outro.
+  expectLogicError(
+    () => assertEndReceiptShape(cancelReceipt),
+    "integrity",
+    "END rejeita receipt de CANCEL",
+  );
+  expectLogicError(
+    () => assertCancelReceiptShape(endReceipt),
+    "integrity",
+    "CANCEL rejeita receipt de END",
+  );
+  // E ambos rejeitam receipt de ISSUE.
+  const issueReceipt: JsonMap = {
+    kind: RESTRICTION_ISSUE_KIND,
+    operation_id: "op-1",
+    operation_type: "issue_restriction",
+    actor_uid: "uid-1",
+    fingerprint: "fp",
+    result: {},
+  };
+  expectLogicError(
+    () => assertEndReceiptShape(issueReceipt),
+    "integrity",
+    "END rejeita receipt de ISSUE",
+  );
+  expectLogicError(
+    () => assertCancelReceiptShape(issueReceipt),
+    "integrity",
+    "CANCEL rejeita receipt de ISSUE",
+  );
+
+  for (const key of Object.keys(endReceipt)) {
+    const broken = {...endReceipt};
+    delete broken[key];
+    expectLogicError(
+      () => assertEndReceiptShape(broken),
+      "integrity",
+      `receipt END sem ${key}`,
+    );
+  }
+
+  // Match por operationType.
+  const base = {
+    receiptExists: true,
+    storedActorUid: "uid-1",
+    storedFingerprint: "fp",
+    actorUid: "uid-1",
+    fingerprint: "fp",
+  };
+  assert.strictEqual(
+    matchEndReceipt({...base, storedOperationType: RESTRICTION_END_OPERATION}),
+    "replay",
+  );
+  assert.strictEqual(
+    matchEndReceipt({
+      ...base,
+      storedOperationType: RESTRICTION_CANCEL_OPERATION,
+    }),
+    "idempotency-conflict",
+    "operationType de CANCEL não é replay de END",
+  );
+  assert.strictEqual(
+    matchCancelReceipt({
+      ...base,
+      storedOperationType: RESTRICTION_CANCEL_OPERATION,
+    }),
+    "replay",
+  );
+  assert.strictEqual(
+    matchCancelReceipt({...base, receiptExists: false}),
+    "missing",
+  );
+}
+
+function testDecideTerminalTransition() {
+  // Receipt tem prioridade sobre status: retry legítimo da MESMA operação não
+  // pode receber conflito espúrio só porque já está terminal.
+  assert.deepStrictEqual(
+    decideTerminalTransition({
+      receiptMatch: "replay",
+      restrictionExists: true,
+      currentStatus: "ended",
+    }),
+    {kind: "replay"},
+    "replay mesmo já terminal",
+  );
+
+  assert.deepStrictEqual(
+    decideTerminalTransition({
+      receiptMatch: "missing",
+      restrictionExists: true,
+      currentStatus: "active",
+    }),
+    {kind: "transition"},
+    "active transiciona",
+  );
+
+  const conflictFp = decideTerminalTransition({
+    receiptMatch: "idempotency-conflict",
+    restrictionExists: true,
+    currentStatus: "active",
+  });
+  assert.strictEqual((conflictFp as {code: string}).code, "idempotency-conflict");
+
+  // Terminal por OUTRA operação → conflict, nunca reabre.
+  for (const status of ["ended", "cancelled"]) {
+    const terminal = decideTerminalTransition({
+      receiptMatch: "missing",
+      restrictionExists: true,
+      currentStatus: status,
+    });
+    assert.strictEqual(terminal.kind, "error", `${status} não transiciona`);
+    assert.strictEqual(
+      (terminal as {code: string}).code,
+      "conflict",
+      `${status} → conflict`,
+    );
+  }
+
+  const missing = decideTerminalTransition({
+    receiptMatch: "missing",
+    restrictionExists: false,
+    currentStatus: undefined,
+  });
+  assert.strictEqual((missing as {code: string}).code, "not-found");
+
+  // Status ausente ou desconhecido é fail-closed, nunca "assume active".
+  for (const bad of [undefined, "", "   ", "paused", "draft"]) {
+    const invalid = decideTerminalTransition({
+      receiptMatch: "missing",
+      restrictionExists: true,
+      currentStatus: bad,
+    });
+    assert.strictEqual(invalid.kind, "error", `status ${bad} falha`);
+    assert.strictEqual(
+      (invalid as {code: string}).code,
+      "integrity",
+      `status ${bad} → integrity`,
+    );
+  }
+}
+
+function testTerminalExclusivity() {
+  // Uma restrição active do B1 não carrega nenhum dos dois conjuntos.
+  const active: JsonMap = {
+    status: "active",
+    level: "absolute",
+    description: "Lesão",
+  };
+  assertNoTerminalMetadata(active, END_METADATA_FIELDS, "encerramento");
+  assertNoTerminalMetadata(active, CANCEL_METADATA_FIELDS, "cancelamento");
+
+  // Agregado com metadata de END não pode receber CANCEL.
+  for (const field of END_METADATA_FIELDS) {
+    expectLogicError(
+      () =>
+        assertNoTerminalMetadata(
+          {...active, [field]: "x"},
+          END_METADATA_FIELDS,
+          "encerramento",
+        ),
+      "integrity",
+      `metadata END presente (${field})`,
+    );
+  }
+  for (const field of CANCEL_METADATA_FIELDS) {
+    expectLogicError(
+      () =>
+        assertNoTerminalMetadata(
+          {...active, [field]: "x"},
+          CANCEL_METADATA_FIELDS,
+          "cancelamento",
+        ),
+      "integrity",
+      `metadata CANCEL presente (${field})`,
+    );
+  }
+
+  // `null` explícito não conta como presente (campo nunca escrito).
+  assertNoTerminalMetadata(
+    {...active, actual_end: null, ended_by: null},
+    END_METADATA_FIELDS,
+    "encerramento",
+  );
+
+  assert.strictEqual(END_METADATA_FIELDS.length, 5, "cinco campos de END");
+  assert.strictEqual(CANCEL_METADATA_FIELDS.length, 3, "três campos de CANCEL");
+}
+
 const tests: Array<[string, () => void]> = [
   ["identidade determinística", testDeterministicIdentity],
   ["level e category estritos", testLevelAndCategory],
@@ -500,6 +854,13 @@ const tests: Array<[string, () => void]> = [
   ["fingerprint", testFingerprint],
   ["receipt e decisão", testReceiptAndDecision],
   ["operationId e recorded_by", testOperationIdAndRecordedBy],
+  ["reason obrigatória (END/CANCEL)", testReason],
+  ["kinds END/CANCEL distintos", testKindsAreDistinct],
+  ["fingerprint END", testEndFingerprint],
+  ["fingerprint CANCEL", testCancelFingerprint],
+  ["receipt shapes terminais", testTerminalReceiptShapes],
+  ["decisão de transição terminal", testDecideTerminalTransition],
+  ["exclusividade de metadata terminal", testTerminalExclusivity],
 ];
 
 let failures = 0;
