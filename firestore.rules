@@ -235,6 +235,44 @@ service cloud.firestore {
         );
     }
 
+    // HW-4A.2C.5R — Identidade ESTRITA da Agenda (Health Schedule).
+    //
+    // A fronteira de segurança collection-group de health_schedule aceita
+    // EXCLUSIVAMENTE `dog_id`. Aliases legados (`dogId`, `caoId`), tolerados por
+    // recordDogId() para coexistência em OUTROS domínios, NÃO autorizam aqui:
+    // um documento sem dog_id canônico não tem identidade válida nesta coleção
+    // e é negado — inclusive para escopo global (fail-closed de namespace).
+    //
+    // Não duplica autorização: delega a canAccessDogRecord(), o mesmo helper
+    // canônico do SEC-02. `data.get('dog_id', '')` evita erro de campo ausente.
+    //
+    // authState() é derivado UMA vez e o escopo amplo curto-circuita ANTES de
+    // canAccessDogRecord(): em query collection-group a regra é avaliada por
+    // documento, e um exists()+get() extra por documento estoura o limite de
+    // acessos por requisição (comprovado: 'list' negado para global).
+    //
+    // CONSEQUÊNCIA DE QUERY (Rules não são filtros): com dog_id exigido FORA do
+    // OR, o motor só consegue provar a condição para TODOS os documentos via
+    // igualdade/`in` em dog_id. Portanto NENHUMA query collection-group
+    // irrestrita passa — nem para global. GLOBAL também enumera dog_id e
+    // também está sujeito ao limite de 30 valores por `in`.
+    function canReadHealthScheduleRecord(data) {
+      let dogId = data.get('dog_id', '');
+      let st = authState();
+      return dogId is string
+        && dogId.size() > 0
+        && (
+          isAdmin()
+          || (
+            st.get('valid', false)
+            && (
+              st.get('global', false)
+              || canAccessDogRecord(dogId)
+            )
+          )
+        );
+    }
+
     function canAccessDogData(data) {
       let dogId = recordDogId(data);
       let st = authState();
@@ -2086,6 +2124,41 @@ service cloud.firestore {
         allow read: if signedIn() && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+    }
+
+    // Health v1 — HW-4A.2C.5: Agenda Preventiva GLOBAL (collection group).
+    //
+    // A Agenda Web precisa ler health_schedule de VÁRIOS K9s em uma única
+    // consulta. collectionGroup() só é autorizado pela forma recursiva; tentar
+    // recuperar o dogId estrutural via /dogs/{dogId}/{path=**}/... NÃO autoriza
+    // a query (comprovado no Emulator). Portanto a identidade cross-dog
+    // disponível às Rules é resource.data.dog_id.
+    //
+    // Usa canReadHealthScheduleRecord(), que exige `dog_id` canônico e delega a
+    // autorização a canAccessDogRecord() — o MESMO helper fail-closed do SEC-02.
+    // NÃO usa canAccessDogData()/recordDogId() aqui: os aliases legados `dogId`
+    // e `caoId` autorizariam documentos sem identidade canônica (comprovado no
+    // Emulator, HW-4A.2C.5R), abrindo bypass nesta fronteira.
+    //
+    // LIMITE CONHECIDO DO FIRESTORE: em collection group, as Rules não alcançam
+    // o dogId do path pai, logo NÃO podem comparar dog_id com o pai estrutural.
+    // A integridade de dog_id é garantida fora das Rules (writer canônico via
+    // callables Admin SDK + migração HW-4A.2C.4 dos registros legados);
+    // divergência é INCIDENTE DE INTEGRIDADE, não caso de autorização.
+    //
+    // Writes cliente permanecem negados: mutação só via callables Admin SDK.
+    match /{path=**}/health_schedule/{scheduleId} {
+      // SUPERFÍCIE MÍNIMA (HW-4A.2C.5R.1): `list` — NÃO `read`.
+      //
+      // `read` cobriria get + list. A Agenda Global precisa desta regra apenas
+      // para QUERY. O GET individual continua sob a regra aninhada
+      // dogs/{dogId}/health_schedule/{id}, que é autoridade de PATH.
+      //
+      // Comprovado: com `read`, um doc fisicamente sob DOG_A declarando
+      // dog_id=DOG_B era ABERTO por GET direto do dono de B (regras sobrepostas
+      // são OR). Com `list`, o mismatch deixa de ampliar GET.
+      allow list: if signedIn() && canReadHealthScheduleRecord(resource.data);
+      allow create, update, delete: if false;
     }
 
     match /occurrences/{occurrenceId} {

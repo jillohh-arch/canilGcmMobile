@@ -133,9 +133,33 @@ function assertDocumentId(id: string, label: string): void {
   }
 }
 
+/**
+ * Extrai o dogId da requisição.
+ *
+ * Autoridade: o dogId é DERIVADO DO PATH da operação (callable), nunca do
+ * payload do cliente. O campo `dog_id` no payload é IGNORADO — ele é gravado
+ * pelo servidor na criação e não pode ser fornecido pelo cliente.
+ *
+ * Comportamento:
+ * - `dogId` presente: usa como autoridade, ignora `dog_id` se presente.
+ * - `dogId` ausente + `dog_id` presente: rejeita (cliente não fornece dog_id).
+ * - ambos ausentes: rejeita.
+ */
 function requireDogId(data: JsonMap): string {
-  const dogId = stringValue(data.dogId) ?? stringValue(data.dog_id);
-  if (!dogId) appError("invalid-argument", "validation", "dogId é obrigatório.");
+  const dogId = stringValue(data.dogId);
+  const dogIdFromPayload = stringValue(data.dog_id);
+
+  if (dogIdFromPayload !== undefined && dogId !== dogIdFromPayload) {
+    appError(
+      "invalid-argument",
+      "validation",
+      "dog_id não pode sobrescrever a autoridade dedogId.",
+    );
+  }
+
+  if (!dogId) {
+    appError("invalid-argument", "validation", "dogId é obrigatório.");
+  }
   assertDocumentId(dogId, "dogId");
   return dogId;
 }
@@ -414,6 +438,7 @@ export async function runHealthScheduleCreateManual(
       const recordedBy = recordedByPayload(caller, isAdmin);
       const revision = initialRevision();
       const record: JsonMap = {
+        dog_id: dogId,
         schedule_type: scheduleType,
         title,
         scheduled_for: scheduledFor,

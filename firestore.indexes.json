@@ -84,9 +84,37 @@
     },
 
     {
+      "collectionGroup": "alertas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "caoId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "atalhos_registro",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "ordem", "order": "ASCENDING" }
+      ]
+    },
+
+    {
       "collectionGroup": "health_schedule",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
+        { "fieldPath": "scheduled_for", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "health_schedule",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "dog_id", "order": "ASCENDING" },
         { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
         { "fieldPath": "scheduled_for", "order": "ASCENDING" }
       ]
