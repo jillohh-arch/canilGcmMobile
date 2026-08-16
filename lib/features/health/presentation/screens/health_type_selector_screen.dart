@@ -16,6 +16,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
   final Future<bool> Function(BuildContext context)? onRegisterWeight;
   final Future<bool> Function(BuildContext context)? onRegisterNutrition;
   final Future<bool> Function(BuildContext context)? onAttachDocument;
+  final Future<bool> Function(BuildContext context)? onRegisterRestriction;
 
   const HealthTypeSelectorScreen({
     super.key,
@@ -31,6 +32,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
     this.onRegisterWeight,
     this.onRegisterNutrition,
     this.onAttachDocument,
+    this.onRegisterRestriction,
   });
 
   @override
@@ -124,6 +126,16 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       group: _HealthActionGroup.clinical,
     ),
     const _HealthActionCategory(
+      id: 'restriction',
+      // Rótulo curto por prova de layout: "Restrição Operacional" trunca em
+      // uma linha a 360dp. O título completo permanece dentro da tela.
+      label: 'Restrição',
+      subtitle: 'Registrar limitação operacional',
+      icon: Icons.gpp_maybe_outlined,
+      color: AppTheme.error,
+      group: _HealthActionGroup.clinical,
+    ),
+    const _HealthActionCategory(
       id: 'other',
       label: 'Outro',
       subtitle: 'Registrar outros eventos de saúde',
@@ -141,6 +153,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       'weight' => widget.onRegisterWeight != null,
       'nutrition' => widget.onRegisterNutrition != null,
       'document' => widget.onAttachDocument != null,
+      'restriction' => widget.onRegisterRestriction != null,
       _ => true,
     };
   }
@@ -187,6 +200,12 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
 
     if (selectedId == 'document') {
       final saved = await widget.onAttachDocument?.call(context) ?? false;
+      if (!mounted) return;
+      if (saved && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+    if (selectedId == 'restriction') {
+      final saved = await widget.onRegisterRestriction?.call(context) ?? false;
       if (!mounted) return;
       if (saved && widget.popOnSave) Navigator.pop(context, true);
       return;

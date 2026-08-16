@@ -23,6 +23,11 @@ import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart'
 import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/data/schedule/firebase_functions_health_schedule_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_document_gateway.dart';
+import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_restriction_issue_gateway.dart';
+import 'package:canil_gcm/features/health/data/restriction/storage_health_evidence_uploader.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_form_screen.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_issue_controller.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
@@ -487,6 +492,34 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
           dogId: widget.dogId,
           dogName: dogContext.name,
           dogBreed: dogContext.breed,
+          onRegisterRestriction: (hubContext) async {
+            // Controller local à navegação: guarda o progresso das etapas
+            // (PREPARE/upload/FINALIZE/ISSUE) enquanto a tela está aberta,
+            // para que "tentar novamente" não refaça o que já concluiu.
+            final controller = HealthRestrictionIssueController(
+              documentGateway: FirebaseFunctionsHealthDocumentGateway(),
+              uploader: StorageHealthEvidenceUploader(),
+              restrictionGateway:
+                  FirebaseFunctionsHealthRestrictionIssueGateway(),
+            );
+            try {
+              final saved = await Navigator.of(
+                hubContext,
+                rootNavigator: true,
+              ).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => HealthRestrictionFormScreen(
+                    dogId: widget.dogId,
+                    dogName: dogContext.name,
+                    controller: controller,
+                  ),
+                ),
+              );
+              return saved == true;
+            } finally {
+              controller.dispose();
+            }
+          },
           onRegisterWeight: (hubContext) async {
             final saved = await showHealthWeightFormSheet(
               context: hubContext,
