@@ -34,7 +34,10 @@ abstract final class HealthRestrictionFlowErrorMapper {
       case 'unauthenticated':
         return HealthRestrictionFlowUnauthenticated(step);
       case 'permission-denied':
-        return HealthRestrictionFlowPermissionDenied(step);
+        return HealthRestrictionFlowPermissionDenied(
+          step,
+          _permissionMessage(step),
+        );
       case 'not-found':
         return HealthRestrictionFlowNotFound(step);
       case 'conflict':
@@ -63,6 +66,29 @@ abstract final class HealthRestrictionFlowErrorMapper {
         );
         return HealthRestrictionFlowUnexpected(step);
     }
+  }
+
+  /// Autoridade negada por etapa.
+  ///
+  /// O backend exige três capabilities distintas — `health.issue_restriction`,
+  /// `health.release_restriction` e `health.cancel_restriction` — então dizer
+  /// "registrar" numa negação de encerramento seria informação errada. Nenhuma
+  /// delas é nomeada ao operador: capability é vocabulário interno.
+  ///
+  /// A mensagem de ISSUE é preservada literalmente (contrato do B3).
+  static String _permissionMessage(HealthRestrictionFlowStep step) {
+    return switch (step) {
+      HealthRestrictionFlowStep.restrictionEnd =>
+        'Você não possui autorização para encerrar uma restrição operacional.',
+      HealthRestrictionFlowStep.restrictionCancel =>
+        'Você não possui autorização para cancelar o registro desta '
+            'restrição operacional.',
+      HealthRestrictionFlowStep.documentPrepare ||
+      HealthRestrictionFlowStep.documentUpload ||
+      HealthRestrictionFlowStep.documentFinalize ||
+      HealthRestrictionFlowStep.restrictionIssue =>
+        'Você não possui autorização para registrar uma restrição operacional.',
+    };
   }
 
   static String _semanticCode(FirebaseFunctionsException e) {

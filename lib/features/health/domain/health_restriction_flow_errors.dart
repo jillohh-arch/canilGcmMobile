@@ -22,7 +22,13 @@ enum HealthRestrictionFlowStep {
   documentFinalize,
 
   /// ISSUE da OperationalRestriction.
-  restrictionIssue;
+  restrictionIssue,
+
+  /// END da OperationalRestriction — liberação clínica documentada.
+  restrictionEnd,
+
+  /// CANCEL da OperationalRestriction — invalidação administrativa.
+  restrictionCancel;
 
   /// Rótulo operacional da etapa, sem vocabulário técnico.
   String get label => switch (this) {
@@ -30,6 +36,8 @@ enum HealthRestrictionFlowStep {
     HealthRestrictionFlowStep.documentUpload ||
     HealthRestrictionFlowStep.documentFinalize => 'anexar o documento',
     HealthRestrictionFlowStep.restrictionIssue => 'registrar a restrição',
+    HealthRestrictionFlowStep.restrictionEnd => 'encerrar a restrição',
+    HealthRestrictionFlowStep.restrictionCancel => 'cancelar o registro',
   };
 }
 
@@ -83,10 +91,16 @@ final class HealthRestrictionFlowUnauthenticated
 
 final class HealthRestrictionFlowPermissionDenied
     extends HealthRestrictionFlowFailure {
+  /// O default é neutro quanto à etapa de propósito: o construtor é `const` e
+  /// não pode derivar a mensagem de [step], então uma frase específica aqui
+  /// mentiria para os outros comandos ("registrar" numa negação de
+  /// encerramento). A frase por etapa é responsabilidade do error mapper, que
+  /// conhece o comando que falhou.
   const HealthRestrictionFlowPermissionDenied(
     HealthRestrictionFlowStep step, [
     String message =
-        'Você não possui autorização para registrar uma restrição operacional.',
+        'Você não possui autorização para esta ação em restrições '
+            'operacionais.',
   ]) : super(
          code: HealthRestrictionFlowErrorCode.permissionDenied,
          step: step,

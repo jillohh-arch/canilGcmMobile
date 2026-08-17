@@ -1,6 +1,7 @@
 import '../../domain/health_document_gateway.dart';
 import '../../domain/health_restriction_flow_errors.dart';
 import '../../domain/health_restriction_issue_gateway.dart';
+import '../../domain/health_restriction_lifecycle_gateway.dart';
 import '../../domain/health_v1_value_objects.dart';
 
 /// Codec dos payloads do fluxo de restrição.
@@ -102,26 +103,13 @@ abstract final class HealthRestrictionFlowPayloadCodec {
   static Map<String, dynamic> encodeIssue(
     IssueOperationalRestrictionCommand command,
   ) {
-    final professional = <String, dynamic>{
-      // Chaves internas em snake_case: é o shape canônico de
-      // ProfessionalIdentity no backend.
-      'name': command.professional.name,
-      'registration_type': command.professional.registrationType.wireName,
-      'registration_number': command.professional.registrationNumber,
-      'clinic': command.professional.clinic,
-    };
-    final specialty = command.professional.specialty?.trim();
-    if (specialty != null && specialty.isNotEmpty) {
-      professional['specialty'] = specialty;
-    }
-
     final data = <String, dynamic>{
       'dogId': command.dogId,
       'operationId': command.operationId,
       'level': command.level.wireName,
       'category': command.category.wireName,
       'description': command.description,
-      'professional': professional,
+      'professional': _encodeProfessional(command.professional),
       'sourceDocument': <String, dynamic>{
         'health_document_id': command.sourceDocument.healthDocumentId,
       },
@@ -149,6 +137,89 @@ abstract final class HealthRestrictionFlowPayloadCodec {
       ], step),
       wasNoOp: _requireBool(map['wasNoOp'] ?? map['was_no_op'], step),
     );
+  }
+
+  // ── END / CANCEL (B2) ─────────────────────────────────────────────────────
+
+  /// Encerramento: razão + profissional externo + evidência canônica.
+  ///
+  /// `actual_end`/`ended_by` são server-owned e não existem no comando, então
+  /// não há como enviá-los por engano.
+  static Map<String, dynamic> encodeEnd(
+    EndOperationalRestrictionCommand command,
+  ) {
+    return <String, dynamic>{
+      'dogId': command.dogId,
+      'restrictionId': command.restrictionId,
+      'operationId': command.operationId,
+      'endReason': command.endReason,
+      'endProfessional': _encodeProfessional(command.endProfessional),
+      'endSourceDocument': <String, dynamic>{
+        'health_document_id': command.endSourceDocument.healthDocumentId,
+      },
+    };
+  }
+
+  /// Cancelamento: razão apenas.
+  ///
+  /// O backend rejeita `cancelProfessional`/`cancelSourceDocument` como erro de
+  /// contrato — não como campo ignorável. O tipo do comando não os possui.
+  static Map<String, dynamic> encodeCancel(
+    CancelOperationalRestrictionCommand command,
+  ) {
+    return <String, dynamic>{
+      'dogId': command.dogId,
+      'restrictionId': command.restrictionId,
+      'operationId': command.operationId,
+      'cancelReason': command.cancelReason,
+    };
+  }
+
+  /// Parse de `terminalResponse`, exigindo o estado terminal esperado.
+  ///
+  /// O status vem do backend; o cliente nunca o infere. Se um END responder
+  /// `cancelled` (ou vice-versa), isso é divergência de contrato e falha
+  /// fechado — aceitar seria relatar ao operador uma transição que não ocorreu.
+  static HealthRestrictionTerminalResult parseTerminal(
+    Object? raw, {
+    required HealthRestrictionTerminalStatus expected,
+    required HealthRestrictionFlowStep step,
+  }) {
+    final map = _requireMap(raw, step);
+    final dogId = _requireString(map, const ['dogId', 'dog_id'], step);
+    final restrictionId = _requireString(map, const [
+      'restrictionId',
+      'restriction_id',
+    ], step);
+    final statusRaw = _requireString(map, const ['status'], step);
+    final status = HealthRestrictionTerminalStatus.fromWire(statusRaw);
+    if (status == null || status != expected) {
+      throw HealthRestrictionFlowIntegrity(step);
+    }
+    return HealthRestrictionTerminalResult(
+      dogId: dogId,
+      restrictionId: restrictionId,
+      status: status,
+      wasNoOp: _requireBool(map['wasNoOp'] ?? map['was_no_op'], step),
+    );
+  }
+
+  /// Shape canônico de `ProfessionalIdentity` no backend: chaves internas em
+  /// snake_case. Compartilhado por ISSUE e END.
+  static Map<String, dynamic> _encodeProfessional(
+    ProfessionalIdentity professional,
+  ) {
+    final map = <String, dynamic>{
+      'name': professional.name,
+      'registration_type': professional.registrationType.wireName,
+      'registration_number': professional.registrationNumber,
+      'clinic': professional.clinic,
+    };
+    final specialty = professional.specialty?.trim();
+    if (specialty != null && specialty.isNotEmpty) {
+      map['specialty'] = specialty;
+    }
+    return map;
   }
 
   // ── Helpers fail-closed ───────────────────────────────────────────────────
