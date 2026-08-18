@@ -20,6 +20,14 @@ void main() {
   final sourceDoc = const HealthDocumentRef(healthDocumentId: 'doc-1');
   final now = DateTime.utc(2026, 7, 14);
 
+  final endProfessional = ProfessionalIdentity(
+    name: 'Dr. Externo',
+    registrationType: ProfessionalRegistrationType.crmv,
+    registrationNumber: 'CRMV-999',
+    clinic: 'Clínica Sul',
+  );
+  final endDoc = const HealthDocumentRef(healthDocumentId: 'doc-end');
+
   OperationalRestriction build({
     RestrictionLevel level = RestrictionLevel.absolute,
     RestrictionStatus status = RestrictionStatus.active,
@@ -27,6 +35,11 @@ void main() {
     DateTime? actualEnd,
     RecordedBy? endedBy,
     String? endReason,
+    ProfessionalIdentity? endProfessionalOverride,
+    HealthDocumentRef? endSourceDocument,
+    DateTime? cancelledAt,
+    RecordedBy? cancelledBy,
+    String? cancelReason,
   }) => OperationalRestriction(
     id: 'r1',
     dogId: 'dog-1',
@@ -43,6 +56,29 @@ void main() {
     actualEnd: actualEnd,
     endedBy: endedBy,
     endReason: endReason,
+    endProfessional: endProfessionalOverride,
+    endSourceDocument: endSourceDocument,
+    cancelledAt: cancelledAt,
+    cancelledBy: cancelledBy,
+    cancelReason: cancelReason,
+  );
+
+  /// Conjunto terminal COMPLETO de END, conforme o patch persistido pelo B2.
+  OperationalRestriction buildEnded() => build(
+    status: RestrictionStatus.ended,
+    actualEnd: now.add(const Duration(days: 1)),
+    endedBy: actor,
+    endReason: 'alta veterinária',
+    endProfessionalOverride: endProfessional,
+    endSourceDocument: endDoc,
+  );
+
+  /// Conjunto terminal COMPLETO de CANCEL: sem profissional, sem documento.
+  OperationalRestriction buildCancelled() => build(
+    status: RestrictionStatus.cancelled,
+    cancelledAt: now.add(const Duration(days: 1)),
+    cancelledBy: actor,
+    cancelReason: 'registro duplicado',
   );
 
   group('OperationalRestriction', () {
@@ -64,13 +100,146 @@ void main() {
     });
 
     test('construção ended completa é aceita', () {
-      final r = build(
-        status: RestrictionStatus.ended,
-        actualEnd: now.add(const Duration(days: 1)),
-        endedBy: actor,
-        endReason: 'alta veterinária',
-      );
+      final r = buildEnded();
       expect(r.status, RestrictionStatus.ended);
+      expect(r.endProfessional, endProfessional);
+      expect(r.endSourceDocument, endDoc);
+    });
+
+    test('ended sem endProfessional é recusado', () {
+      expect(
+        () => build(
+          status: RestrictionStatus.ended,
+          actualEnd: now.add(const Duration(days: 1)),
+          endedBy: actor,
+          endReason: 'alta veterinária',
+          endSourceDocument: endDoc,
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'incomplete_ending_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('ended sem endSourceDocument é recusado', () {
+      expect(
+        () => build(
+          status: RestrictionStatus.ended,
+          actualEnd: now.add(const Duration(days: 1)),
+          endedBy: actor,
+          endReason: 'alta veterinária',
+          endProfessionalOverride: endProfessional,
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'incomplete_ending_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('construção cancelled completa é aceita', () {
+      final r = buildCancelled();
+      expect(r.status, RestrictionStatus.cancelled);
+      expect(r.cancelReason, 'registro duplicado');
+      expect(r.cancelledBy, actor);
+      // CANCEL não afirma liberação clínica.
+      expect(r.endProfessional, isNull);
+      expect(r.endSourceDocument, isNull);
+    });
+
+    test('cancelled sem metadata de cancelamento é recusado', () {
+      expect(
+        () => build(status: RestrictionStatus.cancelled),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'missing_cancellation_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('cancelled com metadata parcial é recusado', () {
+      expect(
+        () => build(
+          status: RestrictionStatus.cancelled,
+          cancelledAt: now.add(const Duration(days: 1)),
+          cancelledBy: actor,
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'incomplete_cancellation_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('terminal híbrido END + CANCEL é recusado', () {
+      expect(
+        () => build(
+          status: RestrictionStatus.ended,
+          actualEnd: now.add(const Duration(days: 1)),
+          endedBy: actor,
+          endReason: 'alta veterinária',
+          endProfessionalOverride: endProfessional,
+          endSourceDocument: endDoc,
+          cancelledAt: now.add(const Duration(days: 1)),
+          cancelledBy: actor,
+          cancelReason: 'registro duplicado',
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'hybrid_terminal_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('active com metadata de cancelamento é recusado', () {
+      expect(
+        () => build(
+          cancelledAt: now.add(const Duration(days: 1)),
+          cancelledBy: actor,
+          cancelReason: 'registro duplicado',
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'unexpected_cancellation_metadata',
+          ),
+        ),
+      );
+    });
+
+    test('cancelled_at anterior a issued_at é recusado', () {
+      expect(
+        () => build(
+          status: RestrictionStatus.cancelled,
+          cancelledAt: now.subtract(const Duration(days: 1)),
+          cancelledBy: actor,
+          cancelReason: 'registro duplicado',
+        ),
+        throwsA(
+          isA<HealthDomainException>().having(
+            (e) => e.code,
+            'code',
+            'inconsistent_cancelled_at',
+          ),
+        ),
+      );
     });
 
     test('matriz de transições (independente da implementação)', () {

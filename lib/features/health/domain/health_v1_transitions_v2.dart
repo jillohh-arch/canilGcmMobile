@@ -1,6 +1,7 @@
 import 'health_v1_enums.dart';
 import 'health_v1_enums_ext.dart';
 import 'health_v1_models.dart';
+import 'health_v1_value_objects.dart';
 
 import 'dose_administration.dart';
 import 'exam_process.dart';
@@ -213,12 +214,21 @@ abstract final class OperationalRestrictionTransitions {
   static bool canTransition(RestrictionStatus from, RestrictionStatus to) =>
       _allowed[from]?.contains(to) ?? false;
 
+  /// Projeta o agregado para um estado terminal.
+  ///
+  /// NÃO é writer authority: o backend é quem decide e persiste END/CANCEL. Isto
+  /// existe para representar/validar o resultado em memória, e exige o conjunto
+  /// terminal COMPLETO conforme o patch persistido pelo B2 — inclusive
+  /// `end_professional` e `end_source_document`, que antes eram silenciosamente
+  /// descartados aqui.
   static OperationalRestriction transition(
     OperationalRestriction current,
     RestrictionStatus destination, {
     DateTime? actualEnd,
     RecordedBy? endedBy,
     String? endReason,
+    ProfessionalIdentity? endProfessional,
+    HealthDocumentRef? endSourceDocument,
     DateTime? cancelledAt,
     RecordedBy? cancelledBy,
     String? cancelReason,
@@ -230,10 +240,15 @@ abstract final class OperationalRestrictionTransitions {
       );
     }
     if (destination == RestrictionStatus.ended &&
-        (actualEnd == null || endedBy == null || endReason == null)) {
+        (actualEnd == null ||
+            endedBy == null ||
+            endReason == null ||
+            endProfessional == null ||
+            endSourceDocument == null)) {
       throw const HealthDomainException(
         'missing_ending_metadata',
-        'encerramento exige actual_end, ended_by e end_reason',
+        'encerramento exige actual_end, ended_by, end_reason, '
+            'end_professional e end_source_document',
       );
     }
     if (destination == RestrictionStatus.cancelled &&
@@ -243,6 +258,8 @@ abstract final class OperationalRestrictionTransitions {
         'cancelamento exige cancelled_at, cancelled_by e cancel_reason',
       );
     }
+    final toEnded = destination == RestrictionStatus.ended;
+    final toCancelled = destination == RestrictionStatus.cancelled;
     return OperationalRestriction(
       id: current.id,
       dogId: current.dogId,
@@ -257,15 +274,16 @@ abstract final class OperationalRestrictionTransitions {
       schemaVersion: current.schemaVersion,
       activitiesRestricted: current.activitiesRestricted,
       expectedEnd: current.expectedEnd,
-      actualEnd: destination == RestrictionStatus.ended
-          ? actualEnd
-          : current.actualEnd,
-      endedBy: destination == RestrictionStatus.ended
-          ? endedBy
-          : current.endedBy,
-      endReason: destination == RestrictionStatus.ended
-          ? endReason
-          : current.endReason,
+      actualEnd: toEnded ? actualEnd : current.actualEnd,
+      endedBy: toEnded ? endedBy : current.endedBy,
+      endReason: toEnded ? endReason : current.endReason,
+      endProfessional: toEnded ? endProfessional : current.endProfessional,
+      endSourceDocument: toEnded
+          ? endSourceDocument
+          : current.endSourceDocument,
+      cancelledAt: toCancelled ? cancelledAt : current.cancelledAt,
+      cancelledBy: toCancelled ? cancelledBy : current.cancelledBy,
+      cancelReason: toCancelled ? cancelReason : current.cancelReason,
       evidence: current.evidence,
       caseId: current.caseId,
       eventId: current.eventId,

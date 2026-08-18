@@ -26,6 +26,9 @@ final class OperationalRestriction {
     this.endProfessional,
     this.endSourceDocument,
     String? endReason,
+    this.cancelledAt,
+    this.cancelledBy,
+    String? cancelReason,
     this.evidence,
     this.caseId,
     this.eventId,
@@ -36,6 +39,7 @@ final class OperationalRestriction {
          List<String>.of(activitiesRestricted ?? const []),
        ),
        endReason = endReason?.trim(),
+       cancelReason = cancelReason?.trim(),
        status = status {
     if (schemaVersion <= 0) {
       throw const HealthDomainException(
@@ -43,7 +47,7 @@ final class OperationalRestriction {
         'schema_version deve ser positivo',
       );
     }
-    if (description.isEmpty) {
+    if (this.description.isEmpty) {
       throw const HealthDomainException(
         'missing_restriction_description',
         'description é obrigatória',
@@ -55,19 +59,62 @@ final class OperationalRestriction {
         'actual_end não pode ser anterior a issued_at',
       );
     }
-    final endMetadata = [actualEnd, endedBy, endReason];
+    if (cancelledAt != null && cancelledAt!.isBefore(issuedAt)) {
+      throw const HealthDomainException(
+        'inconsistent_cancelled_at',
+        'cancelled_at não pode ser anterior a issued_at',
+      );
+    }
+    // Conjuntos terminais conforme o patch persistido pelo B2: END grava
+    // `actual_end`, `ended_by`, `end_reason`, `end_professional` e
+    // `end_source_document`; CANCEL grava `cancelled_at`, `cancelled_by` e
+    // `cancel_reason`. Nenhum dos dois é parcial no backend, então um agregado
+    // parcial só existe por corrupção — e é recusado.
+    final endMetadata = [
+      actualEnd,
+      endedBy,
+      this.endReason,
+      endProfessional,
+      endSourceDocument,
+    ];
     final endAny = endMetadata.any((v) => v != null);
     final endAll = endMetadata.every((v) => v != null);
+    final cancelMetadata = [cancelledAt, cancelledBy, this.cancelReason];
+    final cancelAny = cancelMetadata.any((v) => v != null);
+    final cancelAll = cancelMetadata.every((v) => v != null);
     if (endAny && !endAll) {
       throw const HealthDomainException(
         'incomplete_ending_metadata',
-        'Metadados de encerramento devem ser completos',
+        'ended exige actual_end, ended_by, end_reason, end_professional e '
+            'end_source_document',
+      );
+    }
+    if (cancelAny && !cancelAll) {
+      throw const HealthDomainException(
+        'incomplete_cancellation_metadata',
+        'cancelled exige cancelled_at, cancelled_by e cancel_reason',
+      );
+    }
+    // Exclusividade terminal (backend: `assertNoTerminalMetadata`). Um agregado
+    // com metadata dos dois lados seria um terminal híbrido sem significado
+    // clínico — nunca é interpretado, é recusado.
+    if (endAny && cancelAny) {
+      throw const HealthDomainException(
+        'hybrid_terminal_metadata',
+        'metadados de encerramento e de cancelamento não podem coexistir',
       );
     }
     if (status == RestrictionStatus.ended && !endAll) {
       throw const HealthDomainException(
         'missing_ending_metadata',
-        'ended exige actual_end, ended_by e end_reason',
+        'ended exige actual_end, ended_by, end_reason, end_professional e '
+            'end_source_document',
+      );
+    }
+    if (status == RestrictionStatus.cancelled && !cancelAll) {
+      throw const HealthDomainException(
+        'missing_cancellation_metadata',
+        'cancelled exige cancelled_at, cancelled_by e cancel_reason',
       );
     }
     if (status != RestrictionStatus.ended && endAny) {
@@ -76,10 +123,10 @@ final class OperationalRestriction {
         'restrição não encerrada não pode ter metadados de encerramento',
       );
     }
-    if (status == RestrictionStatus.cancelled && endAny) {
+    if (status != RestrictionStatus.cancelled && cancelAny) {
       throw const HealthDomainException(
-        'inconsistent_cancelled_state',
-        'cancelled não pode coexistir com metadados de encerramento',
+        'unexpected_cancellation_metadata',
+        'restrição não cancelada não pode ter metadados de cancelamento',
       );
     }
     final restrictions = List.unmodifiable(activitiesRestricted ?? const []);
@@ -109,6 +156,12 @@ final class OperationalRestriction {
   final ProfessionalIdentity? endProfessional;
   final HealthDocumentRef? endSourceDocument;
   final String? endReason;
+
+  /// Metadata de CANCEL (invalidação administrativa). NÃO afirma liberação
+  /// clínica: por contrato do backend não carrega profissional nem documento.
+  final DateTime? cancelledAt;
+  final RecordedBy? cancelledBy;
+  final String? cancelReason;
   final RestrictionEvidence? evidence;
   final String? caseId;
   final String? eventId;
