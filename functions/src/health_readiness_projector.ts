@@ -99,8 +99,8 @@ export interface EvaluateReadinessResult {
   /**
    * Generation reserved by THIS execution, before any source read.
    *
-   * Internal metadata for the future causal-convergence contract. Not yet part
-   * of any callable's public response — the refresh wire stays frozen in C1.
+   * Surfaced by the refresh callable as `result.convergence.requiredGeneration`
+   * (B4-R.C2). The triggers ignore it — they have no caller to answer to.
    */
   readonly requiredGeneration: number;
   /** Whether this execution's payload was applied or already superseded. */

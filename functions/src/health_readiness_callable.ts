@@ -21,6 +21,11 @@ import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions";
 import {buildReadinessProjectorDeps} from "./health_readiness_trigger_handlers";
 import {evaluateHealthReadiness} from "./health_readiness_projector";
+import {
+  classifyConvergence,
+  ConvergenceReport,
+  readObservedReadyGeneration,
+} from "./health_readiness_generation";
 
 export interface ReadinessRefreshResult {
   readonly dogId: string;
@@ -30,6 +35,16 @@ export interface ReadinessRefreshResult {
   readonly readinessReasonCode: string | null;
   readonly technicalBlockers: readonly string[];
   readonly operation: string;
+  /**
+   * Causal barrier for this refresh (B4-R.C2). ADDITIVE — every field above
+   * keeps its frozen name and meaning.
+   *
+   * Deliberately separate from `ok`: `ok` remains the legacy "the callable ran
+   * under its contract" signal, so an already-shipped client that only reads
+   * `response['ok']` is unaffected. It is therefore valid and expected to see
+   * `ok: true` together with a non-confirmed convergence.
+   */
+  readonly convergence: ConvergenceReport;
 }
 
 export interface ReadinessRefreshError {
@@ -138,17 +153,51 @@ export function buildHealthReadinessRefreshHandler(
       });
     }
 
-    const snapshot = result.operation === "ready"
-      ? await db
-          .collection("dogs")
-          .doc(dogId)
-          .collection("health_summary")
-          .doc("current")
-          .get()
-          .catch(() => null)
-      : null;
+    // 5. Reread the summary — this is the causal observation point.
+    //
+    // C1 read this only on the ready path, purely to source the two display
+    // labels. C2 needs it on every path, because `observedGeneration` must be
+    // reported even when the projection came back unavailable. A failed reread
+    // stays best-effort and yields a null observation, which can only ever make
+    // convergence LESS confirmed — never more.
+    const snapshot = await db
+      .collection("dogs")
+      .doc(dogId)
+      .collection("health_summary")
+      .doc("current")
+      .get()
+      .catch(() => null);
 
-    const snapshotData = snapshot?.exists ? snapshot.data() as Record<string, unknown> : null;
+    const snapshotData = snapshot?.exists ?
+      snapshot.data() as Record<string, unknown> :
+      null;
+
+    // Legacy label derivation stays gated on the ready path exactly as before,
+    // so the two display fields keep their frozen values byte for byte.
+    const readySnapshotData = result.operation === "ready" ? snapshotData : null;
+
+    const isUnavailableResult = result.operation !== "ready";
+
+    const convergence: ConvergenceReport = classifyConvergence({
+      requiredGeneration: result.requiredGeneration,
+      observedGeneration: readObservedReadyGeneration(snapshotData),
+      observedProjectionStatus: snapshotData?.["projection_status"],
+      isUnavailableResult,
+    });
+
+    if (convergence.status !== "confirmed") {
+      // Never silent: an unproven barrier is a diagnosable condition, even
+      // though `ok` stays true for legacy compatibility.
+      logger.warn("healthReadinessRefresh: convergence not confirmed", {
+        callerUid,
+        dogId,
+        convergenceStatus: convergence.status,
+        requiredGeneration: convergence.requiredGeneration,
+        observedGeneration: convergence.observedGeneration,
+        operation: result.operation,
+        applyOutcome: result.applyOutcome,
+      });
+    }
 
     return {
       ok: true,
@@ -156,10 +205,12 @@ export function buildHealthReadinessRefreshHandler(
         dogId,
         projectionStatus: result.projectionStatus,
         readinessStatus: result.readinessStatus,
-        readinessLabel: snapshotData?.["readiness_label"] as string | null ?? null,
-        readinessReasonCode: snapshotData?.["readiness_reason_code"] as string | null ?? null,
+        readinessLabel: readySnapshotData?.["readiness_label"] as string | null ?? null,
+        readinessReasonCode:
+          readySnapshotData?.["readiness_reason_code"] as string | null ?? null,
         technicalBlockers: result.technicalBlockers,
         operation: result.operation,
+        convergence,
       },
     };
   };

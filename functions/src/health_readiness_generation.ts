@@ -75,6 +75,123 @@ export interface ReadinessGenerationState {
   readonly lastAppliedGeneration: number;
 }
 
+/**
+ * Causal convergence verdict, exposed additively under `result.convergence`.
+ *
+ * Answers exactly one question: "can the server prove a READY summary exists
+ * whose generation is >= the generation this refresh required?"
+ *
+ * There is deliberately no generic `failed` member. Authorization, validation,
+ * integrity and transport failures stay ordinary callable errors — folding them
+ * in here would make `failed` ambiguous between "no causal proof" and "the call
+ * itself broke".
+ */
+export type ConvergenceStatus = "confirmed" | "not_confirmed" | "unavailable";
+
+/** The `result.convergence` object. Additive; never replaces a legacy field. */
+export interface ConvergenceReport {
+  readonly status: ConvergenceStatus;
+  /** Generation reserved by THIS refresh execution. Always present, always > 0. */
+  readonly requiredGeneration: number;
+  /** Observed READY generation, or null when none is observable. Never 0. */
+  readonly observedGeneration: number | null;
+}
+
+/**
+ * Reads the client-observable READY generation off a summary snapshot.
+ *
+ * Fails closed to `null` — never to `0` — on absent, legacy-without-the-field,
+ * or malformed values. `null` means "no causal proof available", which can only
+ * ever produce `not_confirmed`; a fabricated `0` would be a number that invites
+ * arithmetic and could read as a real generation.
+ */
+export function readObservedReadyGeneration(
+  stored: Readonly<Record<string, unknown>> | null,
+): number | null {
+  const raw = stored?.[PROJECTION_GENERATION_FIELD];
+  if (raw === undefined || raw === null) return null;
+  if (
+    typeof raw !== "number" ||
+    !Number.isSafeInteger(raw) ||
+    raw <= 0 ||
+    raw > MAX_READINESS_GENERATION
+  ) {
+    // Corrupt client-observable marker: refuse to treat it as proof.
+    return null;
+  }
+  return raw;
+}
+
+/**
+ * Classifies causal convergence for one refresh execution.
+ *
+ * ── Precedence: OBSERVED PROOF FIRST ────────────────────────────────────────
+ * The question is about the state currently committed, NOT about what this
+ * particular execution managed to write. So a READY summary at generation
+ * >= required confirms even when THIS execution ended unavailable or was
+ * superseded: any generation above the required one was reserved after it, and
+ * the required one was itself reserved after the mutation committed, so by
+ * transitivity that newer READY read state at least as new as the caller needs.
+ *
+ * Checking this execution's own outcome first would produce a false negative
+ * exactly when concurrency did the caller a favour — a refresh whose sources
+ * were briefly unreadable would report unavailable while a newer, complete
+ * READY projection sat committed in front of it. That would also contradict the
+ * frozen `>=` rule (B4-R.B §14) by making convergence depend on WHICH execution
+ * produced the proof.
+ *
+ * ── Why the generation alone is never enough ─────────────────────────────────
+ * `projection_generation >= required` is only proof while the observed
+ * `projection_status` is still `ready`. An unavailable write leaves the previous
+ * READY marker untouched as last-known-good, so the pair
+ * (`unavailable`, generation 42) means "42 was not revalidated", not "42 is
+ * proven". Both conditions are therefore required together.
+ */
+export function classifyConvergence(options: {
+  readonly requiredGeneration: number;
+  readonly observedGeneration: number | null;
+  readonly observedProjectionStatus: unknown;
+  /** True when this execution took the unavailable_preserving/initial path. */
+  readonly isUnavailableResult: boolean;
+}): ConvergenceReport {
+  const {
+    requiredGeneration,
+    observedGeneration,
+    observedProjectionStatus,
+    isUnavailableResult,
+  } = options;
+
+  // A required generation always comes from a completed reservation. A bad one
+  // is an integrity bug, not a "no proof" condition, so it must not silently
+  // degrade into not_confirmed.
+  if (
+    !Number.isSafeInteger(requiredGeneration) ||
+    requiredGeneration <= 0 ||
+    requiredGeneration > MAX_READINESS_GENERATION
+  ) {
+    throw new Error("invalid_generation_candidate");
+  }
+
+  // 1. Observed proof wins, whatever this execution's own outcome was.
+  if (
+    observedProjectionStatus === "ready" &&
+    observedGeneration !== null &&
+    observedGeneration >= requiredGeneration
+  ) {
+    return {status: "confirmed", requiredGeneration, observedGeneration};
+  }
+
+  // 2. No proof: report the factual unavailable condition when there is one.
+  //    Either the state we observed is itself unavailable, or the reread told us
+  //    nothing and this execution is known to have ended unavailable.
+  if (observedProjectionStatus === "unavailable" || isUnavailableResult) {
+    return {status: "unavailable", requiredGeneration, observedGeneration};
+  }
+
+  // 3. Everything else: the barrier simply could not be established.
+  return {status: "not_confirmed", requiredGeneration, observedGeneration};
+}
+
 /** What a guarded apply actually did. `superseded` is healthy, not an error. */
 export type ProjectionApplyOutcome =
   | "applied_ready"
