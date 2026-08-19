@@ -35,6 +35,7 @@ import {
   resolveVaccinationEvidence,
   resolveWeightEvidence,
 } from "./health_readiness_evidence_logic";
+import {ProjectionApplyOutcome} from "./health_readiness_generation";
 import {
   buildReadinessSnapshotWrite,
   FactualEvaluationInstants,
@@ -61,11 +62,24 @@ export interface ProjectorFirestore {
   readCurrentSummary: (
     dogId: string,
   ) => Promise<Readonly<Record<string, unknown>> | null>;
-  /** Merges a readiness-owned patch into `health_summary/current`. */
-  writeCurrentSummary: (
-    dogId: string,
-    payload: Record<string, unknown>,
-  ) => Promise<void>;
+  /**
+   * Reserves this execution's projection generation. MUST be called before any
+   * source read so a higher generation always means "started later".
+   */
+  reserveProjectionGeneration: (dogId: string) => Promise<number>;
+  /**
+   * Atomically ordering-guards and applies a projection.
+   *
+   * There is deliberately no unguarded write helper: every path into
+   * `health_summary/current` goes through here, so a superseded execution can
+   * never overwrite a newer one — whether it is ready or unavailable.
+   */
+  applyProjection: (args: {
+    readonly dogId: string;
+    readonly generation: number;
+    readonly isReady: boolean;
+    readonly payload: Record<string, unknown>;
+  }) => Promise<ProjectionApplyOutcome>;
 }
 
 export interface ProjectorDeps {
@@ -82,6 +96,15 @@ export interface EvaluateReadinessResult {
   readonly readinessStatus: string | null;
   readonly technicalBlockers: readonly string[];
   readonly operation: "ready" | "unavailable_preserving" | "unavailable_initial";
+  /**
+   * Generation reserved by THIS execution, before any source read.
+   *
+   * Internal metadata for the future causal-convergence contract. Not yet part
+   * of any callable's public response — the refresh wire stays frozen in C1.
+   */
+  readonly requiredGeneration: number;
+  /** Whether this execution's payload was applied or already superseded. */
+  readonly applyOutcome: ProjectionApplyOutcome;
 }
 
 /** Canonical + coexistence source paths. */
@@ -220,22 +243,30 @@ export function hasPreviousValidReadiness(
 }
 
 /**
- * Persists a readiness snapshot write.
+ * Persists a readiness snapshot write under the generation ordering guard.
  *
- * Uses merge so unrelated future summary slices survive, but on success writes
- * EVERY readiness-owned field explicitly — otherwise an emptied restriction or
- * alert array would silently keep its previous contents.
+ * Uses merge so unrelated future summary slices survive, but on a ready write
+ * emits EVERY readiness-owned field explicitly — otherwise an emptied
+ * restriction or alert array would silently keep its previous contents. The
+ * `projection_generation` field is added on ready writes only; the guarded
+ * apply publishes it atomically with the payload.
+ *
+ * Returns the apply outcome. `superseded` means a generation >= this one was
+ * already applied, so nothing was written — a healthy result under concurrency,
+ * not an error.
  */
 export async function persistReadinessProjection(
   dogId: string,
   write: ReadinessSnapshotWrite,
+  generation: number,
   deps: ProjectorDeps,
-): Promise<void> {
+): Promise<ProjectionApplyOutcome> {
   assertSafeDogId(dogId);
 
   const payload: Record<string, unknown> = {...write.payload};
+  const isReady = write.kind === "ready";
 
-  if (write.kind === "ready") {
+  if (isReady) {
     // Defensive completeness check: every owned field must be present so a
     // merge can never leave a stale readiness value behind.
     const missing = READINESS_OWNED_FIELDS.filter(
@@ -246,7 +277,12 @@ export async function persistReadinessProjection(
     }
   }
 
-  await deps.firestore.writeCurrentSummary(dogId, payload);
+  return deps.firestore.applyProjection({
+    dogId,
+    generation,
+    isReady,
+    payload,
+  });
 }
 
 /**
@@ -261,6 +297,10 @@ export async function evaluateHealthReadiness(
   deps: ProjectorDeps,
 ): Promise<EvaluateReadinessResult> {
   assertSafeDogId(dogId);
+
+  // Reserve BEFORE any source read: a higher generation must always mean this
+  // execution started later, so its reads saw state at least as new.
+  const generation = await deps.firestore.reserveProjectionGeneration(dogId);
 
   const bundle = await readReadinessEvidence(dogId, deps);
 
@@ -284,7 +324,12 @@ export async function evaluateHealthReadiness(
     extraBlockers: bundle.extraBlockers,
   });
 
-  await persistReadinessProjection(dogId, write, deps);
+  const applyOutcome = await persistReadinessProjection(
+    dogId,
+    write,
+    generation,
+    deps,
+  );
 
   const result: EvaluateReadinessResult = {
     dogId,
@@ -293,11 +338,22 @@ export async function evaluateHealthReadiness(
       write.kind === "ready" ? write.payload.readiness_status : null,
     technicalBlockers: write.payload.technical_blockers ?? [],
     operation: write.kind,
+    requiredGeneration: generation,
+    applyOutcome,
   };
 
-  if (write.kind === "ready") {
+  if (applyOutcome === "superseded") {
+    // A newer generation already committed. Expected under concurrency; log so
+    // the ordering guard's behavior is observable, never silently.
+    deps.logger.info("HealthReadiness projection superseded", {
+      dogId,
+      generation,
+      operation: write.kind,
+    });
+  } else if (write.kind === "ready") {
     deps.logger.info("HealthReadiness projection updated", {
       dogId,
+      generation,
       readinessStatus: result.readinessStatus,
       restrictionCount: write.payload.restriction_count,
     });
@@ -305,6 +361,7 @@ export async function evaluateHealthReadiness(
     // Divergence signal: log at warn, never silently degrade.
     deps.logger.warn("HealthReadiness projection unavailable", {
       dogId,
+      generation,
       operation: write.kind,
       technicalBlockers: result.technicalBlockers,
     });

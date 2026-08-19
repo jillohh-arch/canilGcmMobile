@@ -89,10 +89,47 @@ function fakeDb(rec: Recorder): FirebaseFirestore.Firestore {
     get: async () => ({exists: true, data: () => ({name: "K9"})}),
   });
 
+  // Path-addressed ref for the generation coordination document, backed by the
+  // same store, so runTransaction reservation/apply work end to end.
+  const genStore = store;
+  const pathRef = (segments: string[]): unknown => {
+    const key = segments.join("/");
+    const ref = {
+      collection: (name: string) => ({
+        doc: (id: string) => pathRef([...segments, name, id]),
+      }),
+      get: async () => {
+        const data = genStore.get(key);
+        return {exists: data !== undefined, data: () => data};
+      },
+      set: async (payload: Record<string, unknown>) => {
+        genStore.set(key, {...(genStore.get(key) ?? {}), ...payload});
+      },
+      _key: key,
+    };
+    return ref;
+  };
+
   return {
     collection: (name: string) => ({
-      doc: (id: string) => docRef(id, name),
+      doc: (id: string) =>
+        name === "_health_projection_state" ? pathRef([name, id]) : docRef(id, name),
     }),
+    runTransaction: async (
+      fn: (txn: unknown) => Promise<unknown>,
+    ): Promise<unknown> => {
+      const txn = {
+        get: async (ref: {_key?: string; get: () => Promise<unknown>}) => ref.get(),
+        set: async (
+          ref: {set: (p: Record<string, unknown>) => Promise<void>},
+          payload: Record<string, unknown>,
+        ) => {
+          // The refs themselves record their own write paths.
+          await ref.set(payload);
+        },
+      };
+      return fn(txn);
+    },
   } as unknown as FirebaseFirestore.Firestore;
 }
 

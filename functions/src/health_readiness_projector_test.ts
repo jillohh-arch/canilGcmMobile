@@ -28,6 +28,13 @@ import {
   ProjectorDeps,
   ProjectorFirestore,
 } from "./health_readiness_projector";
+import {
+  decideProjectionApply,
+  nextGeneration,
+  parseGenerationField,
+  parseGenerationState,
+  MAX_READINESS_GENERATION,
+} from "./health_readiness_generation";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const MILLIS_PER_DAY = 86_400_000;
@@ -127,17 +134,32 @@ function completeSources(overrides: FakeSources = {}): FakeSources {
 interface Fake {
   readonly deps: ProjectorDeps;
   readonly store: Map<string, Record<string, unknown>>;
+  /** Coordination state per dog, mirroring _health_projection_state. */
+  readonly generations: Map<string, GenerationDoc>;
   writeCount: number;
 }
 
+type GenerationDoc = Record<string, unknown>;
+
+/**
+ * In-memory readiness Firestore fake with generation coordination.
+ *
+ * Reservation and apply mirror the production adapter's transactional guard,
+ * so ordering/superseded behavior is exercised without the emulator. An
+ * optional `beforeApply` hook lets a test interleave a concurrent execution
+ * between another's evaluate and commit — the deterministic way to reproduce an
+ * out-of-order write without sleeps.
+ */
 function createFake(
   sources: FakeSources,
   existingSummary: Record<string, unknown> | null = null,
+  options: {beforeApply?: (dogId: string) => Promise<void> | void} = {},
 ): Fake {
   const store = new Map<string, Record<string, unknown>>();
   if (existingSummary !== null) {
     store.set("dog-1", {...existingSummary});
   }
+  const generations = new Map<string, GenerationDoc>();
   const state = {writeCount: 0};
 
   const firestore: ProjectorFirestore = {
@@ -146,11 +168,31 @@ function createFake(
       return query ?? EMPTY;
     },
     readCurrentSummary: async (dogId) => store.get(dogId) ?? null,
-    writeCurrentSummary: async (dogId, payload) => {
+    reserveProjectionGeneration: async (dogId) => {
+      const parsed = parseGenerationState(generations.get(dogId) ?? null);
+      const reserved = nextGeneration(parsed.lastReservedGeneration);
+      const prev = generations.get(dogId) ?? {};
+      generations.set(dogId, {...prev, last_reserved_generation: reserved});
+      return reserved;
+    },
+    applyProjection: async ({dogId, generation, isReady, payload}) => {
+      if (options.beforeApply) await options.beforeApply(dogId);
+      const parsed = parseGenerationState(generations.get(dogId) ?? null);
+      const decision = decideProjectionApply({state: parsed, generation, isReady});
+      if (decision.kind === "superseded") return "superseded";
+
       state.writeCount += 1;
-      // Emulates set(..., {merge: true}).
+      const patch: Record<string, unknown> = {...payload};
+      if (decision.publishReadyGeneration !== null) {
+        patch["projection_generation"] = decision.publishReadyGeneration;
+      }
+      // Emulates set(..., {merge: true}) for the summary...
       const previous = store.get(dogId) ?? {};
-      store.set(dogId, {...previous, ...payload});
+      store.set(dogId, {...previous, ...patch});
+      // ...committed atomically with the applied-generation bump.
+      const prevGen = generations.get(dogId) ?? {};
+      generations.set(dogId, {...prevGen, last_applied_generation: generation});
+      return decision.outcome;
     },
   };
 
@@ -164,6 +206,7 @@ function createFake(
   return {
     deps,
     store,
+    generations,
     get writeCount() {
       return state.writeCount;
     },
@@ -860,9 +903,9 @@ async function main(): Promise<void> {
       ...fake.deps,
       firestore: {
         ...fake.deps.firestore,
-        writeCurrentSummary: async (dogId, payload) => {
-          written.push(dogId);
-          await fake.deps.firestore.writeCurrentSummary(dogId, payload);
+        applyProjection: async (args) => {
+          written.push(args.dogId);
+          return fake.deps.firestore.applyProjection(args);
         },
       },
     };
@@ -880,6 +923,291 @@ async function main(): Promise<void> {
         `dogId ${JSON.stringify(bad)} must be rejected`,
       );
     }
+  });
+
+  // ── GEN — generation reservation ─────────────────────────────────────────
+  await test("GEN first reservation is 1 and reservations are monotonic", async () => {
+    const fake = createFake(completeSources());
+    assert.strictEqual(
+      await fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      1,
+    );
+    assert.strictEqual(
+      await fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      2,
+    );
+    assert.strictEqual(
+      await fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      3,
+    );
+  });
+
+  await test("GEN concurrent reservations are unique", async () => {
+    const fake = createFake(completeSources());
+    const reserved = await Promise.all([
+      fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+    ]);
+    assert.strictEqual(new Set(reserved).size, 3, "generations must be unique");
+  });
+
+  await test("GEN different dogs reserve independently", async () => {
+    const fake = createFake(completeSources());
+    assert.strictEqual(
+      await fake.deps.firestore.reserveProjectionGeneration("dog-1"),
+      1,
+    );
+    assert.strictEqual(
+      await fake.deps.firestore.reserveProjectionGeneration("dog-2"),
+      1,
+    );
+  });
+
+  await test("GEN gaps are tolerated (reserved without applying)", () => {
+    // Reserved 5, applied 3: a dead execution leaves a hole, which is fine.
+    const state = parseGenerationState({
+      last_reserved_generation: 5,
+      last_applied_generation: 3,
+    });
+    assert.strictEqual(state.lastReservedGeneration, 5);
+    assert.strictEqual(state.lastAppliedGeneration, 3);
+    assert.strictEqual(nextGeneration(state.lastReservedGeneration), 6);
+  });
+
+  await test("GEN absent state bootstraps to zero", () => {
+    const state = parseGenerationState(null);
+    assert.strictEqual(state.lastReservedGeneration, 0);
+    assert.strictEqual(state.lastAppliedGeneration, 0);
+    assert.strictEqual(parseGenerationField(undefined, "f"), 0);
+    assert.strictEqual(parseGenerationField(null, "f"), 0);
+  });
+
+  await test("GEN malformed state fails closed, never resets", () => {
+    for (const bad of ["3", 1.5, -1, Number.NaN, true, {}, []]) {
+      assert.throws(
+        () => parseGenerationField(bad, "last_reserved_generation"),
+        /invalid_generation_state/,
+        `${JSON.stringify(bad)} must fail closed`,
+      );
+    }
+    assert.throws(
+      () => parseGenerationState({last_applied_generation: 9, last_reserved_generation: 2}),
+      /applied_ahead_of_reserved/,
+    );
+  });
+
+  await test("GEN exhaustion fails closed instead of wrapping", () => {
+    assert.throws(
+      () => nextGeneration(MAX_READINESS_GENERATION),
+      /generation_exhausted/,
+    );
+  });
+
+  // ── GUARD — ordering decision ────────────────────────────────────────────
+  await test("GUARD superseded when applied generation is equal or newer", () => {
+    const state = {lastReservedGeneration: 9, lastAppliedGeneration: 5};
+    for (const gen of [1, 4, 5]) {
+      assert.strictEqual(
+        decideProjectionApply({state, generation: gen, isReady: true}).kind,
+        "superseded",
+        `generation ${gen} must be superseded by applied 5`,
+      );
+    }
+    assert.strictEqual(
+      decideProjectionApply({state, generation: 6, isReady: true}).kind,
+      "apply",
+    );
+  });
+
+  await test("GUARD ready publishes generation, unavailable does not", () => {
+    const state = {lastReservedGeneration: 2, lastAppliedGeneration: 0};
+    const ready = decideProjectionApply({state, generation: 1, isReady: true});
+    assert.strictEqual(ready.kind, "apply");
+    assert.strictEqual(
+      ready.kind === "apply" ? ready.publishReadyGeneration : "n/a",
+      1,
+    );
+    const unavailable = decideProjectionApply({state, generation: 2, isReady: false});
+    assert.strictEqual(unavailable.kind, "apply");
+    assert.strictEqual(
+      unavailable.kind === "apply" ? unavailable.publishReadyGeneration : "n/a",
+      null,
+      "unavailable must never advance the client-observable generation",
+    );
+  });
+
+  // ── ORDER — end-to-end races through the projector ───────────────────────
+  const failedWeight: FakeSources = {
+    ...completeSources(),
+    weight_records: {kind: "failed", reasonCode: "unavailable"},
+  };
+
+  await test("ORDER ready publishes projection_generation on the summary", async () => {
+    const fake = createFake(completeSources());
+    const result = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(result.requiredGeneration, 1);
+    assert.strictEqual(result.applyOutcome, "applied_ready");
+    assert.strictEqual(storedSummary(fake)["projection_generation"], 1);
+  });
+
+  await test("ORDER newer ready advances the generation", async () => {
+    const fake = createFake(completeSources());
+    await evaluateHealthReadiness("dog-1", fake.deps);
+    const second = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(second.requiredGeneration, 2);
+    assert.strictEqual(storedSummary(fake)["projection_generation"], 2);
+  });
+
+  await test("ORDER stale READY cannot overwrite newer READY", async () => {
+    // P1 reserves 1 and evaluates, but a full newer execution (2) commits in
+    // the interleaving window before P1 applies.
+    let interleaved = false;
+    const fake = createFake(completeSources(), null, {
+      beforeApply: async () => {
+        if (interleaved) return;
+        interleaved = true;
+        await evaluateHealthReadiness("dog-1", fake.deps);
+      },
+    });
+    const p1 = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(p1.requiredGeneration, 1);
+    assert.strictEqual(p1.applyOutcome, "superseded", "stale P1 must not write");
+    assert.strictEqual(storedSummary(fake)["projection_generation"], 2);
+  });
+
+  await test("ORDER stale UNAVAILABLE cannot overwrite newer READY", async () => {
+    // The correction that motivated last_applied_generation: without ordering
+    // unavailable writes too, this stale run would merge
+    // projection_status/technical_blockers over a newer ready projection.
+    let interleaved = false;
+    const fake = createFake(failedWeight, null, {
+      beforeApply: async () => {
+        if (interleaved) return;
+        interleaved = true;
+        const readyFake = {...fake.deps, firestore: fake.deps.firestore};
+        // Newer generation 2 evaluates READY from complete sources.
+        await evaluateHealthReadiness("dog-1", {
+          ...readyFake,
+          firestore: {
+            ...fake.deps.firestore,
+            readSubcollection: async (_dogId, collection) =>
+              (completeSources() as Record<string, RawQuery | undefined>)[collection] ??
+              EMPTY,
+          },
+        });
+      },
+    });
+    const stale = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(stale.operation, "unavailable_initial");
+    assert.strictEqual(stale.applyOutcome, "superseded");
+
+    const stored = storedSummary(fake);
+    assert.strictEqual(stored["projection_status"], "ready");
+    assert.strictEqual(stored["projection_generation"], 2);
+    assert.deepStrictEqual(stored["technical_blockers"], []);
+  });
+
+  await test("ORDER newer UNAVAILABLE keeps the last READY generation", async () => {
+    const fake = createFake(completeSources());
+    await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(storedSummary(fake)["projection_generation"], 1);
+
+    // Generation 2 fails technically: status flips, ready generation must not.
+    const unavailable = await evaluateHealthReadiness("dog-1", {
+      ...fake.deps,
+      firestore: {
+        ...fake.deps.firestore,
+        readSubcollection: async (_dogId, collection) =>
+          (failedWeight as Record<string, RawQuery | undefined>)[collection] ?? EMPTY,
+      },
+    });
+    assert.strictEqual(unavailable.requiredGeneration, 2);
+    assert.strictEqual(unavailable.applyOutcome, "applied_unavailable");
+
+    const stored = storedSummary(fake);
+    assert.strictEqual(stored["projection_status"], "unavailable");
+    assert.strictEqual(
+      stored["projection_generation"],
+      1,
+      "an unavailable run must not satisfy causal convergence for generation 2",
+    );
+    // Last-known-good clinical payload survives untouched.
+    assert.strictEqual(stored["readiness_status"], "operational");
+  });
+
+  await test("ORDER unavailable on a fresh dog creates no ready generation", async () => {
+    const fake = createFake(failedWeight);
+    const result = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(result.operation, "unavailable_initial");
+    assert.strictEqual(result.applyOutcome, "applied_unavailable");
+    const stored = storedSummary(fake);
+    assert.ok(
+      !("projection_generation" in stored),
+      "no fabricated ready generation",
+    );
+  });
+
+  await test("ORDER stale UNAVAILABLE cannot overwrite newer UNAVAILABLE", async () => {
+    let interleaved = false;
+    const fake = createFake(failedWeight, null, {
+      beforeApply: async () => {
+        if (interleaved) return;
+        interleaved = true;
+        await evaluateHealthReadiness("dog-1", fake.deps);
+      },
+    });
+    const stale = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(stale.requiredGeneration, 1);
+    assert.strictEqual(stale.applyOutcome, "superseded");
+    assert.strictEqual(
+      parseGenerationState(fake.generations.get("dog-1") ?? null)
+        .lastAppliedGeneration,
+      2,
+    );
+  });
+
+  await test("ORDER superseded performs zero summary writes", async () => {
+    const fake = createFake(completeSources());
+    // Reserve two generations, then apply the newer one first so the older is
+    // born stale — respecting the reserved >= applied invariant.
+    const g1 = await fake.deps.firestore.reserveProjectionGeneration("dog-1");
+    const g2 = await fake.deps.firestore.reserveProjectionGeneration("dog-1");
+    await fake.deps.firestore.applyProjection({
+      dogId: "dog-1",
+      generation: g2,
+      isReady: false,
+      payload: {projection_status: "unavailable"},
+    });
+    const before = fake.writeCount;
+    const outcome = await fake.deps.firestore.applyProjection({
+      dogId: "dog-1",
+      generation: g1,
+      isReady: true,
+      payload: {projection_status: "ready"},
+    });
+    assert.strictEqual(outcome, "superseded");
+    assert.strictEqual(fake.writeCount, before, "no write on superseded");
+  });
+
+  await test("ORDER apply commits summary and applied generation together", async () => {
+    const fake = createFake(completeSources());
+    await evaluateHealthReadiness("dog-1", fake.deps);
+    const state = parseGenerationState(fake.generations.get("dog-1") ?? null);
+    assert.strictEqual(state.lastAppliedGeneration, 1);
+    assert.strictEqual(storedSummary(fake)["projection_generation"], 1);
+  });
+
+  await test("ORDER legacy summary without generation still accepts a ready apply", async () => {
+    const fake = createFake(completeSources(), {
+      schema_version: 1,
+      readiness_status: "temporarily_unfit",
+    });
+    const result = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(result.applyOutcome, "applied_ready");
+    const stored = storedSummary(fake);
+    assert.strictEqual(stored["projection_generation"], 1);
+    assert.strictEqual(stored["schema_version"], 1, "schema_version is not bumped");
   });
 
   if (failures > 0) {

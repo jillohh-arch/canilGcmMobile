@@ -15,6 +15,17 @@ import {
   ProjectorDeps,
   ProjectorFirestore,
 } from "./health_readiness_projector";
+import {
+  decideProjectionApply,
+  nextGeneration,
+  parseGenerationState,
+  LAST_APPLIED_GENERATION_FIELD,
+  LAST_RESERVED_GENERATION_FIELD,
+  PROJECTION_GENERATION_FIELD,
+  READINESS_GENERATION_DOGS_COLLECTION,
+  READINESS_GENERATION_ROOT_COLLECTION,
+  READINESS_GENERATION_ROOT_DOC,
+} from "./health_readiness_generation";
 
 const emuHost = process.env.FIRESTORE_EMULATOR_HOST;
 
@@ -62,15 +73,53 @@ function makeFirestoreAdapter(db: FirebaseFirestore.Firestore): ProjectorFiresto
         return {kind: "failed", reasonCode: String(err)} as never;
       }
     },
-    writeCurrentSummary: async (dogId, payload) => {
-      await db
+    reserveProjectionGeneration: async (dogId) => {
+      const ref = generationDocRef(db, dogId);
+      return db.runTransaction(async (txn) => {
+        const snap = await txn.get(ref);
+        const state = parseGenerationState(
+          snap.exists ? (snap.data() as Record<string, unknown>) : null,
+        );
+        const reserved = nextGeneration(state.lastReservedGeneration);
+        txn.set(ref, {[LAST_RESERVED_GENERATION_FIELD]: reserved}, {merge: true});
+        return reserved;
+      });
+    },
+    applyProjection: async ({dogId, generation, isReady, payload}) => {
+      const ref = generationDocRef(db, dogId);
+      const summaryRef = db
         .collection("dogs")
         .doc(dogId)
         .collection("health_summary")
-        .doc("current")
-        .set(payload, {merge: true});
+        .doc("current");
+      return db.runTransaction(async (txn) => {
+        const snap = await txn.get(ref);
+        const state = parseGenerationState(
+          snap.exists ? (snap.data() as Record<string, unknown>) : null,
+        );
+        const decision = decideProjectionApply({state, generation, isReady});
+        if (decision.kind === "superseded") return "superseded" as const;
+        const summaryPatch: Record<string, unknown> = {...payload};
+        if (decision.publishReadyGeneration !== null) {
+          summaryPatch[PROJECTION_GENERATION_FIELD] = decision.publishReadyGeneration;
+        }
+        txn.set(summaryRef, summaryPatch, {merge: true});
+        txn.set(ref, {[LAST_APPLIED_GENERATION_FIELD]: generation}, {merge: true});
+        return decision.outcome;
+      });
     },
   };
+}
+
+function generationDocRef(
+  db: FirebaseFirestore.Firestore,
+  dogId: string,
+): FirebaseFirestore.DocumentReference {
+  return db
+    .collection(READINESS_GENERATION_ROOT_COLLECTION)
+    .doc(READINESS_GENERATION_ROOT_DOC)
+    .collection(READINESS_GENERATION_DOGS_COLLECTION)
+    .doc(dogId);
 }
 
 function makeDeps(db: FirebaseFirestore.Firestore): ProjectorDeps {

@@ -18,6 +18,17 @@ import type {DocumentSnapshot} from "firebase-functions/v2/firestore";
 import {logger} from "firebase-functions";
 import {evaluateHealthReadiness, ProjectorDeps} from "./health_readiness_projector";
 import {resolveReadinessConfig} from "./health_readiness_config";
+import {
+  decideProjectionApply,
+  nextGeneration,
+  parseGenerationState,
+  LAST_APPLIED_GENERATION_FIELD,
+  LAST_RESERVED_GENERATION_FIELD,
+  PROJECTION_GENERATION_FIELD,
+  READINESS_GENERATION_DOGS_COLLECTION,
+  READINESS_GENERATION_ROOT_COLLECTION,
+  READINESS_GENERATION_ROOT_DOC,
+} from "./health_readiness_generation";
 
 /** Paths that the projector writes to — trigger must ignore writes from these. */
 const PROJECTOR_WRITE_PATHS = new Set([
@@ -54,6 +65,23 @@ function isRecursion(sourcePath: string): boolean {
  * tested without initializing Firebase. The real trigger exports inject `admin.firestore()`;
  * unit tests inject a fake.
  */
+/**
+ * Server-only per-dog generation coordination document:
+ * `_health_projection_state/health_readiness_v1/dogs/{dogId}`.
+ *
+ * Denied to clients by firestore.rules (`_health_projection_state/**`).
+ */
+function generationDocRef(
+  db: FirebaseFirestore.Firestore,
+  dogId: string,
+): FirebaseFirestore.DocumentReference {
+  return db
+    .collection(READINESS_GENERATION_ROOT_COLLECTION)
+    .doc(READINESS_GENERATION_ROOT_DOC)
+    .collection(READINESS_GENERATION_DOGS_COLLECTION)
+    .doc(dogId);
+}
+
 export function buildReadinessProjectorDeps(
   db: FirebaseFirestore.Firestore,
 ): ProjectorDeps {
@@ -87,13 +115,57 @@ export function buildReadinessProjectorDeps(
           return null;
         }
       },
-      writeCurrentSummary: async (dogId, payload) => {
-        await db
+      reserveProjectionGeneration: async (dogId) => {
+        const coordinationRef = generationDocRef(db, dogId);
+        return db.runTransaction(async (txn) => {
+          const snap = await txn.get(coordinationRef);
+          const state = parseGenerationState(
+            snap.exists ? (snap.data() as Record<string, unknown>) : null,
+          );
+          const reserved = nextGeneration(state.lastReservedGeneration);
+          // Merge so last_applied_generation is preserved.
+          txn.set(
+            coordinationRef,
+            {[LAST_RESERVED_GENERATION_FIELD]: reserved},
+            {merge: true},
+          );
+          return reserved;
+        });
+      },
+      applyProjection: async ({dogId, generation, isReady, payload}) => {
+        const coordinationRef = generationDocRef(db, dogId);
+        const summaryRef = db
           .collection("dogs")
           .doc(dogId)
           .collection("health_summary")
-          .doc("current")
-          .set(payload, {merge: true});
+          .doc("current");
+
+        return db.runTransaction(async (txn) => {
+          const snap = await txn.get(coordinationRef);
+          const state = parseGenerationState(
+            snap.exists ? (snap.data() as Record<string, unknown>) : null,
+          );
+          const decision = decideProjectionApply({state, generation, isReady});
+
+          if (decision.kind === "superseded") return "superseded" as const;
+
+          const summaryPatch: Record<string, unknown> = {...payload};
+          if (decision.publishReadyGeneration !== null) {
+            // Ready only: this is the client-observable causal marker.
+            summaryPatch[PROJECTION_GENERATION_FIELD] =
+              decision.publishReadyGeneration;
+          }
+
+          // Summary write and applied-generation bump commit together, so the
+          // guard can never disagree with what the summary actually holds.
+          txn.set(summaryRef, summaryPatch, {merge: true});
+          txn.set(
+            coordinationRef,
+            {[LAST_APPLIED_GENERATION_FIELD]: generation},
+            {merge: true},
+          );
+          return decision.outcome;
+        });
       },
     },
     logger: {
