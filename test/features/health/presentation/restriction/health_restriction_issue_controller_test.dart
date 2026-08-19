@@ -7,6 +7,8 @@ import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_issue_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'convergence_test_gateway.dart';
+
 /// Registra a ordem exata das chamadas para provar que nenhuma etapa é refeita.
 final class _Recorder {
   final List<String> calls = <String>[];
@@ -172,6 +174,7 @@ void main() {
       documentGateway: doc,
       uploader: uploader,
       restrictionGateway: issue,
+      convergenceGateway: convergenceTestGateway(),
       operationIdFactory: () => 'op-${++seq}',
     );
     return (

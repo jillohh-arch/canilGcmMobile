@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/coexistence/summary/health_readiness_convergence_gateway.dart';
 import '../../domain/health_restriction_flow_errors.dart';
 import '../../domain/health_restriction_lifecycle_gateway.dart';
+import 'health_restriction_convergence_coordinator.dart';
 
 /// Progresso do cancelamento.
 ///
@@ -37,12 +39,22 @@ final class HealthRestrictionCancelIntent {
 final class HealthRestrictionCancelController extends ChangeNotifier {
   HealthRestrictionCancelController({
     required HealthRestrictionLifecycleGateway gateway,
+    required HealthReadinessConvergenceGateway convergenceGateway,
     String Function()? operationIdFactory,
   }) : _gateway = gateway,
-       _newOperationId = operationIdFactory ?? (() => const Uuid().v4());
+       _newOperationId = operationIdFactory ?? (() => const Uuid().v4()) {
+    _convergence = HealthRestrictionConvergenceCoordinator(
+      gateway: convergenceGateway,
+      onChanged: notifyListeners,
+    );
+  }
 
   final HealthRestrictionLifecycleGateway _gateway;
   final String Function() _newOperationId;
+  late final HealthRestrictionConvergenceCoordinator _convergence;
+
+  /// Fase causal do comando já commitado (B4-R.C3).
+  HealthRestrictionConvergenceCoordinator get convergence => _convergence;
 
   HealthRestrictionCancelStage _stage = HealthRestrictionCancelStage.idle;
   HealthRestrictionFlowFailure? _failure;
@@ -98,7 +110,12 @@ final class HealthRestrictionCancelController extends ChangeNotifier {
       switch (outcome) {
         case HealthRestrictionTerminalSuccess(:final result):
           _result = result;
+          // O comando terminal já é fato canônico. A partir daqui, qualquer
+          // falha é de CONVERGÊNCIA, nunca de cancelamento: `_result` e o stage
+          // `success` são preservados independentemente do que ocorra na
+          // barreira causal.
           _stage = HealthRestrictionCancelStage.success;
+          await _convergence.onMutationCommitted(intent.dogId);
           return true;
         case HealthRestrictionTerminalError(:final failure):
           return _fail(failure);

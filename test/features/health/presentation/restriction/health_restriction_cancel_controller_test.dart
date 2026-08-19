@@ -3,6 +3,8 @@ import 'package:canil_gcm/features/health/domain/health_restriction_lifecycle_ga
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_cancel_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'convergence_test_gateway.dart';
+
 final class _FakeLifecycleGateway implements HealthRestrictionLifecycleGateway {
   HealthRestrictionFlowFailure? failure;
   bool wasNoOp = false;
@@ -47,6 +49,7 @@ void main() {
     var seq = 0;
     controller = HealthRestrictionCancelController(
       gateway: gateway,
+      convergenceGateway: convergenceTestGateway(),
       operationIdFactory: () => 'cancel-op-${++seq}',
     );
   });
@@ -90,6 +93,7 @@ void main() {
       for (final reason in ['', '   ', '\t\n']) {
         final fresh = HealthRestrictionCancelController(
           gateway: gateway,
+          convergenceGateway: convergenceTestGateway(),
           operationIdFactory: () => 'op',
         );
         final ok = await fresh.submit(intent(reason: reason));

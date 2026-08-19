@@ -16,7 +16,9 @@ import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/coexistence_health_summary_source.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/health_readiness_convergence_gateway.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
+import 'package:canil_gcm/features/health/data/coexistence/summary/readiness_callable.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
@@ -501,6 +503,13 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
               uploader: StorageHealthEvidenceUploader(),
               restrictionGateway:
                   FirebaseFunctionsHealthRestrictionIssueGateway(),
+              // Barreira causal (B4-R.C3): depois do ISSUE commitar, prova que a
+              // projeção observável já reflete a restrição. Dependência
+              // obrigatória de propósito — sem ela a mutation commitaria sem
+              // nenhuma tentativa de convergência.
+              convergenceGateway: HealthReadinessConvergenceGateway(
+                invoke: FirebaseFunctionsReadinessCallableInvoker().call,
+              ),
             );
             try {
               final saved = await Navigator.of(

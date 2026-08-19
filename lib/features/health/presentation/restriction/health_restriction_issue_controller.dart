@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/coexistence/summary/health_readiness_convergence_gateway.dart';
 import '../../domain/health_document_gateway.dart';
 import '../../domain/health_evidence_file.dart';
 import '../../domain/health_restriction_flow_errors.dart';
 import '../../domain/health_restriction_issue_gateway.dart';
 import '../../domain/health_v1_enums_ext.dart';
 import '../../domain/health_v1_value_objects.dart';
+import 'health_restriction_convergence_coordinator.dart';
 
 /// Progresso do fluxo de emissão.
 ///
@@ -93,16 +95,26 @@ final class HealthRestrictionIssueController extends ChangeNotifier {
     required HealthDocumentGateway documentGateway,
     required HealthEvidenceUploader uploader,
     required HealthRestrictionIssueGateway restrictionGateway,
+    required HealthReadinessConvergenceGateway convergenceGateway,
     String Function()? operationIdFactory,
   }) : _documentGateway = documentGateway,
        _uploader = uploader,
        _restrictionGateway = restrictionGateway,
-       _newOperationId = operationIdFactory ?? (() => const Uuid().v4());
+       _newOperationId = operationIdFactory ?? (() => const Uuid().v4()) {
+    _convergence = HealthRestrictionConvergenceCoordinator(
+      gateway: convergenceGateway,
+      onChanged: notifyListeners,
+    );
+  }
 
   final HealthDocumentGateway _documentGateway;
   final HealthEvidenceUploader _uploader;
   final HealthRestrictionIssueGateway _restrictionGateway;
   final String Function() _newOperationId;
+  late final HealthRestrictionConvergenceCoordinator _convergence;
+
+  /// Fase causal da restrição já emitida (B4-R.C3).
+  HealthRestrictionConvergenceCoordinator get convergence => _convergence;
 
   HealthRestrictionIssueStage _stage = HealthRestrictionIssueStage.idle;
   HealthRestrictionFlowFailure? _failure;
@@ -161,7 +173,11 @@ final class HealthRestrictionIssueController extends ChangeNotifier {
       if (!await _ensureDocumentFinalized(dogId, evidence)) return false;
       if (!await _ensureRestrictionIssued(restriction)) return false;
 
+      // A restrição já é fato canônico. Daqui em diante qualquer falha é de
+      // CONVERGÊNCIA, nunca de emissão: `_restrictionId` e o stage `success`
+      // sobrevivem ao que acontecer na barreira causal.
       _stage = HealthRestrictionIssueStage.success;
+      await _convergence.onMutationCommitted(dogId);
       return true;
     } finally {
       _submitting = false;

@@ -9,6 +9,8 @@ import 'package:canil_gcm/features/health/presentation/restriction/health_restri
     show HealthEvidenceIntent;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'convergence_test_gateway.dart';
+
 /// Registra a ordem exata das chamadas para provar que nenhuma etapa é refeita.
 final class _Recorder {
   final List<String> calls = <String>[];
@@ -176,6 +178,7 @@ void main() {
       documentGateway: doc,
       uploader: uploader,
       lifecycleGateway: lifecycle,
+      convergenceGateway: convergenceTestGateway(),
       operationIdFactory: () => 'op-${++seq}',
     );
     return (

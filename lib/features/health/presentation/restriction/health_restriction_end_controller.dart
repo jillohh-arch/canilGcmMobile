@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/coexistence/summary/health_readiness_convergence_gateway.dart';
 import '../../domain/health_document_gateway.dart';
 import '../../domain/health_restriction_flow_errors.dart';
 import '../../domain/health_restriction_lifecycle_gateway.dart';
 import '../../domain/health_v1_value_objects.dart';
+import 'health_restriction_convergence_coordinator.dart';
 // `HealthEvidenceIntent` é reusada do fluxo de emissão: a intenção documental
 // (arquivo + natureza + título) é idêntica nas duas verticais, e duplicá-la
 // criaria dois fingerprints para manter em sincronia. O controller de ISSUE não
@@ -76,16 +78,26 @@ final class HealthRestrictionEndController extends ChangeNotifier {
     required HealthDocumentGateway documentGateway,
     required HealthEvidenceUploader uploader,
     required HealthRestrictionLifecycleGateway lifecycleGateway,
+    required HealthReadinessConvergenceGateway convergenceGateway,
     String Function()? operationIdFactory,
   }) : _documentGateway = documentGateway,
        _uploader = uploader,
        _lifecycleGateway = lifecycleGateway,
-       _newOperationId = operationIdFactory ?? (() => const Uuid().v4());
+       _newOperationId = operationIdFactory ?? (() => const Uuid().v4()) {
+    _convergence = HealthRestrictionConvergenceCoordinator(
+      gateway: convergenceGateway,
+      onChanged: notifyListeners,
+    );
+  }
 
   final HealthDocumentGateway _documentGateway;
   final HealthEvidenceUploader _uploader;
   final HealthRestrictionLifecycleGateway _lifecycleGateway;
   final String Function() _newOperationId;
+  late final HealthRestrictionConvergenceCoordinator _convergence;
+
+  /// Fase causal do encerramento já commitado (B4-R.C3).
+  HealthRestrictionConvergenceCoordinator get convergence => _convergence;
 
   HealthRestrictionEndStage _stage = HealthRestrictionEndStage.idle;
   HealthRestrictionFlowFailure? _failure;
@@ -152,7 +164,11 @@ final class HealthRestrictionEndController extends ChangeNotifier {
 
       if (!await _ensureEnded(end, reason)) return false;
 
+      // O encerramento já é fato canônico. Daqui em diante qualquer falha é de
+      // CONVERGÊNCIA, nunca de encerramento: `_result` e o stage `success`
+      // sobrevivem ao que acontecer na barreira causal.
       _stage = HealthRestrictionEndStage.success;
+      await _convergence.onMutationCommitted(end.dogId);
       return true;
     } finally {
       _submitting = false;

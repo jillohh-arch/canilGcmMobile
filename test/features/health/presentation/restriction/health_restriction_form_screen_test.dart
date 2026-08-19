@@ -10,6 +10,8 @@ import 'package:canil_gcm/features/health/presentation/restriction/health_restri
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'convergence_test_gateway.dart';
+
 /// Fakes das três autoridades. O controller real é usado — é ele que carrega a
 /// máquina de estados que queremos exercitar pela UI.
 final class _FakeDocumentGateway implements HealthDocumentGateway {
@@ -119,6 +121,7 @@ void main() {
       documentGateway: doc,
       uploader: uploader,
       restrictionGateway: issue,
+      convergenceGateway: convergenceTestGateway(),
       operationIdFactory: () => 'op-${++seq}',
     );
     layoutErrors = <String>[];
