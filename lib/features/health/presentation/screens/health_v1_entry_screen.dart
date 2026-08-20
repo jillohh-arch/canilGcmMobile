@@ -32,6 +32,7 @@ import 'package:canil_gcm/features/health/data/canonical/restriction/firestore_h
 import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_restriction_lifecycle_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_controller.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_screen.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_cancel_controller.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_end_controller.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_form_screen.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_issue_controller.dart';
@@ -815,6 +816,14 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
               uploader: StorageHealthEvidenceUploader(),
               lifecycleGateway:
                   FirebaseFunctionsHealthRestrictionLifecycleGateway(),
+              convergenceGateway: HealthReadinessConvergenceGateway(
+                invoke: FirebaseFunctionsReadinessCallableInvoker().call,
+              ),
+            ),
+            // Invalidação administrativa (B4-C.4): sem documento, sem Storage,
+            // sem profissional — apenas lifecycle + barreira causal.
+            cancelControllerFactory: () => HealthRestrictionCancelController(
+              gateway: FirebaseFunctionsHealthRestrictionLifecycleGateway(),
               convergenceGateway: HealthReadinessConvergenceGateway(
                 invoke: FirebaseFunctionsReadinessCallableInvoker().call,
               ),
