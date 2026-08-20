@@ -9,6 +9,10 @@ import {
   onCall,
   onRequest,
 } from "firebase-functions/v2/https";
+import {
+  K9IdentityTransaction,
+  patchK9Identity,
+} from "./admin_patch_k9_identity";
 
 admin.initializeApp();
 
@@ -2159,6 +2163,58 @@ export const adminUpsertK9 = onCall({region}, async (request) => {
   });
   await batch.commit();
   return {id: dogId};
+});
+
+/**
+ * Patch administrativo seguro da identidade do K9.
+ *
+ * Substitui a edicao legada (adminUpsertK9 mode="edit"), que reescrevia o
+ * documento inteiro. A logica de contrato vive em admin_patch_k9_identity.ts;
+ * aqui apenas injetamos Firestore, autorizacao e convencoes de timestamp.
+ */
+export const adminPatchK9Identity = onCall({region}, async (request) => {
+  return patchK9Identity(
+    {
+      authorize: () => requireAccessPermission(request.auth, "k9", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: K9IdentityTransaction = {
+            getDog: async (dogId) =>
+              transaction.get(db.collection("dogs").doc(dogId)),
+            findRegistrationOwners: async (registrationNumber) => {
+              const [legacySnap, currentSnap] = await Promise.all([
+                transaction.get(
+                  db.collection("dogs").where("matricula", "==", registrationNumber),
+                ),
+                transaction.get(
+                  db
+                    .collection("dogs")
+                    .where("registrationNumber", "==", registrationNumber),
+                ),
+              ]);
+              return Array.from(
+                new Set(
+                  [...legacySnap.docs, ...currentSnap.docs].map(
+                    (docSnapshot) => docSnapshot.id,
+                  ),
+                ),
+              );
+            },
+            patchDog: (dogId, patch) => {
+              transaction.set(db.collection("dogs").doc(dogId), patch, {merge: true});
+            },
+            writeAuditLog: (entry) => {
+              transaction.set(db.collection("auditLogs").doc(), entry);
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+    },
+    request.data,
+  );
 });
 
 export const adminArchiveK9 = onCall({region}, async (request) => {

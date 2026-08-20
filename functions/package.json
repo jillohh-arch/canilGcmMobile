@@ -7,6 +7,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
+    "test": "tsc -p tsconfig.test.json && node --test lib/test-build/test/admin_patch_k9_identity.test.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions"
   },
