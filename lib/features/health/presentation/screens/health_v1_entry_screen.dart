@@ -28,8 +28,12 @@ import 'package:canil_gcm/features/health/data/schedule/firebase_functions_healt
 import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_document_gateway.dart';
 import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_restriction_issue_gateway.dart';
 import 'package:canil_gcm/features/health/data/restriction/storage_health_evidence_uploader.dart';
+import 'package:canil_gcm/features/health/data/canonical/restriction/firestore_health_restriction_read_gateway.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_controller.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_screen.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_form_screen.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_issue_controller.dart';
+import 'package:canil_gcm/features/health/presentation/summary/health_summary_attention_destination.dart';
 import 'package:canil_gcm/features/health/domain/health_nutrition_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_schedule_mutation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/nutrition_plan.dart';
@@ -777,6 +781,40 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
     }
   }
 
+  /// Abre o detalhe canônico de UMA restrição operacional (B4-C.2).
+  ///
+  /// `dogId` é o K9 cujo Health está aberto e `restrictionId` é o id canônico já
+  /// traduzido pela boundary do B4-C.1 — a tela nunca deriva identidade da
+  /// descrição, do nível nem da posição do item tocado.
+  Future<void> _openRestrictionDetail({
+    required String dogId,
+    required String restrictionId,
+  }) async {
+    final controller = HealthRestrictionDetailController(
+      dogId: dogId,
+      restrictionId: restrictionId,
+      gateway: FirestoreHealthRestrictionReadGateway(),
+    );
+    try {
+      // Read-only neste gate: back comum, sem resultado de mutation.
+      await Navigator.of(context, rootNavigator: true).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              HealthRestrictionDetailScreen(controller: controller),
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  /// Id de projeção corrompido: informa sem expor diagnóstico técnico e sem
+  /// tentar leitura canônica com identidade não confiável.
+  void _notifyRestrictionUnavailable() {
+    if (!mounted) return;
+    AppFeedback.warning(context, 'Não foi possível abrir esta restrição.');
+  }
+
   /// Clearance real: bottom nav + safe area + folga FAB (mesmo contrato do Resumo).
   double _timelineBottomPadding(BuildContext context) {
     return MainRootNavMetrics.scrollBottomClearance(
@@ -803,13 +841,30 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
           onOpenNutrition: () => _selectSection(HealthShellSection.nutricao),
           onRegisterFeeding: () => _selectSection(HealthShellSection.nutricao),
           onAttentionItemTap: (item) {
-            final hint = (item.destinationHint ?? '').toLowerCase();
-            if (hint.contains('agenda')) {
-              _selectSection(HealthShellSection.agenda);
-            } else if (hint.contains('nutri')) {
-              _selectSection(HealthShellSection.nutricao);
-            } else {
-              _selectSection(HealthShellSection.historico);
+            // Roteamento pela boundary congelada em B4-C.1: nenhum parsing de
+            // `restriction:<id>` acontece aqui. `destinationHint` não é
+            // autoridade para restrição — nenhum produtor de produção o
+            // preenche hoje, então sem esta classificação toda restrição cairia
+            // no fallback de histórico e o id canônico seria descartado.
+            final destination = classifyHealthSummaryAttentionDestination(item);
+            switch (destination) {
+              case HealthSummaryAttentionRestrictionDestination(
+                :final canonicalRestrictionId,
+              ):
+                _openRestrictionDetail(
+                  dogId: dogContext.dogId,
+                  restrictionId: canonicalRestrictionId,
+                );
+              case HealthSummaryAttentionUnavailableDestination():
+                // Id de projeção corrompido: falha fechada. Nenhuma leitura
+                // canônica é tentada com identidade não confiável.
+                _notifyRestrictionUnavailable();
+              case HealthSummaryAttentionAgendaDestination():
+                _selectSection(HealthShellSection.agenda);
+              case HealthSummaryAttentionNutritionDestination():
+                _selectSection(HealthShellSection.nutricao);
+              case HealthSummaryAttentionHistoryDestination():
+                _selectSection(HealthShellSection.historico);
             }
           },
           onRecentRecordTap: (_) {
