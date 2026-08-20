@@ -519,10 +519,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
               ),
             );
             try {
-              final saved = await Navigator.of(
+              final outcome = await Navigator.of(
                 hubContext,
                 rootNavigator: true,
-              ).push<bool>(
+              ).push<HealthRestrictionIssueOutcome>(
                 MaterialPageRoute(
                   builder: (_) => HealthRestrictionFormScreen(
                     dogId: widget.dogId,
@@ -531,8 +531,18 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                   ),
                 ),
               );
-              return saved == true;
+              // Autoridade da mutation é o coordenador do controller, não o
+              // resultado da navegação: um pop por gesto de sistema devolve
+              // `null` mesmo com o ISSUE já commitado, e confiar apenas no
+              // resultado faria o Health esquecer que a restrição existe.
+              final committed =
+                  outcome?.mutationCommitted ??
+                  controller.convergence.mutationCommitted;
+              return committed;
             } finally {
+              // Só aqui o controller morre: a tela de emissão permanece viva
+              // enquanto houver convergência pendente, então o
+              // `retryConvergence()` sobrevive por toda a sessão do fluxo.
               controller.dispose();
             }
           },

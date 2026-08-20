@@ -128,7 +128,11 @@ void main() {
   });
 
   /// Monta a tela em largura de celular. `popResult` captura o pop.
-  Future<List<bool?>> pump(
+  ///
+  /// Desde o B4-C.5 o pop devolve [HealthRestrictionIssueOutcome] em vez de
+  /// `bool`: um booleano colapsaria "registrada e sincronizada" com "registrada
+  /// e sincronização não confirmada".
+  Future<List<HealthRestrictionIssueOutcome?>> pump(
     WidgetTester tester, {
     HealthEvidenceFileResult? pickerResult = const HealthEvidenceFileAccepted(
       validFile,
@@ -142,7 +146,7 @@ void main() {
     final previousOnError = FlutterError.onError;
     FlutterError.onError = (d) => layoutErrors.add(d.exceptionAsString());
 
-    final popped = <bool?>[];
+    final popped = <HealthRestrictionIssueOutcome?>[];
     final navKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
       MaterialApp(navigatorKey: navKey, home: const SizedBox.shrink()),
@@ -150,8 +154,8 @@ void main() {
     // Push imperativo: o Future do push é a única fonte confiável do
     // resultado devolvido por `Navigator.pop(context, value)`.
     navKey.currentState!
-        .push<bool>(
-          MaterialPageRoute<bool>(
+        .push<HealthRestrictionIssueOutcome>(
+          MaterialPageRoute<HealthRestrictionIssueOutcome>(
             builder: (_) => HealthRestrictionFormScreen(
               dogId: 'dog-1',
               dogName: 'Bono',
@@ -596,12 +600,25 @@ void main() {
   });
 
   group('11. sucesso', () {
-    testWidgets('pop(true) e payload correto', (tester) async {
+    testWidgets('mutation commitada e payload correto', (tester) async {
       final popped = await pump(tester);
       await fillValid(tester);
       await submit(tester);
 
-      expect(popped, [true], reason: 'pop(true) propaga para o hub');
+      // O `convergenceTestGateway()` default tem summary vazio, então a
+      // convergência falha de forma benigna. Desde o B4-C.5 esse caso NÃO popa:
+      // a tela permanece viva com o painel de prontidão pendente, preservando o
+      // `retryConvergence()`. O ISSUE, porém, é fato canônico.
+      expect(
+        popped,
+        isEmpty,
+        reason: 'convergência pendente mantém a tela viva',
+      );
+      expect(controller.convergence.mutationCommitted, isTrue);
+      expect(
+        find.byKey(const Key('restriction_issue_convergence_pending')),
+        findsOneWidget,
+      );
       expect(issue.count, 1);
 
       final command = issue.commands.single;

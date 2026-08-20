@@ -12,6 +12,7 @@ import '../shared/widgets/health_field_label.dart';
 import '../shared/widgets/health_form_actions.dart';
 import '../shared/widgets/health_form_section.dart';
 import 'health_professional_draft.dart';
+import 'health_restriction_convergence_coordinator.dart';
 import 'health_restriction_issue_controller.dart';
 import 'health_restriction_labels.dart';
 import 'widgets/health_professional_identity_field.dart';
@@ -20,6 +21,33 @@ import 'widgets/health_professional_identity_field.dart';
 // `healthEvidenceRejectionMessage` vivem na boundary neutra
 // `shared/evidence/health_evidence_picker.dart`. Emissão e encerramento a
 // consomem como irmãs; nenhuma das duas telas importa a outra.
+
+/// Resultado da navegação de emissão (B4-C.5).
+///
+/// Um `bool` não bastaria: `true` colapsaria "restrição criada e prontidão
+/// sincronizada" com "restrição criada e sincronização não confirmada", e
+/// `null`/`false` colapsaria uma mutation JÁ COMMITADA em "nada aconteceu" —
+/// exatamente o erro que END e CANCEL já não cometem.
+///
+/// `restrictionId` viaja para que o pai possa abrir o detalhe canônico da
+/// identidade EXATA criada, nunca "a primeira restrição ativa".
+final class HealthRestrictionIssueOutcome {
+  const HealthRestrictionIssueOutcome({
+    required this.mutationCommitted,
+    required this.convergenceConfirmed,
+    this.restrictionId,
+  });
+
+  /// A restrição foi criada no backend. Nunca volta a falso porque a projeção
+  /// de prontidão não pôde ser provada.
+  final bool mutationCommitted;
+
+  /// A projeção de prontidão foi provada causalmente posterior ao ISSUE.
+  final bool convergenceConfirmed;
+
+  /// Id canônico devolvido pelo writer. Não-nulo quando [mutationCommitted].
+  final String? restrictionId;
+}
 
 /// Registro de restrição operacional (B3).
 ///
@@ -65,10 +93,29 @@ class _HealthRestrictionFormScreenState
   String? _fileRejection;
   bool _titleTouched = false;
 
+  /// Restrição criada, prontidão não confirmada, aguardando o operador.
+  ///
+  /// Enquanto verdadeiro a tela não é o formulário: é o painel pós-commit. O
+  /// formulário não pode reaparecer, porque a restrição já existe e um segundo
+  /// submit criaria OUTRA.
+  bool _awaitingConvergenceAck = false;
+
   Color get _accent => AppTheme.error;
 
   @override
+  void initState() {
+    super.initState();
+    // O painel pós-commit reflete fase causal; sem isto o retry não repinta.
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
     _formController.dispose();
     _descriptionController.dispose();
     _titleController.dispose();
@@ -202,12 +249,67 @@ class _HealthRestrictionFormScreenState
     );
 
     if (!ok || !mounted) return;
-    AppFeedback.success(context, 'Restrição operacional registrada.');
-    Navigator.pop(context, true);
+
+    // Daqui em diante a RESTRIÇÃO EXISTE. A convergência pode ter falhado, e
+    // isso NÃO transforma o cadastro em falha.
+    final convergence = widget.controller.convergence;
+    if (convergence.isConverged) {
+      AppFeedback.success(context, 'Restrição operacional registrada.');
+      _popCommitted(convergenceConfirmed: true);
+      return;
+    }
+
+    // Commitado sem prova causal: a tela PERMANECE viva.
+    //
+    // Sair aqui destruiria o controller no `finally` do host — e com ele o
+    // `retryConvergence()`, exatamente quando é a única ação útil. Manter a tela
+    // preserva o controller e o progresso da sessão sem reestruturar ownership.
+    AppFeedback.warning(
+      context,
+      'Restrição registrada. Prontidão ainda não sincronizada.',
+    );
+    setState(() => _awaitingConvergenceAck = true);
+  }
+
+  /// Retenta apenas a barreira causal. Nunca reenvia PREPARE, upload, FINALIZE
+  /// ou ISSUE.
+  Future<void> _retryConvergence() async {
+    await widget.controller.convergence.retryConvergence();
+    if (!mounted) return;
+    if (widget.controller.convergence.isConverged) {
+      AppFeedback.success(context, 'Prontidão sincronizada.');
+      _popCommitted(convergenceConfirmed: true);
+    }
+  }
+
+  /// Conclui o fluxo com a mutation reconhecida como fato.
+  void _popCommitted({required bool convergenceConfirmed}) {
+    Navigator.pop(
+      context,
+      HealthRestrictionIssueOutcome(
+        // Autoridade é o coordenador, não o resultado do formulário.
+        mutationCommitted: widget.controller.convergence.mutationCommitted,
+        convergenceConfirmed: convergenceConfirmed,
+        restrictionId: widget.controller.restrictionId,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Pós-commit: o formulário sai de cena por completo. Nem rascunho, nem CTA
+    // de submit — a restrição JÁ EXISTE, e reenviar criaria uma segunda.
+    if (_awaitingConvergenceAck) {
+      return HealthFormScaffold(
+        title: 'Restrição Operacional',
+        accentColor: _accent,
+        // Nada a proteger: o rascunho virou registro canônico.
+        protectUnsavedChanges: false,
+        onBack: () => _popCommitted(convergenceConfirmed: false),
+        body: _convergencePendingBody(),
+      );
+    }
+
     return HealthFormScaffold(
       title: 'Restrição Operacional',
       controller: _formController,
@@ -238,6 +340,98 @@ class _HealthRestrictionFormScreenState
           );
         },
       ),
+    );
+  }
+
+  /// Painel de "restrição registrada, prontidão pendente".
+  ///
+  /// Afirma o cadastro como fato e a sincronização como pendência. Jamais diz
+  /// "falha ao registrar" nem oferece novo envio.
+  Widget _convergencePendingBody() {
+    final converging =
+        widget.controller.convergence.phase ==
+        HealthRestrictionConvergencePhase.converging;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const Key('restriction_issue_convergence_pending'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surfacePanel,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: AppTheme.success,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Restrição registrada.',
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'A atualização da prontidão ainda não foi confirmada. O '
+                'registro está salvo e não precisa ser enviado de novo.',
+                style: TextStyle(
+                  color: AppTheme.textSoft,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                key: const Key('restriction_issue_retry_convergence'),
+                // Somente refresh + releitura + prova. Nunca PREPARE, upload,
+                // FINALIZE ou ISSUE.
+                onPressed: converging ? null : _retryConvergence,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(
+                  converging ? 'Sincronizando...' : 'Tentar sincronizar',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.warning,
+                  side: BorderSide(
+                    color: AppTheme.warning.withValues(alpha: 0.7),
+                  ),
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // O operador nunca fica preso: pode concluir com a pendência.
+              TextButton(
+                key: const Key('restriction_issue_finish'),
+                onPressed: () => _popCommitted(convergenceConfirmed: false),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSoft,
+                  minimumSize: const Size.fromHeight(44),
+                ),
+                child: const Text('Concluir'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
