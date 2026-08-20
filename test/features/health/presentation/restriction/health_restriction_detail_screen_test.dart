@@ -76,7 +76,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: HealthRestrictionDetailScreen(controller: controller),
+        // Sem `endControllerFactory`: estes testes cobrem a superfície
+        // read-only do B4-C.2, sem ação de lifecycle.
+        home: HealthRestrictionDetailScreen(
+          controller: controller,
+          dogName: 'Thor',
+        ),
       ),
     );
     await tester.pumpAndSettle();

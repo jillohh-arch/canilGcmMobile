@@ -1,10 +1,10 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../domain/health_evidence_file.dart';
 import '../../domain/health_v1_enums_ext.dart';
+import '../shared/evidence/health_evidence_picker.dart';
 import '../shared/forms/health_form_controller.dart';
 import '../shared/forms/health_form_scaffold.dart';
 import '../shared/widgets/health_date_time_field.dart';
@@ -16,27 +16,10 @@ import 'health_restriction_issue_controller.dart';
 import 'health_restriction_labels.dart';
 import 'widgets/health_professional_identity_field.dart';
 
-/// Seam do seletor de arquivos: mantém o picker fora da lógica de negócio e
-/// permite teste de widget sem plugin de plataforma.
-///
-/// `null` significa cancelamento — não é erro.
-typedef HealthEvidencePicker = Future<HealthEvidenceFileResult?> Function();
-
-Future<HealthEvidenceFileResult?> _defaultPickEvidence() async {
-  final picked = await FilePicker.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: kHealthEvidenceAllowedExtensions,
-    allowMultiple: false,
-  );
-  if (picked == null || picked.files.isEmpty) return null;
-  final file = picked.files.single;
-  // `size` vem do picker: valida antes de materializar bytes em memória.
-  return validateHealthEvidenceFile(
-    name: file.name,
-    path: file.path,
-    size: file.size,
-  );
-}
+// `HealthEvidencePicker`, `defaultPickHealthEvidence` e
+// `healthEvidenceRejectionMessage` vivem na boundary neutra
+// `shared/evidence/health_evidence_picker.dart`. Emissão e encerramento a
+// consomem como irmãs; nenhuma das duas telas importa a outra.
 
 /// Registro de restrição operacional (B3).
 ///
@@ -114,7 +97,7 @@ class _HealthRestrictionFormScreenState
   }
 
   Future<void> _pickFile() async {
-    final picker = widget.evidencePicker ?? _defaultPickEvidence;
+    final picker = widget.evidencePicker ?? defaultPickHealthEvidence;
     final result = await picker();
     if (!mounted) return;
     if (result == null) return; // cancelado: nenhuma mutação, nenhum erro
@@ -135,19 +118,8 @@ class _HealthRestrictionFormScreenState
     }
   }
 
-  String _rejectionMessage(HealthEvidenceFileRejection reason) {
-    return switch (reason) {
-      HealthEvidenceFileRejection.unsupportedExtension =>
-        'Formato não suportado. Envie PDF, imagem (JPG, PNG, WEBP) '
-            'ou documento Word.',
-      HealthEvidenceFileRejection.empty => 'O arquivo selecionado está vazio.',
-      HealthEvidenceFileRejection.tooLarge =>
-        'O arquivo excede 20 MB. Envie um arquivo menor.',
-      HealthEvidenceFileRejection.unreadable =>
-        'Não foi possível acessar o arquivo escolhido. '
-            'Selecione novamente.',
-    };
-  }
+  String _rejectionMessage(HealthEvidenceFileRejection reason) =>
+      healthEvidenceRejectionMessage(reason);
 
   void _addActivity() {
     final value = _activityController.text.trim();

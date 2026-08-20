@@ -29,8 +29,10 @@ import 'package:canil_gcm/features/health/data/restriction/firebase_functions_he
 import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_restriction_issue_gateway.dart';
 import 'package:canil_gcm/features/health/data/restriction/storage_health_evidence_uploader.dart';
 import 'package:canil_gcm/features/health/data/canonical/restriction/firestore_health_restriction_read_gateway.dart';
+import 'package:canil_gcm/features/health/data/restriction/firebase_functions_health_restriction_lifecycle_gateway.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_controller.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_detail_screen.dart';
+import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_end_controller.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_form_screen.dart';
 import 'package:canil_gcm/features/health/presentation/restriction/health_restriction_issue_controller.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_attention_destination.dart';
@@ -781,14 +783,19 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
     }
   }
 
-  /// Abre o detalhe canônico de UMA restrição operacional (B4-C.2).
+  /// Abre o detalhe canônico de UMA restrição operacional (B4-C.2/B4-C.3).
   ///
   /// `dogId` é o K9 cujo Health está aberto e `restrictionId` é o id canônico já
   /// traduzido pela boundary do B4-C.1 — a tela nunca deriva identidade da
   /// descrição, do nível nem da posição do item tocado.
+  ///
+  /// O detalhe hospeda o ciclo de vida (B4-C.3): as dependências de Functions,
+  /// Storage e da barreira causal são injetadas aqui, para que a tela não
+  /// construa Firebase por conta própria.
   Future<void> _openRestrictionDetail({
     required String dogId,
     required String restrictionId,
+    required String dogName,
   }) async {
     final controller = HealthRestrictionDetailController(
       dogId: dogId,
@@ -796,11 +803,23 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
       gateway: FirestoreHealthRestrictionReadGateway(),
     );
     try {
-      // Read-only neste gate: back comum, sem resultado de mutation.
       await Navigator.of(context, rootNavigator: true).push<void>(
         MaterialPageRoute(
-          builder: (_) =>
-              HealthRestrictionDetailScreen(controller: controller),
+          builder: (_) => HealthRestrictionDetailScreen(
+            controller: controller,
+            dogName: dogName,
+            // Sob demanda: nenhum gateway de mutation é criado se o operador
+            // não abrir o encerramento.
+            endControllerFactory: () => HealthRestrictionEndController(
+              documentGateway: FirebaseFunctionsHealthDocumentGateway(),
+              uploader: StorageHealthEvidenceUploader(),
+              lifecycleGateway:
+                  FirebaseFunctionsHealthRestrictionLifecycleGateway(),
+              convergenceGateway: HealthReadinessConvergenceGateway(
+                invoke: FirebaseFunctionsReadinessCallableInvoker().call,
+              ),
+            ),
+          ),
         ),
       );
     } finally {
@@ -854,6 +873,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                 _openRestrictionDetail(
                   dogId: dogContext.dogId,
                   restrictionId: canonicalRestrictionId,
+                  dogName: dogContext.name,
                 );
               case HealthSummaryAttentionUnavailableDestination():
                 // Id de projeção corrompido: falha fechada. Nenhuma leitura

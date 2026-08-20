@@ -5,17 +5,29 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/health_restriction_read_gateway.dart';
 import '../../domain/health_v1_enums_ext.dart';
 import '../../domain/operational_restriction.dart';
+import '../shared/evidence/health_evidence_picker.dart';
 import '../shared/states/health_async_body.dart';
 import '../shared/states/health_presentation_status.dart';
 import '../shared/widgets/health_form_section.dart';
 import '../shared/forms/health_form_scaffold.dart';
 import 'health_professional_draft.dart';
 import 'health_restriction_detail_controller.dart';
+import 'health_restriction_convergence_coordinator.dart';
+import 'health_restriction_end_controller.dart';
+import 'health_restriction_end_form_screen.dart';
 import 'health_restriction_labels.dart';
 
-/// Detalhe canônico de UMA restrição operacional. SOMENTE LEITURA.
+/// Constrói o controller de encerramento sob demanda.
 ///
-/// B4-C.2. Primeiro destino real de uma restrição no Mobile.
+/// Injetado pelo entry screen para que o detalhe não conheça gateways de
+/// Functions/Storage nem construa Firebase por conta própria.
+typedef HealthRestrictionEndControllerFactory =
+    HealthRestrictionEndController Function();
+
+/// Detalhe canônico de UMA restrição operacional.
+///
+/// B4-C.2 (leitura canônica) + B4-C.3 (host do encerramento clínico). Primeiro
+/// destino real de uma restrição no Mobile.
 ///
 /// ## Autoridade dos dados
 ///
@@ -23,21 +35,45 @@ import 'health_restriction_labels.dart';
 /// `dogs/{dogId}/operational_restrictions/{restrictionId}` pelo reader B4-B2. A
 /// projeção de Prontidão levou o operador até aqui, mas deixa de ser autoridade
 /// no instante em que a leitura canônica ocorre — nenhum campo é preenchido com
-/// dado da projeção.
+/// dado da projeção, e nenhum campo sobrevive do formulário de encerramento: o
+/// que a tela exibe após um END é a releitura canônica, não o que foi digitado.
+///
+/// ## Host de lifecycle (B4-C.3)
+///
+/// A tela hospeda o [HealthRestrictionEndController] da sessão. Ele sobrevive ao
+/// fechamento do formulário de propósito: quando o END commitou mas a
+/// convergência causal falhou, é ele que guarda `mutationCommitted`, o resultado
+/// terminal e o `retryConvergence()`. A tela não conhece PREPARE, upload,
+/// FINALIZE nem END — só o controller.
 ///
 /// ## O que esta tela deliberadamente NÃO faz
 ///
-/// - não encerra nem cancela restrição (B4-C.3 / B4-C.4);
+/// - não cancela restrição (CANCEL é B4-C.4);
+/// - não reexecuta END, PREPARE, upload ou FINALIZE em nenhum retry;
 /// - não abre, baixa nem assina URL de HealthDocument (subgate próprio);
 /// - não calcula prontidão, severidade nem autorização operacional;
+/// - não implementa predicado causal: consome o estado congelado do B4-R.C3;
 /// - não toca Firestore diretamente: todo I/O passa pelo controller/gateway.
+
 class HealthRestrictionDetailScreen extends StatefulWidget {
   const HealthRestrictionDetailScreen({
     required this.controller,
+    required this.dogName,
+    this.endControllerFactory,
+    this.evidencePicker,
     super.key,
   });
 
   final HealthRestrictionDetailController controller;
+
+  /// Nome do K9, apenas para cabeçalho do formulário de encerramento.
+  final String dogName;
+
+  /// Ausente desabilita a ação de encerrar (ex.: superfícies read-only).
+  final HealthRestrictionEndControllerFactory? endControllerFactory;
+
+  /// Seam de teste do picker de evidência.
+  final HealthEvidencePicker? evidencePicker;
 
   @override
   State<HealthRestrictionDetailScreen> createState() =>
@@ -48,6 +84,14 @@ class _HealthRestrictionDetailScreenState
     extends State<HealthRestrictionDetailScreen> {
   static final _dateTime = DateFormat('dd/MM/yyyy HH:mm');
   static final _dateOnly = DateFormat('dd/MM/yyyy');
+
+  /// Controller de encerramento da sessão atual.
+  ///
+  /// Sobrevive ao fechamento do formulário de propósito: quando o END commitou
+  /// mas a convergência falhou, é ele que guarda `mutationCommitted`, o
+  /// resultado terminal e o `retryConvergence()` — e repetir o END está fora de
+  /// questão.
+  HealthRestrictionEndController? _endController;
 
   @override
   void initState() {
@@ -60,11 +104,61 @@ class _HealthRestrictionDetailScreenState
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
+    _endController?.removeListener(_onControllerChanged);
+    _endController?.dispose();
     super.dispose();
   }
 
   void _onControllerChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// Abre o formulário de encerramento clínico.
+  ///
+  /// O END é orquestrado pelo controller (PREPARE → upload → FINALIZE → END) e,
+  /// após o commit, pela barreira causal. Nada disso é refeito por retry.
+  Future<void> _openEndForm(OperationalRestriction restriction) async {
+    final factory = widget.endControllerFactory;
+    if (factory == null) return;
+
+    // Reusa o controller da sessão quando existir: ele carrega o progresso
+    // documental e o estado de mutation já commitada.
+    final endController = _endController ??= factory()
+      ..addListener(_onControllerChanged);
+
+    await Navigator.of(context).push<HealthRestrictionEndOutcome>(
+      MaterialPageRoute(
+        builder: (_) => HealthRestrictionEndFormScreen(
+          controller: endController,
+          dogId: widget.controller.dogId,
+          dogName: widget.dogName,
+          restrictionId: restriction.id,
+          evidencePicker: widget.evidencePicker,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    // Reload canônico sempre que o END commitou, INDEPENDENTEMENTE da
+    // convergência: o documento canônico já mudou para `ended`, e é ele — não a
+    // projeção — que a tela apresenta.
+    //
+    // A autoridade é o coordenador do controller, NÃO o resultado da navegação:
+    // um pop por gesto de sistema ou back do Android devolve `null` mesmo com o
+    // END já commitado, e confiar no resultado perderia a mutation. O controller
+    // sobrevive ao fechamento do formulário exatamente para isso.
+    if (endController.convergence.mutationCommitted) {
+      await widget.controller.load();
+    }
+  }
+
+  /// Retenta apenas a barreira causal. Nunca reenvia END, PREPARE, upload ou
+  /// FINALIZE.
+  Future<void> _retryConvergence() async {
+    final endController = _endController;
+    if (endController == null) return;
+    await endController.convergence.retryConvergence();
   }
 
   /// Vermelho institucional já usado pelo fluxo de restrição.
@@ -128,6 +222,9 @@ class _HealthRestrictionDetailScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _statusHeader(restriction),
+        // Banner causal: só aparece quando existe comando commitado nesta sessão
+        // cuja projeção não foi provada. Nunca sugere que o comando falhou.
+        if (_showsConvergencePending) _convergencePendingBanner(),
         HealthFormSection(
           title: 'Restrição',
           accentColor: _accent,
@@ -157,7 +254,106 @@ class _HealthRestrictionDetailScreenState
             accentColor: _accent,
             child: _cancelledBlock(restriction),
           ),
+        // END só faz sentido enquanto a restrição está ativa. A visibilidade é
+        // por status de domínio; a autorização continua sendo do backend, que
+        // pode negar mesmo com a ação oferecida.
+        if (restriction.status == RestrictionStatus.active &&
+            widget.endControllerFactory != null)
+          _endAction(restriction),
       ],
+    );
+  }
+
+  /// Verdadeiro quando um comando desta sessão commitou e a projeção ainda não
+  /// foi provada causalmente.
+  bool get _showsConvergencePending {
+    final convergence = _endController?.convergence;
+    return convergence != null && convergence.needsConvergenceRetry;
+  }
+
+  Widget _convergencePendingBanner() {
+    final converging =
+        _endController?.convergence.phase ==
+        HealthRestrictionConvergencePhase.converging;
+
+    return Container(
+      key: const Key('restriction_convergence_pending'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfacePanel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.sync_problem_outlined,
+                color: AppTheme.warning,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                // Linguagem obrigatória: o comando FOI aplicado. Só a
+                // sincronização da prontidão não pôde ser confirmada.
+                child: Text(
+                  'Encerramento aplicado. Prontidão ainda não sincronizada.',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('restriction_retry_convergence'),
+              // Retry causal apenas: refresh + releitura + prova.
+              onPressed: converging ? null : _retryConvergence,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(
+                converging ? 'Sincronizando...' : 'Tentar sincronizar',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.warning,
+                side: BorderSide(
+                  color: AppTheme.warning.withValues(alpha: 0.7),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _endAction(OperationalRestriction restriction) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: OutlinedButton.icon(
+        key: const Key('restriction_open_end_form'),
+        onPressed: () => _openEndForm(restriction),
+        icon: const Icon(Icons.verified_outlined, size: 18),
+        label: const Text('Encerrar restrição'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _accent,
+          side: BorderSide(color: _accent.withValues(alpha: 0.7)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
     );
   }
 
@@ -317,6 +513,13 @@ class _HealthRestrictionDetailScreenState
           _field('Encerrada por', restriction.endedBy!.name),
         if (restriction.endProfessional != null)
           _field('Profissional', restriction.endProfessional!.name),
+        // Rótulo distinto do 'Documento clínico' da seção de registro: aquele é
+        // a evidência que FUNDAMENTOU a restrição; este é a evidência da
+        // liberação clínica. Um agregado ENDED tem os dois, e confundi-los
+        // apagaria a diferença entre "por que foi restringido" e "por que foi
+        // liberado". Identidade apenas — abrir/baixar é subgate separado.
+        if (restriction.endSourceDocument != null)
+          _field('Documento de liberação', 'Vinculado ao encerramento'),
       ],
     );
   }
