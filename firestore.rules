@@ -1443,6 +1443,54 @@ service cloud.firestore {
         ]);
     }
 
+    // =====================================================================
+    // HEALTH-V1-OP-AUTH — PROVENIÊNCIA DO K9 OPERACIONAL (portado da Frente 20)
+    //
+    // Introduzir ou substituir o K9 de um turno é decisão operacional que só o
+    // backend autoritativo pode tomar. O cliente pode manter o valor atual e
+    // pode limpá-lo, porque endShift/leaveVehicle legitimamente removem o K9.
+    //
+    //   vazio      -> dog novo          NEGADO (introdução)
+    //   dog atual  -> outro dog         NEGADO (substituição)
+    //   dog atual  -> mesmo dog         PERMITIDO (sem nova decisão clínica)
+    //   dog atual  -> vazio/removido    PERMITIDO (endShift / leaveVehicle)
+    //
+    // Fechar o campo inteiro mataria endShift e leaveVehicle. Por isso a
+    // comparação é de VALOR, não de presença de chave.
+    // =====================================================================
+
+    /// Valor do K9 antes da escrita (ausente/limpo => '').
+    function priorDogValue(field) {
+      return resource == null ? '' : resource.data.get(field, '');
+    }
+
+    /// Valor do K9 depois da escrita (ausente/removido => '').
+    function nextDogValue(field) {
+      return request.resource.data.get(field, '');
+    }
+
+    /// True quando a escrita não introduz nem substitui o K9 em [field].
+    ///
+    /// Permite manter o mesmo valor e permite remover. Nega qualquer valor novo
+    /// não-vazio diferente do anterior.
+    function preservesDogProvenance(field) {
+      return nextDogValue(field) == '' ||
+        nextDogValue(field) == priorDogValue(field);
+    }
+
+    /// Nenhuma das representações do K9 operacional pode ser introduzida ou
+    /// substituída pelo cliente.
+    ///
+    /// Os quatro nomes coexistem por histórico do ecossistema (`dogId` legado,
+    /// `service_dog_id` canônico, `currentDogId`/`dog_id` conforme a coleção).
+    /// Proteger só um deixaria os outros como porta lateral.
+    function clientPreservesOperationalDog() {
+      return preservesDogProvenance('dogId')
+        && preservesDogProvenance('service_dog_id')
+        && preservesDogProvenance('currentDogId')
+        && preservesDogProvenance('dog_id');
+    }
+
     function isValidActiveShiftFor(ra) {
       return request.resource.data.keys().hasOnly([
           'shiftId',
@@ -1551,9 +1599,14 @@ service cloud.firestore {
 
     match /active_shifts/{ra} {
       allow read: if signedIn();
-      allow create: if emailMatchesRa(ra) && isValidActiveShiftFor(ra);
+      // HEALTH-V1-OP-AUTH: criar turno JÁ com K9 é introdução de associação
+      // operacional — só o backend autoritativo pode. Turno sem K9 segue livre.
+      allow create: if emailMatchesRa(ra)
+        && isValidActiveShiftFor(ra)
+        && clientPreservesOperationalDog();
       // Update usa diff(): só os campos que mudam (updatedAt SEMPRE presente nos merges)
       allow update: if emailMatchesRa(ra)
+        && clientPreservesOperationalDog()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'shiftId',
           'auth_uid',
@@ -1600,9 +1653,13 @@ service cloud.firestore {
 
     match /shift_logs/{shiftId} {
       allow read: if signedIn();
-      allow create: if isValidShiftLogCreate();
+      // HEALTH-V1-OP-AUTH: o log é o histórico do turno — o K9 registrado nele
+      // acompanha a decisão do backend, não a intenção do cliente.
+      allow create: if isValidShiftLogCreate()
+        && clientPreservesOperationalDog();
       allow update: if signedIn()
         && emailMatchesRa(resource.data.handlerId)
+        && clientPreservesOperationalDog()
         && isValidShiftLogUpdate();
       allow delete: if false;
     }
@@ -1624,8 +1681,13 @@ service cloud.firestore {
 
     match /vehicle_crews/{crewId} {
       allow read: if signedIn();
+      // HEALTH-V1-OP-AUTH: `service_dog_id` da guarnição é a fonte de onde
+      // `respondVehicleCrewInvitation` DERIVA o K9 dos demais membros. Se o
+      // cliente pudesse gravá-lo, o backend propagaria um K9 injetado — bypass
+      // indireto. Fechar aqui é o que torna aquela propagação confiável.
       allow create: if signedIn()
         && emailMatchesRa(request.resource.data.titular_handler_id)
+        && clientPreservesOperationalDog()
         && request.resource.data.keys().hasOnly([
           'id',
           'vehicle_id',
@@ -1659,6 +1721,7 @@ service cloud.firestore {
         )
         && request.resource.data.vehicle_id == resource.data.vehicle_id
         && request.resource.data.crew_size == resource.data.crew_size
+        && clientPreservesOperationalDog()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'id',
           'vehicle_id',
@@ -1679,7 +1742,10 @@ service cloud.firestore {
 
       match /members/{ra} {
         allow read: if signedIn();
+        // HEALTH-V1-OP-AUTH: `dog_id` do membro também é associação operacional.
+        // Fechar só o doc pai deixaria esta porta lateral aberta.
         allow create: if emailMatchesRa(ra)
+          && clientPreservesOperationalDog()
           && request.resource.data.keys().hasOnly([
             'handler_id',
             'auth_uid',
@@ -1699,6 +1765,7 @@ service cloud.firestore {
           && request.resource.data.status == 'active';
         allow update: if emailMatchesRa(ra)
           && request.resource.data.handler_id == resource.data.handler_id
+          && clientPreservesOperationalDog()
           && request.resource.data.role in ['titular', 'motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2', 'k9', '']
           && (
             (
@@ -2079,6 +2146,25 @@ service cloud.firestore {
       // Health v1 — Restrições operacionais canônicas, mantidas pelo backend.
       // Leitura cliente somente no escopo autorizado do K9.
       match /operational_restrictions/{restrictionId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Documentos de saúde canônicos — evidência clínica citável.
+      // (Portado da Frente 20 @ 5345781; gate agora é o canAccessDogRecord
+      //  SEC-02A.2 fail-closed desta baseline, não a variante anterior.)
+      //
+      // `storage_path` é a identidade canônica do arquivo; a URL é derivada e
+      // nunca fonte. O agregado é escrito exclusivamente pelo backend
+      // (callable/Admin SDK) após verificar o objeto no Storage: um documento
+      // cujo arquivo não exista não é evidência de nada.
+      //
+      // Cliente lê com acesso ao K9 e nunca escreve — nem para "corrigir"
+      // metadados, porque metadados de upload são imutáveis.
+      //
+      // NÃO migra capability nesta composição: `health.read` e a autoridade
+      // clínica granular são decisão de gate posterior.
+      match /health_documents/{documentId} {
         allow read: if signedIn() && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
