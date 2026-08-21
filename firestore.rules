@@ -95,10 +95,87 @@ service cloud.firestore {
         );
     }
 
+    // =====================================================================
+    // SEC-02A.2 — ESTADO DE AUTORIZAÇÃO E ESCOPO, FALHA FECHADA
+    //
+    // Histórico do defeito:
+    //   SEC-02A  — `token.get('access_scope', 'global')` tratava claim ausente
+    //              como global, e os guards eram
+    //              `!hasOwnRecordsScope() || <vínculo>`: claim ausente tornava a
+    //              negação verdadeira e liberava QUALQUER K9.
+    //   SEC-02A.2 — a claim deixou de ser AUTORIDADE. O documento de perfil
+    //              (access_profiles/{id}.scope) é a autoridade vigente, como já
+    //              é no backend. Uma claim antiga não amplia acesso enquanto o
+    //              token não é renovado; só pode RESTRINGIR.
+    //
+    // Ordem contratual para chamador NÃO-admin:
+    //   RA válida -> users/{ra} existe -> não soft-deleted ->
+    //   access_profile_id válido -> perfil existe -> status permite ->
+    //   scope é enum válido -> claim/espelho podem só restringir ->
+    //   vínculo com o K9 quando o escopo efetivo é own_records
+    //
+    // AUSENTE / DESCONHECIDO / MALFORMADO => DENY.
+    // =====================================================================
+
+    // Estado de autorização resolvido UMA ÚNICA VEZ.
+    //
+    // Rules não memoizam chamadas de função: helpers encadeados re-derivam a
+    // cadeia inteira a cada referência e estouram o limite de 1000 expressões
+    // por avaliação. Por isso todo o estado é calculado aqui, com `let`, e
+    // devolvido como mapa; cada guard chama esta função uma vez.
+    //
+    // Sentinelas evitam segmento de path vazio quando a claim/campo falta:
+    // exists() falha e o acesso é negado, sem herdar perfil por omissão
+    // (o default 'operador_k9' foi justamente o vetor corrigido no backend).
+    function authState() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.token.get('ra', '__sec02_no_ra__'));
+      let userOk = hasRaClaim() && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
+      let profileId = user.get('access_profile_id', user.get('accessProfileId', '__sec02_no_profile__'));
+      let profilePath = /databases/$(database)/documents/access_profiles/$(profileId is string && profileId.size() > 0 ? profileId : '__sec02_no_profile__');
+      let profileOk = userOk && exists(profilePath);
+      let profile = profileOk ? get(profilePath).data : {};
+      // Enum persistido é 'active' | 'inactive'. AUSENTE é tolerado como ativo
+      // para não divergir de activeProfileGrants nem do backend.
+      let statusOk = profile.get('status', 'active') == 'active';
+      let scope = profile.get('scope', '');
+      // Qualquer camada que declare own_records RESTRINGE. Ampliar é
+      // impossível: só o perfil concede global.
+      let restricted = user.get('access_scope', user.get('accessScope', '')) == 'own_records'
+        || request.auth.token.get('access_scope', '') == 'own_records';
+      return {
+        'valid': userOk
+          && user.get('deleted_at', null) == null
+          && profileOk
+          && statusOk
+          && (scope == 'global' || scope == 'own_records'),
+        'global': scope == 'global' && !restricted,
+      };
+    }
+
+    function hasValidAuthorizationState() {
+      return signedIn() && authState().get('valid', false);
+    }
+
+    // Escopo amplo vigente: perfil ATUAL diz global e nada restringe. Uma claim
+    // 'global' obsoleta não satisfaz esta função — o perfil é a autoridade.
+    function hasExplicitGlobalScope() {
+      let st = authState();
+      return signedIn()
+        && (
+          isAdmin()
+          || (st.get('valid', false) && st.get('global', false))
+        );
+    }
+
+    // Escopo restrito vigente. NÃO usar sua negação como guard de acesso
+    // amplo — negação não prova autorização.
     function hasOwnRecordsScope() {
+      let st = authState();
       return signedIn()
         && !isAdmin()
-        && request.auth.token.get('access_scope', 'global') == 'own_records';
+        && st.get('valid', false)
+        && !st.get('global', false);
     }
 
     function dogAssignedToAuth(data) {
@@ -125,14 +202,27 @@ service cloud.firestore {
         );
     }
 
+    // SEC-02A.2: vínculo com o K9 só vale sob estado de autorização íntegro.
+    // Admin conserva o bypass explícito canônico.
+    //
+    // `authState()` é chamado UMA vez e o resultado reaproveitado via `let` —
+    // encadear helpers aqui re-deriva a cadeia e estoura o limite de 1000
+    // expressões por avaliação.
     function canAccessDogRecord(dogId) {
       let dogPath = /databases/$(database)/documents/dogs/$(dogId);
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          exists(dogPath)
-          && dogAssignedToAuth(get(dogPath).data)
-        )
-        || activeShiftDogMatches(dogId);
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || (
+              exists(dogPath)
+              && dogAssignedToAuth(get(dogPath).data)
+            )
+            || activeShiftDogMatches(dogId)
+          )
+        );
     }
 
     function recordDogId(data) {
@@ -145,30 +235,89 @@ service cloud.firestore {
         );
     }
 
+    // HW-4A.2C.5R — Identidade ESTRITA da Agenda (Health Schedule).
+    //
+    // A fronteira de segurança collection-group de health_schedule aceita
+    // EXCLUSIVAMENTE `dog_id`. Aliases legados (`dogId`, `caoId`), tolerados por
+    // recordDogId() para coexistência em OUTROS domínios, NÃO autorizam aqui:
+    // um documento sem dog_id canônico não tem identidade válida nesta coleção
+    // e é negado — inclusive para escopo global (fail-closed de namespace).
+    //
+    // Não duplica autorização: delega a canAccessDogRecord(), o mesmo helper
+    // canônico do SEC-02. `data.get('dog_id', '')` evita erro de campo ausente.
+    //
+    // authState() é derivado UMA vez e o escopo amplo curto-circuita ANTES de
+    // canAccessDogRecord(): em query collection-group a regra é avaliada por
+    // documento, e um exists()+get() extra por documento estoura o limite de
+    // acessos por requisição (comprovado: 'list' negado para global).
+    //
+    // CONSEQUÊNCIA DE QUERY (Rules não são filtros): com dog_id exigido FORA do
+    // OR, o motor só consegue provar a condição para TODOS os documentos via
+    // igualdade/`in` em dog_id. Portanto NENHUMA query collection-group
+    // irrestrita passa — nem para global. GLOBAL também enumera dog_id e
+    // também está sujeito ao limite de 30 valores por `in`.
+    function canReadHealthScheduleRecord(data) {
+      let dogId = data.get('dog_id', '');
+      let st = authState();
+      return dogId is string
+        && dogId.size() > 0
+        && (
+          isAdmin()
+          || (
+            st.get('valid', false)
+            && (
+              st.get('global', false)
+              || canAccessDogRecord(dogId)
+            )
+          )
+        );
+    }
+
     function canAccessDogData(data) {
       let dogId = recordDogId(data);
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          dogId is string
-          && dogId.size() > 0
-          && canAccessDogRecord(dogId)
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || (
+              dogId is string
+              && dogId.size() > 0
+              && canAccessDogRecord(dogId)
+            )
+          )
         );
     }
 
     function canReadTrainingData(data) {
       let handlerId = trainingHandlerId(data);
-      return !hasOwnRecordsScope()
-        || emailMatchesRa(handlerId)
-        || canAccessDogData(data);
+      let st = authState();
+      return isAdmin()
+        || (
+          st.get('valid', false)
+          && (
+            st.get('global', false)
+            || emailMatchesRa(handlerId)
+            || canAccessDogData(data)
+          )
+        );
     }
 
     function canReadAuditRecord(data) {
-      return !hasOwnRecordsScope()
+      let st = authState();
+      return isAdmin()
         || (
-          data.get('actor', {}) is map
+          st.get('valid', false)
           && (
-            data.get('actor', {}).get('uid', '') == request.auth.uid
-            || emailMatchesRa(data.get('actor', {}).get('ra', ''))
+            st.get('global', false)
+            || (
+              data.get('actor', {}) is map
+              && (
+                data.get('actor', {}).get('uid', '') == request.auth.uid
+                || emailMatchesRa(data.get('actor', {}).get('ra', ''))
+              )
+            )
           )
         );
     }
@@ -1294,28 +1443,21 @@ service cloud.firestore {
         ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // HEALTH-V1-OP-AUTH — Proveniência do K9 operacional
+    // =====================================================================
+    // HEALTH-V1-OP-AUTH — PROVENIÊNCIA DO K9 OPERACIONAL (portado da Frente 20)
     //
-    // INVARIANTE: nenhum fluxo client-side pode INTRODUZIR ou SUBSTITUIR um
-    // `service_dog_id`/`dogId` não-vazio. Só o backend autoritativo
-    // (`shiftExecuteAuthorizedCommand`) pode, porque só ele valida
-    // `operational_restrictions` com `status == active` antes de gravar.
+    // Introduzir ou substituir o K9 de um turno é decisão operacional que só o
+    // backend autoritativo pode tomar. O cliente pode manter o valor atual e
+    // pode limpá-lo, porque endShift/leaveVehicle legitimamente removem o K9.
     //
-    // Rules NÃO conseguem fazer esse enforcement por conta própria: avaliar
-    // "existe restrição absoluta ativa" exige uma QUERY com where, e Rules só
-    // fazem `get()` de documento específico. Daí a divisão de trabalho: o
-    // backend decide clinicamente, e as Rules garantem que ninguém escreva o
-    // K9 por fora dele.
+    //   vazio      -> dog novo          NEGADO (introdução)
+    //   dog atual  -> outro dog         NEGADO (substituição)
+    //   dog atual  -> mesmo dog         PERMITIDO (sem nova decisão clínica)
+    //   dog atual  -> vazio/removido    PERMITIDO (endShift / leaveVehicle)
     //
-    // Matriz (proveniência, não nome de função):
-    //   dog atual -> dog diferente   NEGADO  (substituição)
-    //   sem dog   -> dog novo        NEGADO  (introdução)
-    //   dog atual -> mesmo dog       PERMITIDO (sem nova decisão clínica)
-    //   dog atual -> vazio/removido  PERMITIDO (endShift / leaveVehicle)
-    //
-    // Fechar o campo inteiro mataria endShift e leaveVehicle, que legitimamente
-    // limpam o K9. Por isso a comparação é de VALOR, não presença de chave.
+    // Fechar o campo inteiro mataria endShift e leaveVehicle. Por isso a
+    // comparação é de VALOR, não de presença de chave.
+    // =====================================================================
 
     /// Valor do K9 antes da escrita (ausente/limpo => '').
     function priorDogValue(field) {
@@ -2001,6 +2143,41 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      // Health v1 — Restrições operacionais canônicas, mantidas pelo backend.
+      // Leitura cliente somente no escopo autorizado do K9.
+      match /operational_restrictions/{restrictionId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Documentos de saúde canônicos — evidência clínica citável.
+      // (Portado da Frente 20 @ 5345781; gate agora é o canAccessDogRecord
+      //  SEC-02A.2 fail-closed desta baseline, não a variante anterior.)
+      //
+      // `storage_path` é a identidade canônica do arquivo; a URL é derivada e
+      // nunca fonte. O agregado é escrito exclusivamente pelo backend
+      // (callable/Admin SDK) após verificar o objeto no Storage: um documento
+      // cujo arquivo não exista não é evidência de nada.
+      //
+      // Cliente lê com acesso ao K9 e nunca escreve — nem para "corrigir"
+      // metadados, porque metadados de upload são imutáveis.
+      //
+      // NÃO migra capability nesta composição: `health.read` e a autoridade
+      // clínica granular são decisão de gate posterior.
+      match /health_documents/{documentId} {
+        allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // Health v1 — Projeção server-side singleton para prontidão atual.
+      // Não expõe histórico nem aceita writes diretos de clientes.
+      match /health_summary/{summaryId} {
+        allow read: if summaryId == 'current'
+          && signedIn()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
       // Health v1 — Nutrição canônica (5D Gate 4): read-only no cliente.
       // Mesmo predicado da Agenda: signedIn + canAccessDogRecord(dogId).
       // Writes canônicos exclusivamente via callables Admin SDK
@@ -2033,44 +2210,41 @@ service cloud.firestore {
         allow read: if signedIn() && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+    }
 
-      // Readiness v1 — projeção server-side de Prontidão (health_summary/current).
+    // Health v1 — HW-4A.2C.5: Agenda Preventiva GLOBAL (collection group).
+    //
+    // A Agenda Web precisa ler health_schedule de VÁRIOS K9s em uma única
+    // consulta. collectionGroup() só é autorizado pela forma recursiva; tentar
+    // recuperar o dogId estrutural via /dogs/{dogId}/{path=**}/... NÃO autoriza
+    // a query (comprovado no Emulator). Portanto a identidade cross-dog
+    // disponível às Rules é resource.data.dog_id.
+    //
+    // Usa canReadHealthScheduleRecord(), que exige `dog_id` canônico e delega a
+    // autorização a canAccessDogRecord() — o MESMO helper fail-closed do SEC-02.
+    // NÃO usa canAccessDogData()/recordDogId() aqui: os aliases legados `dogId`
+    // e `caoId` autorizariam documentos sem identidade canônica (comprovado no
+    // Emulator, HW-4A.2C.5R), abrindo bypass nesta fronteira.
+    //
+    // LIMITE CONHECIDO DO FIRESTORE: em collection group, as Rules não alcançam
+    // o dogId do path pai, logo NÃO podem comparar dog_id com o pai estrutural.
+    // A integridade de dog_id é garantida fora das Rules (writer canônico via
+    // callables Admin SDK + migração HW-4A.2C.4 dos registros legados);
+    // divergência é INCIDENTE DE INTEGRIDADE, não caso de autorização.
+    //
+    // Writes cliente permanecem negados: mutação só via callables Admin SDK.
+    match /{path=**}/health_schedule/{scheduleId} {
+      // SUPERFÍCIE MÍNIMA (HW-4A.2C.5R.1): `list` — NÃO `read`.
       //
-      // NATUREZA: projeção de DISPLAY, reconstruível a partir das fontes canônicas.
-      // Não é agregado canônico e NUNCA é autoridade de autorização: ações críticas
-      // continuam validando operational_restrictions no backend.
+      // `read` cobriria get + list. A Agenda Global precisa desta regra apenas
+      // para QUERY. O GET individual continua sob a regra aninhada
+      // dogs/{dogId}/health_schedule/{id}, que é autoridade de PATH.
       //
-      // Escrita: exclusivamente pelo projector via Admin SDK (bypassa Rules).
-      // Cliente jamais escreve — nem o próprio readiness_status que ele lê.
-      match /health_summary/{summaryId} {
-        allow read: if signedIn() && canAccessDogRecord(dogId);
-        allow create, update, delete: if false;
-      }
-
-      // Documentos de saúde canônicos — evidência clínica citável.
-      //
-      // `storage_path` é a identidade canônica do arquivo; a URL é derivada e
-      // nunca fonte. O agregado é escrito exclusivamente pelo backend
-      // (callable/Admin SDK) após verificar o objeto no Storage: um documento
-      // cujo arquivo não exista não é evidência de nada.
-      //
-      // Cliente lê com acesso ao K9 e nunca escreve — nem para "corrigir"
-      // metadados, porque metadados de upload são imutáveis.
-      match /health_documents/{documentId} {
-        allow read: if signedIn() && canAccessDogRecord(dogId);
-        allow create, update, delete: if false;
-      }
-
-      // Restrições operacionais canônicas — decisão profissional de saúde.
-      //
-      // Leitura cliente com acesso ao K9 (alimenta a exibição de Prontidão).
-      // Escrita negada nesta vertical: enquanto não existir um mutation owner
-      // canônico explícito, criar/alterar/encerrar restrição permanece decisão
-      // de backend. Não abrir writer direto de cliente apenas para satisfazer Rules.
-      match /operational_restrictions/{restrictionId} {
-        allow read: if signedIn() && canAccessDogRecord(dogId);
-        allow create, update, delete: if false;
-      }
+      // Comprovado: com `read`, um doc fisicamente sob DOG_A declarando
+      // dog_id=DOG_B era ABERTO por GET direto do dono de B (regras sobrepostas
+      // são OR). Com `list`, o mismatch deixa de ampliar GET.
+      allow list: if signedIn() && canReadHealthScheduleRecord(resource.data);
+      allow create, update, delete: if false;
     }
 
     match /occurrences/{occurrenceId} {

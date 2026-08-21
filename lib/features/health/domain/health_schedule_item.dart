@@ -195,7 +195,10 @@ final class HealthScheduleTemporalPolicy {
   /// Data efetiva única:
   /// `due_until ?? scheduled_for + config(schedule_type).tolerance`.
   ///
-  /// Lança se a configuração do tipo estiver ausente.
+  /// Lança se a configuração do tipo estiver ausente, ou se o tipo não possuir
+  /// tolerância genérica e o item não trouxer `due_until` explícito — caso
+  /// aprovado de [ScheduleType.dose] (HW-4A.2B). Não há substituição silenciosa
+  /// por tolerância de outro tipo.
   DateTime effectiveDueUntil(HealthScheduleItem item) {
     final due = item.dueUntil;
     if (due != null) return due;
@@ -204,7 +207,16 @@ final class HealthScheduleTemporalPolicy {
       scheduledFor: item.scheduledFor,
       timezone: item.timezone,
     );
-    return item.scheduledFor.add(settings.toleranceAfterScheduled);
+    final tolerance = settings.toleranceAfterScheduled;
+    if (tolerance == null) {
+      throw HealthDomainException(
+        'incomplete_schedule_temporal_config',
+        'schedule_type=${item.scheduleType.wireName} não possui tolerância '
+            'genérica: due_until explícito é obrigatório para derivar o '
+            'vencimento efetivo',
+      );
+    }
+    return item.scheduledFor.add(tolerance);
   }
 
   /// Regra única absoluta — primeira condição verdadeira vence.

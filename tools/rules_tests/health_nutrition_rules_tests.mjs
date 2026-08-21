@@ -141,8 +141,29 @@ async function clearAll() {
   await testEnv.clearFirestore();
 }
 
+/**
+ * SEC-02A.2: o estado declarativo de autorização passou a ser pré-requisito
+ * das Rules — o documento de perfil é a autoridade de escopo, não a claim.
+ * Antes desta mudança a fixture não precisava destes documentos.
+ */
+async function seedAuthorizationState(adminDb) {
+  await setDoc(doc(adminDb, 'access_profiles', 'operador_k9'), {
+    status: 'active',
+    scope: 'own_records',
+    permissions: {health: {view: true, create: true, edit: true}},
+  });
+  for (const ra of [PRIMARY_RA, MEMBER_RA, OUTSIDER_RA]) {
+    await setDoc(doc(adminDb, 'users', ra), {
+      ra,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+    });
+  }
+}
+
 async function seedNutritionFixtures() {
   await seedFirestore(async (adminDb) => {
+    await seedAuthorizationState(adminDb);
     await setDoc(doc(adminDb, 'dogs', DOG_A), {
       name: 'Rex A',
       conductorRa: PRIMARY_RA,
@@ -198,11 +219,18 @@ async function seedNutritionFixtures() {
   });
 }
 
-// ── Authorized read (global scope = default sem own_records) ───────────────
+// ── Authorized read ────────────────────────────────────────────────────────
+//
+// SEC-02A: antes deste gate a autorização vinha do DEFAULT — um token sem
+// `access_scope` era tratado como global, e o cabeçalho original desta seção
+// dizia exatamente isso ("global scope = default sem own_records"). Agora a
+// leitura precisa de autoridade real. PRIMARY_RA é o condutor registrado de
+// DOG_A na fixture, então basta a claim `ra` que todo token real carrega
+// (`humanClaims` sempre a emite) para o vínculo ser provado.
 
 test('authorized: le nutrition_plans / meal_logs / supplement_logs', async () => {
   await seedNutritionFixtures();
-  const db = dbFor(PRIMARY_RA);
+  const db = dbFor(PRIMARY_RA, {ra: PRIMARY_RA});
 
   await assertSucceeds(
     getDoc(doc(db, 'dogs', DOG_A, 'nutrition_plans', 'plan-a1')),

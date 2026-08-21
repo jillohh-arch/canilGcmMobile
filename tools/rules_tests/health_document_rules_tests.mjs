@@ -44,10 +44,19 @@ import {
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || 'canil-gcm';
 
-// RA com escopo global — modelo padrão do ecossistema.
+// RA vinculado ao K9 sob teste. Sob SEC-02A.2 a autoridade vem do PERFIL
+// (own_records) somada ao VÍNCULO com o cão — não da claim `access_scope`.
 const PRIMARY_RA = '691755';
-// RA com own_records e SEM vínculo com o K9 → não autorizado.
+// RA com estado de autorização VÁLIDO, porém SEM vínculo com o K9 → negado.
 const OUTSIDER_RA = '999999';
+// RA cujo perfil resolve escopo global — autoridade ampla legítima.
+const GLOBAL_RA = '700001';
+// RA autenticado SEM espelho em users/{ra} → estado não resolvível → DENY.
+const NO_MIRROR_RA = '700002';
+// RA cujo espelho aponta para um perfil que não existe → DENY.
+const NO_PROFILE_RA = '700003';
+// RA cujo perfil existe mas está inativo → DENY.
+const INACTIVE_RA = '700004';
 const ANONYMOUS = null;
 
 const DOG_A = 'dog-document-a';
@@ -122,12 +131,86 @@ async function clearAll() {
   }
 }
 
-/** K9 atribuído ao PRIMARY_RA → autoriza canAccessDogRecord. */
+/**
+ * SEC-02A.2 — estado de autorização é PRÉ-REQUISITO, não detalhe de fixture.
+ *
+ * Antes deste gate a suite dependia apenas da claim `access_scope`, que era o
+ * modelo da variante fail-OPEN. Sob SEC-02A.2 o perfil de acesso é a autoridade
+ * e `authState()` faz `get()` em `users/{ra}` e `access_profiles/{id}`: sem
+ * esses documentos a avaliação nem chega a decidir — ela ERRA, e um erro de
+ * avaliação não é prova de DENY.
+ *
+ * Semeia o estado MÍNIMO derivado das Rules (nada inventado):
+ *   users/{ra}.access_profile_id  -> resolve o perfil
+ *   access_profiles/{id}.status   -> 'active'
+ *   access_profiles/{id}.scope    -> enum válido ('own_records' | 'global')
+ */
+async function seedAuthorizationState(db) {
+  await setDoc(doc(db, 'access_profiles', 'operador_k9'), {
+    status: 'active',
+    scope: 'own_records',
+    permissions: {health: {view: true, create: true, edit: true}},
+  });
+  await setDoc(doc(db, 'access_profiles', 'gestor_global'), {
+    status: 'active',
+    scope: 'global',
+    permissions: {health: {view: true, create: true, edit: true}},
+  });
+  // Condutor vinculado ao DOG_A: autoridade por VÍNCULO, escopo restrito.
+  await setDoc(doc(db, 'users', PRIMARY_RA), {
+    ra: PRIMARY_RA,
+    access_profile_id: 'operador_k9',
+    access_scope: 'own_records',
+  });
+  // Estado válido, porém SEM vínculo com o K9 — deve continuar negado.
+  await setDoc(doc(db, 'users', OUTSIDER_RA), {
+    ra: OUTSIDER_RA,
+    access_profile_id: 'operador_k9',
+    access_scope: 'own_records',
+  });
+  // Autoridade ampla resolvida pelo perfil.
+  await setDoc(doc(db, 'users', GLOBAL_RA), {
+    ra: GLOBAL_RA,
+    access_profile_id: 'gestor_global',
+    access_scope: 'global',
+  });
+  // NO_MIRROR_RA: deliberadamente SEM documento em users/{ra}.
+  // Espelho aponta para perfil inexistente.
+  await setDoc(doc(db, 'users', NO_PROFILE_RA), {
+    ra: NO_PROFILE_RA,
+    access_profile_id: 'perfil_que_nao_existe',
+    access_scope: 'global',
+  });
+  // Perfil existe, porém inativo — status é consultado pelo authState().
+  await setDoc(doc(db, 'access_profiles', 'perfil_inativo'), {
+    status: 'inactive',
+    scope: 'global',
+    permissions: {health: {view: true}},
+  });
+  await setDoc(doc(db, 'users', INACTIVE_RA), {
+    ra: INACTIVE_RA,
+    access_profile_id: 'perfil_inativo',
+    access_scope: 'global',
+  });
+}
+
+/**
+ * K9 atribuído ao PRIMARY_RA → autoriza `canAccessDogRecord` pela via de
+ * vínculo.
+ *
+ * `dogAssignedToAuth` reconhece exatamente `conductorRa`, `conductor_ra`,
+ * `handlerId` e `handler_id`. A fixture anterior gravava `handler_ra`, que NÃO
+ * é nenhum deles: o vínculo nunca era reconhecido nem na variante antiga.
+ */
 async function seedDog(dogId = DOG_A) {
   await seedFirestore(async (db) => {
+    await seedAuthorizationState(db);
     await setDoc(doc(db, 'dogs', dogId), {
       name: 'Bono',
-      handler_ra: PRIMARY_RA,
+      conductorRa: PRIMARY_RA,
+      conductor_ra: PRIMARY_RA,
+      handlerId: PRIMARY_RA,
+      handler_id: PRIMARY_RA,
       status: 'active',
     });
   });
@@ -182,6 +265,103 @@ test('Firestore: leitura negada para anônimo', async () => {
   await assertFails(
     getDoc(doc(db, 'dogs', DOG_A, 'health_documents', DOC_ID)),
   );
+});
+
+// ── SEC-02A.2: estado de autorização é PRÉ-CONDIÇÃO da leitura ───────────────
+//
+// Cada caso isola UMA falha do estado de autorização. Todos carregam a claim
+// `access_scope: 'global'` (default de `auth()`) DE PROPÓSITO: sob SEC-02A.2 a
+// claim não é autoridade e não pode ampliar acesso quando o perfil não resolve.
+// Antes deste gate a suite não exercitava nenhum destes caminhos.
+
+/** Contexto SEM a claim `access_scope` — prova que ausência não vira global. */
+function dbWithoutScopeClaim(ra) {
+  return testEnv
+    .authenticatedContext(`uid-${ra}`, {email: `${ra}@gcm.com.br`, ra})
+    .firestore();
+}
+
+const healthDocumentRef = (db) =>
+  doc(db, 'dogs', DOG_A, 'health_documents', DOC_ID);
+
+test('SEC-02A.2: espelho de usuário ausente nega leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // NO_MIRROR_RA não tem documento em users/{ra}: estado não resolvível.
+  await assertFails(getDoc(healthDocumentRef(dbFor(NO_MIRROR_RA))));
+});
+
+test('SEC-02A.2: perfil de acesso ausente nega leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // Espelho existe e aponta para access_profiles/perfil_que_nao_existe.
+  await assertFails(getDoc(healthDocumentRef(dbFor(NO_PROFILE_RA))));
+});
+
+test('SEC-02A.2: perfil inativo nega leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // Perfil existe com scope global, porém status: 'inactive'.
+  await assertFails(getDoc(healthDocumentRef(dbFor(INACTIVE_RA))));
+});
+
+test('SEC-02A.2: claim global NÃO amplia quando o perfil não resolve', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // Este é o vetor exato do defeito SEC-02A: claim dizendo global com estado
+  // de autorização irresolvível NÃO pode liberar o registro do K9.
+  for (const ra of [NO_MIRROR_RA, NO_PROFILE_RA, INACTIVE_RA]) {
+    await assertFails(
+      getDoc(healthDocumentRef(dbFor(ra, {access_scope: 'global'}))),
+    );
+  }
+});
+
+test('SEC-02A.2: autoridade global resolvida pelo PERFIL permite leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  const snap = await assertSucceeds(
+    getDoc(healthDocumentRef(dbFor(GLOBAL_RA))),
+  );
+  assert.equal(snap.exists(), true);
+  assert.equal(snap.data().document_type, 'certificate');
+});
+
+test('SEC-02A.2: claim ausente não impede autoridade derivada do perfil', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // Perfil é a autoridade: sem claim `access_scope`, o escopo global do perfil
+  // continua valendo. Ausência de claim não restringe nem amplia por si.
+  const snap = await assertSucceeds(
+    getDoc(healthDocumentRef(dbWithoutScopeClaim(GLOBAL_RA))),
+  );
+  assert.equal(snap.exists(), true);
+});
+
+test('SEC-02A.2: own_records válido sem vínculo com o K9 nega leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // OUTSIDER_RA tem estado de autorização VÁLIDO (users + perfil ativo), mas
+  // escopo own_records e nenhum vínculo com DOG_A. Estado válido não basta.
+  await assertFails(getDoc(healthDocumentRef(dbFor(OUTSIDER_RA))));
+});
+
+test('SEC-02A.2: own_records COM vínculo ao K9 permite leitura', async () => {
+  await clearAll();
+  await seedDog();
+  await seedDocument();
+  // PRIMARY_RA é own_records e é o condutor do DOG_A — via de vínculo.
+  const snap = await assertSucceeds(
+    getDoc(healthDocumentRef(dbFor(PRIMARY_RA, {access_scope: 'own_records'}))),
+  );
+  assert.equal(snap.exists(), true);
 });
 
 // ── Firestore: escrita de cliente sempre negada ──────────────────────────────
