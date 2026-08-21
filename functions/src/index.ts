@@ -593,6 +593,178 @@ async function requireAnyAccessPermission(
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE-C.B — AUTORIDADE EXPLÍCITA DO LIFECYCLE DE RESTRIÇÃO (Option B)
+//
+// Decisão humana da Control Tower (GATE-C.A → GATE-C.H): administração técnica
+// NÃO implica autoridade clínica. Para as três actions de restrição a capability
+// é explícita para TODOS os atores, inclusive administradores.
+//
+// Por que um caminho dedicado em vez de alterar `requireAccessPermission`:
+// aquele helper é compartilhado por 42 call sites (Health não-restriction,
+// Frente 10, administração de acesso). O bypass administrativo genérico
+// PERMANECE intacto lá. Aqui, e só aqui, ele não existe.
+//
+// Separação load-bearing entre dois conceitos que antes coincidiam:
+//
+//   AUTORIZAÇÃO      → esta função. Admin NÃO bypassa.
+//   CLASSIFICAÇÃO DE
+//   AUDITORIA        → `isAdministrativeHealthAuthority`, preservada, usada
+//                      apenas para `recorded_by/ended_by/cancelled_by
+//                      .internal_role`. Nunca para conceder autoridade.
+//
+// `isAdministrativeHealthAuthority` NÃO é alterada: ela é load-bearing em
+// `healthScheduleCancel` (itens automáticos) e está fora de escopo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** As três actions cujo bypass administrativo foi removido por decisão humana. */
+export type RestrictionLifecycleAction =
+  | "issue_restriction"
+  | "release_restriction"
+  | "cancel_restriction";
+
+/** Motivo estruturado da recusa. Diagnóstico, nunca mensagem ao usuário. */
+export type RestrictionGrantDenialReason =
+  | "missing-auth"
+  | "unresolved-ra"
+  | "missing-user-mirror"
+  | "user-soft-deleted"
+  | "missing-access-profile"
+  | "inactive-access-profile"
+  | "capability-not-granted";
+
+export type RestrictionGrantResolution =
+  | {kind: "granted"}
+  | {kind: "denied"; reason: RestrictionGrantDenialReason};
+
+/**
+ * Entradas já lidas do servidor. `undefined` distingue "documento ausente" de
+ * "documento presente e vazio" — a diferença importa para falhar fechado.
+ */
+export interface RestrictionGrantInputs {
+  /** Existe token autenticado. */
+  authPresent: boolean;
+  /** RA derivado do e-mail do token. Vazio => identidade não mapeável. */
+  ra: string;
+  /** `users/{ra}`. `undefined` quando o documento não existe. */
+  userDoc: JsonMap | undefined;
+  /** `access_profiles/{id}`. `undefined` quando o documento não existe. */
+  profileDoc: JsonMap | undefined;
+  /** Action de restrição exigida. */
+  action: RestrictionLifecycleAction;
+}
+
+/**
+ * Decisão de capability explícita para o lifecycle de restrição.
+ *
+ * Ordem de avaliação é contratual — testes dependem dela.
+ *
+ * DELIBERADAMENTE AUSENTES desta função: `isAdminToken` e `isAdminUserRecord`.
+ * A omissão é o comportamento aprovado, não um esquecimento: em
+ * `requireAccessPermission` esses dois bypasses retornam ANTES da leitura do
+ * grant de perfil, o que tornava `access_profiles/administrador` decorativo
+ * para ISSUE/END/CANCEL. Um teste estático protege essa ausência.
+ */
+export function decideRestrictionLifecycleGrant(
+  inputs: RestrictionGrantInputs,
+): RestrictionGrantResolution {
+  if (!inputs.authPresent) return {kind: "denied", reason: "missing-auth"};
+
+  if (!inputs.ra.trim()) return {kind: "denied", reason: "unresolved-ra"};
+
+  if (inputs.userDoc === undefined) {
+    return {kind: "denied", reason: "missing-user-mirror"};
+  }
+  // Simétrico ao SEC-02A: soft-delete não conserva autoridade clínica.
+  if (inputs.userDoc.deleted_at != null) {
+    return {kind: "denied", reason: "user-soft-deleted"};
+  }
+
+  if (inputs.profileDoc === undefined) {
+    return {kind: "denied", reason: "missing-access-profile"};
+  }
+
+  // Ciclo de vida do perfil. AUSENTE é tolerado como ativo pela MESMA razão
+  // documentada em `decideAccessScope`: o contrato canônico vigente em
+  // `profileGrantsPermission` já define `stringValue(status) ?? "active"` para
+  // este mesmo documento. Divergir aqui criaria duas verdades sobre um único
+  // registro. Qualquer outro valor ("", "inactive", desconhecido, tipo errado)
+  // NEGA, com motivo próprio para diagnóstico.
+  const status = inputs.profileDoc.status;
+  if (status !== undefined && status !== null) {
+    if (typeof status !== "string" || status.trim() !== "active") {
+      return {kind: "denied", reason: "inactive-access-profile"};
+    }
+  }
+
+  // Autoridade real: o grant explícito no perfil. Reutiliza o helper canônico
+  // — não reimplementa a leitura do mapa de permissões — de modo que malformado
+  // ou ausente resulta em `false`, isto é, nega.
+  if (
+    !profileGrantsPermission(inputs.profileDoc, "health", inputs.action)
+  ) {
+    return {kind: "denied", reason: "capability-not-granted"};
+  }
+
+  return {kind: "granted"};
+}
+
+function restrictionCapabilityDenied(
+  action: RestrictionLifecycleAction,
+  reason: RestrictionGrantDenialReason,
+): HttpsError {
+  return new HttpsError(
+    "permission-denied",
+    `Perfil sem permissao explicita para health.${action}.`,
+    {code: "restriction-capability-required", reason, action},
+  );
+}
+
+/**
+ * Exige capability explícita para ISSUE / RELEASE / CANCEL.
+ *
+ * Faz as leituras de servidor e delega a DECISÃO para
+ * `decideRestrictionLifecycleGrant` (função pura, testável sem emulador),
+ * espelhando a arquitetura já estabelecida por `resolveAccessScope`.
+ *
+ * NÃO substitui `requireDogRecordAccess`: capability e dog-access continuam
+ * sendo gates separados e ambos permanecem obrigatórios.
+ */
+async function requireRestrictionLifecyclePermission(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  action: RestrictionLifecycleAction,
+): Promise<CallerIdentity> {
+  const caller = requireAuth(auth);
+
+  // Guard antes de qualquer leitura: `doc("")` lança erro não estruturado.
+  if (!caller.ra.trim()) {
+    throw restrictionCapabilityDenied(action, "unresolved-ra");
+  }
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
+
+  const profileId = accessProfileIdFrom(auth?.token, userDoc ?? {});
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+
+  const decision = decideRestrictionLifecycleGrant({
+    authPresent: true,
+    ra: caller.ra,
+    userDoc,
+    profileDoc: profileSnap.exists ? profileSnap.data() ?? {} : undefined,
+    action,
+  });
+
+  if (decision.kind === "denied") {
+    throw restrictionCapabilityDenied(action, decision.reason);
+  }
+
+  return caller;
+}
+
 /**
  * Valida escopo em caminho de ESCRITA. Rejeita com erro estruturado em vez de
  * coagir para `"global"`: nenhum writer pode ampliar permissão por omissão ou
@@ -8220,10 +8392,11 @@ function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
  */
 const healthRestrictionDeps: HealthRestrictionCallableDeps = {
   db,
+  // GATE-C.B — capability explícita, sem bypass administrativo.
   requireIssueRestriction: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   ) => toRestrictionCaller(
-    await requireAccessPermission(auth, "health", "issue_restriction"),
+    await requireRestrictionLifecyclePermission(auth, "issue_restriction"),
   ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
@@ -8263,15 +8436,16 @@ export const healthRestrictionIssue = onCall({region}, async (request) => {
  */
 const healthRestrictionLifecycleDeps: HealthRestrictionLifecycleDeps = {
   db,
+  // GATE-C.B — capability explícita, sem bypass administrativo.
   requireReleaseRestriction: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   ) => toRestrictionCaller(
-    await requireAccessPermission(auth, "health", "release_restriction"),
+    await requireRestrictionLifecyclePermission(auth, "release_restriction"),
   ),
   requireCancelRestriction: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   ) => toRestrictionCaller(
-    await requireAccessPermission(auth, "health", "cancel_restriction"),
+    await requireRestrictionLifecyclePermission(auth, "cancel_restriction"),
   ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
