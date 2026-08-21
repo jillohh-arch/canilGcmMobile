@@ -273,6 +273,46 @@ service cloud.firestore {
         );
     }
 
+    // CLIN-AUTH-BE-3B.A — Autoridade de LEITURA clínica (Clinical v1).
+    //
+    // Prontuário clínico (clinical_cases/events/amendments) exige capability
+    // EXPLÍCITA `health.read`. Este é o primeiro caminho Health a gatear em
+    // capability granular; os demais (Agenda, Nutrição, Readiness, Documentos)
+    // usam apenas `canAccessDogRecord`, decisão de compatibilidade adiada.
+    //
+    // POR QUE `activeProfileGrants` DIRETO E NÃO `hasAccessPermission`:
+    //   hasAccessPermission() abre com `isAdmin() ||`, então QUALQUER admin
+    //   passa em QUALQUER capability sem grant explícito. A Permission Matrix
+    //   Health v1 define admin como gestor administrativo SEM qualificação
+    //   clínica, e a decisão humana GATE-C.B (functions/src/index.ts) já
+    //   construiu um caminho de autorização dedicado, sem bypass admin, pelo
+    //   mesmo motivo: administração técnica NÃO é autoridade clínica.
+    //   activeProfileGrants() não tem bypass admin e ainda exige perfil
+    //   existente + status 'active'.
+    //
+    // POR QUE `health.view` NÃO É ACEITO (adapter legado = AUTHORITY CONFLICT):
+    //   `view` é a ação genérica de leitura de módulo. O perfil
+    //   `administrador` carrega health.view=true nas fixtures reais, e
+    //   `health.view` não tem NENHUMA proveniência documental como alias de
+    //   `health.read`. Um OR `read || view` vazaria leitura clínica para
+    //   admin técnico e outros perfis não-clínicos — exatamente o que este
+    //   gate precisa impedir. Compatibilidade de migração é decisão de gate
+    //   posterior, não desta fundação.
+    //
+    // Capability é resolvida via mapa dinâmico (activeProfileGrants faz
+    // `permissions.get('health',{}).get('read',false)`): nenhum enum novo é
+    // exigido e a capability FALHA FECHADA para todo perfil ainda não migrado
+    // — produção hoje não concede health.read, o que é o estado esperado.
+    //
+    // NÃO adiciona acessos a documento novos além dos que canAccessDogRecord()
+    // já faz: users/{ra} e access_profiles/{id} são os mesmos documentos que
+    // authState() já lê, e get()/exists() idênticos são cacheados na avaliação.
+    function hasClinicalReadAuthority() {
+      return signedIn()
+        && hasRaClaim()
+        && activeProfileGrants(currentAccessProfileId(), 'health', 'read');
+    }
+
     function canAccessDogData(data) {
       let dogId = recordDogId(data);
       let st = authState();
@@ -2208,6 +2248,54 @@ service cloud.firestore {
       // Leitura cliente com acesso ao K9, writes canônicos exclusivamente via backend.
       match /health_timeline/{timelineId} {
         allow read: if signedIn() && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      // =====================================================================
+      // CLIN-AUTH-BE-3B.A — PRONTUÁRIO CLÍNICO v1, LEITURA FAIL-CLOSED
+      //
+      // Primeira autoridade EXECUTÁVEL de clinical_cases. Antes deste gate o
+      // prontuário era apenas contrato documental: nenhuma Rule o alcançava, e
+      // o wildcard terminal `/{document=**}` negava tudo.
+      //
+      // Duas pernas, ambas obrigatórias:
+      //   1. hasClinicalReadAuthority() — capability EXPLÍCITA health.read,
+      //      sem bypass admin (ver helper). Autoridade clínica não se herda de
+      //      administração técnica.
+      //   2. canAccessDogRecord(dogId) — o MESMO helper fail-closed do
+      //      SEC-02A.2, com o dogId ESTRUTURAL do path.
+      //
+      // dogId vem do PATH, nunca do payload: `dog_id` do documento não é
+      // consultado em nenhuma destas regras, logo um payload forjado não
+      // amplia acesso nem alcança K9 alheio.
+      //
+      // WRITES: TODOS negados, inclusive Amendment. O contrato futuro prevê
+      // Amendment append-only e lifecycle server-orchestrated, mas nenhum
+      // writer existe ainda — nem callable, nem capability. Permitir create
+      // agora criaria prontuário sem autoria, sem evidência e sem auditoria.
+      // Mutação é decisão dos gates de writer (health.record_incident,
+      // health.amend_record, health.discharge_case, ...), todos AUSENTES.
+      //
+      // SEM collection-group nesta fundação: listar ClinicalCase cross-dog
+      // exigiria uma regra recursiva cuja identidade disponível seria
+      // resource.data.dog_id — e o incidente HW-4A.2C.5R provou que essa
+      // fronteira precisa de análise própria de overlap/list/get/índice.
+      // LIST aqui é seguro porque o path já determina o dogId.
+      match /clinical_cases/{caseId} {
+        allow read: if hasClinicalReadAuthority()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      match /clinical_cases/{caseId}/events/{eventId} {
+        allow read: if hasClinicalReadAuthority()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
+
+      match /clinical_cases/{caseId}/events/{eventId}/amendments/{amendId} {
+        allow read: if hasClinicalReadAuthority()
+          && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
     }
