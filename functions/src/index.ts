@@ -13,6 +13,10 @@ import {
   K9IdentityTransaction,
   patchK9Identity,
 } from "./admin_patch_k9_identity";
+import {
+  createHuman,
+  DocumentAlreadyExistsError,
+} from "./admin_create_human";
 
 admin.initializeApp();
 
@@ -2723,6 +2727,31 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     temporary_password: temporaryPassword,
     token_refresh_required: true,
   };
+});
+
+export const adminCreateHuman = onCall({region}, async (request) => {
+  return createHuman(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "create"),
+      createUserDoc: async (ra, payload) => {
+        try {
+          // create() e atomico e falha se o documento ja existir: nao ha
+          // janela TOCTOU nem risco de overwrite (nunca usa merge).
+          await db.collection("users").doc(ra).create(payload);
+        } catch (error) {
+          const code = (error as {code?: unknown}).code;
+          // Firestore ALREADY_EXISTS: gRPC code 6 (admin SDK) ou string.
+          if (code === 6 || code === "already-exists") {
+            throw new DocumentAlreadyExistsError();
+          }
+          throw error;
+        }
+      },
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+    },
+    request.data,
+  );
 });
 
 export const adminArchiveHuman = onCall({region}, async (request) => {
