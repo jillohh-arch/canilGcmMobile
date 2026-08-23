@@ -15,6 +15,18 @@ import {
   decideAccessScope,
   parseAccessScope,
 } from "./access_scope";
+// CLIN-AUTH-BE-4A.I2.T0: os writers de access profile vivem no seam injetável.
+// A política (taxonomia de capability, tri-state, precondition, TOCTOU) tem
+// fonte ÚNICA lá; aqui ficam apenas o wiring de produção e o re-export de
+// `requireAccessScope`, que faz parte da superfície pública deste módulo.
+import {
+  requireAccessScope,
+  runAdminDuplicateAccessProfile,
+  runAdminSaveAccessProfile,
+  runAdminSeedAccessProfiles,
+  type AccessProfileAction,
+  type AccessProfileWriterDeps,
+} from "./access_profile_writer_callables";
 import {
   runHealthScheduleCancel,
   runHealthScheduleComplete,
@@ -426,25 +438,11 @@ type AccessModule =
   | "training"
   | "vehicles";
 
-type AccessAction =
-  | "view"
-  | "create"
-  | "edit"
-  | "archive"
-  | "approve"
-  | "manage_nutrition_plan"
-  | "record_routine"
-  // Autoridade de emissão de restrição operacional (B1). Deliberadamente
-  // distinta de `create`/`edit`: registrar um documento não é declarar que um
-  // K9 não pode trabalhar.
-  | "issue_restriction"
-  // Transições terminais (B2). Três poderes distintos, três capabilities
-  // distintas (ADR-005 E12): emitir cria impacto operacional, liberar declara
-  // que o motivo clínico terminou, cancelar invalida o próprio registro.
-  // `cancel_restriction` tem nome próprio porque um cancel indevido recoloca
-  // um K9 em operação sem afirmar melhora clínica.
-  | "release_restriction"
-  | "cancel_restriction";
+// CLIN-AUTH-BE-4A.I2.T0: a união canônica de ações vive no seam de writers,
+// junto da matriz `module.action` que a consome. Alias — e não uma segunda
+// união — para que exista uma fonte única: duplicar a lista permitiria que a
+// taxonomia de leitura e a de escrita divergissem silenciosamente.
+type AccessAction = AccessProfileAction;
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -765,22 +763,10 @@ async function requireRestrictionLifecyclePermission(
   return caller;
 }
 
-/**
- * Valida escopo em caminho de ESCRITA. Rejeita com erro estruturado em vez de
- * coagir para `"global"`: nenhum writer pode ampliar permissão por omissão ou
- * erro de digitação.
- */
-export function requireAccessScope(value: unknown): AccessScope {
-  const scope = parseAccessScope(value);
-  if (scope === null) {
-    throw new HttpsError(
-      "invalid-argument",
-      "scope deve ser exatamente \"global\" ou \"own_records\".",
-      {code: "invalid-access-scope"},
-    );
-  }
-  return scope;
-}
+// CLIN-AUTH-BE-4A.I2.T0: `requireAccessScope` acompanhou `accessProfilePayload`
+// para o seam de writers — era seu único consumidor. Re-exportado aqui para
+// preservar a superfície pública deste módulo.
+export {requireAccessScope};
 
 /**
  * SEC-02A — resolução de escopo FALHA FECHADA.
@@ -910,51 +896,16 @@ function sanitizeAccessPermissions(value: unknown): JsonMap {
   return permissions;
 }
 
-function accessProfilePayload(
-  profileId: string,
-  source: JsonMap,
-  caller: CallerIdentity,
-  options: {
-    action: string;
-    exists: boolean;
-    status?: "active" | "inactive";
-  },
-): JsonMap {
-  const status =
-    options.status ??
-    (stringValue(source.status) === "inactive" ? "inactive" : "active");
-  const payload: JsonMap = {
-    id: profileId,
-    description: optionalString(source, "description") ?? "",
-    level: optionalString(source, "level") ?? "restrito",
-    module_tags: stringList(source.module_tags),
-    name: requiredString(source, "name"),
-    permissions: sanitizeAccessPermissions(source.permissions),
-    role_keys: stringList(source.role_keys),
-    // SEC-02A: escopo é validado explicitamente. Antes, qualquer valor
-    // diferente de "own_records" — inclusive ausente, "" ou "ownRecords" —
-    // era reescrito silenciosamente como "global", transformando erro de
-    // digitação numa ampliação de permissão persistida.
-    scope: requireAccessScope(source.scope),
-    seed_version: optionalNumberValue(source.seed_version) ?? 0,
-    slug: optionalString(source, "slug") ?? profileId,
-    status,
-    tone: optionalString(source, "tone") ?? "cyan",
-    ui_hidden: source.ui_hidden === true,
-    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    updated_by: caller.ra,
-    audit_trail: options.exists
-      ? admin.firestore.FieldValue.arrayUnion(auditEntry(options.action, caller))
-      : [auditEntry("created", caller)],
-  };
+// CLIN-AUTH-BE-4A.I2.T0: o sanitizador tri-state de ESCRITA
+// (`accessPermissionsWritePayload`), seu modo de mutação e
+// `accessProfilePayload` vivem agora em `access_profile_writer_callables.ts`,
+// junto dos writers que são seus únicos consumidores.
+//
+// `sanitizeAccessPermissions`, logo acima, PERMANECE aqui: é o caminho de
+// LEITURA de autoridade (`profileGrantsPermission`), não lança e não produz
+// sentinels. A separação entre os dois é load-bearing.
 
-  if (!options.exists) {
-    payload.created_at = admin.firestore.FieldValue.serverTimestamp();
-    payload.created_by = caller.ra;
-  }
-
-  return payload;
-}
+// (extraídos para access_profile_writer_callables.ts — ver nota acima)
 
 function mapArray(value: unknown): JsonMap[] {
   if (!Array.isArray(value)) return [];
@@ -1821,62 +1772,28 @@ export const decidePromotionRequest = onCall({region}, async (request) => {
   return {id: requestId, status: decisionValue};
 });
 
-export const adminSaveAccessProfile = onCall({region}, async (request) => {
-  const data = request.data as JsonMap;
-  const source = (data.profile ?? {}) as JsonMap;
-  const profileId = stringValue(data.id) ?? requiredString(source, "id");
-  assertDocumentId(profileId, "Identificador do perfil");
+// CLIN-AUTH-BE-4A.I2.T0 — dependências reais dos writers de access profile.
+//
+// A política inteira (TOCTOU, tri-state, precondition, capability-pair,
+// seed_version) vive em `access_profile_writer_callables.ts`. Aqui só se liga
+// o que é externo ao comportamento: Firestore, o gate de autorização e a
+// fábrica de trilha de auditoria.
+//
+// `requireAccessPermission` é injetado com a assinatura completa, e não como um
+// booleano: o invariant de atomicidade exige que se possa provar QUAL
+// capability foi exigida (`access.create` vs `access.edit`).
+const accessProfileWriterDeps: AccessProfileWriterDeps = {
+  db,
+  requireAccessPermission,
+  auditEntry,
+};
 
-  const ref = db.collection("access_profiles").doc(profileId);
-  const snapshot = await ref.get();
-  const caller = await requireAccessPermission(
-    request.auth,
-    "access",
-    snapshot.exists ? "edit" : "create",
-  );
-  await ref.set(
-    accessProfilePayload(profileId, source, caller, {
-      action: "updated",
-      exists: snapshot.exists,
-    }),
-    {merge: true},
-  );
-  return {id: profileId, created: !snapshot.exists};
+export const adminSaveAccessProfile = onCall({region}, async (request) => {
+  return runAdminSaveAccessProfile(request, accessProfileWriterDeps);
 });
 
 export const adminDuplicateAccessProfile = onCall({region}, async (request) => {
-  const caller = await requireAccessPermission(request.auth, "access", "create");
-  const data = request.data as JsonMap;
-  const source = (data.profile ?? {}) as JsonMap;
-  const sourceId = requiredString(source, "id");
-  const profileId =
-    stringValue(data.id) ??
-    `${normalizedKey(sourceId).slice(0, 70)}_copia_${Date.now().toString(36)}`;
-  assertDocumentId(profileId, "Identificador do perfil");
-
-  const ref = db.collection("access_profiles").doc(profileId);
-  if ((await ref.get()).exists) {
-    throw new HttpsError("already-exists", "Ja existe um perfil com este identificador.");
-  }
-
-  await ref.set(
-    accessProfilePayload(
-      profileId,
-      {
-        ...source,
-        id: profileId,
-        name: `${requiredString(source, "name")} (copia)`,
-        slug: profileId,
-      },
-      caller,
-      {
-        action: "duplicated",
-        exists: false,
-        status: "inactive",
-      },
-    ),
-  );
-  return {id: profileId};
+  return runAdminDuplicateAccessProfile(request, accessProfileWriterDeps);
 });
 
 export const adminSetAccessProfileStatus = onCall({region}, async (request) => {
@@ -2065,70 +1982,7 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
 });
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
-  const caller = await requireAccessPermission(request.auth, "access", "approve");
-  const data = request.data as JsonMap;
-  const profiles = mapArray(data.profiles);
-  const reconcile = data.reconcile !== false;
-  if (profiles.length === 0) {
-    throw new HttpsError("invalid-argument", "Nenhum perfil informado para seed.");
-  }
-
-  const batch = db.batch();
-  const created: string[] = [];
-  const updated: string[] = [];
-  const archived: string[] = [];
-  const seedIds = new Set<string>();
-  for (const profile of profiles) {
-    const profileId = requiredString(profile, "id");
-    assertDocumentId(profileId, "Identificador do perfil");
-    seedIds.add(profileId);
-    const ref = db.collection("access_profiles").doc(profileId);
-    const snapshot = await ref.get();
-    if (snapshot.exists) {
-      updated.push(profileId);
-    } else {
-      created.push(profileId);
-    }
-    batch.set(ref, accessProfilePayload(profileId, profile, caller, {
-      action: snapshot.exists ? "seed_updated" : "seeded",
-      exists: snapshot.exists,
-    }), {merge: true});
-  }
-
-  if (reconcile) {
-    const snapshot = await db.collection("access_profiles").get();
-    for (const docSnapshot of snapshot.docs) {
-      if (seedIds.has(docSnapshot.id)) continue;
-      const dataBefore = docSnapshot.data() ?? {};
-      if (dataBefore.status === "inactive") continue;
-      batch.set(docSnapshot.ref, {
-        status: "inactive",
-        deprecated_by_seed: true,
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        updated_by: caller.ra,
-        audit_trail: admin.firestore.FieldValue.arrayUnion(
-          auditEntry("inactivated_by_profile_seed", caller),
-        ),
-      }, {merge: true});
-      archived.push(docSnapshot.id);
-    }
-  }
-
-  if (created.length > 0 || updated.length > 0 || archived.length > 0) {
-    batch.set(db.collection("auditLogs").doc(), {
-      action: "access_profiles_seeded",
-      entity_type: "access_profiles",
-      entity_id: "access_profiles",
-      summary: `Matriz de perfis reconciliada: ${created.length} criados, ${updated.length} atualizados, ${archived.length} inativados`,
-      actor: caller,
-      metadata: {archived, created, reconcile, updated},
-      source: "functions",
-      performed_at: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-  await batch.commit();
-  return {archived, created, updated};
+  return runAdminSeedAccessProfiles(request, accessProfileWriterDeps);
 });
 
 const K9_MODALITY_LABELS: Record<string, string> = {

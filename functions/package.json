@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc",
     "test:access-scope": "npm run build && node lib/access_scope_test.js",
+    "test:access-profile-writer": "npm run build && node lib/access_profile_writer_test.js",
     "test:health-schedule": "npm run build && node lib/health_schedule_logic_test.js && node lib/health_schedule_callables_test.js",
     "test:health-weight": "npm run build && node lib/health_weight_engine_test.js",
     "test:health-weight-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_weight_emulator_e2e_test.js\"",
@@ -19,7 +20,7 @@
     "test:health-readiness": "npm run build && node lib/health_readiness_policy_test.js && node lib/health_readiness_evidence_logic_test.js && node lib/health_readiness_projector_test.js && node lib/health_readiness_callable_test.js && node lib/health_readiness_trigger_test.js",
     "test:health-document": "npm run build && node lib/health_document_logic_test.js && node lib/health_document_callables_test.js",
     "test:health-readiness-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_readiness_emulator_test.js\"",
-    "test": "npm run test:access-scope && npm run test:restriction-capability && npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition && npm run test:health-readiness && npm run test:health-document && npm run test:health-restriction",
+    "test": "npm run test:access-scope && npm run test:access-profile-writer && npm run test:restriction-capability && npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition && npm run test:health-readiness && npm run test:health-document && npm run test:health-restriction",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
     "test:health-restriction": "npm run build && node lib/health_restriction_logic_test.js && node lib/health_restriction_callables_test.js",
