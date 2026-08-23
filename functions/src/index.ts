@@ -17,6 +17,10 @@ import {
   createHuman,
   DocumentAlreadyExistsError,
 } from "./admin_create_human";
+import {
+  HumanPersonnelTransaction,
+  patchHumanPersonnel,
+} from "./admin_patch_human_personnel";
 
 admin.initializeApp();
 
@@ -2749,6 +2753,38 @@ export const adminCreateHuman = onCall({region}, async (request) => {
       },
       serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
       auditEntry: (action, caller) => auditEntry(action, caller),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
+  return patchHumanPersonnel(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPersonnelTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              // merge:true aplica atualizacoes e FieldValue.delete() sem
+              // reescrever o documento inteiro.
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+      deleteField: () => admin.firestore.FieldValue.delete(),
     },
     request.data,
   );
