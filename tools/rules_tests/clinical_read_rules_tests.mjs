@@ -3,8 +3,8 @@
  *
  * Testes de Firestore Rules para o prontuário clínico v1:
  *   dogs/{dogId}/clinical_cases/{caseId}
- *   dogs/{dogId}/clinical_cases/{caseId}/events/{eventId}
- *   dogs/{dogId}/clinical_cases/{caseId}/events/{eventId}/amendments/{amendId}
+ *   dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}
+ *   dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}/clinical_amendments/{amendId}
  *
  * Contrato sob teste:
  * 1. Leitura exige DUAS pernas: capability EXPLÍCITA `health.read`
@@ -302,13 +302,13 @@ async function seedClinicalWorld() {
         casePayload({dogId}),
       );
       await setDoc(
-        doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'events', EVENT_A),
+        doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'clinical_events', EVENT_A),
         eventPayload({dogId}),
       );
       await setDoc(
         doc(
           db, 'dogs', dogId, 'clinical_cases', CASE_A,
-          'events', EVENT_A, 'amendments', AMEND_A,
+          'clinical_events', EVENT_A, 'clinical_amendments', AMEND_A,
         ),
         amendmentPayload({dogId}),
       );
@@ -321,12 +321,12 @@ const caseRef = (db, dogId = DOG_A, caseId = CASE_A) =>
   doc(db, 'dogs', dogId, 'clinical_cases', caseId);
 
 const eventRef = (db, dogId = DOG_A) =>
-  doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'events', EVENT_A);
+  doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'clinical_events', EVENT_A);
 
 const amendRef = (db, dogId = DOG_A) =>
   doc(
     db, 'dogs', dogId, 'clinical_cases', CASE_A,
-    'events', EVENT_A, 'amendments', AMEND_A,
+    'clinical_events', EVENT_A, 'clinical_amendments', AMEND_A,
   );
 
 const casesCol = (db, dogId = DOG_A) =>
@@ -682,7 +682,7 @@ test('CP-01 dog_id de payload apontando para o K9 do leitor NÃO abre K9 alheio'
       casePayload({dogId: DOG_A}),
     );
     await setDoc(
-      doc(db, 'dogs', DOG_B, 'clinical_cases', 'case-forjado', 'events', EVENT_A),
+      doc(db, 'dogs', DOG_B, 'clinical_cases', 'case-forjado', 'clinical_events', EVENT_A),
       eventPayload({dogId: DOG_A}),
     );
   });
@@ -692,7 +692,7 @@ test('CP-01 dog_id de payload apontando para o K9 do leitor NÃO abre K9 alheio'
   const db = dbFor(PRIMARY_RA, {access_scope: 'own_records'});
   await assertFails(getDoc(caseRef(db, DOG_B, 'case-forjado')));
   await assertFails(
-    getDoc(doc(db, 'dogs', DOG_B, 'clinical_cases', 'case-forjado', 'events', EVENT_A)),
+    getDoc(doc(db, 'dogs', DOG_B, 'clinical_cases', 'case-forjado', 'clinical_events', EVENT_A)),
   );
 });
 
@@ -736,7 +736,7 @@ test('CW-02 ClinicalEvent: create/update/delete NEGADOS para leitor autorizado',
   const db = dbFor(GLOBAL_RA);
   await assertFails(
     setDoc(
-      doc(db, 'dogs', DOG_A, 'clinical_cases', CASE_A, 'events', 'event-novo'),
+      doc(db, 'dogs', DOG_A, 'clinical_cases', CASE_A, 'clinical_events', 'event-novo'),
       eventPayload(),
     ),
   );
@@ -755,7 +755,7 @@ test('CW-03 Amendment: create NEGADO — append-only não tem writer neste gate'
     setDoc(
       doc(
         db, 'dogs', DOG_A, 'clinical_cases', CASE_A,
-        'events', EVENT_A, 'amendments', 'amend-novo',
+        'clinical_events', EVENT_A, 'clinical_amendments', 'amend-novo',
       ),
       amendmentPayload(),
     ),
@@ -786,7 +786,7 @@ test('CW-05 admin técnico NÃO escreve prontuário', async () => {
     setDoc(
       doc(
         db, 'dogs', DOG_A, 'clinical_cases', CASE_A,
-        'events', EVENT_A, 'amendments', 'amend-admin',
+        'clinical_events', EVENT_A, 'clinical_amendments', 'amend-admin',
       ),
       amendmentPayload(),
     ),

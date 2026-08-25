@@ -275,7 +275,8 @@ service cloud.firestore {
 
     // CLIN-AUTH-BE-3B.A — Autoridade de LEITURA clínica (Clinical v1).
     //
-    // Prontuário clínico (clinical_cases/events/amendments) exige capability
+    // Prontuário clínico (clinical_cases/clinical_events/clinical_amendments)
+    // exige capability
     // EXPLÍCITA `health.read`. Este é o primeiro caminho Health a gatear em
     // capability granular; os demais (Agenda, Nutrição, Readiness, Documentos)
     // usam apenas `canAccessDogRecord`, decisão de compatibilidade adiada.
@@ -2287,13 +2288,21 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
-      match /clinical_cases/{caseId}/events/{eventId} {
+      // CLIN-WRITER-1.W1b — RENAME de colisão de collection-group.
+      //   events       -> clinical_events      (colisão TRÊS-vias: vehicles +
+      //                                          occurrences + clinical_cases)
+      //   amendments   -> clinical_amendments  (colisão com occurrences)
+      // Sem writer canônico e ZERO documentos clínicos em produção, não há
+      // migração de dados neste gate. NENHUM alias antigo é retido: os paths
+      // /events e /amendments sob clinical_cases deixam de existir. Autoridade
+      // de leitura INALTERADA (health.read + canAccessDogRecord, sem bypass).
+      match /clinical_cases/{caseId}/clinical_events/{eventId} {
         allow read: if hasClinicalReadAuthority()
           && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
 
-      match /clinical_cases/{caseId}/events/{eventId}/amendments/{amendId} {
+      match /clinical_cases/{caseId}/clinical_events/{eventId}/clinical_amendments/{amendId} {
         allow read: if hasClinicalReadAuthority()
           && canAccessDogRecord(dogId);
         allow create, update, delete: if false;

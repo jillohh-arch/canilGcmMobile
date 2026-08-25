@@ -26,8 +26,8 @@ como agregado preventivo independente) e **2 projeções** (`health_timeline`,
 ```
 dogs/{dogId}/
 ├── clinical_cases/{caseId}
-│   ├── events/{eventId}
-│   │   └── amendments/{amendId}
+│   ├── clinical_events/{eventId}
+│   │   └── clinical_amendments/{amendId}
 │   └── exams/{examId}                   [agregado ExamProcess]
 ├── treatment_protocols/{protocolId}
 │   └── doses/{doseId}
@@ -48,6 +48,57 @@ Migrações são controladas em:
 ```
 _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 ```
+
+### 1.1 CLIN-WRITER-1.W1b — nomes canônicos das subcoleções clínicas (CONGELADO)
+
+As subcoleções aninhadas do prontuário foram renomeadas para eliminar colisão de
+collection-group:
+
+```
+ANTES: dogs/{dogId}/clinical_cases/{caseId}/events/{eventId}
+       dogs/{dogId}/clinical_cases/{caseId}/events/{eventId}/amendments/{amendId}
+
+AGORA: dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}
+       dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}/clinical_amendments/{amendId}
+```
+
+Motivo factual: `collectionGroup("events")` já abrange **três** árvores
+(`vehicles/{id}/events`, `occurrences/{id}/events`, prontuário) e
+`collectionGroup("amendments")` já colide com `occurrences/{id}/amendments`. Um
+collection-group clínico futuro seria impossível de gatear sem contaminar
+Ocorrências e Viaturas.
+
+**Nenhum alias antigo é retido.** Os paths `/events` e `/amendments` sob
+`clinical_cases` deixam de existir no contrato. Não há migração de dados: não
+existe nenhum writer canônico e não existe nenhum documento clínico canônico em
+produção.
+
+O nome de collection-group `clinical_events` também aparece como *rótulo de
+proveniência* da projeção de timeline (`dogs/{dogId}/clinical_events`, string em
+`functions/src/health_timeline_projection.ts`). Esse rótulo é **plano e legado ao
+contrato**, não corresponde a nenhuma coleção real, e sua correção pertence ao
+gate de projeção — não a este gate. Nenhum índice de collection-group clínico é
+criado aqui.
+
+### 1.2 Fronteira de escrita do cliente (CONGELADA)
+
+```
+ESCRITAS DE CLIENTE NO PRONTUÁRIO CANÔNICO
+create = DENY
+update = DENY
+delete = DENY
+PERMANENTEMENTE
+```
+
+Toda mutação clínica canônica é de **backend, Admin SDK**. Capabilities
+autorizam **comandos callable**, nunca escrita direta de cliente no Firestore:
+nenhuma permissão condicional de escrita de cliente será adicionada para
+capability futura.
+
+A **leitura** permanece exatamente como congelada pelos gates de leitura
+clínica: `health.read` + `canAccessDogRecord(dogId)` estrutural do path, **sem
+bypass admin**. Este gate não altera nenhuma semântica de autorização de
+leitura.
 
 ---
 
@@ -93,7 +144,29 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 
 ---
 
-### 2.2 clinical_cases/{caseId}/events/{eventId}
+### 2.2 clinical_cases/{caseId}/clinical_events/{eventId}
+
+#### Identidade canônica do evento (CONGELADA — CLIN-WRITER-1.W1b)
+
+Estes campos formam a identidade do ClinicalEvent. A coluna **Origem** é
+normativa para o writer: `SERVER` significa derivado do path estrutural, da
+autenticação ou do servidor, e **nunca** aceito do payload do cliente.
+
+| Campo | Origem | Autoridade |
+|-------|--------|-----------|
+| dog_id | SERVER | Derivado do path estrutural `dogs/{dogId}`. Desnormalizado apenas para queryability futura; a autoridade é o path + o writer, nunca o campo. |
+| case_id | SERVER | Derivado do path estrutural `clinical_cases/{caseId}` |
+| event_id | SERVER | Gerado pelo servidor / determinístico pela autoridade de idempotência |
+| entity_kind | SERVER | Constante server-managed, valor `clinical_event` |
+| schema_version | SERVER | Server-managed |
+| event_type | CLIENTE (validado) | Deve ser wire value de `ClinicalEventType` (18 valores, autoridade `functions/src/clinical_domain.ts`) |
+| status | SERVER | Valor de lifecycle server-managed; transições apenas por comando (`draft`→`final`, `draft`→`cancelled`, `final`→`cancelled`) |
+| occurred_at | CLIENTE (validado) | Tempo clínico da ocorrência |
+| recorded_at | SERVER | Timestamp de servidor |
+| recorded_by | SERVER | Derivado do chamador autenticado |
+
+**NUNCA confiado no payload do cliente:** `dog_id`, `case_id`, `event_id`,
+`entity_kind`, `schema_version`, `status`, `recorded_at`, `recorded_by`.
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
@@ -113,9 +186,9 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 | operational_impact | map | ❌ | Ver OperationalImpact |
 | attachment_refs | array of string | ❌ | IDs de HealthDocument (não URLs); tratado como `[]` quando ausente |
 | source_document | HealthDocumentRef | ❌ | Evidência documental |
-| has_amendments | bool | ✅ | Server-managed, default false |
-| amendment_count | number | ✅ | Server-managed, default 0 |
-| last_amended_at | timestamp | ❌ | Server-managed |
+| has_amendments | bool | ✅ | **DERIVADO / SERVER-MANAGED**, default false |
+| amendment_count | number | ✅ | **DERIVADO / SERVER-MANAGED**, default 0 |
+| last_amended_at | timestamp | ❌ | **DERIVADO / SERVER-MANAGED** |
 | deleted_at | timestamp | ❌ | Soft delete |
 | deleted_by | RecordedBy | ❌ | |
 | delete_reason | string | ❌ | |
@@ -124,8 +197,11 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 | legacy_id | string | ❌ | |
 | schema_version | number | ✅ | |
 
-**Escritor:** Mobile/Web (create, update draft). Function (gerencia metadados has_amendments).
-**Leitor:** Mobile, Web.
+**Escritor:** **Backend Admin SDK, exclusivamente** (CLIN-WRITER-1.W1b). Cliente
+Mobile/Web tem `create, update, delete: if false` — permanentemente. A descrição
+anterior ("Mobile/Web create, update draft") descrevia intenção de contrato antes
+de existir autoridade de writer e **não** é a fronteira vigente.
+**Leitor:** Mobile, Web — via `health.read` + acesso estrutural ao K9, sem bypass admin.
 **Soft delete:** via status=cancelled com cancel_reason + campos deleted_*.
 **Anexos:** apenas IDs em attachment_refs; URLs são derivadas de HealthDocument.storage_path.
 **Sem `exam_group_id`** — relacionamento com exame é via `exam_id` em ExamProcess.
@@ -133,7 +209,13 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 
 ---
 
-### 2.3 events/{eventId}/amendments/{amendId}
+### 2.3 clinical_cases/{caseId}/clinical_events/{eventId}/clinical_amendments/{amendId}
+
+**Modelo de emenda (CONGELADO, P2 v1):** as emendas formam uma **lista causal
+plana** contra o ClinicalEvent original. O conteúdo do evento original **nunca**
+é reescrito. **Não** há caminho recursivo de emenda-de-emenda. Os contadores
+`has_amendments` / `amendment_count` no evento pai são derivados/server-managed
+(§2.2); o writer de emenda os atualiza atomicamente (gate W5).
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
@@ -142,12 +224,12 @@ _migrations/health_v1/batches/{batchId}  [metadados de batch de migração]
 | payload_type | string | ✅ | Mesmo do evento pai |
 | payload_version | number | ✅ | Mesmo do evento pai |
 | content | map | ✅ | Apenas campos alterados/adicionados |
-| recorded_by | RecordedBy | ✅ | |
-| recorded_at | timestamp | ✅ | Server timestamp |
-| schema_version | number | ✅ | |
+| recorded_by | RecordedBy | ✅ | SERVER — derivado do chamador autenticado |
+| recorded_at | timestamp | ✅ | SERVER timestamp |
+| schema_version | number | ✅ | SERVER-managed |
 
-**Escritor:** Mobile/Web (create-only; imutável após criação).
-**Leitor:** Mobile, Web.
+**Escritor:** **Backend Admin SDK, exclusivamente** (create-only; imutável após criação). Cliente `if false`.
+**Leitor:** Mobile, Web — via `health.read` + acesso estrutural, sem bypass admin.
 **Índices:** `recorded_at ASC`.
 
 ---
@@ -869,7 +951,7 @@ Reapresenta o ReadinessSnapshot consolidado (readiness_status, indicadores, etc.
 
 | Schema atual | Schema alvo | Estrategia |
 |-------------|-------------|-----------|
-| `dogs/{dogId}/health_events` (todos os tipos, todos os registros) | `dogs/{dogId}/legacy_health_records/{recordId}` | **Contrato conservador único:** todos os `health_events` anteriores ao go-live vão para `legacy_health_records` com `original_payload` preservado. Nenhum `ClinicalEvent` retroativo é criado em `clinical_cases/events`. Operações administrativas futuras podem, de forma auditada, vincular `case_id`, atualizar `normalized_view` ou criar evento clínico curado separado quando clinicamente justificado. |
+| `dogs/{dogId}/health_events` (todos os tipos, todos os registros) | `dogs/{dogId}/legacy_health_records/{recordId}` | **Contrato conservador único:** todos os `health_events` anteriores ao go-live vão para `legacy_health_records` com `original_payload` preservado. Nenhum `ClinicalEvent` retroativo é criado em `clinical_cases/clinical_events`. Operações administrativas futuras podem, de forma auditada, vincular `case_id`, atualizar `normalized_view` ou criar evento clínico curado separado quando clinicamente justificado. |
 | `dogs/{dogId}/exams` (se existir como subcollection) | `clinical_cases/{caseId}/exams` | Migração para subcoleção de caso; sem exam_group_id |
 | `dogs/{dogId}/weight_records` | `weight_records` (normalizado) | Adicionar campos |
 | `dogs/{dogId}/weight_history` | — | Não migrado como fonte canônica; preservado read-only durante todo o v1 |
@@ -878,7 +960,7 @@ Reapresenta o ReadinessSnapshot consolidado (readiness_status, indicadores, etc.
 | `dogs/{dogId}/nutritional_prescriptions` | `nutrition_plans` | Rename + normalização (`vigent_*`→`valid_*`; schedule inferido marcado; 1 active) |
 | `dogs/{dogId}/nutrition_prescriptions` | — | LEGACY CURRENT fallback; read-only histórico |
 | `dogs/{dogId}/nutrition_supplements` | **não** `supplement_logs` automático | Regime/estado em uso → adapter / curadoria de regimen; **ZERO** SupplementLog retroativo |
-| `vacinas/{id}` (raiz) | `vaccination_records/{vaccinationId}` (canônico) + `legacy_health_records` (incompletos) | Migração com dados suficientes vai para VaccinationRecord; incompletos permanecem em legacy_health_records read-only. **Não** backfilar para `clinical_cases/events` nem para "caso preventivo". |
+| `vacinas/{id}` (raiz) | `vaccination_records/{vaccinationId}` (canônico) + `legacy_health_records` (incompletos) | Migração com dados suficientes vai para VaccinationRecord; incompletos permanecem em legacy_health_records read-only. **Não** backfilar para `clinical_cases/clinical_events` nem para "caso preventivo". |
 | `documentos/{id}` (raiz) | `health_documents` | Backfill com `storage_path` canônico normalizado (URLs antigas preservadas apenas no payload/metadado legado) |
 | `dogs/{dogId}/documents` | `health_documents` | Migrar para coleção consolidada |
 | `dogs/{dogId}/health_schedule` (com estados temporais persistidos) | `health_schedule` (apenas lifecycle_status) | Migrar lifecycle_status; descartar temporais |
@@ -950,7 +1032,7 @@ Documentos migrados recebem `migration_batch_id` que aponta para `_migrations/he
   "case_id": "case_abc123",
   "case_title": "Lesao MPD",
   "dog_id": "dog_001",
-  "source_collection": "dogs/dog_001/clinical_cases/case_abc123/events",
+  "source_collection": "dogs/dog_001/clinical_cases/case_abc123/clinical_events",
   "source_id": "evt_xyz789",
   "recorded_by": {
     "uid": "uid_001",
