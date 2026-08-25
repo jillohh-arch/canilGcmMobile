@@ -105,6 +105,12 @@ const DART_CASE_REOPEN_DESTINATIONS = [
   "monitoring",
 ];
 
+// Reopen ORIGIN authority, transcribed independently from the Dart guard in
+// health_v1_transitions.dart (`current.status != ClinicalCaseStatus.discharged`
+// throws invalid_case_reopen). `cancelled` is terminal and never reopens —
+// only `discharged` does.
+const DART_CASE_REOPEN_ORIGINS = ["discharged"];
+
 const DART_EVENT_TRANSITIONS: Record<string, string[]> = {
   draft: ["final", "cancelled"],
   final: ["cancelled"],
@@ -257,6 +263,25 @@ function main(): void {
       "invalid_case_reopen",
       "illegal_transition",
     );
+  });
+
+  test("cancelled never reopens into ANY destination (exhaustive origin denial)", () => {
+    // Locks the reopen ORIGIN set, not just one representative edge: every
+    // non-discharged origin — `cancelled` above all — must be rejected for
+    // every one of the four permitted destinations, with a valid non-blank
+    // reason so the failure can only come from the origin guard.
+    for (const origin of CLINICAL_CASE_STATUSES) {
+      if (DART_CASE_REOPEN_ORIGINS.includes(origin)) {
+        continue;
+      }
+      for (const dest of DART_CASE_REOPEN_DESTINATIONS as ClinicalCaseStatus[]) {
+        expectDomainError(
+          () => assertCaseReopen(origin, dest, "recidiva confirmada"),
+          "invalid_case_reopen",
+          "illegal_transition",
+        );
+      }
+    }
   });
 
   test("reopen origin/destination check precedes reason check (Dart order)", () => {
