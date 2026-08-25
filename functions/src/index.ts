@@ -57,6 +57,12 @@ import {
   createAdminHealthDocumentStorageAdapter,
 } from "./health_document_storage_adapter";
 import {
+  ClinicalCaller,
+  runHealthAppendClinicalEvent,
+  runHealthOpenClinicalCase,
+  type ClinicalCaseCallableDeps,
+} from "./clinical_case_callables";
+import {
   RestrictionCaller,
   runHealthRestrictionCancel,
   runHealthRestrictionEnd,
@@ -8226,6 +8232,166 @@ export const healthDocumentPrepareUpload = onCall({region}, async (request) => {
  */
 export const healthDocumentFinalizeUpload = onCall({region}, async (request) => {
   return runHealthDocumentFinalizeUpload(request, healthDocumentDeps);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIN-WRITER-1.W3 — autoridade de ESCRITA clínica persistida
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Capabilities clínicas canônicas (W2). Definidas no catálogo
+ * `CANONICAL_ACCESS_PROFILE_CAPABILITIES`, concedidas a NENHUM perfil real.
+ *
+ * Vocabulário próprio aqui em vez de `AccessAction`: as cinco actions clínicas
+ * foram deliberadamente mantidas FORA da união `AccessProfileAction` por W2, e
+ * aquele módulo está congelado. O caminho de LEITURA de autoridade
+ * (`sanitizeAccessPermissions` → `profileGrantsPermission`) já é key-agnostic,
+ * então o par `health.record_clinical` é resolvido corretamente sem alargar o
+ * tipo de escrita — que é justamente o que não deve ser alargado por este gate.
+ */
+type ClinicalCapability =
+  | "record_clinical"
+  | "finalize_clinical"
+  | "amend_clinical"
+  | "manage_clinical_case"
+  | "reopen_clinical_case";
+
+function clinicalCapabilityDenied(
+  action: ClinicalCapability,
+  reason: RestrictionGrantDenialReason,
+): HttpsError {
+  return new HttpsError(
+    "permission-denied",
+    `Perfil sem permissao explicita para health.${action}.`,
+    {code: "permission-denied", reason, action},
+  );
+}
+
+/**
+ * Exige capability clínica EXPLÍCITA, sem qualquer bypass administrativo.
+ *
+ * Espelha `requireRestrictionLifecyclePermission` (GATE-C.B) e NÃO
+ * `requireAccessPermission`: naquele, `isAdminToken`/`isAdminUserRecord`
+ * retornam antes da leitura do grant, o que tornaria a capability clínica
+ * decorativa para qualquer administrador técnico. Administração técnica não é
+ * autoridade clínica.
+ *
+ * `health.read` também não implica escrita: só o par exato
+ * `health.<action>` concede, e a ausência da chave significa NÃO CONCEDIDA.
+ *
+ * NÃO substitui `requireDogRecordAccess`: capability e escopo estrutural de K9
+ * seguem sendo dois gates obrigatórios e independentes.
+ */
+async function requireClinicalCapability(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  action: ClinicalCapability,
+): Promise<CallerIdentity> {
+  const caller = requireAuth(auth);
+
+  // Guard antes de qualquer leitura: `doc("")` lança erro não estruturado.
+  if (!caller.ra.trim()) {
+    throw clinicalCapabilityDenied(action, "unresolved-ra");
+  }
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
+  if (userDoc === undefined) {
+    throw clinicalCapabilityDenied(action, "missing-user-mirror");
+  }
+  // Simétrico ao SEC-02A: soft-delete não conserva autoridade clínica.
+  if (userDoc.deleted_at != null) {
+    throw clinicalCapabilityDenied(action, "user-soft-deleted");
+  }
+
+  const profileId = accessProfileIdFrom(auth?.token, userDoc);
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+  if (!profileSnap.exists) {
+    throw clinicalCapabilityDenied(action, "missing-access-profile");
+  }
+  const profileDoc = profileSnap.data() ?? {};
+
+  // Ciclo de vida do perfil, com a MESMA tolerância a `status` ausente já
+  // contratada por `profileGrantsPermission`/`decideAccessScope` para este
+  // documento. Divergir criaria duas verdades sobre um único registro.
+  const status = profileDoc.status;
+  if (status !== undefined && status !== null) {
+    if (typeof status !== "string" || status.trim() !== "active") {
+      throw clinicalCapabilityDenied(action, "inactive-access-profile");
+    }
+  }
+
+  if (
+    !profileGrantsPermission(profileDoc, "health", action as AccessAction)
+  ) {
+    throw clinicalCapabilityDenied(action, "capability-not-granted");
+  }
+
+  return caller;
+}
+
+function toClinicalCaller(caller: CallerIdentity): ClinicalCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * Writer canônico do registro clínico — abertura de caso e append de evento.
+ *
+ * `health.record_clinical` é autoridade própria e ninguém a possui hoje: o
+ * catálogo W2 apenas tornou o par sintaticamente concedível. Enquanto nenhum
+ * perfil real receber o grant, estes callables ficam inertes por design.
+ */
+const clinicalCaseDeps: ClinicalCaseCallableDeps = {
+  db,
+  requireRecordClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "record_clinical"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ClinicalCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  // CLASSIFICAÇÃO de auditoria (`recorded_by.internal_role`), nunca autoridade.
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ClinicalCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Abre um ClinicalCase junto com seu evento de abertura, atomicamente.
+ * Um caso nunca existe sem o evento que o abriu.
+ */
+export const healthOpenClinicalCase = onCall({region}, async (request) => {
+  return runHealthOpenClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Anexa um ClinicalEvent a um caso EXISTENTE e não terminal.
+ * Não é transição de ciclo de vida: `clinical_status` permanece intacto.
+ */
+export const healthAppendClinicalEvent = onCall({region}, async (request) => {
+  return runHealthAppendClinicalEvent(request, clinicalCaseDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
