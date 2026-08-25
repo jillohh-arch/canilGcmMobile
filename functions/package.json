@@ -20,11 +20,12 @@
     "test:health-readiness": "npm run build && node lib/health_readiness_policy_test.js && node lib/health_readiness_evidence_logic_test.js && node lib/health_readiness_projector_test.js && node lib/health_readiness_callable_test.js && node lib/health_readiness_trigger_test.js",
     "test:health-document": "npm run build && node lib/health_document_logic_test.js && node lib/health_document_callables_test.js",
     "test:health-readiness-emulator": "npm run build && firebase emulators:exec --project canil-gcm --only firestore \"node lib/health_readiness_emulator_test.js\"",
-    "test": "npm run test:access-scope && npm run test:access-profile-writer && npm run test:restriction-capability && npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition && npm run test:health-readiness && npm run test:health-document && npm run test:health-restriction",
+    "test": "npm run test:access-scope && npm run test:access-profile-writer && npm run test:restriction-capability && npm run test:health-schedule && npm run test:health-weight && npm run test:health-nutrition && npm run test:health-readiness && npm run test:health-document && npm run test:health-restriction && npm run test:health-clinical",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
     "test:health-restriction": "npm run build && node lib/health_restriction_logic_test.js && node lib/health_restriction_callables_test.js",
-    "test:restriction-capability": "npm run build && node lib/restriction_capability_test.js"
+    "test:restriction-capability": "npm run build && node lib/restriction_capability_test.js",
+    "test:health-clinical": "npm run build && node lib/clinical_domain_test.js && node lib/clinical_case_callables_test.js"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0",

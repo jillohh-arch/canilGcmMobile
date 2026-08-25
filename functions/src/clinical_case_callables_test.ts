@@ -10,6 +10,8 @@
  */
 import * as assert from "assert";
 import * as crypto from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 
 import {
   ClinicalCaller,
@@ -22,8 +24,30 @@ import {
   runHealthAppendClinicalEvent,
   runHealthOpenClinicalCase,
 } from "./clinical_case_callables";
+import {
+  isAdminToken,
+  isAdminUserRecord,
+  profileGrantsPermission,
+} from "./index";
 
 type JsonMap = Record<string, unknown>;
+
+// ── Leitura de fonte para as guardas arquiteturais ───────────────────────────
+
+const SRC_DIR = __dirname.endsWith("lib") ?
+  path.join(__dirname, "..", "src") :
+  __dirname;
+
+function readSource(relative: string): string {
+  return fs.readFileSync(path.join(SRC_DIR, relative), "utf8");
+}
+
+/** Remove comentários, para que uma menção explicativa não gere falso positivo. */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
 
 const actor: ClinicalCaller = {
   uid: "uid-clin",
@@ -694,6 +718,176 @@ async function testAppendEventWithoutReceiptFailsClosed() {
   );
 }
 
+// ── Receipt malformado ───────────────────────────────────────────────────────
+
+/**
+ * Um receipt que EXISTE mas é ilegível é CORRUPÇÃO, não "ausente".
+ *
+ * Esta é a fronteira que sustenta toda a autoridade de idempotência: se um
+ * receipt malformado fosse tratado como ausente, o writer criaria um SEGUNDO
+ * fato clínico para uma operação que já produziu um. A auditoria W3.A1 provou o
+ * comportamento correto contra o emulador Firestore real; a cobertura abaixo o
+ * fixa na suíte commitada, porque uma mutação que desativa
+ * `assertClinicalReceiptShape` sobrevivia a todos os testes daqui.
+ */
+
+/** Campos cuja ausência precisa ser detectada como corrupção. */
+const RECEIPT_REQUIRED_FIELDS = [
+  "kind",
+  "operation_id",
+  "operation_type",
+  "actor_uid",
+  "fingerprint",
+  "result",
+];
+
+/** Receipt bem formado de abertura, usado como base das variantes corrompidas. */
+function wellFormedOpenReceipt(caseId: string, eventId: string): JsonMap {
+  return {
+    kind: "clinical_case_open_v1",
+    operation_id: "op-open-1",
+    operation_type: "open_clinical_case",
+    actor_uid: actor.uid,
+    fingerprint: "fp-qualquer",
+    result: {dogId: "dog-1", caseId, eventId},
+  };
+}
+
+async function testOpenMalformedReceiptFailsClosed() {
+  const caseId = caseIdFor("dog-1", "op-open-1");
+  const eventId = openingEventIdFor(caseId);
+  const opPath = `dogs/dog-1/clinical_cases/${caseId}/operations/op-open-1`;
+
+  // Um campo obrigatório ausente por vez: nenhuma variante pode ser tratada
+  // como "receipt ausente" e virar uma segunda abertura.
+  for (const missing of RECEIPT_REQUIRED_FIELDS) {
+    const corrupt = wellFormedOpenReceipt(caseId, eventId);
+    delete corrupt[missing];
+
+    const db = dbWithDog();
+    db._store.set(opPath, corrupt);
+    const keysBefore = storeKeys(db);
+
+    await expectReject(
+      () => runHealthOpenClinicalCase(mockRequest(validOpen), depsFor({db})),
+      "integrity",
+      `receipt de abertura sem "${missing}" falha fechado`,
+    );
+
+    // Nenhum fato clínico novo, nenhum receipt substituto, nenhum audit.
+    assert.deepStrictEqual(
+      storeKeys(db),
+      keysBefore,
+      `receipt sem "${missing}": store não pode ganhar documentos`,
+    );
+    assert.deepStrictEqual(
+      db._store.get(opPath),
+      corrupt,
+      `receipt sem "${missing}": receipt corrompido não pode ser sobrescrito`,
+    );
+    assert.strictEqual(
+      db._store.get(`dogs/dog-1/clinical_cases/${caseId}`),
+      undefined,
+      `receipt sem "${missing}": nenhum caso clínico criado`,
+    );
+    assert.strictEqual(
+      storeKeys(db).filter((k) => k.startsWith("auditLogs/")).length,
+      0,
+      `receipt sem "${missing}": nenhum audit de sucesso`,
+    );
+  }
+
+  // Valor presente porém vazio também é ilegível, não "ausente".
+  for (const empty of [null, ""]) {
+    const corrupt = wellFormedOpenReceipt(caseId, eventId);
+    corrupt.fingerprint = empty;
+    const db = dbWithDog();
+    db._store.set(opPath, corrupt);
+    await expectReject(
+      () => runHealthOpenClinicalCase(mockRequest(validOpen), depsFor({db})),
+      "integrity",
+      `receipt com fingerprint ${JSON.stringify(empty)} falha fechado`,
+    );
+    assert.strictEqual(
+      db._store.get(`dogs/dog-1/clinical_cases/${caseId}`),
+      undefined,
+      "nenhum caso criado sob receipt de fingerprint vazio",
+    );
+  }
+
+  // `kind` de outro comando não é aceito como receipt desta operação: um
+  // receipt legítimo de OUTRA família nunca autoriza replay aqui.
+  const crossKind = wellFormedOpenReceipt(caseId, eventId);
+  crossKind.kind = "clinical_event_append_v1";
+  const dbCross = dbWithDog();
+  dbCross._store.set(opPath, crossKind);
+  await expectReject(
+    () => runHealthOpenClinicalCase(mockRequest(validOpen), depsFor({db: dbCross})),
+    "integrity",
+    "receipt de kind alheio não é aceito na abertura",
+  );
+  assert.strictEqual(
+    dbCross._store.get(`dogs/dog-1/clinical_cases/${caseId}`),
+    undefined,
+    "kind cruzado não pode abrir caso",
+  );
+}
+
+async function testAppendMalformedReceiptFailsClosed() {
+  const db = dbWithDog();
+  const caseId = await openAndReturnCaseId(db);
+  const eventId = eventIdFor("dog-1", caseId, "op-append-1");
+  const opPath =
+    `dogs/dog-1/clinical_cases/${caseId}/operations/op-append-1`;
+  const eventPath =
+    `dogs/dog-1/clinical_cases/${caseId}/clinical_events/${eventId}`;
+
+  // Receipt de append sem `actor_uid`: ilegível, logo corrupção.
+  db._store.set(opPath, {
+    kind: "clinical_event_append_v1",
+    operation_id: "op-append-1",
+    operation_type: "append_clinical_event",
+    fingerprint: "fp-qualquer",
+    result: {dogId: "dog-1", caseId, eventId},
+  });
+  const keysBefore = storeKeys(db);
+  const caseBefore = {...(db._store.get(
+    `dogs/dog-1/clinical_cases/${caseId}`,
+  ) as JsonMap)};
+
+  await expectReject(
+    () =>
+      runHealthAppendClinicalEvent(
+        mockRequest(appendPayload(caseId)),
+        depsFor({db}),
+      ),
+    "integrity",
+    "receipt de append malformado falha fechado",
+  );
+
+  assert.deepStrictEqual(
+    storeKeys(db),
+    keysBefore,
+    "append sob receipt malformado não pode criar documentos",
+  );
+  assert.strictEqual(
+    db._store.get(eventPath),
+    undefined,
+    "nenhum evento clínico criado",
+  );
+  // O agregado não pode ter sido tocado: nem contador, nem last_event_at.
+  assert.deepStrictEqual(
+    db._store.get(`dogs/dog-1/clinical_cases/${caseId}`),
+    caseBefore,
+    "caso não pode ser mutado por append recusado",
+  );
+  assert.strictEqual(
+    storeKeys(db).filter((k) => k.startsWith("auditLogs/")).length,
+    1,
+    "somente o audit da abertura permanece",
+  );
+}
+
 // ── Idempotência cruzada entre atores ────────────────────────────────────────
 
 async function testCrossActorOperationIdConflict() {
@@ -709,6 +903,186 @@ async function testCrossActorOperationIdConflict() {
       ),
     "idempotency-conflict",
     "operationId reutilizada por outro ator",
+  );
+}
+
+// ── Guarda arquitetural: sem bypass administrativo na autoridade clínica ─────
+
+/**
+ * Prova ARQUITETURAL, no mesmo espírito de `restriction_capability_test.ts`.
+ *
+ * `requireClinicalCapability` vive em `index.ts` e depende de leituras de
+ * Firestore, então um teste comportamental exigiria emulador. O que esta guarda
+ * protege é o invariante que o gate existe para garantir: identidade
+ * administrativa, por si só, NÃO concede `health.record_clinical`.
+ *
+ * Sem esta guarda, alguém "unificando" o caminho clínico de volta no helper
+ * genérico — ou simplesmente adicionando um atalho de admin — reintroduziria o
+ * bypass sem que nenhum teste falhasse (mutação MUT6 da auditoria W3.A1).
+ * Administração técnica não é autoridade clínica.
+ */
+const CLINICAL_CAPABILITY_FN = "async function requireClinicalCapability";
+
+/** Corpo textual de `requireClinicalCapability`, sem comentários. */
+function clinicalCapabilityBody(): string {
+  const indexCode = stripComments(readSource("index.ts"));
+  const start = indexCode.indexOf(CLINICAL_CAPABILITY_FN);
+  assert.ok(start > 0, "requireClinicalCapability não encontrada em index.ts");
+  const end = indexCode.indexOf("\n}", start);
+  assert.ok(end > start, "corpo de requireClinicalCapability não delimitado");
+  return indexCode.slice(start, end);
+}
+
+async function testClinicalCapabilityHasNoAdminBypass() {
+  const body = clinicalCapabilityBody();
+
+  // Atalhos administrativos conhecidos da plataforma. Qualquer um deles no
+  // corpo tornaria a capability clínica decorativa para admins técnicos.
+  for (const forbidden of [
+    "isAdminToken",
+    "isAdminUserRecord",
+    "isAdminAccessLevel",
+    "isAdministrativeHealthAuthority",
+    "requireAccessPermission",
+    "requireAnyAccessPermission",
+  ]) {
+    assert.ok(
+      !body.includes(forbidden),
+      `bypass reintroduzido: ${forbidden} apareceu na autoridade clínica`,
+    );
+  }
+
+  // Rede de segurança para um atalho escrito à mão (`token.admin === true`,
+  // `user.admin`, `claims.admin`) que não passe pelos helpers acima.
+  assert.ok(
+    !/\badmin\b\s*(===|==|!==|!=)/.test(body) &&
+      !/\.admin\b/.test(body) &&
+      !/\badmin\s*:/.test(body),
+    "atalho administrativo manual apareceu na autoridade clínica",
+  );
+
+  // A autoridade real precisa continuar sendo o grant explícito do perfil.
+  assert.ok(
+    body.includes("profileGrantsPermission("),
+    "a autoridade clínica deixou de consultar o grant explícito do perfil",
+  );
+  assert.ok(
+    body.includes("\"health\""),
+    "a autoridade clínica deixou de exigir o módulo health",
+  );
+  // Escopo estrutural de K9 segue sendo gate separado e obrigatório.
+  assert.ok(
+    !body.includes("requireDogRecordAccess"),
+    "capability e escopo de K9 não podem ser fundidos em um único gate",
+  );
+}
+
+async function testClinicalCallablesUseDedicatedAuthority() {
+  const indexCode = stripComments(readSource("index.ts"));
+
+  // O writer clínico precisa exigir a capability própria, não uma genérica.
+  assert.ok(
+    /requireClinicalCapability\(\s*auth\s*,\s*"record_clinical"\s*\)/.test(
+      indexCode,
+    ),
+    "o writer clínico não está exigindo health.record_clinical dedicado",
+  );
+
+  // Os dois callables deste gate precisam compartilhar os deps que carregam
+  // aquela autoridade — nunca montar um caminho paralelo.
+  for (const callable of [
+    "healthOpenClinicalCase",
+    "healthAppendClinicalEvent",
+  ]) {
+    const start = indexCode.indexOf(`export const ${callable} =`);
+    assert.ok(start > 0, `${callable} não encontrado em index.ts`);
+    const body = indexCode.slice(start, indexCode.indexOf("});", start));
+    assert.ok(
+      body.includes("clinicalCaseDeps"),
+      `${callable} não está usando clinicalCaseDeps`,
+    );
+    for (const forbidden of ["isAdminToken", "isAdminUserRecord"]) {
+      assert.ok(
+        !body.includes(forbidden),
+        `${callable} ganhou atalho administrativo: ${forbidden}`,
+      );
+    }
+  }
+
+  // O bypass administrativo GENÉRICO da plataforma permanece intacto: o escopo
+  // aprovado é cirúrgico, o resto da plataforma não muda.
+  const generic = indexCode.indexOf("async function requireAccessPermission");
+  assert.ok(generic > 0, "requireAccessPermission não encontrada");
+  const genericBody = indexCode.slice(
+    generic,
+    indexCode.indexOf("\n}", generic),
+  );
+  assert.ok(
+    genericBody.includes("isAdminToken(auth.token)") &&
+      genericBody.includes("isAdminUserRecord(user)"),
+    "o bypass genérico desapareceu — fora do escopo deste gate",
+  );
+}
+
+async function testAdminIdentityAloneDoesNotGrantRecordClinical() {
+  // Prova COMPORTAMENTAL do invariante, sobre o helper canônico de leitura de
+  // grant que a autoridade clínica usa. Perfil de administrador SEM o par
+  // `health.record_clinical` não pode ser autorizado a escrever registro
+  // clínico — nem quando o token/espelho o identificam como admin.
+  const adminToken = {admin: true, role: "administrador"} as never;
+  assert.strictEqual(isAdminToken(adminToken), true, "token é admin de fato");
+  assert.strictEqual(
+    isAdminUserRecord({admin: true, accessLevel: "administrador"}),
+    true,
+    "espelho é admin de fato",
+  );
+
+  const adminProfileSemGrant: JsonMap = {
+    status: "active",
+    permissions: {
+      health: {
+        view: true,
+        read: true,
+        create: true,
+        edit: true,
+        audit: true,
+        export: true,
+        approve: true,
+        archive: true,
+      },
+    },
+  };
+  assert.strictEqual(
+    profileGrantsPermission(adminProfileSemGrant, "health", "record_clinical" as never),
+    false,
+    "administrador sem o par explícito NÃO recebe record_clinical",
+  );
+  // `health.read` tampouco implica escrita clínica.
+  assert.strictEqual(
+    profileGrantsPermission({status: "active", permissions: {health: {read: true}}},
+      "health", "record_clinical" as never),
+    false,
+    "health.read não implica record_clinical",
+  );
+  // Só o par exato concede.
+  assert.strictEqual(
+    profileGrantsPermission(
+      {status: "active", permissions: {health: {record_clinical: true}}},
+      "health",
+      "record_clinical" as never,
+    ),
+    true,
+    "o par exato concede",
+  );
+  // Perfil inativo não conserva autoridade nem com o grant.
+  assert.strictEqual(
+    profileGrantsPermission(
+      {status: "inactive", permissions: {health: {record_clinical: true}}},
+      "health",
+      "record_clinical" as never,
+    ),
+    false,
+    "perfil inativo não concede",
   );
 }
 
@@ -730,7 +1104,12 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["APPEND status corrompido falha fechado", testAppendCorruptStatusFailsClosed],
   ["APPEND guards e injeção", testAppendGuardsAndInjection],
   ["APPEND evento sem receipt falha fechado", testAppendEventWithoutReceiptFailsClosed],
+  ["OPEN receipt malformado falha fechado", testOpenMalformedReceiptFailsClosed],
+  ["APPEND receipt malformado falha fechado", testAppendMalformedReceiptFailsClosed],
   ["Idempotência cruzada entre atores", testCrossActorOperationIdConflict],
+  ["ARQ autoridade clínica sem bypass administrativo", testClinicalCapabilityHasNoAdminBypass],
+  ["ARQ callables clínicos usam autoridade dedicada", testClinicalCallablesUseDedicatedAuthority],
+  ["ARQ identidade admin não concede record_clinical", testAdminIdentityAloneDoesNotGrantRecordClinical],
 ];
 
 (async () => {
