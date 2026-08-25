@@ -587,6 +587,12 @@ const ACCEPTED_PAIRS: Array<[string, string]> = [
   ["health", "issue_restriction"],
   ["health", "release_restriction"],
   ["health", "cancel_restriction"],
+  // CLIN-WRITER-1.W2 — vocabulário clínico canônico (definição apenas).
+  ["health", "record_clinical"],
+  ["health", "finalize_clinical"],
+  ["health", "amend_clinical"],
+  ["health", "manage_clinical_case"],
+  ["health", "reopen_clinical_case"],
   ["k9", "view"],
   ["k9", "edit"],
 ];
@@ -766,6 +772,166 @@ async function testSeedMatrixCompatibility(): Promise<void> {
       `health.${action} é emitida pelo backend e deve ser canônica`,
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §7B — CLIN-WRITER-1.W2: DEFINIÇÃO NÃO É CONCESSÃO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** As cinco capabilities clínicas canônicas. Definição apenas. */
+const CLINICAL_CAPABILITIES = [
+  "record_clinical",
+  "finalize_clinical",
+  "amend_clinical",
+  "manage_clinical_case",
+  "reopen_clinical_case",
+];
+
+/**
+ * Prova load-bearing do W2: entrar no catálogo canônico torna o par
+ * `health.<action>` VÁLIDO PARA CONCESSÃO FUTURA, e nada além disso. Nenhum
+ * perfil passa a possuir a capability, e a omissão continua significando
+ * NÃO CONCEDIDA.
+ */
+async function testClinicalCapabilitiesDefinedButNotGranted(): Promise<void> {
+  // (a) DEFINIÇÃO: as cinco são reconhecidas como pares canônicos.
+  for (const action of CLINICAL_CAPABILITIES) {
+    assert.strictEqual(
+      isCanonicalCapability("health", action),
+      true,
+      `health.${action} deveria ser canônica após o W2`,
+    );
+  }
+
+  // (b) CONCESSÃO ZERO: um perfil armazenado que não pede nada clínico não
+  // recebe nada clínico. Definir no catálogo não materializa a chave.
+  const db = createFakeDb({[PATH]: storedProfile()});
+  const deps = createDeps(db);
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      expectedUpdatedAt: STORED_T1,
+      profile: sourceProfile({permissions: {health: {view: true}}}),
+    }),
+    deps,
+  );
+  const health = (permissionsOf(db).health as JsonMap) ?? {};
+  for (const action of CLINICAL_CAPABILITIES) {
+    assert.ok(
+      !(action in health),
+      `health.${action} NÃO deveria existir no perfil: definição não é concessão`,
+    );
+  }
+
+  // (c) OMISSÃO = NÃO CONCEDIDA: nenhuma capability clínica aparece como
+  // `false` placeholder nem como qualquer outro valor materializado.
+  for (const action of CLINICAL_CAPABILITIES) {
+    assert.strictEqual(
+      health[action],
+      undefined,
+      `health.${action} deve permanecer ausente, não um placeholder`,
+    );
+  }
+
+  // (d) INVARIANTE health.read: o W2 não altera a política de leitura.
+  assert.strictEqual(isCanonicalCapability("health", "read"), true);
+  assert.strictEqual(health.read, true, "health.read preservado do stored");
+
+  // (e) MUNDO FECHADO PRESERVADO: nome clínico inventado continua inválido.
+  for (const action of [
+    "frobnicate",
+    "record_clinicals",
+    "Record_clinical",
+    "open_case",
+    "append_event",
+    "cancel_event",
+    "transition_case",
+    "discharge_case",
+  ]) {
+    assert.strictEqual(
+      isCanonicalCapability("health", action),
+      false,
+      `health.${action} NÃO é vocabulário canônico`,
+    );
+  }
+
+  // (f) PAR CRUZADO: capability clínica só existe sob `health`.
+  for (const moduleId of ["k9", "me", "dashboard", "occurrences", "access"]) {
+    for (const action of CLINICAL_CAPABILITIES) {
+      assert.strictEqual(
+        isCanonicalCapability(moduleId, action),
+        false,
+        `o PAR ${moduleId}.${action} nunca é legítimo`,
+      );
+    }
+  }
+}
+
+/**
+ * O vocabulário clínico não abre caminho de escrita nova: uma capability
+ * clínica inválida (typo) continua sendo recusada com ZERO escrita, e o
+ * contrato endurecido do writer permanece intacto.
+ */
+async function testClinicalCapabilityTypoFailsClosed(): Promise<void> {
+  for (const action of ["record_clinicial", "finalise_clinical", "amend_clinicals"]) {
+    const db = createFakeDb({[PATH]: storedProfile()});
+    const deps = createDeps(db);
+    await expectHttpsError(
+      () =>
+        runAdminSaveAccessProfile(
+          makeRequest({
+            expectedUpdatedAt: STORED_T1,
+            profile: sourceProfile({permissions: {health: {[action]: true}}}),
+          }),
+          deps,
+        ),
+      "invalid-argument",
+      `health.${action}`,
+    );
+    assertZeroWrites(db, `health.${action}`);
+  }
+}
+
+/**
+ * Concessão explícita continua sendo o ÚNICO caminho: a capability clínica só
+ * chega ao documento quando o payload autorizado a pede com `true`, e o
+ * tri-state endurecido (`false` → revoga em merge) segue valendo para ela.
+ */
+async function testClinicalCapabilityRequiresExplicitGrant(): Promise<void> {
+  // Concessão explícita persiste.
+  const db = createFakeDb({[PATH]: storedProfile()});
+  const deps = createDeps(db);
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      expectedUpdatedAt: STORED_T1,
+      profile: sourceProfile({permissions: {health: {record_clinical: true}}}),
+    }),
+    deps,
+  );
+  assert.strictEqual(
+    ((permissionsOf(db).health as JsonMap) ?? {}).record_clinical,
+    true,
+    "concessão explícita deveria persistir",
+  );
+
+  // `false` em merge revoga via sentinel de delete — mesmo contrato endurecido.
+  const db2 = createFakeDb({
+    [PATH]: storedProfile({
+      permissions: {health: {view: true, read: true, record_clinical: true}},
+    }),
+  });
+  const deps2 = createDeps(db2);
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      expectedUpdatedAt: STORED_T1,
+      profile: sourceProfile({permissions: {health: {record_clinical: false}}}),
+    }),
+    deps2,
+  );
+  const written = lastWrite(db2);
+  assert.ok(
+    hasDeleteSentinelDeep(written.data),
+    "record_clinical: false deveria revogar via FieldValue.delete()",
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1812,6 +1978,9 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["capability: pares recusados", testCapabilityPairsRejected],
   ["capability: módulo+ação conhecidos não bastam", testKnownModuleAndActionIsNotEnough],
   ["seed v6: matriz compatível", testSeedMatrixCompatibility],
+  ["clínico: definido mas não concedido", testClinicalCapabilitiesDefinedButNotGranted],
+  ["clínico: typo falha fechado", testClinicalCapabilityTypoFailsClosed],
+  ["clínico: exige concessão explícita", testClinicalCapabilityRequiresExplicitGrant],
   ["CREATE: sucesso sem expectedUpdatedAt", testCreateSucceedsWithoutExpectedUpdatedAt],
   ["CREATE: expectedUpdatedAt proibido", testCreateRejectsExpectedUpdatedAt],
   ["EDIT: expectedUpdatedAt obrigatório", testEditRequiresExpectedUpdatedAt],

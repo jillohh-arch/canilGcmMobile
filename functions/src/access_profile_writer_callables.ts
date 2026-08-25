@@ -226,6 +226,19 @@ export const CANONICAL_ACCESS_PROFILE_CAPABILITIES: Record<string, ReadonlySet<s
     "issue_restriction",
     "release_restriction",
     "cancel_restriction",
+    // CLIN-WRITER-1.W2 — vocabulário clínico canônico. DEFINIÇÃO APENAS.
+    // Entrar neste catálogo torna o PAR `health.<action>` sintaticamente
+    // válido para uma futura concessão; NÃO concede nada a nenhum perfil.
+    // Capability ausente de `access_profiles/{id}.permissions` continua
+    // significando NÃO CONCEDIDA (fail-closed por omissão).
+    // Estas cinco autorizam comandos callable do backend (Admin SDK), nunca
+    // escrita Firestore do cliente — os três níveis de `clinical_cases`
+    // permanecem `allow create, update, delete: if false`.
+    "record_clinical",
+    "finalize_clinical",
+    "amend_clinical",
+    "manage_clinical_case",
+    "reopen_clinical_case",
   ]),
 };
 
