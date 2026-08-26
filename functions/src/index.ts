@@ -58,6 +58,7 @@ import {
 } from "./health_document_storage_adapter";
 import {
   ClinicalCaller,
+  runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
   runHealthCancelClinicalEvent,
   runHealthFinalizeClinicalEvent,
@@ -8423,6 +8424,16 @@ export const healthFinalizeClinicalEvent = onCall({region}, async (request) => {
  */
 export const healthCancelClinicalEvent = onCall({region}, async (request) => {
   return runHealthCancelClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Anexa uma emenda imutável (correction/addendum/complement) a um ClinicalEvent
+ * `final`, sem reescrever o conteúdo original. O evento pai permanece `final`.
+ * Exige `health.amend_clinical` — a mesma autoridade corretiva do cancelamento,
+ * mas um comando distinto, com receipt, fingerprint e audit próprios.
+ */
+export const healthAmendClinicalEvent = onCall({region}, async (request) => {
+  return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {

@@ -95,6 +95,26 @@ export const CLINICAL_EVENT_FINALIZE_KIND = "clinical_event_finalize_v1";
 export const CLINICAL_EVENT_FINALIZE_OPERATION = "finalize_clinical_event";
 export const CLINICAL_EVENT_CANCEL_KIND = "clinical_event_cancel_v1";
 export const CLINICAL_EVENT_CANCEL_OPERATION = "cancel_clinical_event";
+export const CLINICAL_EVENT_AMEND_KIND = "clinical_event_amend_v1";
+export const CLINICAL_EVENT_AMEND_OPERATION = "amend_clinical_event";
+
+/**
+ * Frozen amendment type vocabulary (schema §2.3, ADR-002).
+ *
+ * Closed like `payload_type`: the type states WHY the original record needed a
+ * causal complement, and a reader composing the record must be able to interpret
+ * every value it encounters.
+ */
+export const CLINICAL_AMENDMENT_TYPES = [
+  "correction",
+  "addendum",
+  "complement",
+] as const;
+
+export type ClinicalAmendmentType = typeof CLINICAL_AMENDMENT_TYPES[number];
+
+/** Only status from which an amendment may be created (ADR-002 §Rules). */
+export const CLINICAL_AMENDABLE_EVENT_STATUS = "final";
 
 export const MAX_CASE_TITLE_LEN = 200;
 export const MAX_REASON_LEN = 2000;
@@ -174,6 +194,13 @@ export interface ClinicalCaseCallableDeps {
    *
    * Cancelling is the corrective authority over an existing clinical record,
    * which is why it keys on amendment rather than on recording or finalisation.
+   *
+   * SHARED with amendment creation (W5) on purpose: `health.amend_clinical` is
+   * the single corrective authority in the W2 catalogue. Sharing the capability
+   * does NOT merge the commands — each keeps its own request vocabulary, receipt
+   * kind, fingerprint, audit action and business semantics. A second seam is
+   * deliberately NOT introduced: it would let a test assert a state that cannot
+   * exist in production (one allowed while the other is denied).
    */
   requireAmendClinical: (
     auth: CallableRequest["auth"],
@@ -708,6 +735,42 @@ function assertCancelReason(raw: unknown): string {
   return raw.trim();
 }
 
+/** Frozen amendment vocabulary (§2.3). Unknown values are never coerced. */
+function parseAmendmentType(raw: unknown): ClinicalAmendmentType {
+  const value = stringValue(raw);
+  if (!value) {
+    throw logicError("validation", "amendmentType é obrigatório.");
+  }
+  if (!(CLINICAL_AMENDMENT_TYPES as readonly string[]).includes(value)) {
+    throw logicError(
+      "validation",
+      `amendmentType inválido: "${value}". Valores aceitos: ` +
+        `${CLINICAL_AMENDMENT_TYPES.join(", ")}.`,
+    );
+  }
+  return value as ClinicalAmendmentType;
+}
+
+/**
+ * The amendment's justification. REQUIRED by the frozen schema.
+ *
+ * An amendment without a stated reason would be indistinguishable from a silent
+ * rewrite of the record, which is exactly what the immutability model exists to
+ * prevent.
+ */
+function assertAmendmentReason(raw: unknown): string {
+  if (raw === undefined || raw === null) {
+    throw logicError("validation", "reason é obrigatório.");
+  }
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    throw logicError("validation", "reason não pode ser vazio.");
+  }
+  if (raw.length > MAX_REASON_LEN) {
+    throw logicError("validation", "reason muito longo.");
+  }
+  return raw.trim();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Deterministic identity
 // ─────────────────────────────────────────────────────────────────────────────
@@ -746,6 +809,26 @@ export function deterministicEventId(hashHex: string): string {
 }
 
 /**
+ * Amendment identity material.
+ *
+ * Keyed on the PARENT EVENT plus the operationId, so a network retry of the same
+ * amendment reproduces the same id and cannot create a second causal fact. The
+ * caller never chooses it.
+ */
+export function amendmentIdentityMaterial(
+  dogId: string,
+  caseId: string,
+  eventId: string,
+  operationId: string,
+): string {
+  return `${CLINICAL_EVENT_AMEND_KIND}|${dogId}|${caseId}|${eventId}|${operationId}`;
+}
+
+export function deterministicAmendmentId(hashHex: string): string {
+  return `ca_${hashHex.slice(0, 28)}`;
+}
+
+/**
  * The opening event id is derived from the CASE identity, not independently.
  *
  * Consequence: case and opening event are one identity pair, so a replay of
@@ -757,6 +840,18 @@ export function openingEventIdFor(caseId: string): string {
 
 export function canonicalCasePath(dogId: string, caseId: string): string {
   return `dogs/${dogId}/clinical_cases/${caseId}`;
+}
+
+export function canonicalAmendmentPath(
+  dogId: string,
+  caseId: string,
+  eventId: string,
+  amendmentId: string,
+): string {
+  return (
+    `${canonicalEventPath(dogId, caseId, eventId)}` +
+    `/clinical_amendments/${amendmentId}`
+  );
 }
 
 export function canonicalEventPath(
@@ -774,6 +869,18 @@ export function clinicalCaseRef(caseId: string): JsonMap {
 
 export function clinicalEventRef(caseId: string, eventId: string): JsonMap {
   return {clinical_case_id: caseId, clinical_event_id: eventId};
+}
+
+export function clinicalAmendmentRef(
+  caseId: string,
+  eventId: string,
+  amendmentId: string,
+): JsonMap {
+  return {
+    clinical_case_id: caseId,
+    clinical_event_id: eventId,
+    clinical_amendment_id: amendmentId,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -890,6 +997,43 @@ export function fingerprintCancelEventIntent(intent: {
       intent.caseId,
       intent.eventId,
       intent.cancelReason,
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of an AMEND intent.
+ *
+ * Includes every caller-controlled business input: the target event, the
+ * amendment type, the normalized reason and the canonical amendment content.
+ * Amending the same event twice under one `operationId` with different content is
+ * a genuine intent divergence and must surface as `idempotency-conflict` rather
+ * than silently replaying the first correction.
+ *
+ * `content` goes through `stableStringify`, so a map with the same entries in a
+ * different insertion order is the SAME logical intent — otherwise a client that
+ * merely reserialised its payload would be told its retry conflicted.
+ *
+ * `expectedUpdatedAt` is excluded, exactly as in finalize/cancel: it is a
+ * precondition on current state, not part of what was requested.
+ */
+export function fingerprintAmendEventIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly eventId: string;
+  readonly amendmentType: string;
+  readonly reason: string;
+  readonly content: JsonMap;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_EVENT_AMEND_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.eventId,
+      intent.amendmentType,
+      intent.reason,
+      stableStringify(intent.content),
     ].join("|"),
   );
 }
@@ -1046,6 +1190,25 @@ function eventRef(
   eventId: string,
 ): FirebaseFirestore.DocumentReference {
   return caseRef(db, dogId, caseId).collection("clinical_events").doc(eventId);
+}
+
+/**
+ * Amendments live UNDER the ClinicalEvent they correct.
+ *
+ * `clinical_amendments`, never the historical `amendments`: W1b renamed it to
+ * escape the collection-group collision with the occurrences domain, and no
+ * alias is retained.
+ */
+function amendmentRef(
+  db: FirebaseFirestore.Firestore,
+  dogId: string,
+  caseId: string,
+  eventId: string,
+  amendmentId: string,
+): FirebaseFirestore.DocumentReference {
+  return eventRef(db, dogId, caseId, eventId)
+    .collection("clinical_amendments")
+    .doc(amendmentId);
 }
 
 /**
@@ -1744,6 +1907,60 @@ function assertStoredEventIntegrity(
   }
 }
 
+/**
+ * Reads the parent event's amendment counters, refusing corrupt values.
+ *
+ * The schema marks `has_amendments`/`amendment_count` REQUIRED and server-managed,
+ * so a W3-born event always carries `false`/`0`. A non-boolean flag or a
+ * non-integer/negative count is CORRUPTION: incrementing from it would persist a
+ * count the server cannot justify, and silently coercing it to 0 would erase the
+ * evidence that earlier amendments exist. Both fail closed.
+ *
+ * `last_amended_at` is optional (absent before the first amendment) but must be a
+ * Timestamp when present.
+ */
+function assertAmendmentMetadataIntegrity(event: JsonMap): number {
+  const flag = event.has_amendments;
+  if (flag !== undefined && typeof flag !== "boolean") {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent com has_amendments corrompido.",
+    );
+  }
+  const count = event.amendment_count;
+  if (count !== undefined) {
+    if (
+      typeof count !== "number" ||
+      !Number.isInteger(count) ||
+      count < 0
+    ) {
+      throw logicError(
+        "integrity",
+        "ClinicalEvent com amendment_count corrompido.",
+      );
+    }
+  }
+  const last = event.last_amended_at as {toMillis?: unknown} | undefined;
+  if (
+    last !== undefined &&
+    last !== null &&
+    typeof last.toMillis !== "function"
+  ) {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent com last_amended_at ilegível.",
+    );
+  }
+  // A count without the flag (or vice versa) is an inconsistent aggregate.
+  if (typeof count === "number" && count > 0 && flag === false) {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent com has_amendments inconsistente com amendment_count.",
+    );
+  }
+  return typeof count === "number" ? count : 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FINALIZE CLINICAL EVENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2103,6 +2320,377 @@ export async function runHealthCancelClinicalEvent(
         caseId,
         eventId,
         status: "cancelled",
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AMEND CLINICAL EVENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Closed key vocabulary of the amendment command.
+ *
+ * `content` IS accepted here — but it is the content of the NEW amendment
+ * document, never a replacement for the parent event's content. The parent patch
+ * below is an explicit metadata-only write, so the two can never be confused.
+ */
+const EVENT_AMEND_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "eventId",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedUpdatedAt",
+  "expected_updated_at",
+  "amendmentType",
+  "reason",
+  "content",
+] as const;
+
+/** Selector + business inputs exempt from the server-managed blocklist. */
+const EVENT_AMEND_INPUTS = [
+  "eventId",
+  "amendmentType",
+  "reason",
+  "content",
+] as const;
+
+function rejectUnknownAmendKeys(data: JsonMap): void {
+  for (const key of Object.keys(data)) {
+    if (EVENT_AMEND_ALLOWED_KEYS.includes(key as never)) continue;
+    throw logicError(
+      "validation",
+      `Campo não aceito por um comando de emenda clínica: ${key}.`,
+    );
+  }
+}
+
+interface ParsedAmendInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly eventId: string;
+  readonly operationId: string;
+  readonly expectedUpdatedAt: number;
+  readonly amendmentType: ClinicalAmendmentType;
+  readonly reason: string;
+  readonly content: JsonMap;
+}
+
+function parseAmendInput(data: JsonMap): ParsedAmendInput {
+  return {
+    dogId: assertDogId(data.dogId ?? data.dog_id),
+    caseId: assertPathId(data.caseId ?? data.case_id, "caseId"),
+    eventId: assertPathId(data.eventId, "eventId"),
+    operationId: normalizeOperationId(
+      data.idempotencyKey ?? data.operationId ?? data.operation_id,
+    ),
+    expectedUpdatedAt: assertExpectedUpdatedAt(
+      data.expectedUpdatedAt ?? data.expected_updated_at,
+    ),
+    amendmentType: parseAmendmentType(data.amendmentType),
+    reason: assertAmendmentReason(data.reason),
+    content: assertContent(data.content),
+  };
+}
+
+/**
+ * Builds the canonical ClinicalAmendment document (schema §2.3).
+ *
+ * `payload_type`/`payload_version` are INHERITED from the parent event rather
+ * than accepted from the caller: the schema requires them to equal the parent's,
+ * and deriving them server-side removes the possibility of an amendment claiming
+ * a contract its parent never had. `professional` does NOT exist in amendment v1
+ * — it is deliberately absent rather than copied from the parent.
+ */
+function clinicalAmendmentDocument(
+  input: ParsedAmendInput,
+  parent: JsonMap,
+  caller: ClinicalCaller,
+  isAdmin: boolean,
+  recordedAt: Timestamp,
+): JsonMap {
+  return {
+    type: input.amendmentType,
+    reason: input.reason,
+    payload_type: parent.payload_type,
+    payload_version: parent.payload_version,
+    content: input.content,
+    recorded_by: recordedByPayload(caller, isAdmin),
+    recorded_at: recordedAt,
+    schema_version: CLINICAL_SCHEMA_VERSION,
+  };
+}
+
+function amendResponse(params: {
+  dogId: string;
+  caseId: string;
+  eventId: string;
+  amendmentId: string;
+  amendmentCount: number;
+  wasNoOp: boolean;
+}): JsonMap {
+  const {dogId, caseId, eventId, amendmentId, amendmentCount, wasNoOp} = params;
+  return {
+    dog_id: dogId,
+    case_id: caseId,
+    event_id: eventId,
+    amendment_id: amendmentId,
+    amendment_count: amendmentCount,
+    reference: clinicalAmendmentRef(caseId, eventId, amendmentId),
+    was_no_op: wasNoOp,
+    dogId,
+    caseId,
+    eventId,
+    amendmentId,
+    amendmentCount,
+    wasNoOp,
+  };
+}
+
+/**
+ * Appends an immutable correction/addendum/complement to a FINAL ClinicalEvent.
+ *
+ * THE consequence of the W4 immutability latch. A finalised clinical fact is
+ * never rewritten: a correction becomes a SEPARATE causal document under
+ * `clinical_amendments`, and the parent keeps `status: final` forever. There is
+ * no "amended" state — `has_amendments` signals that complements exist
+ * (ADR-002 §7).
+ *
+ * Eligibility is `final` ONLY. A `draft` is still editable through its own
+ * pre-final workflow, so amending it would be a second, redundant path to the
+ * same outcome; a `cancelled` event is terminal historical evidence and must not
+ * accrue new clinical meaning.
+ *
+ * The parent write is metadata-only and explicit: `has_amendments`,
+ * `amendment_count`, `last_amended_at`, `updated_at`. `status`, `finalized_at`,
+ * `content`, `occurred_at` and every other clinical field are absent from the
+ * patch by construction, so no amendment can alter the record it corrects.
+ *
+ * Amendments are CREATE-ONLY (ADR-002 §7.3): this module offers no update or
+ * delete path, and correcting a previous amendment means writing another sibling
+ * amendment against the same original event — never an amendment-of-amendment.
+ *
+ * Same replay-before-stale ordering as the other mutation commands.
+ */
+export async function runHealthAmendClinicalEvent(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const caller = await deps.requireAmendClinical(request.auth);
+    const data = (request.data ?? {}) as JsonMap;
+    rejectServerManagedInjection(data, EVENT_AMEND_INPUTS);
+    rejectUnknownAmendKeys(data);
+
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const input = parseAmendInput(data);
+    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const amendmentId = deterministicAmendmentId(
+      sha256Hex(
+        amendmentIdentityMaterial(dogId, caseId, eventId, operationId),
+      ),
+    );
+
+    const fingerprint = fingerprintAmendEventIntent({
+      dogId,
+      caseId,
+      eventId,
+      amendmentType: input.amendmentType,
+      reason: input.reason,
+      content: input.content,
+    });
+
+    const eRef = eventRef(deps.db, dogId, caseId, eventId);
+    const aRef = amendmentRef(deps.db, dogId, caseId, eventId, amendmentId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        auditDocId(
+          CLINICAL_EVENT_AMEND_OPERATION,
+          dogId,
+          caseId,
+          eventId,
+          operationId,
+        ),
+      );
+
+    const amendedAt = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [eventSnap, amendSnap, opSnap] = await Promise.all([
+        tx.get(eRef),
+        tx.get(aRef),
+        tx.get(opRef),
+      ]);
+
+      // ── 1. RECEIPT FIRST (replay / conflict), BEFORE any state check ──────
+      let match: ReceiptMatch = "missing";
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_EVENT_AMEND_KIND,
+          CLINICAL_EVENT_AMEND_OPERATION,
+        );
+        match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_EVENT_AMEND_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+      }
+
+      if (match === "idempotency-conflict") {
+        throw logicError(
+          "idempotency-conflict",
+          "Mesma operationId com intenção diferente da emenda original.",
+        );
+      }
+      if (match === "replay") {
+        const stored = (eventSnap.data() ?? {}) as JsonMap;
+        const count = typeof stored.amendment_count === "number" ?
+          stored.amendment_count :
+          0;
+        return amendResponse({
+          dogId,
+          caseId,
+          eventId,
+          amendmentId,
+          amendmentCount: count,
+          wasNoOp: true,
+        });
+      }
+
+      // ── 2. only now: the parent event and its integrity ───────────────────
+      if (!eventSnap.exists) {
+        throw logicError("not-found", "Evento clínico não encontrado.");
+      }
+      const event = (eventSnap.data() ?? {}) as JsonMap;
+      assertStoredEventIntegrity(event, dogId, caseId);
+      const currentCount = assertAmendmentMetadataIntegrity(event);
+
+      // An amendment document existing without its receipt is corruption: the
+      // deterministic id means only THIS operation could have written it.
+      if (amendSnap.exists) {
+        throw logicError(
+          "integrity",
+          "Emenda clínica existe sem receipt da operação: " +
+            "recusando sobrescrever evidência clínica.",
+        );
+      }
+
+      // ── 3. concurrency precondition ───────────────────────────────────────
+      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+
+      // ── 4. eligibility, decided against the FROZEN status vocabulary ──────
+      const currentStatus = parseClinicalEventStatus(event.status);
+      if (currentStatus !== CLINICAL_AMENDABLE_EVENT_STATUS) {
+        throw logicError(
+          "conflict",
+          `Evento clínico ${currentStatus} não aceita emendas: ` +
+            "somente um evento final pode ser emendado.",
+        );
+      }
+
+      // The amendment inherits the parent's payload contract; a parent without
+      // one cannot be described by an amendment.
+      if (
+        stringValue(event.payload_type) === undefined ||
+        typeof event.payload_version !== "number"
+      ) {
+        throw logicError(
+          "integrity",
+          "Evento clínico sem payload_type/payload_version canônicos.",
+        );
+      }
+
+      // ── 5. atomic amendment + parent metadata + receipt + audit ───────────
+      tx.set(
+        aRef,
+        clinicalAmendmentDocument(input, event, caller, isAdmin, amendedAt),
+      );
+      // EXPLICIT metadata-only patch. `status`, `finalized_at` and every
+      // clinical field are absent by construction: the parent stays `final` and
+      // its content is untouched.
+      // `amendment_count` is written as an EXPLICIT number, not
+      // `FieldValue.increment(1)`. The transaction already read the current count
+      // and validated it, and `expectedUpdatedAt` serialises competing mutations,
+      // so there is no lost-update to defend against. An explicit value keeps the
+      // stored count, the audit entry and the response provably equal — with a
+      // sentinel, the server would report a number it never actually wrote.
+      tx.set(
+        eRef,
+        {
+          has_amendments: true,
+          amendment_count: currentCount + 1,
+          last_amended_at: amendedAt,
+          updated_at: amendedAt,
+        },
+        {merge: true},
+      );
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_EVENT_AMEND_KIND,
+          operationType: CLINICAL_EVENT_AMEND_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {dogId, caseId, eventId, amendmentId},
+        }),
+      );
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_event_amended",
+          caller,
+          entityType: "clinical_amendments",
+          entityId: amendmentId,
+          entityPath: canonicalAmendmentPath(
+            dogId,
+            caseId,
+            eventId,
+            amendmentId,
+          ),
+          summary:
+            `Emenda clínica registrada no evento ${eventId} do K9 ${dogId}`,
+          metadata: {
+            dog_id: dogId,
+            case_id: caseId,
+            event_id: eventId,
+            amendment_id: amendmentId,
+            operation_id: operationId,
+            amendment_type: input.amendmentType,
+            reason: input.reason,
+            event_status: currentStatus,
+            amendment_count: currentCount + 1,
+          },
+        }),
+      );
+
+      return amendResponse({
+        dogId,
+        caseId,
+        eventId,
+        amendmentId,
+        amendmentCount: currentCount + 1,
         wasNoOp: false,
       });
     });

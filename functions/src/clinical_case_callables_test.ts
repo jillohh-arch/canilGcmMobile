@@ -22,6 +22,7 @@ import {
   eventIdentityMaterial,
   deterministicEventId,
   openingEventIdFor,
+  runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
   runHealthCancelClinicalEvent,
   runHealthFinalizeClinicalEvent,
@@ -2216,6 +2217,809 @@ async function testMalformedInputRejectedBeforeAnyRead() {
   );
 }
 
+// ── AMENDMENTS (W5) ────────────────────────────────────────────────────────
+
+const T2 = new Date("2026-08-17T15:45:00.000Z");
+const T3 = new Date("2026-08-18T08:15:00.000Z");
+
+/** Cria um evento e o FINALIZA: o único estado emendável. */
+async function seedFinalEvent(options: {admin?: boolean} = {}) {
+  const s = await seedDraftEvent(options);
+  await runHealthFinalizeClinicalEvent(
+    mockRequest(mutationCmd(s.caseId, s.eventId, "op-seed-fin", s.t0)),
+    depsFor({db: s.db, now: T1, admin: options.admin}),
+  );
+  const ev = eventOf(s.db, s.eventPath);
+  return {
+    ...s,
+    tFinal: (ev.updated_at as Timestamp).toMillis(),
+    finalizedAt: (ev.finalized_at as Timestamp).toMillis(),
+  };
+}
+
+const amendCmd = (
+  caseId: string,
+  eventId: string,
+  operationId: string,
+  expectedUpdatedAt: number,
+  extra: JsonMap = {},
+): JsonMap => ({
+  dogId: "dog-1",
+  caseId,
+  eventId,
+  operationId,
+  expectedUpdatedAt,
+  amendmentType: "correction",
+  reason: "corrige dose registrada",
+  content: {notes: "dose correta: 5mg"},
+  ...extra,
+});
+
+const amendKeys = (
+  db: {_store: Map<string, JsonMap>},
+  eventPath: string,
+): string[] =>
+  [...db._store.keys()]
+    .filter((k) => k.startsWith(`${eventPath}/clinical_amendments/`))
+    .sort();
+
+/**
+ * Campos clínicos do PAI que uma emenda nunca pode tocar.
+ *
+ * Não é `CONTENT_FIELDS`: aquele conjunto trata `has_amendments`/`amendment_count`
+ * como imutáveis, o que vale para finalize/cancel mas NÃO para a emenda — esses
+ * dois são exatamente os metadados derivados que o W5 tem autoridade para mover.
+ * Confundir os dois conjuntos tornaria o teste de preservação de conteúdo
+ * impossível de satisfazer, ou (pior) mascararia uma reescrita real.
+ */
+const AMEND_IMMUTABLE_PARENT_FIELDS = [
+  "dog_id",
+  "case_id",
+  "entity_kind",
+  "event_type",
+  "occurred_at",
+  "recorded_at",
+  "recorded_by",
+  "payload_type",
+  "payload_version",
+  "content",
+  "schema_version",
+  "status",
+  "finalized_at",
+];
+
+function assertParentClinicalPayloadPreserved(
+  before: JsonMap,
+  after: JsonMap,
+  label: string,
+): void {
+  for (const f of AMEND_IMMUTABLE_PARENT_FIELDS) {
+    assert.deepStrictEqual(
+      after[f],
+      before[f],
+      `${label}: campo clínico do pai alterado: ${f}`,
+    );
+  }
+}
+
+async function testAmendSuccessAndParentMetadata() {
+  const s = await seedFinalEvent();
+  const before = {...eventOf(s.db, s.eventPath)};
+  const caseBefore = {...(s.db._store.get(s.casePath) as JsonMap)};
+  const auditsBefore = auditKeys(s.db).length;
+  const opsBefore = opKeys(s.db, s.casePath).length;
+
+  const res = (await runHealthAmendClinicalEvent(
+    mockRequest(
+      amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal, {
+        reason: "   corrige a dose registrada   ",
+      }),
+    ),
+    depsFor({db: s.db, now: T2}),
+  )) as JsonMap;
+
+  // 1/2 — emenda criada no caminho canônico aninhado.
+  assert.strictEqual(res.was_no_op, false, "1: primeira emenda não é no-op");
+  const paths = amendKeys(s.db, s.eventPath);
+  assert.strictEqual(paths.length, 1, "2: esperava 1 emenda, obtive " + paths.length);
+  const amendPath = paths[0];
+  assert.ok(
+    /\/clinical_amendments\/ca_[0-9a-f]{28}$/.test(amendPath),
+    "2: caminho/ID canônico divergente: " + amendPath,
+  );
+  // Nunca o caminho histórico.
+  assert.strictEqual(
+    [...s.db._store.keys()].some((k) => /\/amendments\//.test(k)),
+    false,
+    "2: coleção histórica /amendments/ foi usada",
+  );
+
+  const after = eventOf(s.db, s.eventPath);
+  // 3/4 — pai continua final, conteúdo original intacto.
+  assert.strictEqual(after.status, "final", "3: status do pai mudou");
+  assertParentClinicalPayloadPreserved(before, after, "4");
+  assert.strictEqual(
+    (after.finalized_at as Timestamp).toMillis(),
+    s.finalizedAt,
+    "15: finalized_at alterado",
+  );
+
+  // 5..9 — shape exato da emenda.
+  const a = s.db._store.get(amendPath) as JsonMap;
+  assert.deepStrictEqual(
+    Object.keys(a).sort(),
+    ["content", "payload_type", "payload_version", "reason", "recorded_at",
+      "recorded_by", "schema_version", "type"].sort(),
+    "5: shape da emenda divergente: " + JSON.stringify(Object.keys(a)),
+  );
+  assert.strictEqual(a.type, "correction", "6: type");
+  assert.strictEqual(a.reason, "corrige a dose registrada", "7: reason não trimado");
+  assert.strictEqual(
+    (a.recorded_at as Timestamp).toMillis(),
+    T2.getTime(),
+    "8: recorded_at não é do servidor",
+  );
+  assert.deepStrictEqual(
+    a.recorded_by,
+    {uid: actor.uid, name: actor.name, internal_role: "condutor"},
+    "9: recorded_by não é server-derived",
+  );
+  // payload herdado do pai, não do cliente.
+  assert.strictEqual(a.payload_type, before.payload_type, "payload_type herdado");
+  assert.strictEqual(a.payload_version, before.payload_version, "payload_version herdado");
+  assert.strictEqual(a.schema_version, 1, "schema_version");
+  // `professional` NÃO existe na v1 congelada da emenda.
+  assert.strictEqual(a.professional, undefined, "professional não pertence à emenda v1");
+  assert.deepStrictEqual(a.content, {notes: "dose correta: 5mg"}, "content da emenda");
+
+  // 11..14 — metadados derivados do pai.
+  assert.strictEqual(after.has_amendments, true, "11: has_amendments");
+  assert.strictEqual(after.amendment_count, 1, "12: amendment_count");
+  const lastAmended = after.last_amended_at as Timestamp;
+  assert.ok(lastAmended && typeof lastAmended.toMillis === "function", "13: last_amended_at");
+  assert.strictEqual(lastAmended.toMillis(), T2.getTime(), "13: instante do servidor");
+  assert.strictEqual(
+    (after.updated_at as Timestamp).toMillis(),
+    lastAmended.toMillis(),
+    "14: updated_at != last_amended_at",
+  );
+
+  // 16..18 — caso intacto, um receipt, um audit.
+  assert.deepStrictEqual(
+    s.db._store.get(s.casePath),
+    caseBefore,
+    "16: documento do caso foi alterado",
+  );
+  assert.strictEqual(
+    opKeys(s.db, s.casePath).length,
+    opsBefore + 1,
+    "17: receipts != +1",
+  );
+  assert.ok(
+    opKeys(s.db, s.casePath).includes(`${s.casePath}/operations/op-am-1`),
+    "17: receipt case-scoped ausente",
+  );
+  assert.strictEqual(
+    auditKeys(s.db).length,
+    auditsBefore + 1,
+    "18: audits != +1",
+  );
+  const audit = s.db._store.get(
+    auditKeys(s.db).find((k) => {
+      const x = s.db._store.get(k) as JsonMap;
+      return x.action === "clinical_event_amended";
+    }) as string,
+  ) as JsonMap;
+  assert.ok(audit, "18: audit de emenda ausente");
+  const meta = audit.metadata as JsonMap;
+  assert.strictEqual(meta.amendment_type, "correction", "audit: tipo");
+  assert.strictEqual(meta.amendment_count, 1, "audit: contagem");
+  assert.strictEqual(meta.event_status, "final", "audit: status do pai");
+  assert.strictEqual(audit.entity_type, "clinical_amendments", "audit: entity_type");
+}
+
+async function testSecondAmendmentIsSibling() {
+  const s = await seedFinalEvent();
+  await runHealthAmendClinicalEvent(
+    mockRequest(amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal)),
+    depsFor({db: s.db, now: T2}),
+  );
+  const firstPath = amendKeys(s.db, s.eventPath)[0];
+  const firstDoc = {...(s.db._store.get(firstPath) as JsonMap)};
+  const tokenAfterFirst = (
+    eventOf(s.db, s.eventPath).updated_at as Timestamp
+  ).toMillis();
+
+  // 19/20 — segunda emenda legítima com token renovado.
+  await runHealthAmendClinicalEvent(
+    mockRequest(
+      amendCmd(s.caseId, s.eventId, "op-am-2", tokenAfterFirst, {
+        amendmentType: "addendum",
+        reason: "acrescenta observação do plantão",
+        content: {notes: "reavaliar em 24h"},
+      }),
+    ),
+    depsFor({db: s.db, now: T3}),
+  );
+  const after = eventOf(s.db, s.eventPath);
+  assert.strictEqual(after.amendment_count, 2, "19: contagem != 2");
+  assert.strictEqual(after.has_amendments, true, "19: has_amendments");
+  assert.strictEqual(
+    (after.last_amended_at as Timestamp).toMillis(),
+    T3.getTime(),
+    "20: last_amended_at não avançou",
+  );
+  assert.strictEqual(after.status, "final", "pai deixou de ser final");
+
+  // 21/22 — a primeira emenda permanece imutável e ambas coexistem.
+  const all = amendKeys(s.db, s.eventPath);
+  assert.strictEqual(all.length, 2, "21: esperava 2 emendas irmãs");
+  assert.deepStrictEqual(
+    s.db._store.get(firstPath),
+    firstDoc,
+    "22: a primeira emenda foi reescrita",
+  );
+  // Modelo causal PLANO: nada aninhado sob uma emenda.
+  assert.strictEqual(
+    [...s.db._store.keys()].some((k) =>
+      /\/clinical_amendments\/[^/]+\/clinical_amendments\//.test(k)),
+    false,
+    "modelo recursivo de emenda-de-emenda apareceu",
+  );
+}
+
+async function testAmendParentEligibility() {
+  // 23 — draft negado.
+  const d = await seedDraftEvent();
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(d.caseId, d.eventId, "op-am-d", d.t0)),
+      depsFor({db: d.db, now: T2}),
+    ),
+    "conflict",
+    "23: draft deveria negar emenda",
+  );
+  assert.strictEqual(
+    amendKeys(d.db, d.eventPath).length,
+    0,
+    "23: emenda criada sobre draft",
+  );
+  assert.strictEqual(
+    eventOf(d.db, d.eventPath).has_amendments,
+    false,
+    "23: metadados do draft mutados",
+  );
+
+  // 24 — cancelled negado.
+  const c = await seedDraftEvent();
+  await runHealthCancelClinicalEvent(
+    mockRequest(
+      mutationCmd(c.caseId, c.eventId, "op-can", c.t0, {cancelReason: "erro"}),
+    ),
+    depsFor({db: c.db, now: T1}),
+  );
+  const cTok = (eventOf(c.db, c.eventPath).updated_at as Timestamp).toMillis();
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(c.caseId, c.eventId, "op-am-c", cTok)),
+      depsFor({db: c.db, now: T2}),
+    ),
+    "conflict",
+    "24: cancelled deveria negar emenda",
+  );
+  assert.strictEqual(amendKeys(c.db, c.eventPath).length, 0, "24: emenda criada");
+
+  // 25 — evento inexistente.
+  const s = await seedFinalEvent();
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(s.caseId, "ce_naoexiste", "op-am-x", s.tFinal)),
+      depsFor({db: s.db, now: T2}),
+    ),
+    "not-found",
+    "25: evento inexistente",
+  );
+
+  // 26 — status persistido corrompido.
+  const k = await seedFinalEvent();
+  const kev = eventOf(k.db, k.eventPath);
+  kev.status = "meio_final";
+  k.db._store.set(k.eventPath, kev);
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(k.caseId, k.eventId, "op-am-k", k.tFinal)),
+      depsFor({db: k.db, now: T2}),
+    ),
+    "validation",
+    "26: status corrompido deveria falhar fechado",
+  );
+  assert.strictEqual(amendKeys(k.db, k.eventPath).length, 0, "26: emenda criada");
+}
+
+async function testAmendConcurrency() {
+  const s = await seedFinalEvent();
+
+  // 27/28 — token obrigatório e malformado.
+  const bad: Array<[unknown, string]> = [
+    [undefined, "27: ausente"],
+    ["1755259200000", "28: string"],
+    [1.5, "28: fracionário"],
+    [Number.NaN, "28: NaN"],
+    [-1, "28: negativo"],
+  ];
+  for (const [v, label] of bad) {
+    const c = amendCmd(s.caseId, s.eventId, "op-am-t", s.tFinal);
+    if (v === undefined) delete c.expectedUpdatedAt;
+    else c.expectedUpdatedAt = v;
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(c),
+        depsFor({db: s.db, now: T2}),
+      ),
+      "validation",
+      "CONCURRENCY " + label,
+    );
+  }
+  assert.strictEqual(amendKeys(s.db, s.eventPath).length, 0, "token inválido criou emenda");
+
+  // 29 — updated_at armazenado malformado.
+  for (const corrupt of [undefined, "2026-08-16T09:30:00.000Z", 12345]) {
+    const m = await seedFinalEvent();
+    const ev = eventOf(m.db, m.eventPath);
+    if (corrupt === undefined) delete ev.updated_at;
+    else ev.updated_at = corrupt;
+    m.db._store.set(m.eventPath, ev);
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(m.caseId, m.eventId, "op-am-s", m.tFinal)),
+        depsFor({db: m.db, now: T2}),
+      ),
+      "integrity",
+      "29: updated_at armazenado inválido (" + String(corrupt) + ")",
+    );
+    assert.strictEqual(amendKeys(m.db, m.eventPath).length, 0, "29: emenda criada");
+  }
+
+  // 30 — token velho (transição legal, token é a ÚNICA falha).
+  const st = await seedFinalEvent();
+  const stev = eventOf(st.db, st.eventPath);
+  const advanced = Timestamp.fromMillis(st.tFinal + 5000);
+  stev.updated_at = advanced;
+  st.db._store.set(st.eventPath, stev);
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(st.caseId, st.eventId, "op-am-stale", st.tFinal)),
+      depsFor({db: st.db, now: T2}),
+    ),
+    "conflict",
+    "30: token velho deveria falhar stale",
+  );
+  assert.strictEqual(amendKeys(st.db, st.eventPath).length, 0, "30: emenda criada");
+  assert.strictEqual(
+    eventOf(st.db, st.eventPath).amendment_count,
+    0,
+    "30: contagem incrementada por requisição stale",
+  );
+  // Com o token correto a MESMA emenda é aceita: prova que a rejeição foi do token.
+  await runHealthAmendClinicalEvent(
+    mockRequest(
+      amendCmd(st.caseId, st.eventId, "op-am-fresh", advanced.toMillis()),
+    ),
+    depsFor({db: st.db, now: T2}),
+  );
+  assert.strictEqual(
+    eventOf(st.db, st.eventPath).amendment_count,
+    1,
+    "token correto deveria permitir a mesma emenda",
+  );
+
+  // 31..33 — replay com token PRE-mutação.
+  const r = await seedFinalEvent();
+  const cmd = amendCmd(r.caseId, r.eventId, "op-am-1", r.tFinal);
+  await runHealthAmendClinicalEvent(mockRequest(cmd), depsFor({db: r.db, now: T2}));
+  const tokenAfter = (eventOf(r.db, r.eventPath).updated_at as Timestamp).toMillis();
+  const amendsAfter = amendKeys(r.db, r.eventPath).length;
+  const auditsAfter = auditKeys(r.db).length;
+  const opsAfter = opKeys(r.db, r.casePath).length;
+
+  const replay = (await runHealthAmendClinicalEvent(
+    mockRequest(cmd),
+    depsFor({db: r.db, now: T3}),
+  )) as JsonMap;
+  assert.strictEqual(replay.was_no_op, true, "31: replay não sinalizou no-op");
+  const afterReplay = eventOf(r.db, r.eventPath);
+  assert.strictEqual(afterReplay.amendment_count, 1, "32: replay incrementou a contagem");
+  assert.strictEqual(
+    (afterReplay.updated_at as Timestamp).toMillis(),
+    tokenAfter,
+    "33: replay avançou o token",
+  );
+  assert.strictEqual(
+    (afterReplay.last_amended_at as Timestamp).toMillis(),
+    T2.getTime(),
+    "33: replay avançou last_amended_at",
+  );
+  assert.strictEqual(amendKeys(r.db, r.eventPath).length, amendsAfter, "31: replay duplicou emenda");
+  assert.strictEqual(auditKeys(r.db).length, auditsAfter, "31: replay duplicou audit");
+  assert.strictEqual(opKeys(r.db, r.casePath).length, opsAfter, "31: replay duplicou receipt");
+
+  // 34 — operação NOVA com token velho.
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(r.caseId, r.eventId, "op-am-9", r.tFinal)),
+      depsFor({db: r.db, now: T3}),
+    ),
+    "conflict",
+    "34: nova operação com token velho",
+  );
+  assert.strictEqual(
+    eventOf(r.db, r.eventPath).amendment_count,
+    1,
+    "34: stale incrementou a contagem",
+  );
+}
+
+async function testAmendIdempotencyAndReceipts() {
+  const s = await seedFinalEvent();
+  const base = amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal);
+  await runHealthAmendClinicalEvent(mockRequest(base), depsFor({db: s.db, now: T2}));
+  const tok = (eventOf(s.db, s.eventPath).updated_at as Timestamp).toMillis();
+  const countBefore = eventOf(s.db, s.eventPath).amendment_count;
+
+  // 35..37 — mesma operationId, intenção divergente.
+  const divergent: Array<[string, JsonMap]> = [
+    ["35: tipo diferente", {amendmentType: "addendum"}],
+    ["36: motivo diferente", {reason: "outro motivo completamente distinto"}],
+    ["37: conteúdo diferente", {content: {notes: "conteúdo diferente"}}],
+  ];
+  for (const [label, extra] of divergent) {
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-1", tok, extra)),
+        depsFor({db: s.db, now: T3}),
+      ),
+      "idempotency-conflict",
+      label,
+    );
+  }
+  assert.strictEqual(
+    eventOf(s.db, s.eventPath).amendment_count,
+    countBefore,
+    "conflito alterou a contagem",
+  );
+  assert.strictEqual(amendKeys(s.db, s.eventPath).length, 1, "conflito criou emenda");
+
+  // Ordem de chaves do content NÃO muda a intenção lógica (serializador estável).
+  const reordered = amendCmd(s.caseId, s.eventId, "op-am-1", tok, {
+    content: {notes: "dose correta: 5mg"},
+  });
+  const replay = (await runHealthAmendClinicalEvent(
+    mockRequest(reordered),
+    depsFor({db: s.db, now: T3}),
+  )) as JsonMap;
+  assert.strictEqual(replay.was_no_op, true, "content equivalente deveria replayar");
+
+  // 38/39 — receipt malformado falha fechado e NÃO é sobrescrito.
+  const m = await seedFinalEvent();
+  const corrupt: JsonMap = {
+    kind: "clinical_event_amend_v1",
+    operation_id: "op-mal",
+    // operation_type ausente
+    actor_uid: actor.uid,
+    fingerprint: "x",
+    result: {},
+  };
+  m.db._store.set(`${m.casePath}/operations/op-mal`, corrupt);
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(m.caseId, m.eventId, "op-mal", m.tFinal)),
+      depsFor({db: m.db, now: T2}),
+    ),
+    "integrity",
+    "38: receipt malformado",
+  );
+  assert.strictEqual(amendKeys(m.db, m.eventPath).length, 0, "38: emenda criada");
+  assert.deepStrictEqual(
+    m.db._store.get(`${m.casePath}/operations/op-mal`),
+    corrupt,
+    "39: receipt corrompido foi sobrescrito",
+  );
+
+  // Emenda existente sem receipt = corrupção (ID determinístico).
+  const o = await seedFinalEvent();
+  const orphanId = (await (async () => {
+    await runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(o.caseId, o.eventId, "op-orphan", o.tFinal)),
+      depsFor({db: o.db, now: T2}),
+    );
+    return amendKeys(o.db, o.eventPath)[0];
+  })());
+  o.db._store.delete(`${o.casePath}/operations/op-orphan`);
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(
+        amendCmd(
+          o.caseId,
+          o.eventId,
+          "op-orphan",
+          (eventOf(o.db, o.eventPath).updated_at as Timestamp).toMillis(),
+        ),
+      ),
+      depsFor({db: o.db, now: T3}),
+    ),
+    "integrity",
+    "emenda órfã deveria falhar fechado",
+  );
+  assert.ok(o.db._store.get(orphanId), "emenda órfã foi apagada");
+}
+
+async function testAmendAuthorizationAndInjection() {
+  const s = await seedFinalEvent();
+
+  // 40..43 — capability e escopo.
+  const denials: Array<[string, Parameters<typeof depsFor>[0]]> = [
+    ["40: sem amend_clinical", {db: s.db, allowAmend: false}],
+    ["41: só record_clinical", {db: s.db, allowRecord: true, allowFinalize: false, allowAmend: false}],
+    ["41: só finalize_clinical", {db: s.db, allowFinalize: true, allowAmend: false}],
+    ["41: só health.read", {db: s.db, allowRecord: false, allowFinalize: false, allowAmend: false}],
+    ["43: admin sem grant", {db: s.db, admin: true, allowAmend: false}],
+  ];
+  for (const [label, opts] of denials) {
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-w", s.tFinal)),
+        depsFor({...opts, now: T2}),
+      ),
+      "permission-denied",
+      label,
+    );
+  }
+  // 42 — escopo de K9 é gate independente.
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(s.caseId, s.eventId, "op-am-dog", s.tFinal)),
+      depsFor({db: s.db, now: T2, allowAmend: true, dogAccess: false}),
+    ),
+    "permission-denied",
+    "42: escopo de K9 negado",
+  );
+  assert.strictEqual(amendKeys(s.db, s.eventPath).length, 0, "negação criou emenda");
+  assert.strictEqual(
+    eventOf(s.db, s.eventPath).has_amendments,
+    false,
+    "negação mutou metadados do pai",
+  );
+
+  // 44..46 — injeção de identidade/servidor e substituição do pai.
+  const forged: Array<[string, JsonMap]> = [
+    ["status", {status: "draft"}],
+    ["updated_at", {updated_at: 1}],
+    ["updatedAt", {updatedAt: 1}],
+    ["finalized_at", {finalized_at: 1}],
+    ["finalizedAt", {finalizedAt: 1}],
+    ["has_amendments", {has_amendments: true}],
+    ["amendment_count", {amendment_count: 99}],
+    ["last_amended_at", {last_amended_at: 1}],
+    ["recorded_at", {recorded_at: 1}],
+    ["recorded_by", {recorded_by: {uid: "x"}}],
+    ["dog_id", {dog_id: "dog-2"}],
+    ["case_id", {case_id: "cc_outro"}],
+    ["event_id", {event_id: "ce_outro"}],
+    ["amendment_id", {amendment_id: "ca_forjado"}],
+    ["amendId", {amendId: "ca_forjado"}],
+    ["schema_version", {schema_version: 2}],
+    ["event_type", {event_type: "incident"}],
+    ["eventType", {eventType: "incident"}],
+    ["occurred_at", {occurred_at: "2026-01-01T00:00:00.000Z"}],
+    ["occurredAt", {occurredAt: "2026-01-01T00:00:00.000Z"}],
+    ["payload_type", {payload_type: "incident_v1"}],
+    ["payloadType", {payloadType: "incident_v1"}],
+    ["payload_version", {payload_version: 9}],
+    ["professional", {professional: {name: "x"}}],
+    ["attachment_refs", {attachment_refs: ["a"]}],
+    ["attachmentRefs", {attachmentRefs: ["a"]}],
+    ["chave desconhecida", {qualquerCoisa: 1}],
+  ];
+  for (const [label, extra] of forged) {
+    const before = {...eventOf(s.db, s.eventPath)};
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-inj", s.tFinal, extra)),
+        depsFor({db: s.db, now: T2}),
+      ),
+      "validation",
+      "44/45/46: injeção de " + label,
+    );
+    assert.deepStrictEqual(
+      eventOf(s.db, s.eventPath),
+      before,
+      "injeção de " + label + " escreveu no pai",
+    );
+    assert.strictEqual(
+      amendKeys(s.db, s.eventPath).length,
+      0,
+      "injeção de " + label + " criou emenda",
+    );
+  }
+
+  // Vocabulário de emenda inválido / campos obrigatórios ausentes.
+  const invalid: Array<[string, JsonMap]> = [
+    ["tipo inválido", {amendmentType: "retificacao"}],
+    ["tipo vazio", {amendmentType: ""}],
+    ["motivo vazio", {reason: "   "}],
+    ["content não-mapa", {content: "texto"}],
+    ["content array", {content: []}],
+  ];
+  for (const [label, extra] of invalid) {
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-v", s.tFinal, extra)),
+        depsFor({db: s.db, now: T2}),
+      ),
+      "validation",
+      "vocabulário: " + label,
+    );
+  }
+  for (const missing of ["amendmentType", "reason", "content"]) {
+    const c = amendCmd(s.caseId, s.eventId, "op-am-m", s.tFinal);
+    delete c[missing];
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(c),
+        depsFor({db: s.db, now: T2}),
+      ),
+      "validation",
+      "campo obrigatório ausente: " + missing,
+    );
+  }
+}
+
+/** Metadados de emenda corrompidos no pai falham fechado, sem normalização. */
+async function testAmendParentMetadataIntegrity() {
+  const cases: Array<[string, JsonMap]> = [
+    ["has_amendments não-booleano", {has_amendments: "sim"}],
+    ["amendment_count string", {amendment_count: "1"}],
+    ["amendment_count negativo", {amendment_count: -1}],
+    ["amendment_count fracionário", {amendment_count: 1.5}],
+    ["last_amended_at ilegível", {last_amended_at: "2026-08-17T00:00:00.000Z"}],
+    ["contagem sem flag", {has_amendments: false, amendment_count: 3}],
+  ];
+  for (const [label, patch] of cases) {
+    const s = await seedFinalEvent();
+    const ev = eventOf(s.db, s.eventPath);
+    Object.assign(ev, patch);
+    s.db._store.set(s.eventPath, ev);
+    await expectReject(
+      () => runHealthAmendClinicalEvent(
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-i", s.tFinal)),
+        depsFor({db: s.db, now: T2}),
+      ),
+      "integrity",
+      "metadados corrompidos: " + label,
+    );
+    assert.strictEqual(
+      amendKeys(s.db, s.eventPath).length,
+      0,
+      label + ": emenda criada apesar da corrupção",
+    );
+  }
+
+  // Pai sem payload canônico não pode ser descrito por uma emenda.
+  const p = await seedFinalEvent();
+  const pev = eventOf(p.db, p.eventPath);
+  delete pev.payload_type;
+  p.db._store.set(p.eventPath, pev);
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(p.caseId, p.eventId, "op-am-p", p.tFinal)),
+      depsFor({db: p.db, now: T2}),
+    ),
+    "integrity",
+    "pai sem payload_type",
+  );
+}
+
+/**
+ * Guarda arquitetural: a emenda NUNCA escreve conteúdo clínico no pai.
+ *
+ * Estrutural, não só comportamental: se um dia o patch do pai passasse a
+ * carregar um campo clínico, nenhum teste de caixa-preta necessariamente
+ * falharia — este falha.
+ */
+async function testAmendWriterHasNoParentContentPath() {
+  const src = stripComments(readSource("clinical_case_callables.ts"));
+  const body = src.slice(src.indexOf("export async function runHealthAmendClinicalEvent"));
+
+  assert.ok(body.includes("deps.requireAmendClinical("), "emenda exige amend_clinical");
+  assert.strictEqual(
+    body.includes("deps.requireRecordClinical(") ||
+      body.includes("deps.requireFinalizeClinical("),
+    false,
+    "emenda não pode usar outra seam de capability",
+  );
+
+  // Ordem obrigatória: replay antes do stale-check.
+  const replayAt = body.indexOf("matchClinicalReceipt(");
+  const staleAt = body.indexOf("assertFreshToken(");
+  assert.ok(replayAt > 0 && staleAt > 0, "checagens ausentes");
+  assert.ok(replayAt < staleAt, "stale-check precede o replay (ordenação P0 violada)");
+
+  // O patch do pai é metadata-only: extrai o bloco tx.set(eRef, ...).
+  // Line-ending agnostic: the source is checked out with CRLF on Windows, so a
+  // literal "\n" here would never match and the guard would pass vacuously.
+  const i = body.search(/tx\.set\(\s*eRef,/);
+  assert.ok(i > 0, "patch do pai não encontrado");
+  const patch = body.slice(i, body.indexOf("{merge: true},", i));
+  for (const forbidden of ["content", "status", "finalized_at", "event_type",
+    "occurred_at", "payload_type", "payload_version", "recorded_at", "recorded_by",
+    "professional", "attachment_refs"]) {
+    assert.strictEqual(
+      new RegExp("\\b" + forbidden + "\\s*:").test(patch),
+      false,
+      `patch do pai contém campo proibido: ${forbidden}`,
+    );
+  }
+  for (const required of ["has_amendments", "amendment_count", "last_amended_at",
+    "updated_at"]) {
+    assert.ok(
+      new RegExp("\\b" + required + "\\s*:").test(patch),
+      `patch do pai não escreve ${required}`,
+    );
+  }
+  // Nenhum spread de payload do cliente no comando.
+  assert.strictEqual(
+    /\.\.\.\s*(data|input|request)/.test(body),
+    false,
+    "spread de payload do cliente presente na emenda",
+  );
+  // Caminho canônico, nunca o histórico. A coleção é construída no helper
+  // `amendmentRef`, definido ANTES do comando — por isso a asserção da coleção
+  // olha o módulo inteiro, e a do comando verifica que ele usa o helper.
+  assert.ok(
+    src.includes("collection(\"clinical_amendments\")"),
+    "coleção canônica clinical_amendments ausente no writer",
+  );
+  assert.ok(
+    body.includes("amendmentRef(deps.db"),
+    "o comando não usa o helper canônico amendmentRef",
+  );
+  assert.strictEqual(
+    /collection\("amendments"\)/.test(src),
+    false,
+    "coleção histórica amendments presente no writer",
+  );
+  // Create-only: nenhum callable de update/delete de emenda.
+  for (const forbidden of ["runHealthUpdateClinicalAmendment",
+    "runHealthDeleteClinicalAmendment", "runHealthCancelClinicalAmendment"]) {
+    assert.strictEqual(src.includes(forbidden), false, `writer expõe ${forbidden}`);
+  }
+  // O wiring real liga a capability exata E entrega as deps canônicas intactas.
+  //
+  // Verificar apenas a string da capability não bastaria: o callable poderia
+  // sobrescrever `requireAmendClinical` no ponto de injeção e passar a exigir
+  // outra autoridade sem que nenhuma string mudasse.
+  const index = stripComments(readSource("index.ts"));
+  assert.ok(
+    index.includes("healthAmendClinicalEvent = onCall"),
+    "index não exporta healthAmendClinicalEvent",
+  );
+  const wiring = index.slice(index.indexOf("healthAmendClinicalEvent = onCall"));
+  const call = wiring.slice(0, wiring.indexOf("});") + 3);
+  assert.ok(
+    /runHealthAmendClinicalEvent\(request,\s*clinicalCaseDeps\)/.test(call),
+    "a emenda deve receber clinicalCaseDeps sem sobrescrita: " + call,
+  );
+  assert.strictEqual(
+    /\.\.\.\s*clinicalCaseDeps/.test(call),
+    false,
+    "wiring da emenda sobrescreve deps canônicas",
+  );
+  assert.ok(
+    index.includes("requireClinicalCapability(auth, \"amend_clinical\")"),
+    "index deve ligar amend_clinical",
+  );
+}
+
 /** §20 — nenhuma capability clínica implica outra. */
 async function testCrossCapabilityMatrix() {
   const matrix: Array<{
@@ -2423,6 +3227,14 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["Entrada malformada rejeitada antes de qualquer leitura", testMalformedInputRejectedBeforeAnyRead],
   ["Matriz cruzada de capabilities clínicas", testCrossCapabilityMatrix],
   ["ARQ comandos de mutação usam seams dedicadas", testMutationCommandsUseDedicatedCapabilitySeams],
+  ["AMEND emenda criada e metadados do pai", testAmendSuccessAndParentMetadata],
+  ["AMEND segunda emenda é irmã plana", testSecondAmendmentIsSibling],
+  ["AMEND elegibilidade do pai (final apenas)", testAmendParentEligibility],
+  ["AMEND concorrência e replay", testAmendConcurrency],
+  ["AMEND idempotência e receipts", testAmendIdempotencyAndReceipts],
+  ["AMEND autorização e injeção", testAmendAuthorizationAndInjection],
+  ["AMEND integridade de metadados do pai", testAmendParentMetadataIntegrity],
+  ["ARQ emenda não tem caminho para o conteúdo do pai", testAmendWriterHasNoParentContentPath],
 ];
 
 (async () => {
