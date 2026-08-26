@@ -166,7 +166,8 @@ autenticação ou do servidor, e **nunca** aceito do payload do cliente.
 | recorded_by | SERVER | Derivado do chamador autenticado |
 
 **NUNCA confiado no payload do cliente:** `dog_id`, `case_id`, `event_id`,
-`entity_kind`, `schema_version`, `status`, `recorded_at`, `recorded_by`.
+`entity_kind`, `schema_version`, `status`, `recorded_at`, `updated_at`,
+`recorded_by`.
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
@@ -174,10 +175,12 @@ autenticação ou do servidor, e **nunca** aceito do payload do cliente.
 | status | string (enum) | ✅ | draft, final, cancelled (sem "amended") |
 | occurred_at | timestamp | ✅ | Quando aconteceu |
 | recorded_at | timestamp | ✅ | Server timestamp |
-| updated_at | timestamp | ❌ | Só em draft |
-| finalized_at | timestamp | ❌ | |
-| cancelled_at | timestamp | ❌ | |
-| cancel_reason | string | ❌ | Obrigatório se cancelled |
+| updated_at | timestamp | ✅ | **SERVER-MANAGED. Autoridade canônica de concorrência otimista** — ver §2.2.1. Obrigatório em todo ClinicalEvent v1 criado pelo writer canônico; na criação vale exatamente `recorded_at`; avança a cada mutação canônica bem-sucedida. Nunca aceito do payload |
+| finalized_at | timestamp | ❌ | **SERVER-MANAGED.** Obrigatório quando `status == final`; ausente em `draft`. **Preservado imutável** se um evento `final` for posteriormente cancelado — registra o fato histórico da finalização. Ver §2.2.1 |
+| finalized_by | — | — | **NÃO EXISTE no ClinicalEvent v1.** A identidade de quem finalizou é proveniência de `auditLogs` + operation receipt, nunca campo do evento. Ver §2.2.1 |
+| cancelled_at | timestamp | ❌ | **SERVER-MANAGED.** Obrigatório quando `status == cancelled` |
+| cancelled_by | RecordedBy | ❌ | **SERVER-DERIVED** do chamador autenticado. Obrigatório quando `status == cancelled` |
+| cancel_reason | string | ❌ | Obrigatório se cancelled; validado non-blank e **trimmed** |
 | recorded_by | RecordedBy | ✅ | Quem registrou no sistema |
 | professional | ProfessionalIdentity | ❌ | Quem decidiu clinicamente (externo) |
 | payload_type | string (enum) | ✅ | Ver Domain Model §6 |
@@ -206,6 +209,101 @@ de existir autoridade de writer e **não** é a fronteira vigente.
 **Anexos:** apenas IDs em attachment_refs; URLs são derivadas de HealthDocument.storage_path.
 **Sem `exam_group_id`** — relacionamento com exame é via `exam_id` em ExamProcess.
 **Índices:** `status ASC, occurred_at DESC`; `event_type ASC, occurred_at DESC`; `payload_type ASC, status ASC`.
+
+---
+
+#### 2.2.1 Mutação de ClinicalEvent — concorrência, finalização e receipts (CONGELADO — CLIN-WRITER-1.W4.P0)
+
+Esta seção é a autoridade para **qualquer comando que altere um ClinicalEvent já
+existente**. O writer de criação (W3: `healthOpenClinicalCase` /
+`healthAppendClinicalEvent`) não muta eventos; ele apenas garante que todo evento
+**nasça** com o token descrito abaixo.
+
+##### Concorrência otimista — `updated_at` é a autoridade canônica
+
+| Aspecto | Contrato |
+|---|---|
+| Campo de autoridade | `updated_at` (Firestore `Timestamp`) |
+| Owner | **SERVER.** Nunca aceito do payload do cliente |
+| Na criação | `updated_at = recorded_at`, do **mesmo** Timestamp de servidor |
+| Em cada mutação canônica bem-sucedida | `updated_at = timestamp de servidor da mutação` |
+| Token de wire na requisição | `expectedUpdatedAt` |
+| Unidade de wire | **epoch milissegundos** (inteiro) |
+| Comparação no servidor | `stored.updated_at.toMillis() === request.expectedUpdatedAt` |
+| Divergência (token obsoleto) | `failed-precondition` |
+| `expectedUpdatedAt` ausente/malformado | `invalid-argument` |
+| `updated_at` armazenado ausente/malformado | `failed-precondition` / `integrity` |
+| Retry automático | **NÃO.** O chamador relê e decide |
+
+**Não** usamos `DocumentSnapshot.updateTime` como token. A autoridade precisa ser
+um campo do documento que Mobile/Web leiam pelo caminho normal de leitura; depender
+de metadata interna do Firestore criaria um contrato paralelo não congelado.
+
+**Ordem obrigatória dentro da transação de mutação:**
+
+```
+1. ler o operation receipt
+2. replay válido  → retornar o resultado original (NÃO checar concorrência)
+3. conflito de intenção → failed-precondition / idempotency-conflict
+4. ler o evento/estado atual
+5. validar expectedUpdatedAt (concorrência)
+6. validar a transição de estado no domínio congelado
+7. escrever
+```
+
+O passo 2 **precede** o passo 5 deliberadamente: um retry de rede de uma operação
+que já teve sucesso ainda carrega o `expectedUpdatedAt` antigo. Checar concorrência
+antes do replay rejeitaria como "obsoleto" um retry legítimo.
+
+##### Finalização — `draft → final`
+
+| Campo | Contrato |
+|---|---|
+| `status` | `final` |
+| `finalized_at` | timestamp de **servidor**, obrigatório na finalização |
+| `updated_at` | **o mesmo** timestamp da finalização |
+| `finalized_by` | **não existe** no ClinicalEvent v1 |
+| conteúdo clínico | 100% preservado — `event_type`, `occurred_at`, `payload_type`, `payload_version`, `content`, `professional`, `attachment_refs`, `recorded_at`, `recorded_by` |
+
+O ator que finalizou é registrado em `auditLogs` + na proveniência do operation
+receipt. A ausência de `finalized_at` no objeto puro de transição de domínio Dart
+(`ClinicalEventTransitions.transition`) **não** invalida sua persistência:
+transição de domínio e metadado server-side de persistência são responsabilidades
+distintas.
+
+##### Cancelamento — `draft → cancelled` e `final → cancelled`
+
+| Campo | Contrato |
+|---|---|
+| `status` | `cancelled` (terminal) |
+| `cancel_reason` | obrigatório, non-blank, **trimmed** |
+| `cancelled_at` | timestamp de **servidor** |
+| `cancelled_by` | ator autenticado derivado no **servidor** |
+| `updated_at` | o mesmo timestamp do cancelamento |
+| `finalized_at` | **preservado imutável** se o evento já era `final`; ausente se veio de `draft` |
+| conteúdo clínico | **preservado integralmente** |
+
+Cancelar **não** apaga e **não** reescreve conteúdo. Correção de conteúdo
+finalizado é emenda (§2.3), nunca mutação.
+
+##### Escopo dos operation receipts — CASE-SCOPED
+
+Todos os comandos clínicos compartilham o namespace de operações do
+**ClinicalCase**:
+
+```
+dogs/{dogId}/clinical_cases/{caseId}/operations/{operationId}
+```
+
+Vale para `healthOpenClinicalCase`, `healthAppendClinicalEvent`,
+`healthFinalizeClinicalEvent`, `healthCancelClinicalEvent` e comandos clínicos
+case-scoped posteriores, até que um novo gate explícito de autoridade decida
+diferente.
+
+**Não** existe `clinical_events/{eventId}/operations/{operationId}`. Reutilizar o
+mesmo `operationId` para um comando/intenção diferente dentro do mesmo caso é
+**conflito** (resolvido por `kind`/fingerprint), não motivo para um segundo
+namespace.
 
 ---
 

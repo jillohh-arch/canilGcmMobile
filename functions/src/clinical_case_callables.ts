@@ -24,8 +24,14 @@
  *
  * Identity is SERVER-DERIVED and never trusted from the payload: `dog_id`,
  * `case_id`, `event_id`, `entity_kind`, `schema_version`, `status`,
- * `recorded_at`, `recorded_by`, `opened_at`, `opened_by`, `opening_event_id`.
- * Any attempt to override one is rejected before any write.
+ * `recorded_at`, `updated_at`, `recorded_by`, `opened_at`, `opened_by`,
+ * `opening_event_id`. Any attempt to override one is rejected before any write.
+ *
+ * Every ClinicalEvent is born carrying `updated_at` — the canonical
+ * optimistic-concurrency token (CLIN-WRITER-1.W4.P0), equal to `recorded_at` at
+ * creation. This writer never ADVANCES the token, because it never mutates an
+ * existing event: replay returns the original result untouched. Advancing it is
+ * the responsibility of each future mutation command.
  *
  * Idempotency mirrors the HealthDocument protocol: a non-empty `operationId`
  * keys a durable receipt; same op + same intent replays with zero duplicate
@@ -861,6 +867,12 @@ interface EventFacts {
  * `has_amendments`/`amendment_count` are seeded because the schema marks them
  * REQUIRED and server-managed; a reader must never have to treat their absence
  * as "unknown".
+ *
+ * `updated_at` is the canonical optimistic-concurrency authority of the
+ * ClinicalEvent (CLIN-WRITER-1.W4.P0). Every event is BORN with it — equal to
+ * `recorded_at`, from the same server Timestamp — so that a mutation command can
+ * always compare a caller's `expectedUpdatedAt` against a field that provably
+ * exists. An event created without the token could never be safely mutated.
  */
 function clinicalEventDocument(
   facts: EventFacts,
@@ -876,6 +888,9 @@ function clinicalEventDocument(
     status: CLINICAL_EVENT_INITIAL_STATUS,
     occurred_at: Timestamp.fromDate(facts.occurredAt),
     recorded_at: recordedAt,
+    // Same Timestamp instance as `recorded_at`: on creation the two are the
+    // same fact, and no mutation has happened yet.
+    updated_at: recordedAt,
     recorded_by: recordedByPayload(caller, isAdmin),
     payload_type: facts.payloadType,
     payload_version: facts.payloadVersion,

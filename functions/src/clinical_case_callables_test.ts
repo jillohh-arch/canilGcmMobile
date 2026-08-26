@@ -12,6 +12,7 @@ import * as assert from "assert";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import {Timestamp} from "firebase-admin/firestore";
 
 import {
   ClinicalCaller,
@@ -888,6 +889,208 @@ async function testAppendMalformedReceiptFailsClosed() {
   );
 }
 
+// ── Token de concorrência do ClinicalEvent (W4.P0) ───────────────────────────
+
+/**
+ * `updated_at` é a autoridade canônica de concorrência otimista do
+ * ClinicalEvent (decisão da Control Tower em CLIN-WRITER-1.W4.P0).
+ *
+ * O contrato que estes testes fixam é o de NASCIMENTO do token: todo evento
+ * canônico já existe com `updated_at`, igual a `recorded_at` na criação. Sem
+ * isso, um comando futuro de mutação compararia o `expectedUpdatedAt` do
+ * chamador contra um campo ausente — e não haveria como distinguir "token
+ * obsoleto" de "evento nunca teve token".
+ *
+ * Este writer NÃO avança o token: ele nunca muta um evento existente. Avançar é
+ * responsabilidade de cada comando de mutação (W4 em diante).
+ */
+
+/** Lê o documento de evento canônico direto do store do fake. */
+function eventDocOf(
+  db: {_store: Map<string, JsonMap>},
+  caseId: string,
+  eventId: string,
+): JsonMap {
+  const path = `dogs/dog-1/clinical_cases/${caseId}/clinical_events/${eventId}`;
+  const doc = db._store.get(path);
+  assert.ok(doc, `evento não encontrado em ${path}`);
+  return doc as JsonMap;
+}
+
+/** Asserção compartilhada: o token nasce presente, Timestamp e == recorded_at. */
+function assertBornWithToken(event: JsonMap, label: string) {
+  const updatedAt = event.updated_at;
+  const recordedAt = event.recorded_at;
+
+  assert.ok(
+    updatedAt !== undefined && updatedAt !== null,
+    `${label}: evento canônico nasceu SEM updated_at`,
+  );
+  // Mesmo tipo de instante que `recorded_at`: um Timestamp do servidor, nunca
+  // string nem número. `toMillis` é o que o contrato de wire exige.
+  assert.ok(
+    typeof (updatedAt as Timestamp)?.toMillis === "function",
+    `${label}: updated_at não é Timestamp (toMillis ausente)`,
+  );
+  assert.strictEqual(
+    (updatedAt as Timestamp).toMillis(),
+    (recordedAt as Timestamp).toMillis(),
+    `${label}: na criação updated_at deve ser igual a recorded_at`,
+  );
+  // O token é derivado do relógio do servidor injetado, nunca do payload.
+  assert.strictEqual(
+    (updatedAt as Timestamp).toMillis(),
+    FIXED_NOW.getTime(),
+    `${label}: updated_at não veio do relógio do servidor`,
+  );
+}
+
+async function testOpenEventBornWithConcurrencyToken() {
+  const db = dbWithDog();
+  const caseId = caseIdFor("dog-1", "op-open-1");
+  const eventId = openingEventIdFor(caseId);
+
+  await runHealthOpenClinicalCase(mockRequest(validOpen), depsFor({db}));
+
+  assertBornWithToken(eventDocOf(db, caseId, eventId), "OPEN");
+}
+
+async function testAppendEventBornWithConcurrencyToken() {
+  const db = dbWithDog();
+  const caseId = await openAndReturnCaseId(db);
+  const eventId = eventIdFor("dog-1", caseId, "op-append-1");
+
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db}),
+  );
+
+  assertBornWithToken(eventDocOf(db, caseId, eventId), "APPEND");
+}
+
+async function testConcurrencyTokenIsServerOwned() {
+  // O cliente não escolhe o token. `updated_at`/`updatedAt` já estão na lista de
+  // chaves proibidas do W3; aqui provamos que a proteção cobre o campo NOVO —
+  // caso contrário o chamador poderia nascer com um token forjado e derrotar
+  // qualquer verificação de concorrência futura.
+  const db = dbWithDog();
+  const deps = depsFor({db});
+
+  for (const forged of [
+    {updated_at: "2020-01-01T00:00:00.000Z"},
+    {updatedAt: 1},
+  ]) {
+    await expectReject(
+      () =>
+        runHealthOpenClinicalCase(
+          mockRequest({...validOpen, ...forged}),
+          deps,
+        ),
+      "validation",
+      `OPEN rejeita token forjado: ${Object.keys(forged)[0]}`,
+    );
+  }
+  assert.deepStrictEqual(
+    storeKeys(db),
+    ["dogs/dog-1"],
+    "token forjado não pode escrever nada",
+  );
+
+  // Mesma proteção no APPEND, sobre um caso real já aberto.
+  const dbAppend = dbWithDog();
+  const caseId = await openAndReturnCaseId(dbAppend);
+  const keysBefore = storeKeys(dbAppend);
+  for (const forged of [
+    {updated_at: "2020-01-01T00:00:00.000Z"},
+    {updatedAt: 1},
+  ]) {
+    await expectReject(
+      () =>
+        runHealthAppendClinicalEvent(
+          mockRequest(appendPayload(caseId, forged)),
+          depsFor({db: dbAppend}),
+        ),
+      "validation",
+      `APPEND rejeita token forjado: ${Object.keys(forged)[0]}`,
+    );
+  }
+  assert.deepStrictEqual(
+    storeKeys(dbAppend),
+    keysBefore,
+    "token forjado no append não pode escrever nada",
+  );
+}
+
+async function testReplayDoesNotAdvanceConcurrencyToken() {
+  // Um replay é a MESMA verdade, não uma nova mutação: se ele avançasse o token,
+  // um retry de rede invalidaria silenciosamente o `expectedUpdatedAt` que o
+  // chamador acabou de ler — exatamente o modo de falha que o token existe para
+  // impedir.
+  const db = dbWithDog();
+  const caseId = await openAndReturnCaseId(db);
+  const openingId = openingEventIdFor(caseId);
+  const openingBefore = {...eventDocOf(db, caseId, openingId)};
+
+  await runHealthOpenClinicalCase(mockRequest(validOpen), depsFor({db}));
+  assert.deepStrictEqual(
+    eventDocOf(db, caseId, openingId),
+    openingBefore,
+    "replay de OPEN não pode reescrever o evento de abertura",
+  );
+
+  const eventId = eventIdFor("dog-1", caseId, "op-append-1");
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db}),
+  );
+  const appendBefore = {...eventDocOf(db, caseId, eventId)};
+
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db}),
+  );
+  assert.deepStrictEqual(
+    eventDocOf(db, caseId, eventId),
+    appendBefore,
+    "replay de APPEND não pode avançar updated_at",
+  );
+}
+
+async function testIdempotencyConflictLeavesTokenIntact() {
+  // Conflito de intenção não é mutação: zero evento novo, token intacto.
+  const db = dbWithDog();
+  const caseId = await openAndReturnCaseId(db);
+  const eventId = eventIdFor("dog-1", caseId, "op-append-1");
+
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db}),
+  );
+  const before = {...eventDocOf(db, caseId, eventId)};
+  const keysBefore = storeKeys(db);
+
+  await expectReject(
+    () =>
+      runHealthAppendClinicalEvent(
+        mockRequest(appendPayload(caseId, {content: {notes: "outra coisa"}})),
+        depsFor({db}),
+      ),
+    "idempotency-conflict",
+    "mesma operationId com intenção diferente",
+  );
+
+  assert.deepStrictEqual(
+    storeKeys(db),
+    keysBefore,
+    "conflito não pode criar um segundo evento",
+  );
+  assert.deepStrictEqual(
+    eventDocOf(db, caseId, eventId),
+    before,
+    "conflito não pode alterar updated_at do evento existente",
+  );
+}
+
 // ── Idempotência cruzada entre atores ────────────────────────────────────────
 
 async function testCrossActorOperationIdConflict() {
@@ -1106,6 +1309,11 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["APPEND evento sem receipt falha fechado", testAppendEventWithoutReceiptFailsClosed],
   ["OPEN receipt malformado falha fechado", testOpenMalformedReceiptFailsClosed],
   ["APPEND receipt malformado falha fechado", testAppendMalformedReceiptFailsClosed],
+  ["OPEN evento nasce com token de concorrência", testOpenEventBornWithConcurrencyToken],
+  ["APPEND evento nasce com token de concorrência", testAppendEventBornWithConcurrencyToken],
+  ["Token de concorrência é server-owned", testConcurrencyTokenIsServerOwned],
+  ["Replay não avança o token de concorrência", testReplayDoesNotAdvanceConcurrencyToken],
+  ["Conflito de idempotência preserva o token", testIdempotencyConflictLeavesTokenIntact],
   ["Idempotência cruzada entre atores", testCrossActorOperationIdConflict],
   ["ARQ autoridade clínica sem bypass administrativo", testClinicalCapabilityHasNoAdminBypass],
   ["ARQ callables clínicos usam autoridade dedicada", testClinicalCallablesUseDedicatedAuthority],
