@@ -59,6 +59,8 @@ import {
 import {
   ClinicalCaller,
   runHealthAppendClinicalEvent,
+  runHealthCancelClinicalEvent,
+  runHealthFinalizeClinicalEvent,
   runHealthOpenClinicalCase,
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
@@ -8355,6 +8357,19 @@ const clinicalCaseDeps: ClinicalCaseCallableDeps = {
   ) => toClinicalCaller(
     await requireClinicalCapability(auth, "record_clinical"),
   ),
+  // Capabilities DISTINTAS por comando: registrar um rascunho, travá-lo como
+  // evidência imutável e corrigi-lo são autoridades diferentes. Nenhuma implica
+  // a outra, e nenhuma delas é implicada por administração técnica.
+  requireFinalizeClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "finalize_clinical"),
+  ),
+  requireAmendClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "amend_clinical"),
+  ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
     caller: ClinicalCaller,
@@ -8392,6 +8407,22 @@ export const healthOpenClinicalCase = onCall({region}, async (request) => {
  */
 export const healthAppendClinicalEvent = onCall({region}, async (request) => {
   return runHealthAppendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Trava um ClinicalEvent `draft` como evidência clínica imutável.
+ * Exige `health.finalize_clinical` — `record_clinical` não finaliza.
+ */
+export const healthFinalizeClinicalEvent = onCall({region}, async (request) => {
+  return runHealthFinalizeClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalEvent `draft` ou `final`, preservando o conteúdo original.
+ * Exige `health.amend_clinical` — não é delete e não é edição de conteúdo.
+ */
+export const healthCancelClinicalEvent = onCall({region}, async (request) => {
+  return runHealthCancelClinicalEvent(request, clinicalCaseDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {

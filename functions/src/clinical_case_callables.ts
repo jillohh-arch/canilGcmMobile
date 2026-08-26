@@ -47,9 +47,11 @@ import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 
 import {
   ClinicalDomainError,
+  assertEventTransition,
   isTerminalCaseStatus,
   parseClinicalCaseOpeningType,
   parseClinicalCaseStatus,
+  parseClinicalEventStatus,
   parseClinicalEventType,
 } from "./clinical_domain";
 import {
@@ -89,6 +91,10 @@ export const CLINICAL_CASE_OPEN_KIND = "clinical_case_open_v1";
 export const CLINICAL_CASE_OPEN_OPERATION = "open_clinical_case";
 export const CLINICAL_EVENT_APPEND_KIND = "clinical_event_append_v1";
 export const CLINICAL_EVENT_APPEND_OPERATION = "append_clinical_event";
+export const CLINICAL_EVENT_FINALIZE_KIND = "clinical_event_finalize_v1";
+export const CLINICAL_EVENT_FINALIZE_OPERATION = "finalize_clinical_event";
+export const CLINICAL_EVENT_CANCEL_KIND = "clinical_event_cancel_v1";
+export const CLINICAL_EVENT_CANCEL_OPERATION = "cancel_clinical_event";
 
 export const MAX_CASE_TITLE_LEN = 200;
 export const MAX_REASON_LEN = 2000;
@@ -151,6 +157,25 @@ export interface ClinicalCaseCallableDeps {
    * path, exactly as the restriction lifecycle does.
    */
   requireRecordClinical: (
+    auth: CallableRequest["auth"],
+  ) => Promise<ClinicalCaller>;
+  /**
+   * MUST enforce `health.finalize_clinical` EXPLICITLY.
+   *
+   * A SEPARATE seam from `requireRecordClinical` on purpose: recording a draft
+   * and latching it into immutable clinical evidence are different authorities,
+   * so `health.record_clinical` must never imply finalisation.
+   */
+  requireFinalizeClinical: (
+    auth: CallableRequest["auth"],
+  ) => Promise<ClinicalCaller>;
+  /**
+   * MUST enforce `health.amend_clinical` EXPLICITLY.
+   *
+   * Cancelling is the corrective authority over an existing clinical record,
+   * which is why it keys on amendment rather than on recording or finalisation.
+   */
+  requireAmendClinical: (
     auth: CallableRequest["auth"],
   ) => Promise<ClinicalCaller>;
   /** Structural dog scope — the existing canonical fail-closed helper. */
@@ -292,6 +317,11 @@ const FORBIDDEN_PAYLOAD_KEYS = [
   "openingEventId",
   "finalized_at",
   "finalizedAt",
+  // P0 froze `finalized_by` as NON-EXISTENT in ClinicalEvent v1. Rejecting it at
+  // the boundary means a client that believes the field exists is corrected
+  // loudly, instead of having it silently dropped and assuming it was stored.
+  "finalized_by",
+  "finalizedBy",
   "cancelled_at",
   "cancelledAt",
   "cancelled_by",
@@ -350,14 +380,82 @@ const FORBIDDEN_PAYLOAD_KEYS = [
   "source",
 ] as const;
 
-function rejectServerManagedInjection(data: JsonMap): void {
+/**
+ * `allowedSelectors` narrowly exempts keys that are TARGET IDENTITY for the
+ * command being executed, never persisted content.
+ *
+ * The creation writers exempt nothing: they DERIVE `eventId` deterministically,
+ * so a caller supplying one is trying to choose where a new clinical fact lands.
+ * A mutation command is the opposite case — it must name the event it acts on,
+ * and refusing `eventId` there would make the command unaddressable.
+ *
+ * The snake_case `event_id` stays forbidden for every command, including
+ * mutations: that is the AT-REST server-managed field, and accepting it would let
+ * a caller rewrite the stored identity of the document it is mutating.
+ */
+function rejectServerManagedInjection(
+  data: JsonMap,
+  allowedSelectors: readonly string[] = [],
+): void {
   for (const key of FORBIDDEN_PAYLOAD_KEYS) {
+    if (allowedSelectors.includes(key)) continue;
     if (Object.prototype.hasOwnProperty.call(data, key)) {
       throw logicError(
         "validation",
         `Campo server-managed não permitido no payload: ${key}.`,
       );
     }
+  }
+}
+
+/** The ONLY key a ClinicalEvent mutation command may add to the W3 baseline. */
+const EVENT_MUTATION_SELECTORS = ["eventId"] as const;
+
+/**
+ * Cancel additionally accepts the camelCase `cancelReason` as declared INPUT.
+ *
+ * The snake_case `cancel_reason` remains forbidden: that is the persisted field,
+ * and the server writes it from the validated, trimmed input. Accepting both
+ * would give a caller two ways to state the reason, only one of which is
+ * validated.
+ */
+const EVENT_CANCEL_INPUTS = ["eventId", "cancelReason"] as const;
+
+/**
+ * CLOSED key vocabulary of a ClinicalEvent mutation command.
+ *
+ * A mutation is validated by ALLOWLIST, not by blocklist. The blocklist protects
+ * server-managed fields, but it cannot protect a field that is legitimate
+ * INPUT elsewhere: `content`, `professional` and `attachmentRefs` are valid on
+ * creation, so a blocklist would silently accept them here and let a caller
+ * believe a finalisation had rewritten clinical content. Since finalize and
+ * cancel accept no replacement payload at all, anything outside this set is a
+ * misunderstanding of the command and is rejected before any read.
+ */
+const EVENT_MUTATION_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "eventId",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedUpdatedAt",
+  "expected_updated_at",
+] as const;
+
+function rejectUnknownMutationKeys(
+  data: JsonMap,
+  extraAllowed: readonly string[] = [],
+): void {
+  for (const key of Object.keys(data)) {
+    if (EVENT_MUTATION_ALLOWED_KEYS.includes(key as never)) continue;
+    if (extraAllowed.includes(key)) continue;
+    throw logicError(
+      "validation",
+      `Campo não aceito por um comando de mutação clínica: ${key}.`,
+    );
   }
 }
 
@@ -522,6 +620,94 @@ function assertOccurredAt(raw: unknown, now: Date): Date {
   return parsed;
 }
 
+/**
+ * The caller's optimistic-concurrency token, as frozen by CLIN-WRITER-1.W4.P0.
+ *
+ * Epoch MILLISECONDS, matching the hardened access-profile writer convention.
+ * Absence and malformation are both `invalid-argument`: the request itself is
+ * unusable, which is a different fault from a well-formed token that lost the
+ * race (`failed-precondition`). Collapsing the two would tell a client to
+ * "reload and retry" when the real problem is that it never sent a token.
+ */
+function assertExpectedUpdatedAt(raw: unknown): number {
+  if (raw === undefined || raw === null) {
+    throw logicError(
+      "validation",
+      "expectedUpdatedAt é obrigatório para mutar um evento clínico.",
+    );
+  }
+  if (
+    typeof raw !== "number" ||
+    !Number.isFinite(raw) ||
+    !Number.isInteger(raw) ||
+    raw < 0
+  ) {
+    throw logicError(
+      "validation",
+      "expectedUpdatedAt deve ser epoch em milissegundos (number).",
+    );
+  }
+  return raw;
+}
+
+/**
+ * Reads the STORED concurrency authority off a ClinicalEvent.
+ *
+ * A canonical event is BORN with `updated_at` (P0), so a stored event without a
+ * readable Timestamp is CORRUPTION, not a legacy shape to be tolerated. Failing
+ * closed here is what stops a mutation from proceeding with no precondition at
+ * all. `recorded_at`, `finalized_at`, `snapshot.updateTime` and the client clock
+ * are deliberately NOT fallbacks — each would silently restore the stale-write
+ * hole the token exists to close.
+ */
+function storedUpdatedAtMillis(event: JsonMap): number {
+  const raw = event.updated_at as {toMillis?: unknown} | undefined;
+  if (
+    raw === undefined ||
+    raw === null ||
+    typeof raw.toMillis !== "function"
+  ) {
+    throw logicError(
+      "integrity",
+      "Evento clínico sem updated_at canônico: " +
+        "recarregue o evento antes de mutar.",
+    );
+  }
+  const millis = (raw.toMillis as () => unknown)();
+  if (typeof millis !== "number" || !Number.isFinite(millis)) {
+    throw logicError(
+      "integrity",
+      "Evento clínico com updated_at ilegível.",
+    );
+  }
+  return millis;
+}
+
+/** Stale precondition. NEVER retried automatically: the caller must re-read. */
+function assertFreshToken(storedMillis: number, expected: number): void {
+  if (storedMillis !== expected) {
+    throw logicError(
+      "conflict",
+      "Evento clínico alterado por outra operação. " +
+        "Recarregue antes de mutar.",
+    );
+  }
+}
+
+/** `cancelReason` is the only clinical content a cancellation may carry. */
+function assertCancelReason(raw: unknown): string {
+  if (raw === undefined || raw === null) {
+    throw logicError("validation", "cancelReason é obrigatório.");
+  }
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    throw logicError("validation", "cancelReason não pode ser vazio.");
+  }
+  if (raw.length > MAX_REASON_LEN) {
+    throw logicError("validation", "cancelReason muito longo.");
+  }
+  return raw.trim();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Deterministic identity
 // ─────────────────────────────────────────────────────────────────────────────
@@ -655,6 +841,55 @@ export function fingerprintAppendEventIntent(intent: {
       stableStringify(intent.content),
       stableStringify(intent.professional),
       stableStringify(intent.attachmentRefs),
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of a FINALIZE intent.
+ *
+ * `expectedUpdatedAt` is deliberately EXCLUDED. A legitimate network retry of an
+ * already-applied finalisation still carries the pre-mutation token, so
+ * including it would make the replay look like a different intent and raise a
+ * spurious `idempotency-conflict` for an operation that already succeeded. The
+ * token is a precondition on the CURRENT state, not part of what was requested.
+ */
+export function fingerprintFinalizeEventIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly eventId: string;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_EVENT_FINALIZE_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.eventId,
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of a CANCEL intent.
+ *
+ * Includes the trimmed reason — cancelling the same event for a DIFFERENT stated
+ * reason under the same `operationId` is a genuine intent divergence and must
+ * surface as `idempotency-conflict`, not silently replay the first reason.
+ * `expectedUpdatedAt` is excluded for the same reason as in finalize.
+ */
+export function fingerprintCancelEventIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly eventId: string;
+  readonly cancelReason: string;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_EVENT_CANCEL_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.eventId,
+      intent.cancelReason,
     ].join("|"),
   );
 }
@@ -1408,6 +1643,468 @@ export async function runHealthAppendClinicalEvent(
       );
 
       return appendEventResponse({dogId, caseId, eventId, wasNoOp: false});
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT MUTATION — shared identity and integrity
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Command identity common to every ClinicalEvent mutation.
+ *
+ * Narrow BY DESIGN: a mutation command names the event and proves which version
+ * of it the caller saw. It carries no replacement clinical payload, so there is
+ * no code path by which a caller could rewrite finalised evidence.
+ */
+interface ParsedEventMutationInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly eventId: string;
+  readonly operationId: string;
+  readonly expectedUpdatedAt: number;
+}
+
+function parseEventMutationInput(data: JsonMap): ParsedEventMutationInput {
+  return {
+    dogId: assertDogId(data.dogId ?? data.dog_id),
+    caseId: assertPathId(data.caseId ?? data.case_id, "caseId"),
+    eventId: assertPathId(data.eventId ?? data.event_id, "eventId"),
+    operationId: normalizeOperationId(
+      data.idempotencyKey ?? data.operationId ?? data.operation_id,
+    ),
+    expectedUpdatedAt: assertExpectedUpdatedAt(
+      data.expectedUpdatedAt ?? data.expected_updated_at,
+    ),
+  };
+}
+
+function eventMutationResponse(params: {
+  dogId: string;
+  caseId: string;
+  eventId: string;
+  status: string;
+  wasNoOp: boolean;
+}): JsonMap {
+  const {dogId, caseId, eventId, status, wasNoOp} = params;
+  return {
+    dog_id: dogId,
+    case_id: caseId,
+    event_id: eventId,
+    status,
+    reference: clinicalEventRef(caseId, eventId),
+    was_no_op: wasNoOp,
+    dogId,
+    caseId,
+    eventId,
+    wasNoOp,
+  };
+}
+
+/**
+ * Structural integrity of a stored ClinicalEvent about to be mutated.
+ *
+ * Every check FAILS CLOSED. Corrupt clinical evidence is never repaired in
+ * passing: an event whose identity does not match the path it was found at, or
+ * whose `schema_version` this writer does not understand, is refused rather than
+ * normalised, because a mutation would then be persisting an interpretation the
+ * server cannot justify.
+ */
+function assertStoredEventIntegrity(
+  event: JsonMap,
+  dogId: string,
+  caseId: string,
+): void {
+  if (stringValue(event.entity_kind) !== CLINICAL_EVENT_ENTITY_KIND) {
+    throw logicError(
+      "integrity",
+      "Documento não é um ClinicalEvent canônico.",
+    );
+  }
+  if (stringValue(event.dog_id) !== dogId) {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent com dog_id divergente do caminho canônico.",
+    );
+  }
+  if (stringValue(event.case_id) !== caseId) {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent com case_id divergente do caminho canônico.",
+    );
+  }
+  if (event.schema_version !== CLINICAL_SCHEMA_VERSION) {
+    throw logicError(
+      "integrity",
+      "ClinicalEvent de schema_version não suportada por este writer.",
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINALIZE CLINICAL EVENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Latches a `draft` ClinicalEvent into immutable clinical evidence.
+ *
+ * THE immutability latch. After this returns, no writer in this module can
+ * rewrite the event's clinical content — the only remaining transition is
+ * cancellation, which appends metadata and preserves content.
+ *
+ * The mutation is an EXPLICIT three-field patch (`status`, `finalized_at`,
+ * `updated_at`), never a spread of caller data, so the set of fields a
+ * finalisation can touch is bounded by this function rather than by the request.
+ * `finalized_by` does NOT exist in ClinicalEvent v1 (P0): the finalising actor
+ * is provenance of the audit entry and the operation receipt.
+ *
+ * ORDER IS LOAD-BEARING: the receipt is inspected BEFORE the concurrency token.
+ * A network retry of a request that already succeeded still carries the
+ * pre-mutation token, so checking staleness first would reject an operation that
+ * genuinely completed. Replay is decided on operation identity, not on state.
+ *
+ * Being already `final` is NOT idempotent. Only a same-operation receipt replays;
+ * a NEW operationId targeting a `final` event is an illegal transition, because
+ * "someone else already finalised this" is a different fact from "your request
+ * was applied".
+ */
+export async function runHealthFinalizeClinicalEvent(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const caller = await deps.requireFinalizeClinical(request.auth);
+    const data = (request.data ?? {}) as JsonMap;
+    rejectServerManagedInjection(data, EVENT_MUTATION_SELECTORS);
+    rejectUnknownMutationKeys(data);
+
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const input = parseEventMutationInput(data);
+    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+
+    const fingerprint = fingerprintFinalizeEventIntent({dogId, caseId, eventId});
+
+    const eRef = eventRef(deps.db, dogId, caseId, eventId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        auditDocId(
+          CLINICAL_EVENT_FINALIZE_OPERATION,
+          dogId,
+          caseId,
+          eventId,
+          operationId,
+        ),
+      );
+
+    const finalizedAt = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [eventSnap, opSnap] = await Promise.all([
+        tx.get(eRef),
+        tx.get(opRef),
+      ]);
+
+      // ── 1. RECEIPT FIRST (replay / conflict), BEFORE any state check ──────
+      let match: ReceiptMatch = "missing";
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_EVENT_FINALIZE_KIND,
+          CLINICAL_EVENT_FINALIZE_OPERATION,
+        );
+        match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_EVENT_FINALIZE_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+      }
+
+      if (match === "idempotency-conflict") {
+        throw logicError(
+          "idempotency-conflict",
+          "Mesma operationId com intenção diferente da finalização original.",
+        );
+      }
+      if (match === "replay") {
+        return eventMutationResponse({
+          dogId,
+          caseId,
+          eventId,
+          status: "final",
+          wasNoOp: true,
+        });
+      }
+
+      // ── 2. only now: the event and its integrity ──────────────────────────
+      if (!eventSnap.exists) {
+        throw logicError("not-found", "Evento clínico não encontrado.");
+      }
+      const event = (eventSnap.data() ?? {}) as JsonMap;
+      assertStoredEventIntegrity(event, dogId, caseId);
+
+      // ── 3. concurrency precondition ───────────────────────────────────────
+      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+
+      // ── 4. transition legality, decided by the FROZEN domain authority ────
+      const currentStatus = parseClinicalEventStatus(event.status);
+      assertEventTransition(currentStatus, "final");
+
+      // ── 5. atomic mutation + receipt + audit ──────────────────────────────
+      // EXPLICIT fields only. `updated_at` carries the SAME Timestamp as
+      // `finalized_at`: they are one fact.
+      tx.set(
+        eRef,
+        {
+          status: "final",
+          finalized_at: finalizedAt,
+          updated_at: finalizedAt,
+        },
+        {merge: true},
+      );
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_EVENT_FINALIZE_KIND,
+          operationType: CLINICAL_EVENT_FINALIZE_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {dogId, caseId, eventId},
+        }),
+      );
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_event_finalized",
+          caller,
+          entityType: "clinical_events",
+          entityId: eventId,
+          entityPath: canonicalEventPath(dogId, caseId, eventId),
+          summary:
+            `Evento clínico finalizado no caso ${caseId} do K9 ${dogId}`,
+          metadata: {
+            dog_id: dogId,
+            case_id: caseId,
+            event_id: eventId,
+            operation_id: operationId,
+            previous_status: currentStatus,
+            event_status: "final",
+          },
+        }),
+      );
+
+      return eventMutationResponse({
+        dogId,
+        caseId,
+        eventId,
+        status: "final",
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANCEL CLINICAL EVENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Cancels a ClinicalEvent from `draft` or from `final`.
+ *
+ * Cancellation is NOT a content edit and NOT a delete. The original clinical
+ * content, its authorship and its chronology all survive; what changes is the
+ * status plus the cancellation metadata. `finalized_at` is deliberately absent
+ * from the patch, so a `final → cancelled` event keeps the historical fact that
+ * it was once finalised, and a `draft → cancelled` event never acquires one.
+ *
+ * `cancelled_by` is SERVER-derived from the authenticated caller via the same
+ * `recordedByPayload` shape the creation writer uses, so authorship of a
+ * cancellation is exactly as trustworthy as authorship of the record.
+ *
+ * Same replay-before-stale ordering as finalisation, and the same rule that
+ * being already `cancelled` is not idempotent: `cancelled` is terminal in the
+ * frozen domain, so a NEW operationId against it is an illegal transition.
+ */
+export async function runHealthCancelClinicalEvent(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+): Promise<JsonMap> {
+  try {
+    const caller = await deps.requireAmendClinical(request.auth);
+    const data = (request.data ?? {}) as JsonMap;
+    rejectServerManagedInjection(data, EVENT_CANCEL_INPUTS);
+    rejectUnknownMutationKeys(data, ["cancelReason"]);
+
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const input = parseEventMutationInput(data);
+    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+    const cancelReason = assertCancelReason(
+      data.cancelReason ?? data.cancel_reason,
+    );
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintCancelEventIntent({
+      dogId,
+      caseId,
+      eventId,
+      cancelReason,
+    });
+
+    const eRef = eventRef(deps.db, dogId, caseId, eventId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        auditDocId(
+          CLINICAL_EVENT_CANCEL_OPERATION,
+          dogId,
+          caseId,
+          eventId,
+          operationId,
+        ),
+      );
+
+    const cancelledAt = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [eventSnap, opSnap] = await Promise.all([
+        tx.get(eRef),
+        tx.get(opRef),
+      ]);
+
+      // ── 1. RECEIPT FIRST (replay / conflict), BEFORE any state check ──────
+      let match: ReceiptMatch = "missing";
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_EVENT_CANCEL_KIND,
+          CLINICAL_EVENT_CANCEL_OPERATION,
+        );
+        match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_EVENT_CANCEL_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+      }
+
+      if (match === "idempotency-conflict") {
+        throw logicError(
+          "idempotency-conflict",
+          "Mesma operationId com intenção diferente do cancelamento original.",
+        );
+      }
+      if (match === "replay") {
+        return eventMutationResponse({
+          dogId,
+          caseId,
+          eventId,
+          status: "cancelled",
+          wasNoOp: true,
+        });
+      }
+
+      // ── 2. only now: the event and its integrity ──────────────────────────
+      if (!eventSnap.exists) {
+        throw logicError("not-found", "Evento clínico não encontrado.");
+      }
+      const event = (eventSnap.data() ?? {}) as JsonMap;
+      assertStoredEventIntegrity(event, dogId, caseId);
+
+      // ── 3. concurrency precondition ───────────────────────────────────────
+      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+
+      // ── 4. transition legality + cancellation metadata completeness, both
+      //       decided by the FROZEN domain authority in one call ─────────────
+      const currentStatus = parseClinicalEventStatus(event.status);
+      const cancelledBy = recordedByPayload(caller, isAdmin);
+      const transition = assertEventTransition(currentStatus, "cancelled", {
+        cancelReason,
+        cancelledAt: nowDate,
+        cancelledBy: {
+          uid: caller.uid,
+          name: stringValue(cancelledBy.name) ?? caller.uid,
+          internalRole: stringValue(cancelledBy.internal_role) ?? "condutor",
+        },
+      });
+
+      // ── 5. atomic mutation + receipt + audit ──────────────────────────────
+      // EXPLICIT fields only. `finalized_at` is NOT in this patch: on
+      // `final → cancelled` the stored value survives untouched, and on
+      // `draft → cancelled` it must stay absent.
+      tx.set(
+        eRef,
+        {
+          status: "cancelled",
+          cancel_reason: transition.cancellation?.cancelReason ?? cancelReason,
+          cancelled_at: cancelledAt,
+          cancelled_by: cancelledBy,
+          updated_at: cancelledAt,
+        },
+        {merge: true},
+      );
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_EVENT_CANCEL_KIND,
+          operationType: CLINICAL_EVENT_CANCEL_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {dogId, caseId, eventId},
+        }),
+      );
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_event_cancelled",
+          caller,
+          entityType: "clinical_events",
+          entityId: eventId,
+          entityPath: canonicalEventPath(dogId, caseId, eventId),
+          summary:
+            `Evento clínico cancelado no caso ${caseId} do K9 ${dogId}`,
+          metadata: {
+            dog_id: dogId,
+            case_id: caseId,
+            event_id: eventId,
+            operation_id: operationId,
+            previous_status: currentStatus,
+            event_status: "cancelled",
+            cancel_reason: cancelReason,
+          },
+        }),
+      );
+
+      return eventMutationResponse({
+        dogId,
+        caseId,
+        eventId,
+        status: "cancelled",
+        wasNoOp: false,
+      });
     });
   } catch (err) {
     mapClinicalError(err);
