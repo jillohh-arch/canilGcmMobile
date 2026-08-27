@@ -976,6 +976,233 @@ async function main(): Promise<void> {
   const hash = crypto.createHash("sha256").update(material).digest("hex");
   assert.ok(deterministicManualScheduleId(hash).startsWith("m_"));
 
+  // ── dog_id autoridade (HW-4A.2C) ──────────────────────────────────────────
+  //
+  // `dogId` do payload é a autoridade estrutural; `dog_id` redundante é
+  // ignorado quando consistente e rejeitado quando conflitante. `dog_id`
+  // nunca pode sobrescrever nem substituir a autoridade estrutural, e o
+  // documento canônico criado SEMPRE persiste `dog_id: dogId` — é a
+  // identidade que a fronteira collection-group das Rules exige.
+  const futureScheduledForIso = new Date(
+    Date.now() + 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  await test("create: persiste dog_id == dogId autorizado", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    const r = await runHealthScheduleCreateManual(
+      mockRequest(
+        {
+          dogId: "dog-1",
+          scheduleType: "vaccination",
+          title: "V10",
+          scheduledFor: futureScheduledForIso,
+          timezone: "America/Sao_Paulo",
+          idempotencyKey: "dog-id-persisted",
+        },
+        {uid: actor.uid, token: {}},
+      ),
+      deps,
+    );
+    assert.strictEqual(r.wasNoOp, false);
+    const stored = db._store.get("dogs/dog-1/health_schedule/" + r.scheduleId);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id gravado = dogId");
+  });
+
+  await test("create: dogId + dog_id consistente → ignora dog_id", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    const r = await runHealthScheduleCreateManual(
+      mockRequest(
+        {
+          dogId: "dog-1",
+          dog_id: "dog-1", // redundante mas consistente → aceito
+          scheduleType: "vaccination",
+          title: "V10",
+          scheduledFor: futureScheduledForIso,
+          timezone: "America/Sao_Paulo",
+          idempotencyKey: "dog-id-consistent",
+        },
+        {uid: actor.uid, token: {}},
+      ),
+      deps,
+    );
+    assert.strictEqual(r.wasNoOp, false);
+    assert.strictEqual(r.dogId, "dog-1");
+    const stored = db._store.get("dogs/dog-1/health_schedule/" + r.scheduleId);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id gravado = dogId");
+  });
+
+  await test("create: dogId + dog_id conflitante → rejeita", async () => {
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      "dogs/dog-other": {name: "Outro"},
+    });
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCreateManual(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other", // sobrescrita → rejeita
+              scheduleType: "vaccination",
+              title: "V10",
+              scheduledFor: futureScheduledForIso,
+              timezone: "America/Sao_Paulo",
+              idempotencyKey: "dog-id-conflict",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        Boolean(e.message?.includes("dog_id não pode sobrescrever")),
+    );
+  });
+
+  await test("create: dog_id sem dogId → rejeita", async () => {
+    const db = createFakeDb({"dogs/dog-1": {name: "Rex"}});
+    const deps = depsFor({db, allowCreate: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCreateManual(
+          mockRequest(
+            {
+              dog_id: "dog-1", // cliente tentando usar dog_id como autoridade
+              scheduleType: "vaccination",
+              title: "V10",
+              scheduledFor: futureScheduledForIso,
+              timezone: "America/Sao_Paulo",
+              idempotencyKey: "dog-id-missing-dogId",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string}) => e.code === "invalid-argument",
+    );
+  });
+
+  await test("update: dogId + dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-update-dog-id-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      "dogs/dog-other": {name: "Outro"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1",
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleUpdateOpen(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other", // sobrescrita → rejeita
+              scheduleId,
+              expectedRevision: 1,
+              operationId: "update-dog-id-conflict",
+              title: "Nova V",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        Boolean(e.message?.includes("dog_id não pode sobrescrever")),
+    );
+    const stored = db._store.get(`dogs/dog-1/health_schedule/${scheduleId}`);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id imutável");
+  });
+
+  await test("complete: dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-complete-dog-id-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1",
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleComplete(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other",
+              scheduleId,
+              operationId: "complete-dog-id-conflict",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        Boolean(e.message?.includes("dog_id não pode sobrescrever")),
+    );
+    const stored = db._store.get(`dogs/dog-1/health_schedule/${scheduleId}`);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id imutável");
+  });
+
+  await test("cancel: dog_id conflitante → rejeita", async () => {
+    const scheduleId = "s-cancel-dog-id-conflict";
+    const db = createFakeDb({
+      "dogs/dog-1": {name: "Rex"},
+      [`dogs/dog-1/health_schedule/${scheduleId}`]: {
+        lifecycle_status: "open",
+        source_type: "manual",
+        revision: 1,
+        title: "V",
+        schedule_type: "vaccination",
+        timezone: "America/Sao_Paulo",
+        schema_version: 1,
+        dog_id: "dog-1",
+      },
+    });
+    const deps = depsFor({db, allowEdit: true, dogAccess: true});
+    await assert.rejects(
+      () =>
+        runHealthScheduleCancel(
+          mockRequest(
+            {
+              dogId: "dog-1",
+              dog_id: "dog-other",
+              scheduleId,
+              operationId: "cancel-dog-id-conflict",
+              cancelReason: "motivo",
+            },
+            {uid: actor.uid, token: {}},
+          ),
+          deps,
+        ),
+      (e: {code?: string; message?: string}) =>
+        e.code === "invalid-argument" &&
+        Boolean(e.message?.includes("dog_id não pode sobrescrever")),
+    );
+    const stored = db._store.get(`dogs/dog-1/health_schedule/${scheduleId}`);
+    assert.strictEqual(stored?.dog_id, "dog-1", "dog_id imutável");
+  });
+
   console.log("\nhealth_schedule_callables_test: all passed");
 }
 
