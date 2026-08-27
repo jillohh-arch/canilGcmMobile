@@ -131,7 +131,8 @@ leitura.
 | has_pending_schedule | bool | ❌ | Derivado por Function |
 | active_treatments_count | number | ❌ | Derivado por Function |
 | last_event_at | timestamp | ❌ | Derivado |
-| updated_at | timestamp | ✅ | Token canônico de concorrência otimista (SERVER; §2.1.2) |
+| updated_at | timestamp | ✅ | **METADADO TEMPORAL** apenas (SERVER; §2.1.2). NÃO é token de concorrência |
+| revision | number | ✅ | **Token canônico de concorrência otimista** (SERVER; inteiro `>= 1`; nasce em 1; §2.1.2) |
 | event_count | number | ❌ | Derivado |
 | deleted_at | timestamp | ❌ | Soft delete |
 | deleted_by | RecordedBy | ❌ | |
@@ -203,23 +204,55 @@ pertence ao `ClinicalEvent` imutável de alta e ao audit.
 O writer de lifecycle que executa essas escritas **não** existe ainda (gate W6);
 esta seção congela apenas a semântica.
 
-#### 2.1.2 Autoridade de concorrência otimista do ClinicalCase (CONGELADO — CLIN-WRITER-1.W6.P0.F1)
+#### 2.1.2 Autoridade de concorrência otimista do ClinicalCase (CONGELADO — CLIN-WRITER-1.W6.P0.F1.C1)
 
-O campo `updated_at` é a autoridade canônica de concorrência otimista para o aggregate `ClinicalCase`:
+> **SUCESSOR.** A versão anterior desta seção (F1) declarava `updated_at` como
+> autoridade de concorrência. O gate **F1.C0** provou empiricamente que um token
+> de relógio de parede **não detecta obsolescência**: duas mutações bem-sucedidas
+> no mesmo milissegundo deixam o token observável inalterado, e uma operação
+> DISTINTA e obsoleta comparava igual a uma fresca — sendo aceita. O fato
+> histórico permanece registrado aqui; a autoridade de concorrência passou a ser
+> `revision`. As igualdades temporais de `updated_at` continuam válidas.
 
-| Operação | Semântica de `updated_at` |
-|---|---|
-| **OPEN** (`healthOpenClinicalCase`) | `updated_at == opened_at == last_event_at` (mesmo `Timestamp` do servidor gerado no nascimento) |
-| **APPEND** (`healthAppendClinicalEvent`) | `updated_at == last_event_at == appendedEvent.recorded_at` (avança no mesmo instante do evento anexado) |
-| **Lifecycle Mutations** (futuros writers W6) | `updated_at == mutation server Timestamp` (avança a cada mutação canônica do caso) |
-| **Replay / Idempotência** | Replay preserva `updated_at` (zero re-avanço; idempotência avaliada antes do token) |
-| **Event-only mutations** (W4 Finalize/Cancel, W5 Amend) | Não alteram `ClinicalCase`, logo **não avançam** `updated_at` |
+O campo `revision` é a autoridade canônica de concorrência otimista do
+`ClinicalCase`. `updated_at` permanece **exclusivamente metadado temporal**.
 
-**Propriedades normativas:**
-- **Propriedade / Dono**: `SERVER` apenas (`Firestore Timestamp`). Clientes nunca escrevem diretamente no campo.
-- **Precondição de Wire (W6)**: `expectedUpdatedAt` em milissegundos de época (`number` / epoch ms). `storedCase.updated_at.toMillis() === request.expectedUpdatedAt`. Se divergente: `failed-precondition`. Se ausente/malformado: `invalid-argument`.
-- **Rejeição de Autoridade Externa**: `DocumentSnapshot.updateTime` **não** é autoridade canônica; `updated_at` persistido é a única fonte da verdade de concorrência.
-- **Nenhum retry automático**: Conflito de concorrência falha fechado como `failed-precondition`.
+| Operação | `revision` | `updated_at` (temporal) |
+|---|---|---|
+| **OPEN** (`healthOpenClinicalCase`) | nasce em `1` | `updated_at == opened_at == last_event_at` |
+| **APPEND** (`healthAppendClinicalEvent`) | `anterior + 1` | `updated_at == last_event_at == appendedEvent.recorded_at` |
+| **Lifecycle Mutations** (futuros writers W6) | `anterior + 1` | `updated_at == mutation server Timestamp` |
+| **Replay / Idempotência** | **não avança** (idempotência avaliada ANTES do token) | preservado |
+| **Operação rejeitada** | **não avança** | preservado |
+| **Event-only mutations** (W4 Finalize/Cancel, W5 Amend) | não alteram `ClinicalCase`, logo **não avançam** | idem |
+
+**Propriedades normativas de `revision`:**
+- **Owner**: `SERVER` apenas (inteiro). Nunca aceito do payload do cliente.
+- **Piso**: `Number.isSafeInteger(revision) && revision >= 1`. Ausente, `0`,
+  negativo, fracionário, não-numérico ⇒ `failed-precondition` / `integrity`.
+- **Precondição de Wire (W6)**: `expectedRevision` (inteiro seguro `>= 1`).
+  Comparação `storedCase.revision === request.expectedRevision`. Divergente:
+  `failed-precondition`. Ausente/malformado: `invalid-argument`.
+- **Sem `FieldValue.increment`**: a revisão resultante é calculada explicitamente
+  dentro da transação, para que documento, resposta, receipt e audit sejam
+  provavelmente o mesmo número.
+- **Overflow**: em `Number.MAX_SAFE_INTEGER` a mutação falha fechada
+  (`integrity`). Sem wraparound, saturação ou float.
+- **Rejeição de Autoridade Externa**: `DocumentSnapshot.updateTime` **não** é
+  autoridade.
+- **Nenhum retry automático**: conflito falha fechado; o chamador relê e decide.
+
+**Divergência deliberada do Schedule.** `health_schedule_logic.readRevision`
+tolera revisão ausente/legada como `0`, porque Schedule **possui** documentos
+anteriores à introdução do campo. Clinical **não** possui essa população: todo
+aggregate canônico nasce em `1`, logo ausência é corrupção. Aceitar `0` seria um
+fail-open gratuito. Não "harmonizar" com Schedule.
+
+**`updated_at` após o sucessor** — metadado temporal apenas:
+- **não** é único;
+- **não** é monotônico;
+- **não** implica ordem de commit;
+- **não** participa da decisão fresco/obsoleto.
 
 ---
 
@@ -254,7 +287,8 @@ autenticação ou do servidor, e **nunca** aceito do payload do cliente.
 | status | string (enum) | ✅ | draft, final, cancelled (sem "amended") |
 | occurred_at | timestamp | ✅ | Quando aconteceu |
 | recorded_at | timestamp | ✅ | Server timestamp |
-| updated_at | timestamp | ✅ | **SERVER-MANAGED. Autoridade canônica de concorrência otimista** — ver §2.2.1. Obrigatório em todo ClinicalEvent v1 criado pelo writer canônico; na criação vale exatamente `recorded_at`; avança a cada mutação canônica bem-sucedida. Nunca aceito do payload |
+| updated_at | timestamp | ✅ | **SERVER-MANAGED. METADADO TEMPORAL apenas** — ver §2.2.1. Obrigatório em todo ClinicalEvent v1 criado pelo writer canônico; na criação vale exatamente `recorded_at`; avança a cada mutação canônica bem-sucedida. **NÃO** é token de concorrência (não é único nem monotônico). Nunca aceito do payload |
+| revision | number | ✅ | **SERVER-MANAGED. Autoridade canônica de concorrência otimista** — ver §2.2.1. Inteiro seguro `>= 1`; nasce em `1` em todo caminho de criação; avança exatamente +1 por mutação canônica bem-sucedida; nunca via `FieldValue.increment`. Nunca aceito do payload |
 | finalized_at | timestamp | ❌ | **SERVER-MANAGED.** Obrigatório quando `status == final`; ausente em `draft`. **Preservado imutável** se um evento `final` for posteriormente cancelado — registra o fato histórico da finalização. Ver §2.2.1 |
 | finalized_by | — | — | **NÃO EXISTE no ClinicalEvent v1.** A identidade de quem finalizou é proveniência de `auditLogs` + operation receipt, nunca campo do evento. Ver §2.2.1 |
 | cancelled_at | timestamp | ❌ | **SERVER-MANAGED.** Obrigatório quando `status == cancelled` |
@@ -298,25 +332,42 @@ existente**. O writer de criação (W3: `healthOpenClinicalCase` /
 `healthAppendClinicalEvent`) não muta eventos; ele apenas garante que todo evento
 **nasça** com o token descrito abaixo.
 
-##### Concorrência otimista — `updated_at` é a autoridade canônica
+##### Concorrência otimista — `revision` é a autoridade canônica (SUCESSOR — CLIN-WRITER-1.W6.P0.F1.C1)
+
+> **SUCESSOR de W4.P0.** A versão congelada em W4.P0 declarava `updated_at` +
+> `expectedUpdatedAt` (epoch ms) como autoridade. O gate **F1.C0** provou que
+> duas mutações bem-sucedidas no mesmo milissegundo deixam o token inalterado,
+> permitindo que uma operação DISTINTA e obsoleta fosse aceita — inclusive
+> violando o contrato congelado do W5 ("exatamente um vencedor"). O contrato
+> temporal de `updated_at` (§ Finalização/Cancelamento) permanece; apenas a
+> autoridade de concorrência foi substituída.
 
 | Aspecto | Contrato |
 |---|---|
-| Campo de autoridade | `updated_at` (Firestore `Timestamp`) |
+| Campo de autoridade | `revision` (inteiro) |
 | Owner | **SERVER.** Nunca aceito do payload do cliente |
-| Na criação | `updated_at = recorded_at`, do **mesmo** Timestamp de servidor |
-| Em cada mutação canônica bem-sucedida | `updated_at = timestamp de servidor da mutação` |
-| Token de wire na requisição | `expectedUpdatedAt` |
-| Unidade de wire | **epoch milissegundos** (inteiro) |
-| Comparação no servidor | `stored.updated_at.toMillis() === request.expectedUpdatedAt` |
+| Na criação | `revision = 1` (todo ClinicalEvent canônico, por qualquer caminho de criação) |
+| Em cada mutação canônica bem-sucedida | `revision = revisão armazenada + 1`, calculada **explicitamente** na transação |
+| Token de wire na requisição | `expectedRevision` |
+| Unidade de wire | **inteiro seguro `>= 1`** |
+| Comparação no servidor | `stored.revision === request.expectedRevision` |
 | Divergência (token obsoleto) | `failed-precondition` |
-| `expectedUpdatedAt` ausente/malformado | `invalid-argument` |
-| `updated_at` armazenado ausente/malformado | `failed-precondition` / `integrity` |
+| `expectedRevision` ausente/malformado/`0`/negativo/fracionário | `invalid-argument` |
+| `revision` armazenada ausente/malformada/`0` | `failed-precondition` / `integrity` |
+| `revision` em `MAX_SAFE_INTEGER` | `integrity` — falha fechada, nunca inteiro inseguro |
+| `FieldValue.increment` para `revision` | **PROIBIDO** — documento, resposta, receipt e audit precisam do mesmo número exato |
+| `expectedUpdatedAt` | **RETIRADO** do contrato clínico; o vocabulário fechado o rejeita (`invalid-argument`) |
 | Retry automático | **NÃO.** O chamador relê e decide |
 
 **Não** usamos `DocumentSnapshot.updateTime` como token. A autoridade precisa ser
 um campo do documento que Mobile/Web leiam pelo caminho normal de leitura; depender
 de metadata interna do Firestore criaria um contrato paralelo não congelado.
+
+**Resposta / receipt / audit.** As mutações de evento retornam a `revision`
+resultante (`Finalize`, `Cancel Event`, `Amend` → revisão do evento pai). O
+receipt da operação persiste a mesma `revision`, de modo que um replay retorna
+exatamente a revisão que **aquela** operação produziu — nunca uma recalculada do
+estado atual. O audit central registra `event_revision`.
 
 **Ordem obrigatória dentro da transação de mutação:**
 
@@ -325,14 +376,20 @@ de metadata interna do Firestore criaria um contrato paralelo não congelado.
 2. replay válido  → retornar o resultado original (NÃO checar concorrência)
 3. conflito de intenção → failed-precondition / idempotency-conflict
 4. ler o evento/estado atual
-5. validar expectedUpdatedAt (concorrência)
+5. validar expectedRevision (concorrência)
 6. validar a transição de estado no domínio congelado
-7. escrever
+7. escrever revision = anterior + 1
 ```
 
 O passo 2 **precede** o passo 5 deliberadamente: um retry de rede de uma operação
-que já teve sucesso ainda carrega o `expectedUpdatedAt` antigo. Checar concorrência
+que já teve sucesso ainda carrega a `expectedRevision` antiga. Checar concorrência
 antes do replay rejeitaria como "obsoleto" um retry legítimo.
+
+**`updated_at` no ClinicalEvent após o sucessor** — metadado temporal apenas: não
+é único, não é monotônico, não implica ordem de commit e não participa da decisão
+fresco/obsoleto. As igualdades `updated_at == recorded_at` (criação),
+`== finalized_at`, `== cancelled_at` e `== last_amended_at` permanecem válidas
+como fatos temporais.
 
 ##### Finalização — `draft → final`
 
