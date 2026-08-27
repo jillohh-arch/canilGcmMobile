@@ -120,11 +120,11 @@ leitura.
 | closure_type | string (enum) | ❌ | discharge, cancelled, administrative |
 | closure_reason | string | ❌ | |
 | primary_professional | ProfessionalIdentity | ❌ | |
-| reopen_reason | string | ❌ | Obrigatório em reabertura |
-| reopened_at | timestamp | ❌ | Última reabertura |
-| reopened_by | RecordedBy | ❌ | Quem reabriu |
-| previous_status | string | ❌ | Status anterior ao reopen (= discharged) |
-| reopened_count | number | ❌ | Default 0 |
+| reopen_reason | string | ❌ | **HISTÓRICO** — motivo da última reabertura (§2.1.1) |
+| reopened_at | timestamp | ❌ | **HISTÓRICO** — instante da última reabertura (§2.1.1) |
+| reopened_by | RecordedBy | ❌ | **HISTÓRICO** — ator da última reabertura (§2.1.1) |
+| previous_status | string | ❌ | **HISTÓRICO** — status imediatamente anterior à última reabertura; sempre `discharged` (§2.1.1) |
+| reopened_count | number | ❌ | **HISTÓRICO / CUMULATIVO** — total de reaberturas bem-sucedidas; default 0; nunca reiniciado (§2.1.1) |
 | recurrence_of_case_id | string | ❌ | Ref a caso anterior |
 | related_case_ids | array of string | ❌ | Refs a casos relacionados |
 | has_active_restriction | bool | ❌ | Derivado por Function |
@@ -141,6 +141,66 @@ leitura.
 **Escritor:** Mobile (abertura por intercorrência), Web (abertura por consulta/admin), Function (flags derivados).
 **Leitor:** Mobile, Web.
 **Índices:** `clinical_status ASC, opened_at DESC`; `clinical_status ASC, last_event_at DESC`.
+
+#### 2.1.1 História de reabertura vs. fechamento atual (CONGELADO — CLIN-WRITER-1.W6.P0.D1)
+
+Os dois grupos de metadados do ClinicalCase têm significados **diferentes** e não
+devem ser confundidos:
+
+```
+reopened_at / reopened_by / reopen_reason / previous_status / reopened_count
+  = HISTÓRICO da ÚLTIMA reabertura + contagem acumulada
+
+closed_at / closed_by / closure_type / closure_reason
+  = estado de fechamento ATUAL do caso
+```
+
+**A tupla de reabertura é histórica.** Sua consistência **não** depende do
+`clinical_status` atual. Um caso reaberto e depois novamente encerrado
+(`discharged`) ou cancelado (`cancelled`) **preserva** a tupla e o
+`reopened_count`. Se o status atual participasse dessa validação, a história
+lícita `discharge → reopen → discharge` seria irrepresentável — e não existe
+caminho para limpar a tupla, porque `reopened_count > 0` sem tupla também é
+inconsistente.
+
+Invariantes at-rest (autoridade: `ClinicalCase` em
+`lib/features/health/domain/health_v1_models.dart`, espelhada por
+`assertCaseReopenConsistency` em `functions/src/clinical_domain.ts`):
+
+| Situação | Regra |
+|----------|-------|
+| Nunca reaberto | `reopened_count = 0` **e** os quatro campos da tupla ausentes |
+| Já reaberto | `reopened_count > 0` **e** tupla completa: `reopened_at`, `reopened_by`, `reopen_reason` não vazio, `previous_status = discharged` |
+| Status atual | Qualquer um dos seis valores canônicos, terminais incluídos |
+| `reopened_count` | Inteiro `>= 0`, cumulativo, **nunca reiniciado** por um fechamento posterior |
+
+Uma nova reabertura bem-sucedida **substitui** o snapshot da última reabertura e
+faz `reopened_count = contagem anterior + 1`. O histórico das reaberturas
+anteriores permanece nos `ClinicalEvent` imutáveis de `reopen` e no audit.
+
+**Isto não amplia a AÇÃO de reabertura.** Continuam valendo, sem alteração:
+
+```
+REOPEN
+origem:   discharged APENAS
+destinos: open, under_investigation, under_treatment, monitoring
+cancelled: terminal
+```
+
+São duas perguntas distintas: *"posso executar REOPEN agora?"*
+(`assertCaseReopen`) e *"este caso já foi reaberto alguma vez?"*
+(`assertCaseReopenConsistency`).
+
+**Separação em relação ao fechamento.** Como `closed_*` representa o fechamento
+**atual**, uma reabertura futura para estado ativo deve **DELETAR** `closed_at`,
+`closed_by`, `closure_type` e `closure_reason` (deleção de campo, não `null`),
+enquanto atualiza a tupla de reabertura e incrementa a contagem. Se o caso for
+depois encerrado ou cancelado outra vez, novos `closed_*` são escritos e a tupla
+`reopened_*` permanece **preservada**. A alta anterior não se perde: sua história
+pertence ao `ClinicalEvent` imutável de alta e ao audit.
+
+O writer de lifecycle que executa essas escritas **não** existe ainda (gate W6);
+esta seção congela apenas a semântica.
 
 ---
 

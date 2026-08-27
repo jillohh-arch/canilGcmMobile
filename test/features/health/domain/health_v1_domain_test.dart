@@ -264,13 +264,17 @@ void main() {
         );
       }
       expect(build(), isNot(build(schemaVersion: 2)));
+      // CLIN-WRITER-1.W6.P0.D1 — esta combinação passou a ser LEGÍTIMA. Um caso
+      // reaberto e depois cancelado preserva a história da última reabertura; a
+      // asserção anterior exigia o inverso e tornava irrepresentável a história
+      // lícita `discharge → reopen → cancel`. Ver o grupo dedicado abaixo.
       expect(
-        () => build(
+        build(
           status: ClinicalCaseStatus.cancelled,
           previousStatus: ClinicalCaseStatus.discharged,
           reopened: true,
-        ),
-        throwsA(isA<HealthDomainException>()),
+        ).reopenedCount,
+        1,
       );
       expect(
         () => ClinicalCase(
@@ -291,6 +295,277 @@ void main() {
         () => build(previousStatus: ClinicalCaseStatus.open, reopened: true),
         throwsA(isA<HealthDomainException>()),
       );
+    });
+
+    // ── História de reabertura at-rest (CLIN-WRITER-1.W6.P0.D1) ──────────────
+    //
+    // `reopened_*` é HISTÓRICO: descreve a última reabertura bem-sucedida mais a
+    // contagem acumulada. Sua validade NÃO depende do status atual do caso, senão
+    // a história lícita `discharge → reopen → discharge` seria irrepresentável.
+
+    ClinicalCase historyCase({
+      required ClinicalCaseStatus status,
+      required int reopenedCount,
+      bool tuple = true,
+      ClinicalCaseStatus? previousStatus = ClinicalCaseStatus.discharged,
+      String? reopenReason = 'Alta prematura',
+    }) => ClinicalCase(
+      id: 'case-history',
+      dogId: 'dog-1',
+      title: 'Caso',
+      status: status,
+      openedAt: now,
+      openingEventId: 'event-1',
+      openingType: ClinicalCaseOpeningType.consultation,
+      recordedBy: actor,
+      schemaVersion: 1,
+      reopenedAt: tuple ? now : null,
+      reopenedBy: tuple ? actor : null,
+      previousStatus: tuple ? previousStatus : null,
+      reopenReason: tuple ? reopenReason : null,
+      reopenedCount: reopenedCount,
+    );
+
+    test('história de reabertura é válida sob QUALQUER status atual', () {
+      // A: nunca reaberto.
+      expect(
+        historyCase(
+          status: ClinicalCaseStatus.open,
+          reopenedCount: 0,
+          tuple: false,
+        ).reopenedCount,
+        0,
+      );
+      // B..F: reaberto, sob todos os seis status canônicos — incluindo os
+      // terminais `discharged` (D) e `cancelled` (E).
+      for (final status in ClinicalCaseStatus.values) {
+        final subject = historyCase(status: status, reopenedCount: 1);
+        expect(subject.status, status);
+        expect(subject.reopenedCount, 1);
+        expect(subject.previousStatus, ClinicalCaseStatus.discharged);
+        expect(subject.reopenedAt, now);
+        expect(subject.reopenedBy, actor);
+        expect(subject.reopenReason, 'Alta prematura');
+      }
+      // F: contagem cumulativa preservada.
+      expect(
+        historyCase(
+          status: ClinicalCaseStatus.monitoring,
+          reopenedCount: 2,
+        ).reopenedCount,
+        2,
+      );
+    });
+
+    test(
+      'discharge → reopen → discharge/cancel é representável de ponta a ponta',
+      () {
+        final discharged = caseWith(ClinicalCaseStatus.discharged);
+        final reopened = ClinicalCaseTransitions.reopen(
+          discharged,
+          destination: ClinicalCaseStatus.underTreatment,
+          reason: 'Alta prematura',
+          reopenedBy: actor,
+          reopenedAt: now,
+        ).clinicalCase;
+        expect(reopened.reopenedCount, 1);
+
+        // Nova alta: antes de D1 esta transição era bloqueada, deixando o caso
+        // preso para sempre em estados ativos.
+        final rediscarged = ClinicalCaseTransitions.transition(
+          reopened,
+          ClinicalCaseStatus.discharged,
+        );
+        expect(rediscarged.status, ClinicalCaseStatus.discharged);
+        expect(rediscarged.reopenedCount, 1);
+        expect(rediscarged.reopenedAt, now);
+
+        // Cancelamento de um caso previamente reaberto.
+        final cancelled = ClinicalCaseTransitions.transition(
+          reopened,
+          ClinicalCaseStatus.cancelled,
+        );
+        expect(cancelled.status, ClinicalCaseStatus.cancelled);
+        expect(cancelled.reopenedCount, 1);
+
+        // Segunda reabertura a partir da nova alta: contagem acumula, nunca reseta.
+        final second = ClinicalCaseTransitions.reopen(
+          rediscarged,
+          destination: ClinicalCaseStatus.monitoring,
+          reason: 'Recidiva',
+          reopenedBy: actor,
+          reopenedAt: now,
+        ).clinicalCase;
+        expect(second.reopenedCount, 2);
+        expect(second.reopenReason, 'Recidiva');
+        expect(second.previousStatus, ClinicalCaseStatus.discharged);
+      },
+    );
+
+    Matcher throwsDomainCode(String code) => throwsA(
+      isA<HealthDomainException>().having((e) => e.code, 'code', code),
+    );
+
+    test('história de reabertura inválida continua fail-closed', () {
+      // G: contagem negativa. O código é asserido: outras invariantes também
+      // recusariam a contagem negativa, mas com códigos diferentes, e este guard
+      // precisa ser o responsável.
+      for (final invalid in [-1, -7]) {
+        expect(
+          () => historyCase(
+            status: ClinicalCaseStatus.open,
+            reopenedCount: invalid,
+          ),
+          throwsDomainCode('invalid_reopened_count'),
+        );
+        // Também sem tupla e com tupla parcial: a contagem negativa é recusada
+        // por ESTE guard em qualquer configuração.
+        expect(
+          () => historyCase(
+            status: ClinicalCaseStatus.open,
+            reopenedCount: invalid,
+            tuple: false,
+          ),
+          throwsDomainCode('invalid_reopened_count'),
+        );
+      }
+      // L: autoria malformada é recusada pelo próprio value object.
+      for (final blank in ['', '   ']) {
+        expect(
+          () => RecordedBy(uid: blank, name: 'N', internalRole: 'condutor'),
+          throwsA(isA<HealthDomainException>()),
+        );
+        expect(
+          () => RecordedBy(uid: 'u', name: blank, internalRole: 'condutor'),
+          throwsA(isA<HealthDomainException>()),
+        );
+        expect(
+          () => RecordedBy(uid: 'u', name: 'N', internalRole: blank),
+          throwsA(isA<HealthDomainException>()),
+        );
+      }
+      // H: contagem 0 com tupla completa.
+      expect(
+        () => historyCase(status: ClinicalCaseStatus.open, reopenedCount: 0),
+        throwsA(isA<HealthDomainException>()),
+      );
+      // I: contagem > 0 sem tupla alguma.
+      expect(
+        () => historyCase(
+          status: ClinicalCaseStatus.open,
+          reopenedCount: 1,
+          tuple: false,
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
+      // J: previous_status diferente de discharged.
+      for (final invalid in ClinicalCaseStatus.values) {
+        if (invalid == ClinicalCaseStatus.discharged) continue;
+        expect(
+          () => historyCase(
+            status: ClinicalCaseStatus.open,
+            reopenedCount: 1,
+            previousStatus: invalid,
+          ),
+          throwsA(isA<HealthDomainException>()),
+          reason: 'previous_status ${invalid.wireName} deve ser recusado',
+        );
+      }
+      // K: motivo em branco.
+      for (final blank in ['', '   ']) {
+        expect(
+          () => historyCase(
+            status: ClinicalCaseStatus.open,
+            reopenedCount: 1,
+            reopenReason: blank,
+          ),
+          throwsA(isA<HealthDomainException>()),
+        );
+      }
+      // Também sob status terminal: afrouxar o status não afrouxou a tupla.
+      expect(
+        () => historyCase(
+          status: ClinicalCaseStatus.cancelled,
+          reopenedCount: 1,
+          previousStatus: ClinicalCaseStatus.open,
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
+      expect(
+        () => historyCase(
+          status: ClinicalCaseStatus.discharged,
+          reopenedCount: 0,
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
+    });
+
+    test('consistência at-rest NÃO é permissão para reabrir', () {
+      // Um caso cancelado pode legitimamente carregar história de reabertura…
+      expect(
+        historyCase(
+          status: ClinicalCaseStatus.cancelled,
+          reopenedCount: 1,
+        ).reopenedCount,
+        1,
+      );
+      // …e ainda assim a AÇÃO de reabertura permanece negada a partir dele.
+      expect(
+        () => ClinicalCaseTransitions.reopen(
+          historyCase(status: ClinicalCaseStatus.cancelled, reopenedCount: 1),
+          destination: ClinicalCaseStatus.open,
+          reason: 'Erro de alta',
+          reopenedBy: actor,
+          reopenedAt: now,
+        ),
+        throwsA(isA<HealthDomainException>()),
+      );
+      // Origem continua sendo discharged apenas. O código é asserido: sem o
+      // guard de origem, a construção do agregado ainda falharia, mas com
+      // `inconsistent_reopen_metadata` — um erro de integridade at-rest, não a
+      // recusa de autorização da AÇÃO. Os dois não são intercambiáveis.
+      for (final from in ClinicalCaseStatus.values) {
+        if (from == ClinicalCaseStatus.discharged) continue;
+        expect(
+          () => ClinicalCaseTransitions.reopen(
+            caseWith(from),
+            destination: ClinicalCaseStatus.open,
+            reason: 'Erro de alta',
+            reopenedBy: actor,
+            reopenedAt: now,
+          ),
+          throwsDomainCode('invalid_case_reopen'),
+          reason: 'reopen a partir de ${from.wireName} deve ser negado',
+        );
+      }
+      // Destinos terminais continuam negados.
+      for (final destination in const [
+        ClinicalCaseStatus.discharged,
+        ClinicalCaseStatus.cancelled,
+      ]) {
+        expect(
+          () => ClinicalCaseTransitions.reopen(
+            caseWith(ClinicalCaseStatus.discharged),
+            destination: destination,
+            reason: 'Erro de alta',
+            reopenedBy: actor,
+            reopenedAt: now,
+          ),
+          throwsDomainCode('invalid_case_reopen'),
+        );
+      }
+      // E a reabertura legítima continua permitida para os quatro destinos.
+      for (final destination in ClinicalCaseTransitions.reopenDestinations) {
+        final result = ClinicalCaseTransitions.reopen(
+          caseWith(ClinicalCaseStatus.discharged),
+          destination: destination,
+          reason: 'Erro de alta',
+          reopenedBy: actor,
+          reopenedAt: now,
+        ).clinicalCase;
+        expect(result.status, destination);
+        expect(result.reopenedCount, 1);
+      }
     });
   });
 

@@ -199,13 +199,22 @@ final class ClinicalCase {
         'reopen_reason é obrigatório',
       );
     }
+    // Metadados de reabertura são HISTÓRICOS: descrevem a última reabertura
+    // bem-sucedida, não uma propriedade válida apenas enquanto o caso está
+    // ativo. O status atual NÃO participa desta checagem — um caso reaberto e
+    // depois novamente encerrado (`discharged`) ou cancelado preserva a tupla e
+    // o `reopened_count` acumulado. Se o status atual participasse, a história
+    // legítima `discharge → reopen → discharge` seria irrepresentável.
+    //
+    // A autoridade da AÇÃO de reabertura permanece separada e inalterada em
+    // `ClinicalCaseTransitions.reopen`: origem `discharged` apenas, destinos
+    // ativos apenas, `cancelled` terminal.
     if (hasAll &&
         (previousStatus != ClinicalCaseStatus.discharged ||
-            !_reopenStatuses.contains(status) ||
             reopenedCount <= 0)) {
       throw const HealthDomainException(
         'inconsistent_reopen_metadata',
-        'Metadados de reabertura não correspondem ao status do caso',
+        'Metadados de reabertura inconsistentes com o histórico do caso',
       );
     }
     if (!hasAny && reopenedCount != 0) {
@@ -301,12 +310,10 @@ final class ClinicalCase {
 }
 
 const _notProvided = Object();
-const _reopenStatuses = {
-  ClinicalCaseStatus.open,
-  ClinicalCaseStatus.underInvestigation,
-  ClinicalCaseStatus.underTreatment,
-  ClinicalCaseStatus.monitoring,
-};
+// O conjunto de destinos ativos de reabertura vive em
+// `ClinicalCaseTransitions.reopenDestinations`, que é a autoridade da AÇÃO.
+// Não existe espelho privado aqui: a consistência at-rest da história de
+// reabertura não depende do status atual do caso.
 
 final class ClinicalEvent {
   ClinicalEvent({

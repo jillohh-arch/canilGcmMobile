@@ -22,6 +22,7 @@ import {
   ClinicalEventStatus,
   allowedCaseTransitions,
   assertCaseReopen,
+  assertCaseReopenConsistency,
   assertCaseTransition,
   assertEventCancellationConsistency,
   assertEventTransition,
@@ -451,6 +452,212 @@ function main(): void {
     assert.strictEqual(isEventContentImmutable("cancelled"), true);
     assert.strictEqual(isEventContentEditable("final"), false);
     assert.strictEqual(isEventContentEditable("cancelled"), false);
+  });
+
+  // ── ClinicalCase reopen HISTORY at rest (CLIN-WRITER-1.W6.P0.D1) ────────────
+  //
+  // Transcribed independently from the corrected Dart `ClinicalCase` constructor
+  // invariants. The load-bearing property: the tuple's validity does NOT depend
+  // on the case's current status, so a reopened case can still be discharged or
+  // cancelled afterwards without its history becoming unrepresentable.
+
+  const REOPEN_TUPLE = {
+    reopenedAt: T,
+    reopenedBy: ACTOR,
+    previousStatus: "discharged" as ClinicalCaseStatus,
+    reopenReason: "Alta prematura",
+    reopenedCount: 1,
+  };
+
+  test("never reopened: absent tuple with count 0 is consistent", () => {
+    assert.strictEqual(assertCaseReopenConsistency(), null);
+    assert.strictEqual(assertCaseReopenConsistency({}), null);
+    assert.strictEqual(assertCaseReopenConsistency({reopenedCount: 0}), null);
+    // Explicit nulls are the same fact as omission.
+    assert.strictEqual(
+      assertCaseReopenConsistency({
+        reopenedAt: null,
+        reopenedBy: null,
+        previousStatus: null,
+        reopenReason: null,
+        reopenedCount: null,
+      }),
+      null,
+    );
+  });
+
+  test("reopen history is valid under EVERY current case status", () => {
+    // The whole point of D1: no status participates in the at-rest check.
+    for (const status of CLINICAL_CASE_STATUSES) {
+      const history = assertCaseReopenConsistency(REOPEN_TUPLE);
+      assert.ok(history, `history must validate while case is ${status}`);
+      assert.strictEqual(history.reopenedCount, 1);
+      assert.strictEqual(history.previousStatus, "discharged");
+      assert.strictEqual(history.reopenReason, "Alta prematura");
+      assert.strictEqual(history.reopenedAt, T);
+      assert.deepStrictEqual(history.reopenedBy, ACTOR);
+    }
+  });
+
+  test("post-reopen re-discharge and cancellation histories are representable", () => {
+    // discharge #1 → reopen #1 → discharge #2 : count survives the re-closure.
+    const rediscarged = assertCaseReopenConsistency(REOPEN_TUPLE);
+    assert.strictEqual(rediscarged?.reopenedCount, 1);
+    // …and a later cancellation likewise preserves it.
+    const cancelled = assertCaseReopenConsistency(REOPEN_TUPLE);
+    assert.strictEqual(cancelled?.reopenedCount, 1);
+    // Second reopen: cumulative count, never reset.
+    const second = assertCaseReopenConsistency({
+      ...REOPEN_TUPLE,
+      reopenedCount: 2,
+    });
+    assert.strictEqual(second?.reopenedCount, 2);
+    const many = assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount: 7});
+    assert.strictEqual(many?.reopenedCount, 7);
+  });
+
+  test("reopen history: reason is trimmed like the Dart aggregate", () => {
+    const history = assertCaseReopenConsistency({
+      ...REOPEN_TUPLE,
+      reopenReason: "  Alta prematura  ",
+    });
+    assert.strictEqual(history?.reopenReason, "Alta prematura");
+  });
+
+  test("reopen history: negative or non-integer count fails closed", () => {
+    // The code is asserted, not merely "some rejection": without this guard the
+    // tuple invariants would still reject a negative count, but as
+    // `inconsistent_reopen_metadata` / `inconsistent_reopened_count`. The count
+    // guard must be the one that answers, in every tuple configuration.
+    for (const reopenedCount of [-1, -7]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenedAt: T, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+    }
+    for (const reopenedCount of [1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: count 0 with a tuple is inconsistent", () => {
+    expectDomainError(
+      () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount: 0}),
+      "inconsistent_reopen_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("reopen history: count > 0 without any tuple is inconsistent", () => {
+    expectDomainError(
+      () => assertCaseReopenConsistency({reopenedCount: 1}),
+      "inconsistent_reopened_count",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({reopenedCount: 4}),
+      "inconsistent_reopened_count",
+      "invalid_value",
+    );
+  });
+
+  test("reopen history: every partial tuple fails closed", () => {
+    const fields = [
+      "reopenedAt",
+      "reopenedBy",
+      "previousStatus",
+      "reopenReason",
+    ] as const;
+    // Each field alone.
+    for (const field of fields) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({[field]: REOPEN_TUPLE[field]}),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+    // Each field missing from an otherwise complete tuple.
+    for (const field of fields) {
+      const partial: Record<string, unknown> = {...REOPEN_TUPLE};
+      delete partial[field];
+      expectDomainError(
+        () => assertCaseReopenConsistency(partial),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: previous_status must be discharged", () => {
+    for (const previousStatus of CLINICAL_CASE_STATUSES) {
+      if (previousStatus === "discharged") continue;
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, previousStatus}),
+        "inconsistent_reopen_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: blank reason fails closed", () => {
+    for (const reopenReason of ["", "   ", "\t\n"]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenReason}),
+        "missing_reopen_reason",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("at-rest history consistency is NOT permission to reopen", () => {
+    // THE separation D1 exists to prove. A cancelled case may legitimately carry
+    // reopen history…
+    assert.ok(assertCaseReopenConsistency(REOPEN_TUPLE));
+    // …while the reopen ACTION remains denied from cancelled,
+    expectDomainError(
+      () => assertCaseReopen("cancelled", "open", "Erro de alta"),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+    // denied from every active status (source must be discharged),
+    for (const from of CLINICAL_CASE_STATUSES) {
+      if (from === "discharged") continue;
+      expectDomainError(
+        () => assertCaseReopen(from, "open", "Erro de alta"),
+        "invalid_case_reopen",
+        "illegal_transition",
+      );
+    }
+    // denied into terminal destinations,
+    for (const destination of ["discharged", "cancelled"] as const) {
+      expectDomainError(
+        () => assertCaseReopen("discharged", destination, "Erro de alta"),
+        "invalid_case_reopen",
+        "illegal_transition",
+      );
+    }
+    // and allowed from discharged into each active destination.
+    for (const destination of caseReopenDestinations()) {
+      assert.deepStrictEqual(
+        assertCaseReopen("discharged", destination, " Erro de alta "),
+        {destination, reason: "Erro de alta"},
+      );
+    }
   });
 
   if (failed > 0) {

@@ -49,6 +49,10 @@ export const CLINICAL_DOMAIN_ERROR_CODES = [
   "invalid_case_transition",
   "invalid_case_reopen",
   "missing_reopen_reason",
+  "invalid_reopened_count",
+  "incomplete_reopen_metadata",
+  "inconsistent_reopen_metadata",
+  "inconsistent_reopened_count",
   "invalid_event_transition",
   "missing_cancel_reason",
   "missing_cancellation_metadata",
@@ -336,6 +340,112 @@ export function assertCaseReopen(
     throw invalidValue("missing_reopen_reason", "reopen_reason é obrigatório");
   }
   return {destination, reason: normalizedReason};
+}
+
+/**
+ * Stored reopen history of a ClinicalCase, as read at rest.
+ *
+ * All four snapshot fields are optional at the boundary because a case that was
+ * never reopened carries none of them.
+ */
+export interface ClinicalCaseReopenHistoryInput {
+  readonly reopenedAt?: Date | null;
+  readonly reopenedBy?: ClinicalActor | null;
+  readonly previousStatus?: ClinicalCaseStatus | null;
+  readonly reopenReason?: string | null;
+  readonly reopenedCount?: number | null;
+}
+
+/** Validated reopen history. `null` when the case was never reopened. */
+export interface ClinicalCaseReopenHistory {
+  readonly reopenedAt: Date;
+  readonly reopenedBy: ClinicalActor;
+  readonly previousStatus: ClinicalCaseStatus;
+  readonly reopenReason: string;
+  readonly reopenedCount: number;
+}
+
+/**
+ * Validates the AT-REST reopen history of a stored ClinicalCase.
+ *
+ * Mirror of the `ClinicalCase` constructor invariants in
+ * `lib/features/health/domain/health_v1_models.dart`, check-for-check and in the
+ * same order, so the server refuses exactly what the mobile aggregate refuses.
+ *
+ * THE CURRENT CASE STATUS IS DELIBERATELY NOT AN INPUT (CLIN-WRITER-1.W6.P0.D1).
+ * Reopen metadata is HISTORICAL: it describes the most recent successful reopen
+ * plus the cumulative count. A case reopened once and later discharged again — or
+ * cancelled — keeps that history, so `discharge → reopen → discharge` stays
+ * representable. Constraining the history by current status made that lawful
+ * lifecycle unreachable, because the aggregate offers no way to clear the tuple
+ * either (`count > 0` with no tuple is itself rejected).
+ *
+ * This is NOT permission to reopen. Whether a reopen ACTION is legal right now
+ * remains {@link assertCaseReopen}: source `discharged` only, destinations active
+ * only, `cancelled` terminal. Two different questions:
+ *   "may I reopen this case now?"     → assertCaseReopen
+ *   "was this case ever reopened?"    → assertCaseReopenConsistency
+ *
+ * Ordering mirrors Dart exactly:
+ *   1. count integer >= 0                    → invalid_reopened_count
+ *   2. partial tuple                          → incomplete_reopen_metadata
+ *   3. blank reason                           → missing_reopen_reason
+ *   4. tuple present + bad previous/count     → inconsistent_reopen_metadata
+ *   5. count > 0 with no tuple                → inconsistent_reopened_count
+ */
+export function assertCaseReopenConsistency(
+  history: ClinicalCaseReopenHistoryInput = {},
+): ClinicalCaseReopenHistory | null {
+  const {reopenedAt, reopenedBy, previousStatus, reopenReason} = history;
+  const rawCount = history.reopenedCount;
+
+  // Absent count is the Dart default of 0, not a corruption.
+  const count = isPresent(rawCount) ? (rawCount as number) : 0;
+  if (typeof count !== "number" || !Number.isInteger(count) || count < 0) {
+    throw invalidValue(
+      "invalid_reopened_count",
+      "reopened_count não pode ser negativo",
+    );
+  }
+
+  const normalizedReason = isPresent(reopenReason) ?
+    (reopenReason as string).trim() :
+    undefined;
+
+  const tuple = [reopenedAt, reopenedBy, previousStatus, normalizedReason];
+  const hasAny = tuple.some((value) => isPresent(value));
+  const hasAll = tuple.every((value) => isPresent(value));
+
+  if (hasAny && !hasAll) {
+    throw invalidValue(
+      "incomplete_reopen_metadata",
+      "Metadados de reabertura devem ser completos",
+    );
+  }
+  if (normalizedReason !== undefined && normalizedReason.length === 0) {
+    throw invalidValue("missing_reopen_reason", "reopen_reason é obrigatório");
+  }
+  if (hasAll && (previousStatus !== "discharged" || count <= 0)) {
+    throw invalidValue(
+      "inconsistent_reopen_metadata",
+      "Metadados de reabertura inconsistentes com o histórico do caso",
+    );
+  }
+  if (!hasAny && count !== 0) {
+    throw invalidValue(
+      "inconsistent_reopened_count",
+      "reopened_count exige metadados da última reabertura",
+    );
+  }
+
+  if (!hasAll) return null;
+  return {
+    reopenedAt: reopenedAt as Date,
+    reopenedBy: reopenedBy as ClinicalActor,
+    previousStatus: previousStatus as ClinicalCaseStatus,
+    reopenReason: normalizedReason as string,
+    reopenedCount: count,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
