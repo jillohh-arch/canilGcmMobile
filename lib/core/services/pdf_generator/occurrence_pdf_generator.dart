@@ -1366,10 +1366,12 @@ class OccurrencePdfGenerator {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         // Header da seção
+        // _sectionLabel contém um Expanded interno, então precisa entrar como
+        // flex child para receber largura limitada. A régua interna já empurra a
+        // contagem para a direita, dispensando Spacer.
         pw.Row(
           children: [
-            _sectionLabel('Mapa de deslocamento', f),
-            pw.Spacer(),
+            pw.Expanded(child: _sectionLabel('Mapa de deslocamento', f)),
             pw.Text(
               '${locations.length} ${locations.length == 1 ? 'local' : 'locais'}',
               style: _body(f, size: 8, color: _inkSoft),
@@ -1909,13 +1911,14 @@ class OccurrencePdfGenerator {
             margin: const pw.EdgeInsets.only(bottom: 12),
             padding: const pw.EdgeInsets.all(11),
             decoration: pw.BoxDecoration(
+              // Borda parcial intencional (aba colorida à esquerda). O package pdf
+              // não aceita borderRadius em Border não uniforme, por isso sem raio.
               border: pw.Border(
                 left: pw.BorderSide(color: color, width: 2.5),
                 top: pw.BorderSide(color: _line),
                 right: pw.BorderSide(color: _line),
                 bottom: pw.BorderSide(color: _line),
               ),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
             ),
             child: pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
