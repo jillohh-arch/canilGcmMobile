@@ -1,6 +1,6 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
@@ -2664,22 +2664,35 @@ class OccurrencePdfGenerator {
     return raw is Map ? Map<String, dynamic>.from(raw) : null;
   }
 
-  String _drugDescription(dynamic raw) {
+  /// Formata a lista de drogas apreendidas para o card de resultados.
+  ///
+  /// `weight_grams` é peso em gramas (o campo que o operador preenche em
+  /// "Peso em gramas"), então o documento precisa mostrar a unidade. O campo
+  /// legado `quantidade` não tem unidade conhecida e é renderizado cru.
+  @visibleForTesting
+  static String formatDrugDescriptionForTest(dynamic raw) =>
+      _formatDrugDescription(raw);
+
+  static String _formatDrugDescription(dynamic raw) {
     if (raw is List && raw.isNotEmpty) {
       final entries = raw
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .map((e) {
             final type = (e['type'] ?? e['tipo'] ?? 'substancia').toString();
+            final hasWeight = e['weight_grams'] != null;
             final amount = (e['weight_grams'] ?? e['quantidade'] ?? '')
                 .toString();
-            return amount.isEmpty ? type : '$type - $amount';
+            if (amount.isEmpty) return type;
+            return hasWeight ? '$type - $amount g' : '$type - $amount';
           })
           .join('; ');
       if (entries.isNotEmpty) return entries;
     }
     return 'Substancia analoga a entorpecente apreendida e registrada na ocorrencia.';
   }
+
+  String _drugDescription(dynamic raw) => _formatDrugDescription(raw);
 
   String _weaponDescription(Map<String, dynamic>? details) {
     final type = details?['type']?.toString();
