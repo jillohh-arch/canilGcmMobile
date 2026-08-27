@@ -615,6 +615,7 @@ function main(): void {
   });
 
   test("reopen history: blank reason fails closed", () => {
+    // COMPLETE tuple + blank reason: the reason guard is the one that answers.
     for (const reopenReason of ["", "   ", "\t\n"]) {
       expectDomainError(
         () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenReason}),
@@ -622,6 +623,74 @@ function main(): void {
         "invalid_value",
       );
     }
+  });
+
+  test("reopen history: tuple completeness is decided BEFORE reason", () => {
+    // ORDER GUARD (CLIN-WRITER-1.W6.P0.D1.C1). These fixtures are the only input
+    // class that can distinguish the two orderings, because they violate BOTH
+    // completeness and the reason rule at once. Dart decides completeness first,
+    // so a TS module that checked the reason first would return
+    // `missing_reopen_reason` where the mobile aggregate returns
+    // `incomplete_reopen_metadata` — silent Dart/server divergence on the very
+    // parity this gate exists to freeze.
+    const blanks = ["", "   ", "\t\n"];
+
+    // CASE A — count > 0, INCOMPLETE tuple, blank reason.
+    for (const reopenReason of blanks) {
+      for (const present of ["reopenedAt", "reopenedBy", "previousStatus"] as const) {
+        expectDomainError(
+          () => assertCaseReopenConsistency({
+            [present]: REOPEN_TUPLE[present],
+            reopenReason,
+            reopenedCount: 1,
+          }),
+          "incomplete_reopen_metadata",
+          "invalid_value",
+        );
+      }
+      // Blank reason as the ONLY present component is still an incomplete tuple.
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenReason, reopenedCount: 1}),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+      // Each single field dropped from an otherwise complete tuple.
+      for (const missing of ["reopenedAt", "reopenedBy", "previousStatus"] as const) {
+        const partial: Record<string, unknown> = {...REOPEN_TUPLE, reopenReason};
+        delete partial[missing];
+        expectDomainError(
+          () => assertCaseReopenConsistency(partial),
+          "incomplete_reopen_metadata",
+          "invalid_value",
+        );
+      }
+    }
+
+    // CASE B — count == 0, partial tuple, blank reason. Orthogonal to A: proves
+    // completeness also outranks the count/tuple coherence rule, not just reason.
+    for (const reopenReason of blanks) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({
+          reopenedAt: T,
+          reopenReason,
+          reopenedCount: 0,
+        }),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+
+    // And the negative count still outranks completeness, keeping the full chain
+    // pinned end to end: count → completeness → reason → prev/count → count-only.
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        reopenedAt: T,
+        reopenReason: "   ",
+        reopenedCount: -1,
+      }),
+      "invalid_reopened_count",
+      "invalid_value",
+    );
   });
 
   test("at-rest history consistency is NOT permission to reopen", () => {
