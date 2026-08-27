@@ -943,6 +943,7 @@ clínica são imutáveis após emissão — correção é `cancelled` + nova res
 
 | Campo | Tipo | Obrigatório | Notas |
 |-------|------|-------------|-------|
+| dog_id | string | ✅ | Identidade canônica cross-dog do K9, usada pelas leituras e pela autorização collection-group da Agenda. Gravado pelo writer server-side a partir do `dogId` estruturalmente autorizado da operação; **cliente não fornece**. Sem aliases. Imutável após a criação. Ver invariante de identidade abaixo. |
 | schedule_type | string (enum) | ✅ | dose, vaccination, exam, consultation, weighing, reevaluation, deworming, bath, general |
 | title | string | ✅ | |
 | scheduled_for | timestamp | ✅ | Create manual: presente ou futuro (autoridade callable; minuto corrente do servidor aceito). Não nasce no passado. |
@@ -989,6 +990,19 @@ dogs/{dogId}/health_schedule/{scheduleId}/operations/{operationId}
 `last_*_operation_id` no documento pai = apenas atalhos auxiliares (não substituem receipts).
 
 Retenção: receipts permanecem enquanto forem necessários para retries legítimos; política de purga futura documentável sem apagar cedo demais.
+
+**Invariante de identidade (`dog_id`):**
+
+`dogId` é o campo **da requisição** (callable); `dog_id` é o campo **persistido** no Firestore. São camadas distintas do mesmo contrato e não são intercambiáveis.
+
+- **Autoridade:** o writer canônico grava `dog_id` a partir do `dogId` estruturalmente autorizado da operação — o mesmo valor já validado pelo controle de acesso ao K9. O `dog_id` do payload **nunca** define a identidade persistida.
+- **Cliente:** não escolhe a identidade canônica. `dog_id` divergente de `dogId` é rejeitado (`invalid-argument`); `dog_id` sem `dogId` não se torna a autoridade operativa.
+- **Aliases:** não existem. `dogId` (payload), `caoId`, `k9_id` e `dogID` **não** substituem `dog_id` como identidade persistida canônica.
+- **Imutabilidade:** `dog_id` é imutável após a criação. `healthScheduleUpdateOpen` não o altera; `healthScheduleComplete` e `healthScheduleCancel` também não. Não existe operação canônica que mova um item de agenda entre K9s.
+- **Dependência collection-group:** a Agenda global depende de `dog_id`. As Rules autorizam a query por `resource.data.dog_id` (`canReadHealthScheduleRecord()`), e a shape canônica filtra por `dog_id` (índice COLLECTION_GROUP `dog_id, lifecycle_status, scheduled_for`). Um documento sem `dog_id` canônico não é alcançável pela Agenda global.
+- **GET aninhado:** `dogs/{dogId}/health_schedule/{scheduleId}` é autorizado pelo **path estrutural** e não depende de `dog_id`. Por isso um documento sem `dog_id` pode continuar legível por K9 e ainda assim ser invisível à Agenda global.
+- **Integridade:** `dog_id` ausente, malformado (vazio/tipo inválido) ou divergente do `dogId` estrutural do path é **problema de integridade**, não caso de autorização. Em escopo collection-group as Rules não alcançam o `dogId` do path pai e portanto **não** podem comparar o campo persistido com o pai estrutural; não há fallback nem reconciliação por path.
+- **Legado / migração:** documentos legados sem `dog_id` são **candidatos** a migração controlada, tendo o `dogId` estrutural do path canônico como autoridade de migração. A necessidade e o estado dessa migração em produção não são afirmados aqui.
 
 **Invariante absoluta de persistência:** apenas `lifecycle_status` é persistido. Os valores `scheduled`, `upcoming`, `today`, `pending`, `overdue` são **somente calculados na leitura**. Nenhuma Function, nenhum job periódico, nenhuma reconciliação, nenhuma atualização implícita grava esses valores como campos no documento. Não existe permissão em Rules para criar/atualizar campos temporais derivados. Quaisquer campos derivados existentes em dados migrados devem ser descartados no cutover.
 
