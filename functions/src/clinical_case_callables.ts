@@ -1494,6 +1494,7 @@ export async function runHealthOpenClinicalCase(
         reopened_count: 0,
         event_count: 1,
         last_event_at: recordedAt,
+        updated_at: recordedAt,
         schema_version: CLINICAL_SCHEMA_VERSION,
       };
       if (input.professional !== undefined) {
@@ -1769,7 +1770,11 @@ export async function runHealthAppendClinicalEvent(
       // patch: appending an event is not a lifecycle transition.
       tx.set(
         cRef,
-        {event_count: FieldValue.increment(1), last_event_at: recordedAt},
+        {
+          event_count: FieldValue.increment(1),
+          last_event_at: recordedAt,
+          updated_at: recordedAt,
+        },
         {merge: true},
       );
       tx.set(

@@ -316,6 +316,22 @@ async function testOpenSuccess() {
   assert.strictEqual(caseDoc.opening_type, "consultation", "opening_type");
   assert.strictEqual(caseDoc.schema_version, 1, "schema_version do caso");
   assert.strictEqual(caseDoc.event_count, 1, "contador inicia em 1");
+  assert.ok(caseDoc.updated_at, "case.updated_at presente na abertura");
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.opened_at as Timestamp).toMillis(),
+    "case.updated_at == case.opened_at na abertura",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.last_event_at as Timestamp).toMillis(),
+    "case.updated_at == case.last_event_at na abertura",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    FIXED_NOW.getTime(),
+    "case.updated_at usa o Timestamp do servidor",
+  );
   assert.deepStrictEqual(
     caseDoc.recorded_by,
     {uid: actor.uid, name: actor.name, internal_role: "condutor"},
@@ -595,6 +611,17 @@ async function testAppendSuccess() {
   ) as JsonMap;
   // clinical_status intacto — append NÃO é transição de ciclo de vida.
   assert.strictEqual(caseDoc.clinical_status, "open", "status intacto");
+  assert.ok(caseDoc.updated_at, "case.updated_at presente após append");
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.last_event_at as Timestamp).toMillis(),
+    "case.updated_at == case.last_event_at após append",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (eventDoc.recorded_at as Timestamp).toMillis(),
+    "case.updated_at == eventDoc.recorded_at",
+  );
 
   const audits = storeKeys(db).filter((k) => k.startsWith("auditLogs/"));
   assert.strictEqual(audits.length, 2, "1 audit de abertura + 1 de append");
@@ -1107,6 +1134,169 @@ async function testIdempotencyConflictLeavesTokenIntact() {
     eventDocOf(db, caseId, eventId),
     before,
     "conflito não pode alterar updated_at do evento existente",
+  );
+}
+
+// ── Token de concorrência do ClinicalCase (CLIN-WRITER-1.W6.P0.F1) ───────────
+
+async function testCaseConcurrencyTokenLifecycle() {
+  const db = dbWithDog();
+  const t0 = new Date("2026-08-15T10:00:00.000Z");
+  const t1 = new Date("2026-08-15T11:00:00.000Z");
+  const t2 = new Date("2026-08-15T12:00:00.000Z");
+  const t3 = new Date("2026-08-15T13:00:00.000Z");
+  const t4 = new Date("2026-08-15T14:00:00.000Z");
+
+  // 1. OPEN: case.updated_at nasce igual a opened_at e last_event_at (T0)
+  await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: t0}),
+  );
+  const caseId = caseIdFor("dog-1", "op-open-1");
+  const casePath = `dogs/dog-1/clinical_cases/${caseId}`;
+  let caseDoc = db._store.get(casePath) as JsonMap;
+
+  assert.ok(caseDoc.updated_at, "case.updated_at deve existir na abertura");
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t0.getTime(),
+    "OPEN: updated_at == T0",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.opened_at as Timestamp).toMillis(),
+    "OPEN: updated_at == opened_at",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.last_event_at as Timestamp).toMillis(),
+    "OPEN: updated_at == last_event_at",
+  );
+
+  // Replay de OPEN não avança case.updated_at
+  await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: t1}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t0.getTime(),
+    "OPEN replay não avança case.updated_at",
+  );
+
+  // 2. APPEND: case.updated_at avança para T1 (last_event_at == appendedEvent.recorded_at)
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db, now: t1}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  const eventId = eventIdFor("dog-1", caseId, "op-append-1");
+  const eventDoc = db._store.get(
+    `dogs/dog-1/clinical_cases/${caseId}/clinical_events/${eventId}`,
+  ) as JsonMap;
+
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "APPEND: updated_at avança para T1",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (caseDoc.last_event_at as Timestamp).toMillis(),
+    "APPEND: updated_at == last_event_at",
+  );
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    (eventDoc.recorded_at as Timestamp).toMillis(),
+    "APPEND: updated_at == appendedEvent.recorded_at",
+  );
+
+  // Replay de APPEND não avança case.updated_at
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db, now: t2}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "APPEND replay não avança case.updated_at",
+  );
+
+  // Conflito de APPEND não avança case.updated_at
+  await expectReject(
+    () =>
+      runHealthAppendClinicalEvent(
+        mockRequest(appendPayload(caseId, {content: {notes: "divergente"}})),
+        depsFor({db, now: t2}),
+      ),
+    "idempotency-conflict",
+    "append conflito",
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "APPEND conflict não avança case.updated_at",
+  );
+
+  // 3. W4 FINALIZE: mutação exclusiva de evento NÃO altera case.updated_at
+  await runHealthFinalizeClinicalEvent(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      eventId,
+      operationId: "op-finalize-1",
+      expectedUpdatedAt: t1.getTime(),
+    }),
+    depsFor({db, now: t2}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "FINALIZE não altera case.updated_at",
+  );
+
+  // 4. W5 AMEND: emenda de evento NÃO altera case.updated_at
+  await runHealthAmendClinicalEvent(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      eventId,
+      operationId: "op-amend-1",
+      expectedUpdatedAt: t2.getTime(),
+      amendmentType: "addendum",
+      reason: "observação clínica complementar",
+      content: {note: "evolução estável"},
+    }),
+    depsFor({db, now: t3}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "AMEND não altera case.updated_at",
+  );
+
+  // 5. W4 CANCEL: cancelamento de evento NÃO altera case.updated_at
+  await runHealthCancelClinicalEvent(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      eventId,
+      operationId: "op-cancel-1",
+      expectedUpdatedAt: t3.getTime(),
+      cancelReason: "registro duplicado pelo veterinário",
+    }),
+    depsFor({db, now: t4}),
+  );
+  caseDoc = db._store.get(casePath) as JsonMap;
+  assert.strictEqual(
+    (caseDoc.updated_at as Timestamp).toMillis(),
+    t1.getTime(),
+    "CANCEL não altera case.updated_at",
   );
 }
 
@@ -3211,6 +3401,7 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["Token de concorrência é server-owned", testConcurrencyTokenIsServerOwned],
   ["Replay não avança o token de concorrência", testReplayDoesNotAdvanceConcurrencyToken],
   ["Conflito de idempotência preserva o token", testIdempotencyConflictLeavesTokenIntact],
+  ["Token de concorrência do caso (OPEN/APPEND/Replay/W4/W5)", testCaseConcurrencyTokenLifecycle],
   ["Idempotência cruzada entre atores", testCrossActorOperationIdConflict],
   ["ARQ autoridade clínica sem bypass administrativo", testClinicalCapabilityHasNoAdminBypass],
   ["ARQ callables clínicos usam autoridade dedicada", testClinicalCallablesUseDedicatedAuthority],

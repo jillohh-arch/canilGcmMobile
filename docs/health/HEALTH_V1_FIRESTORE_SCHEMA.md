@@ -131,6 +131,7 @@ leitura.
 | has_pending_schedule | bool | ❌ | Derivado por Function |
 | active_treatments_count | number | ❌ | Derivado por Function |
 | last_event_at | timestamp | ❌ | Derivado |
+| updated_at | timestamp | ✅ | Token canônico de concorrência otimista (SERVER; §2.1.2) |
 | event_count | number | ❌ | Derivado |
 | deleted_at | timestamp | ❌ | Soft delete |
 | deleted_by | RecordedBy | ❌ | |
@@ -201,6 +202,24 @@ pertence ao `ClinicalEvent` imutável de alta e ao audit.
 
 O writer de lifecycle que executa essas escritas **não** existe ainda (gate W6);
 esta seção congela apenas a semântica.
+
+#### 2.1.2 Autoridade de concorrência otimista do ClinicalCase (CONGELADO — CLIN-WRITER-1.W6.P0.F1)
+
+O campo `updated_at` é a autoridade canônica de concorrência otimista para o aggregate `ClinicalCase`:
+
+| Operação | Semântica de `updated_at` |
+|---|---|
+| **OPEN** (`healthOpenClinicalCase`) | `updated_at == opened_at == last_event_at` (mesmo `Timestamp` do servidor gerado no nascimento) |
+| **APPEND** (`healthAppendClinicalEvent`) | `updated_at == last_event_at == appendedEvent.recorded_at` (avança no mesmo instante do evento anexado) |
+| **Lifecycle Mutations** (futuros writers W6) | `updated_at == mutation server Timestamp` (avança a cada mutação canônica do caso) |
+| **Replay / Idempotência** | Replay preserva `updated_at` (zero re-avanço; idempotência avaliada antes do token) |
+| **Event-only mutations** (W4 Finalize/Cancel, W5 Amend) | Não alteram `ClinicalCase`, logo **não avançam** `updated_at` |
+
+**Propriedades normativas:**
+- **Propriedade / Dono**: `SERVER` apenas (`Firestore Timestamp`). Clientes nunca escrevem diretamente no campo.
+- **Precondição de Wire (W6)**: `expectedUpdatedAt` em milissegundos de época (`number` / epoch ms). `storedCase.updated_at.toMillis() === request.expectedUpdatedAt`. Se divergente: `failed-precondition`. Se ausente/malformado: `invalid-argument`.
+- **Rejeição de Autoridade Externa**: `DocumentSnapshot.updateTime` **não** é autoridade canônica; `updated_at` persistido é a única fonte da verdade de concorrência.
+- **Nenhum retry automático**: Conflito de concorrência falha fechado como `failed-precondition`.
 
 ---
 
