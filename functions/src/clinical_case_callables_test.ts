@@ -311,6 +311,7 @@ async function expectReject(
   fn: () => Promise<unknown>,
   code: string,
   label: string,
+  expectedMessage?: string | RegExp,
 ) {
   try {
     await fn();
@@ -321,6 +322,22 @@ async function expectReject(
       code,
       `${label}: code ${details?.code} != ${code}`,
     );
+    if (expectedMessage !== undefined) {
+      const msg = (err as Error)?.message ?? "";
+      if (typeof expectedMessage === "string") {
+        assert.strictEqual(
+          msg,
+          expectedMessage,
+          `${label}: message '${msg}' != '${expectedMessage}'`,
+        );
+      } else {
+        assert.match(
+          msg,
+          expectedMessage,
+          `${label}: message '${msg}' does not match ${expectedMessage}`,
+        );
+      }
+    }
     return;
   }
   assert.fail(`${label}: esperava rejeição ${code}`);
@@ -4003,6 +4020,31 @@ async function testLifecycleTransitionActiveMatrix(): Promise<void> {
     "conflict",
     "transição com expectedRevision desatualizado",
   );
+
+  // Dual-invalid: Stale expectedRevision (4 != 6) combined with ineligible transition destination (open -> open).
+  // OCC freshness MUST precede transition eligibility checking (M28 killer).
+  const caseBeforeDual = {...caseOf(db, canonicalCasePath("dog-1", caseId))};
+  const opsBeforeDual = opKeys(db, canonicalCasePath("dog-1", caseId)).length;
+  const auditsBeforeDual = auditKeys(db).length;
+
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-dual-invalid-trans",
+        expectedRevision: 4,
+        destination: "open",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição com expectedRevision desatualizado e destino inelegível (OCC precede elegibilidade)",
+    "Registro clínico alterado por outra operação. Recarregue antes de mutar.",
+  );
+  assert.deepStrictEqual(caseOf(db, canonicalCasePath("dog-1", caseId)), caseBeforeDual);
+  assert.strictEqual(opKeys(db, canonicalCasePath("dog-1", caseId)).length, opsBeforeDual);
+  assert.strictEqual(auditKeys(db).length, auditsBeforeDual);
 }
 
 async function testLifecycleDischarge(): Promise<void> {
