@@ -13,6 +13,60 @@ abstract final class HealthScheduleDocumentMapper {
 
   static const collectionId = 'health_schedule';
 
+  /// Identidade canônica de um documento lido por **collection group**.
+  ///
+  /// Numa query collection-group não existe segmento de path do cão: a
+  /// autoridade de identidade é o campo `dog_id` declarado no próprio
+  /// documento — exatamente o que a fronteira das Rules exige
+  /// (`canReadHealthScheduleRecord`).
+  ///
+  /// Estritamente canônico, alinhado a HW-4A.2C.5R: aliases legados
+  /// (`dogId`, `caoId`, `k9_id`) **não** substituem `dog_id`. Documento sem
+  /// identidade válida falha fechado — nunca é mapeado com o pai do path nem
+  /// silenciosamente descartado.
+  static String requireCollectionGroupDogId({
+    required String documentId,
+    required Map<String, dynamic> data,
+  }) {
+    final raw = data['dog_id'];
+    if (raw == null) {
+      throw HealthScheduleIntegrityException(
+        documentId: documentId,
+        field: 'dog_id',
+        reason: 'dog_id ausente: identidade global inválida',
+      );
+    }
+    if (raw is! String) {
+      throw HealthScheduleIntegrityException(
+        documentId: documentId,
+        field: 'dog_id',
+        reason: 'dog_id tipo inválido (${raw.runtimeType})',
+      );
+    }
+    final normalized = raw.trim();
+    if (normalized.isEmpty) {
+      throw HealthScheduleIntegrityException(
+        documentId: documentId,
+        field: 'dog_id',
+        reason: 'dog_id vazio: identidade global inválida',
+      );
+    }
+    return normalized;
+  }
+
+  /// Mapeia documento lido por collection group, usando o `dog_id` declarado
+  /// como autoridade de identidade.
+  static HealthScheduleItem fromCollectionGroup({
+    required String documentId,
+    required Map<String, dynamic> data,
+  }) {
+    return fromFirestore(
+      dogId: requireCollectionGroupDogId(documentId: documentId, data: data),
+      documentId: documentId,
+      data: data,
+    );
+  }
+
   static HealthScheduleItem fromFirestore({
     required String dogId,
     required String documentId,
