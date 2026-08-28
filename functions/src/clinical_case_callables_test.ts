@@ -1248,7 +1248,7 @@ async function testCaseConcurrencyTokenLifecycle() {
       caseId,
       eventId,
       operationId: "op-finalize-1",
-      expectedUpdatedAt: t1.getTime(),
+      expectedRevision: 1,
     }),
     depsFor({db, now: t2}),
   );
@@ -1266,7 +1266,7 @@ async function testCaseConcurrencyTokenLifecycle() {
       caseId,
       eventId,
       operationId: "op-amend-1",
-      expectedUpdatedAt: t2.getTime(),
+      expectedRevision: 2,
       amendmentType: "addendum",
       reason: "observação clínica complementar",
       content: {note: "evolução estável"},
@@ -1287,7 +1287,7 @@ async function testCaseConcurrencyTokenLifecycle() {
       caseId,
       eventId,
       operationId: "op-cancel-1",
-      expectedUpdatedAt: t3.getTime(),
+      expectedRevision: 3,
       cancelReason: "registro duplicado pelo veterinário",
     }),
     depsFor({db, now: t4}),
@@ -1522,14 +1522,14 @@ const mutationCmd = (
   caseId: string,
   eventId: string,
   operationId: string,
-  expectedUpdatedAt: number,
+  expectedRevision: number,
   extra: JsonMap = {},
 ): JsonMap => ({
   dogId: "dog-1",
   caseId,
   eventId,
   operationId,
-  expectedUpdatedAt,
+  expectedRevision,
   ...extra,
 });
 
@@ -1579,7 +1579,7 @@ async function testFinalizeSuccess() {
   const auditsBefore = auditKeys(db).length;
 
   const res = (await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", t0)),
+    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", 1)),
     depsFor({db, now: T1}),
   )) as JsonMap;
 
@@ -1651,29 +1651,28 @@ async function testFinalizeSuccess() {
 }
 
 async function testFinalizeReplayAndStale() {
-  const {db, caseId, eventId, casePath, eventPath, t0} = await seedDraftEvent();
+  const {db, caseId, eventId, casePath, eventPath} = await seedDraftEvent();
   const deps = depsFor({db, now: T1});
 
   await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", t0)),
+    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", 1)),
     deps,
   );
-  const t1 = (eventOf(db, eventPath).updated_at as Timestamp).toMillis();
   const opsAfterFirst = opKeys(db, casePath).length;
   const auditsAfterFirst = auditKeys(db).length;
 
   // K/L — mesma operação, mesma intenção, token ANTIGO T0: replay bem-sucedido.
   const replay = (await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", t0)),
+    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", 1)),
     deps,
   )) as JsonMap;
   assert.strictEqual(replay.was_no_op, true, "L: replay não sinalizou no-op");
 
   // M — replay não avança o token, não duplica receipt nem audit.
   assert.strictEqual(
-    (eventOf(db, eventPath).updated_at as Timestamp).toMillis(),
-    t1,
-    "M: replay avançou o token",
+    eventOf(db, eventPath).revision,
+    2,
+    "M: replay avançou a revision",
   );
   assert.strictEqual(
     opKeys(db, casePath).length,
@@ -1689,7 +1688,7 @@ async function testFinalizeReplayAndStale() {
   // N — operação NOVA com token velho: stale, fail-closed.
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(caseId, eventId, "op-fin-2", t0)),
+      mockRequest(mutationCmd(caseId, eventId, "op-fin-2", 1)),
       deps,
     ),
     "conflict",
@@ -1703,18 +1702,17 @@ async function testFinalizeReplayAndStale() {
 }
 
 async function testFinalizeConflictAndIllegalTransitions() {
-  const {db, caseId, eventId, eventPath, t0} = await seedDraftEvent();
+  const {db, caseId, eventId} = await seedDraftEvent();
   const deps = depsFor({db, now: T1});
 
   // O — mesma operação, ator diferente = intenção divergente.
   await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", t0)),
+    mockRequest(mutationCmd(caseId, eventId, "op-fin-1", 1)),
     deps,
   );
-  const t1 = (eventOf(db, eventPath).updated_at as Timestamp).toMillis();
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(caseId, eventId, "op-fin-1", t1), {
+      mockRequest(mutationCmd(caseId, eventId, "op-fin-1", 2), {
         uid: actorB.uid,
         token: {},
       }),
@@ -1727,7 +1725,7 @@ async function testFinalizeConflictAndIllegalTransitions() {
   // P — nova operação sobre evento JÁ final: transição ilegal, não idempotência.
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(caseId, eventId, "op-fin-3", t1)),
+      mockRequest(mutationCmd(caseId, eventId, "op-fin-3", 2)),
       deps,
     ),
     "conflict",
@@ -1738,16 +1736,15 @@ async function testFinalizeConflictAndIllegalTransitions() {
   const c = await seedDraftEvent();
   await runHealthCancelClinicalEvent(
     mockRequest(
-      mutationCmd(c.caseId, c.eventId, "op-can-1", c.t0, {
+      mutationCmd(c.caseId, c.eventId, "op-can-1", 1, {
         cancelReason: "erro de digitação",
       }),
     ),
     depsFor({db: c.db, now: T1}),
   );
-  const cT1 = (eventOf(c.db, c.eventPath).updated_at as Timestamp).toMillis();
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(c.caseId, c.eventId, "op-fin-9", cT1)),
+      mockRequest(mutationCmd(c.caseId, c.eventId, "op-fin-9", 2)),
       depsFor({db: c.db, now: T1}),
     ),
     "conflict",
@@ -1761,24 +1758,30 @@ async function testFinalizeTokenAndIntegrityFailures() {
   // R — evento inexistente.
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(base.caseId, "ce_naoexiste", "op-x", base.t0)),
+      mockRequest(mutationCmd(base.caseId, "ce_naoexiste", "op-x", 1)),
       depsFor({db: base.db, now: T1}),
     ),
     "not-found",
     "R: evento inexistente",
   );
 
-  // T/U — token de requisição ausente e malformado.
+  // T/U — token de requisição ausente e malformado. O piso é 1: revision 0 e
+  // ausência NÃO são toleradas (divergência deliberada do Schedule legado).
   for (const [bad, label] of [
-    [undefined, "T: expectedUpdatedAt ausente"],
-    ["1755259200000", "U: expectedUpdatedAt string"],
-    [1.5, "U: expectedUpdatedAt fracionário"],
-    [Number.NaN, "U: expectedUpdatedAt NaN"],
-    [-1, "U: expectedUpdatedAt negativo"],
+    [undefined, "T: expectedRevision ausente"],
+    ["1", "U: expectedRevision string"],
+    [1.5, "U: expectedRevision fracionário"],
+    [Number.NaN, "U: expectedRevision NaN"],
+    [Number.POSITIVE_INFINITY, "U: expectedRevision Infinity"],
+    [-1, "U: expectedRevision negativo"],
+    [0, "U: expectedRevision zero (sem tolerância legada)"],
+    [true, "U: expectedRevision boolean"],
+    [null, "U: expectedRevision null"],
+    [Number.MAX_SAFE_INTEGER + 1, "U: expectedRevision inteiro inseguro"],
   ] as Array<[unknown, string]>) {
-    const cmd = mutationCmd(base.caseId, base.eventId, "op-t", base.t0);
-    if (bad === undefined) delete cmd.expectedUpdatedAt;
-    else cmd.expectedUpdatedAt = bad;
+    const cmd = mutationCmd(base.caseId, base.eventId, "op-t", 1);
+    if (bad === undefined) delete cmd.expectedRevision;
+    else cmd.expectedRevision = bad;
     await expectReject(
       () => runHealthFinalizeClinicalEvent(
         mockRequest(cmd),
@@ -1789,20 +1792,43 @@ async function testFinalizeTokenAndIntegrityFailures() {
     );
   }
 
-  // S — updated_at armazenado malformado: integrity, zero mutação.
-  for (const corrupt of [undefined, "2026-08-15T12:00:00.000Z", 123]) {
-    const s = await seedDraftEvent();
-    const ev = eventOf(s.db, s.eventPath);
-    if (corrupt === undefined) delete ev.updated_at;
-    else ev.updated_at = corrupt;
-    s.db._store.set(s.eventPath, ev);
+  // T2 — expectedUpdatedAt foi RETIRADO: o vocabulário fechado o recusa mesmo
+  // quando acompanhado de um expectedRevision válido. Prova autoridade única.
+  for (const legacy of ["expectedUpdatedAt", "expected_updated_at"]) {
+    const cmd = mutationCmd(base.caseId, base.eventId, "op-t2", 1);
+    cmd[legacy] = 1755259200000;
     await expectReject(
       () => runHealthFinalizeClinicalEvent(
-        mockRequest(mutationCmd(s.caseId, s.eventId, "op-s", s.t0)),
+        mockRequest(cmd),
+        depsFor({db: base.db, now: T1}),
+      ),
+      "validation",
+      `T2: ${legacy} retirado do contrato clínico`,
+    );
+  }
+
+  // S — revision armazenada malformada: integrity, zero mutação. Inclui 0 e
+  // ausência: Clinical NÃO herda a tolerância legada do Schedule, e
+  // MAX_SAFE_INTEGER falha porque não pode avançar com segurança.
+  for (const corrupt of [
+    undefined, "1", 0, -1, 1.5, Number.NaN, true, null,
+    Number.MAX_SAFE_INTEGER,
+  ] as unknown[]) {
+    const s = await seedDraftEvent();
+    const ev = eventOf(s.db, s.eventPath);
+    if (corrupt === undefined) delete ev.revision;
+    else ev.revision = corrupt as never;
+    s.db._store.set(s.eventPath, ev);
+    const expected = corrupt === Number.MAX_SAFE_INTEGER ?
+      Number.MAX_SAFE_INTEGER :
+      1;
+    await expectReject(
+      () => runHealthFinalizeClinicalEvent(
+        mockRequest(mutationCmd(s.caseId, s.eventId, "op-s", expected)),
         depsFor({db: s.db, now: T1}),
       ),
       "integrity",
-      `S: updated_at armazenado inválido (${String(corrupt)})`,
+      `S: revision armazenada inválida (${String(corrupt)})`,
     );
     assert.strictEqual(
       eventOf(s.db, s.eventPath).status,
@@ -1823,7 +1849,7 @@ async function testFinalizeTokenAndIntegrityFailures() {
   });
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(m.caseId, m.eventId, "op-mal", m.t0)),
+      mockRequest(mutationCmd(m.caseId, m.eventId, "op-mal", 1)),
       depsFor({db: m.db, now: T1}),
     ),
     "integrity",
@@ -1842,7 +1868,7 @@ async function testFinalizeTokenAndIntegrityFailures() {
   d.db._store.set(d.eventPath, dev);
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(d.caseId, d.eventId, "op-d", d.t0)),
+      mockRequest(mutationCmd(d.caseId, d.eventId, "op-d", 1)),
       depsFor({db: d.db, now: T1}),
     ),
     "integrity",
@@ -1855,7 +1881,7 @@ async function testFinalizeAuthorizationMatrix() {
   const v = await seedDraftEvent();
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(v.caseId, v.eventId, "op-v", v.t0)),
+      mockRequest(mutationCmd(v.caseId, v.eventId, "op-v", 1)),
       depsFor({db: v.db, now: T1, dogAccess: false}),
     ),
     "permission-denied",
@@ -1885,7 +1911,7 @@ async function testFinalizeAuthorizationMatrix() {
   for (const [label, opts] of cases) {
     await expectReject(
       () => runHealthFinalizeClinicalEvent(
-        mockRequest(mutationCmd(v.caseId, v.eventId, "op-w", v.t0)),
+        mockRequest(mutationCmd(v.caseId, v.eventId, "op-w", 1)),
         depsFor({...opts, now: T1}),
       ),
       "permission-denied",
@@ -1913,7 +1939,7 @@ async function testFinalizeAuthorizationMatrix() {
     await expectReject(
       () => runHealthFinalizeClinicalEvent(
         mockRequest(
-          mutationCmd(v.caseId, v.eventId, "op-inj", v.t0, forged as JsonMap),
+          mutationCmd(v.caseId, v.eventId, "op-inj", 1, forged as JsonMap),
         ),
         depsFor({db: v.db, now: T1}),
       ),
@@ -1935,7 +1961,7 @@ async function testCancelFromDraftAndFinal() {
   const dCaseBefore = {...(d.db._store.get(d.casePath) as JsonMap)};
   const res = (await runHealthCancelClinicalEvent(
     mockRequest(
-      mutationCmd(d.caseId, d.eventId, "op-can-1", d.t0, {
+      mutationCmd(d.caseId, d.eventId, "op-can-1", 1, {
         cancelReason: "  registrado no K9 errado  ",
       }),
     ),
@@ -1995,17 +2021,16 @@ async function testCancelFromDraftAndFinal() {
   // B/L — final → cancelled preserva finalized_at.
   const f = await seedDraftEvent();
   await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(f.caseId, f.eventId, "op-fin-1", f.t0)),
+    mockRequest(mutationCmd(f.caseId, f.eventId, "op-fin-1", 1)),
     depsFor({db: f.db, now: T1}),
   );
   const finalized = eventOf(f.db, f.eventPath);
   const finalizedAtMs = (finalized.finalized_at as Timestamp).toMillis();
-  const fT1 = (finalized.updated_at as Timestamp).toMillis();
   const T2 = new Date("2026-08-17T15:45:00.000Z");
 
   await runHealthCancelClinicalEvent(
     mockRequest(
-      mutationCmd(f.caseId, f.eventId, "op-can-2", fT1, {
+      mutationCmd(f.caseId, f.eventId, "op-can-2", 2, {
         cancelReason: "laudo emitido em duplicidade",
       }),
     ),
@@ -2029,7 +2054,7 @@ async function testCancelFromDraftAndFinal() {
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(f.caseId, f.eventId, "op-can-3", T2.getTime(), {
+        mutationCmd(f.caseId, f.eventId, "op-can-3", 2, {
           cancelReason: "de novo",
         }),
       ),
@@ -2050,7 +2075,7 @@ async function testCancelReasonAndReplay() {
     ["   ", "E: cancelReason só espaços"],
     [42, "E: cancelReason não-string"],
   ] as Array<[unknown, string]>) {
-    const cmd = mutationCmd(base.caseId, base.eventId, "op-r", base.t0);
+    const cmd = mutationCmd(base.caseId, base.eventId, "op-r", 1);
     if (bad !== undefined) cmd.cancelReason = bad;
     await expectReject(
       () => runHealthCancelClinicalEvent(
@@ -2070,7 +2095,7 @@ async function testCancelReasonAndReplay() {
   // P/Q/R — replay com token antigo.
   const r = await seedDraftEvent();
   const deps = depsFor({db: r.db, now: T1});
-  const cmd = mutationCmd(r.caseId, r.eventId, "op-can-1", r.t0, {
+  const cmd = mutationCmd(r.caseId, r.eventId, "op-can-1", 1, {
     cancelReason: "duplicado",
   });
   await runHealthCancelClinicalEvent(mockRequest(cmd), deps);
@@ -2103,7 +2128,7 @@ async function testCancelReasonAndReplay() {
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(r.caseId, r.eventId, "op-can-1", rT1, {
+        mutationCmd(r.caseId, r.eventId, "op-can-1", 2, {
           cancelReason: "motivo completamente diferente",
         }),
       ),
@@ -2117,7 +2142,7 @@ async function testCancelReasonAndReplay() {
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(r.caseId, r.eventId, "op-can-9", r.t0, {
+        mutationCmd(r.caseId, r.eventId, "op-can-9", 1, {
           cancelReason: "outro",
         }),
       ),
@@ -2136,7 +2161,7 @@ async function testCancelIntegrityAndAuthorization() {
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(base.caseId, "ce_naoexiste", "op-u", base.t0, reason),
+        mutationCmd(base.caseId, "ce_naoexiste", "op-u", 1, reason),
       ),
       depsFor({db: base.db, now: T1}),
     ),
@@ -2144,25 +2169,25 @@ async function testCancelIntegrityAndAuthorization() {
     "U: evento inexistente",
   );
 
-  // V — updated_at armazenado malformado.
+  // V — revision armazenada malformada.
   const v = await seedDraftEvent();
   const vev = eventOf(v.db, v.eventPath);
-  delete vev.updated_at;
+  delete vev.revision;
   v.db._store.set(v.eventPath, vev);
   await expectReject(
     () => runHealthCancelClinicalEvent(
-      mockRequest(mutationCmd(v.caseId, v.eventId, "op-v", v.t0, reason)),
+      mockRequest(mutationCmd(v.caseId, v.eventId, "op-v", 1, reason)),
       depsFor({db: v.db, now: T1}),
     ),
     "integrity",
-    "V: updated_at armazenado ausente",
+    "V: revision armazenada ausente",
   );
 
   // W/X/Y/Z/AA — escopo e capability.
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(base.caseId, base.eventId, "op-w", base.t0, reason),
+        mutationCmd(base.caseId, base.eventId, "op-w", 1, reason),
       ),
       depsFor({db: base.db, now: T1, dogAccess: false}),
     ),
@@ -2189,7 +2214,7 @@ async function testCancelIntegrityAndAuthorization() {
     await expectReject(
       () => runHealthCancelClinicalEvent(
         mockRequest(
-          mutationCmd(base.caseId, base.eventId, "op-c", base.t0, reason),
+          mutationCmd(base.caseId, base.eventId, "op-c", 1, reason),
         ),
         depsFor({...opts, now: T1}),
       ),
@@ -2212,7 +2237,7 @@ async function testCancelIntegrityAndAuthorization() {
     await expectReject(
       () => runHealthCancelClinicalEvent(
         mockRequest(
-          mutationCmd(base.caseId, base.eventId, "op-inj", base.t0, {
+          mutationCmd(base.caseId, base.eventId, "op-inj", 1, {
             ...reason,
             ...forged,
           } as JsonMap),
@@ -2241,7 +2266,7 @@ async function testCancelIntegrityAndAuthorization() {
   });
   await expectReject(
     () => runHealthCancelClinicalEvent(
-      mockRequest(mutationCmd(m.caseId, m.eventId, "op-mal", m.t0, reason)),
+      mockRequest(mutationCmd(m.caseId, m.eventId, "op-mal", 1, reason)),
       depsFor({db: m.db, now: T1}),
     ),
     "integrity",
@@ -2273,12 +2298,13 @@ async function testStaleTokenIsTheSoleRejectionCause() {
   const fev = eventOf(f.db, f.eventPath);
   const advanced = Timestamp.fromMillis(f.t0 + 5000);
   fev.updated_at = advanced;
+  fev.revision = 7;
   f.db._store.set(f.eventPath, fev);
   assert.strictEqual(fev.status, "draft", "pré-condição: evento segue draft");
 
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
-      mockRequest(mutationCmd(f.caseId, f.eventId, "op-stale-f", f.t0)),
+      mockRequest(mutationCmd(f.caseId, f.eventId, "op-stale-f", 1)),
       depsFor({db: f.db, now: T1}),
     ),
     "conflict",
@@ -2305,7 +2331,7 @@ async function testStaleTokenIsTheSoleRejectionCause() {
   // veio do token e não de uma proibição estrutural.
   await runHealthFinalizeClinicalEvent(
     mockRequest(
-      mutationCmd(f.caseId, f.eventId, "op-fresh-f", advanced.toMillis()),
+      mutationCmd(f.caseId, f.eventId, "op-fresh-f", 7),
     ),
     depsFor({db: f.db, now: T1}),
   );
@@ -2320,12 +2346,13 @@ async function testStaleTokenIsTheSoleRejectionCause() {
   const cev = eventOf(c.db, c.eventPath);
   const cAdvanced = Timestamp.fromMillis(c.t0 + 5000);
   cev.updated_at = cAdvanced;
+  cev.revision = 7;
   c.db._store.set(c.eventPath, cev);
 
   await expectReject(
     () => runHealthCancelClinicalEvent(
       mockRequest(
-        mutationCmd(c.caseId, c.eventId, "op-stale-c", c.t0, {
+        mutationCmd(c.caseId, c.eventId, "op-stale-c", 1, {
           cancelReason: "motivo válido",
         }),
       ),
@@ -2342,7 +2369,7 @@ async function testStaleTokenIsTheSoleRejectionCause() {
 
   await runHealthCancelClinicalEvent(
     mockRequest(
-      mutationCmd(c.caseId, c.eventId, "op-fresh-c", cAdvanced.toMillis(), {
+      mutationCmd(c.caseId, c.eventId, "op-fresh-c", 7, {
         cancelReason: "motivo válido",
       }),
     ),
@@ -2375,7 +2402,7 @@ async function testMalformedInputRejectedBeforeAnyRead() {
     await expectReject(
       () => runHealthCancelClinicalEvent(
         mockRequest(
-          mutationCmd(s.caseId, s.eventId, "op-pre", s.t0, extra),
+          mutationCmd(s.caseId, s.eventId, "op-pre", 1, extra),
         ),
         depsFor({db: s.db, now: T1}),
       ),
@@ -2390,15 +2417,15 @@ async function testMalformedInputRejectedBeforeAnyRead() {
   );
 
   // Idem para o token de requisição no finalize.
-  const cmdNoToken = mutationCmd(s.caseId, s.eventId, "op-pre2", s.t0);
-  delete cmdNoToken.expectedUpdatedAt;
+  const cmdNoToken = mutationCmd(s.caseId, s.eventId, "op-pre2", 1);
+  delete cmdNoToken.expectedRevision;
   await expectReject(
     () => runHealthFinalizeClinicalEvent(
       mockRequest(cmdNoToken),
       depsFor({db: s.db, now: T1}),
     ),
     "validation",
-    "FINALIZE sem expectedUpdatedAt",
+    "FINALIZE sem expectedRevision",
   );
   assert.strictEqual(
     s.db._transactions(),
@@ -2416,7 +2443,7 @@ const T3 = new Date("2026-08-18T08:15:00.000Z");
 async function seedFinalEvent(options: {admin?: boolean} = {}) {
   const s = await seedDraftEvent(options);
   await runHealthFinalizeClinicalEvent(
-    mockRequest(mutationCmd(s.caseId, s.eventId, "op-seed-fin", s.t0)),
+    mockRequest(mutationCmd(s.caseId, s.eventId, "op-seed-fin", 1)),
     depsFor({db: s.db, now: T1, admin: options.admin}),
   );
   const ev = eventOf(s.db, s.eventPath);
@@ -2431,14 +2458,14 @@ const amendCmd = (
   caseId: string,
   eventId: string,
   operationId: string,
-  expectedUpdatedAt: number,
+  expectedRevision: number,
   extra: JsonMap = {},
 ): JsonMap => ({
   dogId: "dog-1",
   caseId,
   eventId,
   operationId,
-  expectedUpdatedAt,
+  expectedRevision,
   amendmentType: "correction",
   reason: "corrige dose registrada",
   content: {notes: "dose correta: 5mg"},
@@ -2501,7 +2528,7 @@ async function testAmendSuccessAndParentMetadata() {
 
   const res = (await runHealthAmendClinicalEvent(
     mockRequest(
-      amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal, {
+      amendCmd(s.caseId, s.eventId, "op-am-1", 2, {
         reason: "   corrige a dose registrada   ",
       }),
     ),
@@ -2611,14 +2638,12 @@ async function testAmendSuccessAndParentMetadata() {
 async function testSecondAmendmentIsSibling() {
   const s = await seedFinalEvent();
   await runHealthAmendClinicalEvent(
-    mockRequest(amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal)),
+    mockRequest(amendCmd(s.caseId, s.eventId, "op-am-1", 2)),
     depsFor({db: s.db, now: T2}),
   );
   const firstPath = amendKeys(s.db, s.eventPath)[0];
   const firstDoc = {...(s.db._store.get(firstPath) as JsonMap)};
-  const tokenAfterFirst = (
-    eventOf(s.db, s.eventPath).updated_at as Timestamp
-  ).toMillis();
+  const tokenAfterFirst = eventOf(s.db, s.eventPath).revision as number;
 
   // 19/20 — segunda emenda legítima com token renovado.
   await runHealthAmendClinicalEvent(
@@ -2663,7 +2688,7 @@ async function testAmendParentEligibility() {
   const d = await seedDraftEvent();
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(d.caseId, d.eventId, "op-am-d", d.t0)),
+      mockRequest(amendCmd(d.caseId, d.eventId, "op-am-d", 1)),
       depsFor({db: d.db, now: T2}),
     ),
     "conflict",
@@ -2684,11 +2709,11 @@ async function testAmendParentEligibility() {
   const c = await seedDraftEvent();
   await runHealthCancelClinicalEvent(
     mockRequest(
-      mutationCmd(c.caseId, c.eventId, "op-can", c.t0, {cancelReason: "erro"}),
+      mutationCmd(c.caseId, c.eventId, "op-can", 1, {cancelReason: "erro"}),
     ),
     depsFor({db: c.db, now: T1}),
   );
-  const cTok = (eventOf(c.db, c.eventPath).updated_at as Timestamp).toMillis();
+  const cTok = eventOf(c.db, c.eventPath).revision as number;
   await expectReject(
     () => runHealthAmendClinicalEvent(
       mockRequest(amendCmd(c.caseId, c.eventId, "op-am-c", cTok)),
@@ -2703,7 +2728,7 @@ async function testAmendParentEligibility() {
   const s = await seedFinalEvent();
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(s.caseId, "ce_naoexiste", "op-am-x", s.tFinal)),
+      mockRequest(amendCmd(s.caseId, "ce_naoexiste", "op-am-x", 2)),
       depsFor({db: s.db, now: T2}),
     ),
     "not-found",
@@ -2717,7 +2742,7 @@ async function testAmendParentEligibility() {
   k.db._store.set(k.eventPath, kev);
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(k.caseId, k.eventId, "op-am-k", k.tFinal)),
+      mockRequest(amendCmd(k.caseId, k.eventId, "op-am-k", 2)),
       depsFor({db: k.db, now: T2}),
     ),
     "validation",
@@ -2738,9 +2763,9 @@ async function testAmendConcurrency() {
     [-1, "28: negativo"],
   ];
   for (const [v, label] of bad) {
-    const c = amendCmd(s.caseId, s.eventId, "op-am-t", s.tFinal);
-    if (v === undefined) delete c.expectedUpdatedAt;
-    else c.expectedUpdatedAt = v;
+    const c = amendCmd(s.caseId, s.eventId, "op-am-t", 2);
+    if (v === undefined) delete c.expectedRevision;
+    else c.expectedRevision = v;
     await expectReject(
       () => runHealthAmendClinicalEvent(
         mockRequest(c),
@@ -2752,20 +2777,20 @@ async function testAmendConcurrency() {
   }
   assert.strictEqual(amendKeys(s.db, s.eventPath).length, 0, "token inválido criou emenda");
 
-  // 29 — updated_at armazenado malformado.
-  for (const corrupt of [undefined, "2026-08-16T09:30:00.000Z", 12345]) {
+  // 29 — revision armazenada malformada (inclui 0, sem tolerância legada).
+  for (const corrupt of [undefined, "2", 0, -1, 1.5, true] as unknown[]) {
     const m = await seedFinalEvent();
     const ev = eventOf(m.db, m.eventPath);
-    if (corrupt === undefined) delete ev.updated_at;
-    else ev.updated_at = corrupt;
+    if (corrupt === undefined) delete ev.revision;
+    else ev.revision = corrupt as never;
     m.db._store.set(m.eventPath, ev);
     await expectReject(
       () => runHealthAmendClinicalEvent(
-        mockRequest(amendCmd(m.caseId, m.eventId, "op-am-s", m.tFinal)),
+        mockRequest(amendCmd(m.caseId, m.eventId, "op-am-s", 2)),
         depsFor({db: m.db, now: T2}),
       ),
       "integrity",
-      "29: updated_at armazenado inválido (" + String(corrupt) + ")",
+      "29: revision armazenada inválida (" + String(corrupt) + ")",
     );
     assert.strictEqual(amendKeys(m.db, m.eventPath).length, 0, "29: emenda criada");
   }
@@ -2775,10 +2800,11 @@ async function testAmendConcurrency() {
   const stev = eventOf(st.db, st.eventPath);
   const advanced = Timestamp.fromMillis(st.tFinal + 5000);
   stev.updated_at = advanced;
+  stev.revision = 7;
   st.db._store.set(st.eventPath, stev);
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(st.caseId, st.eventId, "op-am-stale", st.tFinal)),
+      mockRequest(amendCmd(st.caseId, st.eventId, "op-am-stale", 2)),
       depsFor({db: st.db, now: T2}),
     ),
     "conflict",
@@ -2793,7 +2819,7 @@ async function testAmendConcurrency() {
   // Com o token correto a MESMA emenda é aceita: prova que a rejeição foi do token.
   await runHealthAmendClinicalEvent(
     mockRequest(
-      amendCmd(st.caseId, st.eventId, "op-am-fresh", advanced.toMillis()),
+      amendCmd(st.caseId, st.eventId, "op-am-fresh", 7),
     ),
     depsFor({db: st.db, now: T2}),
   );
@@ -2805,7 +2831,7 @@ async function testAmendConcurrency() {
 
   // 31..33 — replay com token PRE-mutação.
   const r = await seedFinalEvent();
-  const cmd = amendCmd(r.caseId, r.eventId, "op-am-1", r.tFinal);
+  const cmd = amendCmd(r.caseId, r.eventId, "op-am-1", 2);
   await runHealthAmendClinicalEvent(mockRequest(cmd), depsFor({db: r.db, now: T2}));
   const tokenAfter = (eventOf(r.db, r.eventPath).updated_at as Timestamp).toMillis();
   const amendsAfter = amendKeys(r.db, r.eventPath).length;
@@ -2836,7 +2862,7 @@ async function testAmendConcurrency() {
   // 34 — operação NOVA com token velho.
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(r.caseId, r.eventId, "op-am-9", r.tFinal)),
+      mockRequest(amendCmd(r.caseId, r.eventId, "op-am-9", 2)),
       depsFor({db: r.db, now: T3}),
     ),
     "conflict",
@@ -2851,9 +2877,9 @@ async function testAmendConcurrency() {
 
 async function testAmendIdempotencyAndReceipts() {
   const s = await seedFinalEvent();
-  const base = amendCmd(s.caseId, s.eventId, "op-am-1", s.tFinal);
+  const base = amendCmd(s.caseId, s.eventId, "op-am-1", 2);
   await runHealthAmendClinicalEvent(mockRequest(base), depsFor({db: s.db, now: T2}));
-  const tok = (eventOf(s.db, s.eventPath).updated_at as Timestamp).toMillis();
+  const tok = eventOf(s.db, s.eventPath).revision as number;
   const countBefore = eventOf(s.db, s.eventPath).amendment_count;
 
   // 35..37 — mesma operationId, intenção divergente.
@@ -2902,7 +2928,7 @@ async function testAmendIdempotencyAndReceipts() {
   m.db._store.set(`${m.casePath}/operations/op-mal`, corrupt);
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(m.caseId, m.eventId, "op-mal", m.tFinal)),
+      mockRequest(amendCmd(m.caseId, m.eventId, "op-mal", 2)),
       depsFor({db: m.db, now: T2}),
     ),
     "integrity",
@@ -2919,7 +2945,7 @@ async function testAmendIdempotencyAndReceipts() {
   const o = await seedFinalEvent();
   const orphanId = (await (async () => {
     await runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(o.caseId, o.eventId, "op-orphan", o.tFinal)),
+      mockRequest(amendCmd(o.caseId, o.eventId, "op-orphan", 2)),
       depsFor({db: o.db, now: T2}),
     );
     return amendKeys(o.db, o.eventPath)[0];
@@ -2957,7 +2983,7 @@ async function testAmendAuthorizationAndInjection() {
   for (const [label, opts] of denials) {
     await expectReject(
       () => runHealthAmendClinicalEvent(
-        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-w", s.tFinal)),
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-w", 2)),
         depsFor({...opts, now: T2}),
       ),
       "permission-denied",
@@ -2967,7 +2993,7 @@ async function testAmendAuthorizationAndInjection() {
   // 42 — escopo de K9 é gate independente.
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(s.caseId, s.eventId, "op-am-dog", s.tFinal)),
+      mockRequest(amendCmd(s.caseId, s.eventId, "op-am-dog", 2)),
       depsFor({db: s.db, now: T2, allowAmend: true, dogAccess: false}),
     ),
     "permission-denied",
@@ -3014,7 +3040,7 @@ async function testAmendAuthorizationAndInjection() {
     const before = {...eventOf(s.db, s.eventPath)};
     await expectReject(
       () => runHealthAmendClinicalEvent(
-        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-inj", s.tFinal, extra)),
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-inj", 2, extra)),
         depsFor({db: s.db, now: T2}),
       ),
       "validation",
@@ -3043,7 +3069,7 @@ async function testAmendAuthorizationAndInjection() {
   for (const [label, extra] of invalid) {
     await expectReject(
       () => runHealthAmendClinicalEvent(
-        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-v", s.tFinal, extra)),
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-v", 2, extra)),
         depsFor({db: s.db, now: T2}),
       ),
       "validation",
@@ -3051,7 +3077,7 @@ async function testAmendAuthorizationAndInjection() {
     );
   }
   for (const missing of ["amendmentType", "reason", "content"]) {
-    const c = amendCmd(s.caseId, s.eventId, "op-am-m", s.tFinal);
+    const c = amendCmd(s.caseId, s.eventId, "op-am-m", 2);
     delete c[missing];
     await expectReject(
       () => runHealthAmendClinicalEvent(
@@ -3081,7 +3107,7 @@ async function testAmendParentMetadataIntegrity() {
     s.db._store.set(s.eventPath, ev);
     await expectReject(
       () => runHealthAmendClinicalEvent(
-        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-i", s.tFinal)),
+        mockRequest(amendCmd(s.caseId, s.eventId, "op-am-i", 2)),
         depsFor({db: s.db, now: T2}),
       ),
       "integrity",
@@ -3101,7 +3127,7 @@ async function testAmendParentMetadataIntegrity() {
   p.db._store.set(p.eventPath, pev);
   await expectReject(
     () => runHealthAmendClinicalEvent(
-      mockRequest(amendCmd(p.caseId, p.eventId, "op-am-p", p.tFinal)),
+      mockRequest(amendCmd(p.caseId, p.eventId, "op-am-p", 2)),
       depsFor({db: p.db, now: T2}),
     ),
     "integrity",
@@ -3130,7 +3156,7 @@ async function testAmendWriterHasNoParentContentPath() {
 
   // Ordem obrigatória: replay antes do stale-check.
   const replayAt = body.indexOf("matchClinicalReceipt(");
-  const staleAt = body.indexOf("assertFreshToken(");
+  const staleAt = body.indexOf("assertFreshRevision(");
   assert.ok(replayAt > 0 && staleAt > 0, "checagens ausentes");
   assert.ok(replayAt < staleAt, "stale-check precede o replay (ordenação P0 violada)");
 
@@ -3260,7 +3286,7 @@ async function testCrossCapabilityMatrix() {
     const f = await seedDraftEvent();
     if (row.finalize === "allow") {
       await runHealthFinalizeClinicalEvent(
-        mockRequest(mutationCmd(f.caseId, f.eventId, "op-m", f.t0)),
+        mockRequest(mutationCmd(f.caseId, f.eventId, "op-m", 1)),
         depsFor({db: f.db, ...row.opts, now: T1}),
       );
       assert.strictEqual(
@@ -3271,7 +3297,7 @@ async function testCrossCapabilityMatrix() {
     } else {
       await expectReject(
         () => runHealthFinalizeClinicalEvent(
-          mockRequest(mutationCmd(f.caseId, f.eventId, "op-m", f.t0)),
+          mockRequest(mutationCmd(f.caseId, f.eventId, "op-m", 1)),
           depsFor({db: f.db, ...row.opts, now: T1}),
         ),
         "permission-denied",
@@ -3281,7 +3307,7 @@ async function testCrossCapabilityMatrix() {
 
     // CANCEL
     const c = await seedDraftEvent();
-    const cmd = mutationCmd(c.caseId, c.eventId, "op-m", c.t0, {
+    const cmd = mutationCmd(c.caseId, c.eventId, "op-m", 1, {
       cancelReason: "matriz",
     });
     if (row.cancel === "allow") {
@@ -3355,9 +3381,9 @@ async function testMutationCommandsUseDedicatedCapabilitySeams() {
     ["cancel", cancelBody],
   ] as Array<[string, string]>) {
     const replayAt = body.indexOf("matchClinicalReceipt(");
-    const staleAt = body.indexOf("assertFreshToken(");
+    const staleAt = body.indexOf("assertFreshRevision(");
     assert.ok(replayAt > 0, `${label}: matchClinicalReceipt ausente`);
-    assert.ok(staleAt > 0, `${label}: assertFreshToken ausente`);
+    assert.ok(staleAt > 0, `${label}: assertFreshRevision ausente`);
     assert.ok(
       replayAt < staleAt,
       `${label}: stale-check precede o replay (ordenação P0 violada)`,
@@ -3373,6 +3399,308 @@ async function testMutationCommandsUseDedicatedCapabilitySeams() {
   assert.ok(
     index.includes("requireClinicalCapability(auth, \"amend_clinical\")"),
     "index deve ligar amend_clinical",
+  );
+}
+
+/**
+ * REVISION as the sole optimistic-concurrency authority
+ * (CLIN-WRITER-1.W6.P0.F1.C1).
+ *
+ * Every mutation here runs on ONE IDENTICAL clock instant on purpose. F1.C0
+ * proved the previous `updated_at.toMillis()` token could not distinguish a
+ * stale caller from a fresh one when two successful mutations shared a
+ * millisecond, which let a DISTINCT stale operation through and broke W5's
+ * frozen "exactly one winner" contract. These guards fail if the authority ever
+ * regresses to a wall-clock value: the old token would compare equal here.
+ *
+ * Deliberately NOT using the hourly `t0..t4` spacing of the older concurrency
+ * tests — that spacing is exactly why the defect stayed hidden.
+ */
+async function testRevisionConcurrencyAuthority() {
+  const FIXED = new Date("2026-09-01T12:00:00.000Z");
+
+  // ── creation: both aggregates are born at revision 1 ────────────────────────
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED}),
+  )) as JsonMap;
+  const caseId = openRes.case_id as string;
+  const casePath = `dogs/dog-1/clinical_cases/${caseId}`;
+  const openingPath =
+    `${casePath}/clinical_events/${openRes.opening_event_id as string}`;
+  assert.strictEqual(
+    (db._store.get(casePath) as JsonMap).revision, 1,
+    "OPEN: case nasce em revision 1",
+  );
+  assert.strictEqual(
+    eventOf(db, openingPath).revision, 1,
+    "OPEN: evento de abertura nasce em revision 1",
+  );
+
+  // ── W3 APPEND advances the CASE revision; the new event is born at 1 ────────
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId)),
+    depsFor({db, now: FIXED}),
+  );
+  assert.strictEqual(
+    (db._store.get(casePath) as JsonMap).revision, 2,
+    "APPEND: case revision 1 -> 2 no MESMO milissegundo",
+  );
+  const appendedPath =
+    `${casePath}/clinical_events/${eventIdFor("dog-1", caseId, "op-append-1")}`;
+  assert.strictEqual(
+    eventOf(db, appendedPath).revision, 1,
+    "APPEND: evento anexado nasce em revision 1",
+  );
+  // A second distinct append advances it again — same instant.
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId, {operationId: "op-append-2"})),
+    depsFor({db, now: FIXED}),
+  );
+  assert.strictEqual(
+    (db._store.get(casePath) as JsonMap).revision, 3,
+    "APPEND: segundo append avança para 3 (relógio irrelevante)",
+  );
+  // Replay must NOT advance it.
+  await runHealthAppendClinicalEvent(
+    mockRequest(appendPayload(caseId, {operationId: "op-append-2"})),
+    depsFor({db, now: FIXED}),
+  );
+  assert.strictEqual(
+    (db._store.get(casePath) as JsonMap).revision, 3,
+    "APPEND replay: revision NÃO avança",
+  );
+
+  // ── D: W4 stale-after-finalize, one clock instant ──────────────────────────
+  const d = await seedDraftEvent();
+  const dDeps = depsFor({db: d.db, now: FIXED});
+  const finRes = (await runHealthFinalizeClinicalEvent(
+    mockRequest(mutationCmd(d.caseId, d.eventId, "op-c1-fin", 1)),
+    dDeps,
+  )) as JsonMap;
+  assert.strictEqual(finRes.revision, 2, "FINALIZE: response revision = 2");
+  assert.strictEqual(
+    eventOf(d.db, d.eventPath).revision, 2,
+    "FINALIZE: stored revision = 2",
+  );
+  // A DISTINCT operation still holding revision 1 must fail stale, even though
+  // its clock instant is identical to the winner's.
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(d.caseId, d.eventId, "op-c1-stale", 1)),
+      dDeps,
+    ),
+    "conflict",
+    "D: operação distinta com revision pré-mutação deve falhar stale",
+  );
+  assert.strictEqual(
+    amendKeys(d.db, d.eventPath).length, 0,
+    "D: emenda stale criou documento",
+  );
+
+  // ── A/B/C: W5 same-instant race, replay, and intent conflict ───────────────
+  const s = await seedFinalEvent();
+  const sDeps = depsFor({db: s.db, now: FIXED});
+  const revBefore = eventOf(s.db, s.eventPath).revision as number;
+  const winner = (await runHealthAmendClinicalEvent(
+    mockRequest(amendCmd(s.caseId, s.eventId, "op-c1-A", revBefore)),
+    sDeps,
+  )) as JsonMap;
+  assert.strictEqual(
+    winner.revision, revBefore + 1, "A: vencedor avança exatamente 1",
+  );
+  const opsAfterWinner = opKeys(s.db, s.casePath).length;
+  const auditsAfterWinner = auditKeys(s.db).length;
+
+  // B — a DISTINCT amendment reusing the SAME token at the SAME instant loses.
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(s.caseId, s.eventId, "op-c1-B", revBefore, {
+        amendmentType: "addendum",
+        reason: "segunda intenção distinta",
+        content: {note: "outro conteúdo"},
+      })),
+      sDeps,
+    ),
+    "conflict",
+    "B: segunda emenda distinta no MESMO ms deve falhar stale",
+  );
+  assert.strictEqual(
+    eventOf(s.db, s.eventPath).amendment_count, 1,
+    "B: exactly-one-winner — contagem deve ser 1",
+  );
+  assert.strictEqual(
+    amendKeys(s.db, s.eventPath).length, 1,
+    "B: exactly-one-winner — um único documento de emenda",
+  );
+  assert.strictEqual(
+    eventOf(s.db, s.eventPath).revision, revBefore + 1,
+    "B: perdedor não avançou a revision",
+  );
+  assert.strictEqual(
+    opKeys(s.db, s.casePath).length, opsAfterWinner,
+    "B: perdedor criou receipt",
+  );
+  assert.strictEqual(
+    auditKeys(s.db).length, auditsAfterWinner,
+    "B: perdedor criou audit",
+  );
+
+  // B2 — the winner's replay carries its ORIGINAL (now stale) token and still
+  // no-ops, returning the revision IT produced. Replay-before-stale preserved.
+  const replay = (await runHealthAmendClinicalEvent(
+    mockRequest(amendCmd(s.caseId, s.eventId, "op-c1-A", revBefore)),
+    sDeps,
+  )) as JsonMap;
+  assert.strictEqual(replay.was_no_op, true, "B2: replay do vencedor é no-op");
+  assert.strictEqual(
+    replay.revision, revBefore + 1,
+    "B2: replay retorna a revision que ELE produziu",
+  );
+  assert.strictEqual(
+    eventOf(s.db, s.eventPath).revision, revBefore + 1,
+    "B2: replay não avançou a revision",
+  );
+  assert.strictEqual(
+    amendKeys(s.db, s.eventPath).length, 1, "B2: replay duplicou emenda",
+  );
+
+  // C — same operationId, DIFFERENT intent: conflict, never stale.
+  await expectReject(
+    () => runHealthAmendClinicalEvent(
+      mockRequest(amendCmd(s.caseId, s.eventId, "op-c1-A", revBefore, {
+        reason: "intenção divergente",
+      })),
+      sDeps,
+    ),
+    "idempotency-conflict",
+    "C: mesma operação com intenção distinta é conflito, não stale",
+  );
+
+  // ── receipt + audit agree with the stored revision ─────────────────────────
+  const receipt = s.db._store.get(
+    `${s.casePath}/operations/op-c1-A`,
+  ) as JsonMap;
+  assert.strictEqual(
+    (receipt.result as JsonMap).revision, revBefore + 1,
+    "receipt guarda a revision resultante",
+  );
+  const amendAudit = auditKeys(s.db)
+    .map((k) => s.db._store.get(k) as JsonMap)
+    .find((a) => a.action === "clinical_event_amended") as JsonMap;
+  assert.strictEqual(
+    (amendAudit.metadata as JsonMap).event_revision, revBefore + 1,
+    "audit registra event_revision resultante",
+  );
+
+  // The SAME four-way agreement must hold for FINALIZE and CANCEL, not only for
+  // AMEND. Without these, a writer could report one revision while persisting
+  // another — the receipt would then replay a number that never existed.
+  const fin = await seedDraftEvent();
+  const finQRes = (await runHealthFinalizeClinicalEvent(
+    mockRequest(mutationCmd(fin.caseId, fin.eventId, "op-c1-finq", 1)),
+    depsFor({db: fin.db, now: FIXED}),
+  )) as JsonMap;
+  const finStored = eventOf(fin.db, fin.eventPath).revision;
+  const finReceipt = fin.db._store.get(
+    `${fin.casePath}/operations/op-c1-finq`,
+  ) as JsonMap;
+  const finAudit = auditKeys(fin.db)
+    .map((key) => fin.db._store.get(key) as JsonMap)
+    .find((a) => a.action === "clinical_event_finalized") as JsonMap;
+  assert.strictEqual(finStored, 2, "FINALIZE: revision persistida = 2");
+  assert.strictEqual(
+    finQRes.revision, finStored, "FINALIZE: response == persistida",
+  );
+  assert.strictEqual(
+    (finReceipt.result as JsonMap).revision, finStored,
+    "FINALIZE: receipt.result.revision == persistida",
+  );
+  assert.strictEqual(
+    (finAudit.metadata as JsonMap).event_revision, finStored,
+    "FINALIZE: audit.event_revision == persistida",
+  );
+
+  const can = await seedFinalEvent();
+  const canRev = eventOf(can.db, can.eventPath).revision as number;
+  const canResp = (await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(can.caseId, can.eventId, "op-c1-canq", canRev, {
+      cancelReason: "registro duplicado pelo veterinário",
+    })),
+    depsFor({db: can.db, now: FIXED}),
+  )) as JsonMap;
+  const canStored = eventOf(can.db, can.eventPath).revision;
+  const canReceipt = can.db._store.get(
+    `${can.casePath}/operations/op-c1-canq`,
+  ) as JsonMap;
+  const canAudit = auditKeys(can.db)
+    .map((key) => can.db._store.get(key) as JsonMap)
+    .find((a) => a.action === "clinical_event_cancelled") as JsonMap;
+  assert.strictEqual(
+    canStored, canRev + 1, "CANCEL: revision persistida avançou 1",
+  );
+  assert.strictEqual(
+    canResp.revision, canStored, "CANCEL: response == persistida",
+  );
+  assert.strictEqual(
+    (canReceipt.result as JsonMap).revision, canStored,
+    "CANCEL: receipt.result.revision == persistida",
+  );
+  assert.strictEqual(
+    (canAudit.metadata as JsonMap).event_revision, canStored,
+    "CANCEL: audit.event_revision == persistida",
+  );
+
+  // ── CANCEL advances the event revision by exactly 1 ────────────────────────
+  const k = await seedFinalEvent();
+  const kRev = eventOf(k.db, k.eventPath).revision as number;
+  const canRes = (await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(k.caseId, k.eventId, "op-c1-can", kRev, {
+      cancelReason: "registro duplicado",
+    })),
+    depsFor({db: k.db, now: FIXED}),
+  )) as JsonMap;
+  assert.strictEqual(canRes.revision, kRev + 1, "CANCEL: response revision +1");
+  assert.strictEqual(
+    eventOf(k.db, k.eventPath).revision, kRev + 1,
+    "CANCEL: stored revision +1",
+  );
+
+  // ── overflow fails closed: never produce an unsafe integer ─────────────────
+  const o = await seedDraftEvent();
+  const oev = eventOf(o.db, o.eventPath);
+  oev.revision = Number.MAX_SAFE_INTEGER;
+  o.db._store.set(o.eventPath, oev);
+  await expectReject(
+    () => runHealthFinalizeClinicalEvent(
+      mockRequest(
+        mutationCmd(o.caseId, o.eventId, "op-c1-ovf", Number.MAX_SAFE_INTEGER),
+      ),
+      depsFor({db: o.db, now: FIXED}),
+    ),
+    "integrity",
+    "overflow: revision em MAX_SAFE_INTEGER não pode avançar",
+  );
+  assert.strictEqual(
+    eventOf(o.db, o.eventPath).status, "draft",
+    "overflow: evento mutado apesar do fail-closed",
+  );
+
+  // ── the case token is NOT the concurrency authority any more: event-only
+  //    mutations leave the case revision untouched ────────────────────────────
+  const w = await seedFinalEvent();
+  const caseRevBefore = (w.db._store.get(w.casePath) as JsonMap).revision;
+  await runHealthAmendClinicalEvent(
+    mockRequest(amendCmd(
+      w.caseId, w.eventId, "op-c1-nd",
+      eventOf(w.db, w.eventPath).revision as number,
+    )),
+    depsFor({db: w.db, now: FIXED}),
+  );
+  assert.strictEqual(
+    (w.db._store.get(w.casePath) as JsonMap).revision, caseRevBefore,
+    "AMEND não altera a revision do caso",
   );
 }
 
@@ -3425,6 +3753,8 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["AMEND idempotência e receipts", testAmendIdempotencyAndReceipts],
   ["AMEND autorização e injeção", testAmendAuthorizationAndInjection],
   ["AMEND integridade de metadados do pai", testAmendParentMetadataIntegrity],
+  ["REVISION é a autoridade única de concorrência (relógio fixo)",
+    testRevisionConcurrencyAuthority],
   ["ARQ emenda não tem caminho para o conteúdo do pai", testAmendWriterHasNoParentContentPath],
 ];
 

@@ -468,8 +468,8 @@ const EVENT_MUTATION_ALLOWED_KEYS = [
   "operationId",
   "operation_id",
   "idempotencyKey",
-  "expectedUpdatedAt",
-  "expected_updated_at",
+  "expectedRevision",
+  "expected_revision",
 ] as const;
 
 function rejectUnknownMutationKeys(
@@ -648,74 +648,140 @@ function assertOccurredAt(raw: unknown, now: Date): Date {
 }
 
 /**
- * The caller's optimistic-concurrency token, as frozen by CLIN-WRITER-1.W4.P0.
+ * The caller's optimistic-concurrency token (CLIN-WRITER-1.W6.P0.F1.C1).
  *
- * Epoch MILLISECONDS, matching the hardened access-profile writer convention.
+ * An EXACT INTEGER REVISION, superseding the epoch-millisecond `updated_at`
+ * token frozen by W4.P0. F1.C0 proved that a wall-clock token cannot detect
+ * staleness: two successful mutations landing in the same millisecond leave the
+ * observable token unchanged, so a DISTINCT stale operation compared equal to a
+ * fresh one and was accepted. A monotonic counter removes the clock from the
+ * decision entirely.
+ *
  * Absence and malformation are both `invalid-argument`: the request itself is
  * unusable, which is a different fault from a well-formed token that lost the
  * race (`failed-precondition`). Collapsing the two would tell a client to
  * "reload and retry" when the real problem is that it never sent a token.
+ *
+ * The floor is 1, NOT 0. Every canonical Clinical aggregate is born with
+ * `revision: 1`, so `0` is not a legacy shape to accommodate — this deliberately
+ * diverges from `health_schedule_logic.readRevision`, which tolerates absent or
+ * legacy revisions as 0 because Schedule DOES carry pre-revision documents.
+ * Clinical has no such population, and accepting 0 would be a gratuitous
+ * fail-open.
  */
-function assertExpectedUpdatedAt(raw: unknown): number {
+function parseExpectedRevision(raw: unknown): number {
   if (raw === undefined || raw === null) {
     throw logicError(
       "validation",
-      "expectedUpdatedAt é obrigatório para mutar um evento clínico.",
+      "expectedRevision é obrigatório para mutar um evento clínico.",
     );
   }
   if (
     typeof raw !== "number" ||
-    !Number.isFinite(raw) ||
-    !Number.isInteger(raw) ||
-    raw < 0
+    !Number.isSafeInteger(raw) ||
+    raw < 1
   ) {
     throw logicError(
       "validation",
-      "expectedUpdatedAt deve ser epoch em milissegundos (number).",
+      "expectedRevision deve ser um inteiro seguro >= 1.",
     );
   }
   return raw;
 }
 
 /**
- * Reads the STORED concurrency authority off a ClinicalEvent.
+ * Reads the STORED concurrency authority off a revisioned Clinical aggregate.
  *
- * A canonical event is BORN with `updated_at` (P0), so a stored event without a
- * readable Timestamp is CORRUPTION, not a legacy shape to be tolerated. Failing
- * closed here is what stops a mutation from proceeding with no precondition at
- * all. `recorded_at`, `finalized_at`, `snapshot.updateTime` and the client clock
- * are deliberately NOT fallbacks — each would silently restore the stale-write
- * hole the token exists to close.
+ * A canonical ClinicalCase/ClinicalEvent is BORN with `revision: 1`, so a stored
+ * aggregate without a valid revision is CORRUPTION, not a legacy shape to be
+ * tolerated. Failing closed here is what stops a mutation from proceeding with no
+ * precondition at all. `updated_at`, `recorded_at`, `snapshot.updateTime` and the
+ * client clock are deliberately NOT fallbacks — each would restore the
+ * same-millisecond stale-write hole this token exists to close.
  */
-function storedUpdatedAtMillis(event: JsonMap): number {
-  const raw = event.updated_at as {toMillis?: unknown} | undefined;
+function parseStoredRevision(raw: unknown): number {
+  if (raw === undefined || raw === null) {
+    throw logicError(
+      "integrity",
+      "Aggregate clínico sem revision canônica: " +
+        "recarregue o registro antes de mutar.",
+    );
+  }
   if (
-    raw === undefined ||
-    raw === null ||
-    typeof raw.toMillis !== "function"
+    typeof raw !== "number" ||
+    !Number.isSafeInteger(raw) ||
+    raw < 1
   ) {
     throw logicError(
       "integrity",
-      "Evento clínico sem updated_at canônico: " +
-        "recarregue o evento antes de mutar.",
+      "Aggregate clínico com revision corrompida.",
     );
   }
-  const millis = (raw.toMillis as () => unknown)();
-  if (typeof millis !== "number" || !Number.isFinite(millis)) {
+  return raw;
+}
+
+/**
+ * The exact next revision.
+ *
+ * NEVER `FieldValue.increment(1)`: the resulting value must be known inside the
+ * transaction so the stored aggregate, the response, the operation receipt and
+ * the audit entry are provably the same number. With a sentinel the server would
+ * report a revision it never actually computed.
+ *
+ * Overflow fails closed rather than producing an unsafe integer: past
+ * `MAX_SAFE_INTEGER` a counter stops being exact, and an inexact concurrency
+ * token is worse than a refused mutation.
+ */
+function nextRevision(current: number): number {
+  if (current >= Number.MAX_SAFE_INTEGER) {
     throw logicError(
       "integrity",
-      "Evento clínico com updated_at ilegível.",
+      "revision do aggregate clínico não pode avançar com segurança.",
     );
   }
-  return millis;
+  return current + 1;
+}
+
+/**
+ * The resulting revision recorded by a stored operation receipt.
+ *
+ * A replay MUST return the revision the original operation actually produced,
+ * never a value recomputed from current state: another operation may have
+ * advanced the aggregate since, and reporting today's revision would tell the
+ * caller its own write produced a number it never wrote.
+ *
+ * A receipt written by this successor always carries it, so absence is a
+ * malformed receipt and fails closed exactly like the other receipt-shape
+ * violations.
+ */
+function receiptResultRevision(stored: JsonMap): number {
+  const result = stored.result as JsonMap | undefined;
+  if (result === undefined || result === null) {
+    throw logicError(
+      "integrity",
+      "Receipt clínico malformado: campo obrigatório ausente (result).",
+    );
+  }
+  const raw = result.revision;
+  if (
+    typeof raw !== "number" ||
+    !Number.isSafeInteger(raw) ||
+    raw < 1
+  ) {
+    throw logicError(
+      "integrity",
+      "Receipt clínico sem revision resultante canônica.",
+    );
+  }
+  return raw;
 }
 
 /** Stale precondition. NEVER retried automatically: the caller must re-read. */
-function assertFreshToken(storedMillis: number, expected: number): void {
-  if (storedMillis !== expected) {
+function assertFreshRevision(stored: number, expected: number): void {
+  if (stored !== expected) {
     throw logicError(
       "conflict",
-      "Evento clínico alterado por outra operação. " +
+      "Registro clínico alterado por outra operação. " +
         "Recarregue antes de mutar.",
     );
   }
@@ -955,8 +1021,8 @@ export function fingerprintAppendEventIntent(intent: {
 /**
  * Fingerprint of a FINALIZE intent.
  *
- * `expectedUpdatedAt` is deliberately EXCLUDED. A legitimate network retry of an
- * already-applied finalisation still carries the pre-mutation token, so
+ * `expectedRevision` is deliberately EXCLUDED. A legitimate network retry of an
+ * already-applied finalisation still carries the pre-mutation revision, so
  * including it would make the replay look like a different intent and raise a
  * spurious `idempotency-conflict` for an operation that already succeeded. The
  * token is a precondition on the CURRENT state, not part of what was requested.
@@ -982,7 +1048,7 @@ export function fingerprintFinalizeEventIntent(intent: {
  * Includes the trimmed reason — cancelling the same event for a DIFFERENT stated
  * reason under the same `operationId` is a genuine intent divergence and must
  * surface as `idempotency-conflict`, not silently replay the first reason.
- * `expectedUpdatedAt` is excluded for the same reason as in finalize.
+ * `expectedRevision` is excluded for the same reason as in finalize.
  */
 export function fingerprintCancelEventIntent(intent: {
   readonly dogId: string;
@@ -1014,7 +1080,7 @@ export function fingerprintCancelEventIntent(intent: {
  * different insertion order is the SAME logical intent — otherwise a client that
  * merely reserialised its payload would be told its retry conflicted.
  *
- * `expectedUpdatedAt` is excluded, exactly as in finalize/cancel: it is a
+ * `expectedRevision` is excluded, exactly as in finalize/cancel: it is a
  * precondition on current state, not part of what was requested.
  */
 export function fingerprintAmendEventIntent(intent: {
@@ -1266,11 +1332,16 @@ interface EventFacts {
  * REQUIRED and server-managed; a reader must never have to treat their absence
  * as "unknown".
  *
- * `updated_at` is the canonical optimistic-concurrency authority of the
- * ClinicalEvent (CLIN-WRITER-1.W4.P0). Every event is BORN with it — equal to
- * `recorded_at`, from the same server Timestamp — so that a mutation command can
- * always compare a caller's `expectedUpdatedAt` against a field that provably
+ * `revision` is the canonical optimistic-concurrency authority of the
+ * ClinicalEvent (CLIN-WRITER-1.W6.P0.F1.C1, superseding the W4.P0 `updated_at`
+ * token). Every event is BORN at `revision: 1` so that a mutation command can
+ * always compare a caller's `expectedRevision` against a field that provably
  * exists. An event created without the token could never be safely mutated.
+ *
+ * `updated_at` is BORN equal to `recorded_at`, from the same server Timestamp,
+ * and remains purely TEMPORAL metadata: it is not unique, not monotonic, and
+ * carries no commit-order meaning. F1.C0 proved a wall-clock token cannot detect
+ * staleness when two successful mutations share a millisecond.
  */
 function clinicalEventDocument(
   facts: EventFacts,
@@ -1287,7 +1358,8 @@ function clinicalEventDocument(
     occurred_at: Timestamp.fromDate(facts.occurredAt),
     recorded_at: recordedAt,
     // Same Timestamp instance as `recorded_at`: on creation the two are the
-    // same fact, and no mutation has happened yet.
+    // same fact, and no mutation has happened yet. TEMPORAL METADATA ONLY —
+    // the concurrency authority is `revision` (F1.C1).
     updated_at: recordedAt,
     recorded_by: recordedByPayload(caller, isAdmin),
     payload_type: facts.payloadType,
@@ -1295,6 +1367,9 @@ function clinicalEventDocument(
     content: facts.content,
     has_amendments: false,
     amendment_count: 0,
+    // Optimistic-concurrency authority. Every canonical event is born at 1,
+    // through BOTH creation paths, because this builder is shared.
+    revision: 1,
     schema_version: CLINICAL_SCHEMA_VERSION,
   };
   if (facts.professional !== undefined) {
@@ -1495,6 +1570,9 @@ export async function runHealthOpenClinicalCase(
         event_count: 1,
         last_event_at: recordedAt,
         updated_at: recordedAt,
+        // Optimistic-concurrency authority. Born at 1: absence is corruption,
+        // never a legacy shape (F1.C1).
+        revision: 1,
         schema_version: CLINICAL_SCHEMA_VERSION,
       };
       if (input.professional !== undefined) {
@@ -1747,6 +1825,13 @@ export async function runHealthAppendClinicalEvent(
         );
       }
 
+      // APPEND carries no caller precondition, so there is no stale check here.
+      // The stored revision is still parsed and advanced explicitly: a corrupt
+      // aggregate must fail closed rather than silently restart its counter.
+      const nextCaseRevision = nextRevision(
+        parseStoredRevision(caseData.revision),
+      );
+
       const eventDocument = clinicalEventDocument(
         {
           dogId,
@@ -1768,12 +1853,20 @@ export async function runHealthAppendClinicalEvent(
       tx.set(eRef, eventDocument);
       // Derived counters only. `clinical_status` is deliberately NOT in this
       // patch: appending an event is not a lifecycle transition.
+      //
+      // The case revision DOES advance: appending mutates the aggregate, so a
+      // future W6 lifecycle caller holding the previous revision must observe
+      // that change and fail stale. `event_count` keeps its `increment`
+      // sentinel — it is a pure counter nobody preconditions on — while
+      // `revision` is written EXPLICITLY from the value read in this
+      // transaction, so the stored token is always exactly one step on.
       tx.set(
         cRef,
         {
           event_count: FieldValue.increment(1),
           last_event_at: recordedAt,
           updated_at: recordedAt,
+          revision: nextCaseRevision,
         },
         {merge: true},
       );
@@ -1833,7 +1926,7 @@ interface ParsedEventMutationInput {
   readonly caseId: string;
   readonly eventId: string;
   readonly operationId: string;
-  readonly expectedUpdatedAt: number;
+  readonly expectedRevision: number;
 }
 
 function parseEventMutationInput(data: JsonMap): ParsedEventMutationInput {
@@ -1844,8 +1937,8 @@ function parseEventMutationInput(data: JsonMap): ParsedEventMutationInput {
     operationId: normalizeOperationId(
       data.idempotencyKey ?? data.operationId ?? data.operation_id,
     ),
-    expectedUpdatedAt: assertExpectedUpdatedAt(
-      data.expectedUpdatedAt ?? data.expected_updated_at,
+    expectedRevision: parseExpectedRevision(
+      data.expectedRevision ?? data.expected_revision,
     ),
   };
 }
@@ -1855,14 +1948,17 @@ function eventMutationResponse(params: {
   caseId: string;
   eventId: string;
   status: string;
+  revision: number;
   wasNoOp: boolean;
 }): JsonMap {
-  const {dogId, caseId, eventId, status, wasNoOp} = params;
+  const {dogId, caseId, eventId, status, revision, wasNoOp} = params;
   return {
     dog_id: dogId,
     case_id: caseId,
     event_id: eventId,
     status,
+    // Resulting event revision: the caller's next optimistic-concurrency token.
+    revision,
     reference: clinicalEventRef(caseId, eventId),
     was_no_op: wasNoOp,
     dogId,
@@ -2005,7 +2101,7 @@ export async function runHealthFinalizeClinicalEvent(
 
     const nowDate = (deps.now ?? (() => new Date()))();
     const input = parseEventMutationInput(data);
-    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+    const {dogId, caseId, eventId, operationId, expectedRevision} = input;
 
     const dog = await loadDog(deps.db, dogId);
     await deps.requireDogAccess(request.auth, caller, dogId, dog);
@@ -2066,6 +2162,9 @@ export async function runHealthFinalizeClinicalEvent(
           caseId,
           eventId,
           status: "final",
+          // The revision THIS operation produced, read back from its own
+          // receipt — never recomputed from current state.
+          revision: receiptResultRevision((opSnap.data() ?? {}) as JsonMap),
           wasNoOp: true,
         });
       }
@@ -2078,7 +2177,9 @@ export async function runHealthFinalizeClinicalEvent(
       assertStoredEventIntegrity(event, dogId, caseId);
 
       // ── 3. concurrency precondition ───────────────────────────────────────
-      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+      const storedRevision = parseStoredRevision(event.revision);
+      assertFreshRevision(storedRevision, expectedRevision);
+      const resultingRevision = nextRevision(storedRevision);
 
       // ── 4. transition legality, decided by the FROZEN domain authority ────
       const currentStatus = parseClinicalEventStatus(event.status);
@@ -2086,13 +2187,16 @@ export async function runHealthFinalizeClinicalEvent(
 
       // ── 5. atomic mutation + receipt + audit ──────────────────────────────
       // EXPLICIT fields only. `updated_at` carries the SAME Timestamp as
-      // `finalized_at`: they are one fact.
+      // `finalized_at`: they are one fact — temporal metadata, NOT the
+      // concurrency token. `revision` is written as an explicit number so the
+      // stored value, the response, the receipt and the audit are provably equal.
       tx.set(
         eRef,
         {
           status: "final",
           finalized_at: finalizedAt,
           updated_at: finalizedAt,
+          revision: resultingRevision,
         },
         {merge: true},
       );
@@ -2104,7 +2208,7 @@ export async function runHealthFinalizeClinicalEvent(
           operationId,
           actorUid: caller.uid,
           fingerprint,
-          result: {dogId, caseId, eventId},
+          result: {dogId, caseId, eventId, revision: resultingRevision},
         }),
       );
       tx.set(
@@ -2124,6 +2228,7 @@ export async function runHealthFinalizeClinicalEvent(
             operation_id: operationId,
             previous_status: currentStatus,
             event_status: "final",
+            event_revision: resultingRevision,
           },
         }),
       );
@@ -2133,6 +2238,7 @@ export async function runHealthFinalizeClinicalEvent(
         caseId,
         eventId,
         status: "final",
+        revision: resultingRevision,
         wasNoOp: false,
       });
     });
@@ -2174,7 +2280,7 @@ export async function runHealthCancelClinicalEvent(
 
     const nowDate = (deps.now ?? (() => new Date()))();
     const input = parseEventMutationInput(data);
-    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+    const {dogId, caseId, eventId, operationId, expectedRevision} = input;
     const cancelReason = assertCancelReason(
       data.cancelReason ?? data.cancel_reason,
     );
@@ -2244,6 +2350,8 @@ export async function runHealthCancelClinicalEvent(
           caseId,
           eventId,
           status: "cancelled",
+          // The revision THIS operation produced, read back from its own receipt.
+          revision: receiptResultRevision((opSnap.data() ?? {}) as JsonMap),
           wasNoOp: true,
         });
       }
@@ -2256,7 +2364,9 @@ export async function runHealthCancelClinicalEvent(
       assertStoredEventIntegrity(event, dogId, caseId);
 
       // ── 3. concurrency precondition ───────────────────────────────────────
-      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+      const storedRevision = parseStoredRevision(event.revision);
+      assertFreshRevision(storedRevision, expectedRevision);
+      const resultingRevision = nextRevision(storedRevision);
 
       // ── 4. transition legality + cancellation metadata completeness, both
       //       decided by the FROZEN domain authority in one call ─────────────
@@ -2284,6 +2394,7 @@ export async function runHealthCancelClinicalEvent(
           cancelled_at: cancelledAt,
           cancelled_by: cancelledBy,
           updated_at: cancelledAt,
+          revision: resultingRevision,
         },
         {merge: true},
       );
@@ -2295,7 +2406,7 @@ export async function runHealthCancelClinicalEvent(
           operationId,
           actorUid: caller.uid,
           fingerprint,
-          result: {dogId, caseId, eventId},
+          result: {dogId, caseId, eventId, revision: resultingRevision},
         }),
       );
       tx.set(
@@ -2316,6 +2427,7 @@ export async function runHealthCancelClinicalEvent(
             previous_status: currentStatus,
             event_status: "cancelled",
             cancel_reason: cancelReason,
+            event_revision: resultingRevision,
           },
         }),
       );
@@ -2325,6 +2437,7 @@ export async function runHealthCancelClinicalEvent(
         caseId,
         eventId,
         status: "cancelled",
+        revision: resultingRevision,
         wasNoOp: false,
       });
     });
@@ -2353,8 +2466,8 @@ const EVENT_AMEND_ALLOWED_KEYS = [
   "operationId",
   "operation_id",
   "idempotencyKey",
-  "expectedUpdatedAt",
-  "expected_updated_at",
+  "expectedRevision",
+  "expected_revision",
   "amendmentType",
   "reason",
   "content",
@@ -2383,7 +2496,7 @@ interface ParsedAmendInput {
   readonly caseId: string;
   readonly eventId: string;
   readonly operationId: string;
-  readonly expectedUpdatedAt: number;
+  readonly expectedRevision: number;
   readonly amendmentType: ClinicalAmendmentType;
   readonly reason: string;
   readonly content: JsonMap;
@@ -2397,8 +2510,8 @@ function parseAmendInput(data: JsonMap): ParsedAmendInput {
     operationId: normalizeOperationId(
       data.idempotencyKey ?? data.operationId ?? data.operation_id,
     ),
-    expectedUpdatedAt: assertExpectedUpdatedAt(
-      data.expectedUpdatedAt ?? data.expected_updated_at,
+    expectedRevision: parseExpectedRevision(
+      data.expectedRevision ?? data.expected_revision,
     ),
     amendmentType: parseAmendmentType(data.amendmentType),
     reason: assertAmendmentReason(data.reason),
@@ -2440,15 +2553,20 @@ function amendResponse(params: {
   eventId: string;
   amendmentId: string;
   amendmentCount: number;
+  revision: number;
   wasNoOp: boolean;
 }): JsonMap {
-  const {dogId, caseId, eventId, amendmentId, amendmentCount, wasNoOp} = params;
+  const {
+    dogId, caseId, eventId, amendmentId, amendmentCount, revision, wasNoOp,
+  } = params;
   return {
     dog_id: dogId,
     case_id: caseId,
     event_id: eventId,
     amendment_id: amendmentId,
     amendment_count: amendmentCount,
+    // Resulting PARENT event revision: the caller's next concurrency token.
+    revision,
     reference: clinicalAmendmentRef(caseId, eventId, amendmentId),
     was_no_op: wasNoOp,
     dogId,
@@ -2497,7 +2615,7 @@ export async function runHealthAmendClinicalEvent(
 
     const nowDate = (deps.now ?? (() => new Date()))();
     const input = parseAmendInput(data);
-    const {dogId, caseId, eventId, operationId, expectedUpdatedAt} = input;
+    const {dogId, caseId, eventId, operationId, expectedRevision} = input;
 
     const dog = await loadDog(deps.db, dogId);
     await deps.requireDogAccess(request.auth, caller, dogId, dog);
@@ -2569,9 +2687,9 @@ export async function runHealthAmendClinicalEvent(
         );
       }
       if (match === "replay") {
-        const stored = (eventSnap.data() ?? {}) as JsonMap;
-        const count = typeof stored.amendment_count === "number" ?
-          stored.amendment_count :
+        const storedEvent = (eventSnap.data() ?? {}) as JsonMap;
+        const count = typeof storedEvent.amendment_count === "number" ?
+          storedEvent.amendment_count :
           0;
         return amendResponse({
           dogId,
@@ -2579,6 +2697,10 @@ export async function runHealthAmendClinicalEvent(
           eventId,
           amendmentId,
           amendmentCount: count,
+          // The parent revision THIS operation produced, read from ITS OWN
+          // RECEIPT — not from the event, which another operation may have
+          // advanced since.
+          revision: receiptResultRevision((opSnap.data() ?? {}) as JsonMap),
           wasNoOp: true,
         });
       }
@@ -2602,7 +2724,9 @@ export async function runHealthAmendClinicalEvent(
       }
 
       // ── 3. concurrency precondition ───────────────────────────────────────
-      assertFreshToken(storedUpdatedAtMillis(event), expectedUpdatedAt);
+      const storedRevision = parseStoredRevision(event.revision);
+      assertFreshRevision(storedRevision, expectedRevision);
+      const resultingRevision = nextRevision(storedRevision);
 
       // ── 4. eligibility, decided against the FROZEN status vocabulary ──────
       const currentStatus = parseClinicalEventStatus(event.status);
@@ -2634,12 +2758,12 @@ export async function runHealthAmendClinicalEvent(
       // EXPLICIT metadata-only patch. `status`, `finalized_at` and every
       // clinical field are absent by construction: the parent stays `final` and
       // its content is untouched.
-      // `amendment_count` is written as an EXPLICIT number, not
-      // `FieldValue.increment(1)`. The transaction already read the current count
-      // and validated it, and `expectedUpdatedAt` serialises competing mutations,
-      // so there is no lost-update to defend against. An explicit value keeps the
-      // stored count, the audit entry and the response provably equal — with a
-      // sentinel, the server would report a number it never actually wrote.
+      // `amendment_count` and `revision` are written as EXPLICIT numbers, not
+      // `FieldValue.increment(1)`. The transaction already read both and
+      // validated them, and `expectedRevision` serialises competing mutations,
+      // so there is no lost-update to defend against. Explicit values keep the
+      // stored state, the receipt, the audit entry and the response provably
+      // equal — with a sentinel, the server would report a number it never wrote.
       tx.set(
         eRef,
         {
@@ -2647,6 +2771,7 @@ export async function runHealthAmendClinicalEvent(
           amendment_count: currentCount + 1,
           last_amended_at: amendedAt,
           updated_at: amendedAt,
+          revision: resultingRevision,
         },
         {merge: true},
       );
@@ -2658,7 +2783,9 @@ export async function runHealthAmendClinicalEvent(
           operationId,
           actorUid: caller.uid,
           fingerprint,
-          result: {dogId, caseId, eventId, amendmentId},
+          result: {
+            dogId, caseId, eventId, amendmentId, revision: resultingRevision,
+          },
         }),
       );
       tx.set(
@@ -2686,6 +2813,7 @@ export async function runHealthAmendClinicalEvent(
             reason: input.reason,
             event_status: currentStatus,
             amendment_count: currentCount + 1,
+            event_revision: resultingRevision,
           },
         }),
       );
@@ -2696,6 +2824,7 @@ export async function runHealthAmendClinicalEvent(
         eventId,
         amendmentId,
         amendmentCount: currentCount + 1,
+        revision: resultingRevision,
         wasNoOp: false,
       });
     });
