@@ -3704,6 +3704,82 @@ async function testRevisionConcurrencyAuthority() {
   );
 }
 
+/**
+ * Persistence-boundary actor hygiene (CLIN-WRITER-1.W6.P0.K1).
+ *
+ * Two things must hold at once: the canonical server-derived actor still passes
+ * strict validation, AND the writer no longer manufactures a role when one is
+ * missing. The old `?? "condutor"` fallback would have defeated any downstream
+ * validator, so its absence is asserted against the source text — a behavioural
+ * test alone cannot prove a fallback is gone when the happy path never needs it.
+ */
+async function testPersistedActorBoundary() {
+  // A — canonical server-derived actor (condutor) survives the strict adapter.
+  const d = await seedDraftEvent();
+  await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(d.caseId, d.eventId, "op-k1-can", 1, {
+      cancelReason: "registro duplicado",
+    })),
+    depsFor({db: d.db, now: T1}),
+  );
+  const dAfter = eventOf(d.db, d.eventPath);
+  assert.strictEqual(dAfter.status, "cancelled", "A: cancelamento falhou");
+  assert.deepStrictEqual(
+    dAfter.cancelled_by,
+    {uid: actor.uid, name: actor.name, internal_role: "condutor"},
+    "A: cancelled_by persistido deve manter o shape snake_case canônico",
+  );
+
+  // B — the admin branch of recordedByPayload also passes: proves the adapter
+  // READS internal_role instead of defaulting it. Under the old fallback an
+  // unread key still produced "condutor", so "admin" would have been lost.
+  const a = await seedDraftEvent({admin: true});
+  await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(a.caseId, a.eventId, "op-k1-adm", 1, {
+      cancelReason: "registro duplicado",
+    })),
+    depsFor({db: a.db, now: T1, admin: true}),
+  );
+  assert.strictEqual(
+    ((eventOf(a.db, a.eventPath).cancelled_by as JsonMap).internal_role),
+    "admin",
+    "B: papel admin foi perdido/sobrescrito pela adaptação",
+  );
+
+  // C — the dangerous precedent is gone and the strict adapter is in its place.
+  const src = stripComments(readSource("clinical_case_callables.ts"));
+  assert.strictEqual(
+    src.includes("?? \"condutor\""),
+    false,
+    "C: fallback `?? \"condutor\"` reintroduzido — mascara ator corrompido",
+  );
+  assert.strictEqual(
+    /internalRole:\s*stringValue\(/.test(src),
+    false,
+    "C: adaptação manual de ator reintroduzida fora da fronteira estrita",
+  );
+  const cancelBody = src.slice(
+    src.indexOf("export async function runHealthCancelClinicalEvent"),
+  );
+  assert.ok(
+    cancelBody.includes("actorFromPersistedShape("),
+    "C: CANCEL deve adaptar o ator pela fronteira estrita",
+  );
+
+  // D — the boundary is the ONLY place snake_case meets the domain: pure domain
+  // must never learn the persisted key.
+  const domainSrc = stripComments(readSource("clinical_domain.ts"));
+  assert.strictEqual(
+    domainSrc.includes("internal_role:"),
+    false,
+    "D: clinical_domain.ts não pode ler a chave persistida internal_role",
+  );
+  assert.ok(
+    domainSrc.includes("export function assertClinicalActor("),
+    "D: validador canônico de ator deve viver no domínio puro",
+  );
+}
+
 const tests: Array<[string, () => Promise<void>]> = [
   ["OPEN sucesso e shape canônico", testOpenSuccess],
   ["OPEN replay sem duplicação", testOpenReplayNoDuplicate],
@@ -3756,6 +3832,7 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["REVISION é a autoridade única de concorrência (relógio fixo)",
     testRevisionConcurrencyAuthority],
   ["ARQ emenda não tem caminho para o conteúdo do pai", testAmendWriterHasNoParentContentPath],
+  ["ATOR fronteira de persistência estrita sem default", testPersistedActorBoundary],
 ];
 
 (async () => {

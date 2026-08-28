@@ -46,7 +46,9 @@ import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 
 import {
+  ClinicalActor,
   ClinicalDomainError,
+  assertClinicalActor,
   assertEventTransition,
   isTerminalCaseStatus,
   parseClinicalCaseOpeningType,
@@ -785,6 +787,35 @@ function assertFreshRevision(stored: number, expected: number): void {
         "Recarregue antes de mutar.",
     );
   }
+}
+
+/**
+ * PERSISTENCE BOUNDARY: canonical stored/server `RecordedBy` → domain
+ * `ClinicalActor` (CLIN-WRITER-1.W6.P0.K1).
+ *
+ * The stored shape is snake_case (`internal_role`); the domain shape is camelCase
+ * (`internalRole`). This is the ONLY place the two vocabularies meet, so the pure
+ * domain never learns storage naming and a reader never hand-rolls the mapping.
+ *
+ * STRICTLY no defaulting, no coercion, no fallback. The pattern this replaces —
+ * `stringValue(actor.internal_role) ?? "condutor"` — manufactured a valid-looking
+ * role out of a missing one, which would defeat `assertClinicalActor` before it
+ * ever ran. W6 will read persisted actors, so that precedent had to die here.
+ *
+ * Corruption surfaces as the domain's own `missing_uid` / `missing_name` /
+ * `missing_internal_role`, mapped by the caller's existing error handling.
+ */
+function actorFromPersistedShape(raw: unknown): ClinicalActor {
+  const source: Record<string, unknown> =
+    typeof raw === "object" && raw !== null && !Array.isArray(raw) ?
+      (raw as Record<string, unknown>) :
+      {};
+  return assertClinicalActor({
+    uid: source.uid,
+    name: source.name,
+    // The ONLY translation. Read the persisted key, hand the domain its own.
+    internalRole: source.internal_role,
+  });
 }
 
 /** `cancelReason` is the only clinical content a cancellation may carry. */
@@ -2375,11 +2406,10 @@ export async function runHealthCancelClinicalEvent(
       const transition = assertEventTransition(currentStatus, "cancelled", {
         cancelReason,
         cancelledAt: nowDate,
-        cancelledBy: {
-          uid: caller.uid,
-          name: stringValue(cancelledBy.name) ?? caller.uid,
-          internalRole: stringValue(cancelledBy.internal_role) ?? "condutor",
-        },
+        // Strict boundary adaptation — no defaulting. If the server-derived
+        // payload were ever incomplete, this fails closed instead of inventing
+        // a role (the pre-K1 `?? "condutor"` behaviour).
+        cancelledBy: actorFromPersistedShape(cancelledBy),
       });
 
       // ── 5. atomic mutation + receipt + audit ──────────────────────────────
