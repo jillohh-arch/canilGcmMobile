@@ -4272,7 +4272,7 @@ async function testLifecycleReopen(): Promise<void> {
     depsFor({db, now: T2}),
   );
 
-  // Reopen again (rev 4 -> rev 5, reopened_count: 2)
+  // Reopen again with a distinct actor (rev 4 -> rev 5, reopened_count: 2)
   const r2Res = await runHealthReopenClinicalCase(
     mockRequest({
       dogId: "dog-1",
@@ -4281,14 +4281,20 @@ async function testLifecycleReopen(): Promise<void> {
       expectedRevision: 4,
       destination: "monitoring",
       reopenReason: "Reabertura para monitoramento pós-alta",
-    }),
-    depsFor({db, now: T2}),
+    }, {uid: actorB.uid, token: {}}),
+    depsFor({db, now: T2, caller: actorB}),
   );
   assert.strictEqual(r2Res?.revision, 5);
   assert.strictEqual(r2Res?.clinicalStatus, "monitoring");
 
   const cDoc2 = caseOf(db, canonicalCasePath("dog-1", caseId));
   assert.strictEqual(cDoc2.reopened_count, 2);
+  assert.deepStrictEqual(cDoc2.reopened_by, {
+    uid: actorB.uid,
+    name: actorB.name,
+    internal_role: "condutor",
+  });
+  assert.notDeepStrictEqual(cDoc2.reopened_by, cDoc.reopened_by);
   assert.strictEqual(cDoc2.closed_at, undefined);
 
   // Reopening active case rejected
