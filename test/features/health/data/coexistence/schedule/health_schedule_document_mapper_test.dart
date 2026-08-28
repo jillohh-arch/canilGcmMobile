@@ -228,6 +228,91 @@ void main() {
       expect(item.recordedBy.uid, 'system');
       expect(item.recordedBy.internalRole, 'system');
     });
+
+    group('fromCollectionGroup', () {
+      test('dog_id canônico aceito', () {
+        final data = fullDoc()..['dog_id'] = 'dog-cg-1';
+        final item = HealthScheduleDocumentMapper.fromCollectionGroup(
+          documentId: 'cg-doc-1',
+          data: data,
+        );
+        expect(item.id, 'cg-doc-1');
+        expect(item.dogId, 'dog-cg-1');
+      });
+
+      test('dog_id ausente → integrity', () {
+        final data = fullDoc();
+        data.remove('dog_id');
+        expect(
+          () => HealthScheduleDocumentMapper.fromCollectionGroup(
+            documentId: 'cg-doc-2',
+            data: data,
+          ),
+          throwsA(
+            isA<HealthScheduleIntegrityException>().having(
+              (e) => e.field,
+              'field',
+              'dog_id',
+            ),
+          ),
+        );
+      });
+
+      test('dog_id tipo inválido → integrity', () {
+        final data = fullDoc()..['dog_id'] = 12345;
+        expect(
+          () => HealthScheduleDocumentMapper.fromCollectionGroup(
+            documentId: 'cg-doc-3',
+            data: data,
+          ),
+          throwsA(
+            isA<HealthScheduleIntegrityException>().having(
+              (e) => e.field,
+              'field',
+              'dog_id',
+            ),
+          ),
+        );
+      });
+
+      test('dog_id string vazia → integrity', () {
+        final data = fullDoc()..['dog_id'] = '   ';
+        expect(
+          () => HealthScheduleDocumentMapper.fromCollectionGroup(
+            documentId: 'cg-doc-4',
+            data: data,
+          ),
+          throwsA(
+            isA<HealthScheduleIntegrityException>().having(
+              (e) => e.field,
+              'field',
+              'dog_id',
+            ),
+          ),
+        );
+      });
+
+      test('aliases dogId / caoId / k9_id NÃO substituem dog_id ausente', () {
+        for (final alias in ['dogId', 'caoId', 'k9_id', 'dogID']) {
+          final data = fullDoc()..[alias] = 'dog-alias-1';
+          data.remove('dog_id');
+          expect(
+            () => HealthScheduleDocumentMapper.fromCollectionGroup(
+              documentId: 'cg-doc-alias',
+              data: data,
+            ),
+            throwsA(
+              isA<HealthScheduleIntegrityException>().having(
+                (e) => e.field,
+                'field',
+                'dog_id',
+              ),
+            ),
+            reason: '$alias não deve substituir dog_id',
+          );
+        }
+      });
+    });
   });
 
   group('HealthScheduleDateParse', () {

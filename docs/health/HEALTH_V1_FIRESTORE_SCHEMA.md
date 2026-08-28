@@ -1142,7 +1142,7 @@ A regra é única: o primeiro caso verdadeiro vence. Não há caso em que o mesm
 - Mobile/Web **não** escrevem o documento diretamente; invocam callables autenticados.
 
 **Leitor:** Mobile, Web (cliente autenticado com `canAccessDogRecord`).
-**Índices:** `lifecycle_status ASC, scheduled_for ASC`; `schedule_type ASC, lifecycle_status ASC, scheduled_for ASC`.
+**Índices:** COLLECTION: `lifecycle_status ASC, scheduled_for ASC`; COLLECTION_GROUP: `dog_id ASC, lifecycle_status ASC, scheduled_for ASC`.
 
 ---
 
