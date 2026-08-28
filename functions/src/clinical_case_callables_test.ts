@@ -4207,6 +4207,30 @@ async function testLifecycleReopen(): Promise<void> {
     depsFor({db, now: T1}),
   );
 
+  // Reopen requires an explicit destination: all three accepted input forms
+  // are deliberately absent, and validation must fail without mutating the case.
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const dischargedBeforeMissingDestination = {...caseOf(db, casePath)};
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-missing-destination",
+        expectedRevision: 2,
+        reopenReason: "Recidiva que exige destino explícito",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "validation",
+    "reabertura sem destination/targetStatus/target_status",
+  );
+  assert.deepStrictEqual(caseOf(db, casePath), dischargedBeforeMissingDestination);
+  assert.strictEqual(
+    db._store.get(`${casePath}/operations/op-reopen-missing-destination`),
+    undefined,
+  );
+
   // Reopen discharged case (rev 2 -> rev 3, reopened_count: 1)
   const rRes = await runHealthReopenClinicalCase(
     mockRequest({
