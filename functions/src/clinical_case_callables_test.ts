@@ -4448,6 +4448,50 @@ async function testLifecycleStoredIntegrityFailClosed(): Promise<void> {
     "integrity",
     "caso discharged com ator malformado",
   );
+
+  // 5. Complete coherent reopen history with malformed persisted reopened_by.
+  // Integrity must win over stale OCC, and the rejected command must be side-effect free.
+  const db5 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "open",
+      revision: 5,
+      reopened_at: Timestamp.fromDate(T1),
+      reopened_by: {uid: "", name: "Dr Vet", internal_role: "veterinario"},
+      previous_status: "discharged",
+      reopen_reason: "Recidiva confirmada",
+      reopened_count: 1,
+    },
+  });
+  const beforeMalformedReopenedBy = {...caseOf(db5, casePath)};
+  const opsBeforeMalformedReopenedBy = opKeys(db5, casePath).length;
+  const auditsBeforeMalformedReopenedBy = auditKeys(db5).length;
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-5",
+        expectedRevision: 999,
+        destination: "under_investigation",
+      }),
+      depsFor({db: db5, now: T2}),
+    ),
+    "integrity",
+    "caso com reopened_by persistido malformado antes de OCC",
+  );
+  assert.deepStrictEqual(caseOf(db5, casePath), beforeMalformedReopenedBy);
+  assert.strictEqual(opKeys(db5, casePath).length, opsBeforeMalformedReopenedBy);
+  assert.strictEqual(
+    db5._store.get(`${casePath}/operations/op-corrupt-5`),
+    undefined,
+  );
+  assert.strictEqual(
+    auditKeys(db5).length,
+    auditsBeforeMalformedReopenedBy,
+  );
 }
 
 async function testLifecycleGuardsAndAuthorization(): Promise<void> {
