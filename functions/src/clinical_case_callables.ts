@@ -47,7 +47,16 @@ import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 
 import {
   ClinicalActor,
+  ClinicalCaseClosure,
+  ClinicalCaseClosureInput,
+  ClinicalCaseClosureType,
+  ClinicalCaseReopenHistoryInput,
+  ClinicalCaseStatus,
   ClinicalDomainError,
+  assertCaseClosureConsistency,
+  assertCaseReopen,
+  assertCaseReopenConsistency,
+  assertCaseTransition,
   assertClinicalActor,
   assertEventTransition,
   isTerminalCaseStatus,
@@ -99,6 +108,16 @@ export const CLINICAL_EVENT_CANCEL_KIND = "clinical_event_cancel_v1";
 export const CLINICAL_EVENT_CANCEL_OPERATION = "cancel_clinical_event";
 export const CLINICAL_EVENT_AMEND_KIND = "clinical_event_amend_v1";
 export const CLINICAL_EVENT_AMEND_OPERATION = "amend_clinical_event";
+
+/** Lifecycle mutation receipt kinds & operations (CLIN-WRITER-1.W6.I1). */
+export const CLINICAL_CASE_TRANSITION_KIND = "clinical_case_transition_v1";
+export const CLINICAL_CASE_TRANSITION_OPERATION = "transition_clinical_case";
+export const CLINICAL_CASE_DISCHARGE_KIND = "clinical_case_discharge_v1";
+export const CLINICAL_CASE_DISCHARGE_OPERATION = "discharge_clinical_case";
+export const CLINICAL_CASE_CANCEL_KIND = "clinical_case_cancel_v1";
+export const CLINICAL_CASE_CANCEL_OPERATION = "cancel_clinical_case";
+export const CLINICAL_CASE_REOPEN_KIND = "clinical_case_reopen_v1";
+export const CLINICAL_CASE_REOPEN_OPERATION = "reopen_clinical_case";
 
 /**
  * Frozen amendment type vocabulary (schema §2.3, ADR-002).
@@ -205,6 +224,14 @@ export interface ClinicalCaseCallableDeps {
    * exist in production (one allowed while the other is denied).
    */
   requireAmendClinical: (
+    auth: CallableRequest["auth"],
+  ) => Promise<ClinicalCaller>;
+  /** MUST enforce `health.manage_clinical_case` EXPLICITLY (transition/discharge/cancel). */
+  requireManageClinicalCase: (
+    auth: CallableRequest["auth"],
+  ) => Promise<ClinicalCaller>;
+  /** MUST enforce `health.reopen_clinical_case` EXPLICITLY. */
+  requireReopenClinicalCase: (
     auth: CallableRequest["auth"],
   ) => Promise<ClinicalCaller>;
   /** Structural dog scope — the existing canonical fail-closed helper. */
@@ -481,6 +508,79 @@ function rejectUnknownMutationKeys(
   for (const key of Object.keys(data)) {
     if (EVENT_MUTATION_ALLOWED_KEYS.includes(key as never)) continue;
     if (extraAllowed.includes(key)) continue;
+    throw logicError(
+      "validation",
+      `Campo não aceito por um comando de mutação clínica: ${key}.`,
+    );
+  }
+}
+
+const CASE_TRANSITION_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedRevision",
+  "expected_revision",
+  "destination",
+  "targetStatus",
+  "target_status",
+] as const;
+
+const CASE_DISCHARGE_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedRevision",
+  "expected_revision",
+  "closureReason",
+  "closure_reason",
+] as const;
+
+const CASE_CANCEL_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedRevision",
+  "expected_revision",
+  "closureReason",
+  "closure_reason",
+] as const;
+
+const CASE_REOPEN_ALLOWED_KEYS = [
+  "dogId",
+  "dog_id",
+  "caseId",
+  "case_id",
+  "operationId",
+  "operation_id",
+  "idempotencyKey",
+  "expectedRevision",
+  "expected_revision",
+  "destination",
+  "targetStatus",
+  "target_status",
+  "reopenReason",
+  "reopen_reason",
+] as const;
+
+function rejectUnknownCaseMutationKeys(
+  data: JsonMap,
+  allowedKeys: readonly string[],
+): void {
+  for (const key of Object.keys(data)) {
+    if (allowedKeys.includes(key)) continue;
     throw logicError(
       "validation",
       `Campo não aceito por um comando de mutação clínica: ${key}.`,
@@ -818,6 +918,136 @@ function actorFromPersistedShape(raw: unknown): ClinicalActor {
   });
 }
 
+function persistedInstantToDate(raw: unknown, label: string): Date | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  if (raw instanceof Date) {
+    if (Number.isNaN(raw.getTime())) throw logicError("integrity", `${label} inválido.`);
+    return raw;
+  }
+  if (typeof (raw as {toDate?: unknown})?.toDate === "function") {
+    return (raw as {toDate: () => Date}).toDate();
+  }
+  if (typeof (raw as {toMillis?: unknown})?.toMillis === "function") {
+    return new Date((raw as {toMillis: () => number}).toMillis());
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return new Date(raw);
+  }
+  const text = stringValue(raw);
+  if (!text) throw logicError("integrity", `${label} inválido.`);
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) throw logicError("integrity", `${label} inválido.`);
+  return parsed;
+}
+
+/**
+ * PERSISTENCE BOUNDARY: adapted closure snapshot from persisted snake_case
+ * Firestore document to pure-domain `ClinicalCaseClosureInput`.
+ */
+function caseClosureFromPersistedShape(
+  rawCase: Record<string, unknown>,
+): ClinicalCaseClosureInput {
+  const closedAt = persistedInstantToDate(rawCase.closed_at, "closed_at");
+  const closedBy =
+    rawCase.closed_by !== undefined && rawCase.closed_by !== null ?
+      actorFromPersistedShape(rawCase.closed_by) :
+      undefined;
+  const closureType = stringValue(rawCase.closure_type) as
+    | ClinicalCaseClosureType
+    | undefined;
+  const closureReason = stringValue(rawCase.closure_reason);
+
+  return {closedAt, closedBy, closureType, closureReason};
+}
+
+/**
+ * PERSISTENCE BOUNDARY: adapted reopen history from persisted snake_case
+ * Firestore document to pure-domain `ClinicalCaseReopenHistoryInput`.
+ */
+function caseReopenHistoryFromPersistedShape(
+  rawCase: Record<string, unknown>,
+): ClinicalCaseReopenHistoryInput {
+  const reopenedAt = persistedInstantToDate(rawCase.reopened_at, "reopened_at");
+  const reopenedBy =
+    rawCase.reopened_by !== undefined && rawCase.reopened_by !== null ?
+      actorFromPersistedShape(rawCase.reopened_by) :
+      undefined;
+  const previousStatus = stringValue(rawCase.previous_status) as
+    | ClinicalCaseStatus
+    | undefined;
+  const reopenReason = stringValue(rawCase.reopen_reason);
+  const reopenedCount =
+    typeof rawCase.reopened_count === "number" ?
+      rawCase.reopened_count :
+      (rawCase.reopened_count as never);
+
+  return {
+    reopenedAt,
+    reopenedBy,
+    previousStatus,
+    reopenReason,
+    reopenedCount,
+  };
+}
+
+export interface StoredCaseIntegrityResult {
+  readonly status: ClinicalCaseStatus;
+  readonly revision: number;
+  readonly closure: ClinicalCaseClosure | null;
+  readonly reopenHistory: ReturnType<typeof assertCaseReopenConsistency>;
+}
+
+/**
+ * Validates the full stored ClinicalCase aggregate before OCC freshness.
+ *
+ * Runs:
+ * A. Canonical status integrity
+ * B. Stored revision structural integrity
+ * C. Closure snapshot consistency + embedded closed_by actor
+ * D. Reopen history consistency + embedded reopened_by actor
+ *
+ * Stored corruption throws `integrity` (mapped to `failed-precondition`).
+ */
+export function assertStoredCaseIntegrity(
+  storedCase: JsonMap,
+): StoredCaseIntegrityResult {
+  // A. Canonical Status
+  let status: ClinicalCaseStatus;
+  try {
+    status = parseClinicalCaseStatus(storedCase.clinical_status);
+  } catch (err) {
+    throw logicError(
+      "integrity",
+      `Caso clínico com status corrompido: ${JSON.stringify(storedCase.clinical_status)}`,
+    );
+  }
+
+  // B. Stored Revision
+  const revision = parseStoredRevision(storedCase.revision);
+
+  // C. Closure Consistency + Embedded Actor
+  let closure: ClinicalCaseClosure | null;
+  try {
+    const closureInput = caseClosureFromPersistedShape(storedCase);
+    closure = assertCaseClosureConsistency(status, closureInput);
+  } catch (err) {
+    const msg = (err as Error)?.message || "Metadados de fechamento corrompidos.";
+    throw logicError("integrity", `Integridade de fechamento do caso violada: ${msg}`);
+  }
+
+  // D. Reopen History Consistency + Embedded Actor
+  let reopenHistory: ReturnType<typeof assertCaseReopenConsistency>;
+  try {
+    const reopenInput = caseReopenHistoryFromPersistedShape(storedCase);
+    reopenHistory = assertCaseReopenConsistency(reopenInput);
+  } catch (err) {
+    const msg = (err as Error)?.message || "Histórico de reabertura corrompido.";
+    throw logicError("integrity", `Integridade de reabertura do caso violada: ${msg}`);
+  }
+
+  return {status, revision, closure, reopenHistory};
+}
+
 /** `cancelReason` is the only clinical content a cancellation may carry. */
 function assertCancelReason(raw: unknown): string {
   if (raw === undefined || raw === null) {
@@ -1135,6 +1365,89 @@ export function fingerprintAmendEventIntent(intent: {
   );
 }
 
+/**
+ * Fingerprint of a TRANSITION intent.
+ *
+ * Includes dogId, caseId and destination. `expectedRevision` is excluded
+ * so that legitimate network replays before stale match.
+ */
+export function fingerprintTransitionCaseIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly destination: string;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_CASE_TRANSITION_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.destination,
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of a DISCHARGE intent.
+ *
+ * Includes dogId, caseId, and closureReason (normalized or null).
+ */
+export function fingerprintDischargeCaseIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly closureReason: string | null;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_CASE_DISCHARGE_KIND,
+      intent.dogId,
+      intent.caseId,
+      stableStringify(intent.closureReason),
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of a CANCEL CASE intent.
+ *
+ * Includes dogId, caseId, and closureReason.
+ */
+export function fingerprintCancelCaseIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly closureReason: string;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_CASE_CANCEL_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.closureReason,
+    ].join("|"),
+  );
+}
+
+/**
+ * Fingerprint of a REOPEN intent.
+ *
+ * Includes dogId, caseId, destination, and reopenReason.
+ */
+export function fingerprintReopenCaseIntent(intent: {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly destination: string;
+  readonly reopenReason: string;
+}): string {
+  return sha256Hex(
+    [
+      CLINICAL_CASE_REOPEN_KIND,
+      intent.dogId,
+      intent.caseId,
+      intent.destination,
+      intent.reopenReason,
+    ].join("|"),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Receipts
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1232,6 +1545,16 @@ function auditDocId(
   const h = sha256Hex(
     `${operation}|${dogId}|${caseId}|${eventId}|${operationId}`,
   );
+  return `clin_audit_${h.slice(0, 40)}`;
+}
+
+function caseAuditDocId(
+  operation: string,
+  dogId: string,
+  caseId: string,
+  operationId: string,
+): string {
+  const h = sha256Hex(`${operation}|${dogId}|${caseId}|${operationId}`);
   return `clin_audit_${h.slice(0, 40)}`;
 }
 
@@ -2854,6 +3177,882 @@ export async function runHealthAmendClinicalEvent(
         eventId,
         amendmentId,
         amendmentCount: currentCount + 1,
+        revision: resultingRevision,
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ClinicalCase Lifecycle Writers (CLIN-WRITER-1.W6.I1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ClinicalCaseLifecycleResponse {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly clinicalStatus: ClinicalCaseStatus;
+  readonly revision: number;
+  readonly wasNoOp: boolean;
+}
+
+function lifecycleCaseResponse(params: {
+  dogId: string;
+  caseId: string;
+  clinicalStatus: ClinicalCaseStatus;
+  revision: number;
+  wasNoOp: boolean;
+}): ClinicalCaseLifecycleResponse {
+  return {
+    dogId: params.dogId,
+    caseId: params.caseId,
+    clinicalStatus: params.clinicalStatus,
+    revision: params.revision,
+    wasNoOp: params.wasNoOp,
+  };
+}
+
+interface HealthTransitionClinicalCaseInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly operationId: string;
+  readonly expectedRevision: number;
+  readonly destination: ClinicalCaseStatus;
+}
+
+export function parseTransitionCaseRequest(
+  raw: unknown,
+): HealthTransitionClinicalCaseInput {
+  if (!isPlainObject(raw)) {
+    throw logicError("validation", "Payload deve ser um objeto.");
+  }
+  rejectServerManagedInjection(raw, [
+    "destination",
+    "targetStatus",
+    "target_status",
+  ]);
+  rejectUnknownCaseMutationKeys(raw, CASE_TRANSITION_ALLOWED_KEYS);
+
+  const dogId = assertDogId(raw.dogId ?? raw.dog_id);
+  const caseId = assertPathId(raw.caseId ?? raw.case_id, "caseId");
+  const operationId = normalizeOperationId(
+    raw.operationId ?? raw.operation_id ?? raw.idempotencyKey,
+  );
+  const expectedRevision = parseExpectedRevision(
+    raw.expectedRevision ?? raw.expected_revision,
+  );
+
+  const destRaw = raw.destination ?? raw.targetStatus ?? raw.target_status;
+  if (!destRaw) {
+    throw logicError("validation", "destination é obrigatório.");
+  }
+  const destination = parseClinicalCaseStatus(destRaw);
+
+  return {
+    dogId,
+    caseId,
+    operationId,
+    expectedRevision,
+    destination,
+  };
+}
+
+interface HealthDischargeClinicalCaseInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly operationId: string;
+  readonly expectedRevision: number;
+  readonly closureReason?: string;
+}
+
+export function parseDischargeCaseRequest(
+  raw: unknown,
+): HealthDischargeClinicalCaseInput {
+  if (!isPlainObject(raw)) {
+    throw logicError("validation", "Payload deve ser um objeto.");
+  }
+  rejectServerManagedInjection(raw, ["closureReason", "closure_reason"]);
+  rejectUnknownCaseMutationKeys(raw, CASE_DISCHARGE_ALLOWED_KEYS);
+
+  const dogId = assertDogId(raw.dogId ?? raw.dog_id);
+  const caseId = assertPathId(raw.caseId ?? raw.case_id, "caseId");
+  const operationId = normalizeOperationId(
+    raw.operationId ?? raw.operation_id ?? raw.idempotencyKey,
+  );
+  const expectedRevision = parseExpectedRevision(
+    raw.expectedRevision ?? raw.expected_revision,
+  );
+
+  let closureReason: string | undefined;
+  const reasonRaw = raw.closureReason ?? raw.closure_reason;
+  if (reasonRaw !== undefined && reasonRaw !== null) {
+    if (typeof reasonRaw !== "string") {
+      throw logicError("validation", "closureReason deve ser uma string.");
+    }
+    const trimmed = reasonRaw.trim();
+    if (trimmed.length === 0) {
+      throw logicError(
+        "validation",
+        "closureReason não pode ser apenas espaços em branco quando fornecido.",
+      );
+    }
+    if (trimmed.length > MAX_REASON_LEN) {
+      throw logicError("validation", "closureReason excede o tamanho máximo.");
+    }
+    closureReason = trimmed;
+  }
+
+  return {
+    dogId,
+    caseId,
+    operationId,
+    expectedRevision,
+    ...(closureReason !== undefined ? {closureReason} : {}),
+  };
+}
+
+interface HealthCancelClinicalCaseInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly operationId: string;
+  readonly expectedRevision: number;
+  readonly closureReason: string;
+}
+
+export function parseCancelCaseRequest(
+  raw: unknown,
+): HealthCancelClinicalCaseInput {
+  if (!isPlainObject(raw)) {
+    throw logicError("validation", "Payload deve ser um objeto.");
+  }
+  rejectServerManagedInjection(raw, ["closureReason", "closure_reason"]);
+  rejectUnknownCaseMutationKeys(raw, CASE_CANCEL_ALLOWED_KEYS);
+
+  const dogId = assertDogId(raw.dogId ?? raw.dog_id);
+  const caseId = assertPathId(raw.caseId ?? raw.case_id, "caseId");
+  const operationId = normalizeOperationId(
+    raw.operationId ?? raw.operation_id ?? raw.idempotencyKey,
+  );
+  const expectedRevision = parseExpectedRevision(
+    raw.expectedRevision ?? raw.expected_revision,
+  );
+
+  const reasonRaw = raw.closureReason ?? raw.closure_reason;
+  if (reasonRaw === undefined || reasonRaw === null) {
+    throw logicError("validation", "closureReason é obrigatório.");
+  }
+  if (typeof reasonRaw !== "string") {
+    throw logicError("validation", "closureReason deve ser uma string.");
+  }
+  const trimmed = reasonRaw.trim();
+  if (trimmed.length === 0) {
+    throw logicError("validation", "closureReason não pode ser vazio.");
+  }
+  if (trimmed.length > MAX_REASON_LEN) {
+    throw logicError("validation", "closureReason excede o tamanho máximo.");
+  }
+
+  return {
+    dogId,
+    caseId,
+    operationId,
+    expectedRevision,
+    closureReason: trimmed,
+  };
+}
+
+interface HealthReopenClinicalCaseInput {
+  readonly dogId: string;
+  readonly caseId: string;
+  readonly operationId: string;
+  readonly expectedRevision: number;
+  readonly destination: ClinicalCaseStatus;
+  readonly reopenReason: string;
+}
+
+export function parseReopenCaseRequest(
+  raw: unknown,
+): HealthReopenClinicalCaseInput {
+  if (!isPlainObject(raw)) {
+    throw logicError("validation", "Payload deve ser um objeto.");
+  }
+  rejectServerManagedInjection(raw, [
+    "destination",
+    "targetStatus",
+    "target_status",
+    "reopenReason",
+    "reopen_reason",
+  ]);
+  rejectUnknownCaseMutationKeys(raw, CASE_REOPEN_ALLOWED_KEYS);
+
+  const dogId = assertDogId(raw.dogId ?? raw.dog_id);
+  const caseId = assertPathId(raw.caseId ?? raw.case_id, "caseId");
+  const operationId = normalizeOperationId(
+    raw.operationId ?? raw.operation_id ?? raw.idempotencyKey,
+  );
+  const expectedRevision = parseExpectedRevision(
+    raw.expectedRevision ?? raw.expected_revision,
+  );
+
+  const destRaw = raw.destination ?? raw.targetStatus ?? raw.target_status;
+  if (!destRaw) {
+    throw logicError("validation", "destination é obrigatório.");
+  }
+  const destination = parseClinicalCaseStatus(destRaw);
+
+  const reasonRaw = raw.reopenReason ?? raw.reopen_reason;
+  if (reasonRaw === undefined || reasonRaw === null) {
+    throw logicError("validation", "reopenReason é obrigatório.");
+  }
+  if (typeof reasonRaw !== "string") {
+    throw logicError("validation", "reopenReason deve ser uma string.");
+  }
+  const trimmed = reasonRaw.trim();
+  if (trimmed.length === 0) {
+    throw logicError("validation", "reopenReason não pode ser vazio.");
+  }
+  if (trimmed.length > MAX_REASON_LEN) {
+    throw logicError("validation", "reopenReason excede o tamanho máximo.");
+  }
+
+  return {
+    dogId,
+    caseId,
+    operationId,
+    expectedRevision,
+    destination,
+    reopenReason: trimmed,
+  };
+}
+
+export async function runHealthTransitionClinicalCase(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+  nowDate: Date = new Date(),
+): Promise<ClinicalCaseLifecycleResponse | undefined> {
+  try {
+    const caller = await deps.requireManageClinicalCase(request.auth);
+    const input = parseTransitionCaseRequest(request.data);
+    const {dogId, caseId, operationId, destination} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+
+    const fingerprint = fingerprintTransitionCaseIntent({
+      dogId,
+      caseId,
+      destination,
+    });
+
+    const cRef = caseRef(deps.db, dogId, caseId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        caseAuditDocId(
+          CLINICAL_CASE_TRANSITION_OPERATION,
+          dogId,
+          caseId,
+          operationId,
+        ),
+      );
+
+    const nowTimestamp = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [caseSnap, opSnap] = await Promise.all([
+        tx.get(cRef),
+        tx.get(opRef),
+      ]);
+
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_CASE_TRANSITION_KIND,
+          CLINICAL_CASE_TRANSITION_OPERATION,
+        );
+        const match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_CASE_TRANSITION_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+        if (match === "idempotency-conflict") {
+          throw logicError(
+            "idempotency-conflict",
+            "Mesma operationId com intenção diferente da transição original.",
+          );
+        }
+        if (match === "replay") {
+          const rev = receiptResultRevision(stored);
+          return lifecycleCaseResponse({
+            dogId,
+            caseId,
+            clinicalStatus: destination,
+            revision: rev,
+            wasNoOp: true,
+          });
+        }
+      }
+
+      if (!caseSnap.exists) {
+        throw logicError("not-found", "Caso clínico não encontrado.");
+      }
+      const storedCase = (caseSnap.data() ?? {}) as JsonMap;
+
+      // Stored aggregate integrity BEFORE stale
+      const storedIntegrity = assertStoredCaseIntegrity(storedCase);
+
+      // OCC freshness
+      assertFreshRevision(storedIntegrity.revision, input.expectedRevision);
+
+      // Command eligibility (10 active-to-active pairs only; no same status, no terminal destination)
+      if (storedIntegrity.status === destination) {
+        throw logicError(
+          "conflict",
+          `Transição ${storedIntegrity.status} → ${destination} não permitida (mesmo status).`,
+        );
+      }
+      if (isTerminalCaseStatus(destination)) {
+        throw logicError(
+          "conflict",
+          `Transição genérica não aceita destino terminal (${destination}): use discharge ou cancel.`,
+        );
+      }
+      assertCaseTransition(storedIntegrity.status, destination);
+
+      const resultingRevision = nextRevision(storedIntegrity.revision);
+
+      tx.update(cRef, {
+        clinical_status: destination,
+        revision: resultingRevision,
+        updated_at: nowTimestamp,
+      });
+
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_CASE_TRANSITION_KIND,
+          operationType: CLINICAL_CASE_TRANSITION_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {
+            dogId,
+            caseId,
+            clinicalStatus: destination,
+            revision: resultingRevision,
+          },
+        }),
+      );
+
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_case_transitioned",
+          caller,
+          entityType: "clinical_cases",
+          entityId: caseId,
+          entityPath: canonicalCasePath(dogId, caseId),
+          summary: `Transição do caso clínico ${caseId} do K9 ${dogId} para ${destination}`,
+          metadata: {
+            case_id: caseId,
+            dog_id: dogId,
+            clinical_status: destination,
+            case_revision: resultingRevision,
+            operation_id: operationId,
+          },
+        }),
+      );
+
+      return lifecycleCaseResponse({
+        dogId,
+        caseId,
+        clinicalStatus: destination,
+        revision: resultingRevision,
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+export async function runHealthDischargeClinicalCase(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+  nowDate: Date = new Date(),
+): Promise<ClinicalCaseLifecycleResponse | undefined> {
+  try {
+    const caller = await deps.requireManageClinicalCase(request.auth);
+    const input = parseDischargeCaseRequest(request.data);
+    const {dogId, caseId, operationId, closureReason} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintDischargeCaseIntent({
+      dogId,
+      caseId,
+      closureReason: closureReason ?? null,
+    });
+
+    const cRef = caseRef(deps.db, dogId, caseId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        caseAuditDocId(
+          CLINICAL_CASE_DISCHARGE_OPERATION,
+          dogId,
+          caseId,
+          operationId,
+        ),
+      );
+
+    const nowTimestamp = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [caseSnap, opSnap] = await Promise.all([
+        tx.get(cRef),
+        tx.get(opRef),
+      ]);
+
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_CASE_DISCHARGE_KIND,
+          CLINICAL_CASE_DISCHARGE_OPERATION,
+        );
+        const match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_CASE_DISCHARGE_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+        if (match === "idempotency-conflict") {
+          throw logicError(
+            "idempotency-conflict",
+            "Mesma operationId com intenção diferente da alta original.",
+          );
+        }
+        if (match === "replay") {
+          const rev = receiptResultRevision(stored);
+          return lifecycleCaseResponse({
+            dogId,
+            caseId,
+            clinicalStatus: "discharged",
+            revision: rev,
+            wasNoOp: true,
+          });
+        }
+      }
+
+      if (!caseSnap.exists) {
+        throw logicError("not-found", "Caso clínico não encontrado.");
+      }
+      const storedCase = (caseSnap.data() ?? {}) as JsonMap;
+
+      // Stored aggregate integrity BEFORE stale
+      const storedIntegrity = assertStoredCaseIntegrity(storedCase);
+
+      // OCC freshness
+      assertFreshRevision(storedIntegrity.revision, input.expectedRevision);
+
+      // Eligibility: only active cases may be discharged
+      if (isTerminalCaseStatus(storedIntegrity.status)) {
+        throw logicError(
+          "conflict",
+          `Caso com status terminal (${storedIntegrity.status}) não pode receber alta.`,
+        );
+      }
+
+      const resultingRevision = nextRevision(storedIntegrity.revision);
+      const actor = recordedByPayload(caller, isAdmin);
+
+      const updatePayload: JsonMap = {
+        clinical_status: "discharged",
+        closed_at: nowTimestamp,
+        closed_by: actor,
+        closure_type: "discharge",
+        revision: resultingRevision,
+        updated_at: nowTimestamp,
+      };
+      if (closureReason !== undefined) {
+        updatePayload.closure_reason = closureReason;
+      }
+
+      tx.update(cRef, updatePayload);
+
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_CASE_DISCHARGE_KIND,
+          operationType: CLINICAL_CASE_DISCHARGE_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {
+            dogId,
+            caseId,
+            clinicalStatus: "discharged",
+            revision: resultingRevision,
+          },
+        }),
+      );
+
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_case_discharged",
+          caller,
+          entityType: "clinical_cases",
+          entityId: caseId,
+          entityPath: canonicalCasePath(dogId, caseId),
+          summary: `Alta concedida no caso clínico ${caseId} do K9 ${dogId}`,
+          metadata: {
+            case_id: caseId,
+            dog_id: dogId,
+            clinical_status: "discharged",
+            case_revision: resultingRevision,
+            operation_id: operationId,
+          },
+        }),
+      );
+
+      return lifecycleCaseResponse({
+        dogId,
+        caseId,
+        clinicalStatus: "discharged",
+        revision: resultingRevision,
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+export async function runHealthCancelClinicalCase(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+  nowDate: Date = new Date(),
+): Promise<ClinicalCaseLifecycleResponse | undefined> {
+  try {
+    const caller = await deps.requireManageClinicalCase(request.auth);
+    const input = parseCancelCaseRequest(request.data);
+    const {dogId, caseId, operationId, closureReason} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintCancelCaseIntent({
+      dogId,
+      caseId,
+      closureReason,
+    });
+
+    const cRef = caseRef(deps.db, dogId, caseId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        caseAuditDocId(
+          CLINICAL_CASE_CANCEL_OPERATION,
+          dogId,
+          caseId,
+          operationId,
+        ),
+      );
+
+    const nowTimestamp = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [caseSnap, opSnap] = await Promise.all([
+        tx.get(cRef),
+        tx.get(opRef),
+      ]);
+
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_CASE_CANCEL_KIND,
+          CLINICAL_CASE_CANCEL_OPERATION,
+        );
+        const match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_CASE_CANCEL_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+        if (match === "idempotency-conflict") {
+          throw logicError(
+            "idempotency-conflict",
+            "Mesma operationId com intenção diferente do cancelamento original.",
+          );
+        }
+        if (match === "replay") {
+          const rev = receiptResultRevision(stored);
+          return lifecycleCaseResponse({
+            dogId,
+            caseId,
+            clinicalStatus: "cancelled",
+            revision: rev,
+            wasNoOp: true,
+          });
+        }
+      }
+
+      if (!caseSnap.exists) {
+        throw logicError("not-found", "Caso clínico não encontrado.");
+      }
+      const storedCase = (caseSnap.data() ?? {}) as JsonMap;
+
+      // Stored aggregate integrity BEFORE stale
+      const storedIntegrity = assertStoredCaseIntegrity(storedCase);
+
+      // OCC freshness
+      assertFreshRevision(storedIntegrity.revision, input.expectedRevision);
+
+      // Eligibility: only active cases may be cancelled
+      if (isTerminalCaseStatus(storedIntegrity.status)) {
+        throw logicError(
+          "conflict",
+          `Caso com status terminal (${storedIntegrity.status}) não pode ser cancelado.`,
+        );
+      }
+
+      const resultingRevision = nextRevision(storedIntegrity.revision);
+      const actor = recordedByPayload(caller, isAdmin);
+
+      tx.update(cRef, {
+        clinical_status: "cancelled",
+        closed_at: nowTimestamp,
+        closed_by: actor,
+        closure_type: "cancelled",
+        closure_reason: closureReason,
+        revision: resultingRevision,
+        updated_at: nowTimestamp,
+      });
+
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_CASE_CANCEL_KIND,
+          operationType: CLINICAL_CASE_CANCEL_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {
+            dogId,
+            caseId,
+            clinicalStatus: "cancelled",
+            revision: resultingRevision,
+          },
+        }),
+      );
+
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_case_cancelled",
+          caller,
+          entityType: "clinical_cases",
+          entityId: caseId,
+          entityPath: canonicalCasePath(dogId, caseId),
+          summary: `Caso clínico ${caseId} do K9 ${dogId} cancelado`,
+          metadata: {
+            case_id: caseId,
+            dog_id: dogId,
+            clinical_status: "cancelled",
+            case_revision: resultingRevision,
+            operation_id: operationId,
+          },
+        }),
+      );
+
+      return lifecycleCaseResponse({
+        dogId,
+        caseId,
+        clinicalStatus: "cancelled",
+        revision: resultingRevision,
+        wasNoOp: false,
+      });
+    });
+  } catch (err) {
+    mapClinicalError(err);
+  }
+}
+
+export async function runHealthReopenClinicalCase(
+  request: CallableRequest,
+  deps: ClinicalCaseCallableDeps,
+  nowDate: Date = new Date(),
+): Promise<ClinicalCaseLifecycleResponse | undefined> {
+  try {
+    const caller = await deps.requireReopenClinicalCase(request.auth);
+    const input = parseReopenCaseRequest(request.data);
+    const {dogId, caseId, operationId, destination, reopenReason} = input;
+
+    const dog = await loadDog(deps.db, dogId);
+    await deps.requireDogAccess(request.auth, caller, dogId, dog);
+    const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
+
+    const fingerprint = fingerprintReopenCaseIntent({
+      dogId,
+      caseId,
+      destination,
+      reopenReason,
+    });
+
+    const cRef = caseRef(deps.db, dogId, caseId);
+    const opRef = caseOperationRef(deps.db, dogId, caseId, operationId);
+    const auditRef = deps.db
+      .collection("auditLogs")
+      .doc(
+        caseAuditDocId(
+          CLINICAL_CASE_REOPEN_OPERATION,
+          dogId,
+          caseId,
+          operationId,
+        ),
+      );
+
+    const nowTimestamp = Timestamp.fromDate(nowDate);
+
+    return await deps.db.runTransaction(async (tx) => {
+      const [caseSnap, opSnap] = await Promise.all([
+        tx.get(cRef),
+        tx.get(opRef),
+      ]);
+
+      if (opSnap.exists) {
+        const stored = (opSnap.data() ?? {}) as JsonMap;
+        assertClinicalReceiptShape(
+          stored,
+          CLINICAL_CASE_REOPEN_KIND,
+          CLINICAL_CASE_REOPEN_OPERATION,
+        );
+        const match = matchClinicalReceipt({
+          receiptExists: true,
+          storedActorUid: stringValue(stored.actor_uid),
+          storedOperationType: stringValue(stored.operation_type),
+          storedFingerprint: stringValue(stored.fingerprint),
+          expectedOperationType: CLINICAL_CASE_REOPEN_OPERATION,
+          actorUid: caller.uid,
+          fingerprint,
+        });
+        if (match === "idempotency-conflict") {
+          throw logicError(
+            "idempotency-conflict",
+            "Mesma operationId com intenção diferente da reabertura original.",
+          );
+        }
+        if (match === "replay") {
+          const rev = receiptResultRevision(stored);
+          return lifecycleCaseResponse({
+            dogId,
+            caseId,
+            clinicalStatus: destination,
+            revision: rev,
+            wasNoOp: true,
+          });
+        }
+      }
+
+      if (!caseSnap.exists) {
+        throw logicError("not-found", "Caso clínico não encontrado.");
+      }
+      const storedCase = (caseSnap.data() ?? {}) as JsonMap;
+
+      // Stored aggregate integrity BEFORE stale
+      const storedIntegrity = assertStoredCaseIntegrity(storedCase);
+
+      // OCC freshness
+      assertFreshRevision(storedIntegrity.revision, input.expectedRevision);
+
+      // Eligibility: only discharged cases may be reopened into allowed destinations
+      const reopenIntent = assertCaseReopen(
+        storedIntegrity.status,
+        destination,
+        reopenReason,
+      );
+
+      const resultingRevision = nextRevision(storedIntegrity.revision);
+      const actor = recordedByPayload(caller, isAdmin);
+      const prevCount = storedIntegrity.reopenHistory?.reopenedCount ?? 0;
+
+      tx.update(cRef, {
+        clinical_status: reopenIntent.destination,
+        closed_at: FieldValue.delete(),
+        closed_by: FieldValue.delete(),
+        closure_type: FieldValue.delete(),
+        closure_reason: FieldValue.delete(),
+        reopened_at: nowTimestamp,
+        reopened_by: actor,
+        previous_status: "discharged",
+        reopen_reason: reopenIntent.reason,
+        reopened_count: prevCount + 1,
+        revision: resultingRevision,
+        updated_at: nowTimestamp,
+      });
+
+      tx.set(
+        opRef,
+        receiptPayload({
+          kind: CLINICAL_CASE_REOPEN_KIND,
+          operationType: CLINICAL_CASE_REOPEN_OPERATION,
+          operationId,
+          actorUid: caller.uid,
+          fingerprint,
+          result: {
+            dogId,
+            caseId,
+            clinicalStatus: reopenIntent.destination,
+            revision: resultingRevision,
+          },
+        }),
+      );
+
+      tx.set(
+        auditRef,
+        auditLogPayload({
+          action: "clinical_case_reopened",
+          caller,
+          entityType: "clinical_cases",
+          entityId: caseId,
+          entityPath: canonicalCasePath(dogId, caseId),
+          summary: `Caso clínico ${caseId} do K9 ${dogId} reaberto para ${reopenIntent.destination}`,
+          metadata: {
+            case_id: caseId,
+            dog_id: dogId,
+            clinical_status: reopenIntent.destination,
+            case_revision: resultingRevision,
+            operation_id: operationId,
+          },
+        }),
+      );
+
+      return lifecycleCaseResponse({
+        dogId,
+        caseId,
+        clinicalStatus: reopenIntent.destination,
         revision: resultingRevision,
         wasNoOp: false,
       });

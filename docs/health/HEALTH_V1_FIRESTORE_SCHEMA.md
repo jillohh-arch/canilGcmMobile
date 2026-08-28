@@ -305,6 +305,47 @@ fail-open gratuito. Não "harmonizar" com Schedule.
 - **não** implica ordem de commit;
 - **não** participa da decisão fresco/obsoleto.
 
+#### 2.1.3 Writers canônicos de ciclo de vida do ClinicalCase (CONGELADO — CLIN-WRITER-1.W6.I1)
+
+Quatro callables dedicados executam mutações de ciclo de vida do `ClinicalCase`.
+Todas as operações de ciclo de vida são **CASE-ONLY** (não geram `ClinicalEvent`
+automático; `event_count`, `last_event_at` e `opening_event_id` permanecem intactos).
+
+| Comando | Callable | Capability requerida | Origem válida | Destino válido |
+|---|---|---|---|---|
+| **TRANSITION** | `healthTransitionClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | Ativo (10 pares canônicos) |
+| **DISCHARGE** | `healthDischargeClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | `discharged` |
+| **CANCEL** | `healthCancelClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | `cancelled` |
+| **REOPEN** | `healthReopenClinicalCase` | `health.reopen_clinical_case` | `discharged` apenas | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) |
+
+**Matriz de Transições Canônica:**
+- **Ativo → Ativo (10 pares):**
+  - `open` → `under_investigation`, `under_treatment`, `monitoring`
+  - `under_investigation` → `open`, `under_treatment`, `monitoring`
+  - `under_treatment` → `under_investigation`, `monitoring`
+  - `monitoring` → `under_investigation`, `under_treatment`
+- **Ativo → Fechado (Discharge / Cancel):**
+  - `open`, `under_investigation`, `under_treatment`, `monitoring` → `discharged` (via `healthDischargeClinicalCase`)
+  - `open`, `under_investigation`, `under_treatment`, `monitoring` → `cancelled` (via `healthCancelClinicalCase`)
+- **Fechado → Ativo (Reopen):**
+  - `discharged` → `open`, `under_investigation`, `under_treatment`, `monitoring` (via `healthReopenClinicalCase`)
+- **Terminal (Cancelled):**
+  - `cancelled` possui 0 saídas. Nenhuma transição permitida.
+
+**Propriedades Normativas de Execução:**
+- **Integridade antes do stale:** Toda mutação valida a integridade do agregado
+  armazenado (`assertStoredCaseIntegrity`: status, revision, closure, reopen
+  history, atores) ANTES de validar a precondição de concorrência `expectedRevision`.
+- **Replay antes do stale:** Receipts idempotentes armazenados sob
+  `dogs/{dogId}/clinical_cases/{caseId}/operations/{operationId}` são avaliados
+  antes da frescura do token OCC.
+- **Deleção na Reabertura:** `healthReopenClinicalCase` deleta atomicamente todos
+  os 4 campos de fechamento (`closed_at`, `closed_by`, `closure_type`,
+  `closure_reason`) via `FieldValue.delete()`.
+- **Audit Logs:** Cada comando grava deterministicamente uma entrada em
+  `auditLogs` (`clinical_case_transitioned`, `clinical_case_discharged`,
+  `clinical_case_cancelled`, `clinical_case_reopened`).
+
 ---
 
 ### 2.2 clinical_cases/{caseId}/clinical_events/{eventId}

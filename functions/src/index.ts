@@ -60,9 +60,13 @@ import {
   ClinicalCaller,
   runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
+  runHealthCancelClinicalCase,
   runHealthCancelClinicalEvent,
+  runHealthDischargeClinicalCase,
   runHealthFinalizeClinicalEvent,
   runHealthOpenClinicalCase,
+  runHealthReopenClinicalCase,
+  runHealthTransitionClinicalCase,
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
 import {
@@ -8371,6 +8375,16 @@ const clinicalCaseDeps: ClinicalCaseCallableDeps = {
   ) => toClinicalCaller(
     await requireClinicalCapability(auth, "amend_clinical"),
   ),
+  requireManageClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "manage_clinical_case"),
+  ),
+  requireReopenClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "reopen_clinical_case"),
+  ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
     caller: ClinicalCaller,
@@ -8434,6 +8448,34 @@ export const healthCancelClinicalEvent = onCall({region}, async (request) => {
  */
 export const healthAmendClinicalEvent = onCall({region}, async (request) => {
   return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Transiciona o status de um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthTransitionClinicalCase = onCall({region}, async (request) => {
+  return runHealthTransitionClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Concede alta a um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthDischargeClinicalCase = onCall({region}, async (request) => {
+  return runHealthDischargeClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthCancelClinicalCase = onCall({region}, async (request) => {
+  return runHealthCancelClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Reabre um ClinicalCase encerrado (health.reopen_clinical_case + dog access).
+ */
+export const healthReopenClinicalCase = onCall({region}, async (request) => {
+  return runHealthReopenClinicalCase(request, clinicalCaseDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
