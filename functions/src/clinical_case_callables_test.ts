@@ -3857,13 +3857,18 @@ async function testLifecycleTransitionActiveMatrix(): Promise<void> {
     wasNoOp: false,
   });
 
-  // Replay t1
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const caseAfterT1 = {...caseOf(db, casePath)};
+  const opsAfterT1 = opKeys(db, casePath).length;
+  const auditsAfterT1 = auditKeys(db).length;
+
+  // Replay t1 com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const t1Replay = await runHealthTransitionClinicalCase(
     mockRequest({
       dogId: "dog-1",
       caseId,
       operationId: "op-t1",
-      expectedRevision: 1,
+      expectedRevision: 99,
       destination: "under_investigation",
     }),
     depsFor({db, now: T1}),
@@ -3875,6 +3880,9 @@ async function testLifecycleTransitionActiveMatrix(): Promise<void> {
     revision: 2,
     wasNoOp: true,
   });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterT1);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterT1);
+  assert.strictEqual(auditKeys(db).length, auditsAfterT1);
 
   // Idempotency conflict on op-t1
   await expectReject(
@@ -4025,7 +4033,8 @@ async function testLifecycleDischarge(): Promise<void> {
     wasNoOp: false,
   });
 
-  const cDoc = caseOf(db, canonicalCasePath("dog-1", caseId));
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const cDoc = caseOf(db, casePath);
   assert.strictEqual(cDoc.clinical_status, "discharged");
   assert.strictEqual(cDoc.closure_type, "discharge");
   assert.strictEqual(cDoc.closure_reason, "Paciente 100% recuperado do quadro clínico");
@@ -4037,13 +4046,17 @@ async function testLifecycleDischarge(): Promise<void> {
     internal_role: "condutor",
   });
 
-  // Replay
+  const caseAfterDischarge = {...caseOf(db, casePath)};
+  const opsAfterDischarge = opKeys(db, casePath).length;
+  const auditsAfterDischarge = auditKeys(db).length;
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const dReplay = await runHealthDischargeClinicalCase(
     mockRequest({
       dogId: "dog-1",
       caseId,
       operationId: "op-dc-1",
-      expectedRevision: 1,
+      expectedRevision: 99,
       closureReason: "Paciente 100% recuperado do quadro clínico",
     }),
     depsFor({db, now: T1}),
@@ -4055,6 +4068,9 @@ async function testLifecycleDischarge(): Promise<void> {
     revision: 2,
     wasNoOp: true,
   });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterDischarge);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterDischarge);
+  assert.strictEqual(auditKeys(db).length, auditsAfterDischarge);
 
   // Idempotency conflict
   await expectReject(
@@ -4131,7 +4147,8 @@ async function testLifecycleCancelCase(): Promise<void> {
     wasNoOp: false,
   });
 
-  const cDoc = caseOf(db, canonicalCasePath("dog-1", caseId));
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const cDoc = caseOf(db, casePath);
   assert.strictEqual(cDoc.clinical_status, "cancelled");
   assert.strictEqual(cDoc.closure_type, "cancelled");
   assert.strictEqual(cDoc.closure_reason, "Abertura realizada em duplicidade pelo condutor");
@@ -4142,18 +4159,47 @@ async function testLifecycleCancelCase(): Promise<void> {
     internal_role: "admin",
   });
 
-  // Replay
+  const caseAfterCancel = {...caseOf(db, casePath)};
+  const opsAfterCancel = opKeys(db, casePath).length;
+  const auditsAfterCancel = auditKeys(db).length;
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const cReplay = await runHealthCancelClinicalCase(
     mockRequest({
       dogId: "dog-1",
       caseId,
       operationId: "op-cc-1",
-      expectedRevision: 1,
+      expectedRevision: 99,
       closureReason: "Abertura realizada em duplicidade pelo condutor",
     }),
     depsFor({db, now: T1, admin: true}),
   );
-  assert.strictEqual(cReplay?.wasNoOp, true);
+  assert.deepStrictEqual(cReplay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "cancelled",
+    revision: 2,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterCancel);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterCancel);
+  assert.strictEqual(auditKeys(db).length, auditsAfterCancel);
+
+  // Idempotency conflict on op-cc-1 (motivo divergente)
+  await expectReject(
+    () => runHealthCancelClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-cc-1",
+        expectedRevision: 1,
+        closureReason: "Outro motivo divergente de cancelamento",
+      }),
+      depsFor({db, now: T1, admin: true}),
+    ),
+    "idempotency-conflict",
+    "cancelamento com motivo divergente",
+  );
 
   // Cancelled case cannot be transitioned or cancelled again
   await expectReject(
@@ -4270,19 +4316,66 @@ async function testLifecycleReopen(): Promise<void> {
   assert.strictEqual(cDoc.closure_type, undefined);
   assert.strictEqual(cDoc.closure_reason, undefined);
 
-  // Replay
+  const caseAfterReopen = {...caseOf(db, casePath)};
+  const opsAfterReopen = opKeys(db, casePath).length;
+  const auditsAfterReopen = auditKeys(db).length;
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const rReplay = await runHealthReopenClinicalCase(
     mockRequest({
       dogId: "dog-1",
       caseId,
       operationId: "op-reopen-1",
-      expectedRevision: 2,
+      expectedRevision: 99,
       destination: "under_investigation",
       reopenReason: "Recidiva dos sintomas observada em patrulhamento",
     }),
     depsFor({db, now: T2}),
   );
-  assert.strictEqual(rReplay?.wasNoOp, true);
+  assert.deepStrictEqual(rReplay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "under_investigation",
+    revision: 3,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterReopen);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterReopen);
+  assert.strictEqual(auditKeys(db).length, auditsAfterReopen);
+
+  // Idempotency conflict on op-reopen-1 (destino divergente)
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-1",
+        expectedRevision: 2,
+        destination: "open",
+        reopenReason: "Recidiva dos sintomas observada em patrulhamento",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "idempotency-conflict",
+    "reabertura com destino divergente",
+  );
+
+  // Idempotency conflict on op-reopen-1 (motivo divergente)
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-1",
+        expectedRevision: 2,
+        destination: "under_investigation",
+        reopenReason: "Outro motivo de reabertura divergente",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "idempotency-conflict",
+    "reabertura com motivo divergente",
+  );
 
   // Second cycle: Discharge again (rev 3 -> rev 4)
   await runHealthDischargeClinicalCase(
