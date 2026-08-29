@@ -4737,7 +4737,14 @@ async function testLifecycleGuardsAndAuthorization(): Promise<void> {
 }
 
 async function testLifecycleCaseOnlyInvariants(): Promise<void> {
-  const db = dbWithDog();
+  const initialSummary: JsonMap = {
+    readiness_status: "in_training",
+    updated_at: "2026-08-01T00:00:00Z",
+  };
+  const summaryPath = "dogs/dog-1/health_summary/current";
+  const db = dbWithDog({
+    [summaryPath]: initialSummary,
+  });
   const openRes = (await runHealthOpenClinicalCase(
     mockRequest(validOpen),
     depsFor({db, now: FIXED_NOW}),
@@ -4800,6 +4807,14 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
     eventDocs.length,
     1,
     "Nenhum novo ClinicalEvent deve ter sido criado pelas operações de ciclo de vida",
+  );
+
+  // Verify readiness summary was NOT mutated/overwritten/merged by lifecycle writers
+  const finalSummary = db._store.get(summaryPath);
+  assert.deepStrictEqual(
+    finalSummary,
+    initialSummary,
+    "Resumo de prontidão (health_summary/current) não pode ser mutado por operações de ciclo de vida do caso clínico",
   );
 }
 
