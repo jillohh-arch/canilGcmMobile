@@ -118,9 +118,9 @@ class VaccinationPdf {
                     decoration: pw.BoxDecoration(
                       color: isVaccineOk
                           ? PdfInstitutionalColors.greenInstitutional.withAlpha(
-                              25,
+                              25 / 255,
                             )
-                          : PdfInstitutionalColors.redAlert.withAlpha(25),
+                          : PdfInstitutionalColors.redAlert.withAlpha(25 / 255),
                       border: pw.Border.all(
                         color: isVaccineOk
                             ? PdfInstitutionalColors.greenInstitutional
@@ -332,9 +332,11 @@ class VaccinationPdf {
         width: double.infinity,
         padding: const pw.EdgeInsets.all(10),
         decoration: pw.BoxDecoration(
-          color: PdfInstitutionalColors.greenInstitutional.withAlpha(15),
+          color: PdfInstitutionalColors.greenInstitutional.withAlpha(15 / 255),
           border: pw.Border.all(
-            color: PdfInstitutionalColors.greenInstitutional.withAlpha(50),
+            color: PdfInstitutionalColors.greenInstitutional.withAlpha(
+              50 / 255,
+            ),
           ),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
         ),
@@ -380,8 +382,8 @@ class VaccinationPdf {
           margin: const pw.EdgeInsets.only(bottom: 6),
           padding: const pw.EdgeInsets.all(10),
           decoration: pw.BoxDecoration(
-            color: color.withAlpha(15),
-            border: pw.Border.all(color: color.withAlpha(50)),
+            color: color.withAlpha(15 / 255),
+            border: pw.Border.all(color: color.withAlpha(50 / 255)),
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
           ),
           child: pw.Row(

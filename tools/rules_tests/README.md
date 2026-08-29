@@ -24,6 +24,7 @@ Esta pasta contém uma bateria mínima de testes server-side para provar que reg
 - Upload válido de evidência no Storage é aceito.
 - Upload de evidência com tipo inválido é recusado.
 - Exclusão de evidência no Storage é recusada.
+- `health_schedule` (Health v1 / 4D): ver `health_schedule_rules_tests.mjs` — leitura com `signedIn + canAccessDogRecord`; writes cliente negados; query operacional `lifecycle_status + scheduled_for + documentId`; escopo `own_records` e admin.
 
 ## Como rodar
 
@@ -38,6 +39,19 @@ Alternativa, se `firebase` estiver no `PATH`:
 ```powershell
 cd tools\rules_tests
 npm test
+```
+
+### Health schedule (4D) — suite dedicada
+
+```powershell
+cd tools\rules_tests
+npm run test:health-schedule
+```
+
+Ou na raiz:
+
+```powershell
+& 'C:\npm-global\firebase.cmd' emulators:exec --project canil-gcm --config firebase.json --only firestore "node tools/rules_tests/health_schedule_rules_tests.mjs"
 ```
 
 ## Dependências

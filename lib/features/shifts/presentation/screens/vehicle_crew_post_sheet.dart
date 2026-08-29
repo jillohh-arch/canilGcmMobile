@@ -12,6 +12,8 @@ import 'package:canil_gcm/features/shifts/data/vehicle_service.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/domain/shift_authorization.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/shift_authorization_prompts.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 
@@ -479,6 +481,57 @@ class _PostBoardStep extends StatelessWidget {
     await shiftVM.assumeVehicle(vehicle, role: role, name: memberName);
 
     if (!context.mounted) return;
+
+    // HEALTH-V1-OP-AUTH: assumir posto embarca o K9 na guarnição, então a
+    // decisão do backend precisa ser apresentada pela natureza real — um
+    // bloqueio clínico não pode aparecer como texto de erro genérico.
+    final failure = shiftVM.authorizationFailure;
+    if (failure != null) {
+      final dogName = shiftVM.activeDogId ?? 'o K9 do turno';
+      if (failure.isClinicalBlock) {
+        await ShiftAuthorizationPrompts.showBlocked(
+          context,
+          dogName: dogName,
+          failure: failure,
+        );
+      } else if (failure.kind ==
+          ShiftAuthorizationFailureKind.acknowledgementRequired) {
+        final acknowledged = await ShiftAuthorizationPrompts.confirmPartial(
+          context,
+          dogName: dogName,
+          failure: failure,
+        );
+        if (acknowledged) {
+          final authorized = await shiftVM.acknowledgePartialRestrictions();
+          if (!context.mounted) return;
+          if (authorized) {
+            AppFeedback.success(
+              context,
+              'Posto de $roleLabel assumido na ${vehicle.label}.',
+            );
+            shiftVM.clearAuthorizationFeedback();
+            Navigator.pop(context);
+            return;
+          }
+          final retryFailure = shiftVM.authorizationFailure;
+          if (retryFailure != null) {
+            ShiftAuthorizationPrompts.showFailureMessage(
+              context,
+              dogName: dogName,
+              failure: retryFailure,
+            );
+          }
+        }
+      } else {
+        ShiftAuthorizationPrompts.showFailureMessage(
+          context,
+          dogName: dogName,
+          failure: failure,
+        );
+      }
+      shiftVM.clearAuthorizationFeedback();
+      return;
+    }
 
     final error = shiftVM.error;
     if (error != null) {

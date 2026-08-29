@@ -86,12 +86,36 @@ AGENDA
 
 NUTRIÇÃO
 
-- Plano
-- Consumo
-- Refeições
-- Suplementos
-- Observações
-- Histórico
+Contrato canônico (5A/5B): `nutrition_plans` / `meal_logs` / `supplement_logs`.
+Web define plano; Mobile executa via backend; zero dual-write novo.
+
+Subfases:
+
+```text
+5A — Auditoria do operacional legado          [ENCERRADA]
+5B — Decisões canônicas D1–D42                [ENCERRADA]
+5C — Foundation domínio + read/adapters       [próxima; ZERO write]
+5D — Writes canônicos de execução (callables)
+5E — Plano backend + fechamento mobile write de plano
+5F — UI Nutrição Hoje (shell + registro)
+5G — Inventário produção + backfill
+5H — Cutover e confronto final
+```
+
+Read model / UI:
+
+- estados `loading | data | empty | offline | error` (erro ≠ empty silencioso)
+- estado keyed por `dogId`
+- timezone domínio default `America/Sao_Paulo`
+
+Escopo de produto da fase:
+
+- Plano (consulta mobile; gestão Web/backend)
+- Consumo (offered/consumed/acceptance)
+- Refeições (slots + meal_occurrence_id)
+- Suplementos (regime no plano ≠ SupplementLog)
+- Observações (no MealLog)
+- Histórico (meals + admin logs + plano via timeline)
 
 ---
 
@@ -253,3 +277,23 @@ Memórias
 ↓
 Próxima fase
 ```
+
+---
+
+# Trilha canônica de Pesagem — APPROVED TARGET / NOT STARTED
+
+| Fase | Objetivo | Dependências | Deploy | APK | Risco | Gate |
+|---|---|---|---|---|---|---|
+| WEIGHT-01 | Domínio, schema e bridge | WEIGHT-00C/00D | Não | Não | Médio | contrato + unit |
+| WEIGHT-02 | Pesagem Rápida online | 01 | Functions | Sim | Alto | Emulator, Rules, Pixel |
+| WEIGHT-03 | Pesagem Oficial online | 02 | Functions | Sim | Alto | retroatividade/projeção |
+| WEIGHT-04 | Complementação e correção | 03 | Functions | Sim | Crítico | revisions/concurrency |
+| WEIGHT-05 | Invalidação e reprojeção | 04 | Functions | Sim | Crítico | recomputação integral |
+| WEIGHT-06 | Imagens e HealthDocument | 05 | Functions/Storage Rules | Sim | Alto | dedupe/retenção/falha parcial |
+| WEIGHT-07 | Faixa, meta, alertas e BCS | 05 | Functions/Web | Sim | Alto | nenhuma restrição automática |
+| WEIGHT-08 | Offline e sincronização | 02–07 | Não necessariamente | Sim | Crítico | relógio/multi-device/security soak |
+| WEIGHT-09 | Histórico, filtros, gráficos e Web | 03–08 | Web | Sim | Médio | paridade dos readers |
+| WEIGHT-10 | Clínica, nutrição e agenda | 07–09 | Functions/Web | Sim | Alto | nenhuma mutação implícita |
+| WEIGHT-11 | Migração e homologação física | Todas | Controlado | Sim | Crítico | dry-run + reconciliação + rollback |
+
+Nenhuma fase desta trilha foi iniciada por WEIGHT-00C.

@@ -334,7 +334,10 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                       ),
                     ),
                     Text(
-                      '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
+                      // WEIGHT-01E-R: `dogs.weight` é projeção legada e não é
+                      // exibida como peso clínico. Sem a decisão canônica
+                      // disponível nesta página, informa ausência.
+                      '—',
                       style: GoogleFonts.inter(
                         color: AppTheme.textPrimary,
                         fontSize: 10,
@@ -429,8 +432,9 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
     final antipulgasOk = antipulgasDays <= 90;
     final antipulgasDaysRemaining = (90 - antipulgasDays).clamp(0, 90);
 
-    // 3. Peso
-    final weightOk = widget.dog.weight != null;
+    // 3. Peso — WEIGHT-01E-R: não há flag de peso aqui. A presença de
+    // `dogs.weight` (projeção legada) não é evidência de pesagem e não pode
+    // produzir status clínico "ok"; esta página não resolve `weight_records`.
 
     // 4. Exames
     final examesLogs =
@@ -489,9 +493,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             _buildMedCard(
               icon: '⚖',
               label: 'PESO',
-              value: '${widget.dog.weight?.toStringAsFixed(1) ?? '28.0'} kg',
-              sub: 'Estável · últimos 3 meses',
-              status: weightOk ? _CardStatus.ok : _CardStatus.warn,
+              // WEIGHT-01E-R: `dogs.weight` é projeção legada, não peso clínico.
+              // Este card não resolve `weight_records`, então não afirma valor
+              // nem status "ok": encaminha para a tela com a decisão canônica.
+              value: '—',
+              sub: 'Ver histórico de pesagens',
+              status: _CardStatus.warn,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => WeightHistoryScreen(dog: widget.dog),
@@ -1031,7 +1038,12 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date)); // Oldest first for chart
 
-    final currentWeight = widget.dog.weight ?? 28.0;
+    // WEIGHT-01E-R: `dogs.weight` é projeção legada e NÃO é autoridade de peso
+    // clínico atual. Esta página não lê `weight_records`, portanto não possui a
+    // decisão da WeightCollectionPolicy e não pode afirmar um peso atual — nem
+    // mesmo "o último conhecido". O valor canônico vive na tela de histórico
+    // (link 'Ver tudo →' abaixo), que resolve a coleção completa.
+    const double? currentWeight = null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1078,40 +1090,25 @@ class _K9ProfilePageState extends State<K9ProfilePage> {
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: currentWeight.toStringAsFixed(1),
+                          text: currentWeight == null
+                              ? 'Sem registro'
+                              : currentWeight.toStringAsFixed(1),
                           style: GoogleFonts.inter(
                             color: AppTheme.textPrimary,
-                            fontSize: 22,
+                            fontSize: currentWeight == null ? 15 : 22,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        TextSpan(
-                          text: ' kg',
-                          style: GoogleFonts.inter(
-                            color: AppTheme.textTertiary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        if (currentWeight != null)
+                          TextSpan(
+                            text: ' kg',
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textTertiary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
                       ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.success.withAlpha(31),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '→ Estável',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.success,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
                   ),
                 ],
@@ -1899,10 +1896,13 @@ class _MiniWeightChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Se não tiver dados suficientes, desenha uma linha simulada estável como no mockup
-    final List<double> values = logs.isNotEmpty
-        ? logs.map((l) => l.weight ?? 28.0).toList()
-        : const [27.0, 27.5, 28.0, 28.1, 28.0, 27.9, 28.0];
+    // WEIGHT-01E-C2B: sem série factual não desenha nada. A linha simulada
+    // anterior apresentava dado demonstrativo como evolução clínica real.
+    final List<double> values = logs
+        .map((l) => l.weight)
+        .whereType<double>()
+        .toList(growable: false);
+    if (values.length < 2) return;
 
     final double minVal = values.reduce((a, b) => a < b ? a : b) - 0.5;
     final double maxVal = values.reduce((a, b) => a > b ? a : b) + 0.5;

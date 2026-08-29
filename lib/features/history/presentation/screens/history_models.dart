@@ -208,12 +208,28 @@ class RecordDetail {
       'Local não informado',
     ]);
 
-    final author = _normalizeAuthor(entry.author);
-    final handlerName = _firstNonEmpty([
-      _detailValue(details, const ['Condutor', 'Responsável', 'Responsavel']),
-      author.replaceFirst('GCM ', ''),
-      'Ragonha',
-    ]);
+    // Pesagem recognized-legacy sem recorder chega com author vazio. Nesse
+    // caso a autoria permanece ausente: não aplicar o fallback padrão
+    // ('Ragonha'/'GCM ...'), não inventar condutor nem responsável técnico.
+    final isAuthorlessWeight =
+        details['_healthKind'] == 'weight' && entry.author.trim().isEmpty;
+
+    final author = isAuthorlessWeight ? '' : _normalizeAuthor(entry.author);
+    final handlerName = isAuthorlessWeight
+        ? _detailValue(details, const [
+            'Condutor',
+            'Responsável',
+            'Responsavel',
+          ])
+        : _firstNonEmpty([
+            _detailValue(details, const [
+              'Condutor',
+              'Responsável',
+              'Responsavel',
+            ]),
+            author.replaceFirst('GCM ', ''),
+            'Ragonha',
+          ]);
     final dogName = _firstNonEmpty([
       _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
       'Bono',
@@ -469,8 +485,15 @@ class RecordDetail {
     }
 
     final editedAt = entry.editedAt;
+    // Sem autor factual (ex.: pesagem legada sem recorder), o evento de criação
+    // não afirma autoria: usa 'Registro criado' em vez de 'Criado por <nome>'.
+    final hasAuthor = author.trim().isNotEmpty;
     return [
-      AuditEvent(timestamp: entry.time, action: 'Criado por', user: author),
+      AuditEvent(
+        timestamp: entry.time,
+        action: hasAuthor ? 'Criado por' : 'Registro criado',
+        user: author,
+      ),
       if (_hasMedia(entry))
         AuditEvent(
           timestamp: entry.time.add(const Duration(minutes: 14)),

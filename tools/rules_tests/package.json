@@ -4,10 +4,23 @@
   "type": "module",
   "scripts": {
     "test": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node rules_tests.mjs\"",
+    "test:health-schedule": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_schedule_rules_tests.mjs\"",
+    "test:health-schedule-cg": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_schedule_collection_group_rules_tests.mjs\"",
+    "test:health-schedule-cg-limits": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_schedule_cg_chunk_limit_tests.mjs\"",
+    "test:health-nutrition": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_nutrition_rules_tests.mjs\"",
+    "test:health-nutrition-readers": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore \"node health_nutrition_canonical_readers_emulator_tests.mjs\"",
+    "test:health-nutrition-callable-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node health_nutrition_callables_emulator_tests.mjs\"",
+    "test:health-timeline": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_timeline_rules_tests.mjs\"",
+    "test:health-readiness": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node health_readiness_rules_tests.mjs\"",
+    "test:clinical-read": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node clinical_read_rules_tests.mjs\"",
+    "test:health-document": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node health_document_rules_tests.mjs\"",
+    "test:shift-dog-provenance": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node shift_dog_provenance_rules_tests.mjs\"",
+    "test:shift-authorization-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node shift_authorization_callables_emulator_tests.mjs\"",
     "test:direct": "node rules_tests.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
-    "firebase": "^12.14.0"
+    "firebase": "^12.14.0",
+    "firebase-admin": "^13.10.0"
   }
 }

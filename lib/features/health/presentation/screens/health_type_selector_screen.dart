@@ -16,6 +16,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
   final Future<bool> Function(BuildContext context)? onRegisterWeight;
   final Future<bool> Function(BuildContext context)? onRegisterNutrition;
   final Future<bool> Function(BuildContext context)? onAttachDocument;
+  final Future<bool> Function(BuildContext context)? onRegisterRestriction;
 
   const HealthTypeSelectorScreen({
     super.key,
@@ -31,6 +32,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
     this.onRegisterWeight,
     this.onRegisterNutrition,
     this.onAttachDocument,
+    this.onRegisterRestriction,
   });
 
   @override
@@ -40,6 +42,7 @@ class HealthTypeSelectorScreen extends StatefulWidget {
 
 class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
   String? _selectedType;
+  bool _isContinuing = false;
 
   List<_HealthActionCategory> get _mainCategories => [
     const _HealthActionCategory(
@@ -52,8 +55,8 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     ),
     const _HealthActionCategory(
       id: 'weight',
-      label: 'Peso',
-      subtitle: 'Registrar nova pesagem',
+      label: 'Pesagem',
+      subtitle: 'Registrar peso corporal',
       icon: Icons.monitor_weight_rounded,
       color: AppTheme.primary,
       group: _HealthActionGroup.frequent,
@@ -108,7 +111,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     ),
     const _HealthActionCategory(
       id: 'symptom',
-      label: 'Sintoma observado',
+      label: 'Sintoma',
       subtitle: 'Adicionar reação ou sintoma',
       icon: Icons.warning_rounded,
       color: AppTheme.error,
@@ -120,6 +123,16 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       subtitle: 'Registrar procedimento cirúrgico',
       icon: Icons.healing_rounded,
       color: AppTheme.attention,
+      group: _HealthActionGroup.clinical,
+    ),
+    const _HealthActionCategory(
+      id: 'restriction',
+      // Rótulo curto por prova de layout: "Restrição Operacional" trunca em
+      // uma linha a 360dp. O título completo permanece dentro da tela.
+      label: 'Restrição',
+      subtitle: 'Registrar limitação operacional',
+      icon: Icons.gpp_maybe_outlined,
+      color: AppTheme.error,
       group: _HealthActionGroup.clinical,
     ),
     const _HealthActionCategory(
@@ -140,6 +153,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       'weight' => widget.onRegisterWeight != null,
       'nutrition' => widget.onRegisterNutrition != null,
       'document' => widget.onAttachDocument != null,
+      'restriction' => widget.onRegisterRestriction != null,
       _ => true,
     };
   }
@@ -149,6 +163,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
   }
 
   Future<void> _continueSelected() async {
+    if (_isContinuing) return;
     _HealthActionCategory? selected;
     for (final category in _categories) {
       if (category.id == _selectedType) {
@@ -159,6 +174,16 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     if (selected == null) return;
     final selectedId = selected.id;
 
+    setState(() => _isContinuing = true);
+
+    try {
+      await _openSelectedCategory(selectedId);
+    } finally {
+      if (mounted) setState(() => _isContinuing = false);
+    }
+  }
+
+  Future<void> _openSelectedCategory(String selectedId) async {
     if (selectedId == 'weight') {
       final saved = await widget.onRegisterWeight?.call(context) ?? false;
       if (!mounted) return;
@@ -175,6 +200,12 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
 
     if (selectedId == 'document') {
       final saved = await widget.onAttachDocument?.call(context) ?? false;
+      if (!mounted) return;
+      if (saved && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+    if (selectedId == 'restriction') {
+      final saved = await widget.onRegisterRestriction?.call(context) ?? false;
       if (!mounted) return;
       if (saved && widget.popOnSave) Navigator.pop(context, true);
       return;
@@ -353,7 +384,7 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
                           ),
                           elevation: _selectedType != null ? 4 : 0,
                         ),
-                        onPressed: _selectedType == null
+                        onPressed: _selectedType == null || _isContinuing
                             ? null
                             : _continueSelected,
                         child: Text(

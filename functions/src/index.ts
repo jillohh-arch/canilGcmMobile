@@ -21,6 +21,103 @@ import {
   HumanPersonnelTransaction,
   patchHumanPersonnel,
 } from "./admin_patch_human_personnel";
+import {
+  AccessScope,
+  AccessScopeResolution,
+  decideAccessScope,
+  parseAccessScope,
+} from "./access_scope";
+// CLIN-AUTH-BE-4A.I2.T0: os writers de access profile vivem no seam injetável.
+// A política (taxonomia de capability, tri-state, precondition, TOCTOU) tem
+// fonte ÚNICA lá; aqui ficam apenas o wiring de produção e o re-export de
+// `requireAccessScope`, que faz parte da superfície pública deste módulo.
+import {
+  requireAccessScope,
+  runAdminDuplicateAccessProfile,
+  runAdminSaveAccessProfile,
+  runAdminSeedAccessProfiles,
+  type AccessProfileAction,
+  type AccessProfileWriterDeps,
+} from "./access_profile_writer_callables";
+import {
+  runHealthScheduleCancel,
+  runHealthScheduleComplete,
+  runHealthScheduleCreateManual,
+  runHealthScheduleUpdateOpen,
+  ScheduleCaller,
+} from "./health_schedule_callables";
+import {
+  runHealthNutritionCreateMealLog,
+  runHealthNutritionCreateSupplementLog,
+  runHealthNutritionCreateAndActivatePlan,
+  runHealthNutritionUpdateActivePlan,
+  runHealthNutritionCancelPlan,
+  type HealthNutritionCallableDeps,
+} from "./health_nutrition_callables";
+import type {NutritionActor} from "./health_nutrition_engine";
+import {
+  buildHealthWeightCreateRecordHandler,
+  createAdminWeightEngineDeps,
+} from "./health_weight_callables";
+import {
+  DocumentCaller,
+  runHealthDocumentFinalizeUpload,
+  runHealthDocumentPrepareUpload,
+  type HealthDocumentCallableDeps,
+} from "./health_document_callables";
+import {
+  createAdminHealthDocumentStorageAdapter,
+} from "./health_document_storage_adapter";
+import {
+  ClinicalCaller,
+  runHealthAmendClinicalEvent,
+  runHealthAppendClinicalEvent,
+  runHealthCancelClinicalCase,
+  runHealthCancelClinicalEvent,
+  runHealthDischargeClinicalCase,
+  runHealthFinalizeClinicalEvent,
+  runHealthOpenClinicalCase,
+  runHealthReopenClinicalCase,
+  runHealthTransitionClinicalCase,
+  type ClinicalCaseCallableDeps,
+} from "./clinical_case_callables";
+import {
+  RestrictionCaller,
+  runHealthRestrictionCancel,
+  runHealthRestrictionEnd,
+  runHealthRestrictionIssue,
+  type HealthRestrictionCallableDeps,
+  type HealthRestrictionLifecycleDeps,
+} from "./health_restriction_callables";
+import {
+  healthTimelineProjectMealLogCreatedWrapper,
+  healthTimelineProjectSupplementLogCreatedWrapper,
+} from "./health_timeline_triggers";
+import {FirestoreAnomalySink} from "./health_timeline_anomaly_sink";
+import {FirestoreHealthTimelineRuntime} from "./health_timeline_runtime";
+import {
+  runHealthTimelineReconciliation,
+  DEFAULT_ORCHESTRATOR_CONFIG,
+} from "./health_timeline_orchestrator";
+import {readActivationGuard} from "./health_timeline_activation_guard";
+import {runHealthTimelineRecordShadowTelemetry} from "./health_timeline_shadow_telemetry_callable";
+import {FirestoreHealthTimelineShadowTelemetryAggregateWriter} from "./health_timeline_shadow_telemetry_firestore_adapter";
+import {
+  buildHealthReadinessRefreshHandler,
+  type HealthReadinessCallableDeps,
+} from "./health_readiness_callable";
+import {
+  healthReadinessProjectWeightRecord,
+  healthReadinessProjectHealthEvent,
+  healthReadinessProjectNutritionPlan,
+  healthReadinessProjectRestriction,
+} from "./health_readiness_triggers";
+import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
+import {
+  buildShiftAuthorizedCommandHandler,
+  createAdminShiftEngineDeps,
+} from "./shift_authorization_callables";
+import type {ShiftActor} from "./shift_authorization_engine";
 
 admin.initializeApp();
 
@@ -28,6 +125,17 @@ const db = admin.firestore();
 const region = "southamerica-east1";
 
 type JsonMap = Record<string, unknown>;
+
+/**
+ * Horário autoritativo genérico do sistema.
+ * Auth obrigatória; read-only; App Check não enforced nesta primeira versão.
+ */
+export const systemAuthoritativeTimeNow = onCall({region}, async (request) => {
+  return runSystemAuthoritativeTimeNow(request, {
+    nowMs: () => Date.now(),
+    requestId: () => crypto.randomUUID(),
+  });
+});
 
 const ACTION_REQUIRED_NOTIFICATION_TYPES = new Set([
   "vehicle_crew_invitation",
@@ -155,8 +263,13 @@ function assertDocumentId(id: string, label: string): void {
   }
 }
 
-function isAdminAccessLevel(accessLevel: string): boolean {
+export function isAdminAccessLevel(accessLevel: string): boolean {
   return ["admin", "administrador"].includes(normalizedKey(accessLevel));
+}
+
+export function isAdminUserRecord(user: JsonMap): boolean {
+  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
+  return isAdminAccessLevel(accessLevel) || user.admin === true;
 }
 
 const MANAGED_ACCESS_ROLES = new Set([
@@ -331,7 +444,7 @@ function customClaimRoles(token: admin.auth.DecodedIdToken): string[] {
     [];
 }
 
-function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
+export function isAdminToken(token: admin.auth.DecodedIdToken): boolean {
   const role = normalizedKey(token.role);
   return token.admin === true ||
     ["admin", "administrador", "admin_master"].includes(role) ||
@@ -350,7 +463,11 @@ type AccessModule =
   | "training"
   | "vehicles";
 
-type AccessAction = "view" | "create" | "edit" | "archive" | "approve";
+// CLIN-AUTH-BE-4A.I2.T0: a união canônica de ações vive no seam de writers,
+// junto da matriz `module.action` que a consome. Alias — e não uma segunda
+// união — para que exista uma fonte única: duplicar a lista permitiria que a
+// taxonomia de leitura e a de escrita divergissem silenciosamente.
+type AccessAction = AccessProfileAction;
 
 function legacyAccessProfileId(value: unknown): string | null {
   const normalized = normalizedKey(value);
@@ -436,7 +553,7 @@ function accessProfileIdFrom(
   return "operador_k9";
 }
 
-function profileGrantsPermission(
+export function profileGrantsPermission(
   profile: JsonMap,
   moduleId: AccessModule,
   action: AccessAction,
@@ -459,8 +576,7 @@ async function requireAccessPermission(
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
   const user = userSnap.data() ?? {};
-  const accessLevel = String(user.accessLevel ?? user.access_level ?? "");
-  if (isAdminAccessLevel(accessLevel) || user.admin === true) return caller;
+  if (isAdminUserRecord(user)) return caller;
 
   const profileId = accessProfileIdFrom(auth?.token, user);
   const profileSnap = await db.collection("access_profiles").doc(profileId).get();
@@ -500,25 +616,217 @@ async function requireAnyAccessPermission(
   );
 }
 
-async function accessScopeForCaller(
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE-C.B — AUTORIDADE EXPLÍCITA DO LIFECYCLE DE RESTRIÇÃO (Option B)
+//
+// Decisão humana da Control Tower (GATE-C.A → GATE-C.H): administração técnica
+// NÃO implica autoridade clínica. Para as três actions de restrição a capability
+// é explícita para TODOS os atores, inclusive administradores.
+//
+// Por que um caminho dedicado em vez de alterar `requireAccessPermission`:
+// aquele helper é compartilhado por 42 call sites (Health não-restriction,
+// Frente 10, administração de acesso). O bypass administrativo genérico
+// PERMANECE intacto lá. Aqui, e só aqui, ele não existe.
+//
+// Separação load-bearing entre dois conceitos que antes coincidiam:
+//
+//   AUTORIZAÇÃO      → esta função. Admin NÃO bypassa.
+//   CLASSIFICAÇÃO DE
+//   AUDITORIA        → `isAdministrativeHealthAuthority`, preservada, usada
+//                      apenas para `recorded_by/ended_by/cancelled_by
+//                      .internal_role`. Nunca para conceder autoridade.
+//
+// `isAdministrativeHealthAuthority` NÃO é alterada: ela é load-bearing em
+// `healthScheduleCancel` (itens automáticos) e está fora de escopo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** As três actions cujo bypass administrativo foi removido por decisão humana. */
+export type RestrictionLifecycleAction =
+  | "issue_restriction"
+  | "release_restriction"
+  | "cancel_restriction";
+
+/** Motivo estruturado da recusa. Diagnóstico, nunca mensagem ao usuário. */
+export type RestrictionGrantDenialReason =
+  | "missing-auth"
+  | "unresolved-ra"
+  | "missing-user-mirror"
+  | "user-soft-deleted"
+  | "missing-access-profile"
+  | "inactive-access-profile"
+  | "capability-not-granted";
+
+export type RestrictionGrantResolution =
+  | {kind: "granted"}
+  | {kind: "denied"; reason: RestrictionGrantDenialReason};
+
+/**
+ * Entradas já lidas do servidor. `undefined` distingue "documento ausente" de
+ * "documento presente e vazio" — a diferença importa para falhar fechado.
+ */
+export interface RestrictionGrantInputs {
+  /** Existe token autenticado. */
+  authPresent: boolean;
+  /** RA derivado do e-mail do token. Vazio => identidade não mapeável. */
+  ra: string;
+  /** `users/{ra}`. `undefined` quando o documento não existe. */
+  userDoc: JsonMap | undefined;
+  /** `access_profiles/{id}`. `undefined` quando o documento não existe. */
+  profileDoc: JsonMap | undefined;
+  /** Action de restrição exigida. */
+  action: RestrictionLifecycleAction;
+}
+
+/**
+ * Decisão de capability explícita para o lifecycle de restrição.
+ *
+ * Ordem de avaliação é contratual — testes dependem dela.
+ *
+ * DELIBERADAMENTE AUSENTES desta função: `isAdminToken` e `isAdminUserRecord`.
+ * A omissão é o comportamento aprovado, não um esquecimento: em
+ * `requireAccessPermission` esses dois bypasses retornam ANTES da leitura do
+ * grant de perfil, o que tornava `access_profiles/administrador` decorativo
+ * para ISSUE/END/CANCEL. Um teste estático protege essa ausência.
+ */
+export function decideRestrictionLifecycleGrant(
+  inputs: RestrictionGrantInputs,
+): RestrictionGrantResolution {
+  if (!inputs.authPresent) return {kind: "denied", reason: "missing-auth"};
+
+  if (!inputs.ra.trim()) return {kind: "denied", reason: "unresolved-ra"};
+
+  if (inputs.userDoc === undefined) {
+    return {kind: "denied", reason: "missing-user-mirror"};
+  }
+  // Simétrico ao SEC-02A: soft-delete não conserva autoridade clínica.
+  if (inputs.userDoc.deleted_at != null) {
+    return {kind: "denied", reason: "user-soft-deleted"};
+  }
+
+  if (inputs.profileDoc === undefined) {
+    return {kind: "denied", reason: "missing-access-profile"};
+  }
+
+  // Ciclo de vida do perfil. AUSENTE é tolerado como ativo pela MESMA razão
+  // documentada em `decideAccessScope`: o contrato canônico vigente em
+  // `profileGrantsPermission` já define `stringValue(status) ?? "active"` para
+  // este mesmo documento. Divergir aqui criaria duas verdades sobre um único
+  // registro. Qualquer outro valor ("", "inactive", desconhecido, tipo errado)
+  // NEGA, com motivo próprio para diagnóstico.
+  const status = inputs.profileDoc.status;
+  if (status !== undefined && status !== null) {
+    if (typeof status !== "string" || status.trim() !== "active") {
+      return {kind: "denied", reason: "inactive-access-profile"};
+    }
+  }
+
+  // Autoridade real: o grant explícito no perfil. Reutiliza o helper canônico
+  // — não reimplementa a leitura do mapa de permissões — de modo que malformado
+  // ou ausente resulta em `false`, isto é, nega.
+  if (
+    !profileGrantsPermission(inputs.profileDoc, "health", inputs.action)
+  ) {
+    return {kind: "denied", reason: "capability-not-granted"};
+  }
+
+  return {kind: "granted"};
+}
+
+function restrictionCapabilityDenied(
+  action: RestrictionLifecycleAction,
+  reason: RestrictionGrantDenialReason,
+): HttpsError {
+  return new HttpsError(
+    "permission-denied",
+    `Perfil sem permissao explicita para health.${action}.`,
+    {code: "restriction-capability-required", reason, action},
+  );
+}
+
+/**
+ * Exige capability explícita para ISSUE / RELEASE / CANCEL.
+ *
+ * Faz as leituras de servidor e delega a DECISÃO para
+ * `decideRestrictionLifecycleGrant` (função pura, testável sem emulador),
+ * espelhando a arquitetura já estabelecida por `resolveAccessScope`.
+ *
+ * NÃO substitui `requireDogRecordAccess`: capability e dog-access continuam
+ * sendo gates separados e ambos permanecem obrigatórios.
+ */
+async function requireRestrictionLifecyclePermission(
   auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
-  caller: CallerIdentity,
-): Promise<"global" | "own_records"> {
-  if (auth && isAdminToken(auth.token)) return "global";
+  action: RestrictionLifecycleAction,
+): Promise<CallerIdentity> {
+  const caller = requireAuth(auth);
+
+  // Guard antes de qualquer leitura: `doc("")` lança erro não estruturado.
+  if (!caller.ra.trim()) {
+    throw restrictionCapabilityDenied(action, "unresolved-ra");
+  }
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
-  const user = userSnap.data() ?? {};
-  const profileId = accessProfileIdFrom(auth?.token, user);
-  const profileSnap = await db.collection("access_profiles").doc(profileId).get();
-  const profileScope = stringValue(profileSnap.data()?.scope);
-  if (profileScope === "own_records") return "own_records";
-  if (profileScope === "global") return "global";
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
 
-  const mirroredScope =
-    stringValue(user.access_scope) ??
-    stringValue(user.accessScope) ??
-    stringValue(auth?.token.access_scope);
-  return mirroredScope === "own_records" ? "own_records" : "global";
+  const profileId = accessProfileIdFrom(auth?.token, userDoc ?? {});
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+
+  const decision = decideRestrictionLifecycleGrant({
+    authPresent: true,
+    ra: caller.ra,
+    userDoc,
+    profileDoc: profileSnap.exists ? profileSnap.data() ?? {} : undefined,
+    action,
+  });
+
+  if (decision.kind === "denied") {
+    throw restrictionCapabilityDenied(action, decision.reason);
+  }
+
+  return caller;
+}
+
+// CLIN-AUTH-BE-4A.I2.T0: `requireAccessScope` acompanhou `accessProfilePayload`
+// para o seam de writers — era seu único consumidor. Re-exportado aqui para
+// preservar a superfície pública deste módulo.
+export {requireAccessScope};
+
+/**
+ * SEC-02A — resolução de escopo FALHA FECHADA.
+ *
+ * Faz as leituras de servidor e delega a DECISÃO para `decideAccessScope`
+ * (módulo puro, testável sem emulador). Ver `access_scope.ts` para o contrato.
+ */
+async function resolveAccessScope(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+): Promise<AccessScopeResolution> {
+  if (!auth) return {kind: "denied", reason: "missing-auth"};
+  if (isAdminToken(auth.token)) return {kind: "global"};
+  if (!caller.ra.trim()) return {kind: "denied", reason: "unresolved-ra"};
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
+  if (userDoc === undefined) {
+    return {kind: "denied", reason: "missing-user-mirror"};
+  }
+
+  const profileId = accessProfileIdFrom(auth.token, userDoc);
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+
+  return decideAccessScope({
+    authPresent: true,
+    isAdminToken: false,
+    ra: caller.ra,
+    userDoc,
+    profileDoc: profileSnap.exists ? profileSnap.data() ?? {} : undefined,
+    tokenAccessScope: auth.token.access_scope,
+  });
 }
 
 function dogHandlerRa(dog: JsonMap): string | null {
@@ -542,19 +850,56 @@ async function callerHasActiveDog(caller: CallerIdentity, dogId: string) {
   return stringValue(shift.status) === "active" && activeDogId === dogId;
 }
 
+/**
+ * SEC-02A.1 — acesso a registro de K9 FALHA FECHADO, contrato estrito.
+ *
+ * Ordem contratual, não negociável:
+ *
+ *   1. autenticado
+ *   2. bypass administrativo explícito (server-controlled), se canônico
+ *   3. estado de autorização VÁLIDO — espelho do usuário existe, usuário não
+ *      soft-deleted, perfil de acesso existe e está ativo, scope é enum válido
+ *   4. decisão de escopo
+ *   5. vínculo com o K9, quando aplicável
+ *
+ * Vínculo com o K9 é avaliado SOMENTE depois que o estado de autorização é
+ * válido. Um vínculo válido NÃO compensa configuração de autorização ausente,
+ * inválida ou malformada: se a camada declarativa está quebrada, nega.
+ *
+ * Decisão humana SEC-02A.1: a versão anterior deste gate permitia que escopo
+ * não resolvível caísse para prova de vínculo ("não sei o escopo, mas ele é o
+ * condutor → permito"). Isso eliminava a escalada para global, mas era uma
+ * política diferente da aprovada. Health e dados operacionais exigem o modelo
+ * rígido.
+ */
 async function requireDogRecordAccess(
   auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
   caller: CallerIdentity,
   dogId: string,
   dog: JsonMap,
 ) {
-  if ((await accessScopeForCaller(auth, caller)) === "global") return;
+  const scope = await resolveAccessScope(auth, caller);
+
+  // Estado de autorização inválido/ausente/malformado: nega, sem consultar
+  // vínculo. Não existe fallback de compatibilidade por vínculo.
+  if (scope.kind === "denied") {
+    throw new HttpsError(
+      "permission-denied",
+      "Nao foi possivel estabelecer autorizacao valida para este acesso.",
+      {code: "authorization-state-invalid", reason: scope.reason},
+    );
+  }
+
+  if (scope.kind === "global") return;
+
+  // scope === own_records: aqui, e só aqui, o vínculo com o K9 decide.
   if (dogHandlerRa(dog) === caller.ra) return;
   if (await callerHasActiveDog(caller, dogId)) return;
 
   throw new HttpsError(
     "permission-denied",
     "Seu perfil permite registrar dados apenas para o K9 vinculado ou em turno ativo.",
+    {code: "dog-scope-denied", scope: scope.kind},
   );
 }
 
@@ -576,47 +921,16 @@ function sanitizeAccessPermissions(value: unknown): JsonMap {
   return permissions;
 }
 
-function accessProfilePayload(
-  profileId: string,
-  source: JsonMap,
-  caller: CallerIdentity,
-  options: {
-    action: string;
-    exists: boolean;
-    status?: "active" | "inactive";
-  },
-): JsonMap {
-  const status =
-    options.status ??
-    (stringValue(source.status) === "inactive" ? "inactive" : "active");
-  const payload: JsonMap = {
-    id: profileId,
-    description: optionalString(source, "description") ?? "",
-    level: optionalString(source, "level") ?? "restrito",
-    module_tags: stringList(source.module_tags),
-    name: requiredString(source, "name"),
-    permissions: sanitizeAccessPermissions(source.permissions),
-    role_keys: stringList(source.role_keys),
-    scope: stringValue(source.scope) === "own_records" ? "own_records" : "global",
-    seed_version: optionalNumberValue(source.seed_version) ?? 0,
-    slug: optionalString(source, "slug") ?? profileId,
-    status,
-    tone: optionalString(source, "tone") ?? "cyan",
-    ui_hidden: source.ui_hidden === true,
-    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    updated_by: caller.ra,
-    audit_trail: options.exists
-      ? admin.firestore.FieldValue.arrayUnion(auditEntry(options.action, caller))
-      : [auditEntry("created", caller)],
-  };
+// CLIN-AUTH-BE-4A.I2.T0: o sanitizador tri-state de ESCRITA
+// (`accessPermissionsWritePayload`), seu modo de mutação e
+// `accessProfilePayload` vivem agora em `access_profile_writer_callables.ts`,
+// junto dos writers que são seus únicos consumidores.
+//
+// `sanitizeAccessPermissions`, logo acima, PERMANECE aqui: é o caminho de
+// LEITURA de autoridade (`profileGrantsPermission`), não lança e não produz
+// sentinels. A separação entre os dois é load-bearing.
 
-  if (!options.exists) {
-    payload.created_at = admin.firestore.FieldValue.serverTimestamp();
-    payload.created_by = caller.ra;
-  }
-
-  return payload;
-}
+// (extraídos para access_profile_writer_callables.ts — ver nota acima)
 
 function mapArray(value: unknown): JsonMap[] {
   if (!Array.isArray(value)) return [];
@@ -1483,62 +1797,28 @@ export const decidePromotionRequest = onCall({region}, async (request) => {
   return {id: requestId, status: decisionValue};
 });
 
-export const adminSaveAccessProfile = onCall({region}, async (request) => {
-  const data = request.data as JsonMap;
-  const source = (data.profile ?? {}) as JsonMap;
-  const profileId = stringValue(data.id) ?? requiredString(source, "id");
-  assertDocumentId(profileId, "Identificador do perfil");
+// CLIN-AUTH-BE-4A.I2.T0 — dependências reais dos writers de access profile.
+//
+// A política inteira (TOCTOU, tri-state, precondition, capability-pair,
+// seed_version) vive em `access_profile_writer_callables.ts`. Aqui só se liga
+// o que é externo ao comportamento: Firestore, o gate de autorização e a
+// fábrica de trilha de auditoria.
+//
+// `requireAccessPermission` é injetado com a assinatura completa, e não como um
+// booleano: o invariant de atomicidade exige que se possa provar QUAL
+// capability foi exigida (`access.create` vs `access.edit`).
+const accessProfileWriterDeps: AccessProfileWriterDeps = {
+  db,
+  requireAccessPermission,
+  auditEntry,
+};
 
-  const ref = db.collection("access_profiles").doc(profileId);
-  const snapshot = await ref.get();
-  const caller = await requireAccessPermission(
-    request.auth,
-    "access",
-    snapshot.exists ? "edit" : "create",
-  );
-  await ref.set(
-    accessProfilePayload(profileId, source, caller, {
-      action: "updated",
-      exists: snapshot.exists,
-    }),
-    {merge: true},
-  );
-  return {id: profileId, created: !snapshot.exists};
+export const adminSaveAccessProfile = onCall({region}, async (request) => {
+  return runAdminSaveAccessProfile(request, accessProfileWriterDeps);
 });
 
 export const adminDuplicateAccessProfile = onCall({region}, async (request) => {
-  const caller = await requireAccessPermission(request.auth, "access", "create");
-  const data = request.data as JsonMap;
-  const source = (data.profile ?? {}) as JsonMap;
-  const sourceId = requiredString(source, "id");
-  const profileId =
-    stringValue(data.id) ??
-    `${normalizedKey(sourceId).slice(0, 70)}_copia_${Date.now().toString(36)}`;
-  assertDocumentId(profileId, "Identificador do perfil");
-
-  const ref = db.collection("access_profiles").doc(profileId);
-  if ((await ref.get()).exists) {
-    throw new HttpsError("already-exists", "Ja existe um perfil com este identificador.");
-  }
-
-  await ref.set(
-    accessProfilePayload(
-      profileId,
-      {
-        ...source,
-        id: profileId,
-        name: `${requiredString(source, "name")} (copia)`,
-        slug: profileId,
-      },
-      caller,
-      {
-        action: "duplicated",
-        exists: false,
-        status: "inactive",
-      },
-    ),
-  );
-  return {id: profileId};
+  return runAdminDuplicateAccessProfile(request, accessProfileWriterDeps);
 });
 
 export const adminSetAccessProfileStatus = onCall({region}, async (request) => {
@@ -1600,8 +1880,19 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   }
   const profileName = stringValue(profile.name) ?? profileId;
   const seedVersion = optionalNumberValue(profile.seed_version) ?? null;
-  const accessScope =
-    stringValue(profile.scope) === "own_records" ? "own_records" : "global";
+  // SEC-02A: perfil com escopo ausente/malformado NÃO pode virar claim global.
+  // Recusa explícita — é operação administrativa, e cunhar uma claim ampla a
+  // partir de dado inválido é exatamente a escalada que este gate fecha.
+  const storedScope = parseAccessScope(profile.scope);
+  if (storedScope === null) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Perfil de acesso possui scope ausente ou invalido; corrija o perfil " +
+        "antes de atribui-lo.",
+      {code: "invalid-access-scope"},
+    );
+  }
+  const accessScope = storedScope;
   const roleKeys = normalizedRoleKeys(profile.role_keys, [profileId]);
   const roleSet = new Set(roleKeys);
   const isAdminProfile = roleSet.has("admin") ||
@@ -1716,70 +2007,7 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
 });
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
-  const caller = await requireAccessPermission(request.auth, "access", "approve");
-  const data = request.data as JsonMap;
-  const profiles = mapArray(data.profiles);
-  const reconcile = data.reconcile !== false;
-  if (profiles.length === 0) {
-    throw new HttpsError("invalid-argument", "Nenhum perfil informado para seed.");
-  }
-
-  const batch = db.batch();
-  const created: string[] = [];
-  const updated: string[] = [];
-  const archived: string[] = [];
-  const seedIds = new Set<string>();
-  for (const profile of profiles) {
-    const profileId = requiredString(profile, "id");
-    assertDocumentId(profileId, "Identificador do perfil");
-    seedIds.add(profileId);
-    const ref = db.collection("access_profiles").doc(profileId);
-    const snapshot = await ref.get();
-    if (snapshot.exists) {
-      updated.push(profileId);
-    } else {
-      created.push(profileId);
-    }
-    batch.set(ref, accessProfilePayload(profileId, profile, caller, {
-      action: snapshot.exists ? "seed_updated" : "seeded",
-      exists: snapshot.exists,
-    }), {merge: true});
-  }
-
-  if (reconcile) {
-    const snapshot = await db.collection("access_profiles").get();
-    for (const docSnapshot of snapshot.docs) {
-      if (seedIds.has(docSnapshot.id)) continue;
-      const dataBefore = docSnapshot.data() ?? {};
-      if (dataBefore.status === "inactive") continue;
-      batch.set(docSnapshot.ref, {
-        status: "inactive",
-        deprecated_by_seed: true,
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        updated_by: caller.ra,
-        audit_trail: admin.firestore.FieldValue.arrayUnion(
-          auditEntry("inactivated_by_profile_seed", caller),
-        ),
-      }, {merge: true});
-      archived.push(docSnapshot.id);
-    }
-  }
-
-  if (created.length > 0 || updated.length > 0 || archived.length > 0) {
-    batch.set(db.collection("auditLogs").doc(), {
-      action: "access_profiles_seeded",
-      entity_type: "access_profiles",
-      entity_id: "access_profiles",
-      summary: `Matriz de perfis reconciliada: ${created.length} criados, ${updated.length} atualizados, ${archived.length} inativados`,
-      actor: caller,
-      metadata: {archived, created, reconcile, updated},
-      source: "functions",
-      performed_at: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-  await batch.commit();
-  return {archived, created, updated};
+  return runAdminSeedAccessProfiles(request, accessProfileWriterDeps);
 });
 
 const K9_MODALITY_LABELS: Record<string, string> = {
@@ -2549,10 +2777,34 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   const accessProfileSnapshot = accessProfileId
     ? await db.collection("access_profiles").doc(accessProfileId).get()
     : null;
-  const accessScope =
-    stringValue(accessProfileSnapshot?.data()?.scope) === "own_records"
-      ? "own_records"
-      : "global";
+  // SEC-02A: escopo do usuário provisionado nunca é ampliado por omissão.
+  //
+  // Antes: `accessProfileId` ausente deixava o snapshot null e o escopo caía em
+  // "global"; perfil com scope malformado idem. O valor era gravado no espelho
+  // `users/{ra}` E na custom claim, tornando a ampliação permanente.
+  //
+  // Agora: perfil declarado precisa existir com scope válido (recusa explícita
+  // se não); sem perfil declarado, assume-se o escopo MENOS privilegiado.
+  const accessScope: AccessScope = (() => {
+    if (!accessProfileId) return "own_records";
+    if (!accessProfileSnapshot?.exists) {
+      throw new HttpsError(
+        "not-found",
+        "Perfil de acesso informado nao existe.",
+        {code: "missing-access-profile"},
+      );
+    }
+    const parsed = parseAccessScope(accessProfileSnapshot.data()?.scope);
+    if (parsed === null) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Perfil de acesso possui scope ausente ou invalido; corrija o perfil " +
+          "antes de vincula-lo a um usuario.",
+        {code: "invalid-access-scope"},
+      );
+    }
+    return parsed;
+  })();
   const isAdminProfile = profileRoleSet.has("admin") ||
     profileRoleSet.has("administrador") ||
     profileRoleSet.has("admin_master");
@@ -2598,6 +2850,10 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     );
   }
   let authUser: admin.auth.UserRecord | null = null;
+  // SEC-02A: distingue conta CRIADA por esta chamada de conta preexistente.
+  // Compensação só pode agir sobre a que nós criamos — nunca apagar nem
+  // desabilitar uma conta que já existia por causa de falha de update.
+  let createdNewAuthUser = false;
 
   if (existingUid) {
     try {
@@ -2631,30 +2887,29 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
         "A senha provisoria deve ter ao menos 8 caracteres.",
       );
     }
+    // SEC-02A: conta nova nasce SEMPRE desabilitada, independente de `active`.
+    // Firebase Auth e Firestore são serviços distintos — não existe transação
+    // atômica entre eles. Em vez de fingir que existe, a conta só se torna
+    // utilizável depois que o espelho de autorização estiver válido (ver
+    // habilitação no final desta função).
     authUser = await admin.auth().createUser({
-      disabled: !active,
+      disabled: true,
       displayName: callsign,
       email,
       password: temporaryPassword,
       photoURL: optionalString(profile, "photoUrl") ?? undefined,
     });
+    createdNewAuthUser = true;
   } else {
+    // Conta existente: desabilitar é a direção SEGURA e pode ser aplicada de
+    // imediato. Habilitar é a direção perigosa e fica para o final, após o
+    // espelho de autorização estar gravado.
     authUser = await admin.auth().updateUser(authUser.uid, {
-      disabled: !active,
+      ...(active ? {} : {disabled: true}),
       displayName: callsign,
       photoURL: optionalString(profile, "photoUrl") ?? undefined,
     });
   }
-
-  const claims = humanClaims(
-    authUser.customClaims ?? {},
-    ra,
-    accessLevel,
-    accessProfileId,
-    isK9Instructor,
-    accessScope,
-  );
-  await admin.auth().setCustomUserClaims(authUser.uid, claims);
 
   const payload: JsonMap = {
     ra,
@@ -2723,7 +2978,60 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     );
   }
 
-  await userRef.set(payload, {merge: true});
+  // SEC-02A — ordem de provisionamento FALHA FECHADA.
+  //
+  // Auth e Firestore não compartilham transação, então a ordem é escolhida para
+  // que qualquer falha parcial deixe a conta MENOS utilizável, nunca mais:
+  //
+  //   1. espelho de autorização em users/{ra}   (nada utilizável ainda)
+  //   2. custom claims                          (derivadas de escopo validado)
+  //   3. habilitar a conta                      (último — só aqui vira usável)
+  //
+  // Falha em 1 ou 2 com conta recém-criada: compensa desabilitando/removendo.
+  // A conta jamais fica habilitada sem espelho de autorização válido.
+  try {
+    await userRef.set(payload, {merge: true});
+
+    const claims = humanClaims(
+      authUser.customClaims ?? {},
+      ra,
+      accessLevel,
+      accessProfileId,
+      isK9Instructor,
+      accessScope,
+    );
+    await admin.auth().setCustomUserClaims(authUser.uid, claims);
+  } catch (error) {
+    if (createdNewAuthUser) {
+      // Compensação idempotente. Desabilitar primeiro: mesmo que a remoção
+      // falhe, a conta não fica utilizável.
+      try {
+        await admin.auth().updateUser(authUser.uid, {disabled: true});
+      } catch (compensationError) {
+        console.error(
+          "[adminUpsertHuman] falha ao desabilitar conta órfã",
+          {ra, uid: authUser.uid, error: String(compensationError)},
+        );
+      }
+      try {
+        await admin.auth().deleteUser(authUser.uid);
+      } catch (compensationError) {
+        console.error(
+          "[adminUpsertHuman] conta órfã permanece desabilitada; remover " +
+            "manualmente",
+          {ra, uid: authUser.uid, error: String(compensationError)},
+        );
+      }
+    }
+    throw error;
+  }
+
+  // Habilitação por último, e somente quando solicitado. Retry desta callable é
+  // idempotente: reexecuta o espelho e as claims antes de habilitar de novo.
+  if (active) {
+    authUser = await admin.auth().updateUser(authUser.uid, {disabled: false});
+  }
+
   return {
     ra,
     uid: authUser.uid,
@@ -7937,5 +8245,894 @@ export const scheduledCheckOpenShifts = onSchedule(
   async () => {
     await runShiftReminderScan(new Date());
     return;
+  },
+);
+
+
+// =============================================================================
+// Health Schedule callables (Fase 4E Gate 2) � Admin SDK; Rules client read-only
+// =============================================================================
+
+async function isAdministrativeHealthAuthority(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+): Promise<boolean> {
+  if (auth && isAdminToken(auth.token)) return true;
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const user = userSnap.data() ?? {};
+  return isAdminUserRecord(user);
+}
+
+function toScheduleCaller(caller: CallerIdentity): ScheduleCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const healthScheduleDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toScheduleCaller(await requireAccessPermission(auth, "health", "create")),
+  requireHealthEdit: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toScheduleCaller(await requireAccessPermission(auth, "health", "edit")),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ScheduleCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ScheduleCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+function toDocumentCaller(caller: CallerIdentity): DocumentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * HealthDocument canônico (B0 — fatia mínima de evidência clínica).
+ *
+ * `health.create` é a autoridade real existente e é deliberadamente estreita:
+ * criar documento NÃO concede autoridade para declarar o K9 inapto, que
+ * continua dependendo de `health.issue_restriction`.
+ */
+const healthDocumentDeps: HealthDocumentCallableDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toDocumentCaller(await requireAccessPermission(auth, "health", "create")),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: DocumentCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: DocumentCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+  storage: createAdminHealthDocumentStorageAdapter(),
+};
+
+/**
+ * Reserva determinística de identidade + Storage path. ZERO writes.
+ * Não é autoridade: apenas FINALIZE cria o agregado canônico.
+ */
+export const healthDocumentPrepareUpload = onCall({region}, async (request) => {
+  return runHealthDocumentPrepareUpload(request, healthDocumentDeps);
+});
+
+/**
+ * Cria o HealthDocument canônico após verificar o objeto no Storage.
+ * Recomputa documentId/storagePath — path do cliente nunca é autoridade.
+ */
+export const healthDocumentFinalizeUpload = onCall({region}, async (request) => {
+  return runHealthDocumentFinalizeUpload(request, healthDocumentDeps);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIN-WRITER-1.W3 — autoridade de ESCRITA clínica persistida
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Capabilities clínicas canônicas (W2). Definidas no catálogo
+ * `CANONICAL_ACCESS_PROFILE_CAPABILITIES`, concedidas a NENHUM perfil real.
+ *
+ * Vocabulário próprio aqui em vez de `AccessAction`: as cinco actions clínicas
+ * foram deliberadamente mantidas FORA da união `AccessProfileAction` por W2, e
+ * aquele módulo está congelado. O caminho de LEITURA de autoridade
+ * (`sanitizeAccessPermissions` → `profileGrantsPermission`) já é key-agnostic,
+ * então o par `health.record_clinical` é resolvido corretamente sem alargar o
+ * tipo de escrita — que é justamente o que não deve ser alargado por este gate.
+ */
+type ClinicalCapability =
+  | "record_clinical"
+  | "finalize_clinical"
+  | "amend_clinical"
+  | "manage_clinical_case"
+  | "reopen_clinical_case";
+
+function clinicalCapabilityDenied(
+  action: ClinicalCapability,
+  reason: RestrictionGrantDenialReason,
+): HttpsError {
+  return new HttpsError(
+    "permission-denied",
+    `Perfil sem permissao explicita para health.${action}.`,
+    {code: "permission-denied", reason, action},
+  );
+}
+
+/**
+ * Exige capability clínica EXPLÍCITA, sem qualquer bypass administrativo.
+ *
+ * Espelha `requireRestrictionLifecyclePermission` (GATE-C.B) e NÃO
+ * `requireAccessPermission`: naquele, `isAdminToken`/`isAdminUserRecord`
+ * retornam antes da leitura do grant, o que tornaria a capability clínica
+ * decorativa para qualquer administrador técnico. Administração técnica não é
+ * autoridade clínica.
+ *
+ * `health.read` também não implica escrita: só o par exato
+ * `health.<action>` concede, e a ausência da chave significa NÃO CONCEDIDA.
+ *
+ * NÃO substitui `requireDogRecordAccess`: capability e escopo estrutural de K9
+ * seguem sendo dois gates obrigatórios e independentes.
+ */
+async function requireClinicalCapability(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  action: ClinicalCapability,
+): Promise<CallerIdentity> {
+  const caller = requireAuth(auth);
+
+  // Guard antes de qualquer leitura: `doc("")` lança erro não estruturado.
+  if (!caller.ra.trim()) {
+    throw clinicalCapabilityDenied(action, "unresolved-ra");
+  }
+
+  const userSnap = await db.collection("users").doc(caller.ra).get();
+  const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
+  if (userDoc === undefined) {
+    throw clinicalCapabilityDenied(action, "missing-user-mirror");
+  }
+  // Simétrico ao SEC-02A: soft-delete não conserva autoridade clínica.
+  if (userDoc.deleted_at != null) {
+    throw clinicalCapabilityDenied(action, "user-soft-deleted");
+  }
+
+  const profileId = accessProfileIdFrom(auth?.token, userDoc);
+  const profileSnap = await db
+    .collection("access_profiles")
+    .doc(profileId)
+    .get();
+  if (!profileSnap.exists) {
+    throw clinicalCapabilityDenied(action, "missing-access-profile");
+  }
+  const profileDoc = profileSnap.data() ?? {};
+
+  // Ciclo de vida do perfil, com a MESMA tolerância a `status` ausente já
+  // contratada por `profileGrantsPermission`/`decideAccessScope` para este
+  // documento. Divergir criaria duas verdades sobre um único registro.
+  const status = profileDoc.status;
+  if (status !== undefined && status !== null) {
+    if (typeof status !== "string" || status.trim() !== "active") {
+      throw clinicalCapabilityDenied(action, "inactive-access-profile");
+    }
+  }
+
+  if (
+    !profileGrantsPermission(profileDoc, "health", action as AccessAction)
+  ) {
+    throw clinicalCapabilityDenied(action, "capability-not-granted");
+  }
+
+  return caller;
+}
+
+function toClinicalCaller(caller: CallerIdentity): ClinicalCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * Writer canônico do registro clínico — abertura de caso e append de evento.
+ *
+ * `health.record_clinical` é autoridade própria e ninguém a possui hoje: o
+ * catálogo W2 apenas tornou o par sintaticamente concedível. Enquanto nenhum
+ * perfil real receber o grant, estes callables ficam inertes por design.
+ */
+const clinicalCaseDeps: ClinicalCaseCallableDeps = {
+  db,
+  requireRecordClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "record_clinical"),
+  ),
+  // Capabilities DISTINTAS por comando: registrar um rascunho, travá-lo como
+  // evidência imutável e corrigi-lo são autoridades diferentes. Nenhuma implica
+  // a outra, e nenhuma delas é implicada por administração técnica.
+  requireFinalizeClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "finalize_clinical"),
+  ),
+  requireAmendClinical: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "amend_clinical"),
+  ),
+  requireManageClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "manage_clinical_case"),
+  ),
+  requireReopenClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "reopen_clinical_case"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ClinicalCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  // CLASSIFICAÇÃO de auditoria (`recorded_by.internal_role`), nunca autoridade.
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: ClinicalCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Abre um ClinicalCase junto com seu evento de abertura, atomicamente.
+ * Um caso nunca existe sem o evento que o abriu.
+ */
+export const healthOpenClinicalCase = onCall({region}, async (request) => {
+  return runHealthOpenClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Anexa um ClinicalEvent a um caso EXISTENTE e não terminal.
+ * Não é transição de ciclo de vida: `clinical_status` permanece intacto.
+ */
+export const healthAppendClinicalEvent = onCall({region}, async (request) => {
+  return runHealthAppendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Trava um ClinicalEvent `draft` como evidência clínica imutável.
+ * Exige `health.finalize_clinical` — `record_clinical` não finaliza.
+ */
+export const healthFinalizeClinicalEvent = onCall({region}, async (request) => {
+  return runHealthFinalizeClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalEvent `draft` ou `final`, preservando o conteúdo original.
+ * Exige `health.amend_clinical` — não é delete e não é edição de conteúdo.
+ */
+export const healthCancelClinicalEvent = onCall({region}, async (request) => {
+  return runHealthCancelClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Anexa uma emenda imutável (correction/addendum/complement) a um ClinicalEvent
+ * `final`, sem reescrever o conteúdo original. O evento pai permanece `final`.
+ * Exige `health.amend_clinical` — a mesma autoridade corretiva do cancelamento,
+ * mas um comando distinto, com receipt, fingerprint e audit próprios.
+ */
+export const healthAmendClinicalEvent = onCall({region}, async (request) => {
+  return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Transiciona o status de um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthTransitionClinicalCase = onCall({region}, async (request) => {
+  return runHealthTransitionClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Concede alta a um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthDischargeClinicalCase = onCall({region}, async (request) => {
+  return runHealthDischargeClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthCancelClinicalCase = onCall({region}, async (request) => {
+  return runHealthCancelClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Reabre um ClinicalCase encerrado (health.reopen_clinical_case + dog access).
+ */
+export const healthReopenClinicalCase = onCall({region}, async (request) => {
+  return runHealthReopenClinicalCase(request, clinicalCaseDeps);
+});
+
+function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+/**
+ * Writer canônico de OperationalRestriction — ISSUE (B1).
+ *
+ * `health.issue_restriction` é autoridade própria: nenhuma outra ação Health
+ * autoriza declarar impacto operacional. Nenhum access profile real recebe
+ * esse grant automaticamente — a concessão é decisão de cutover.
+ */
+const healthRestrictionDeps: HealthRestrictionCallableDeps = {
+  db,
+  // GATE-C.B — capability explícita, sem bypass administrativo.
+  requireIssueRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireRestrictionLifecyclePermission(auth, "issue_restriction"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Emite restrição operacional canônica (health.issue_restriction + dog access).
+ * Admin SDK write; a projeção de readiness reage pelo trigger existente.
+ */
+export const healthRestrictionIssue = onCall({region}, async (request) => {
+  return runHealthRestrictionIssue(request, healthRestrictionDeps);
+});
+
+/**
+ * Writers de lifecycle terminal — END / CANCEL (B2).
+ *
+ * Autoridades separadas e não intercambiáveis. Nenhum access profile real
+ * recebe esses grants automaticamente: a concessão é decisão de cutover.
+ */
+const healthRestrictionLifecycleDeps: HealthRestrictionLifecycleDeps = {
+  db,
+  // GATE-C.B — capability explícita, sem bypass administrativo.
+  requireReleaseRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireRestrictionLifecyclePermission(auth, "release_restriction"),
+  ),
+  requireCancelRestriction: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toRestrictionCaller(
+    await requireRestrictionLifecyclePermission(auth, "cancel_restriction"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: RestrictionCaller,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/**
+ * Encerra restrição por liberação clínica documentada
+ * (health.release_restriction + dog access). Admin SDK write.
+ */
+export const healthRestrictionEnd = onCall({region}, async (request) => {
+  return runHealthRestrictionEnd(request, healthRestrictionLifecycleDeps);
+});
+
+/**
+ * Invalida o registro de uma restrição (health.cancel_restriction + dog
+ * access). Não afirma liberação clínica. Admin SDK write.
+ */
+export const healthRestrictionCancel = onCall({region}, async (request) => {
+  return runHealthRestrictionCancel(request, healthRestrictionLifecycleDeps);
+});
+
+/** Create manual schedule item (health.create + dog access). Admin SDK write. */
+export const healthScheduleCreateManual = onCall({region}, async (request) => {
+  return runHealthScheduleCreateManual(request, healthScheduleDeps);
+});
+
+/** Update open manual item (health.edit + dog access + revision). */
+export const healthScheduleUpdateOpen = onCall({region}, async (request) => {
+  return runHealthScheduleUpdateOpen(request, healthScheduleDeps);
+});
+
+/** Complete open item (health.edit + dog access). Terminal idempotent. */
+export const healthScheduleComplete = onCall({region}, async (request) => {
+  return runHealthScheduleComplete(request, healthScheduleDeps);
+});
+
+/** Cancel item (health.edit + dog access; auto requires admin authority). */
+export const healthScheduleCancel = onCall({region}, async (request) => {
+  return runHealthScheduleCancel(request, healthScheduleDeps);
+});
+
+// =============================================================================
+// Health Nutrition callables (Fase 5D Gate 2) — Admin SDK; Rules client read-only
+// App Check: paridade Agenda — sem enforceAppCheck (ACCEPTED HARDENING DEBT)
+// =============================================================================
+
+function toNutritionActor(caller: CallerIdentity): NutritionActor {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const healthNutritionDeps: HealthNutritionCallableDeps = {
+  db,
+  requireHealthCreate: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toNutritionActor(await requireAccessPermission(auth, "health", "create")),
+  requireManageNutritionPlan: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toNutritionActor(
+    await requireAccessPermission(auth, "health", "manage_nutrition_plan"),
+  ),
+  requireDogAccess: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: NutritionActor,
+    dogId: string,
+    dog: Record<string, unknown>,
+  ) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+    caller: NutritionActor,
+  ) => isAdministrativeHealthAuthority(
+    auth,
+    {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+  ),
+};
+
+/** Create MealLog planned|adhoc (health.create + dog access). Admin SDK write. */
+export const healthNutritionCreateMealLog = onCall({region}, async (request) => {
+  return runHealthNutritionCreateMealLog(request, healthNutritionDeps);
+});
+
+/** Create SupplementLog (health.create + dog access). Admin SDK write. */
+export const healthNutritionCreateSupplementLog = onCall(
+  {region},
+  async (request) => {
+    return runHealthNutritionCreateSupplementLog(request, healthNutritionDeps);
+  },
+);
+
+/** Create and atomically activate a NutritionPlan (health.manage_nutrition_plan). */
+export const healthNutritionCreateAndActivatePlan = onCall({region}, async (request) => {
+  return runHealthNutritionCreateAndActivatePlan(request, healthNutritionDeps);
+});
+
+/** Administrative in-place update of the unique active NutritionPlan. */
+export const healthNutritionUpdateActivePlan = onCall({region}, async (request) => {
+  return runHealthNutritionUpdateActivePlan(request, healthNutritionDeps);
+});
+
+/** Cancel the unique active NutritionPlan without reactivating superseded plans. */
+export const healthNutritionCancelPlan = onCall({region}, async (request) => {
+  return runHealthNutritionCancelPlan(request, healthNutritionDeps);
+});
+
+const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler({
+  db,
+  requireHealthRecordRoutine: async (auth) => {
+    const caller = await requireAccessPermission(
+      auth,
+      "health",
+      "record_routine",
+    );
+    const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
+    return {
+      uid: caller.uid,
+      name: caller.name,
+      ra: caller.ra,
+      internalRole: isAdmin ? "admin" : "condutor",
+    };
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    const accessCaller = requireAuth(auth);
+    if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
+      throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
+    }
+    await requireDogRecordAccess(
+      auth,
+      accessCaller,
+      dogId,
+      dog,
+    );
+  },
+  createEngineDeps: () => createAdminWeightEngineDeps(db),
+});
+
+/** Create a canonical WeightRecord with durable receipt idempotency (health.record_routine). */
+export const healthWeightCreateRecord = onCall({region}, async (request) =>
+  runHealthWeightCreateRecord(request));
+
+
+// =============================================================================
+// Health Readiness — Triggers + Callable (Gate 4)
+// =============================================================================
+
+/**
+ * Deps reais do refresh de Prontidão.
+ *
+ * A autorização dog-level vive DENTRO de `requireHealthReadAccess` — o seam
+ * injetável — e não inline no wrapper. Isso é deliberado: o Admin SDK ignora as
+ * Rules, então o callable precisa reproduzir `canAccessDogRecord(dogId)` por
+ * conta própria, e essa checagem tem de ser exercitável por teste chamando o
+ * handler real. Enquanto ela ficava fora do handler, nenhum teste do handler
+ * conseguia provar que um K9 alheio é negado.
+ *
+ * `requireDogRecordAccess` é reutilizada, não reimplementada: mesmas três vias
+ * de acesso das Rules (escopo global / handler do K9 / turno ativo).
+ */
+function buildReadinessCallableDeps(
+  auth: CallableRequest["auth"],
+): HealthReadinessCallableDeps {
+  return {
+    requireAuth: async (callableAuth) => {
+      const caller = requireAuth(callableAuth);
+      return {uid: caller.uid};
+    },
+    requireHealthReadAccess: async (_uid: string, dogId: string) => {
+      const caller = requireAuth(auth);
+      const dogSnap = await db.collection("dogs").doc(dogId).get();
+      if (!dogSnap.exists) {
+        throw new HttpsError("not-found", "Cao nao encontrado.");
+      }
+      await requireDogRecordAccess(auth, caller, dogId, dogSnap.data() ?? {});
+    },
+  };
+}
+
+export const healthReadinessRefresh = onCall({region}, async (request) => {
+  // Ordem explícita: auth → dogId válido → autorização por K9 → handler.
+  //
+  // `dogId` é validado ANTES de qualquer coisa para que a checagem de acesso
+  // nunca dependa de um caminho condicional. Um payload sem dogId utilizável é
+  // rejeitado aqui e não alcança o handler.
+  requireAuth(request.auth);
+
+  const data = request.data as Record<string, unknown> | undefined;
+  const rawDogId = data?.dogId;
+  if (
+    typeof rawDogId !== "string" ||
+    rawDogId.trim().length === 0 ||
+    rawDogId.length > 128 ||
+    rawDogId.includes("/") ||
+    rawDogId === "." ||
+    rawDogId === ".."
+  ) {
+    throw new HttpsError("invalid-argument", "dogId invalido.");
+  }
+
+  const handler = buildHealthReadinessRefreshHandler(
+    buildReadinessCallableDeps(request.auth),
+    db,
+  );
+  return handler(request);
+});
+
+/** Readiness trigger — fires on any weight_records write. */
+export {healthReadinessProjectWeightRecord};
+
+/** Readiness trigger — fires on any health_events write. */
+export {healthReadinessProjectHealthEvent};
+
+/** Readiness trigger — fires on any nutrition_plans write. */
+export {healthReadinessProjectNutritionPlan};
+
+/** Readiness trigger — fires on any operational_restrictions write. */
+export {healthReadinessProjectRestriction};
+
+
+// =============================================================================
+// HEALTH-V1-OP-AUTH — Enforcement operacional de restrições (Gate B)
+// =============================================================================
+
+/**
+ * Deps reais do mutation owner de associação operacional de K9.
+ *
+ * AUTORIZAÇÃO DO CALLER: preserva o modelo factual vigente. Turno NÃO é gated
+ * por capability de perfil — não existe módulo `shifts` em `AccessModule`, e as
+ * Rules autorizam hoje apenas via `emailMatchesRa(ra)`, isto é, "o operador age
+ * sobre o próprio RA". Reproduzimos exatamente isso: identidade sempre derivada
+ * do token, nunca do payload, então um cliente não abre turno no RA de outro.
+ * Introduzir aqui uma capability inexistente negaria a operação a todos os
+ * condutores reais.
+ *
+ * ACESSO AO K9: `requireDogRecordAccess` é reutilizada, não reimplementada. Vale
+ * notar uma assimetria real: uma de suas três vias é "ter turno ativo com o
+ * cão", que no `start_shift` ainda não existe. Logo, quem inicia turno passa
+ * pelas outras duas vias (escopo global ou ser o condutor vinculado ao K9) —
+ * exatamente como as Rules já se comportam hoje para este caso.
+ */
+function buildShiftAuthorizationDeps() {
+  return {
+    db,
+    requireShiftActor: async (
+      auth: CallableRequest["auth"],
+    ): Promise<ShiftActor> => {
+      const caller = requireAuth(auth);
+      if (!caller.ra) {
+        throw new HttpsError(
+          "permission-denied",
+          "RA do operador não pôde ser resolvido.",
+        );
+      }
+      return {
+        uid: caller.uid,
+        ra: caller.ra,
+        email: caller.email,
+        name: caller.name,
+      };
+    },
+    requireDogAccess: async (
+      auth: CallableRequest["auth"],
+      actor: ShiftActor,
+      dogId: string,
+    ): Promise<void> => {
+      const dogSnap = await db.collection("dogs").doc(dogId).get();
+      if (!dogSnap.exists) {
+        throw new HttpsError("not-found", "Cao nao encontrado.");
+      }
+      await requireDogRecordAccess(
+        auth,
+        {
+          uid: actor.uid,
+          email: actor.email,
+          ra: actor.ra,
+          name: actor.name,
+        },
+        dogId,
+        dogSnap.data() ?? {},
+      );
+    },
+    createEngineDeps: () => createAdminShiftEngineDeps(db),
+  };
+}
+
+/**
+ * Executa uma ação operacional crítica com K9 sob guard canônico de restrições.
+ *
+ * Ações: `start_shift`, `switch_dog`, `assume_vehicle` — todas as que podem
+ * INTRODUZIR ou SUBSTITUIR o K9 operacional. A autoridade é
+ * `dogs/{dogId}/operational_restrictions` com `status == active`, consultada
+ * dentro da mesma transação que aplica a mutação. `health_summary/current` NÃO
+ * participa da decisão (ADR-005 §13).
+ */
+export const shiftExecuteAuthorizedCommand = onCall({region}, async (request) => {
+  const handler = buildShiftAuthorizedCommandHandler(
+    buildShiftAuthorizationDeps(),
+  );
+  return handler(request);
+});
+
+
+// =============================================================================
+// Health Timeline — Triggers + Scheduler (Gate 5C.5C.5)
+//
+// Local code — NOT DEPLOYED.
+// Triggers require retry: true for the approved transient-failure taxonomy.
+// Scheduler uses INITIAL ACTIVATION CONFIG (not SLA):
+//   - 03:00 America/Sao_Paulo — aligned with existing backend patterns
+//   - 1 bounded page per pass — anti-starvation guarantee
+//   - 10 min lease — conservative for 8 sequential pages
+// No production reconciliation until indexes + rules are deployed and READY.
+// =============================================================================
+
+const healthTimelineClock: import("./health_timeline_runtime").RuntimeClock = {
+  now: () => new Date(),
+};
+
+const healthTimelineRuntime = new FirestoreHealthTimelineRuntime(
+  db,
+  healthTimelineClock,
+  {
+    info: (message, context) => logger.info(message, context ?? {}),
+    warn: (message, context) => logger.warn(message, context ?? {}),
+    error: (message, context) => logger.error(message, context ?? {}),
+  },
+);
+
+const healthTimelineAnomalySink = new FirestoreAnomalySink(
+  db,
+  healthTimelineClock,
+);
+
+const healthTimelineTriggerDeps: import("./health_timeline_trigger_handlers").TriggerHandlerDependencies = {
+  projector: healthTimelineRuntime,
+  anomalySink: healthTimelineAnomalySink,
+  clock: healthTimelineClock,
+  logger: {
+    info: (message, context) => logger.info(message, context ?? {}),
+    warn: (message, context) => logger.warn(message, context ?? {}),
+    error: (message, context) => logger.error(message, context ?? {}),
+  },
+};
+
+/**
+ * HealthTimeline MealLog projection trigger.
+ *
+ * Firestore path: dogs/{dogId}/meal_logs/{mealId}
+ * Region: southamerica-east1
+ * Retry: enabled (transient failure taxonomy requires it)
+ */
+export const healthTimelineProjectMealLogCreated = onDocumentCreated(
+  {
+    document: "dogs/{dogId}/meal_logs/{mealId}",
+    region,
+    retry: true,
+  },
+  healthTimelineProjectMealLogCreatedWrapper(healthTimelineTriggerDeps),
+);
+
+/**
+ * HealthTimeline SupplementLog projection trigger.
+ *
+ * Firestore path: dogs/{dogId}/supplement_logs/{supplementLogId}
+ * Region: southamerica-east1
+ * Retry: enabled (transient failure taxonomy requires it)
+ */
+export const healthTimelineProjectSupplementLogCreated = onDocumentCreated(
+  {
+    document: "dogs/{dogId}/supplement_logs/{supplementLogId}",
+    region,
+    retry: true,
+  },
+  healthTimelineProjectSupplementLogCreatedWrapper(healthTimelineTriggerDeps),
+);
+
+/**
+ * HealthTimeline daily reconciliation scheduler.
+ *
+ * Region: southamerica-east1
+ * Schedule: every day at 03:00 America/Sao_Paulo
+ *   (aligned with existing backend temporal patterns and lower administrative activity —
+ *    K9 night shift 19h–07h remains operational; this is not a downtime window claim)
+ * Retry: default (intentional — reconciliation is idempotent, lease-protected,
+ *   cursor-committed, and stale-fenced; the default retry behavior is safe)
+ *
+ * Activation guard: HEALTH_TIMELINE_RECONCILIATION_ENABLED must be exactly "true"
+ * to allow reconciliation. Any other value (absent, "false", invalid) is fail-closed:
+ * the handler logs a structured no-op event and returns successfully without touching
+ * Firestore. This allows structural deployment during Stage D while keeping Stage E
+ * as the controlled first-execution gate.
+ */
+export const healthTimelineReconcileDaily = onSchedule(
+  {
+    region,
+    schedule: "every day 03:00",
+    timeZone: "America/Sao_Paulo",
+  },
+  async () => {
+    const guard = readActivationGuard();
+    if (!guard.enabled) {
+      logger.info("health_timeline_reconciliation_skipped", {
+        event: "health_timeline_reconciliation_skipped",
+        reason: "activation_guard_disabled",
+        enabled: false,
+        function: "healthTimelineReconcileDaily",
+      });
+      return;
+    }
+    await runHealthTimelineReconciliation(
+      db,
+      DEFAULT_ORCHESTRATOR_CONFIG,
+      healthTimelineClock,
+      {
+        info: (message, context) => logger.info(message, context ?? {}),
+        warn: (message, context) => logger.warn(message, context ?? {}),
+        error: (message, context) => logger.error(message, context ?? {}),
+      },
+      healthTimelineRuntime,
+    );
+  },
+);
+
+export const healthTimelineRecordShadowTelemetry = onCall(
+  {
+    region,
+    timeoutSeconds: 10,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const writer =
+      new FirestoreHealthTimelineShadowTelemetryAggregateWriter(db);
+    return runHealthTimelineRecordShadowTelemetry(request, {
+      recordAggregate: (plan) => writer.recordAggregate(plan),
+      now: () => new Date(),
+    });
   },
 );
