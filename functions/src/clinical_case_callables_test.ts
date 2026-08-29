@@ -4742,9 +4742,27 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
     updated_at: "2026-08-01T00:00:00Z",
   };
   const summaryPath = "dogs/dog-1/health_summary/current";
+  const initialTimelineEntry: JsonMap = {
+    timeline_type: "vaccine",
+    title: "Initial vaccine",
+    created_at: "2026-08-01T00:00:00Z",
+  };
+  const timelinePath = "dogs/dog-1/health_timeline/existing-sentinel";
   const db = dbWithDog({
     [summaryPath]: initialSummary,
+    [timelinePath]: initialTimelineEntry,
   });
+
+  const getTimelineDocs = (): Record<string, unknown> => {
+    const entries: Record<string, unknown> = {};
+    for (const [k, v] of db._store.entries()) {
+      if (k.startsWith("dogs/dog-1/health_timeline/")) {
+        entries[k] = JSON.parse(JSON.stringify(v));
+      }
+    }
+    return entries;
+  };
+
   const openRes = (await runHealthOpenClinicalCase(
     mockRequest(validOpen),
     depsFor({db, now: FIXED_NOW}),
@@ -4756,8 +4774,10 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
   const initialLastEventAt = initialCase.last_event_at;
   const initialOpeningEventId = initialCase.opening_event_id;
 
+  const beforeTimeline = getTimelineDocs();
+
   // Run transition
-  await runHealthTransitionClinicalCase(
+  const transRes = await runHealthTransitionClinicalCase(
     mockRequest({
       dogId: "dog-1",
       caseId,
@@ -4766,6 +4786,14 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
       destination: "under_investigation",
     }),
     depsFor({db, now: T1}),
+  );
+  assert.ok(transRes);
+
+  const afterTransitionTimeline = getTimelineDocs();
+  assert.deepStrictEqual(
+    afterTransitionTimeline,
+    beforeTimeline,
+    "Projeção de timeline (health_timeline) não pode ser mutada por transição de caso clínico",
   );
 
   // Run discharge
@@ -4815,6 +4843,14 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
     finalSummary,
     initialSummary,
     "Resumo de prontidão (health_summary/current) não pode ser mutado por operações de ciclo de vida do caso clínico",
+  );
+
+  // Verify health timeline was NOT mutated/created across all lifecycle operations
+  const finalTimeline = getTimelineDocs();
+  assert.deepStrictEqual(
+    finalTimeline,
+    beforeTimeline,
+    "Projeção de timeline (health_timeline) não pode ser mutada por operações de ciclo de vida do caso clínico",
   );
 }
 
