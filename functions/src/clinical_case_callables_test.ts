@@ -1600,6 +1600,37 @@ const caseOf = (db: {_store: Map<string, JsonMap>}, p: string): JsonMap =>
 const auditKeys = (db: {_store: Map<string, JsonMap>}): string[] =>
   [...db._store.keys()].filter((k) => k.startsWith("auditLogs/"));
 
+/**
+ * The audit record of ONE lifecycle command, located by its persisted
+ * `metadata.operation_id`.
+ *
+ * Deliberately NOT located by `action`: keying the lookup on the very field
+ * under test is circular — a corrupted action would simply not be found, and
+ * the assertion would report a missing document instead of the wrong value.
+ *
+ * Deliberately NOT located by audit document id either: `caseAuditDocId` hashes
+ * the `CLINICAL_CASE_*_OPERATION` constant, which is a SEPARATE value from the
+ * persisted `action`. The id — and therefore the audit count — stays correct
+ * even when `action` names the wrong command, so neither can serve as proof of
+ * action semantics.
+ */
+const lifecycleAuditOf = (
+  db: {_store: Map<string, JsonMap>},
+  operationId: string,
+): JsonMap => {
+  const found = auditKeys(db)
+    .map((k) => db._store.get(k) as JsonMap)
+    .filter(
+      (a) => ((a.metadata ?? {}) as JsonMap).operation_id === operationId,
+    );
+  assert.strictEqual(
+    found.length,
+    1,
+    `exatamente 1 audit de ciclo de vida para ${operationId}`,
+  );
+  return found[0];
+};
+
 const opKeys = (
   db: {_store: Map<string, JsonMap>},
   casePath: string,
@@ -3879,6 +3910,13 @@ async function testLifecycleTransitionActiveMatrix(): Promise<void> {
   const opsAfterT1 = opKeys(db, casePath).length;
   const auditsAfterT1 = auditKeys(db).length;
 
+  // A transição bem-sucedida deve registrar EXATAMENTE a ação da transição.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-t1").action,
+    "clinical_case_transitioned",
+    "TRANSITION: audit.action deve ser clinical_case_transitioned",
+  );
+
   // Replay t1 com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const t1Replay = await runHealthTransitionClinicalCase(
     mockRequest({
@@ -4092,6 +4130,13 @@ async function testLifecycleDischarge(): Promise<void> {
   const opsAfterDischarge = opKeys(db, casePath).length;
   const auditsAfterDischarge = auditKeys(db).length;
 
+  // A alta bem-sucedida deve registrar EXATAMENTE a ação de alta.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-dc-1").action,
+    "clinical_case_discharged",
+    "DISCHARGE: audit.action deve ser clinical_case_discharged",
+  );
+
   // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const dReplay = await runHealthDischargeClinicalCase(
     mockRequest({
@@ -4204,6 +4249,13 @@ async function testLifecycleCancelCase(): Promise<void> {
   const caseAfterCancel = {...caseOf(db, casePath)};
   const opsAfterCancel = opKeys(db, casePath).length;
   const auditsAfterCancel = auditKeys(db).length;
+
+  // O cancelamento bem-sucedido deve registrar EXATAMENTE a ação de cancelamento.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-cc-1").action,
+    "clinical_case_cancelled",
+    "CANCEL: audit.action deve ser clinical_case_cancelled",
+  );
 
   // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const cReplay = await runHealthCancelClinicalCase(
@@ -4361,6 +4413,13 @@ async function testLifecycleReopen(): Promise<void> {
   const caseAfterReopen = {...caseOf(db, casePath)};
   const opsAfterReopen = opKeys(db, casePath).length;
   const auditsAfterReopen = auditKeys(db).length;
+
+  // A reabertura bem-sucedida deve registrar EXATAMENTE a ação de reabertura.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-reopen-1").action,
+    "clinical_case_reopened",
+    "REOPEN: audit.action deve ser clinical_case_reopened",
+  );
 
   // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
   const rReplay = await runHealthReopenClinicalCase(
