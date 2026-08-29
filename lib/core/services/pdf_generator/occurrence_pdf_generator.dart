@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
-import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -85,10 +84,6 @@ class OccurrencePdfGenerator {
     final media = await _buildMediaItems(sortedEvents);
     final finalizationMedia = await _buildFinalizationMediaItems(occurrence);
 
-    // Mapas sequenciais para evitar pico de memória (tiles + composição)
-    final staticMapImage = await _buildStaticMapImage(occurrence);
-    final displacementMapImage = await _buildDisplacementMapImage(locations);
-
     // Carregar aditamentos (se houver)
     final amendments = await AmendmentRepository().listByOccurrence(
       occurrence.id,
@@ -104,8 +99,13 @@ class OccurrencePdfGenerator {
       fonts: fonts,
       media: media,
       finalizationMedia: finalizationMedia,
-      staticMapImage: staticMapImage,
-      displacementMapImage: displacementMapImage,
+      // FF-OCC-05: o PDF não solicita basemap externo. O provider passou a
+      // sobrepor "API KEY REQUIRED" em tiles cartográficos válidos, e não há
+      // como distinguir tile limpo de tile carimbado no transporte. As duas
+      // seções usam sempre o mapa esquemático, que é determinístico e
+      // independente de rede.
+      staticMapImage: null,
+      displacementMapImage: null,
       locations: locations,
       amendments: amendments,
       integrityVerdict: integrityVerdict,
@@ -319,37 +319,9 @@ class OccurrencePdfGenerator {
     );
   }
 
-  /// Gera mapa estático OSM para a página de localização (ponto único).
-  Future<pw.ImageProvider?> _buildStaticMapImage(Occurrence occurrence) async {
-    final lat = occurrence.gpsLat;
-    final lng = occurrence.gpsLng;
-    if (lat == null || lng == null) return null;
-
-    final generator = OsmStaticMapGenerator();
-    try {
-      final bytes = await generator.generateSinglePointMap(lat, lng);
-      if (bytes == null) return null;
-      return pw.MemoryImage(bytes);
-    } finally {
-      generator.dispose();
-    }
-  }
-
-  /// Gera mapa estático OSM com múltiplos pinos numerados para o deslocamento.
-  Future<pw.ImageProvider?> _buildDisplacementMapImage(
-    List<OccurrenceLocation> locations,
-  ) async {
-    if (locations.isEmpty) return null;
-
-    final generator = OsmStaticMapGenerator();
-    try {
-      final bytes = await generator.generateDisplacementMap(locations);
-      if (bytes == null) return null;
-      return pw.MemoryImage(bytes);
-    } finally {
-      generator.dispose();
-    }
-  }
+  // FF-OCC-05: os helpers que baixavam tiles de basemap foram removidos. O PDF
+  // não tem mais nenhum caminho de runtime capaz de contatar um provider
+  // externo de mapas.
 
   String _buildDocId(Occurrence occ) {
     final seq = occ.id.length >= 4
